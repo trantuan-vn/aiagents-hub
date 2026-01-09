@@ -14,7 +14,7 @@ export const OrderSchema = z.object({
   currency: z.string().default('VND'),
   appliedVoucherCode: z.string().optional(),
   notes: z.string().optional(),
-  internalNotes: z.string().optional(),
+  internalNotes: z.string().optional().nullable(),
 });
 
 export const OrderItemSchema = z.object({

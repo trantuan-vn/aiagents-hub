@@ -1,0 +1,99 @@
+{
+  "fields": [
+    {
+      "name": "orderCode",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "subtotalAmount",
+      "type": "float64",
+      "required": true
+    },
+    {
+      "name": "discountAmount",
+      "type": "float64",
+      "required": false
+    },
+    {
+      "name": "finalAmount",
+      "type": "float64",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "currency",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "appliedVoucherCode",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "notes",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "internalNotes",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "globalId",
+      "type": "int64",
+      "required": false
+    },
+    {
+      "name": "id",
+      "type": "int64",
+      "required": false
+    },
+    {
+      "name": "createdAt",
+      "type": "float64",
+      "required": false
+    },
+    {
+      "name": "updatedAt",
+      "type": "float64",
+      "required": false
+    },
+    {
+      "name": "userId",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "organizationId",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "queueId",
+      "type": "int64",
+      "required": false
+    },
+    {
+      "name": "queueStatus",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "flushedAt",
+      "type": "float64",
+      "required": false
+    },
+    {
+      "name": "processedAt",
+      "type": "float64",
+      "required": false
+    }
+  ]
+}

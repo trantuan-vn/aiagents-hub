@@ -4,5 +4,7 @@
 			"path": "."
 		}
 	],
-	"settings": {}
+	"settings": {
+		"python.defaultInterpreterPath": "${workspaceFolder}/workers/python-workers/aggregation-worker/.venv/bin/python"
+	}
 }

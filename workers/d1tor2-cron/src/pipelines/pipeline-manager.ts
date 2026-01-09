@@ -268,28 +268,16 @@ export class PipelineManager {
 
 		// Nếu có API service, kiểm tra xem schema đã có pipeline chưa
 		if (this.apiService) {
-			try {
-				// Kiểm tra xem pipeline đã tồn tại cho schema này chưa
-				const pipelineExists = await this.apiService.pipelineExistsForSchema(config.schemaName, config.tableName);
-				
-				if (!pipelineExists) {
-					// Nếu chưa có pipeline, tạo pipeline, stream, sink và cập nhật endpoint
-					console.log(`Schema ${config.schemaName} chưa có pipeline, đang tạo mới...`);
-				} else {
-					console.log(`Schema ${config.schemaName} đã có pipeline, đang kiểm tra endpoint...`);
-				}
-
-				// Đảm bảo pipeline tồn tại và lấy endpoint (tạo mới nếu cần)
-				const endpoint = await this.apiService.ensurePipelineExists(config);
-				if (endpoint) {
-					// Lưu endpoint vào cache
-					this.endpointCache.set(config.schemaName, endpoint);
-					console.log(`Pipeline cho schema ${config.schemaName} đã sẵn sàng với endpoint: ${endpoint}`);
-					return;
-				}
-			} catch (error) {
-				console.warn(`Failed to ensure pipeline exists for schema ${config.schemaName}:`, error);
-				// Tiếp tục với việc lấy endpoint từ env/config (đã check ở trên)
+			// Đảm bảo pipeline tồn tại và lấy endpoint (tạo mới nếu cần)
+			const endpoint = await this.apiService.ensurePipelineExists(config);
+			if (endpoint) {
+				// Lưu endpoint vào cache
+				this.endpointCache.set(config.schemaName, endpoint);
+				console.log(`Pipeline cho schema ${config.schemaName} đã sẵn sàng với endpoint: ${endpoint}`);
+				return;
+			}
+			else {
+				throw new Error(`Pipeline for schema ${config.schemaName} does not exist`);
 			}
 		}
 	}
@@ -387,7 +375,7 @@ export class PipelineManager {
 					const batchLength = batch.length;
 
 					// Tạo promise để xử lý batch này song song
-					const processPromise = this.processBatch(config, targetDate, batch, currentOffset)
+					const processPromise = this.processBatch(config, batch, currentOffset)
 						.then((processed) => {
 							console.log(`  Completed batch at offset ${currentOffset}: ${batchLength} records`);
 							return processed;
@@ -447,52 +435,70 @@ export class PipelineManager {
 	 */
 	private async processBatch(
 		config: PipelineConfig,
-		targetDate: Date,
-		batch: any[],
+		batch: any[],               // Có thể thay bằng type cụ thể nếu bạn có
 		offset: number
-	): Promise<number> {
-		console.log(`  Processing batch at offset ${offset}: ${batch.length} records...`);
-
-		// 1. Lưu record IDs để xóa sau khi đẩy thành công
-		const recordIds = batch.map((record: any) => record.id).filter((id: any) => id != null);
-
-		// 2. Validate và transform dữ liệu theo Zod schema
-		const validatedRecords = this.validateRecords(batch, config.schema);
-
-		// 3. Gửi data đến Cloudflare Pipeline HTTP endpoint
-		// Data sẽ được pipeline xử lý và lưu vào R2 Data Catalog dưới dạng Iceberg table
-		await this.sendToPipeline(config, validatedRecords);
-
-		// 4. Sau khi đẩy thành công, xóa dữ liệu khỏi D1
-		if (recordIds.length > 0) {
-			await this.deleteBatchFromD1(config.tableName, targetDate, recordIds);
+	  ): Promise<number> {
+		const batchSize = batch.length;
+	  
+		console.log(`Processing batch at offset ${offset}: ${batchSize} records...`);
+	  
+		// 1. Nếu batch rỗng → không làm gì cả, trả về sớm
+		if (batchSize === 0) {
+		  console.log('Batch is empty, skipping processing.');
+		  return 0;
 		}
+	  
+		let recordIds: number[] = []; 
+	  
+		try {
+		  // 2. Lấy danh sách ID để xóa sau (chỉ lấy những record có id hợp lệ)
+		  recordIds = batch
+			.map((record: any) => record.globalId);
+	  
+		  console.log(`Found ${recordIds.length} valid record IDs for potential deletion.`);
+	  
+		  // 3. Validate và transform dữ liệu theo Zod schema
+		  const validatedRecords = this.validateRecords(batch, config.schema);
+	  
+		  // Kiểm tra lại sau validate: nếu không còn record nào hợp lệ
+		  if (validatedRecords.length != batchSize) {
+			throw new Error(`Invalid records: ${validatedRecords.length} of ${batchSize} records failed validation.`);
+		  } else {
+			console.log(`Sending ${validatedRecords.length} validated records to pipeline ${config.schemaName}...`);	  
+			// 4. Gửi đến Cloudflare Pipeline (sẽ throw error nếu fail)
+			const sentSuccessfully = await this.sendToPipeline(config, validatedRecords);
+			if (!sentSuccessfully) {
+				throw new Error(`Failed to send data to pipeline ${config.schemaName}.`);
+			}
+			console.log('Successfully sent data to pipeline.');
+			await this.deleteBatchFromD1(config.tableName, recordIds);
+			console.log(`Deleted ${recordIds.length} records from D1.`);
 
-		return batch.length;
+		  }
+	  
+		  return batchSize;
+		} catch (error: any) {
+		  // 6. Quan trọng: Nếu gửi pipeline thất bại → KHÔNG xóa data khỏi D1
+		  //     Để lần sync sau sẽ thử lại
+		  console.error(
+			`Failed to process batch at offset ${offset}. Data will NOT be deleted from D1 to allow retry.`,
+			error
+		  );
+	  
+		  // Có thể re-throw để caller biết batch này fail (tùy cách bạn handle lỗi tổng thể)
+		  throw error;
+		}
 	}
 
 	/**
 	 * Xóa một batch records từ D1 database (sau khi đã đẩy lên R2 thành công)
 	 */
-	private async deleteBatchFromD1(tableName: string, targetDate: Date, recordIds: string[]): Promise<void> {
-		if (recordIds.length === 0) {
-			return;
-		}
-
-		// Tính timestamp cho đầu và cuối ngày đích
-		const startOfDay = new Date(targetDate);
-		startOfDay.setHours(0, 0, 0, 0);
-		const endOfDay = new Date(targetDate);
-		endOfDay.setHours(23, 59, 59, 999);
-
-		const startTimestamp = Math.floor(startOfDay.getTime());
-		const endTimestamp = Math.floor(endOfDay.getTime());
-
+	private async deleteBatchFromD1(tableName: string, recordIds: number[]): Promise<void> {
 		try {
 			// Xóa batch records
 			const placeholders = recordIds.map(() => '?').join(',');
-			const query = `DELETE FROM ${tableName} WHERE id IN (${placeholders}) AND created_at >= ? AND created_at <= ?`;
-			const params = [...recordIds, startTimestamp, endTimestamp];
+			const query = `DELETE FROM ${tableName} WHERE globalId IN (${placeholders})`;
+			const params = [...recordIds];
 			
 			await this.db.prepare(query).bind(...params).run();
 			console.log(`  Deleted ${recordIds.length} records from ${tableName}`);
@@ -515,7 +521,7 @@ export class PipelineManager {
 	 * Format: POST https://{stream-id}.ingest.cloudflare.com
 	 * Body: JSON array of records
 	 */
-	private async sendToPipeline(config: PipelineConfig, records: any[]): Promise<void> {
+	private async sendToPipeline(config: PipelineConfig, records: any[]): Promise<boolean> {
 		// Lấy pipeline endpoint từ cache, config hoặc environment variable
 		let endpoint = this.endpointCache.get(config.schemaName) || config.pipelineEndpoint;
 		
@@ -551,6 +557,7 @@ export class PipelineManager {
 		const response = await fetch(endpoint, {
 			method: 'POST',
 			headers: {
+				'Authorization': `Bearer ${this.apiToken}`,
 				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify(records),
@@ -560,11 +567,15 @@ export class PipelineManager {
 			const errorText = await response.text().catch(() => 'Unknown error');
 			throw new Error(
 				`Failed to send data to pipeline ${config.schemaName}: ` +
-				`${response.status} ${response.statusText}. ${errorText}`
+				`${response.status} ${response.statusText}. ${errorText}` + 
+				`Endpoint: ${endpoint}; ` +
+				`Records: ${JSON.stringify(records)}`				
 			);
 		}
 
 		console.log(`  Sent ${records.length} records to pipeline ${config.schemaName} (endpoint: ${endpoint})`);
+
+		return true
 	}
 
 	/**
@@ -576,6 +587,7 @@ export class PipelineManager {
 		const errors: string[] = [];
 
 		for (let i = 0; i < records.length; i++) {
+			console.log(`Validating record ${i}:`, JSON.stringify(records[i]));
 			const result = schema.safeParse(records[i]);
 			if (result.success) {
 				validatedRecords.push(result.data);

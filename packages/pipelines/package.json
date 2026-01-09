@@ -1,0 +1,30 @@
+{
+  "name": "@api-services/pipelines",
+  "version": "1.0.0",
+  "description": "CLI tool to export pipeline schemas and create Cloudflare Pipelines",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "pipeline-cli": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "export-schemas": "tsx src/index.ts export",
+    "create-pipelines": "tsx src/index.ts create"
+  },
+  "private": true,
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.3"
+  },
+  "files": [
+    "dist"
+  ]
+}
+

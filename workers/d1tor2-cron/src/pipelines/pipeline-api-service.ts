@@ -146,6 +146,10 @@ export class CloudflarePipelineAPIService {
                         type: 'parquet',
                         compression: 'zstd',
                     },
+                    http: {
+                        authentication: true,
+                        enabled: true,
+                    },
                     schema: schema,
                 }),
             });
@@ -177,10 +181,11 @@ export class CloudflarePipelineAPIService {
         sinkName: string, 
         bucketName: string, 
         namespace: string, 
-        tableName: string
+        tableName: string,
+        schema: PipelineSchema
     ): Promise<void> {
         const endpoint = `/accounts/${this.accountId}/pipelines/v1/sinks`;
-        
+                
         try {
             await this.makeRequest(endpoint, {
                 method: 'POST',
@@ -194,11 +199,17 @@ export class CloudflarePipelineAPIService {
                         bucket: bucketName,
                         namespace: namespace,
                         table_name: tableName,                        
+                        rolling_policy: {
+                            file_size_bytes: 64 * 1024 * 1024,    // 64MB/file
+                            interval_seconds: 300,        // Hoặc 5 phút/file
+                            inactivity_seconds: 300        // Hoặc 5 phút không có log
+                        }
                     },
                     format: {
                         type: 'parquet',
                         compression: 'zstd',
-                    }
+                    }, 
+                    schema: schema,
                 }),
             });
 
@@ -282,8 +293,9 @@ export class CloudflarePipelineAPIService {
     async ensurePipelineExists(config: PipelineConfig): Promise<string> {
         const pipelineName = config.tableName;
         const streamName = `${pipelineName}_stream`;
+        /*
+        // do api phần này chưa hoàn chỉnh nên tạm bỏ qua
         const sinkName = `${pipelineName}_sink`;
-
         console.log(`Ensuring pipeline exists for schema ${config.schemaName}, table: ${pipelineName}`);
 
         // Kiểm tra pipeline đã tồn tại chưa
@@ -299,7 +311,7 @@ export class CloudflarePipelineAPIService {
         const sinkExists = await this.sinkExists(sinkName);
         if (!sinkExists) {
             console.log(`Creating sink: ${sinkName}`);
-            await this.createSink(sinkName, config.r2BucketName, config.namespace, config.tableName);
+            await this.createSink(sinkName, config.r2BucketName, config.namespace, config.tableName, config.pipelineSchema);
         } else {
             console.log(`Sink ${sinkName} already exists`);
         }
@@ -322,7 +334,10 @@ export class CloudflarePipelineAPIService {
             console.log(`Creating pipeline: ${pipelineName}`);
             await this.createPipeline(pipelineName, streamName, sinkName);
         }
-
+        console.log(`✓ Pipeline setup complete for ${config.schemaName}`);
+        console.log(`  Stream ID: ${streamId || 'unknown'}`);
+        console.log(`  Endpoint: ${endpoint}`);
+        */
         // 4. Lấy endpoint cuối cùng
         const endpoint = await this.getPipelineEndpoint(streamName);
         
@@ -330,17 +345,13 @@ export class CloudflarePipelineAPIService {
             throw new Error(`Failed to get endpoint for schema ${config.schemaName}`);
         }
 
-        console.log(`✓ Pipeline setup complete for ${config.schemaName}`);
-        console.log(`  Stream ID: ${streamId || 'unknown'}`);
-        console.log(`  Endpoint: ${endpoint}`);
-
         return endpoint;
     }
 
     /**
      * Kiểm tra xem pipeline đã tồn tại cho schema chưa
      */
-    async pipelineExistsForSchema(schemaName: string, tableName: string): Promise<boolean> {
+    async pipelineExistsForSchema(tableName: string): Promise<boolean> {
         return this.pipelineExists(tableName);
     }
 }
