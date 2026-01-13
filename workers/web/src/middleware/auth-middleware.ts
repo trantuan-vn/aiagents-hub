@@ -3,16 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getUserFromToken } from "@/data/users";
 
 export async function authMiddleware(req: NextRequest) {
-
   const { pathname } = req.nextUrl;
-  const user = await getUserFromToken(req.cookies.get("token")?.value, req.cookies.get("refreshToken")?.value);
-  const isLoggedIn = !!user;
+  // Get cookies from request
+  const cookies = req.cookies;
 
-  console.log("=== DEBUG INFO ===");
-  console.log("pathname:", pathname);
-  console.log("isLoggedIn:", isLoggedIn);
-  console.log("pathname.startsWith('/dashboard'):", pathname.startsWith("/dashboard"));
-  console.log("!isLoggedIn && pathname.startsWith('/dashboard'):", !isLoggedIn && pathname.startsWith("/dashboard"));
+  const token = cookies.get("token")?.value;
+  const refreshToken = cookies.get("refreshToken")?.value;
+  const sessionId = cookies.get("sessionId")?.value;
+
+  const user = await getUserFromToken(token, refreshToken, sessionId);
+  const isLoggedIn = !!user;
 
   if (!isLoggedIn && pathname.startsWith("/dashboard")) {
     console.log(`Redirecting to login page due to unauthenticated request to ${pathname}`);

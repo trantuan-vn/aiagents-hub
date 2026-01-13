@@ -18,7 +18,7 @@ export function GithubButton({ className, ...props }: React.ComponentProps<typeo
 
   const handleGithubLogin = async () => {
     try {
-      const response = await fetch("https://api.unitoken.trade/auth/oauth/github/url");
+      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/github/url");
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

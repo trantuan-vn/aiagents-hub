@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -13,7 +13,10 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NonceSchema = z.object({
-  nonce: z.string().min(1).regex(/^[a-zA-Z0-9]+$/, "Nonce chỉ được chứa chữ cái và số"),
+  nonce: z
+    .string()
+    .min(1)
+    .regex(/^[a-zA-Z0-9]+$/, "Nonce chỉ được chứa chữ cái và số"),
 });
 
 export function WalletConnectButton({ className, ...props }: React.ComponentProps<typeof Button>) {
@@ -24,14 +27,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   const chainId = useChainId() || 1;
   const [isSigning, setIsSigning] = useState(false);
 
-  useEffect(() => {
-    if (isConnected && address) {
-      console.log("Đã kết nối địa chỉ:", address);
-      handlePostConnection();
-    }
-  }, [isConnected, address]);
-
-  const handlePostConnection = async () => {
+  const handlePostConnection = useCallback(async () => {
     setIsSigning(true);
 
     try {
@@ -88,15 +84,15 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       // Thông báo đang xác minh chữ ký
       toast.info("Đang xác minh chữ ký...");
 
-      const connectResponse = await fetch("https://api.unitoken.trade/auth/wallet/connect", {
+      const connectResponse = await fetch("https://api.unitoken.trade/dashboard/auth/wallet/connect", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Origin": window.location.origin
+          Origin: window.location.origin,
         },
         body: JSON.stringify({
           message,
-          signature: signature.startsWith("0x") ? signature : `0x${signature}`
+          signature: signature.startsWith("0x") ? signature : `0x${signature}`,
         }),
         credentials: "include",
       });
@@ -109,7 +105,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
 
       toast.success("Kết nối ví thành công!");
       router.push("/");
-
     } catch (error) {
       console.error("Lỗi sau kết nối:", error);
 
@@ -127,7 +122,14 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     } finally {
       setIsSigning(false);
     }
-  };
+  }, [address, chainId, signMessageAsync, router]);
+
+  useEffect(() => {
+    if (isConnected && address) {
+      console.log("Đã kết nối địa chỉ:", address);
+      handlePostConnection();
+    }
+  }, [isConnected, address, handlePostConnection]);
 
   const handleWalletConnectLogin = async () => {
     if (isConnected && address) {
@@ -182,7 +184,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       disabled={isConnecting || isSigning}
       {...props}
     >
-      <img src="/walletconnect.svg" className="h-4 w-4 mr-2" alt="WalletConnect" />
+      <img src="/walletconnect.svg" className="mr-2 h-4 w-4" alt="WalletConnect" />
       {getButtonText()}
     </Button>
   );

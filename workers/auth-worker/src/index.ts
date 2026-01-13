@@ -45,7 +45,7 @@ function createRoutes(bindingName: string) {
   routes.use('/dashboard/*', createAuthMiddleware(bindingName));  
   routes.use('/dashboard/*', createVersionCheckMiddleware(bindingName));  
     
-  // sub routes /auth
+  // sub routes /auth 
   routes.route('/dashboard/auth', createAuthRoutes(bindingName));  
   routes.route('/dashboard/ws', createDashboardWebSocketRoutes(bindingName));  
   routes.route('/dashboard/token', createTokenRoutes(bindingName)); 

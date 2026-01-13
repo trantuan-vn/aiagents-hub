@@ -184,7 +184,7 @@ export const otpUtils = {
 export const cookieUtils = {
   setCookieWithOption(c: Context, name: string, value: string, maxAge: number) {
     const cookieOptions = {
-      sameSite: 'strict' as const, 
+      sameSite: 'lax' as const, 
       httpOnly: true,
       secure: true,
       path: '/',
@@ -199,7 +199,7 @@ export const cookieUtils = {
       path: '/',
       domain: '.unitoken.trade',
       secure: true,
-      sameSite: 'strict' as const,
+      sameSite: 'lax' as const,
       httpOnly: true,
     };
     
@@ -260,35 +260,35 @@ export const oauthUtils = {
         clientSecret: googleClientSecret,
         tokenEndpoint: 'https://oauth2.googleapis.com/token',
         userInfoEndpoint: 'https://www.googleapis.com/oauth2/v3/userinfo',
-        redirectUri: `${env?.BASE_URL || ""}/api/oauth/google/callback`
+        redirectUri: `${env?.BASE_URL || ""}/dashboard/auth/oauth/google/callback`
       },
       apple: {
         clientId: appleClientId,
         clientSecret: appleClientSecret,
         tokenEndpoint: 'https://appleid.apple.com/auth/token',
         userInfoEndpoint: 'https://appleid.apple.com/auth/userinfo',
-        redirectUri: `${env?.BASE_URL || ""}/api/oauth/apple/callback`
+        redirectUri: `${env?.BASE_URL || ""}/dashboard/auth/oauth/apple/callback`
       },
       facebook: {
         clientId: facebookClientId,
         clientSecret: facebookClientSecret,
         tokenEndpoint: 'https://graph.facebook.com/v18.0/oauth/access_token',
         userInfoEndpoint: 'https://graph.facebook.com/me?fields=id,name,email',
-        redirectUri: `${env?.BASE_URL || ""}/api/oauth/facebook/callback`
+        redirectUri: `${env?.BASE_URL || ""}/dashboard/auth/oauth/facebook/callback`
       },
       github: {
         clientId: githubClientId,
         clientSecret: githubClientSecret,
         tokenEndpoint: 'https://github.com/login/oauth/access_token',
         userInfoEndpoint: 'https://api.github.com/user',
-        redirectUri: `${env?.BASE_URL || ""}/api/oauth/github/callback`
+        redirectUri: `${env?.BASE_URL || ""}/dashboard/auth/oauth/github/callback`
       },
       twitter: {
         clientId: twitterClientId,
         clientSecret: twitterClientSecret,
         tokenEndpoint: 'https://api.x.com/2/oauth2/token',
         userInfoEndpoint: 'https://api.x.com/2/users/me',
-        redirectUri: `${env?.BASE_URL || ""}/api/oauth/twitter/callback`
+        redirectUri: `${env?.BASE_URL || ""}/dashboard/auth/oauth/twitter/callback`
       }
     };
 

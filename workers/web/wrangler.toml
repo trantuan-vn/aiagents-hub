@@ -3,6 +3,9 @@ name = "beta-trading-sto"
 compatibility_date = "2025-03-25"
 compatibility_flags = ["nodejs_compat"]
 
+[observability]
+enabled = true
+
 [vars]
 NEXT_PUBLIC_DEBUG = "true"
 

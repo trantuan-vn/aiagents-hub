@@ -18,7 +18,7 @@ export function GoogleButton({ className, ...props }: React.ComponentProps<typeo
 
   const handleGoogleLogin = async () => {
     try {
-      const response = await fetch("https://api.unitoken.trade/auth/oauth/google/url");
+      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/google/url");
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

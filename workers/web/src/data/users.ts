@@ -1,50 +1,69 @@
-import { verifyJWT } from "@/lib/utils";
-
 export interface User {
   id: string;
   identifier: string;
 }
 
-// Helper function to process token verification
-const verifyToken = async (t: string): Promise<User | null> => {
-  const jwtSecret = process.env.JWT_SECRET;
-  if (!jwtSecret) {
-    console.error("JWT_SECRET is not defined in environment variables");
-    return null;
+interface UserProfileResponse {
+  id?: string;
+  identifier?: string;
+  address?: string;
+}
+
+function buildCookieHeader(
+  token: string | undefined,
+  refreshToken: string | undefined,
+  sessionId: string | undefined,
+): string {
+  const cookieParts: string[] = [];
+  if (token) cookieParts.push(`token=${token}`);
+  if (refreshToken) cookieParts.push(`refreshToken=${refreshToken}`);
+  if (sessionId) cookieParts.push(`sessionId=${sessionId}`);
+  return cookieParts.join("; ");
+}
+
+function parseUserProfile(data: UserProfileResponse): User | null {
+  if (data.id && data.identifier) {
+    return {
+      id: data.id,
+      identifier: data.identifier,
+    };
   }
-
-  const result = await verifyJWT(t, jwtSecret);
-  if (!result.ok || !result.payload) {
-    console.error(result.error ?? "Token verification failed");
-    return null;
-  }
-
-  const { sub, identifier } = result.payload;
-  if (!sub || !identifier) {
-    console.error("Missing required payload fields");
-    return null;
-  }
-
-  return { id: sub, identifier };
-};
-
-export async function getUserFromToken(token?: string, refreshToken?: string): Promise<User | null> {
-
-  if (!token && !refreshToken) {
-    console.error("Both token and refresh token are missing");
-    return null;
-  }
-
-  // Try token first, then refreshToken if token fails
-  if (token) {
-    const user = await verifyToken(token);
-    if (user) return user;
-  }
-
-  if (refreshToken) {
-    const user = await verifyToken(refreshToken);
-    if (user) return user;
-  }
-
   return null;
+}
+
+export async function getUserFromToken(
+  token: string | undefined,
+  refreshToken: string | undefined,
+  sessionId: string | undefined,
+): Promise<User | null> {
+  try {
+    if (!token) {
+      return null;
+    }
+
+    const cookieHeader = buildCookieHeader(token, refreshToken, sessionId);
+    const apiUrl = process.env.AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
+    const response = await fetch(`${apiUrl}/profile/me`, {
+      method: "GET",
+      headers: {
+        Cookie: cookieHeader,
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        return null;
+      }
+      console.error(`Failed to get user profile: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data: UserProfileResponse = await response.json();
+    return parseUserProfile(data);
+  } catch (error) {
+    console.error("Error getting user from token:", error);
+    return null;
+  }
 }

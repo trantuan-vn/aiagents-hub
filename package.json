@@ -19,7 +19,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250528.0",
     "typescript": "^5.8.3",
-    "wrangler": "^4.37.1"
+    "wrangler": "^4.58.0"
   },
   "keywords": [],
   "author": "",

@@ -24,6 +24,7 @@ export function createAuthRoutes(bindingName: string) {
       try {
         if (requireOriginCheck) {
           const origin = c.req.header('origin') || c.req.header('referer');
+          console.log(`origin: ${origin}, frontend_url: ${c.env.FRONTEND_URL}`);
           if (!origin?.startsWith(c.env.FRONTEND_URL)) {
             throw new Error('Invalid origin');
           }
@@ -99,7 +100,7 @@ export function createAuthRoutes(bindingName: string) {
 
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.redirect(c.env.FRONTEND_URL);
-  }, "OAuth callback failed", true));
+  }, "OAuth callback failed"));
 
   // II. OTP Routes
   app.post('/otp/request', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
@@ -121,7 +122,7 @@ export function createAuthRoutes(bindingName: string) {
 
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
-  }, "OTP verification failed", true));
+  }, "OTP verification failed"));
 
   // III. Wallet Routes
   app.get('/wallet/nonce', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
@@ -144,7 +145,7 @@ export function createAuthRoutes(bindingName: string) {
 
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
-  }, "Wallet connection failed", true));
+  }, "Wallet connection failed"));
 
   // IV. Profile Routes
   app.post('/profile/logout', async (c) => {

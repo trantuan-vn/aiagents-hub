@@ -38,6 +38,13 @@ const nextConfig = {
       };
     }
 
+    // Handle React Native modules that MetaMask SDK tries to import
+    // Use false to ignore the module (webpack will treat it as non-existent)
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@react-native-async-storage/async-storage': false,
+    };
+
     return config;
   },
 
@@ -48,7 +55,6 @@ const nextConfig = {
       '@radix-ui/react-icons',
       '@heroicons/react/24/outline',
     ],
-    optimizeFonts: true,
   },
 
   // Logging configuration
@@ -56,8 +62,7 @@ const nextConfig = {
     fetches: {
       fullUrl: true,
     },
-  },
-  optimizeFonts: true,  
+  },  
 }
 
 export default withNextIntl(nextConfig);

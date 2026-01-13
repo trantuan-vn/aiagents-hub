@@ -15,7 +15,9 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 
 // Custom debounce function
-function debounce<T extends(...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
+/* eslint-disable space-before-function-paren */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
 
   return (...args: Parameters<T>) => {
@@ -33,10 +35,9 @@ const FormSchema = z.object({
   username: z
     .string()
     .min(1, { message: "Please enter your email or phone number." })
-    .refine(
-      (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^\+?\d{10,15}$/.test(value),
-      { message: "Please enter a valid email or phone number." }
-    ),
+    .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^\+?\d{10,15}$/.test(value), {
+      message: "Please enter a valid email or phone number.",
+    }),
   remember: z.boolean().optional(),
 });
 
@@ -95,7 +96,7 @@ export function LoginForm() {
 
     setIsLoading(true);
     try {
-      const response = await fetch("https://api.unitoken.trade/auth/otp/verify", {
+      const response = await fetch("https://api.unitoken.trade/dashboard/auth/otp/verify", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -122,46 +123,43 @@ export function LoginForm() {
         setIsLoading(false);
       }
     }
-  }, [otp, identifier, form]);
+  }, [otp, identifier, form, router]);
 
   // Handle form submission
-  const onSubmit = useCallback(
-    async (data: z.infer<typeof FormSchema>) => {
-      if (!isMounted.current) return;
-      setIsLoading(true);
-      try {
-        const requestResponse = await fetch("https://api.unitoken.trade/auth/otp/request", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            identifier: data.username.trim(),
-          }),
-        });
+  const onSubmit = useCallback(async (data: z.infer<typeof FormSchema>) => {
+    if (!isMounted.current) return;
+    setIsLoading(true);
+    try {
+      const requestResponse = await fetch("https://api.unitoken.trade/dashboard/auth/otp/request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          identifier: data.username.trim(),
+        }),
+      });
 
-        if (!requestResponse.ok) {
-          const errorMessage = await getErrorMessage(requestResponse);
-          throw new Error(errorMessage);
-        }
-
-        if (isMounted.current) {
-          setIdentifier(data.username.trim());
-          setShowOtpPopup(true);
-          toast.success("OTP has been sent to your email/phone");
-        }
-      } catch (error) {
-        if (isMounted.current) {
-          toast.error(error instanceof Error ? error.message : "Failed to send OTP. Please try again.");
-        }
-      } finally {
-        if (isMounted.current) {
-          setIsLoading(false);
-        }
+      if (!requestResponse.ok) {
+        const errorMessage = await getErrorMessage(requestResponse);
+        throw new Error(errorMessage);
       }
-    },
-    []
-  );
+
+      if (isMounted.current) {
+        setIdentifier(data.username.trim());
+        setShowOtpPopup(true);
+        toast.success("OTP has been sent to your email/phone");
+      }
+    } catch (error) {
+      if (isMounted.current) {
+        toast.error(error instanceof Error ? error.message : "Failed to send OTP. Please try again.");
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
   // Debounced OTP input handler
   const handleOtpChange = useCallback(
@@ -171,7 +169,7 @@ export function LoginForm() {
         setOtp(numericValue);
       }
     }, 300),
-    []
+    [],
   );
 
   return (
@@ -235,7 +233,7 @@ export function LoginForm() {
         <DialogContent className="sm:max-w-md" aria-describedby="otp-dialog-description">
           <DialogHeader>
             <DialogTitle>Enter OTP Code</DialogTitle>
-            <div id="otp-dialog-description" className="text-sm text-muted-foreground">
+            <div id="otp-dialog-description" className="text-muted-foreground text-sm">
               We have sent a 6-digit verification code to: <strong>{identifier}</strong>
             </div>
           </DialogHeader>
@@ -251,7 +249,7 @@ export function LoginForm() {
                 maxLength={6}
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="text-center text-lg font-mono tracking-widest"
+                className="text-center font-mono text-lg tracking-widest"
                 aria-required="true"
               />
             </div>
