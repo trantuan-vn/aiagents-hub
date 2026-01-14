@@ -25,6 +25,7 @@ export interface NavSubItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  adminOnly?: boolean;
 }
 
 export interface NavMainItem {
@@ -35,6 +36,7 @@ export interface NavMainItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  adminOnly?: boolean;
 }
 
 export interface NavGroup {
@@ -57,11 +59,13 @@ export const sidebarItems: NavGroup[] = [
         title: "CRM",
         url: "/dashboard/crm",
         icon: ChartBar,
+        adminOnly: true,
       },
       {
         title: "Finance",
         url: "/dashboard/finance",
         icon: Banknote,
+        adminOnly: true,
       },
       {
         title: "Analytics",
@@ -161,3 +165,29 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
 ];
+
+// Helper function to filter sidebar items based on user role
+export function filterSidebarItemsByRole(items: NavGroup[], userRole?: "member" | "admin"): NavGroup[] {
+  const isAdmin = userRole === "admin";
+
+  return items.map(group => ({
+    ...group,
+    items: group.items
+      .filter(item => {
+        // Filter out admin-only items if user is not admin
+        if (item.adminOnly && !isAdmin) {
+          return false;
+        }
+        // Filter subItems as well
+        if (item.subItems) {
+          item.subItems = item.subItems.filter(subItem => {
+            if (subItem.adminOnly && !isAdmin) {
+              return false;
+            }
+            return true;
+          });
+        }
+        return true;
+      })
+  }));
+}

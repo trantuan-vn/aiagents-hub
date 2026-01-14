@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { PlusCircleIcon, MailIcon, ChevronRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,18 +32,22 @@ interface NavMainProps {
   readonly items: readonly NavGroup[];
 }
 
-const IsComingSoon = () => (
-  <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
+const IsComingSoon = ({ t }: { t: (key: string) => string }) => (
+  <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">{t("coming_soon")}</span>
 );
 
 const NavItemExpanded = ({
   item,
   isActive,
   isSubmenuOpen,
+  t,
+  translateTitle,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
+  t: (key: string) => string;
+  translateTitle: (title: string) => string;
 }) => {
   return (
     <Collapsible key={item.title} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
@@ -55,8 +60,8 @@ const NavItemExpanded = ({
               tooltip={item.title}
             >
               {item.icon && <item.icon />}
-              <span>{item.title}</span>
-              {item.comingSoon && <IsComingSoon />}
+              <span>{translateTitle(item.title)}</span>
+              {item.comingSoon && <IsComingSoon t={t} />}
               <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
             </SidebarMenuButton>
           ) : (
@@ -68,8 +73,8 @@ const NavItemExpanded = ({
             >
               <Link href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon />}
-                <span>{item.title}</span>
-                {item.comingSoon && <IsComingSoon />}
+                <span>{translateTitle(item.title)}</span>
+                {item.comingSoon && <IsComingSoon t={t} />}
               </Link>
             </SidebarMenuButton>
           )}
@@ -82,8 +87,8 @@ const NavItemExpanded = ({
                   <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
                     <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                       {subItem.icon && <subItem.icon />}
-                      <span>{subItem.title}</span>
-                      {subItem.comingSoon && <IsComingSoon />}
+                      <span>{translateTitle(subItem.title)}</span>
+                      {subItem.comingSoon && <IsComingSoon t={t} />}
                     </Link>
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -99,9 +104,13 @@ const NavItemExpanded = ({
 const NavItemCollapsed = ({
   item,
   isActive,
+  t,
+  translateTitle,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  t: (key: string) => string;
+  translateTitle: (title: string) => string;
 }) => {
   return (
     <SidebarMenuItem key={item.title}>
@@ -113,7 +122,7 @@ const NavItemCollapsed = ({
             isActive={isActive(item.url, item.subItems)}
           >
             {item.icon && <item.icon />}
-            <span>{item.title}</span>
+            <span>{translateTitle(item.title)}</span>
             <ChevronRight />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
@@ -129,8 +138,8 @@ const NavItemCollapsed = ({
               >
                 <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                   {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
-                  <span>{subItem.title}</span>
-                  {subItem.comingSoon && <IsComingSoon />}
+                  <span>{translateTitle(subItem.title)}</span>
+                  {subItem.comingSoon && <IsComingSoon t={t} />}
                 </Link>
               </SidebarMenuSubButton>
             </DropdownMenuItem>
@@ -142,8 +151,39 @@ const NavItemCollapsed = ({
 };
 
 export function NavMain({ items }: NavMainProps) {
+  const t = useTranslations("Sidebar");
   const path = usePathname();
   const { state, isMobile } = useSidebar();
+
+  // Translation mapping for sidebar items
+  const translateTitle = (title: string): string => {
+    const translationMap: Record<string, string> = {
+      Dashboards: t("dashboards"),
+      Pages: t("pages"),
+      Misc: t("misc"),
+      Default: t("default"),
+      CRM: t("crm"),
+      Finance: t("finance"),
+      Analytics: t("analytics"),
+      "E-commerce": t("ecommerce"),
+      Academy: t("academy"),
+      Logistics: t("logistics"),
+      Email: t("email"),
+      Chat: t("chat"),
+      Calendar: t("calendar"),
+      Kanban: t("kanban"),
+      Invoice: t("invoice"),
+      Users: t("users"),
+      Roles: t("roles"),
+      Authentication: t("authentication"),
+      "Login v1": t("login_v1"),
+      "Login v2": t("login_v2"),
+      "Register v1": t("register_v1"),
+      "Register v2": t("register_v2"),
+      Others: t("others"),
+    };
+    return translationMap[title] || title;
+  };
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -163,11 +203,11 @@ export function NavMain({ items }: NavMainProps) {
           <SidebarMenu>
             <SidebarMenuItem className="flex items-center gap-2">
               <SidebarMenuButton
-                tooltip="Quick Create"
+                tooltip={t("quick_create")}
                 className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
               >
                 <PlusCircleIcon />
-                <span>Quick Create</span>
+                <span>{t("quick_create")}</span>
               </SidebarMenuButton>
               <Button
                 size="icon"
@@ -175,7 +215,7 @@ export function NavMain({ items }: NavMainProps) {
                 variant="outline"
               >
                 <MailIcon />
-                <span className="sr-only">Inbox</span>
+                <span className="sr-only">{t("inbox")}</span>
               </Button>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -183,7 +223,7 @@ export function NavMain({ items }: NavMainProps) {
       </SidebarGroup>
       {items.map((group) => (
         <SidebarGroup key={group.id}>
-          {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+          {group.label && <SidebarGroupLabel>{translateTitle(group.label)}</SidebarGroupLabel>}
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               {group.items.map((item) => {
@@ -200,18 +240,33 @@ export function NavMain({ items }: NavMainProps) {
                         >
                           <Link href={item.url} target={item.newTab ? "_blank" : undefined}>
                             {item.icon && <item.icon />}
-                            <span>{item.title}</span>
+                            <span>{translateTitle(item.title)}</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
                   }
                   // Otherwise, render the dropdown as before
-                  return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} />;
+                  return (
+                    <NavItemCollapsed
+                      key={item.title}
+                      item={item}
+                      isActive={isItemActive}
+                      t={t}
+                      translateTitle={translateTitle}
+                    />
+                  );
                 }
                 // Expanded view
                 return (
-                  <NavItemExpanded key={item.title} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} />
+                  <NavItemExpanded
+                    key={item.title}
+                    item={item}
+                    isActive={isItemActive}
+                    isSubmenuOpen={isSubmenuOpen}
+                    t={t}
+                    translateTitle={translateTitle}
+                  />
                 );
               })}
             </SidebarMenu>

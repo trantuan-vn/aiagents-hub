@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { headers } from "next/headers";
 
 import { NextIntlClientProvider } from "next-intl";
+import { getMessages } from "next-intl/server";
 import { cookieToInitialState } from "wagmi";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -24,10 +25,10 @@ export const metadata: Metadata = {
   description: APP_CONFIG.meta.description,
 };
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-
   const themeMode = await getPreference<ThemeMode>("theme_mode", THEME_MODE_VALUES, "light");
   const themePreset = await getPreference<ThemePreset>("theme_preset", THEME_PRESET_VALUES, "default");
   const locale = await getPreference<Locale>("locale", LOCALE_VALUES, "en-US");
+  const messages = await getMessages();
   const cookieHeader = (await headers()).get("cookie");
   const initialState = cookieToInitialState(config, cookieHeader);
 
@@ -49,7 +50,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className={`${inter.className} min-h-screen antialiased`}>
         <PreferencesStoreProvider themeMode={themeMode} themePreset={themePreset} locale={locale}>
-          <NextIntlClientProvider>
+          <NextIntlClientProvider locale={locale} messages={messages}>
             <AuthProvider initialState={initialState}>
               {children}
               <Toaster />

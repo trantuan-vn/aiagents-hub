@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { UserPen, CircleUser, CreditCard, MessageSquareDot, LogOut, LogIn } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useDisconnect, useAccount } from "wagmi";
 
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,8 @@ import {
 import { SidebarMenu, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { User } from "@/data/users";
 
-export function NavUser({
-  user,
-}: {
-  readonly user: User | null;
-}) {
+export function NavUser({ user }: { readonly user: User | null }) {
+  const t = useTranslations("AccountSwitcher");
   const { isMobile } = useSidebar();
   const { disconnect } = useDisconnect();
   const { isConnected } = useAccount();
@@ -77,24 +75,25 @@ export function NavUser({
 
   const menuItems = user
     ? [
-        { title: "Account", icon: CircleUser, url: "/account" },
-        { title: "Billing", icon: CreditCard, url: "/billing" },
-        { title: "Notifications", icon: MessageSquareDot, url: "/notifications" },
-        { title: "Log out", icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogout },
+        { title: t("account"), icon: CircleUser, url: "/account" },
+        { title: t("billing"), icon: CreditCard, url: "/billing" },
+        { title: t("notifications"), icon: MessageSquareDot, url: "/notifications" },
+        { title: t("log_out"), icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogout },
       ]
-    : [{ title: "Log In", icon: LogIn, url: "/login" }];
+    : [{ title: t("log_in"), icon: LogIn, url: "/login" }];
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="icon" disabled={isLoggingOut}>
-              <UserPen />
-            </Button>
-          </DropdownMenuTrigger>
+        <div className="flex items-center gap-2 w-full">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon" disabled={isLoggingOut}>
+                <UserPen />
+              </Button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg space-y-1"
+            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 space-y-1 rounded-lg"
             side={isMobile ? "bottom" : "right"}
             align="end"
             sideOffset={4}
@@ -103,8 +102,8 @@ export function NavUser({
               <>
                 <DropdownMenuGroup>
                   {menuItems.slice(0, -1).map((item, index) => (
-                    <DropdownMenuItem key={index}>
-                      <Link href={item.url} className="flex items-center w-full">
+                    <DropdownMenuItem key={`menu-${index}`}>
+                      <Link href={item.url} className="flex w-full items-center">
                         <item.icon className="mr-2 h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
@@ -115,20 +114,20 @@ export function NavUser({
                 <DropdownMenuItem disabled={isLoggingOut}>
                   <button
                     onClick={menuItems[menuItems.length - 1].onClick}
-                    className="flex items-center w-full"
+                    className="flex w-full items-center"
                     disabled={isLoggingOut}
                   >
                     {(() => {
                       const Icon = menuItems[menuItems.length - 1].icon;
                       return <Icon className="mr-2 h-4 w-4" />;
                     })()}
-                    <span>{isLoggingOut ? "Logging out..." : menuItems[menuItems.length - 1].title}</span>
+                    <span>{isLoggingOut ? t("logging_out") : menuItems[menuItems.length - 1].title}</span>
                   </button>
                 </DropdownMenuItem>
               </>
             ) : (
               <DropdownMenuItem>
-                <Link href={menuItems[0].url} className="flex items-center w-full">
+                <Link href={menuItems[0].url} className="flex w-full items-center">
                   {(() => {
                     const Icon = menuItems[0].icon;
                     return <Icon className="mr-2 h-4 w-4" />;
@@ -139,6 +138,13 @@ export function NavUser({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
+        {user && (
+          <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+            <div className="text-sm font-medium truncate">{user.identifier}</div>
+            <div className="text-xs text-muted-foreground capitalize">{user.role ?? "member"}</div>
+          </div>
+        )}
+        </div>
       </SidebarMenuItem>
     </SidebarMenu>
   );

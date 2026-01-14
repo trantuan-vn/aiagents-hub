@@ -1,5 +1,6 @@
 import { ColumnDef } from "@tanstack/react-table";
 import { CircleCheck, Loader, EllipsisVertical } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -22,7 +23,8 @@ import { DataTableColumnHeader } from "../../../../../components/data-table/data
 import { sectionSchema } from "./schema";
 import { TableCellViewer } from "./table-cell-viewer";
 
-export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
+export function getDashboardColumns(t: (key: string) => string): ColumnDef<z.infer<typeof sectionSchema>>[] {
+  return [
   {
     id: "select",
     header: ({ table }) => (
@@ -48,7 +50,7 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
   },
   {
     accessorKey: "header",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Header" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("header")} />,
     cell: ({ row }) => {
       return <TableCellViewer item={row.original} />;
     },
@@ -56,7 +58,7 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
   },
   {
     accessorKey: "type",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Section Type" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("section_type")} />,
     cell: ({ row }) => (
       <div className="w-32">
         <Badge variant="outline" className="text-muted-foreground px-1.5">
@@ -68,35 +70,38 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
   },
   {
     accessorKey: "status",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-    cell: ({ row }) => (
-      <Badge variant="outline" className="text-muted-foreground px-1.5">
-        {row.original.status === "Done" ? (
-          <CircleCheck className="stroke-border fill-green-500 dark:fill-green-400" />
-        ) : (
-          <Loader />
-        )}
-        {row.original.status}
-      </Badge>
-    ),
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("status")} />,
+    cell: ({ row }) => {
+      const statusText = row.original.status === "Done" ? t("done") : row.original.status;
+      return (
+        <Badge variant="outline" className="text-muted-foreground px-1.5">
+          {row.original.status === "Done" ? (
+            <CircleCheck className="stroke-border fill-green-500 dark:fill-green-400" />
+          ) : (
+            <Loader />
+          )}
+          {statusText}
+        </Badge>
+      );
+    },
     enableSorting: false,
   },
   {
     accessorKey: "target",
-    header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title="Target" />,
+    header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title={t("target")} />,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
           e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
+            loading: `${t("saving")} ${row.original.header}`,
+            success: t("done"),
+            error: t("error"),
           });
         }}
       >
         <Label htmlFor={`${row.original.id}-target`} className="sr-only">
-          Target
+          {t("target")}
         </Label>
         <Input
           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
@@ -109,20 +114,20 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
   },
   {
     accessorKey: "limit",
-    header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title="Limit" />,
+    header: ({ column }) => <DataTableColumnHeader className="w-full text-right" column={column} title={t("limit")} />,
     cell: ({ row }) => (
       <form
         onSubmit={(e) => {
           e.preventDefault();
           toast.promise(new Promise((resolve) => setTimeout(resolve, 1000)), {
-            loading: `Saving ${row.original.header}`,
-            success: "Done",
-            error: "Error",
+            loading: `${t("saving")} ${row.original.header}`,
+            success: t("done"),
+            error: t("error"),
           });
         }}
       >
         <Label htmlFor={`${row.original.id}-limit`} className="sr-only">
-          Limit
+          {t("limit")}
         </Label>
         <Input
           className="hover:bg-input/30 focus-visible:bg-background dark:hover:bg-input/30 dark:focus-visible:bg-input/30 h-8 w-16 border-transparent bg-transparent text-right shadow-none focus-visible:border dark:bg-transparent"
@@ -135,9 +140,10 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
   },
   {
     accessorKey: "reviewer",
-    header: ({ column }) => <DataTableColumnHeader column={column} title="Reviewer" />,
+    header: ({ column }) => <DataTableColumnHeader column={column} title={t("reviewer")} />,
     cell: ({ row }) => {
-      const isAssigned = row.original.reviewer !== "Assign reviewer";
+      const assignReviewerText = t("assign_reviewer");
+      const isAssigned = row.original.reviewer !== "Assign reviewer" && row.original.reviewer !== assignReviewerText;
 
       if (isAssigned) {
         return row.original.reviewer;
@@ -146,7 +152,7 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
       return (
         <>
           <Label htmlFor={`${row.original.id}-reviewer`} className="sr-only">
-            Reviewer
+            {t("reviewer")}
           </Label>
           <Select>
             <SelectTrigger
@@ -154,7 +160,7 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
               size="sm"
               id={`${row.original.id}-reviewer`}
             >
-              <SelectValue placeholder="Assign reviewer" />
+              <SelectValue placeholder={assignReviewerText} />
             </SelectTrigger>
             <SelectContent align="end">
               <SelectItem value="Eddie Lake">Eddie Lake</SelectItem>
@@ -177,14 +183,15 @@ export const dashboardColumns: ColumnDef<z.infer<typeof sectionSchema>>[] = [
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-32">
-          <DropdownMenuItem>Edit</DropdownMenuItem>
-          <DropdownMenuItem>Make a copy</DropdownMenuItem>
-          <DropdownMenuItem>Favorite</DropdownMenuItem>
+          <DropdownMenuItem>{t("edit")}</DropdownMenuItem>
+          <DropdownMenuItem>{t("make_a_copy")}</DropdownMenuItem>
+          <DropdownMenuItem>{t("favorite")}</DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive">Delete</DropdownMenuItem>
+          <DropdownMenuItem variant="destructive">{t("delete")}</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     ),
     enableSorting: false,
   },
 ];
+}

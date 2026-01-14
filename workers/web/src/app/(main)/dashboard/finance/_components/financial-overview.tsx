@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowDownLeft, ArrowUpRight, CalendarCheck } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,39 +25,41 @@ const chartData = [
   { month: "Dec", scheduled: 2100, expenses: 4100, income: 9500 },
 ];
 
-const chartConfig = {
-  scheduled: {
-    label: "Scheduled",
-    color: "var(--chart-1)",
-  },
-  expenses: {
-    label: "Expenses",
-    color: "var(--chart-2)",
-  },
-  income: {
-    label: "Income",
-    color: "var(--chart-3)",
-  },
-} as ChartConfig;
-
 export function FinancialOverview() {
+  const t = useTranslations("Finance");
+
+  const chartConfig = {
+    scheduled: {
+      label: t("scheduled"),
+      color: "var(--chart-1)",
+    },
+    expenses: {
+      label: t("expenses"),
+      color: "var(--chart-2)",
+    },
+    income: {
+      label: t("income"),
+      color: "var(--chart-3)",
+    },
+  } as ChartConfig;
+
   const totalIncome = chartData.reduce((acc, item) => acc + item.income, 0);
   const totalExpenses = chartData.reduce((acc, item) => acc + item.expenses, 0);
   const totalScheduled = chartData.reduce((acc, item) => acc + item.scheduled, 0);
   return (
     <Card className="shadow-xs">
       <CardHeader>
-        <CardTitle>Financial Overview</CardTitle>
-        <CardDescription>Track your income, expenses, and scheduled amounts at a glance.</CardDescription>
+        <CardTitle>{t("financial_overview")}</CardTitle>
+        <CardDescription>{t("track_income_expenses")}</CardDescription>
         <CardAction>
           <Select defaultValue="last-year">
             <SelectTrigger>
-              <SelectValue placeholder="Select period" />
+              <SelectValue placeholder={t("select_period")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="last-year">Last Year</SelectItem>
-              <SelectItem value="last-month">Last Month</SelectItem>
-              <SelectItem value="ytd">Year to Date</SelectItem>
+              <SelectItem value="last-year">{t("last_year")}</SelectItem>
+              <SelectItem value="last-month">{t("last_month")}</SelectItem>
+              <SelectItem value="ytd">{t("year_to_date")}</SelectItem>
             </SelectContent>
           </Select>
         </CardAction>
@@ -69,7 +72,7 @@ export function FinancialOverview() {
               <ArrowDownLeft className="stroke-chart-1 size-6" />
             </div>
             <div>
-              <p className="text-muted-foreground text-xs uppercase">Income</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("income")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(totalIncome, { noDecimals: true })}</p>
             </div>
           </div>
@@ -79,7 +82,7 @@ export function FinancialOverview() {
               <ArrowUpRight className="stroke-chart-2 size-6" />
             </div>
             <div>
-              <p className="text-muted-foreground text-xs uppercase">Expenses</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("expenses")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(totalExpenses, { noDecimals: true })}</p>
             </div>
           </div>
@@ -89,7 +92,7 @@ export function FinancialOverview() {
               <CalendarCheck className="stroke-chart-3 size-6" />
             </div>
             <div>
-              <p className="text-muted-foreground text-xs uppercase">Scheduled</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("scheduled")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(totalScheduled, { noDecimals: true })}</p>
             </div>
           </div>

@@ -2,27 +2,65 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getUserFromToken } from "@/data/users";
 
-export async function authMiddleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  // Get cookies from request
-  const cookies = req.cookies;
+function requiresAdminAccess(pathname: string): boolean {
+  return pathname.startsWith("/dashboard/crm") || pathname.startsWith("/dashboard/finance");
+}
 
+function handleUnauthenticatedDashboard(req: NextRequest, pathname: string): NextResponse {
+  console.log(`Redirecting to login page due to unauthenticated request to ${pathname}`);
+  return NextResponse.redirect(new URL("/auth/v3/login", req.url));
+}
+
+function handleInsufficientPermissions(req: NextRequest, pathname: string): NextResponse {
+  console.log(`Redirecting to default dashboard due to insufficient permissions for ${pathname}`);
+  return NextResponse.redirect(new URL("/dashboard/default", req.url));
+}
+
+function handleAuthenticatedLogin(req: NextRequest): NextResponse {
+  console.log(`Redirecting to dashboard due to authenticated request to /auth/v3/login`);
+  return NextResponse.redirect(new URL("/dashboard", req.url));
+}
+
+async function validateUserAuthentication(req: NextRequest) {
+  const cookies = req.cookies;
   const token = cookies.get("token")?.value;
   const refreshToken = cookies.get("refreshToken")?.value;
   const sessionId = cookies.get("sessionId")?.value;
 
   const user = await getUserFromToken(token, refreshToken, sessionId);
-  const isLoggedIn = !!user;
+  return { user, isLoggedIn: !!user };
+}
 
+function handleDashboardAccess(
+  req: NextRequest,
+  pathname: string,
+  isLoggedIn: boolean,
+  user: any,
+): NextResponse | null {
   if (!isLoggedIn && pathname.startsWith("/dashboard")) {
-    console.log(`Redirecting to login page due to unauthenticated request to ${pathname}`);
-    return NextResponse.redirect(new URL("/auth/v3/login", req.url));
+    return handleUnauthenticatedDashboard(req, pathname);
   }
 
-  if (isLoggedIn && pathname === "/auth/v3/login") {
-    console.log(`Redirecting to dashboard due to authenticated request to ${pathname}`);
-    return NextResponse.redirect(new URL("/dashboard", req.url));
+  if (isLoggedIn && requiresAdminAccess(pathname) && user.role !== "admin") {
+    return handleInsufficientPermissions(req, pathname);
   }
+
+  return null;
+}
+
+export async function authMiddleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  const { user, isLoggedIn } = await validateUserAuthentication(req);
+
+  // Handle dashboard access
+  const dashboardResult = handleDashboardAccess(req, pathname, isLoggedIn, user);
+  if (dashboardResult) return dashboardResult;
+
+  // Handle authenticated user trying to access login page
+  if (isLoggedIn && pathname === "/auth/v3/login") {
+    return handleAuthenticatedLogin(req);
+  }
+
   console.log(`Auth middleware: Request to ${pathname} is ${isLoggedIn ? "" : "not"} authenticated.`);
   return NextResponse.next();
 }

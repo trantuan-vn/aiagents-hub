@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { XAxis, Label, Pie, PieChart, Bar, BarChart, CartesianGrid, LabelList, YAxis } from "recharts";
 
 import { Button } from "@/components/ui/button";
@@ -14,13 +15,14 @@ import {
 } from "./crm.config";
 
 export function InsightCards() {
+  const t = useTranslations("CRM");
   const totalLeads = leadsBySourceChartData.reduce((acc, curr) => acc + curr.leads, 0);
 
   return (
     <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-5">
       <Card className="col-span-1 xl:col-span-2">
         <CardHeader>
-          <CardTitle>Leads by Source</CardTitle>
+          <CardTitle>{t("leads_by_source")}</CardTitle>
         </CardHeader>
         <CardContent className="max-h-48">
           <ChartContainer config={leadsBySourceChartConfig} className="size-full">
@@ -56,7 +58,7 @@ export function InsightCards() {
                             {totalLeads.toLocaleString()}
                           </tspan>
                           <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 24} className="fill-muted-foreground">
-                            Leads
+                            {t("leads")}
                           </tspan>
                         </text>
                       );
@@ -87,17 +89,17 @@ export function InsightCards() {
         </CardContent>
         <CardFooter className="gap-2">
           <Button size="sm" variant="outline" className="basis-1/2">
-            View Full Report
+            {t("view_full_report")}
           </Button>
           <Button size="sm" variant="outline" className="basis-1/2">
-            Download CSV
+            {t("download_csv")}
           </Button>
         </CardFooter>
       </Card>
 
       <Card className="col-span-1 xl:col-span-3">
         <CardHeader>
-          <CardTitle>Project Revenue vs. Target</CardTitle>
+          <CardTitle>{t("project_revenue_vs_target")}</CardTitle>
         </CardHeader>
         <CardContent className="size-full max-h-52">
           <ChartContainer config={projectRevenueChartConfig} className="size-full">
@@ -146,7 +148,7 @@ export function InsightCards() {
           </ChartContainer>
         </CardContent>
         <CardFooter>
-          <p className="text-muted-foreground text-xs">Average progress: 78% · 2 projects above target</p>
+          <p className="text-muted-foreground text-xs">{t("average_progress")}</p>
         </CardFooter>
       </Card>
     </div>

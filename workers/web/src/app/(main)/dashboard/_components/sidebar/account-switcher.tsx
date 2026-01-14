@@ -5,7 +5,8 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { BadgeCheck, Bell, CreditCard, LogOut, LogIn, UserPen } from "lucide-react";
-import { useDisconnect, useAccount } from 'wagmi';
+import { useTranslations } from "next-intl";
+import { useDisconnect, useAccount } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -18,11 +19,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/data/users";
 
-export function AccountSwitcher({
-  user,
-}: {
-  readonly user: User | null;
-}) {
+export function AccountSwitcher({ user }: { readonly user: User | null }) {
+  const t = useTranslations("AccountSwitcher");
   const { disconnect } = useDisconnect();
   const { isConnected } = useAccount();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -67,7 +65,6 @@ export function AccountSwitcher({
       } else {
         console.error("Logout failed");
       }
-
     } catch (error) {
       console.error("Error during logout:", error);
       window.location.href = "/";
@@ -78,12 +75,12 @@ export function AccountSwitcher({
 
   const menuItems = user
     ? [
-        { title: "Account", icon: BadgeCheck, url: "/account" },
-        { title: "Billing", icon: CreditCard, url: "/billing" },
-        { title: "Notifications", icon: Bell, url: "/notifications" },
-        { title: "Log out", icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogoutWithCheck },
+        { title: t("account"), icon: BadgeCheck, url: "/account" },
+        { title: t("billing"), icon: CreditCard, url: "/billing" },
+        { title: t("notifications"), icon: Bell, url: "/notifications" },
+        { title: t("log_out"), icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogoutWithCheck },
       ]
-    : [{ title: "Log In", icon: LogIn, url: "/" }];
+    : [{ title: t("log_in"), icon: LogIn, url: "/" }];
 
   return (
     <DropdownMenu>
@@ -92,18 +89,13 @@ export function AccountSwitcher({
           <UserPen />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent
-        className="min-w-56 space-y-1 rounded-lg"
-        side="bottom"
-        align="end"
-        sideOffset={4}
-      >
+      <DropdownMenuContent className="min-w-56 space-y-1 rounded-lg" side="bottom" align="end" sideOffset={4}>
         {user ? (
           <>
             <DropdownMenuGroup>
               {menuItems.slice(0, -1).map((item, index) => (
-                <DropdownMenuItem key={index}>
-                  <Link href={item.url} className="flex items-center w-full">
+                <DropdownMenuItem key={`menu-${index}`}>
+                  <Link href={item.url} className="flex w-full items-center">
                     <item.icon className="mr-2 h-4 w-4" />
                     <span>{item.title}</span>
                   </Link>
@@ -114,22 +106,20 @@ export function AccountSwitcher({
             <DropdownMenuItem disabled={isLoggingOut}>
               <button
                 onClick={menuItems[menuItems.length - 1].onClick}
-                className="flex items-center w-full"
+                className="flex w-full items-center"
                 disabled={isLoggingOut}
               >
                 {(() => {
                   const Icon = menuItems[menuItems.length - 1].icon;
                   return <Icon className="mr-2 h-4 w-4" />;
                 })()}
-                <span>
-                  {isLoggingOut ? "Logging out..." : menuItems[menuItems.length - 1].title}
-                </span>
+                <span>{isLoggingOut ? t("logging_out") : menuItems[menuItems.length - 1].title}</span>
               </button>
             </DropdownMenuItem>
           </>
         ) : (
           <DropdownMenuItem>
-            <Link href={menuItems[0].url} className="flex items-center w-full">
+            <Link href={menuItems[0].url} className="flex w-full items-center">
               {(() => {
                 const Icon = menuItems[0].icon;
                 return <Icon className="mr-2 h-4 w-4" />;

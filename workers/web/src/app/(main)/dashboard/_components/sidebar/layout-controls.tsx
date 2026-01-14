@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { Settings } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -24,6 +26,7 @@ type LayoutControlsProps = {
 
 export function LayoutControls(props: LayoutControlsProps) {
   const { variant, collapsible, contentLayout } = props;
+  const router = useRouter();
   const t = useTranslations("LayoutControls");
   const themeMode = usePreferencesStore((s) => s.themeMode);
   const setThemeMode = usePreferencesStore((s) => s.setThemeMode);
@@ -49,6 +52,11 @@ export function LayoutControls(props: LayoutControlsProps) {
 
     if (key === "locale") {
       setLocale(value as Locale);
+      await setValueToCookie(key, value);
+      // Reload page to apply new locale
+      router.refresh();
+      window.location.reload();
+      return;
     }
 
     await setValueToCookie(key, value);

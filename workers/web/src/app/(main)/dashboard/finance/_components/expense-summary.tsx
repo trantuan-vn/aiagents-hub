@@ -1,6 +1,7 @@
 "use client";
 
 import { ShoppingBasket, TramFront, Ellipsis } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,27 +11,29 @@ import { formatCurrency } from "@/lib/utils";
 
 const chartData = [{ period: "last-week", groceries: 380, transport: 120, other: 80 }];
 
-const chartConfig = {
-  groceries: {
-    label: "Groceries",
-    color: "var(--chart-1)",
-  },
-  transport: {
-    label: "Transport",
-    color: "var(--chart-2)",
-  },
-  other: {
-    label: "Other",
-    color: "var(--chart-3)",
-  },
-} satisfies ChartConfig;
-
 export function ExpenseSummary() {
+  const t = useTranslations("Finance");
+
+  const chartConfig = {
+    groceries: {
+      label: t("groceries"),
+      color: "var(--chart-1)",
+    },
+    transport: {
+      label: t("transport"),
+      color: "var(--chart-2)",
+    },
+    other: {
+      label: t("other"),
+      color: "var(--chart-3)",
+    },
+  } satisfies ChartConfig;
+
   const totalExpenses = chartData.length ? chartData[0].groceries + chartData[0].transport + chartData[0].other : 0;
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Expense Summary</CardTitle>
+        <CardTitle>{t("expense_summary")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <Separator />
@@ -59,7 +62,7 @@ export function ExpenseSummary() {
                             {formatCurrency(totalExpenses, { noDecimals: true })}
                           </tspan>
                           <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 4} className="fill-muted-foreground">
-                            Spent
+                            {t("spent")}
                           </tspan>
                         </text>
                       );
@@ -98,7 +101,7 @@ export function ExpenseSummary() {
               <ShoppingBasket className="stroke-chart-1 size-5" />
             </div>
             <div className="space-y-0.5 text-center">
-              <p className="text-muted-foreground text-xs uppercase">Groceries</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("groceries")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(chartData[0].groceries, { noDecimals: true })}</p>
             </div>
           </div>
@@ -108,7 +111,7 @@ export function ExpenseSummary() {
               <TramFront className="stroke-chart-2 size-5" />
             </div>
             <div className="space-y-0.5 text-center">
-              <p className="text-muted-foreground text-xs uppercase">Transport</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("transport")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(chartData[0].transport, { noDecimals: true })}</p>
             </div>
           </div>
@@ -118,13 +121,13 @@ export function ExpenseSummary() {
               <Ellipsis className="stroke-chart-3 size-5" />
             </div>
             <div className="space-y-0.5 text-center">
-              <p className="text-muted-foreground text-xs uppercase">Other</p>
+              <p className="text-muted-foreground text-xs uppercase">{t("other")}</p>
               <p className="font-medium tabular-nums">{formatCurrency(chartData[0].other, { noDecimals: true })}</p>
             </div>
           </div>
         </div>
         <span className="text-muted-foreground text-xs tabular-nums">
-          Weekly spending is capped at {formatCurrency(2000, { noDecimals: true })}
+          {t("weekly_spending_capped")} {formatCurrency(2000, { noDecimals: true })}
         </span>
       </CardContent>
     </Card>

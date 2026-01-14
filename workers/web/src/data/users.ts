@@ -1,12 +1,14 @@
 export interface User {
   id: string;
   identifier: string;
+  role?: "member" | "admin";
 }
 
 interface UserProfileResponse {
   id?: string;
   identifier?: string;
   address?: string;
+  role?: "member" | "admin";
 }
 
 function buildCookieHeader(
@@ -26,6 +28,7 @@ function parseUserProfile(data: UserProfileResponse): User | null {
     return {
       id: data.id,
       identifier: data.identifier,
+      role: data.role ?? "member",
     };
   }
   return null;

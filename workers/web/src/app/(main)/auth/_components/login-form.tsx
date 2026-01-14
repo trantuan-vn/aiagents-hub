@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -30,16 +31,7 @@ function debounce<T extends (...args: any[]) => void>(func: T, wait: number): (.
   };
 }
 
-// Schema for form validation
-const FormSchema = z.object({
-  username: z
-    .string()
-    .min(1, { message: "Please enter your email or phone number." })
-    .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^\+?\d{10,15}$/.test(value), {
-      message: "Please enter a valid email or phone number.",
-    }),
-  remember: z.boolean().optional(),
-});
+// Schema for form validation - will be created with translations in component
 
 // Interface for API error response
 interface ErrorResponse {
@@ -47,12 +39,24 @@ interface ErrorResponse {
 }
 
 export function LoginForm() {
+  const t = useTranslations("LoginForm");
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const isMounted = useRef(true);
   const router = useRouter();
+
+  // Schema for form validation with translations
+  const FormSchema = z.object({
+    username: z
+      .string()
+      .min(1, { message: t("email_or_phone_required") })
+      .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^\+?\d{10,15}$/.test(value), {
+        message: t("email_or_phone_invalid"),
+      }),
+    remember: z.boolean().optional(),
+  });
 
   // Form setup with react-hook-form
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -75,16 +79,16 @@ export function LoginForm() {
   const getErrorMessage = async (response: Response): Promise<string> => {
     try {
       const errorData: ErrorResponse = await response.json();
-      return errorData.error ?? "An unexpected error occurred";
+      return errorData.error ?? t("unexpected_error");
     } catch {
-      return "An unexpected error occurred";
+      return t("unexpected_error");
     }
   };
 
   // Validate OTP
   const validateOtp = (otp: string): boolean => {
     if (!otp || otp.length !== 6 || !/^\d{6}$/.test(otp)) {
-      toast.error("Please enter a valid 6-digit OTP");
+      toast.error(t("otp_invalid"));
       return false;
     }
     return true;
@@ -117,7 +121,7 @@ export function LoginForm() {
       form.reset();
       router.push("/");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Invalid OTP. Please try again.");
+      toast.error(error instanceof Error ? error.message : t("otp_verify_error"));
     } finally {
       if (isMounted.current) {
         setIsLoading(false);
@@ -148,11 +152,11 @@ export function LoginForm() {
       if (isMounted.current) {
         setIdentifier(data.username.trim());
         setShowOtpPopup(true);
-        toast.success("OTP has been sent to your email/phone");
+        toast.success(t("otp_sent_success"));
       }
     } catch (error) {
       if (isMounted.current) {
-        toast.error(error instanceof Error ? error.message : "Failed to send OTP. Please try again.");
+        toast.error(error instanceof Error ? error.message : t("otp_send_error"));
       }
     } finally {
       if (isMounted.current) {
@@ -180,12 +184,12 @@ export function LoginForm() {
           name="username"
           render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="username">Email or Phone Number</FormLabel>
+              <FormLabel htmlFor="username">{t("email_or_phone_label")}</FormLabel>
               <FormControl>
                 <Input
                   id="username"
                   type="text"
-                  placeholder="you@example.com or +84..."
+                  placeholder={t("email_or_phone_placeholder")}
                   autoComplete="username"
                   aria-required="true"
                   {...field}
@@ -206,17 +210,17 @@ export function LoginForm() {
                   checked={field.value}
                   onCheckedChange={field.onChange}
                   className="size-4"
-                  aria-label="Remember me for 30 days"
+                  aria-label={t("remember_me")}
                 />
               </FormControl>
               <FormLabel htmlFor="login-remember" className="text-muted-foreground ml-1 text-sm font-medium">
-                Remember me for 30 days
+                {t("remember_me")}
               </FormLabel>
             </FormItem>
           )}
         />
         <Button className="w-full" type="submit" disabled={isLoading || !form.formState.isValid}>
-          {isLoading ? "Sending OTP..." : "Login"}
+          {isLoading ? t("sending_otp") : t("login_button")}
         </Button>
       </form>
 
@@ -232,18 +236,18 @@ export function LoginForm() {
       >
         <DialogContent className="sm:max-w-md" aria-describedby="otp-dialog-description">
           <DialogHeader>
-            <DialogTitle>Enter OTP Code</DialogTitle>
+            <DialogTitle>{t("otp_dialog_title")}</DialogTitle>
             <div id="otp-dialog-description" className="text-muted-foreground text-sm">
-              We have sent a 6-digit verification code to: <strong>{identifier}</strong>
+              {t("otp_dialog_description")} <strong>{identifier}</strong>
             </div>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <FormLabel htmlFor="otp-input">OTP Code</FormLabel>
+              <FormLabel htmlFor="otp-input">{t("otp_label")}</FormLabel>
               <Input
                 id="otp-input"
                 type="text"
-                placeholder="Enter 6-digit code"
+                placeholder={t("otp_placeholder")}
                 value={otp}
                 onChange={(e) => handleOtpChange(e.target.value)}
                 maxLength={6}
@@ -263,7 +267,7 @@ export function LoginForm() {
                   setOtp("");
                 }}
               >
-                Cancel
+                {t("cancel")}
               </Button>
               <Button
                 type="button"
@@ -271,7 +275,7 @@ export function LoginForm() {
                 onClick={handleOtpVerify}
                 disabled={isLoading || otp.length !== 6}
               >
-                {isLoading ? "Verifying..." : "Verify OTP"}
+                {isLoading ? t("verifying") : t("verify_otp")}
               </Button>
             </div>
           </div>

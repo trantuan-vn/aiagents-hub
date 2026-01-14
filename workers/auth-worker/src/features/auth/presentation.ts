@@ -188,7 +188,8 @@ export function createAuthRoutes(bindingName: string) {
       return c.json({ 
         id: user.id, 
         identifier: user.identifier, 
-        address: user.address 
+        address: user.address,
+        role: user.role || 'member'
       });
     } catch (e) {
       const { errorResponse } = await handleError(c, e, "Get user info failed");

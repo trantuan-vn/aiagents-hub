@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { siApple, siPaypal, siOpenai, siVercel, siFigma } from "simple-icons";
 
 import { SimpleIcon } from "@/components/simple-icon";
@@ -25,51 +26,53 @@ function ChipSVG() {
   );
 }
 
-const recentPayments = [
-  {
-    id: 1,
-    icon: siPaypal,
-    title: "Advance Payment",
-    subtitle: "Received via PayPal for Website Project",
-    type: "credit",
-    amount: 1200,
-    date: "Jul 8",
-  },
-  {
-    id: 2,
-    icon: siOpenai,
-    title: "ChatGPT Subscription",
-    subtitle: "OpenAI monthly subscription",
-    type: "debit",
-    amount: 20,
-    date: "Jul 7",
-  },
-  {
-    id: 3,
-    icon: siVercel,
-    title: "Vercel Team Subscription",
-    subtitle: "Vercel cloud hosting charges",
-    type: "debit",
-    amount: 160,
-    date: "Jul 4",
-  },
-  {
-    id: 4,
-    icon: siFigma,
-    title: "Figma Pro",
-    subtitle: "Figma professional plan",
-    type: "debit",
-    amount: 35,
-    date: "Jul 2",
-  },
-];
-
 export function AccountOverview() {
+  const t = useTranslations("Finance");
+
+  const recentPayments = [
+    {
+      id: 1,
+      icon: siPaypal,
+      title: t("advance_payment"),
+      subtitle: t("received_via_paypal"),
+      type: "credit",
+      amount: 1200,
+      date: "Jul 8",
+    },
+    {
+      id: 2,
+      icon: siOpenai,
+      title: t("chatgpt_subscription"),
+      subtitle: t("openai_monthly_subscription"),
+      type: "debit",
+      amount: 20,
+      date: "Jul 7",
+    },
+    {
+      id: 3,
+      icon: siVercel,
+      title: t("vercel_team_subscription"),
+      subtitle: t("vercel_cloud_hosting"),
+      type: "debit",
+      amount: 160,
+      date: "Jul 4",
+    },
+    {
+      id: 4,
+      icon: siFigma,
+      title: t("figma_pro"),
+      subtitle: t("figma_professional_plan"),
+      type: "debit",
+      amount: 35,
+      date: "Jul 2",
+    },
+  ];
+
   return (
     <Card className="shadow-xs">
       <CardHeader className="items-center">
-        <CardTitle>My Cards</CardTitle>
-        <CardDescription>Your card summary, balance, and recent transactions in one view.</CardDescription>
+        <CardTitle>{t("my_cards")}</CardTitle>
+        <CardDescription>{t("card_summary")}</CardDescription>
         <CardAction>
           <Button size="icon" variant="outline">
             <Plus className="size-4" />
@@ -79,9 +82,9 @@ export function AccountOverview() {
       <CardContent>
         <Tabs className="gap-4" defaultValue="virtual">
           <TabsList className="w-full">
-            <TabsTrigger value="virtual">Virtual</TabsTrigger>
+            <TabsTrigger value="virtual">{t("virtual")}</TabsTrigger>
             <TabsTrigger value="physical" disabled>
-              Physical
+              {t("physical")}
             </TabsTrigger>
           </TabsList>
           <TabsContent value="virtual">
@@ -102,43 +105,43 @@ export function AccountOverview() {
 
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Card Number</span>
+                  <span className="text-muted-foreground">{t("card_number")}</span>
                   <span className="font-medium tabular-nums">•••• •••• 5416</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Expiry Date</span>
+                  <span className="text-muted-foreground">{t("expiry_date")}</span>
                   <span className="font-medium tabular-nums">06/09</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">CVC</span>
+                  <span className="text-muted-foreground">{t("cvc")}</span>
                   <span className="font-medium">•••</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Spending Limit</span>
+                  <span className="text-muted-foreground">{t("spending_limit")}</span>
                   <span className="font-medium tabular-nums">$62,000.00</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Available Balance</span>
+                  <span className="text-muted-foreground">{t("available_balance")}</span>
                   <span className="font-medium tabular-nums">$13,100.06</span>
                 </div>
               </div>
 
               <div className="flex gap-2">
                 <Button className="flex-1" variant="outline" size="sm">
-                  Freeze Card
+                  {t("freeze_card")}
                 </Button>
                 <Button className="flex-1" variant="outline" size="sm">
-                  Set Limit
+                  {t("set_limit")}
                 </Button>
                 <Button className="flex-1" variant="outline" size="sm">
-                  More
+                  {t("more")}
                 </Button>
               </div>
 
               <Separator />
 
               <div className="space-y-4">
-                <h6 className="text-muted-foreground text-sm uppercase">Recent Payments</h6>
+                <h6 className="text-muted-foreground text-sm uppercase">{t("recent_payments")}</h6>
 
                 <div className="space-y-4">
                   {recentPayments.map((transaction) => (
@@ -167,12 +170,12 @@ export function AccountOverview() {
                 </div>
 
                 <Button className="w-full" size="sm" variant="outline">
-                  View All Payments
+                  {t("view_all_payments")}
                 </Button>
               </div>
             </div>
           </TabsContent>
-          <TabsContent value="physical">Physical card details are currently unavailable</TabsContent>
+          <TabsContent value="physical">{t("physical_unavailable")}</TabsContent>
         </Tabs>
       </CardContent>
     </Card>
