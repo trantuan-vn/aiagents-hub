@@ -17,7 +17,7 @@ const compat = new FlatCompat({
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   ...compat.config({
-    extends: ['eslint:recommended', 'next'],
+    extends: ["eslint:recommended", "next"],
   }),
 
   { files: ["**/*.{js,mjs,cjs,ts,jsx,tsx}"] },
@@ -165,7 +165,7 @@ export default [
   {
     files: ["next-env.d.ts"],
     rules: {
-      "@typescript-eslint/triple-slash-reference": "off"
+      "@typescript-eslint/triple-slash-reference": "off",
     },
   },
 ];

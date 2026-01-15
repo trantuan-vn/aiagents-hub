@@ -170,24 +170,23 @@ export const sidebarItems: NavGroup[] = [
 export function filterSidebarItemsByRole(items: NavGroup[], userRole?: "member" | "admin"): NavGroup[] {
   const isAdmin = userRole === "admin";
 
-  return items.map(group => ({
+  return items.map((group) => ({
     ...group,
-    items: group.items
-      .filter(item => {
-        // Filter out admin-only items if user is not admin
-        if (item.adminOnly && !isAdmin) {
-          return false;
-        }
-        // Filter subItems as well
-        if (item.subItems) {
-          item.subItems = item.subItems.filter(subItem => {
-            if (subItem.adminOnly && !isAdmin) {
-              return false;
-            }
-            return true;
-          });
-        }
-        return true;
-      })
+    items: group.items.filter((item) => {
+      // Filter out admin-only items if user is not admin
+      if (item.adminOnly && !isAdmin) {
+        return false;
+      }
+      // Filter subItems as well
+      if (item.subItems) {
+        item.subItems = item.subItems.filter((subItem) => {
+          if (subItem.adminOnly && !isAdmin) {
+            return false;
+          }
+          return true;
+        });
+      }
+      return true;
+    }),
   }));
 }

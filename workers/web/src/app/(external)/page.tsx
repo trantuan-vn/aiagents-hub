@@ -1,6 +1,7 @@
-import { redirect } from "next/navigation";
+import App from "./app";
+
+import "@/app/globals.css";
 
 export default function Home() {
-  redirect("/dashboard");
-  return <>Coming Soon</>;
+  return <App />;
 }

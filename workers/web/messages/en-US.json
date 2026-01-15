@@ -210,5 +210,264 @@
     "exchange_fee": "Exchange Fee (1%)",
     "total_amount": "Total Amount",
     "exchange": "Exchange"
+  },
+  "Navbar": {
+    "home": "Home",
+    "packages": "Packages",
+    "documentation": "Documentation",
+    "pricing": "Pricing",
+    "resources": "Resources",
+    "support": "Support",
+    "blog": "Blog",
+    "changelog": "Changelog",
+    "sign_in": "Sign In",
+    "get_started": "Get Started"
+  },
+  "Footer": {
+    "product": "Product",
+    "company": "Company",
+    "resources": "Resources",
+    "developers": "Developers",
+    "features": "Features",
+    "pricing": "Pricing",
+    "api_packages": "API Packages",
+    "documentation": "Documentation",
+    "about": "About",
+    "blog": "Blog",
+    "careers": "Careers",
+    "contact": "Contact",
+    "support": "Support",
+    "changelog": "Changelog",
+    "status": "Status",
+    "terms": "Terms",
+    "api_reference": "API Reference",
+    "sdks": "SDKs",
+    "examples": "Examples",
+    "community": "Community",
+    "description": "Powerful API services for developers and businesses. Build faster with our reliable infrastructure.",
+    "copyright": "© {year} APIHub. All rights reserved.",
+    "privacy_policy": "Privacy Policy",
+    "terms_of_service": "Terms of Service",
+    "cookies": "Cookies"
+  },
+  "Hero": {
+    "badge": "Now with AI-powered recommendations",
+    "title": "Build Faster with",
+    "title_gradient": "Powerful APIs",
+    "subtitle": "Access enterprise-grade API services with simple pricing. From data processing to AI integrations, we've got you covered.",
+    "explore_apis": "Explore APIs",
+    "view_demo": "View Demo",
+    "uptime_sla": "Uptime SLA",
+    "api_calls_per_day": "API Calls/Day",
+    "developers": "Developers",
+    "low_latency": "Low Latency",
+    "enterprise_security": "Enterprise Security",
+    "ai_powered": "AI-Powered"
+  },
+  "Features": {
+    "badge": "Why Choose Us",
+    "title": "Built for Scale, Designed for",
+    "title_gradient": "Developers",
+    "subtitle": "Everything you need to integrate powerful APIs into your applications, with enterprise-grade reliability.",
+    "lightning_fast": "Lightning Fast",
+    "lightning_fast_desc": "Average response time under 50ms with our globally distributed infrastructure.",
+    "enterprise_security": "Enterprise Security",
+    "enterprise_security_desc": "SOC 2 compliant with end-to-end encryption and advanced threat protection.",
+    "global_cdn": "Global CDN",
+    "global_cdn_desc": "Edge servers in 50+ locations ensure minimal latency worldwide.",
+    "realtime_analytics": "Real-time Analytics",
+    "realtime_analytics_desc": "Monitor usage, track performance, and optimize your API consumption.",
+    "developer_first": "Developer First",
+    "developer_first_desc": "Comprehensive SDKs, detailed docs, and code examples in every language.",
+    "support_24_7": "24/7 Support",
+    "support_24_7_desc": "AI-powered chatbot plus dedicated support engineers ready to help.",
+    "ai_integration": "AI Integration",
+    "ai_integration_desc": "Smart recommendations and natural language queries for your data.",
+    "rate_limiting": "Rate Limiting",
+    "rate_limiting_desc": "Flexible rate limits with burst allowances and automatic scaling."
+  },
+  "CTA": {
+    "title": "Ready to Start",
+    "title_gradient": "Building?",
+    "subtitle": "Join thousands of developers using our APIs to power their applications. Get started for free, no credit card required.",
+    "get_started_free": "Get Started Free",
+    "talk_to_sales": "Talk to Sales",
+    "trusted_by": "Trusted by developers at"
+  },
+  "Packages": {
+    "badge": "Pricing",
+    "title": "Simple, Transparent",
+    "title_gradient": "Pricing",
+    "subtitle": "Choose the plan that fits your needs. Scale up or down at any time.",
+    "free": "Free",
+    "free_desc": "Perfect for testing and small projects",
+    "pro": "Pro",
+    "pro_desc": "For growing businesses and teams",
+    "enterprise": "Enterprise",
+    "enterprise_desc": "For large-scale operations",
+    "per_month": "/month",
+    "most_popular": "Most Popular",
+    "start_free": "Start Free",
+    "get_started": "Get Started",
+    "contact_sales": "Contact Sales",
+    "view_all_packages": "View all packages",
+    "features": {
+      "api_calls_month": "{count} API calls/month",
+      "basic_analytics": "Basic analytics",
+      "community_support": "Community support",
+      "api_key": "{count} API key",
+      "standard_rate_limits": "Standard rate limits",
+      "advanced_analytics": "Advanced analytics",
+      "priority_support": "Priority support",
+      "higher_rate_limits": "Higher rate limits",
+      "webhooks": "Webhooks",
+      "custom_domains": "Custom domains",
+      "unlimited_api_calls": "Unlimited API calls",
+      "realtime_analytics": "Real-time analytics",
+      "dedicated_support": "24/7 dedicated support",
+      "unlimited_api_keys": "Unlimited API keys",
+      "custom_rate_limits": "Custom rate limits",
+      "sla_guarantee": "SLA guarantee",
+      "on_premise_option": "On-premise option",
+      "custom_integrations": "Custom integrations"
+    }
+  },
+  "PackagesPage": {
+    "badge": "API Marketplace",
+    "title": "Explore Our",
+    "title_gradient": "API Packages",
+    "subtitle": "Choose from our collection of powerful APIs. Each package includes comprehensive documentation and SDKs.",
+    "search_placeholder": "Search APIs...",
+    "category": "Category",
+    "all_categories": "All Categories",
+    "ai_ml": "AI & ML",
+    "data_processing": "Data Processing",
+    "utilities": "Utilities",
+    "security": "Security",
+    "compare_plans": "Compare plans:",
+    "popular": "Popular",
+    "learn_more": "Learn More",
+    "subscribe": "Subscribe",
+    "per_month": "/month",
+    "api_calls": "API calls",
+    "more_features": "+{count} more features",
+    "no_packages_found": "No packages found matching your criteria.",
+    "packages": {
+      "data_processing": {
+        "name": "Data Processing API",
+        "description": "High-performance data transformation and processing pipeline for structured and unstructured data.",
+        "features": {
+          "0": "JSON/XML parsing",
+          "1": "Batch processing",
+          "2": "Real-time streaming",
+          "3": "Custom transformations"
+        }
+      },
+      "ai_vision": {
+        "name": "AI Vision API",
+        "description": "Advanced image recognition, object detection, and visual content analysis powered by machine learning.",
+        "features": {
+          "0": "Object detection",
+          "1": "Face recognition",
+          "2": "OCR",
+          "3": "Content moderation"
+        }
+      },
+      "geolocation": {
+        "name": "Geolocation API",
+        "description": "Accurate IP geolocation, address validation, and distance calculation services.",
+        "features": {
+          "0": "IP to location",
+          "1": "Address validation",
+          "2": "Distance matrix",
+          "3": "Timezone detection"
+        }
+      },
+      "authentication": {
+        "name": "Authentication API",
+        "description": "Secure user authentication, SSO, and identity verification for your applications.",
+        "features": {
+          "0": "OAuth 2.0",
+          "1": "SAML SSO",
+          "2": "MFA support",
+          "3": "Session management"
+        }
+      },
+      "natural_language": {
+        "name": "Natural Language API",
+        "description": "Text analysis, sentiment detection, entity extraction, and language translation services.",
+        "features": {
+          "0": "Sentiment analysis",
+          "1": "Entity extraction",
+          "2": "Translation",
+          "3": "Summarization"
+        }
+      },
+      "realtime_events": {
+        "name": "Real-time Events API",
+        "description": "WebSocket-based real-time event streaming and pub/sub messaging infrastructure.",
+        "features": {
+          "0": "WebSocket support",
+          "1": "Pub/Sub messaging",
+          "2": "Event history",
+          "3": "Custom channels"
+        }
+      }
+    }
+  },
+  "SupportPage": {
+    "badge": "AI-Powered Support",
+    "title": "How Can We",
+    "title_gradient": "Help?",
+    "subtitle": "Chat with our AI assistant or browse our resources for instant answers.",
+    "ai_assistant": "AI Support Assistant",
+    "online": "Online",
+    "type_message": "Type your message...",
+    "quick_actions": {
+      "recommend_api": "Recommend an API for my use case",
+      "calls_left": "How many calls do I have left?",
+      "rate_limiting": "Help with rate limiting",
+      "upgrade": "Upgrade my subscription"
+    },
+    "faq": {
+      "title": "FAQ",
+      "generate_key": {
+        "question": "How do I generate a new API key?",
+        "answer": "Go to Dashboard > API Keys > Click \"New Key\". You can name your key and set permissions."
+      },
+      "rate_limit": {
+        "question": "What happens if I exceed my rate limit?",
+        "answer": "Requests exceeding your rate limit will receive a 429 response. Consider upgrading your plan for higher limits."
+      },
+      "change_plan": {
+        "question": "How do I change my subscription plan?",
+        "answer": "Navigate to Dashboard > Billing > Change Plan. Changes take effect at your next billing cycle."
+      },
+      "free_trial": {
+        "question": "Is there a free trial available?",
+        "answer": "Yes! All our APIs include a free tier with limited calls per month. No credit card required."
+      }
+    },
+    "need_help": {
+      "title": "Need More Help?",
+      "description": "Reach out to our support team",
+      "email_support": "Email Support",
+      "response_time": "Response Time",
+      "response_time_value": "Usually within 24 hours"
+    },
+    "resources": {
+      "title": "Resources",
+      "api_docs": "API Documentation",
+      "getting_started": "Getting Started Guide",
+      "video_tutorials": "Video Tutorials",
+      "developer_blog": "Developer Blog"
+    },
+    "ai_responses": {
+      "welcome": "Hello! I'm your AI support assistant. I can help you with API recommendations, troubleshooting, and answer questions about your usage. How can I assist you today?",
+      "recommend": "Based on your question, I'd recommend our **AI Vision API** for image processing tasks, or our **Data Processing API** for data transformation needs. What specific use case are you working on?",
+      "calls": "You currently have **15,000 API calls** remaining this month across all your subscriptions. Your quota resets on the 1st of each month.",
+      "rate_limit": "Rate limiting protects our infrastructure. Your current limits are:\n- **Free tier**: 10 requests/second\n- **Pro tier**: 100 requests/second\n\nConsider implementing exponential backoff in your code.",
+      "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"
+    }
   }
 }

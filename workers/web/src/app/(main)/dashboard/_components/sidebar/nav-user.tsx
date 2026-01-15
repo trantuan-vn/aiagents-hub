@@ -85,65 +85,65 @@ export function NavUser({ user }: { readonly user: User | null }) {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <div className="flex items-center gap-2 w-full">
+        <div className="flex w-full items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="icon" disabled={isLoggingOut}>
                 <UserPen />
               </Button>
             </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-[--radix-dropdown-menu-trigger-width] min-w-56 space-y-1 rounded-lg"
-            side={isMobile ? "bottom" : "right"}
-            align="end"
-            sideOffset={4}
-          >
-            {user ? (
-              <>
-                <DropdownMenuGroup>
-                  {menuItems.slice(0, -1).map((item, index) => (
-                    <DropdownMenuItem key={`menu-${index}`}>
-                      <Link href={item.url} className="flex w-full items-center">
-                        <item.icon className="mr-2 h-4 w-4" />
-                        <span>{item.title}</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={isLoggingOut}>
-                  <button
-                    onClick={menuItems[menuItems.length - 1].onClick}
-                    className="flex w-full items-center"
-                    disabled={isLoggingOut}
-                  >
+            <DropdownMenuContent
+              className="w-[--radix-dropdown-menu-trigger-width] min-w-56 space-y-1 rounded-lg"
+              side={isMobile ? "bottom" : "right"}
+              align="end"
+              sideOffset={4}
+            >
+              {user ? (
+                <>
+                  <DropdownMenuGroup>
+                    {menuItems.slice(0, -1).map((item, index) => (
+                      <DropdownMenuItem key={`menu-${index}`}>
+                        <Link href={item.url} className="flex w-full items-center">
+                          <item.icon className="mr-2 h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled={isLoggingOut}>
+                    <button
+                      onClick={menuItems[menuItems.length - 1].onClick}
+                      className="flex w-full items-center"
+                      disabled={isLoggingOut}
+                    >
+                      {(() => {
+                        const Icon = menuItems[menuItems.length - 1].icon;
+                        return <Icon className="mr-2 h-4 w-4" />;
+                      })()}
+                      <span>{isLoggingOut ? t("logging_out") : menuItems[menuItems.length - 1].title}</span>
+                    </button>
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem>
+                  <Link href={menuItems[0].url} className="flex w-full items-center">
                     {(() => {
-                      const Icon = menuItems[menuItems.length - 1].icon;
+                      const Icon = menuItems[0].icon;
                       return <Icon className="mr-2 h-4 w-4" />;
                     })()}
-                    <span>{isLoggingOut ? t("logging_out") : menuItems[menuItems.length - 1].title}</span>
-                  </button>
+                    <span>{menuItems[0].title}</span>
+                  </Link>
                 </DropdownMenuItem>
-              </>
-            ) : (
-              <DropdownMenuItem>
-                <Link href={menuItems[0].url} className="flex w-full items-center">
-                  {(() => {
-                    const Icon = menuItems[0].icon;
-                    return <Icon className="mr-2 h-4 w-4" />;
-                  })()}
-                  <span>{menuItems[0].title}</span>
-                </Link>
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {user && (
-          <div className="flex flex-col flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
-            <div className="text-sm font-medium truncate">{user.identifier}</div>
-            <div className="text-xs text-muted-foreground capitalize">{user.role ?? "member"}</div>
-          </div>
-        )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {user && (
+            <div className="flex min-w-0 flex-1 flex-col group-data-[collapsible=icon]:hidden">
+              <div className="truncate text-sm font-medium">{user.identifier}</div>
+              <div className="text-muted-foreground text-xs capitalize">{user.role ?? "member"}</div>
+            </div>
+          )}
         </div>
       </SidebarMenuItem>
     </SidebarMenu>

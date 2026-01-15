@@ -210,5 +210,264 @@
     "exchange_fee": "Phí chuyển đổi (1%)",
     "total_amount": "Tổng số tiền",
     "exchange": "Chuyển đổi"
+  },
+  "Navbar": {
+    "home": "Trang chủ",
+    "packages": "Gói dịch vụ",
+    "documentation": "Tài liệu",
+    "pricing": "Giá cả",
+    "resources": "Tài nguyên",
+    "support": "Hỗ trợ",
+    "blog": "Blog",
+    "changelog": "Nhật ký thay đổi",
+    "sign_in": "Đăng nhập",
+    "get_started": "Bắt đầu"
+  },
+  "Footer": {
+    "product": "Sản phẩm",
+    "company": "Công ty",
+    "resources": "Tài nguyên",
+    "developers": "Nhà phát triển",
+    "features": "Tính năng",
+    "pricing": "Giá cả",
+    "api_packages": "Gói API",
+    "documentation": "Tài liệu",
+    "about": "Về chúng tôi",
+    "blog": "Blog",
+    "careers": "Tuyển dụng",
+    "contact": "Liên hệ",
+    "support": "Hỗ trợ",
+    "changelog": "Nhật ký thay đổi",
+    "status": "Trạng thái",
+    "terms": "Điều khoản",
+    "api_reference": "Tham chiếu API",
+    "sdks": "SDK",
+    "examples": "Ví dụ",
+    "community": "Cộng đồng",
+    "description": "Dịch vụ API mạnh mẽ cho nhà phát triển và doanh nghiệp. Xây dựng nhanh hơn với cơ sở hạ tầng đáng tin cậy của chúng tôi.",
+    "copyright": "© {year} APIHub. Tất cả quyền được bảo lưu.",
+    "privacy_policy": "Chính sách bảo mật",
+    "terms_of_service": "Điều khoản dịch vụ",
+    "cookies": "Cookies"
+  },
+  "Hero": {
+    "badge": "Hiện có đề xuất được hỗ trợ bởi AI",
+    "title": "Xây dựng nhanh hơn với",
+    "title_gradient": "API mạnh mẽ",
+    "subtitle": "Truy cập các dịch vụ API cấp doanh nghiệp với giá cả đơn giản. Từ xử lý dữ liệu đến tích hợp AI, chúng tôi đã sẵn sàng hỗ trợ bạn.",
+    "explore_apis": "Khám phá API",
+    "view_demo": "Xem Demo",
+    "uptime_sla": "Thời gian hoạt động SLA",
+    "api_calls_per_day": "Lượt gọi API/Ngày",
+    "developers": "Nhà phát triển",
+    "low_latency": "Độ trễ thấp",
+    "enterprise_security": "Bảo mật doanh nghiệp",
+    "ai_powered": "Được hỗ trợ bởi AI"
+  },
+  "Features": {
+    "badge": "Tại sao chọn chúng tôi",
+    "title": "Được xây dựng để mở rộng quy mô, thiết kế cho",
+    "title_gradient": "Nhà phát triển",
+    "subtitle": "Mọi thứ bạn cần để tích hợp API mạnh mẽ vào ứng dụng của mình, với độ tin cậy cấp doanh nghiệp.",
+    "lightning_fast": "Cực kỳ nhanh",
+    "lightning_fast_desc": "Thời gian phản hồi trung bình dưới 50ms với cơ sở hạ tầng phân phối toàn cầu của chúng tôi.",
+    "enterprise_security": "Bảo mật doanh nghiệp",
+    "enterprise_security_desc": "Tuân thủ SOC 2 với mã hóa end-to-end và bảo vệ mối đe dọa nâng cao.",
+    "global_cdn": "CDN toàn cầu",
+    "global_cdn_desc": "Máy chủ biên tại hơn 50 vị trí đảm bảo độ trễ tối thiểu trên toàn thế giới.",
+    "realtime_analytics": "Phân tích thời gian thực",
+    "realtime_analytics_desc": "Theo dõi sử dụng, giám sát hiệu suất và tối ưu hóa việc sử dụng API của bạn.",
+    "developer_first": "Ưu tiên nhà phát triển",
+    "developer_first_desc": "SDK toàn diện, tài liệu chi tiết và ví dụ mã ở mọi ngôn ngữ.",
+    "support_24_7": "Hỗ trợ 24/7",
+    "support_24_7_desc": "Chatbot được hỗ trợ bởi AI cộng với các kỹ sư hỗ trợ chuyên dụng sẵn sàng giúp đỡ.",
+    "ai_integration": "Tích hợp AI",
+    "ai_integration_desc": "Đề xuất thông minh và truy vấn ngôn ngữ tự nhiên cho dữ liệu của bạn.",
+    "rate_limiting": "Giới hạn tốc độ",
+    "rate_limiting_desc": "Giới hạn tốc độ linh hoạt với cho phép burst và tự động mở rộng quy mô."
+  },
+  "CTA": {
+    "title": "Sẵn sàng để bắt đầu",
+    "title_gradient": "Xây dựng?",
+    "subtitle": "Tham gia cùng hàng nghìn nhà phát triển sử dụng API của chúng tôi để cung cấp năng lượng cho ứng dụng của họ. Bắt đầu miễn phí, không cần thẻ tín dụng.",
+    "get_started_free": "Bắt đầu miễn phí",
+    "talk_to_sales": "Nói chuyện với bán hàng",
+    "trusted_by": "Được tin tưởng bởi các nhà phát triển tại"
+  },
+  "Packages": {
+    "badge": "Giá cả",
+    "title": "Đơn giản, minh bạch",
+    "title_gradient": "Giá cả",
+    "subtitle": "Chọn gói phù hợp với nhu cầu của bạn. Mở rộng hoặc thu nhỏ bất cứ lúc nào.",
+    "free": "Miễn phí",
+    "free_desc": "Hoàn hảo cho thử nghiệm và dự án nhỏ",
+    "pro": "Pro",
+    "pro_desc": "Dành cho doanh nghiệp và nhóm đang phát triển",
+    "enterprise": "Doanh nghiệp",
+    "enterprise_desc": "Dành cho hoạt động quy mô lớn",
+    "per_month": "/tháng",
+    "most_popular": "Phổ biến nhất",
+    "start_free": "Bắt đầu miễn phí",
+    "get_started": "Bắt đầu",
+    "contact_sales": "Liên hệ bán hàng",
+    "view_all_packages": "Xem tất cả gói",
+    "features": {
+      "api_calls_month": "{count} lượt gọi API/tháng",
+      "basic_analytics": "Phân tích cơ bản",
+      "community_support": "Hỗ trợ cộng đồng",
+      "api_key": "{count} khóa API",
+      "standard_rate_limits": "Giới hạn tốc độ tiêu chuẩn",
+      "advanced_analytics": "Phân tích nâng cao",
+      "priority_support": "Hỗ trợ ưu tiên",
+      "higher_rate_limits": "Giới hạn tốc độ cao hơn",
+      "webhooks": "Webhooks",
+      "custom_domains": "Tên miền tùy chỉnh",
+      "unlimited_api_calls": "Lượt gọi API không giới hạn",
+      "realtime_analytics": "Phân tích thời gian thực",
+      "dedicated_support": "Hỗ trợ chuyên dụng 24/7",
+      "unlimited_api_keys": "Khóa API không giới hạn",
+      "custom_rate_limits": "Giới hạn tốc độ tùy chỉnh",
+      "sla_guarantee": "Đảm bảo SLA",
+      "on_premise_option": "Tùy chọn tại chỗ",
+      "custom_integrations": "Tích hợp tùy chỉnh"
+    }
+  },
+  "PackagesPage": {
+    "badge": "Thị trường API",
+    "title": "Khám phá",
+    "title_gradient": "Gói API của chúng tôi",
+    "subtitle": "Chọn từ bộ sưu tập API mạnh mẽ của chúng tôi. Mỗi gói bao gồm tài liệu toàn diện và SDK.",
+    "search_placeholder": "Tìm kiếm API...",
+    "category": "Danh mục",
+    "all_categories": "Tất cả danh mục",
+    "ai_ml": "AI & ML",
+    "data_processing": "Xử lý dữ liệu",
+    "utilities": "Tiện ích",
+    "security": "Bảo mật",
+    "compare_plans": "So sánh gói:",
+    "popular": "Phổ biến",
+    "learn_more": "Tìm hiểu thêm",
+    "subscribe": "Đăng ký",
+    "per_month": "/tháng",
+    "api_calls": "lượt gọi API",
+    "more_features": "+{count} tính năng khác",
+    "no_packages_found": "Không tìm thấy gói nào phù hợp với tiêu chí của bạn.",
+    "packages": {
+      "data_processing": {
+        "name": "API Xử lý Dữ liệu",
+        "description": "Pipeline xử lý và chuyển đổi dữ liệu hiệu suất cao cho dữ liệu có cấu trúc và không cấu trúc.",
+        "features": {
+        "0": "Phân tích cú pháp JSON/XML",
+        "1": "Xử lý hàng loạt",
+        "2": "Streaming thời gian thực",
+        "3": "Chuyển đổi tùy chỉnh"
+      }
+    },
+    "ai_vision": {
+      "name": "API Thị giác AI",
+      "description": "Nhận dạng hình ảnh tiên tiến, phát hiện đối tượng và phân tích nội dung trực quan được hỗ trợ bởi machine learning.",
+      "features": {
+        "0": "Phát hiện đối tượng",
+        "1": "Nhận dạng khuôn mặt",
+        "2": "OCR",
+        "3": "Kiểm duyệt nội dung"
+      }
+    },
+    "geolocation": {
+      "name": "API Định vị Địa lý",
+      "description": "Dịch vụ định vị IP chính xác, xác thực địa chỉ và tính toán khoảng cách.",
+      "features": {
+        "0": "IP đến vị trí",
+        "1": "Xác thực địa chỉ",
+        "2": "Ma trận khoảng cách",
+        "3": "Phát hiện múi giờ"
+      }
+    },
+    "authentication": {
+      "name": "API Xác thực",
+      "description": "Xác thực người dùng an toàn, SSO và xác minh danh tính cho ứng dụng của bạn.",
+      "features": {
+        "0": "OAuth 2.0",
+        "1": "SAML SSO",
+        "2": "Hỗ trợ MFA",
+        "3": "Quản lý phiên"
+      }
+    },
+    "natural_language": {
+      "name": "API Ngôn ngữ Tự nhiên",
+      "description": "Dịch vụ phân tích văn bản, phát hiện cảm xúc, trích xuất thực thể và dịch ngôn ngữ.",
+      "features": {
+        "0": "Phân tích cảm xúc",
+        "1": "Trích xuất thực thể",
+        "2": "Dịch thuật",
+        "3": "Tóm tắt"
+      }
+    },
+    "realtime_events": {
+      "name": "API Sự kiện Thời gian thực",
+      "description": "Cơ sở hạ tầng streaming sự kiện thời gian thực và nhắn tin pub/sub dựa trên WebSocket.",
+      "features": {
+        "0": "Hỗ trợ WebSocket",
+        "1": "Nhắn tin Pub/Sub",
+        "2": "Lịch sử sự kiện",
+        "3": "Kênh tùy chỉnh"
+      }
+    }
+    }
+  },
+  "SupportPage": {
+    "badge": "Hỗ trợ được hỗ trợ bởi AI",
+    "title": "Chúng tôi có thể",
+    "title_gradient": "Giúp gì?",
+    "subtitle": "Trò chuyện với trợ lý AI của chúng tôi hoặc duyệt tài nguyên để có câu trả lời tức thì.",
+    "ai_assistant": "Trợ lý Hỗ trợ AI",
+    "online": "Trực tuyến",
+    "type_message": "Nhập tin nhắn của bạn...",
+    "quick_actions": {
+      "recommend_api": "Đề xuất API cho trường hợp sử dụng của tôi",
+      "calls_left": "Tôi còn bao nhiêu lượt gọi?",
+      "rate_limiting": "Giúp với giới hạn tốc độ",
+      "upgrade": "Nâng cấp gói đăng ký của tôi"
+    },
+    "faq": {
+      "title": "Câu hỏi thường gặp",
+      "generate_key": {
+        "question": "Làm thế nào để tạo khóa API mới?",
+        "answer": "Đi tới Bảng điều khiển > Khóa API > Nhấp \"Khóa mới\". Bạn có thể đặt tên cho khóa và thiết lập quyền."
+      },
+      "rate_limit": {
+        "question": "Điều gì xảy ra nếu tôi vượt quá giới hạn tốc độ?",
+        "answer": "Các yêu cầu vượt quá giới hạn tốc độ sẽ nhận được phản hồi 429. Hãy cân nhắc nâng cấp gói của bạn để có giới hạn cao hơn."
+      },
+      "change_plan": {
+        "question": "Làm thế nào để thay đổi gói đăng ký của tôi?",
+        "answer": "Điều hướng đến Bảng điều khiển > Thanh toán > Thay đổi Gói. Thay đổi có hiệu lực vào chu kỳ thanh toán tiếp theo của bạn."
+      },
+      "free_trial": {
+        "question": "Có bản dùng thử miễn phí không?",
+        "answer": "Có! Tất cả API của chúng tôi bao gồm gói miễn phí với số lượt gọi hạn chế mỗi tháng. Không cần thẻ tín dụng."
+      }
+    },
+    "need_help": {
+      "title": "Cần thêm trợ giúp?",
+      "description": "Liên hệ với nhóm hỗ trợ của chúng tôi",
+      "email_support": "Hỗ trợ Email",
+      "response_time": "Thời gian phản hồi",
+      "response_time_value": "Thường trong vòng 24 giờ"
+    },
+    "resources": {
+      "title": "Tài nguyên",
+      "api_docs": "Tài liệu API",
+      "getting_started": "Hướng dẫn Bắt đầu",
+      "video_tutorials": "Video hướng dẫn",
+      "developer_blog": "Blog Nhà phát triển"
+    },
+    "ai_responses": {
+      "welcome": "Xin chào! Tôi là trợ lý hỗ trợ AI của bạn. Tôi có thể giúp bạn với đề xuất API, xử lý sự cố và trả lời câu hỏi về việc sử dụng của bạn. Tôi có thể hỗ trợ bạn như thế nào hôm nay?",
+      "recommend": "Dựa trên câu hỏi của bạn, tôi khuyên dùng **API Thị giác AI** của chúng tôi cho các tác vụ xử lý hình ảnh, hoặc **API Xử lý Dữ liệu** của chúng tôi cho nhu cầu chuyển đổi dữ liệu. Bạn đang làm việc với trường hợp sử dụng cụ thể nào?",
+      "calls": "Bạn hiện có **15.000 lượt gọi API** còn lại trong tháng này trên tất cả các gói đăng ký của bạn. Hạn mức của bạn được đặt lại vào ngày 1 mỗi tháng.",
+      "rate_limit": "Giới hạn tốc độ bảo vệ cơ sở hạ tầng của chúng tôi. Giới hạn hiện tại của bạn là:\n- **Gói miễn phí**: 10 yêu cầu/giây\n- **Gói Pro**: 100 yêu cầu/giây\n\nHãy cân nhắc triển khai exponential backoff trong code của bạn.",
+      "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
+    }
   }
 }
