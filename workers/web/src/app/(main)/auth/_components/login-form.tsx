@@ -119,7 +119,7 @@ export function LoginForm() {
       setShowOtpPopup(false);
       setOtp("");
       form.reset();
-      router.push("/");
+      router.push("/dashboard");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("otp_verify_error"));
     } finally {

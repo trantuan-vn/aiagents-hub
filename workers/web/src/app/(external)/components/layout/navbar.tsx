@@ -2,18 +2,17 @@
 
 import { useState, useEffect } from "react";
 
-import { Globe, Menu, Moon, Sun, X, Zap, ChevronDown } from "lucide-react";
+import { Menu, X, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link, useLocation } from "react-router-dom";
 
 import { updateThemeMode } from "@/lib/theme-utils";
 import { setValueToCookie } from "@/server/server-actions";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
-import { LOCALE_OPTIONS, type Locale } from "@/types/preferences/locale";
+import type { Locale } from "@/types/preferences/locale";
 import type { ThemeMode } from "@/types/preferences/theme";
 
-import { Button } from "../ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
+import { DesktopCTA, DesktopNavigation, MobileMenu } from "./navbar-components";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -40,7 +39,8 @@ export default function Navbar() {
   const handleLocaleChange = async (newLocale: Locale) => {
     setLocale(newLocale);
     await setValueToCookie("locale", newLocale);
-    // Reload page to apply new locale
+    // Reload page to apply new locale while preserving current path
+    // The catch-all route will handle all paths and React Router will route correctly
     window.location.reload();
   };
 
@@ -64,7 +64,9 @@ export default function Navbar() {
   return (
     <nav
       className={`fixed top-0 right-0 left-0 z-50 transition-all duration-300 ${
-        isScrolled ? "glass shadow-lg" : "bg-transparent"
+        isScrolled
+          ? "glass bg-background/95 lg:bg-background/80 shadow-lg backdrop-blur-md lg:backdrop-blur-sm"
+          : "bg-background/95 bg-transparent backdrop-blur-md lg:bg-transparent lg:backdrop-blur-none"
       }`}
     >
       <div className="container mx-auto px-4">
@@ -82,78 +84,14 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden items-center gap-1 lg:flex">
-            {navLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                  isActive(link.path)
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-            <DropdownMenu>
-              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200">
-                {t("resources")}
-                <ChevronDown className="h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem asChild>
-                  <Link to="/support">{t("support")}</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/blog">{t("blog")}</Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/changelog">{t("changelog")}</Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Desktop CTA */}
-          <div className="hidden items-center gap-2 lg:flex">
-            {/* Theme Switcher */}
-            <Button size="icon" variant="ghost" onClick={handleThemeToggle}>
-              {themeMode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            {/* Language Switcher */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost">
-                  <Globe className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                {LOCALE_OPTIONS.map((lang) => (
-                  <DropdownMenuItem
-                    key={lang.value}
-                    onClick={() => handleLocaleChange(lang.value)}
-                    className={locale === lang.value ? "bg-accent" : ""}
-                  >
-                    {lang.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <Link to="/auth/v3/login">
-              <Button variant="ghost" size="sm">
-                {t("sign_in")}
-              </Button>
-            </Link>
-            <Link to="/auth?mode=signup">
-              <Button variant="gradient" size="sm">
-                {t("get_started")}
-              </Button>
-            </Link>
-          </div>
+          <DesktopNavigation navLinks={navLinks} isActive={isActive} t={t} />
+          <DesktopCTA
+            themeMode={themeMode}
+            locale={locale}
+            handleThemeToggle={handleThemeToggle}
+            handleLocaleChange={handleLocaleChange}
+            t={t}
+          />
 
           {/* Mobile Menu Toggle */}
           <button
@@ -164,65 +102,17 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="border-border animate-slide-down border-t py-4 lg:hidden">
-            <div className="flex flex-col gap-2">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 ${
-                    isActive(link.path)
-                      ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-                >
-                  {link.name}
-                </Link>
-              ))}
-              <div className="border-border mt-4 flex flex-col gap-2 border-t pt-4">
-                {/* Theme and Language Switchers */}
-                <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={handleThemeToggle} className="flex-1">
-                    {themeMode === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                    {themeMode === "dark" ? "Light" : "Dark"}
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="outline" className="flex-1">
-                        <Globe className="mr-2 h-4 w-4" />
-                        {LOCALE_OPTIONS.find((l) => l.value === locale)?.label ?? "Language"}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-40">
-                      {LOCALE_OPTIONS.map((lang) => (
-                        <DropdownMenuItem
-                          key={lang.value}
-                          onClick={() => handleLocaleChange(lang.value)}
-                          className={locale === lang.value ? "bg-accent" : ""}
-                        >
-                          {lang.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full">
-                    {t("sign_in")}
-                  </Button>
-                </Link>
-                <Link to="/auth?mode=signup" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="gradient" className="w-full">
-                    {t("get_started")}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
+          <MobileMenu
+            navLinks={navLinks}
+            isActive={isActive}
+            themeMode={themeMode}
+            locale={locale}
+            handleThemeToggle={handleThemeToggle}
+            handleLocaleChange={handleLocaleChange}
+            setIsMobileMenuOpen={setIsMobileMenuOpen}
+            t={t}
+          />
         )}
       </div>
     </nav>

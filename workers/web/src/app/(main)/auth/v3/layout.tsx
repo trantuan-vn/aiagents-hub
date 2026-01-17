@@ -1,34 +1,92 @@
-// import type { ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import { Command } from "lucide-react";
+import { Command, Cloud, Code, Zap, Shield, Globe } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
-import { Separator } from "@/components/ui/separator";
-import { APP_CONFIG } from "@/config/app-config";
-
-// export default function Layout({ children }: Readonly<{ children: ReactNode }>) {
-export default function Layout({ children }: LayoutProps<"/auth/v3">) {
+export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
+  const t = await getTranslations("AuthLayout");
   return (
     <main>
       <div className="grid h-dvh justify-center p-2 lg:grid-cols-2">
-        <div className="bg-primary relative order-2 hidden h-full rounded-3xl lg:flex">
-          <div className="text-primary-foreground absolute top-10 space-y-1 px-10">
-            <Command className="size-10" />
-            <h1 className="text-2xl font-medium">{APP_CONFIG.name}</h1>
-            <p className="text-sm">Design. Build. Launch. Repeat.</p>
+        <div className="bg-primary relative order-2 hidden h-full rounded-3xl lg:flex flex-col">
+          <div className="text-primary-foreground absolute top-10 space-y-2 px-10">
+            <div className="flex items-center gap-3">
+              <Command className="size-8" />
+              <h1 className="text-3xl font-semibold">{t("apihub_title")}</h1>
+            </div>
+            <p className="text-primary-foreground/80 text-base font-light">
+              {t("apihub_tagline")}
+            </p>
           </div>
 
-          <div className="absolute bottom-10 flex w-full justify-between px-10">
-            <div className="text-primary-foreground flex-1 space-y-1">
-              <h2 className="font-medium">Ready to launch?</h2>
-              <p className="text-sm">Clone the repo, install dependencies, and your dashboard is live in minutes.</p>
+          <div className="flex-1 flex items-center justify-center px-10">
+            <div className="text-primary-foreground space-y-6 max-w-md">
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Zap className="size-5 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-semibold mb-1">{t("feature_speed_title")}</h3>
+                    <p className="text-sm text-primary-foreground/80">
+                      {t("feature_speed_description")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Shield className="size-5 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-semibold mb-1">{t("feature_security_title")}</h3>
+                    <p className="text-sm text-primary-foreground/80">
+                      {t("feature_security_description")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Cloud className="size-5 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-semibold mb-1">{t("feature_scalability_title")}</h3>
+                    <p className="text-sm text-primary-foreground/80">
+                      {t("feature_scalability_description")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Code className="size-5 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-semibold mb-1">{t("feature_integration_title")}</h3>
+                    <p className="text-sm text-primary-foreground/80">
+                      {t("feature_integration_description")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-3">
+                  <Globe className="size-5 mt-0.5 shrink-0" />
+                  <div>
+                    <h3 className="font-semibold mb-1">{t("feature_global_title")}</h3>
+                    <p className="text-sm text-primary-foreground/80">
+                      {t("feature_global_description")}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <Separator orientation="vertical" className="mx-3 !h-auto" />
-            <div className="text-primary-foreground flex-1 space-y-1">
-              <h2 className="font-medium">Need help?</h2>
-              <p className="text-sm">
-                Check out the docs or open an issue on GitHub, community support is just a click away.
-              </p>
-            </div>
+          </div>
+
+          <div className="absolute bottom-10 px-10 w-full">
+            <p className="text-primary-foreground/60 text-xs text-center">
+              {t("trust_message")}
+            </p>
           </div>
         </div>
         <div className="relative order-1 flex h-full">{children}</div>

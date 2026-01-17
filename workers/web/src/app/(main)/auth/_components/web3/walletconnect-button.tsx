@@ -1,25 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { useTranslations } from "next-intl";
 import { SiweMessage } from "siwe";
 import { toast } from "sonner";
-import { useConnect, useSignMessage, useAccount, useChainId } from "wagmi";
+import { useAccount, useChainId, useConnect, useSignMessage } from "wagmi";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const NonceSchema = z.object({
-  nonce: z
-    .string()
-    .min(1)
-    .regex(/^[a-zA-Z0-9]+$/, "Nonce chỉ được chứa chữ cái và số"),
-});
-
 export function WalletConnectButton({ className, ...props }: React.ComponentProps<typeof Button>) {
+  const t = useTranslations("WalletConnect");
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: isConnecting } = useConnect();
@@ -27,29 +22,42 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   const chainId = useChainId() || 1;
   const [isSigning, setIsSigning] = useState(false);
 
-  const handlePostConnection = useCallback(async () => {
-    setIsSigning(true);
+  const NonceSchema = useMemo(
+    () =>
+      z.object({
+        nonce: z
+          .string()
+          .min(1)
+          .regex(/^[a-zA-Z0-9]+$/, t("nonce_validation_error")),
+      }),
+    [t],
+  );
 
-    try {
-      // Thông báo cho người dùng biết đang lấy thông tin xác thực
-      toast.info("Đang chuẩn bị thông tin xác thực...");
+  const fetchNonce = useCallback(async () => {
+    toast.info(t("preparing_auth"));
 
-      const nonceResponse = await fetch("https://api.unitoken.trade/dashboard/auth/wallet/nonce", {
-        method: "GET",
-        credentials: "include",
-      });
+    const nonceResponse = await fetch("https://api.unitoken.trade/dashboard/auth/wallet/nonce", {
+      method: "GET",
+      credentials: "include",
+    });
 
-      if (!nonceResponse.ok) {
-        const errorText = await nonceResponse.text();
-        throw new Error(`Không thể lấy nonce: ${errorText}`);
-      }
+    if (!nonceResponse.ok) {
+      const errorText = await nonceResponse.text();
+      throw new Error(t("nonce_fetch_error", { error: errorText }));
+    }
 
-      const data = await nonceResponse.json();
-      console.log("Phản hồi nonce:", nonceResponse.status, data);
-      const result = NonceSchema.parse(data);
-      console.log("Parsed nonce:", result.nonce);
+    const data = await nonceResponse.json();
+    // eslint-disable-next-line no-console
+    console.log("Phản hồi nonce:", nonceResponse.status, data);
+    const result = NonceSchema.parse(data);
+    // eslint-disable-next-line no-console
+    console.log("Parsed nonce:", result.nonce);
 
-      // Tạo message
+    return result.nonce;
+  }, [t, NonceSchema]);
+
+  const createAndSignMessage = useCallback(
+    async (nonce: string) => {
       const domain = window.location.host;
       const origin = window.location.origin;
       const statement = "Please sign this message to confirm your identity.";
@@ -61,28 +69,33 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         uri: origin,
         version: "1",
         chainId: chainId,
-        nonce: result.nonce,
+        nonce,
         issuedAt: new Date().toISOString(),
       });
 
-      // Tạo message để ký
       const message = siweMessage.prepareMessage();
-
+      // eslint-disable-next-line no-console
       console.log("SIWE message:", message);
 
-      // Thông báo cho người dùng mở ví để ký
-      toast.info("Vui lòng mở ví và ký thông điệp để xác nhận...", {
+      toast.info(t("open_wallet_sign"), {
         duration: 5000,
       });
 
       const signature = await signMessageAsync({ message }).catch((err) => {
-        throw new Error(`Ký thông điệp thất bại: ${err.message}`);
+        throw new Error(t("sign_failed", { error: err.message }));
       });
 
+      // eslint-disable-next-line no-console
       console.log("Signature:", signature);
 
-      // Thông báo đang xác minh chữ ký
-      toast.info("Đang xác minh chữ ký...");
+      return { message, signature: signature.startsWith("0x") ? signature : `0x${signature}` };
+    },
+    [address, chainId, signMessageAsync, t],
+  );
+
+  const verifyAndConnect = useCallback(
+    async (message: string, signature: string) => {
+      toast.info(t("verifying_signature"));
 
       const connectResponse = await fetch("https://api.unitoken.trade/dashboard/auth/wallet/connect", {
         method: "POST",
@@ -92,40 +105,63 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         },
         body: JSON.stringify({
           message,
-          signature: signature.startsWith("0x") ? signature : `0x${signature}`,
+          signature,
         }),
         credentials: "include",
       });
 
       if (!connectResponse.ok) {
         const errorData = await connectResponse.json();
+        // eslint-disable-next-line no-console
         console.log("Connect response error:", errorData);
-        throw new Error(`Không thể kết nối ví: ${errorData}`);
+        const errorText = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
+        throw new Error(t("connect_failed", { error: errorText }));
       }
 
-      toast.success("Kết nối ví thành công!");
-      router.push("/");
-    } catch (error) {
+      toast.success(t("connect_success"));
+      router.push("/dashboard");
+    },
+    [t, router],
+  );
+
+  const handleError = useCallback(
+    (error: unknown) => {
+      // eslint-disable-next-line no-console
       console.error("Lỗi sau kết nối:", error);
 
       if (error instanceof Error) {
-        if (error.message.includes("Ký thông điệp thất bại")) {
-          toast.error("Ký thông điệp thất bại. Vui lòng thử lại.");
-        } else if (error.message.includes("Người dùng từ chối")) {
-          toast.error("Bạn đã từ chối ký thông điệp. Vui lòng đồng ý để tiếp tục.");
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes("sign") && (errorMsg.includes("failed") || errorMsg.includes("thất bại"))) {
+          toast.error(t("sign_failed_retry"));
+        } else if (errorMsg.includes("user rejected") || errorMsg.includes("người dùng từ chối") || errorMsg.includes("rejected")) {
+          toast.error(t("user_rejected_sign"));
         } else {
-          toast.error(`Lỗi: ${error.message}`);
+          toast.error(t("error", { error: error.message }));
         }
       } else {
-        toast.error("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+        toast.error(t("unknown_error"));
       }
+    },
+    [t],
+  );
+
+  const handlePostConnection = useCallback(async () => {
+    setIsSigning(true);
+
+    try {
+      const nonce = await fetchNonce();
+      const { message, signature } = await createAndSignMessage(nonce);
+      await verifyAndConnect(message, signature);
+    } catch (error) {
+      handleError(error);
     } finally {
       setIsSigning(false);
     }
-  }, [address, chainId, signMessageAsync, router]);
+  }, [fetchNonce, createAndSignMessage, verifyAndConnect, handleError]);
 
   useEffect(() => {
     if (isConnected && address) {
+      // eslint-disable-next-line no-console
       console.log("Đã kết nối địa chỉ:", address);
       handlePostConnection();
     }
@@ -133,7 +169,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
 
   const handleWalletConnectLogin = async () => {
     if (isConnected && address) {
-      toast.info("Ví đã được kết nối. Đang chuẩn bị xác thực...");
+      toast.info(t("wallet_connected_preparing"));
       await handlePostConnection();
       return;
     }
@@ -143,37 +179,40 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       const walletConnectConnector = connectors.find((c) => c.id === "walletConnect");
 
       if (injectedConnector && window.ethereum) {
+        // eslint-disable-next-line no-console
         console.log("Kết nối bằng injected connector...");
-        toast.info("Vui lòng mở ví và chấp nhận kết nối...");
+        toast.info(t("open_wallet_accept"));
         await connect({ connector: injectedConnector });
       } else if (walletConnectConnector) {
+        // eslint-disable-next-line no-console
         console.log("Kết nối bằng WalletConnect...");
-        toast.info("Đang mở WalletConnect...");
+        toast.info(t("opening_walletconnect"));
         await connect({ connector: walletConnectConnector });
       } else {
-        toast.error("Không tìm thấy ví phù hợp. Vui lòng cài đặt MetaMask hoặc WalletConnect.");
+        toast.error(t("no_wallet_found"));
+        // eslint-disable-next-line no-console
         console.error("Không tìm thấy connector injected hoặc walletConnect.");
       }
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error("Lỗi kết nối ví:", error);
 
       if (error instanceof Error) {
         if (error.message.includes("User rejected")) {
-          toast.error("Bạn đã từ chối kết nối ví. Vui lòng thử lại.");
+          toast.error(t("user_rejected_connect"));
         } else {
-          toast.error(`Kết nối thất bại: ${error.message}`);
+          toast.error(t("connect_failed_error", { error: error.message }));
         }
       } else {
-        toast.error("Kết nối ví thất bại. Vui lòng thử lại.");
+        toast.error(t("connect_failed_retry"));
       }
     }
   };
 
   const getButtonText = () => {
-    if (isConnecting) return "Đang kết nối ví...";
-    if (isSigning) return "Đang chờ ký số...";
-    if (isConnected) return "Tiếp tục với WalletConnect";
-    return "Tiếp tục với WalletConnect";
+    if (isConnecting) return t("connecting");
+    if (isSigning) return t("waiting_sign");
+    return t("continue_with_walletconnect");
   };
 
   return (

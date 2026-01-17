@@ -31,6 +31,21 @@
     "register": "Register",
     "language_label": "ENG"
   },
+  "AuthLayout": {
+    "apihub_title": "APIHub",
+    "apihub_tagline": "Professional API platform for modern businesses",
+    "feature_speed_title": "Lightning Fast",
+    "feature_speed_description": "Process millions of requests per second with the lowest latency",
+    "feature_security_title": "Enterprise Security",
+    "feature_security_description": "Protect data with end-to-end encryption and multi-factor authentication",
+    "feature_scalability_title": "Flexible Scaling",
+    "feature_scalability_description": "Adjust resources on demand, auto-scale to meet traffic needs",
+    "feature_integration_title": "Easy Integration",
+    "feature_integration_description": "Comprehensive SDK and documentation supporting all popular programming languages",
+    "feature_global_title": "Global Reach",
+    "feature_global_description": "Diverse connection points worldwide, ensuring optimal performance",
+    "trust_message": "Thousands of businesses trust APIHub to build our solutions"
+  },
   "LoginForm": {
     "email_or_phone_label": "Email or Phone Number",
     "email_or_phone_placeholder": "you@example.com or +84...",
@@ -469,5 +484,29 @@
       "rate_limit": "Rate limiting protects our infrastructure. Your current limits are:\n- **Free tier**: 10 requests/second\n- **Pro tier**: 100 requests/second\n\nConsider implementing exponential backoff in your code.",
       "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"
     }
+  },
+  "WalletConnect": {
+    "nonce_validation_error": "Nonce must only contain letters and numbers",
+    "preparing_auth": "Preparing authentication information...",
+    "nonce_fetch_error": "Failed to fetch nonce: {error}",
+    "open_wallet_sign": "Please open your wallet and sign the message to confirm...",
+    "sign_failed": "Failed to sign message: {error}",
+    "verifying_signature": "Verifying signature...",
+    "connect_failed": "Failed to connect wallet: {error}",
+    "connect_success": "Wallet connected successfully!",
+    "sign_failed_retry": "Failed to sign message. Please try again.",
+    "user_rejected_sign": "You have rejected signing the message. Please approve to continue.",
+    "error": "Error: {error}",
+    "unknown_error": "An unknown error occurred. Please try again.",
+    "wallet_connected_preparing": "Wallet is connected. Preparing authentication...",
+    "open_wallet_accept": "Please open your wallet and accept the connection...",
+    "opening_walletconnect": "Opening WalletConnect...",
+    "no_wallet_found": "No suitable wallet found. Please install MetaMask or WalletConnect.",
+    "user_rejected_connect": "You have rejected the wallet connection. Please try again.",
+    "connect_failed_error": "Connection failed: {error}",
+    "connect_failed_retry": "Wallet connection failed. Please try again.",
+    "connecting": "Connecting wallet...",
+    "waiting_sign": "Waiting for signature...",
+    "continue_with_walletconnect": "Continue with WalletConnect"
   }
 }

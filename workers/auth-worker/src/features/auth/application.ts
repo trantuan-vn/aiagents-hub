@@ -155,7 +155,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       if (validationUtils.isValidEmail(nIdentifier)) {
         await otpService.sendEmailOTP(nIdentifier, otp);
       } else if (validationUtils.isValidPhone(nIdentifier)) {
-        await otpService.sendSmsOTP(nIdentifier, otp, "VONAGE");
+        await otpService.sendSmsOTP(nIdentifier, otp);
       }
     },
 

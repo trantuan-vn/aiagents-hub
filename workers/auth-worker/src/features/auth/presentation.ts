@@ -99,7 +99,7 @@ export function createAuthRoutes(bindingName: string) {
     );
 
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
-    return c.redirect(c.env.FRONTEND_URL);
+    return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 
   // II. OTP Routes

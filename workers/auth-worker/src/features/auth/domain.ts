@@ -173,7 +173,7 @@ export interface IOTPService {
   generateOTP(sessionId: string): Promise<string>;
   verifyOTP(otp: string, sessionId: string): Promise<boolean>;
   sendEmailOTP(email: string, otp: string): Promise<void>;
-  sendSmsOTP(phone: string, otp: string, provider: string): Promise<void>;
+  sendSmsOTP(phone: string, otp: string): Promise<void>;
 }
 
 export interface IWalletService {

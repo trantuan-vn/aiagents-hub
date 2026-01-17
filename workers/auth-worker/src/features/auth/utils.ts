@@ -116,7 +116,7 @@ export const validationUtils = {
       return identifier.toLowerCase();
     } else if (this.isValidPhone(identifier)) {
       const digits = identifier.replace(/\D/g, '');
-      return digits.startsWith('+') ? digits : `+${digits}`;
+      return digits;
     }
     return identifier.toLowerCase();
   },

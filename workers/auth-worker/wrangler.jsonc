@@ -46,8 +46,8 @@
 	"vars": {
 		"ACCOUNT_ID": "e76b7bb989f93985402e1a61e6cd5ff3",  
 		"SMS_FROM_NUMBER": "+84919358683",		
-		"SIWE_DOMAIN": "beta.unitoken.trade",
-		"FRONTEND_URL": "https://beta.unitoken.trade",
+		"SIWE_DOMAIN": "unitoken.trade",
+		"FRONTEND_URL": "https://unitoken.trade",
 		"BASE_URL": "https://api.unitoken.trade",
 		"DEBUG": "false",
 		"ENVIRONMENT": "production",

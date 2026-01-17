@@ -182,67 +182,68 @@ export function createOTPService(env: Env): IOTPService {
     }
   };
 
-  const sendSMS = async (phone: string, otp: string, provider: string): Promise<void> => {
-    let response: Response | null = null;
-    const accountId= await env.TWILIO_ACCOUNT_SID.get();
-    const authToken= await env.TWILIO_AUTH_TOKEN.get();
-    if (!accountId || !authToken) {
-      throw new Error("TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN is not defined in environment variables");
-    }
+  const sendSMS = async (phone: string, otp: string): Promise<void> => {    
     const apiKey= await env.VONAGE_API_KEY.get();
     const apiSecret= await env.VONAGE_API_SECRET.get();
-    if (!accountId || !authToken) {
-      throw new Error("TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN is not defined in environment variables");
+    if (!apiKey || !apiSecret) {
+      throw new Error("VONAGE_API_KEY or VONAGE_API_SECRET is not defined in environment variables");
     }
-
-
-
-    switch (provider.toUpperCase()) {
-      case "TWILIO": {
-        const smsData = new URLSearchParams({
-          To: phone,
-          From: env.SMS_FROM_NUMBER,
-          Body: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`,
-        });
-
-        const auth = btoa(`${accountId}:${authToken}`);
-        response = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${accountId}/Messages.json`,
-          {
-            method: "POST",
-            headers: {
-              "Authorization": `Basic ${auth}`,
-              "Content-Type": "application/x-www-form-urlencoded",
-            },
-            body: smsData.toString(),
-          }
-        );
-        break;
-      }
-      case "VONAGE": {
-        const smsData = new URLSearchParams({
+    const messageText = `Your OTP code is: ${otp}. This code will expire in 10 minutes.`;
+    
+    // const payload = {
+    //   from: '14157386102',
+    //   to: phone,
+    //   channel: "whatsapp",
+    //   message_type: "text",          
+    //   text: messageText,    
+    //   failover: [
+    //     {
+    //       from: '22353',
+    //       to: phone,
+    //       channel: "viber_service",
+    //       message_type: "text",
+    //       text: messageText,    
+    //     },        
+    //     {
+    //       from: env.SMS_FROM_NUMBER,
+    //       to: phone,          
+    //       channel: "sms",
+    //       message_type: "text",
+    //       text: messageText,
+    //     },
+    //   ]      
+    // };
+    const payload = {
+      from: '15558308877',
+      to: phone,
+      channel: "whatsapp",
+      message_type: "text",          
+      text: messageText,    
+      failover: [
+        {
           from: env.SMS_FROM_NUMBER,
-          to: phone,
-          text: `Your OTP code is: ${otp}. This code will expire in 10 minutes.`,
-        });
+          to: phone,          
+          channel: "sms",
+          message_type: "text",
+          text: messageText,
+        },
+      ]      
+    };    
 
-        const auth = btoa(`${apiKey}:${apiSecret}`);
-        response = await fetch("https://rest.nexmo.com/sms/json", {
-          method: "POST",
-          headers: {
-            "Authorization": `Basic ${auth}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: smsData.toString(),
-        });
-        break;
-      }
-      default:
-        throw new Error(`Unsupported provider: ${provider}`);
-    }
-
-    if (response && !response.ok) {
-      throw new Error(`Failed to send SMS OTP via ${provider}: ${await response.text()}`);
+    const auth = btoa(`${apiKey}:${apiSecret}`);
+    const response = await fetch("https://api.nexmo.com/v1/messages", {  
+    //const response = await fetch("https://messages-sandbox.nexmo.com/v1/messages", {  
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${auth}`,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Failed to send SMS OTP via VONAGE: ${JSON.stringify(errorData)}`);
     }
   };
 
@@ -261,8 +262,8 @@ export function createOTPService(env: Env): IOTPService {
       await sendEmail(email, otp);
     },
 
-    async sendSmsOTP(phone: string, otp: string, provider: string): Promise<void> {
-      await sendSMS(phone, otp, provider);
+    async sendSmsOTP(phone: string, otp: string): Promise<void> {
+      await sendSMS(phone, otp);
     }
   };
 }

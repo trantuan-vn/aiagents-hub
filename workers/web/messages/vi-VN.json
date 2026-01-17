@@ -31,6 +31,21 @@
     "register": "Đăng ký",
     "language_label": "VIE"
   },
+  "AuthLayout": {
+    "apihub_title": "APIHub",
+    "apihub_tagline": "Nền tảng API chuyên nghiệp cho doanh nghiệp hiện đại",
+    "feature_speed_title": "Tốc độ vượt trội",
+    "feature_speed_description": "Xử lý hàng triệu request mỗi giây với độ trễ thấp nhất",
+    "feature_security_title": "Bảo mật hàng đầu",
+    "feature_security_description": "Bảo vệ dữ liệu với mã hóa end-to-end và xác thực đa yếu tố",
+    "feature_scalability_title": "Mở rộng linh hoạt",
+    "feature_scalability_description": "Điều chỉnh tài nguyên theo nhu cầu, tự động scale để đáp ứng tải",
+    "feature_integration_title": "Tích hợp dễ dàng",
+    "feature_integration_description": "SDK và tài liệu đầy đủ hỗ trợ mọi ngôn ngữ lập trình phổ biến",
+    "feature_global_title": "Toàn cầu hóa",
+    "feature_global_description": "Điểm kết nối đa dạng trên toàn thế giới, đảm bảo hiệu năng tối ưu",
+    "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng APIHub để xây dựng giải pháp của chúng tôi"
+  },
   "LoginForm": {
     "email_or_phone_label": "Email hoặc Số điện thoại",
     "email_or_phone_placeholder": "you@example.com hoặc +84...",
@@ -469,5 +484,29 @@
       "rate_limit": "Giới hạn tốc độ bảo vệ cơ sở hạ tầng của chúng tôi. Giới hạn hiện tại của bạn là:\n- **Gói miễn phí**: 10 yêu cầu/giây\n- **Gói Pro**: 100 yêu cầu/giây\n\nHãy cân nhắc triển khai exponential backoff trong code của bạn.",
       "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
     }
+  },
+  "WalletConnect": {
+    "nonce_validation_error": "Nonce chỉ được chứa chữ cái và số",
+    "preparing_auth": "Đang chuẩn bị thông tin xác thực...",
+    "nonce_fetch_error": "Không thể lấy nonce: {error}",
+    "open_wallet_sign": "Vui lòng mở ví và ký thông điệp để xác nhận...",
+    "sign_failed": "Ký thông điệp thất bại: {error}",
+    "verifying_signature": "Đang xác minh chữ ký...",
+    "connect_failed": "Không thể kết nối ví: {error}",
+    "connect_success": "Kết nối ví thành công!",
+    "sign_failed_retry": "Ký thông điệp thất bại. Vui lòng thử lại.",
+    "user_rejected_sign": "Bạn đã từ chối ký thông điệp. Vui lòng đồng ý để tiếp tục.",
+    "error": "Lỗi: {error}",
+    "unknown_error": "Đã xảy ra lỗi không xác định. Vui lòng thử lại.",
+    "wallet_connected_preparing": "Ví đã được kết nối. Đang chuẩn bị xác thực...",
+    "open_wallet_accept": "Vui lòng mở ví và chấp nhận kết nối...",
+    "opening_walletconnect": "Đang mở WalletConnect...",
+    "no_wallet_found": "Không tìm thấy ví phù hợp. Vui lòng cài đặt MetaMask hoặc WalletConnect.",
+    "user_rejected_connect": "Bạn đã từ chối kết nối ví. Vui lòng thử lại.",
+    "connect_failed_error": "Kết nối thất bại: {error}",
+    "connect_failed_retry": "Kết nối ví thất bại. Vui lòng thử lại.",
+    "connecting": "Đang kết nối ví...",
+    "waiting_sign": "Đang chờ ký số...",
+    "continue_with_walletconnect": "Tiếp tục với WalletConnect"
   }
 }
