@@ -19,8 +19,8 @@ const createConnectors = () => {
       metadata: {
         name: "Unitoken",
         description: "Unitoken",
-        url: "http://beta.unitoken.trade",
-        icons: ["http://beta.unitoken.trade/icon.png"],
+        url: "http://unitoken.trade",
+        icons: ["http://unitoken.trade/icon.png"],
       },
     }),
   ];

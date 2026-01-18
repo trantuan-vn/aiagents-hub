@@ -50,7 +50,7 @@ const NavItemExpanded = ({
   translateTitle: (title: string) => string;
 }) => {
   return (
-    <Collapsible key={item.title} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
+    <Collapsible asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
           {item.subItems ? (
@@ -130,7 +130,6 @@ const NavItemCollapsed = ({
           {item.subItems?.map((subItem) => (
             <DropdownMenuItem key={subItem.title} asChild>
               <SidebarMenuSubButton
-                key={subItem.title}
                 asChild
                 className="focus-visible:ring-0"
                 aria-disabled={subItem.comingSoon}
@@ -158,13 +157,33 @@ export function NavMain({ items }: NavMainProps) {
   // Translation mapping for sidebar items
   const translateTitle = (title: string): string => {
     const translationMap: Record<string, string> = {
+      Control: t("control"),
+      Monitor: t("monitor"),
       Dashboards: t("dashboards"),
       Pages: t("pages"),
       Misc: t("misc"),
+      Build: t("build"),
+      "Useful Links": t("useful_links"),
+      Overview: t("overview"),
+      "API Keys": t("api_keys"),
+      Billing: t("billing"),
+      Notifications: t("notifications"),
+      Settings: t("settings"),
+      Logs: t("logs"),
+      Analytics: t("analytics"),
+      "Delivery & Quality": t("delivery_quality"),
       Default: t("default"),
       CRM: t("crm"),
       Finance: t("finance"),
-      Analytics: t("analytics"),
+      eKyc: t("ekyc"),
+      Messaging: t("messaging"),
+      "Ask AI": t("ask_ai"),
+      Documentation: t("documentation"),
+      Support: t("support"),
+      "Legal & Privacy": t("legal_privacy"),
+      "Privacy Policy": t("privacy_policy"),
+      "Cookie Settings": t("cookie_settings"),
+      "Your privacy choices": t("your_privacy_choices"),
       "E-commerce": t("ecommerce"),
       Academy: t("academy"),
       Logistics: t("logistics"),

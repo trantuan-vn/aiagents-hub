@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Menu, X, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -17,6 +17,7 @@ import { DesktopCTA, DesktopNavigation, MobileMenu } from "./navbar-components";
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const location = useLocation();
   const t = useTranslations("Navbar");
   const themeMode = usePreferencesStore((s) => s.themeMode);
@@ -52,14 +53,51 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const navLinks = [
-    { name: t("home"), path: "/" },
-    { name: t("packages"), path: "/packages" },
-    { name: t("documentation"), path: "/docs" },
-    { name: t("pricing"), path: "/pricing" },
-  ];
+  // Check authentication status using API (since token cookie is httpOnly)
+  const checkAuth = useCallback(async () => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
+      const response = await fetch(`${apiUrl}/profile/me`, {
+        method: "GET",
+        credentials: "include",
+      });
+      setIsAuthenticated(response.ok);
+    } catch {
+      // Auth check failed, assume not authenticated
+      setIsAuthenticated(false);
+    }
+  }, []);
 
-  const isActive = (path: string) => location.pathname === path;
+  // Check auth on mount and when location changes
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth, location.pathname]);
+
+  // Re-check auth when user returns to tab (handles token expiration)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAuth();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [checkAuth]);
+
+  const navLinks = useMemo(
+    () => [
+      { name: t("home"), path: "/" },
+      { name: t("packages"), path: "/packages" },
+      { name: t("documentation"), path: "/docs" },
+      { name: t("pricing"), path: "/pricing" },
+    ],
+    [t],
+  );
+
+  const isActive = useMemo(() => (path: string) => location.pathname === path, [location.pathname]);
 
   return (
     <nav
@@ -90,6 +128,7 @@ export default function Navbar() {
             locale={locale}
             handleThemeToggle={handleThemeToggle}
             handleLocaleChange={handleLocaleChange}
+            isAuthenticated={isAuthenticated}
             t={t}
           />
 
@@ -111,6 +150,7 @@ export default function Navbar() {
             handleThemeToggle={handleThemeToggle}
             handleLocaleChange={handleLocaleChange}
             setIsMobileMenuOpen={setIsMobileMenuOpen}
+            isAuthenticated={isAuthenticated}
             t={t}
           />
         )}

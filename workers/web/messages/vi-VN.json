@@ -44,7 +44,7 @@
     "feature_integration_description": "SDK và tài liệu đầy đủ hỗ trợ mọi ngôn ngữ lập trình phổ biến",
     "feature_global_title": "Toàn cầu hóa",
     "feature_global_description": "Điểm kết nối đa dạng trên toàn thế giới, đảm bảo hiệu năng tối ưu",
-    "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng APIHub để xây dựng giải pháp của chúng tôi"
+    "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng APIHub để xây dựng giải pháp của họ"
   },
   "LoginForm": {
     "email_or_phone_label": "Email hoặc Số điện thoại",
@@ -86,13 +86,33 @@
     "go_back_home": "Quay về trang chủ"
   },
   "Sidebar": {
+    "control": "Điều khiển",
+    "monitor": "Giám sát",
     "dashboards": "Bảng điều khiển",
     "pages": "Trang",
     "misc": "Khác",
+    "build": "Xây dựng",
+    "useful_links": "Liên kết hữu ích",
+    "overview": "Tổng quan",
+    "api_keys": "Khóa API",
+    "billing": "Thanh toán",
+    "notifications": "Thông báo",
+    "settings": "Cài đặt",
+    "logs": "Nhật ký",
+    "analytics": "Phân tích",
+    "delivery_quality": "Giao hàng & Chất lượng",
     "default": "Mặc định",
     "crm": "CRM",
     "finance": "Tài chính",
-    "analytics": "Phân tích",
+    "ekyc": "eKyc",
+    "messaging": "Nhắn tin",
+    "ask_ai": "Hỏi AI",
+    "documentation": "Tài liệu",
+    "support": "Hỗ trợ",
+    "legal_privacy": "Pháp lý & Quyền riêng tư",
+    "privacy_policy": "Chính sách bảo mật",
+    "cookie_settings": "Cài đặt Cookie",
+    "your_privacy_choices": "Lựa chọn quyền riêng tư của bạn",
     "ecommerce": "Thương mại điện tử",
     "academy": "Học viện",
     "logistics": "Hậu cần",
@@ -483,6 +503,44 @@
       "calls": "Bạn hiện có **15.000 lượt gọi API** còn lại trong tháng này trên tất cả các gói đăng ký của bạn. Hạn mức của bạn được đặt lại vào ngày 1 mỗi tháng.",
       "rate_limit": "Giới hạn tốc độ bảo vệ cơ sở hạ tầng của chúng tôi. Giới hạn hiện tại của bạn là:\n- **Gói miễn phí**: 10 yêu cầu/giây\n- **Gói Pro**: 100 yêu cầu/giây\n\nHãy cân nhắc triển khai exponential backoff trong code của bạn.",
       "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
+    }
+  },
+  "OverviewPage": {
+    "title": "Bảng điều khiển",
+    "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",
+    "add_api": "Thêm API",
+    "stats": {
+      "total_api_calls": "Tổng lượt gọi API",
+      "active_subscriptions": "Gói đăng ký đang hoạt động",
+      "success_rate": "Tỷ lệ thành công",
+      "avg_response_time": "Thời gian phản hồi trung bình",
+      "this_month": "tháng này"
+    },
+    "subscriptions": {
+      "title": "Gói đăng ký đang hoạt động",
+      "description": "Các gói API và mức sử dụng hiện tại của bạn",
+      "view_all": "Xem tất cả",
+      "renews": "Gia hạn",
+      "api_calls": "Lượt gọi API",
+      "plan": "Gói"
+    },
+    "api_keys": {
+      "title": "Khóa API",
+      "description": "Quản lý khóa xác thực API của bạn",
+      "new_key": "Khóa mới",
+      "active": "đang hoạt động",
+      "inactive": "không hoạt động"
+    },
+    "activity": {
+      "title": "Hoạt động gần đây",
+      "description": "Các lượt gọi API và sự kiện mới nhất"
+    },
+    "quick_links": {
+      "title": "Liên kết nhanh",
+      "api_documentation": "Tài liệu API",
+      "support_center": "Trung tâm hỗ trợ",
+      "status_page": "Trang trạng thái",
+      "billing_history": "Lịch sử thanh toán"
     }
   },
   "WalletConnect": {

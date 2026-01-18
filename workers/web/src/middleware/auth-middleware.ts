@@ -13,7 +13,7 @@ function handleUnauthenticatedDashboard(req: NextRequest, pathname: string): Nex
 
 function handleInsufficientPermissions(req: NextRequest, pathname: string): NextResponse {
   console.log(`Redirecting to default dashboard due to insufficient permissions for ${pathname}`);
-  return NextResponse.redirect(new URL("/dashboard/default", req.url));
+  return NextResponse.redirect(new URL("/dashboard/control/overview", req.url));
 }
 
 function handleAuthenticatedLogin(req: NextRequest): NextResponse {

@@ -44,7 +44,7 @@
     "feature_integration_description": "Comprehensive SDK and documentation supporting all popular programming languages",
     "feature_global_title": "Global Reach",
     "feature_global_description": "Diverse connection points worldwide, ensuring optimal performance",
-    "trust_message": "Thousands of businesses trust APIHub to build our solutions"
+    "trust_message": "Thousands of businesses trust APIHub to build their solutions"
   },
   "LoginForm": {
     "email_or_phone_label": "Email or Phone Number",
@@ -86,13 +86,33 @@
     "go_back_home": "Go back home"
   },
   "Sidebar": {
+    "control": "Control",
+    "monitor": "Monitor",
     "dashboards": "Dashboards",
     "pages": "Pages",
     "misc": "Misc",
+    "build": "Build",
+    "useful_links": "Useful Links",
+    "overview": "Overview",
+    "api_keys": "API Keys",
+    "billing": "Billing",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "logs": "Logs",
+    "analytics": "Analytics",
+    "delivery_quality": "Delivery & Quality",
     "default": "Default",
     "crm": "CRM",
     "finance": "Finance",
-    "analytics": "Analytics",
+    "ekyc": "eKyc",
+    "messaging": "Messaging",
+    "ask_ai": "Ask AI",
+    "documentation": "Documentation",
+    "support": "Support",
+    "legal_privacy": "Legal & Privacy",
+    "privacy_policy": "Privacy Policy",
+    "cookie_settings": "Cookie Settings",
+    "your_privacy_choices": "Your privacy choices",
     "ecommerce": "E-commerce",
     "academy": "Academy",
     "logistics": "Logistics",
@@ -483,6 +503,44 @@
       "calls": "You currently have **15,000 API calls** remaining this month across all your subscriptions. Your quota resets on the 1st of each month.",
       "rate_limit": "Rate limiting protects our infrastructure. Your current limits are:\n- **Free tier**: 10 requests/second\n- **Pro tier**: 100 requests/second\n\nConsider implementing exponential backoff in your code.",
       "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"
+    }
+  },
+  "OverviewPage": {
+    "title": "Dashboard",
+    "description": "Welcome back! Here's your API overview.",
+    "add_api": "Add API",
+    "stats": {
+      "total_api_calls": "Total API Calls",
+      "active_subscriptions": "Active Subscriptions",
+      "success_rate": "Success Rate",
+      "avg_response_time": "Avg Response Time",
+      "this_month": "this month"
+    },
+    "subscriptions": {
+      "title": "Active Subscriptions",
+      "description": "Your current API packages and usage",
+      "view_all": "View all",
+      "renews": "Renews",
+      "api_calls": "API Calls",
+      "plan": "Plan"
+    },
+    "api_keys": {
+      "title": "API Keys",
+      "description": "Manage your API authentication keys",
+      "new_key": "New Key",
+      "active": "active",
+      "inactive": "inactive"
+    },
+    "activity": {
+      "title": "Recent Activity",
+      "description": "Latest API calls and events"
+    },
+    "quick_links": {
+      "title": "Quick Links",
+      "api_documentation": "API Documentation",
+      "support_center": "Support Center",
+      "status_page": "Status Page",
+      "billing_history": "Billing History"
     }
   },
   "WalletConnect": {

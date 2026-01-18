@@ -1,4 +1,4 @@
-import { Globe, Moon, Sun, ChevronDown } from "lucide-react";
+import { ChevronDown, Globe, Moon, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { LOCALE_OPTIONS, type Locale } from "@/types/preferences/locale";
@@ -59,12 +59,14 @@ export function DesktopCTA({
   locale,
   handleThemeToggle,
   handleLocaleChange,
+  isAuthenticated,
   t,
 }: {
   themeMode: ThemeMode;
   locale: Locale;
   handleThemeToggle: () => void;
   handleLocaleChange: (newLocale: Locale) => void;
+  isAuthenticated: boolean;
   t: (key: string) => string;
 }) {
   return (
@@ -90,24 +92,27 @@ export function DesktopCTA({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => {
-          window.location.href = "/auth/v3/login";
-        }}
-      >
-        {t("sign_in")}
-      </Button>
-      <Button
-        variant="gradient"
-        size="sm"
-        onClick={() => {
-          window.location.href = "/auth?mode=signup";
-        }}
-      >
-        {t("get_started")}
-      </Button>
+      {isAuthenticated ? (
+        <Button
+          variant="gradient"
+          size="sm"
+          onClick={() => {
+            window.location.href = "/dashboard";
+          }}
+        >
+          {t("get_started")}
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            window.location.href = "/auth/v3/login";
+          }}
+        >
+          {t("sign_in")}
+        </Button>
+      )}
     </div>
   );
 }
@@ -120,6 +125,7 @@ export function MobileMenu({
   handleThemeToggle,
   handleLocaleChange,
   setIsMobileMenuOpen,
+  isAuthenticated,
   t,
 }: {
   navLinks: NavLink[];
@@ -129,6 +135,7 @@ export function MobileMenu({
   handleThemeToggle: () => void;
   handleLocaleChange: (newLocale: Locale) => void;
   setIsMobileMenuOpen: (open: boolean) => void;
+  isAuthenticated: boolean;
   t: (key: string) => string;
 }) {
   return (
@@ -212,26 +219,29 @@ export function MobileMenu({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              window.location.href = "/auth/v3/login";
-            }}
-          >
-            {t("sign_in")}
-          </Button>
-          <Button
-            variant="gradient"
-            className="w-full"
-            onClick={() => {
-              setIsMobileMenuOpen(false);
-              window.location.href = "/auth?mode=signup";
-            }}
-          >
-            {t("get_started")}
-          </Button>
+          {isAuthenticated ? (
+            <Button
+              variant="gradient"
+              className="w-full"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                window.location.href = "/dashboard";
+              }}
+            >
+              {t("get_started")}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setIsMobileMenuOpen(false);
+                window.location.href = "/auth/v3/login";
+              }}
+            >
+              {t("sign_in")}
+            </Button>
+          )}
         </div>
       </div>
     </div>
