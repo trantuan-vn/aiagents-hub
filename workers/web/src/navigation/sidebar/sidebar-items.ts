@@ -65,7 +65,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Control",
     items: [
       { title: "Overview", url: "/dashboard/control/overview", icon: LayoutDashboard },
-      { title: "API Keys", url: "/dashboard/control/api-keys", icon: Key },
+      { title: "API Keys", url: "/dashboard/control/token", icon: Key },
       { title: "Billing", url: "/dashboard/control/billing", icon: CreditCard },
       { title: "Notifications", url: "/dashboard/control/notifications", icon: Bell },
       { title: "Settings", url: "/dashboard/control/settings", icon: Settings },

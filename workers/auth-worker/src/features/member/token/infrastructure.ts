@@ -117,7 +117,7 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
   const revokeToken = async (tokenId: number): Promise<void> => {    
     await executeUtils.executeDynamicAction(userDO, 'update', { 
       id: tokenId, 
-      data: { isActive: false } 
+      isActive: false 
     }, 'api_tokens');
   };
 

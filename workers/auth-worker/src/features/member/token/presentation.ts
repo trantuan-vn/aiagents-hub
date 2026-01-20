@@ -8,6 +8,11 @@ import { ERROR_MESSAGES } from './constant';
 export function createTokenRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
 
+  // Handle OPTIONS preflight for all routes (must be before other routes)
+  app.options('*', async (c: any) => {
+    return new Response(null, { status: 204 });
+  });
+
   // Helper function để xử lý route chung
   const createRouteHandler = (
     handler: Function, 
@@ -43,7 +48,17 @@ export function createTokenRoutes(bindingName: string) {
 
   // Revoke specific API token
   app.delete('/revoke/:tokenId', createRouteHandler(async (c: any, user: any) => {
-    const tokenId = c.req.param('tokenId');
+    const tokenIdParam = c.req.param('tokenId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(tokenIdParam)) {
+      throw new Error('Invalid token ID format');
+    }
+    const tokenId = parseInt(tokenIdParam, 10);
+    // Validate range (positive integer)
+    if (tokenId <= 0 || !Number.isInteger(tokenId)) {
+      throw new Error('Invalid token ID');
+    }
+    
     const request = RevokeApiTokenSchema.parse({ tokenId });
     
     const tokenService = createTokenApplicationService(c, bindingName);

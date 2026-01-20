@@ -306,6 +306,9 @@ export class DynamicDataBuilder {
   static parseFromDatabase(data: any, schema: z.ZodSchema): any {
     if (!data) return data;
 
+    // Lưu trường id từ dữ liệu gốc (nếu có)
+    const originalId = data.id !== undefined ? data.id : undefined;
+
     const parsed = { ...data };
     
     // Bước 1: Pre-process - chuyển tất cả null thành undefined
@@ -376,7 +379,14 @@ export class DynamicDataBuilder {
       }        
     });
 
-    return schema.parse(parsed);
+    const result = schema.parse(parsed);
+    
+    // Bổ sung trường id nếu có trong dữ liệu gốc
+    if (originalId !== undefined) {
+      result.id = originalId;
+    }
+
+    return result;
   }  
 
   // Helper methods
