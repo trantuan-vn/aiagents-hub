@@ -89,7 +89,17 @@ export function createVoucherRoutes(bindingName: string) {
 
   // Hủy/vô hiệu hóa voucher
   app.patch('/vouchers/:voucherId/status', createRouteHandler(async (c: any, user: any) => {
-    const voucherId = c.req.param('voucherId');
+    const voucherIdParam = c.req.param('voucherId'); 
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(voucherIdParam)) {
+      throw new Error('Invalid voucher ID format');
+    }
+    const voucherId = parseInt(voucherIdParam, 10);
+    // Validate range (positive integer)
+    if (voucherId <= 0 || !Number.isInteger(voucherId)) {
+      throw new Error('Invalid voucher ID');
+    }
+
     const body = await c.req.json();
     const validatedStatus = VoucherStatusSchema.parse(body.status);
     const voucherApp = createVoucherApplicationService(c, bindingName);

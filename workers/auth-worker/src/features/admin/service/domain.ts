@@ -50,6 +50,6 @@ export type ServiceUsage = z.infer<typeof ServiceUsageSchema>;
 export interface IServiceInfrastructureService {
   registerService(request: Service): Promise<any>;
   getUserServices(): Promise<any[]>;
-  cancelService(serviceId: string): Promise<void>;
-  getServiceUsage(serviceId: string, days?: number): Promise<any[]>;
+  cancelService(serviceId: number): Promise<void>;
+  getServiceUsage(serviceId: number, days?: number): Promise<any[]>;
 }

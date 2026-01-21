@@ -114,19 +114,19 @@ export const sidebarItems: NavGroup[] = [
       },
       {
         title: "Dịch vụ API",
-        url: "/dashboard/api-services",
+        url: "/dashboard/service",
         icon: Code,
         adminOnly: true,
       },
       {
         title: "Voucher giảm giá",
-        url: "/dashboard/vouchers",
+        url: "/dashboard/voucher",
         icon: Ticket,
         adminOnly: true,
       },
       {
         title: "Phiên bản cập nhật",
-        url: "/dashboard/version-updates",
+        url: "/dashboard/version",
         icon: RefreshCw,
         adminOnly: true,
       }

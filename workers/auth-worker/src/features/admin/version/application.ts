@@ -13,7 +13,7 @@ import {
 interface IVersionApplicationService {
   saveNewVersion(identifier: string): Promise<VersionSaveResponse>;
   upgradeVersion(identifier: string): Promise<VersionInfo>;
-  getVersionData(identifier: string, versionId: string): Promise<VersionData>;
+  getVersionData(identifier: string, versionId: number): Promise<VersionData>;
   getVersionList(identifier: string): Promise<VersionListResponse>;
 }
 
@@ -35,7 +35,7 @@ export function createVersionApplicationService(c: Context, bindingName: string)
       return await versionInfra.upgradeVersion();
     },
 
-    async getVersionData(identifier: string, versionId: string): Promise<VersionData> {
+    async getVersionData(identifier: string, versionId: number): Promise<VersionData> {
       const versionInfra = getVersionInfrastructure(identifier);
       return await versionInfra.getVersionData(versionId);
     },

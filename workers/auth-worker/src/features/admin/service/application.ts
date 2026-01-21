@@ -10,8 +10,8 @@ import {
 export interface IServiceApplicationService {
   registerService(identifier: string, request: Service): Promise<Service>;
   getUserServices(identifier: string): Promise<Service[]>;
-  cancelService(identifier: string, serviceId: string): Promise<void>;
-  getServiceUsage(identifier: string, serviceId: string, days?: number): Promise<ServiceUsage[]>;
+  cancelService(identifier: string, serviceId: number): Promise<void>;
+  getServiceUsage(identifier: string, serviceId: number, days?: number): Promise<ServiceUsage[]>;
 }
 
 export function createServiceApplicationService(c: Context, bindingName: string): IServiceApplicationService {
@@ -32,12 +32,12 @@ export function createServiceApplicationService(c: Context, bindingName: string)
       return await serviceInfra.getUserServices();
     },
 
-    async cancelService(identifier: string, serviceId: string): Promise<void> {
+    async cancelService(identifier: string, serviceId: number): Promise<void> {
       const serviceInfra = getServiceInfrastructure(identifier);
       await serviceInfra.cancelService(serviceId);
     },
 
-    async getServiceUsage(identifier: string, serviceId: string, days?: number): Promise<ServiceUsage[]> {
+    async getServiceUsage(identifier: string, serviceId: number, days?: number): Promise<ServiceUsage[]> {
       const serviceInfra = getServiceInfrastructure(identifier);
       return await serviceInfra.getServiceUsage(serviceId, days);
     },

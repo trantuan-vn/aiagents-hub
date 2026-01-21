@@ -19,11 +19,11 @@ export function createServiceInfrastructureService(userDO: DurableObjectStub<Use
       }, 'services')
     },
 
-    async cancelService(serviceId: string): Promise<void> {
+    async cancelService(serviceId: number): Promise<void> {
       await executeUtils.executeDynamicAction(userDO, 'update', { id: serviceId, isActive: false }, 'services');
     },
 
-    async getServiceUsage(serviceId: string, days: number = 30): Promise<any[]> {
+    async getServiceUsage(serviceId: number, days: number = 30): Promise<any[]> {
       const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
       return await executeUtils.executeDynamicAction(userDO, 'select', {
         where: [

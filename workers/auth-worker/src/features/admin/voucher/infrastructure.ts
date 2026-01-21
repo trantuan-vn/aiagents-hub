@@ -239,14 +239,26 @@ export function createVoucherInfrastructureService(userDO: DurableObjectStub<Use
       };
     },
 
-    async getVouchers(status?: string, targetType?: string): Promise<any[]> {      
-      return await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "status", operator: '=', value: status },
-          { field: "targetType", operator: '=', value: targetType }
-        ],
+    async getVouchers(status?: string, targetType?: string): Promise<any[]> {
+      const where: Array<{ field: string; operator: string; value: any }> = [];
+      
+      if (status !== undefined) {
+        where.push({ field: "status", operator: '=', value: status });
+      }
+      
+      if (targetType !== undefined) {
+        where.push({ field: "targetType", operator: '=', value: targetType });
+      }
+      
+      const query: any = {
         orderBy: { field: 'createdAt', direction: 'DESC' }
-      }, 'vouchers')      
+      };
+      
+      if (where.length > 0) {
+        query.where = where;
+      }
+      
+      return await executeUtils.executeDynamicAction(userDO, 'select', query, 'vouchers')      
     },
 
     async getVoucherByCode(voucherCode: string): Promise<any> {
@@ -325,13 +337,11 @@ export function createVoucherInfrastructureService(userDO: DurableObjectStub<Use
       };
     },
 
-    async updateVoucherStatus(voucherId: string, status: string): Promise<any> {
+    async updateVoucherStatus(voucherId: number, status: string): Promise<any> {
       // Update voucher
       return await executeUtils.executeDynamicAction(userDO, 'update', {
         id: voucherId,
-        data: { 
-          status,
-        }
+        status: status
       }, 'vouchers');
     },
 

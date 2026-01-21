@@ -86,7 +86,7 @@ export interface IVoucherInfrastructureService {
   getVoucherByCode(voucherCode: string): Promise<any>;
   validateServiceVoucher(request: ValidateVoucherRequest): Promise<any>;
   validateUserVoucher(request: ValidateVoucherRequest): Promise<any>;
-  updateVoucherStatus(voucherId: string, status: string): Promise<any>;
+  updateVoucherStatus(voucherId: number, status: string): Promise<any>;
   getAvailableServiceVouchers(serviceId?: string, basePrice?: number): Promise<any[]>;
   getAvailableUserVouchers(userId?: string, userRole?: string, basePrice?: number): Promise<any[]>;
 }

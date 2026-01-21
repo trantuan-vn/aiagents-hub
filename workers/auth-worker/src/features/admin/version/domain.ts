@@ -48,6 +48,6 @@ export type VersionListResponse = z.infer<typeof VersionListResponseSchema>;
 export interface IVersionInfrastructureService {
   saveNewVersion(): Promise<VersionSaveResponse>;
   upgradeVersion(): Promise<VersionInfo>;
-  getVersionData(versionId: string): Promise<VersionData>;
+  getVersionData(versionId: number): Promise<VersionData>;
   getVersionList(): Promise<VersionListResponse>;
 }

@@ -201,7 +201,7 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
       };
     },
     
-    async getVersionData(versionId: string): Promise<VersionData> {
+    async getVersionData(versionId: number): Promise<VersionData> {
       const object = await env.R2_VERSION_BUCKET.get(`version-${versionId}.json`);
       
       if (!object) {

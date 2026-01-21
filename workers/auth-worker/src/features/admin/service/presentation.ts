@@ -45,7 +45,18 @@ export function createServiceRoutes(bindingName: string) {
 
   // Hủy dịch vụ
   app.delete('/cancel/:serviceId', createRouteHandler(async (c: any, user: any) => {
-    const serviceId = c.req.param('serviceId');
+    
+    const serviceIdParam = c.req.param('serviceId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(serviceIdParam)) {
+      throw new Error('Invalid service ID format');
+    }
+    const serviceId = parseInt(serviceIdParam, 10);
+    // Validate range (positive integer)
+    if (serviceId <= 0 || !Number.isInteger(serviceId)) {
+      throw new Error('Invalid service ID');
+    }
+
     const serviceApp = createServiceApplicationService(c, bindingName);
     await serviceApp.cancelService(user.identifier, serviceId);
     return c.json({ success: true });
@@ -53,7 +64,16 @@ export function createServiceRoutes(bindingName: string) {
 
   // Lấy lịch sử sử dụng dịch vụ
   app.get('/usage/:serviceId', createRouteHandler(async (c: any, user: any) => {
-    const serviceId = c.req.param('serviceId');
+    const serviceIdParam = c.req.param('serviceId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(serviceIdParam)) {
+      throw new Error('Invalid service ID format');
+    }
+    const serviceId = parseInt(serviceIdParam, 10);
+    // Validate range (positive integer)
+    if (serviceId <= 0 || !Number.isInteger(serviceId)) {
+      throw new Error('Invalid service ID');
+    }
     const days = c.req.query('days') ? parseInt(c.req.query('days')!) : 30;
     const serviceApp = createServiceApplicationService(c, bindingName);
     const result = await serviceApp.getServiceUsage(user.identifier, serviceId, days);

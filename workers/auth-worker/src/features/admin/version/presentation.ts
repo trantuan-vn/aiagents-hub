@@ -40,7 +40,17 @@ export function createVersionRoutes(bindingName: string) {
 
   // Lấy dữ liệu version cụ thể
   app.get('/:versionId', createRouteHandler(async (c: any, user: any) => {
-    const versionId = VersionIdSchema.parse(c.req.param('versionId'));
+    const versionIdParam = c.req.param('versionId'); 
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(versionIdParam)) {
+      throw new Error('Invalid version ID format');
+    }
+    const versionId = parseInt(versionIdParam, 10);
+    // Validate range (positive integer)
+    if (versionId <= 0 || !Number.isInteger(versionId)) {
+      throw new Error('Invalid version ID');
+    }
+
     const versionApp = createVersionApplicationService(c, bindingName);
     const result = await versionApp.getVersionData(user.identifier, versionId);
     return c.json(result);

@@ -16,7 +16,7 @@ export interface IVoucherApplicationService {
   getVoucherByCode(identifier: string, voucherCode: string): Promise<Voucher>;
   validateServiceVoucher(identifier: string, request: ValidateVoucherRequest): Promise<any>;
   validateUserVoucher(identifier: string, request: ValidateVoucherRequest): Promise<any>;
-  updateVoucherStatus(identifier: string, voucherId: string, status: string): Promise<Voucher>;
+  updateVoucherStatus(identifier: string, voucherId: number, status: string): Promise<Voucher>;
   getAvailableServiceVouchers(identifier: string, serviceId?: string, basePrice?: number): Promise<Voucher[]>;
   getAvailableUserVouchers(identifier: string, userId?: string, userRole?: string, basePrice?: number): Promise<Voucher[]>;
 }
@@ -114,7 +114,7 @@ export function createVoucherApplicationService(c: Context, bindingName: string)
       return await voucherInfra.validateUserVoucher(request);
     },
 
-    async updateVoucherStatus(identifier: string, voucherId: string, status: string): Promise<any> {
+    async updateVoucherStatus(identifier: string, voucherId: number, status: string): Promise<any> {
       const voucherInfra = getVoucherInfrastructure(identifier);
       const voucher = await voucherInfra.updateVoucherStatus(voucherId, status);
       
