@@ -9,10 +9,6 @@ import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 // Main authentication middleware factory
 export function createAuthMiddleware(bindingName: string) {
   return async (c: Context, next: Next) => {
-    // Skip authentication for OPTIONS requests (CORS preflight)
-    if (c.req.method === 'OPTIONS') {
-      return await next();
-    }
     
     try {
       // Reset user context
@@ -122,10 +118,6 @@ export function requireAdmin(c: Context) {
 // Version check middleware for admin users
 export function createVersionCheckMiddleware(bindingName: string) {
   return async (c: Context, next: Next) => {
-    // Skip version check for OPTIONS requests (CORS preflight)
-    if (c.req.method === 'OPTIONS') {
-      return await next();
-    }
     
     try {
       const user = requireAuth(c);

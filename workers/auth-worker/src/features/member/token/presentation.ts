@@ -3,15 +3,9 @@ import { createTokenApplicationService } from './application';
 import { CreateApiTokenSchema, RevokeApiTokenSchema } from './domain';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
-import { ERROR_MESSAGES } from './constant';
 
 export function createTokenRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
-
-  // Handle OPTIONS preflight for all routes (must be before other routes)
-  app.options('*', async (c: any) => {
-    return new Response(null, { status: 204 });
-  });
 
   // Helper function để xử lý route chung
   const createRouteHandler = (

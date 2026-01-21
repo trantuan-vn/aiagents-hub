@@ -37,14 +37,17 @@ function createRoutes(bindingName: string) {
       ], 
       allowHeaders: ['Content-Type', 'Authorization'],
       credentials: true, 
-      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   }));
+  // Handle OPTIONS preflight for all routes (must be before other routes)
+  routes.options('*', async (c: any) => {
+    return new Response(null, { status: 204 });
+  });
 
   // I. DASHBOARD
   // Auth middleware
   routes.use('/dashboard/*', createAuthMiddleware(bindingName));  
-  routes.use('/dashboard/*', createVersionCheckMiddleware(bindingName));  
-    
+  routes.use('/dashboard/*', createVersionCheckMiddleware(bindingName));      
   // sub routes /auth 
   routes.route('/dashboard/auth', createAuthRoutes(bindingName));  
   routes.route('/dashboard/ws', createDashboardWebSocketRoutes(bindingName));  

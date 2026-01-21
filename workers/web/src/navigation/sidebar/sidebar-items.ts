@@ -29,6 +29,10 @@ import {
   Scale,
   Cookie,
   Eye,
+  Tag,
+  Code,
+  Ticket,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 
@@ -100,6 +104,30 @@ export const sidebarItems: NavGroup[] = [
         title: "Finance",
         url: "/dashboard/finance",
         icon: Banknote,
+        adminOnly: true,
+      },
+      {
+        title: "Chính sách giá",
+        url: "/dashboard/policy",
+        icon: Tag,
+        adminOnly: true,
+      },
+      {
+        title: "Dịch vụ API",
+        url: "/dashboard/api-services",
+        icon: Code,
+        adminOnly: true,
+      },
+      {
+        title: "Voucher giảm giá",
+        url: "/dashboard/vouchers",
+        icon: Ticket,
+        adminOnly: true,
+      },
+      {
+        title: "Phiên bản cập nhật",
+        url: "/dashboard/version-updates",
+        icon: RefreshCw,
         adminOnly: true,
       }
     ],

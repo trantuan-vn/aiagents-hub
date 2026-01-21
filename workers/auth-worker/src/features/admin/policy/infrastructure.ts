@@ -156,7 +156,7 @@ export function createPriceInfrastructureService(userDO: DurableObjectStub<UserD
 
     getPricePolicies: (limit: number, offset: number, status?: string) => 
       executeUtils.executeDynamicAction(userDO, 'select', {
-        where: { field: "status", operator: '=', value: status ? status : "status" },
+        ...(status ? { where: { field: "status", operator: '=', value: status } } : {}),
         orderBy: { field: 'priority', direction: 'DESC' },
         limit,
         offset
