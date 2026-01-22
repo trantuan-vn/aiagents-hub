@@ -9,49 +9,50 @@ export function createPriceInfrastructureService(userDO: DurableObjectStub<UserD
   // Helper methods
   const isPolicyApplicable = (policy: any, request: PriceCalculationRequest): boolean => {
     const conditions = policy.conditions || {};
-    // check status
+    
+    // Note: Status and expiration are already filtered before calling this function
+    // But we keep these checks as safety measures
     if (policy.status !== 'ACTIVE') {
-      throw new Error(`Policy ${policy.name} is not active.`);
+      return false;
     }
-    // Check date validity
-    if (new Date(policy.expiresAt) < new Date()) {
-      throw new Error(`Policy ${policy.name} has expired.`);
+    
+    if (policy.expiresAt && new Date(policy.expiresAt) < new Date()) {
+      return false;
     }
 
     // Check target specific conditions
     if (policy.targetType === 'SERVICE') {
-      if (policy.targetIds && policy.targetIds.length>0 && !policy.targetIds.includes(request.serviceId)) {
-        throw new Error(`Service ${request.serviceId} is not applicable for this policy (${policy.name}), policy.targetIds is ${Array.isArray(policy.targetIds)}, policy.targetIds[0] is ${typeof policy.targetIds[0] === 'string'} , request.serviceId is ${typeof request.serviceId === 'string' }, policy.targetIds.includes(request.serviceId) is ${policy.targetIds.includes(request.serviceId)}, policy.targetIds is ${policy.targetIds}`);
+      if (policy.targetIds && policy.targetIds.length > 0 && !policy.targetIds.includes(request.serviceId)) {
+        return false;
       }
     }
 
     if (policy.targetType === 'USER') {
-      if (policy.targetIds && policy.targetIds.length>0 && !policy.targetIds.includes(request.userId)) {
-        throw new Error(`User ${request.userId} is not applicable for this policy (${policy.name})`);
+      if (policy.targetIds && policy.targetIds.length > 0 && !policy.targetIds.includes(request.userId)) {
+        return false;
       }
     }
 
     // Check user role
     if (policy.targetType === 'USER' && conditions.userRoles) {
-      if (conditions.userRoles.length>0 && !conditions.userRoles.includes(request.userRole)) {
-        throw new Error(`User role ${request.userRole} is not applicable for this policy (${policy.name})`);
+      if (conditions.userRoles.length > 0 && !conditions.userRoles.includes(request.userRole)) {
+        return false;
       }
     }
 
     // Check usage conditions
     if (policy.type === 'USAGE_BASED' && conditions.maxCalls) {
       if ((request.currentCalls ?? 0) >= conditions.maxCalls) {
-        throw new Error(`Usage limit has been reached for this policy (${policy.name})`);
+        return false;
       }
     }
 
     // Check minimum quantity
     if (conditions.minQuantity && request.quantity) {
       if (request.quantity < conditions.minQuantity) {
-        throw new Error(`Minimum quantity is ${conditions.minQuantity} for this policy (${policy.name}).`);
+        return false;
       }
     }
-
 
     return true;
   };
@@ -108,13 +109,24 @@ export function createPriceInfrastructureService(userDO: DurableObjectStub<UserD
   };
 
   const calculatePrice = async (request: PriceCalculationRequest, targetType: 'SERVICE' | 'USER') => {
-    const activePolicies = await executeUtils.executeDynamicAction(userDO,
+    const allPolicies = await executeUtils.executeDynamicAction(userDO,
       'select', { 
         where: { field: 'targetType', operator: '=', value: targetType },
         orderBy: { field: 'priority', direction: 'DESC' } 
       }, 'price_policies'
     );
 
+    // Filter only active and non-expired policies
+    const now = new Date();
+    const activePolicies = allPolicies.filter((policy: any) => {
+      if (policy.status !== 'ACTIVE') {
+        return false;
+      }
+      if (policy.expiresAt && new Date(policy.expiresAt) < now) {
+        return false;
+      }
+      return true;
+    });
 
     let finalPrice = request.basePrice;
     let totalDiscount = 0;

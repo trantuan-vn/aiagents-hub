@@ -193,9 +193,9 @@ export interface OrderFilters {
 export interface IOrderInfrastructureService {
   createOrder(user: any, request: CreateOrder): Promise<{ id: string; items: OrderCalculationItem[] }>;
   getOrders(filters: OrderFilters): Promise<OrderDetail[]>;
-  getOrderDetail(orderId: string): Promise<OrderDetail>;
-  updateOrderStatus(orderId: string, request: UpdateOrderStatus): Promise<Order>;
-  cancelOrder(orderId: string): Promise<Order>;
+  getOrderDetail(orderId: number): Promise<OrderDetail>;
+  updateOrderStatus(orderId: number, request: UpdateOrderStatus): Promise<Order>;
+  cancelOrder(orderId: number): Promise<Order>;
 }
 
 // Service Interfaces cho external services

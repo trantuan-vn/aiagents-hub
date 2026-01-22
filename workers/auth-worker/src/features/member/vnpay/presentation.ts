@@ -36,7 +36,7 @@ export function createPaymentRoutes(bindingName: string) {
       ipAddr
     );
     
-    return c.redirect(paymentUrl);
+    return c.json({ paymentUrl });
   }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST));
 
   // VNPay return URL
@@ -46,15 +46,28 @@ export function createPaymentRoutes(bindingName: string) {
     const paymentService = createPaymentApplicationService(c, bindingName);
     const result = await paymentService.processReturnUseCase(params);
     
-    return c.json({
-      success: result.success,
-      code: result.code,
-      message: result.message,
-      orderId: result.orderId,
-      amount: result.amount,
-      transactionNo: result.transactionNo,
-      bankCode: result.bankCode
-    });
+    // Redirect về frontend với thông tin kết quả
+    const frontendUrl = process.env.FRONTEND_URL || 'https://unitoken.trade';
+    const redirectUrl = new URL(`${frontendUrl}/dashboard/control/billing`);
+    
+    // Thêm thông tin kết quả vào query params
+    redirectUrl.searchParams.set('payment_result', result.success ? 'success' : 'failed');
+    redirectUrl.searchParams.set('code', result.code);
+    redirectUrl.searchParams.set('message', result.message);
+    if (result.orderId) {
+      redirectUrl.searchParams.set('orderId', result.orderId.toString());
+    }
+    if (result.amount) {
+      redirectUrl.searchParams.set('amount', result.amount.toString());
+    }
+    if (result.transactionNo) {
+      redirectUrl.searchParams.set('transactionNo', result.transactionNo);
+    }
+    if (result.bankCode) {
+      redirectUrl.searchParams.set('bankCode', result.bankCode);
+    }
+    
+    return c.redirect(redirectUrl.toString());
   }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST));
 
   // VNPay IPN URL

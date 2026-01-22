@@ -7,9 +7,9 @@ import { CreateOrder, UpdateOrderStatus } from './domain';
 export interface IOrderApplicationService {
   createOrder(user: any, request: CreateOrder): Promise<any>;
   getOrders(identifier: string, filters: any): Promise<any[]>;
-  getOrderDetail(identifier: string, orderId: string): Promise<any>;
-  updateOrderStatus(identifier: string, orderId: string, request: UpdateOrderStatus): Promise<any>;
-  cancelOrder(identifier: string, orderId: string): Promise<any>;
+  getOrderDetail(identifier: string, orderId: number): Promise<any>;
+  updateOrderStatus(identifier: string, orderId: number, request: UpdateOrderStatus): Promise<any>;
+  cancelOrder(identifier: string, orderId: number): Promise<any>;
 }
 
 export function createOrderApplicationService(c: Context, bindingName: string): IOrderApplicationService {
@@ -29,17 +29,17 @@ export function createOrderApplicationService(c: Context, bindingName: string): 
       return await orderInfra.getOrders(filters);
     },
 
-    async getOrderDetail(identifier: string, orderId: string): Promise<any> {
+    async getOrderDetail(identifier: string, orderId: number): Promise<any> {
       const orderInfra = getOrderInfrastructure(identifier);
       return await orderInfra.getOrderDetail(orderId);
     },
 
-    async updateOrderStatus(identifier: string, orderId: string, request: UpdateOrderStatus): Promise<any> {
+    async updateOrderStatus(identifier: string, orderId: number, request: UpdateOrderStatus): Promise<any> {
       const orderInfra = getOrderInfrastructure(identifier);
       return await orderInfra.updateOrderStatus(orderId, request);
     },
 
-    async cancelOrder(identifier: string, orderId: string): Promise<any> {
+    async cancelOrder(identifier: string, orderId: number): Promise<any> {
       const orderInfra = getOrderInfrastructure(identifier);
       return await orderInfra.cancelOrder(orderId);
     }

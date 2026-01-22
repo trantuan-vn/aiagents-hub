@@ -74,19 +74,21 @@ export const paymentUtils = {
   },
 
   createPaymentReference(identifier: string, paymentId: number, orderId: number): string {
-    return `${identifier}.${paymentId}.${orderId}`;
+    // Sử dụng separator '|' thay vì '.' để tránh conflict với email có dấu chấm
+    return `${identifier}|${paymentId}|${orderId}`;
   },
 
   parsePaymentReference(txnRef: string): { identifier: string; paymentId: number; orderId: number } {
-    const splitData = txnRef.split('.');
+    // Sử dụng separator '|' thay vì '.' để tránh conflict với email có dấu chấm
+    const splitData = txnRef.split('|');
     if (splitData.length !== 3) {
       throw new Error('Invalid payment reference: missing required fields');
     }
     
     return {
       identifier: splitData[0],
-      paymentId: parseInt(splitData[1]),
-      orderId: parseInt(splitData[2])
+      paymentId: parseInt(splitData[1], 10),
+      orderId: parseInt(splitData[2], 10)
     };          
   },
 

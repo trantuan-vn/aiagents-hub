@@ -266,13 +266,17 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
     },
 
     async getOrders(filters: any): Promise<any[]> {
-      
-      const orders = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: { field: "status", operator: '=', value: filters.status },
+      const queryParams: any = {
         orderBy: { field: 'created_at', direction: 'DESC' },
         limit: filters.limit,
         offset: (filters.page - 1) * filters.limit
-      }, 'orders')      
+      };
+
+      if (filters.status) {
+        queryParams.where = { field: "status", operator: '=', value: filters.status };
+      }
+
+      const orders = await executeUtils.executeDynamicAction(userDO, 'select', queryParams, 'orders')      
 
       const ordersWithItems = await Promise.all(
         orders.map(async (order: any) => {
@@ -286,7 +290,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
       return ordersWithItems;
     },
 
-    async getOrderDetail(orderId: string): Promise<any> {
+    async getOrderDetail(orderId: number): Promise<any> {
       const order = await executeUtils.executeDynamicAction(userDO, 'select', {
             where: { field: "id", operator: '=', value: orderId }
           }, 'orders').then((res: any) => res[0]);
@@ -308,7 +312,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
       return { ...order, items, discounts };
     },
 
-    async updateOrderStatus(orderId: string, request: UpdateOrderStatus): Promise<any> {
+    async updateOrderStatus(orderId: number, request: UpdateOrderStatus): Promise<any> {
       const updateData = request.notes 
         ? { status: request.status, notes: request.notes }
         : { status: request.status };
@@ -316,7 +320,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
       return await executeUtils.executeDynamicAction(userDO, 'update', { id: orderId, ...updateData }, 'orders');
     },
 
-    async cancelOrder(orderId: string): Promise<any> {
+    async cancelOrder(orderId: number): Promise<any> {
       const updateData = { status: 'CANCELLED' };
       return await executeUtils.executeDynamicAction(userDO, 'update', { id: orderId, ...updateData }, 'orders');
     }

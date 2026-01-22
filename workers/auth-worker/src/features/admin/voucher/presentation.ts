@@ -61,7 +61,7 @@ export function createVoucherRoutes(bindingName: string) {
     const voucherApp = createVoucherApplicationService(c, bindingName);
     const result = await voucherApp.getVouchers(user.identifier, status, targetType);
     return c.json(result);
-  }, 'Failed to get vouchers'));
+  }, 'Failed to get vouchers', false));
 
   // Lấy thông tin voucher bằng code
   app.get('/code/:voucherCode', createRouteHandler(async (c: any, user: any) => {
@@ -69,7 +69,7 @@ export function createVoucherRoutes(bindingName: string) {
     const voucherApp = createVoucherApplicationService(c, bindingName);
     const result = await voucherApp.getVoucherByCode(user.identifier, voucherCode);
     return c.json(result);
-  }, 'Failed to get voucher'));
+  }, 'Failed to get voucher', false));
 
   // Validate voucher cho service
   app.post('/validate/service', createRouteHandler(async (c: any, user: any) => {

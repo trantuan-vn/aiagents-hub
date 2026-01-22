@@ -45,7 +45,18 @@ export function createOrderRoutes(bindingName: string) {
 
   // Lấy chi tiết đơn hàng
   app.get('/orders/:orderId', createRouteHandler(async (c: any, user: any) => {
-    const orderId = c.req.param('orderId');
+    const orderIdParam = c.req.param('orderId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(orderIdParam)) {
+      throw new Error('Invalid order ID format');
+    }
+    const orderId = parseInt(orderIdParam, 10);
+    // Validate range (positive integer)
+    if (orderId <= 0 || !Number.isInteger(orderId)) {
+      throw new Error('Invalid order ID');
+    }
+    
+    
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.getOrderDetail(user.identifier, orderId);
     return c.json(result);
@@ -53,7 +64,16 @@ export function createOrderRoutes(bindingName: string) {
 
   // Cập nhật trạng thái đơn hàng
   app.patch('/orders/:orderId/status', createRouteHandler(async (c: any, user: any) => {
-    const orderId = c.req.param('orderId');
+    const orderIdParam = c.req.param('orderId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(orderIdParam)) {
+      throw new Error('Invalid order ID format');
+    }
+    const orderId = parseInt(orderIdParam, 10);
+    // Validate range (positive integer)
+    if (orderId <= 0 || !Number.isInteger(orderId)) {
+      throw new Error('Invalid order ID');
+    }
     const body = await c.req.json();
     const request = UpdateOrderStatusSchema.parse(body);
     const orderApp = createOrderApplicationService(c, bindingName);
@@ -63,7 +83,16 @@ export function createOrderRoutes(bindingName: string) {
 
   // Hủy đơn hàng
   app.post('/orders/:orderId/cancel', createRouteHandler(async (c: any, user: any) => {
-    const orderId = c.req.param('orderId');
+    const orderIdParam = c.req.param('orderId');
+    // Validate format first (only digits)
+    if (!/^\d+$/.test(orderIdParam)) {
+      throw new Error('Invalid order ID format');
+    }
+    const orderId = parseInt(orderIdParam, 10);
+    // Validate range (positive integer)
+    if (orderId <= 0 || !Number.isInteger(orderId)) {
+      throw new Error('Invalid order ID');
+    }
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.cancelOrder(user.identifier, orderId);
     return c.json(result);

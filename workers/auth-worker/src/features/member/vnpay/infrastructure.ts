@@ -180,13 +180,28 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     
     paymentUtils.validateAmount(request.amount);
 
-    const orders = await executeUtils.executeDynamicAction(userDO, 'select', { field: 'id', operator: '=', value: request.orderId }, 'orders');
+    const orders = await executeUtils.executeDynamicAction(userDO, 'select', { where: { field: 'id', operator: '=', value: request.orderId } }, 'orders');
 
     if (orders.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
     const order= orders[0];
+    
+    // Tạo payment trước để lấy paymentId
+    const paymentData = PaymentSchema.parse({
+      orderId: request.orderId,
+      paymentMethod: request.bankCode === 'INTCARD' ? 'credit_card' : 'bank_transfer',
+      gateway: 'vnpay',
+      status: PAYMENT_STATUS.PENDING,
+      paymentDetails: {}
+    });
+    
+    const paymentRecord = await executeUtils.executeDynamicAction(userDO, 'insert', paymentData, 'payments');
+    const paymentId = paymentRecord.id;
+    
+    // Tạo vnp_TxnRef với format đúng: identifier.paymentId.orderId
+    const vnp_TxnRef = paymentUtils.createPaymentReference(identifier, paymentId, request.orderId);
     
     const date = new Date();
     
@@ -204,8 +219,8 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
       'vnp_TmnCode': tmnCode,
       'vnp_Locale': request.language,
       'vnp_CurrCode': VNPAY_CONSTANTS.CURRENCY,
-      'vnp_TxnRef': order.orderCode,
-      'vnp_OrderInfo': `${request.language==='vn' ? 'Thanh toán đơn hàng:' : 'Payment order:'} ${order.notes}`,
+      'vnp_TxnRef': vnp_TxnRef,
+      'vnp_OrderInfo': `${request.language==='vn' ? 'Thanh toán đơn hàng:' : 'Payment order:'} ${order.notes ?? ''}`,
       'vnp_OrderType': VNPAY_CONSTANTS.ORDER_TYPE,
       'vnp_Amount': request.amount * 100,
       'vnp_ReturnUrl': returnUrl, 
@@ -225,15 +240,11 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     
     sortedParams['vnp_SecureHash'] = signed;
     
-    const paymentData = PaymentSchema.parse({
-      orderId: request.orderId,
-      paymentMethod: request.bankCode === 'INTCARD' ? 'credit_card' : 'bank_transfer',
-      gateway: 'vnpay',
-      status: PAYMENT_STATUS.PENDING,
+    // Cập nhật payment với paymentDetails đầy đủ
+    await executeUtils.executeDynamicAction(userDO, 'update', {
+      id: paymentId,
       paymentDetails: sortedParams
-    });
-    
-    await executeUtils.executeDynamicAction(userDO, 'insert', paymentData, 'payments');
+    }, 'payments');
 
     const paymentUrl = vnpUrl + '?' + querystring.stringify(sortedParams, { encode: false });
     console.log(`${paymentUrl}`);

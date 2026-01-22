@@ -41,7 +41,7 @@ export function createServiceRoutes(bindingName: string) {
     const serviceApp = createServiceApplicationService(c, bindingName);
     const result = await serviceApp.getUserServices(user.identifier);
     return c.json(result);
-  }, 'Failed to get services'));
+  }, 'Failed to get services', false));
 
   // Hủy dịch vụ
   app.delete('/cancel/:serviceId', createRouteHandler(async (c: any, user: any) => {
