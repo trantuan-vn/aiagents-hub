@@ -12,6 +12,7 @@ import {
 } from './utils';
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { createVersionApplicationService } from '../admin/version/application';
 
 interface IApplicationService {
   // I. OAUTH
@@ -68,6 +69,10 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       isActive: true,
     };
     await repository.sessions.create(sessionData);
+    
+    // Gọi upgrade version sau khi tạo session
+    const versionApp = createVersionApplicationService(c, bindingName);
+    await versionApp.upgradeVersion(user.identifier);
     
     return { token, refreshToken };
   };

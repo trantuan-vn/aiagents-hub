@@ -117,15 +117,14 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           // Thêm lệnh delete trước khi insert
           operations.push({
             table: 'price_policies',
-            operation: 'delete',
-            where: { field: "datetime(expiresAt)", operator: '<', value: "datetime('now')" } 
+            operation: 'delete'
           });
           
           // Thêm operations insert cho price_policies
           versionData.price_policies.forEach( (policy : any) => {
             operations.push({
               table: 'price_policies',
-              operation: 'upsert',
+              operation: 'insert',
               data: policy
             });
           });
@@ -134,15 +133,14 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           // Thêm lệnh delete trước khi insert
           operations.push({
             table: 'services',
-            operation: 'delete',
-            where: { field: "datetime(expiresAt)", operator: '<', value: "datetime('now')" } 
+            operation: 'delete'
           });
           
           // Thêm operations insert cho services
           versionData.services.forEach( (service : any) => {
             operations.push({
               table: 'services',
-              operation: 'upsert',
+              operation: 'insert',
               data: {
                 name: service.name,
                 endpoint: service.endpoint,
@@ -156,15 +154,14 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           // Thêm lệnh delete trước khi insert
           operations.push({
             table: 'vouchers',
-            operation: 'delete',
-            where: { field: "datetime(expiresAt)", operator: '<', value: "datetime('now')" } 
+            operation: 'delete'
           });
           
           // Thêm operations insert cho vouchers
           versionData.vouchers.forEach( (voucher : any) => {
             operations.push({
               table: 'vouchers',
-              operation: 'upsert',
+              operation: 'insert',
               data: voucher
             });
           });

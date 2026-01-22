@@ -125,24 +125,29 @@ export class DynamicSchemaManager {
   }
 
   static createDeleteOperation(
-    table: string, 
+    table: string,
+    id?: number,
     where?: { field: string; operator: string; value: any }
   ): DynamicOperation {
-    if (where) {
+    if (id !== undefined) {
+      // Delete by ID
+      return {
+        sql: `DELETE FROM "${table}" WHERE "id" = ?`,
+        params: [id]
+      };
+    } else if (where) {
+      // Delete by where condition
       return {
         sql: `DELETE FROM "${table}" WHERE "${where.field}" ${where.operator} ?`,
         params: [where.value]
       };
     } else {
-      throw new Error('Where condition required for delete operation');
+      // Delete entire table
+      return {
+        sql: `DELETE FROM "${table}"`,
+        params: []
+      };
     }
-  }
-
-  static createDeleteByIdOperation(table: string, id: number): DynamicOperation {
-    return {
-      sql: `DELETE FROM "${table}" WHERE "id" = ?`,
-      params: [id]
-    };
   }
 }
 
@@ -788,7 +793,7 @@ export class UserDODatabase {
       throw new Error(`Table ${tableName} not registered`);
     }
     
-    const operation = DynamicSchemaManager.createDeleteByIdOperation(tableName, id);
+    const operation = DynamicSchemaManager.createDeleteOperation(tableName, id);
     await this.execTransaction([operation]);
   }
 
@@ -801,7 +806,7 @@ export class UserDODatabase {
       throw new Error(`Table ${tableName} not registered`);
     }
 
-    const operation = DynamicSchemaManager.createDeleteOperation(tableName, where);
+    const operation = DynamicSchemaManager.createDeleteOperation(tableName, undefined, where);
     await this.execTransaction([operation]);
   }
 
@@ -957,14 +962,16 @@ export class UserDODatabase {
           }
           if (op.id) {
             // Delete by ID
-            sqlOp = DynamicSchemaManager.createDeleteByIdOperation(op.table, op.id);
+            sqlOp = DynamicSchemaManager.createDeleteOperation(op.table, op.id);
             results.push({ id: op.id, deleted: true });
           } else if (op.where) {
             // Delete by condition
-            sqlOp = DynamicSchemaManager.createDeleteOperation(op.table, op.where);
+            sqlOp = DynamicSchemaManager.createDeleteOperation(op.table, undefined, op.where);
             results.push({ where: op.where, deleted: true });
           } else {
-            throw new Error('ID or where condition required for delete operation');
+            // Delete entire table
+            sqlOp = DynamicSchemaManager.createDeleteOperation(op.table);
+            results.push({ table: op.table, deleted: true });
           }
           sqlOperations.push(sqlOp);
           break;
