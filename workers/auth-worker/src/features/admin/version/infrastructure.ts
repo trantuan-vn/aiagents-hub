@@ -131,16 +131,16 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           
           // Xử lý services
           // Thêm lệnh delete trước khi insert
-          operations.push({
-            table: 'services',
-            operation: 'delete'
-          });
+          // operations.push({
+          //   table: 'services',
+          //   operation: 'delete'
+          // });
           
           // Thêm operations insert cho services
           versionData.services.forEach( (service : any) => {
             operations.push({
               table: 'services',
-              operation: 'insert',
+              operation: 'upsert',
               data: {
                 name: service.name,
                 endpoint: service.endpoint,

@@ -21,18 +21,20 @@ import { executeUtils } from '../../../shared/utils';
 export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPayService {
   
   // Helper methods
-  const getServiceUpdates = async (orderId: number, operation: 'add' | 'subtract'): Promise<Array<{sql: string, params: any[]}>> => {
-    const orderItems = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM order_items WHERE order_id = ?',
-      [orderId], "order_items"
-    );
-    let operations: Array<{sql: string, params: any[]}> = [];
+  const getServiceUpdates = async (orderId: number, operation: 'add' | 'subtract'): Promise<Array<any>> => {
+    const orderItems = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "orderId", operator: '=', value: orderId }
+    }, 'order_items');
+    
+    let operations: Array<any> = [];
 
     for (const item of orderItems) {
-      const services = await executeUtils.executeRepositorySelect(userDO,
-        'SELECT * FROM services WHERE id = ? AND isActive = ?',
-        [item.serviceId, 1], "services"
-      );
+      const services = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: [
+          { field: "id", operator: '=', value: item.serviceId },
+          { field: "isActive", operator: '=', value: 1 }
+        ]
+      }, 'services');
       
       if (services.length === 0) {
         throw new Error(PAYMENT_ERROR_MESSAGES.SERVICE_NOT_FOUND.replace('${item.serviceId}', item.serviceId));
@@ -41,34 +43,36 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
       const service = services[0];
       const newMaxCalls = operation === 'add' 
         ? service.maxCalls + item.quantity
-        : service.maxCalls - item.quantity;
+        : Math.max(0, service.maxCalls - item.quantity); // Đảm bảo không bao giờ < 0
       
       operations.push({
-        sql: 'UPDATE services SET maxCalls = ? WHERE id = ?',
-        params: [newMaxCalls, service.id]
-      })
+        table: 'services',
+        operation: 'update',
+        id: service.id,
+        data: { 
+          maxCalls: newMaxCalls 
+        }
+      });
     }
     return operations;
   };
 
   const validatePayment = async (paymentId: number, expectedAmount: number): Promise<number> => {
-    const payment = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM payments WHERE id = ?',
-      [paymentId], "payments"
-    );
+    const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: paymentId }
+    }, 'payments');
 
-    if (payment.length === 0) {
+    if (payments.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
     
-    if (payment[0].status !== PAYMENT_STATUS.PENDING) {
+    if (payments[0].status !== PAYMENT_STATUS.PENDING) {
       throw new Error(PAYMENT_ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
     }
 
-    const orders = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM orders WHERE id = ?',
-      [payment[0].orderId], "orders"
-    );
+    const orders = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: payments[0].orderId }
+    }, 'orders');
 
     if (orders.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
@@ -90,29 +94,83 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
       ? PAYMENT_STATUS.COMPLETED 
       : PAYMENT_STATUS.FAILED;
     
-    let updates: Array<{sql: string, params: any[]}>= [];
-    updates.push({
-      sql: 'UPDATE payments SET status = ?, queueStatus = ? WHERE id = ?',
-      params: [newPaymentStatus, 'pending', paymentId]
+    let operations: any[] = [];
+    
+    // Update payment status
+    operations.push({
+      table: 'payments',
+      operation: 'update',
+      id: paymentId,
+      data: { 
+        
+        status: newPaymentStatus, 
+        queueStatus: 'pending' 
+      }
     });
     
     if (newPaymentStatus === PAYMENT_STATUS.COMPLETED) {
-      updates = await getServiceUpdates(orderId, 'subtract');
-      updates.push({
-        sql: 'UPDATE orders SET status = ?, queueStatus = ? WHERE id = ?',
-        params: [ORDER_STATUS.COMPLETED, 'pending', orderId]
+      // Update order status
+      operations.push({
+        table: 'orders',
+        operation: 'update',        
+        id: orderId,
+        data: { 
+          
+          status: ORDER_STATUS.COMPLETED, 
+          queueStatus: 'pending' 
+        }
       });
-      updates.push({
-        sql: 'UPDATE order_items SET queueStatus = ? WHERE orderId = ?',
-        params: ['pending', orderId]
-      });
-      updates.push({
-        sql: 'UPDATE order_discounts SET queueStatus = ? WHERE orderItemId in (SELECT id FROM order_items WHERE orderId = ?)',
-        params: ['pending', orderId]
-      });
+      
+      // Get service updates (multi-table operations for updating services)
+      const serviceUpdates = await getServiceUpdates(orderId, 'add');
+      operations.push(...serviceUpdates);
+      
+      // Get all order_items for this order
+      const orderItems = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: "orderId", operator: '=', value: orderId }
+      }, 'order_items');
+      
+      // Update each order_item queueStatus
+      for (const item of orderItems) {
+        operations.push({
+          table: 'order_items',
+          operation: 'update',          
+          id: item.id,
+          data: { 
+            
+            queueStatus: 'pending' 
+          }
+        });
+      }
+      
+      // Get all order_discounts for these order_items
+      if (orderItems.length > 0) {
+        // Query order_discounts for each order_item_id in parallel
+        const orderDiscountsPromises = orderItems.map((item: { id: number }) =>
+          executeUtils.executeDynamicAction(userDO, 'select', {
+            where: { field: "orderItemId", operator: '=', value: item.id }
+          }, 'order_discounts')
+        );
+        
+        const orderDiscountsResults = await Promise.all(orderDiscountsPromises);
+        
+        // Flatten the results and update each order_discount queueStatus
+        const allOrderDiscounts = orderDiscountsResults.flat();
+        for (const discount of allOrderDiscounts) {
+          operations.push({
+            table: 'order_discounts',
+            operation: 'update',            
+            id: discount.id,
+            data: { 
+              
+              queueStatus: 'pending' 
+            }
+          });
+        }
+      }
     } 
 
-    await executeUtils.executeTransaction(userDO, updates);
+    await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
   };
 
   const processRefundTransaction = async (
@@ -149,11 +207,9 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
       data: { status: ORDER_STATUS.CANCELLED }
     });
     
-    const updates = await getServiceUpdates(orderId, 'subtract');
-    operations.push({
-      operation: 'sql',
-      data: updates
-    });
+    // Get service updates (multi-table operations for updating services)
+    const serviceUpdates = await getServiceUpdates(orderId, 'subtract');
+    operations.push(...serviceUpdates);
 
     const results = await executeUtils.executeDynamicAction(userDO, 'multi-table', {operations: operations});
     
@@ -253,8 +309,11 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
 
   const processReturn = async (paymentId: number, params: VNPayReturn): Promise<PaymentResult> => {
     const orderId = await validatePayment(paymentId, parseInt(params.vnp_Amount) / 100);
+    
+    const isSuccess = (params.vnp_ResponseCode === '00' && params.vnp_TransactionStatus === '00');
+        
     return {
-      success: (params.vnp_ResponseCode === '00' && params.vnp_TransactionStatus === '00'),
+      success: isSuccess,
       code: params.vnp_ResponseCode,
       message: paymentUtils.getResponseMessage(params.vnp_ResponseCode),  
       orderId: orderId,
@@ -265,10 +324,9 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
   };
 
   const processIPN = async (paymentId: number, params: VNPayReturn): Promise<PaymentResult> => {
-    const payments = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM payments WHERE id = ?',
-      [paymentId], "payments"
-    );
+    const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: paymentId }
+    }, 'payments');
 
     if (payments.length === 0) {
       return {
@@ -290,10 +348,9 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
 
     const expectedAmount = payment.paymentDetails.vnp_Amount / 100;
 
-    const orders = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM orders WHERE id = ?',
-      [payment.orderId], "orders"
-    );
+    const orders = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: payment.orderId }
+    }, 'orders');
 
     if (orders.length === 0) {
       return {
@@ -322,10 +379,21 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
   };
 
   const queryTransaction = async (request: PaymentQuery, ipAddr: string): Promise<QueryDRResult> => {
-    const orders = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT b.* FROM payments a, orders b WHERE a.id = ? and a.orderId = b.id',
-      [request.paymentId], "orders"
-    );
+    // Lấy payment trước để lấy orderId
+    const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: request.paymentId }
+    }, 'payments');
+
+    if (payments.length === 0) {
+      throw new Error(PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    }
+
+    const payment = payments[0];
+    
+    // Lấy order từ orderId
+    const orders = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: "id", operator: '=', value: payment.orderId }
+    }, 'orders');
 
     if (orders.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND);
@@ -391,10 +459,12 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     const vnp_RequestId = vnp_CreateDate.substring(vnp_CreateDate.length - 6);
 
     
-    const payments = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM payments WHERE id = ? AND status = ?',
-      [request.paymentId, PAYMENT_STATUS.COMPLETED], "payments"
-    );
+    const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [
+        { field: "id", operator: '=', value: request.paymentId },
+        { field: "status", operator: '=', value: PAYMENT_STATUS.COMPLETED }
+      ]
+    }, 'payments');
 
     if (payments.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND);
@@ -403,10 +473,12 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     const payment = payments[0];
     const vnp_TransactionNo = payment.paymentDetails.vnp_TransactionNo || '';
 
-    const orders = await executeUtils.executeRepositorySelect(userDO,
-      'SELECT * FROM orders WHERE id = ? AND status = ?',
-      [payment.orderId, ORDER_STATUS.COMPLETED], "orders"
-    );
+    const orders = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [
+        { field: "id", operator: '=', value: payment.orderId },
+        { field: "status", operator: '=', value: ORDER_STATUS.COMPLETED }
+      ]
+    }, 'orders');
 
     if (orders.length === 0) {
       throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);

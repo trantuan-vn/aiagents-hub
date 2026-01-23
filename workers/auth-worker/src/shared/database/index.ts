@@ -874,8 +874,8 @@ export class UserDODatabase {
 
   // BATCH OPERATIONS WITH MULTIPLE TABLES
   async dynamicMultiTableTransaction(operations: Array<{
-    table?: string;
-    operation: 'insert' | 'update' | 'upsert' | 'delete' | 'sql';
+    table: string;
+    operation: 'insert' | 'update' | 'upsert' | 'delete';
     data?: any;
     id?: number;
     conflictField?: string;
@@ -919,16 +919,22 @@ export class UserDODatabase {
           if (!config) {
             throw new Error(`Table ${op.table} not registered`);
           }
+          const idData = await this.dynamicSelect(op.table, { field: 'id', operator: '=', value: op.id });
+          if (idData.length === 0) {
+            throw new Error(`No record found with id: ${op.id}`);
+          }
+          const updateData = { ...idData[0], ...op.data };
+      
           extendedSchema = this.createExtendedSchema(config.schema, config.options);
                
-          const updateData = await DynamicDataBuilder.buildData(op.data, extendedSchema, config.options, {
+          const processedData = await DynamicDataBuilder.buildData(updateData, extendedSchema, config.options, {
             currentUserId: this.currentUserId,
             organizationId: this.organizationContext,
             operation: 'update',
             tableName: op.table
           });
-          sqlOp = DynamicSchemaManager.createUpdateOperation(op.table, op.id, updateData);
-          results.push(updateData);
+          sqlOp = DynamicSchemaManager.createUpdateOperation(op.table, op.id, processedData);
+          results.push(processedData);
           sqlOperations.push(sqlOp);
           break;
 
@@ -974,12 +980,6 @@ export class UserDODatabase {
             results.push({ table: op.table, deleted: true });
           }
           sqlOperations.push(sqlOp);
-          break;
-        case 'sql':
-          if (!op.data) throw new Error('Data required for insert operation');
-          for (const itemOp of op.data) {
-            sqlOperations.push(itemOp);  
-          }
           break;
         default:
           throw new Error(`Unknown operation: ${op.operation}`);

@@ -40,35 +40,25 @@ export function createPaymentRoutes(bindingName: string) {
   }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST));
 
   // VNPay return URL
-  app.get('/vnpay_return', createRouteHandler(async (c: any) => {
-    const params = c.req.query();
-    
-    const paymentService = createPaymentApplicationService(c, bindingName);
-    const result = await paymentService.processReturnUseCase(params);
-    
-    // Redirect về frontend với thông tin kết quả
+  app.get('/vnpay_return', async (c: any) => {
     const frontendUrl = process.env.FRONTEND_URL || 'https://unitoken.trade';
     const redirectUrl = new URL(`${frontendUrl}/dashboard/control/billing`);
     
-    // Thêm thông tin kết quả vào query params
-    redirectUrl.searchParams.set('payment_result', result.success ? 'success' : 'failed');
-    redirectUrl.searchParams.set('code', result.code);
-    redirectUrl.searchParams.set('message', result.message);
-    if (result.orderId) {
-      redirectUrl.searchParams.set('orderId', result.orderId.toString());
-    }
-    if (result.amount) {
-      redirectUrl.searchParams.set('amount', result.amount.toString());
-    }
-    if (result.transactionNo) {
-      redirectUrl.searchParams.set('transactionNo', result.transactionNo);
-    }
-    if (result.bankCode) {
-      redirectUrl.searchParams.set('bankCode', result.bankCode);
+    try {
+      const params = c.req.query();      
+      const paymentService = createPaymentApplicationService(c, bindingName);
+      const result = await paymentService.processReturnUseCase(params);      
+      // Redirect về frontend với thông tin kết quả
+      redirectUrl.searchParams.set('payment_result', result.success ? 'success' : 'failed');
+      redirectUrl.searchParams.set('message', result.message);
+    } catch (e) {
+      const { errorResponse } = await handleError(c, e, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST);
+      // Nếu có lỗi, vẫn redirect về frontend với thông tin lỗi
+      redirectUrl.searchParams.set('payment_result', 'failed');
     }
     
     return c.redirect(redirectUrl.toString());
-  }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST));
+  });
 
   // VNPay IPN URL
   app.get('/vnpay_ipn', createRouteHandler(async (c: any) => {

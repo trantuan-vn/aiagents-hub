@@ -75,9 +75,9 @@ export function AccountSwitcher({ user }: { readonly user: User | null }) {
 
   const menuItems = user
     ? [
-        { title: t("account"), icon: BadgeCheck, url: "/account" },
-        { title: t("billing"), icon: CreditCard, url: "/billing" },
-        { title: t("notifications"), icon: Bell, url: "/notifications" },
+        { title: t("account"), icon: BadgeCheck, url: "/dashboard/control/settings" },
+        { title: t("billing"), icon: CreditCard, url: "/dashboard/control/billing" },
+        { title: t("notifications"), icon: Bell, url: "/dashboard/control/notifications" },
         { title: t("log_out"), icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogoutWithCheck },
       ]
     : [{ title: t("log_in"), icon: LogIn, url: "/" }];
