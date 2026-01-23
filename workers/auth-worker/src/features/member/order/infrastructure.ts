@@ -227,8 +227,8 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
 
       const subtotalAmount = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
       const discountAmount = calculationResult.reduce((total, item) => 
-        total + item.servicePrice.totalDiscount + item.userPrice.totalDiscount + 
-               item.serviceVoucher.discountAmount + item.userVoucher.discountAmount, 0);
+        total + (item.servicePrice.totalDiscount + item.userPrice.totalDiscount + 
+               item.serviceVoucher.discountAmount + item.userVoucher.discountAmount)* item.quantity, 0);
       const finalAmount = subtotalAmount - discountAmount;
 
       const orderData = {

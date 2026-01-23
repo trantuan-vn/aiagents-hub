@@ -743,6 +743,7 @@ export class UserDODatabase {
       currentUserId: this.currentUserId,
       organizationId: this.organizationContext,
       operation: 'update',
+      getNextId: (table) => this.getNextId(table),
       tableName
     });
     const operation = DynamicSchemaManager.createUpdateOperation(
@@ -931,6 +932,7 @@ export class UserDODatabase {
             currentUserId: this.currentUserId,
             organizationId: this.organizationContext,
             operation: 'update',
+            getNextId: (table) => this.getNextId(table),
             tableName: op.table
           });
           sqlOp = DynamicSchemaManager.createUpdateOperation(op.table, op.id, processedData);
