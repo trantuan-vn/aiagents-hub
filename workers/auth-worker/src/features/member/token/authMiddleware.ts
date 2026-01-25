@@ -33,7 +33,6 @@ export function createTokenValidationMiddleware(bindingName: string) {
         }
 
         const token = authHeader.substring(7); // Lấy phần sau "Bearer "
-        
         // Token Length Validation - Prevention of DoS attacks
         if (!token || token.length > TOKEN_CONSTANTS.MAX_TOKEN_LENGTH) {
           throw new Error(ERROR_MESSAGES.TOKEN.INVALID_TOKEN);

@@ -62,7 +62,7 @@ function createRoutes(bindingName: string) {
   // II. API
   // Security middleware
   routes.use('/api/*', createTokenValidationMiddleware(bindingName));  
-  routes.use('/api/*', createVersionCheckMiddleware(bindingName));
+  // routes.use('/api/*', createVersionCheckMiddleware(bindingName));
   routes.use('/api/*', securityLoggingMiddleware()); 
   // sub routes /api
   routes.route('/api/ekyc', createEkycRoutes(bindingName));

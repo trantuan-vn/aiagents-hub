@@ -136,10 +136,14 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
       throw new Error("JWT_SECRET is not defined in environment variables");
     }
 
-    const allTokens = await executeUtils.executeRepositorySelect(userDO,
-      "SELECT * FROM api_tokens WHERE isActive = ? and datetime(expiresAt) >= datetime('now') and tokenHash = ?",
-      [1, tokenGenerationUtils.hashToken(token, jwtSecret)], "api_tokens"
-    );
+    const tokenHash = await tokenGenerationUtils.hashToken(token, jwtSecret);
+    const allTokens = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [
+        { field: 'isActive', operator: '=', value: 1 },
+        { field: 'expiresAt', operator: '>=', value: new Date().toISOString() },
+        { field: 'tokenHash', operator: '=', value: tokenHash },
+      ],
+    }, 'api_tokens');    
     if (allTokens.length === 0) {
       return { 
         isValid: false, 

@@ -39,11 +39,18 @@ const BaseRequestSchema = z.object({
   options: BaseOptionsSchema.default({}),
 });
 
+/** Giá trị mặc định options cho nhận dạng giấy tờ – tối ưu chi phí (ít token, đủ cho JSON trích xuất). */
+const DEFAULT_DOCUMENT_OPTIONS = {
+  maxTokens: 400,
+  language: 'vi',
+  confidenceThreshold: 0.8,
+} as const;
+
 // Document Recognition Schemas
 export const DocumentRecognitionSchema = BaseRequestSchema.extend({
   image: ImageFileSchema,
   docType: z.enum(['driver', 'cmt', 'cccd_front', 'cccd_back', 'passport', 'general']).default('general'),
-  options: DocumentOptionsSchema.default({}),
+  options: DocumentOptionsSchema.default(DEFAULT_DOCUMENT_OPTIONS),
 });
 
 export const DocumentExtractionResultSchema = z.object({
@@ -132,19 +139,7 @@ export const LivenessResultSchema = z.object({
   recommendations: z.array(z.string()).optional(),
 });
 
-// Document prompts
-export function getDocumentPrompt(docType: string): string {
-  const prompts: Record<string, string> = {
-    driver: 'Vietnamese Driver\'s License - return { name, license_number, dob, expiry, address } in Vietnamese.',
-    cmt: 'Vietnamese CMND - return { full_name, id_number, dob, expire_date, place } in Vietnamese.',
-    cccd_front: 'Vietnamese CCCD - return { full_name, id_number, dob, expire_date, address } in Vietnamese.',
-    cccd_back: 'Vietnamese CCCD - return { issue_date, issue_address } in Vietnamese.',
-    passport: 'Passport - return { full_name, passport_number, nationality, dob, expiry_date, issue_date }.'
-  };
 
-  const basePrompt = 'Extract structured data (JSON format) from this document image: ';
-  return basePrompt + (prompts[docType] || 'General ID document - identify type and return { type, name, id_number, dob }.');
-}
 
 // Types
 export type DocumentRecognition = z.infer<typeof DocumentRecognitionSchema>;
