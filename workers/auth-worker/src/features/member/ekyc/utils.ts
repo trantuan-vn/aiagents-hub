@@ -60,132 +60,225 @@ export function safeJsonParse(jsonString: string): any {
   }
 }
 
+/**
+ * Tính confidence cho document recognition dựa trên extracted data.
+ * Xem xét số lượng fields có giá trị và field_confidence nếu có.
+ */
 export function calculateConfidence(extractedData: any): number {
-  const fields = Object.keys(extractedData).length;
-  return Math.min(fields / 5, 0.95);
-}
+  if (!extractedData || typeof extractedData !== 'object') {
+    return 0;
+  }
 
-export function calculateFaceDetectionConfidence(faces: any[]): number {
-  if (faces.length === 0) return 0;
-  return faces.reduce((sum, face) => sum + (face.confidence || 0), 0) / faces.length;
-}
-
-export function calculateFaceVerificationConfidence(similarity: number): number {
-  return Math.min(similarity * 1.2, 0.95);
-}
-
-export function getFaceSearchPrompt(): string {
-  return `Bạn là hệ thống phát hiện khuôn mặt chuyên nghiệp. Hãy phân tích hình ảnh và phát hiện TẤT CẢ khuôn mặt người có trong ảnh.
-
-YÊU CẦU:
-1. Phát hiện chính xác từng khuôn mặt người
-2. Trả về thông tin bounding box cho mỗi khuôn mặt
-3. Chỉ trả lời bằng JSON với định dạng sau:
-
-{
-  "face_count": "Số lượng khuôn mặt phát hiện được (số nguyên)",
-  "faces": [
-    {
-      "box": {
-        "x": "Tọa độ x góc trên bên trái (số nguyên, pixel)",
-        "y": "Tọa độ y góc trên bên trái (số nguyên, pixel)",
-        "width": "Chiều rộng bounding box (số nguyên, pixel)",
-        "height": "Chiều cao bounding box (số nguyên, pixel)"
-      },
-      "confidence": "Độ tin cậy phát hiện (số thập phân từ 0.0 đến 1.0)",
-      "landmarks": {
-        "left_eye": {"x": "Tọa độ x mắt trái", "y": "Tọa độ y mắt trái"},
-        "right_eye": {"x": "Tọa độ x mắt phải", "y": "Tọa độ y mắt phải"},
-        "nose": {"x": "Tọa độ x mũi", "y": "Tọa độ y mũi"},
-        "mouth_left": {"x": "Tọa độ x mép trái", "y": "Tọa độ y mép trái"},
-        "mouth_right": {"x": "Tọa độ x mép phải", "y": "Tọa độ y mép phải"}
-      }
+  // Nếu có field_confidence từ AI, sử dụng trung bình của chúng
+  if (extractedData.field_confidence && typeof extractedData.field_confidence === 'object') {
+    const fieldConfidences = Object.values(extractedData.field_confidence) as number[];
+    const validConfidences = fieldConfidences.filter(
+      (conf): conf is number => typeof conf === 'number' && conf >= 0 && conf <= 1
+    );
+    if (validConfidences.length > 0) {
+      const avgConfidence = validConfidences.reduce((sum, conf) => sum + conf, 0) / validConfidences.length;
+      return Math.min(Math.max(avgConfidence, 0), 1);
     }
-  ],
-  "image_dimensions": {
-    "width": "Chiều rộng ảnh gốc (số nguyên, pixel)",
-    "height": "Chiều cao ảnh gốc (số nguyên, pixel)"
+  }
+
+  // Fallback: tính dựa trên số lượng fields có giá trị
+  const allFields = Object.keys(extractedData).filter(
+    key => key !== 'confidence_score' && key !== 'field_confidence' && key !== 'data_quality'
+  );
+  const nonEmptyFields = allFields.filter(key => {
+    const value = extractedData[key];
+    return value !== null && value !== undefined && value !== '';
+  });
+
+  if (allFields.length === 0) {
+    return 0;
+  }
+
+  // Confidence dựa trên tỷ lệ fields có giá trị
+  // Giả sử cần ít nhất 5 fields quan trọng
+  const completeness = nonEmptyFields.length / allFields.length;
+  const minRequiredFields = 5;
+  const fieldCountFactor = Math.min(nonEmptyFields.length / minRequiredFields, 1);
+  
+  // Kết hợp completeness và field count
+  const confidence = (completeness * 0.6 + fieldCountFactor * 0.4);
+  
+  return Math.min(Math.max(confidence, 0), 0.95);
+}
+
+/**
+ * Tính confidence cho face detection dựa trên tất cả faces được phát hiện.
+ */
+export function calculateFaceDetectionConfidence(faces: any[]): number {
+  if (!faces || faces.length === 0) {
+    return 0;
+  }
+
+  // Lấy confidence của từng face (đã được normalize trong processFaceSearch)
+  const confidences = faces
+    .map(face => face.confidence)
+    .filter((conf): conf is number => typeof conf === 'number' && conf >= 0 && conf <= 1);
+
+  if (confidences.length === 0) {
+    return 0;
+  }
+
+  // Tính trung bình confidence
+  const avgConfidence = confidences.reduce((sum, conf) => sum + conf, 0) / confidences.length;
+
+  // Điều chỉnh nhẹ nếu có nhiều faces (có thể là false positive)
+  // 1 face: confidence cao nhất, nhiều faces: giảm nhẹ
+  const faceCountAdjustment = faces.length > 1 ? 0.95 : 1.0;
+
+  return Math.min(Math.max(avgConfidence * faceCountAdjustment, 0), 1);
+}
+
+/**
+ * Tính confidence cho face verification dựa trên similarity score.
+ * Confidence tương quan với similarity nhưng có thể điều chỉnh.
+ */
+export function calculateFaceVerificationConfidence(similarity: number): number {
+  // Đảm bảo similarity trong khoảng hợp lệ
+  const normalizedSimilarity = Math.min(Math.max(similarity, 0), 1);
+
+  // Confidence nên tương quan với similarity
+  // Khi similarity cao (>= 0.8), confidence tăng nhanh hơn
+  if (normalizedSimilarity >= 0.8) {
+    // Cao: confidence gần như bằng similarity, có thể cao hơn một chút
+    return Math.min(normalizedSimilarity * 1.1, 0.95);
+  } else if (normalizedSimilarity >= 0.5) {
+    // Trung bình: confidence tương đương similarity
+    return normalizedSimilarity;
+  } else {
+    // Thấp: confidence thấp hơn similarity một chút
+    return normalizedSimilarity * 0.8;
   }
 }
-
-QUY TẮC:
-1. Nếu không có khuôn mặt nào, trả về "face_count": 0 và "faces": []
-2. Tọa độ (0,0) là góc trên bên trái của ảnh
-3. Tọa độ phải nằm trong phạm vi kích thước ảnh
-4. Đối với các điểm landmarks không phát hiện được, để giá trị null
-5. Độ tin cậy (confidence) phải từ 0.0 đến 1.0
-6. Ưu tiên độ chính xác hơn số lượng (tránh phát hiện sai)
-
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC, KHÔNG GIẢI THÍCH.
-
-Hãy phân tích hình ảnh sau:`;
+/**
+ * Ghép 2 ảnh thành 1 ảnh (đặt cạnh nhau, ảnh 1 bên trái, ảnh 2 bên phải)
+ * Sử dụng Cloudflare Images API nếu có, hoặc fallback về cách khác
+ * 
+ * @param image1 Ảnh đầu tiên (bên trái)
+ * @param image2 Ảnh thứ hai (bên phải)
+ * @param env Cloudflare Workers environment (optional, để sử dụng Images API)
+ * @returns File ảnh đã ghép
+ */
+export async function mergeImages(
+  image1: File, 
+  image2: File, 
+  env: { IMAGES: ImagesBinding }
+): Promise<File> {
+  return await mergeImagesWithCloudflareAPI(image1, image2, env.IMAGES);
 }
+
+/**
+ * Helper function để chuyển Uint8Array thành ReadableStream
+ */
+function arrayBufferToStream(buffer: ArrayBuffer): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(buffer));
+      controller.close();
+    }
+  });
+}
+
+/**
+ * Ghép 2 ảnh sử dụng Cloudflare Images API
+ */
+async function mergeImagesWithCloudflareAPI(
+  image1: File,
+  image2: File,
+  imagesBinding: ImagesBinding
+): Promise<File> {
+  // Đọc buffer của cả 2 ảnh
+  const buffer1 = await image1.arrayBuffer();
+  const buffer2 = await image2.arrayBuffer();
+
+  // Lấy thông tin ảnh 1 và 2 (cần ReadableStream)
+  const info1 = await imagesBinding.info(arrayBufferToStream(buffer1));
+  const info2 = await imagesBinding.info(arrayBufferToStream(buffer2));
+
+  // Tính kích thước ảnh ghép (đặt cạnh nhau)
+  // ImageInfoResponse có thể là union type, cần kiểm tra
+  const width1 = ('width' in info1 ? info1.width : 640) ?? 640;
+  const height1 = ('height' in info1 ? info1.height : 480) ?? 480;
+  const width2 = ('width' in info2 ? info2.width : 640) ?? 640;
+  const height2 = ('height' in info2 ? info2.height : 480) ?? 480;
+  
+  const mergedWidth = width1 + width2;
+  const mergedHeight = Math.max(height1, height2);
+  
+  // Tạo ảnh nền trắng với kích thước đã tính
+  // Sử dụng ảnh 1 làm base, sau đó draw ảnh 2 lên bên phải
+  const baseImage = imagesBinding.input(arrayBufferToStream(buffer1));
+  
+  // Transform ảnh 1 để có kích thước phù hợp
+  const transformed1 = baseImage.transform({
+    width: width1,
+    height: height1,
+    fit: 'contain'
+  });
+  
+  // Tạo ảnh ghép bằng cách draw ảnh 2 lên bên phải của ảnh 1
+  // Tạo ảnh nền với kích thước đã tính
+  const mergedImage = transformed1.transform({
+    width: mergedWidth,
+    height: mergedHeight,
+    fit: 'pad',
+    background: '#FFFFFF'
+  });
+  
+  // Draw ảnh 2 lên bên phải
+  const image2Input = imagesBinding.input(arrayBufferToStream(buffer2));
+  const transformed2 = image2Input.transform({
+    width: width2,
+    height: height2,
+    fit: 'contain'
+  });
+  
+  // Draw ảnh 2 lên vị trí bên phải
+  const finalImage = mergedImage.draw(transformed2, {
+    left: width1,
+    top: 0
+  });
+  
+  // Output ảnh cuối cùng
+  const output = await finalImage.output({
+    format: 'image/jpeg',
+    quality: 90
+  });
+  
+  // Chuyển ReadableStream thành ArrayBuffer rồi tạo File
+  const reader = output.image().getReader();
+  const chunks: Uint8Array[] = [];
+  let done = false;
+  
+  while (!done) {
+    const { value, done: readerDone } = await reader.read();
+    done = readerDone;
+    if (value) {
+      chunks.push(value);
+    }
+  }
+  
+  // Combine chunks thành một Uint8Array
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const mergedBuffer = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    mergedBuffer.set(chunk, offset);
+    offset += chunk.length;
+  }
+  
+  // Tạo File từ buffer
+  return new File([mergedBuffer], 'merged-image.jpg', { type: 'image/jpeg' });
+}
+
 
 // Document prompts
 export function getDocumentPrompt(docType: string): string {
   const prompts: Record<string, string> = {
-    driver: `Bạn là hệ thống trích xuất thông tin từ giấy tờ tùy thân Việt Nam. Hãy phân tích hình ảnh Giấy phép lái xe Việt Nam và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
-{
-  "name": "Họ và tên",
-  "license_number": "Số giấy phép lái xe",
-  "dob": "Ngày tháng năm sinh (dd/mm/yyyy)",
-  "expiry": "Ngày hết hạn (dd/mm/yyyy)",
-  "address": "Địa chỉ",
-  "license_class": "Hạng giấy phép",
-  "issue_place": "Nơi cấp",
-  "confidence_score": 0.0-1.0,
-  "field_confidence": {
-    "name": 0.0-1.0,
-    "license_number": 0.0-1.0,
-    "dob": 0.0-1.0,
-    "expiry": 0.0-1.0,
-    "address": 0.0-1.0,
-    "license_class": 0.0-1.0,
-    "issue_place": 0.0-1.0
-  },
-  "quality_assessment": {
-    "image_clarity": "Cao/Trung bình/Thấp",
-    "text_readability": "Dễ đọc/Khó đọc/Không đọc được",
-    "document_completeness": "Đầy đủ/Thiếu phần/Che khuất"
-  }
-}
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Độ tin cậy tổng thể (0.0-1.0) dựa trên chất lượng ảnh và độ rõ của thông tin.
-field_confidence: Độ tin cậy cho từng trường riêng lẻ.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
-
-    cmt: `Bạn là hệ thống trích xuất thông tin từ giấy tờ tùy thân Việt Nam. Hãy phân tích hình ảnh Chứng minh nhân dân (CMND) cũ Việt Nam và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
-{
-  "full_name": "Họ và tên",
-  "id_number": "Số CMND",
-  "dob": "Ngày tháng năm sinh (dd/mm/yyyy)",
-  "expire_date": "Ngày hết hạn (dd/mm/yyyy) - nếu không có để trống",
-  "place": "Địa chỉ thường trú/Nguyên quán",
-  "characteristics": "Đặc điểm nhận dạng",
-  "issue_date": "Ngày cấp (dd/mm/yyyy)",
-  "issue_place": "Nơi cấp",
-  "confidence_score": 0.0-1.0,
-  "field_confidence": {
-    "full_name": 0.0-1.0,
-    "id_number": 0.0-1.0,
-    "dob": 0.0-1.0,
-    "expire_date": 0.0-1.0,
-    "place": 0.0-1.0,
-    "characteristics": 0.0-1.0,
-    "issue_date": 0.0-1.0,
-    "issue_place": 0.0-1.0
-  },
-  "validation_flags": {
-    "format_valid": true/false,
-    "checksum_valid": true/false (nếu có thể kiểm tra),
-    "date_consistency": true/false
-  }
-}
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Đánh giá tổng thể dựa trên độ rõ của ảnh và thông tin.
-field_confidence: Độ chắc chắn cho từng trường cụ thể.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
-
     cccd_front: `Bạn là hệ thống trích xuất thông tin từ giấy tờ tùy thân Việt Nam. Hãy phân tích hình ảnh Căn cước công dân (CCCD) mặt trước Việt Nam và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
 {
   "no": "Số định danh cá nhân/Số CCCD",
@@ -233,6 +326,11 @@ CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
     "mrz_present": true/false,
     "chip_location": "Có thể nhìn thấy/Không nhìn thấy",
     "security_features": ["Các đặc điểm bảo mật nhìn thấy"]
+  },
+  "data_quality": {
+    "ocr_accuracy": "Cao/Trung bình/Thấp",
+    "field_completeness": "Đầy đủ/Thiếu/Không rõ",
+    "format_compliance": "Đúng định dạng/Sai định dạng"
   }
 }
 Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
@@ -241,95 +339,106 @@ CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
 
     passport: `Bạn là hệ thống trích xuất thông tin từ hộ chiếu. Hãy phân tích hình ảnh Hộ chiếu và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
 {
+  "type": "Loại hộ chiếu (P - Ordinary, D - Diplomatic, etc)",
+  "code": "Mã quốc gia",
+  "passport_no": "Số hộ chiếu",
   "full_name": "Họ và tên (viết hoa, đúng thứ tự)",
-  "passport_number": "Số hộ chiếu",
   "nationality": "Quốc tịch",
-  "dob": "Ngày tháng năm sinh (dd/mm/yyyy)",
-  "expiry_date": "Ngày hết hạn (dd/mm/yyyy)",
-  "issue_date": "Ngày cấp (dd/mm/yyyy)",
-  "issue_place": "Nơi cấp",
-  "type": "Loại (P - Ordinary, D - Diplomatic, etc)",
+  "date_of_birth": "Ngày tháng năm sinh (dd/mm/yyyy)",
+  "place_of_birth": "Nơi sinh",
   "sex": "Giới tính (M/F)",
-  "mrz": "Toàn bộ MRZ (Machine Readable Zone)",
+  "id_card_no": "Số CCCD",
+  "date_of_issue": "Ngày cấp (dd/mm/yyyy)",
+  "date_of_expiry": "Ngày hết hạn (dd/mm/yyyy)",  
+  "place_of_issue": "Nơi cấp",  
   "confidence_score": 0.0-1.0,
   "field_confidence": {
-    "full_name": 0.0-1.0,
-    "passport_number": 0.0-1.0,
-    "nationality": 0.0-1.0,
-    "dob": 0.0-1.0,
-    "expiry_date": 0.0-1.0,
-    "issue_date": 0.0-1.0,
-    "issue_place": 0.0-1.0,
     "type": 0.0-1.0,
+    "code": 0.0-1.0,
+    "passport_no": 0.0-1.0,
+    "full_name": 0.0-1.0,
+    "nationality": 0.0-1.0,
+    "date_of_birth": 0.0-1.0,
+    "place_of_birth": 0.0-1.0,
     "sex": 0.0-1.0,
-    "mrz": 0.0-1.0
+    "id_card_no": 0.0-1.0,
+    "date_of_issue": 0.0-1.0,
+    "date_of_expiry": 0.0-1.0,
+    "place_of_issue": 0.0-1.0,
   },
-  "mrz_analysis": {
-    "mrz_complete": true/false,
-    "checksum_valid": true/false,
-    "data_consistency": "Tương thích/Không tương thích"
-  },
-  "image_quality": {
-    "page_visibility": "Toàn bộ/Che một phần",
-    "focus_clarity": "Rõ nét/Mờ",
-    "glare_present": true/false
+  "data_quality": {
+    "ocr_accuracy": "Cao/Trung bình/Thấp",
+    "field_completeness": "Đầy đủ/Thiếu/Không rõ",
+    "format_compliance": "Đúng định dạng/Sai định dạng"
   }
 }
 Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
 confidence_score: Độ tin cậy tổng thể dựa trên chất lượng ảnh và độ chính xác MRZ.
 field_confidence: Độ chắc chắn cho từng trường thông tin.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
-
-    general_id: `Bạn là hệ thống trích xuất thông tin từ giấy tờ tùy thân. Hãy phân tích hình ảnh tài liệu nhận dạng và:
-1. Xác định loại giấy tờ
-2. Trích xuất thông tin chính xác từ hình ảnh
-3. Đánh giá độ tin cậy
-
-Chỉ trả lời bằng JSON với các khóa sau:
-{
-  "document_type": "Loại giấy tờ (VD: CCCD, CMND, Passport, Driver License, etc)",
-  "document_type_confidence": 0.0-1.0,
-  "name": "Họ và tên",
-  "id_number": "Số định danh/Số giấy tờ",
-  "dob": "Ngày tháng năm sinh (dd/mm/yyyy)",
-  "expiry_date": "Ngày hết hạn (dd/mm/yyyy) - nếu có",
-  "issue_date": "Ngày cấp (dd/mm/yyyy) - nếu có",
-  "nationality": "Quốc tịch - nếu có",
-  "address": "Địa chỉ - nếu có",
-  "confidence_score": 0.0-1.0,
-  "field_confidence": {
-    "document_type": 0.0-1.0,
-    "name": 0.0-1.0,
-    "id_number": 0.0-1.0,
-    "dob": 0.0-1.0,
-    "expiry_date": 0.0-1.0,
-    "issue_date": 0.0-1.0,
-    "nationality": 0.0-1.0,
-    "address": 0.0-1.0
-  },
-  "analysis_metadata": {
-    "extraction_quality": "High/Medium/Low",
-    "recommended_action": "Accept/Review/Re-extract",
-    "potential_errors": ["Các lỗi tiềm ẩn"]
-  }
-}
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Đánh giá tổng thể về độ tin cậy của toàn bộ quá trình trích xuất.
-field_confidence: Độ tin cậy cho từng trường riêng lẻ.
 CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`
   };
 
   return prompts[docType] || prompts.general_id;
 }
 
+export function getFaceSearchPrompt(): string {
+  return `Bạn là hệ thống phát hiện khuôn mặt tự động. Phân tích hình ảnh này và phát hiện TẤT CẢ khuôn mặt người có trong ảnh.
+
+YÊU CẦU QUAN TRỌNG:
+1. CHỈ TRẢ LỜI BẰNG JSON DUY NHẤT - KHÔNG có văn bản, giải thích, ký tự nào khác
+2. Bounding box (hộp giới hạn) PHẢI vừa khít với từng khuôn mặt, không được bằng toàn bộ ảnh
+3. Bounding box phải bao quanh chính xác khuôn mặt: từ trán đến cằm, từ má trái sang má phải
+
+JSON OUTPUT FORMAT - CHỈ TRẢ VỀ ĐÚNG ĐỊNH DẠNG NÀY:
+{
+  "face_count": "Số lượng khuôn mặt phát hiện được (số nguyên)",
+  "faces": [
+    {
+      "box": {
+        "x": "Tọa độ x góc trên bên trái (số nguyên, pixel)",
+        "y": "Tọa độ y góc trên bên trái (số nguyên, pixel)",
+        "width": "Chiều rộng bounding box (số nguyên, pixel)",
+        "height": "Chiều cao bounding box (số nguyên, pixel)"
+      },
+      "confidence": "Độ tin cậy phát hiện (số thập phân từ 0.0 đến 1.0)",
+      "landmarks": {
+        "left_eye": {"x": "Tọa độ x mắt trái", "y": "Tọa độ y mắt trái"},
+        "right_eye": {"x": "Tọa độ x mắt phải", "y": "Tọa độ y mắt phải"},
+        "nose": {"x": "Tọa độ x mũi", "y": "Tọa độ y mũi"},
+        "mouth_left": {"x": "Tọa độ x mép trái", "y": "Tọa độ y mép trái"},
+        "mouth_right": {"x": "Tọa độ x mép phải", "y": "Tọa độ y mép phải"}
+      }
+    }
+  ],
+  "image_dimensions": {
+    "width": "Chiều rộng ảnh gốc (số nguyên, pixel)",
+    "height": "Chiều cao ảnh gốc (số nguyên, pixel)"
+  }
+}
+
+QUY TẮC:
+1. Tọa độ (0,0) là góc trên bên trái của ảnh
+2. Tọa độ phải nằm trong phạm vi kích thước ảnh
+3. Đối với các điểm landmarks không phát hiện được, để giá trị null
+4. Ưu tiên độ chính xác hơn số lượng (tránh phát hiện sai)
+5. Bounding box phải vừa khít với khuôn mặt, không quá lớn
+6. Box chỉ chứa khuôn mặt, không chứa nền thừa
+7. Tọa độ box phải hợp lệ: x + width ≤ image_width, y + height ≤ image_height
+8. Box không được trùng với kích thước toàn ảnh (trừ khi ảnh chỉ có duy nhất 1 khuôn mặt chiếm toàn bộ ảnh)
+9. Mỗi box phải độc lập cho từng khuôn mặt, không chồng chéo quá nhiều
+
+ĐẦU RA DUY NHẤT: MỘT JSON OBJECT.`;
+}
+
 export function getFaceComparisonPrompt(): string {
-  return `Bạn là hệ thống so sánh khuôn mặt chuyên nghiệp. Hãy phân tích HAI ảnh khuôn mặt và đánh giá mức độ tương đồng.
+  return `Bạn là hệ thống so sánh khuôn mặt chuyên nghiệp. Hãy phân tích HAI khuôn mặt trong CÙNG MỘT ẢNH (được ghép cạnh nhau) và đánh giá mức độ tương đồng.
 
 YÊU CẦU:
-1. So sánh chi tiết các đặc điểm khuôn mặt: mắt, mũi, miệng, hình dáng khuôn mặt
-2. Tính toán điểm tương đồng từ 0.0 đến 1.0
-3. Đưa ra kết luận có phải cùng một người hay không
-4. Mô tả ngắn gọn lý do
+1. ẢNH NHẬP VÀO LÀ ẢNH GHÉP: Gồm 2 khuôn mặt nằm cạnh nhau - khuôn mặt bên TRÁI là ảnh gốc, khuôn mặt bên PHẢI là ảnh cần so sánh.
+2. So sánh chi tiết các đặc điểm khuôn mặt: mắt, mũi, miệng, hình dáng khuôn mặt, lông mày
+3. Tính toán điểm tương đồng từ 0.0 đến 1.0
+4. Đưa ra kết luận có phải cùng một người hay không
+5. Mô tả ngắn gọn lý do
 
 Chỉ trả lời bằng JSON với định dạng sau:
 
@@ -351,20 +460,21 @@ Chỉ trả lời bằng JSON với định dạng sau:
 }
 
 QUY TẮC:
-1. Chỉ so sánh khi CẢ HAI ảnh đều có khuôn mặt rõ ràng
-2. Nếu một trong hai ảnh không có khuôn mặt hoặc chất lượng kém:
+1. Chỉ so sánh khi CẢ HAI khuôn mặt trong ảnh đều rõ ràng
+2. Nếu một trong hai khuôn mặt không nhìn thấy hoặc chất lượng kém:
    - similarity: 0.0
    - isMatch: false
    - description: "Không thể so sánh vì [lý do]"
 3. Ngưỡng mặc định:
    - similarity >= 0.75: isMatch = true (có thể cùng người)
    - similarity < 0.75: isMatch = false (khác người)
-4. Điều chỉnh ngưỡng dựa trên chất lượng ảnh và góc chụp
+4. Điều chỉnh ngưỡng dựa trên chất lượng ảnh, góc chụp, ánh sáng
 5. Ưu tiên độ chính xác, không phải tốc độ
+6. XÁC ĐỊNH VỊ TRÍ: Luôn xác định khuôn mặt bên TRÁI là ảnh gốc, bên PHẢI là ảnh so sánh
 
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC, KHÔNG GIẢI THÍCH.
+CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC, KHÔNG GIẢI THÍCH KỂ CẢ TRƯỜNG HỢP KHÔNG SO SÁNH ĐƯỢC.
 
-Hãy so sánh hai khuôn mặt trong các ảnh sau:`;
+Hãy so sánh hai khuôn mặt trong ảnh ghép này:`;
 }
 
 export function getLivenessDetectionPrompt(isVideoFrame: boolean = false): string {

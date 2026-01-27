@@ -14,6 +14,7 @@ import { prepareImageForAI, dataUriFromBuffer, safeJsonParse, calculateConfidenc
 import { getDocumentPrompt, getFaceSearchPrompt, getFaceComparisonPrompt, getLivenessDetectionPrompt } from './utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
+
 export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IAIDocumentService {
 
   const validateServiceUsage = async (endpoint: string): Promise<any> => {
@@ -107,7 +108,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       ]
     }];
 
-    const maxTokens = request.options?.maxTokens ?? 400;
+    const maxTokens = request.options?.maxTokens ?? 500;
     const runModel = () =>
       env.AI.run(LLAMA_VISION_MODEL, {
         messages,
@@ -127,6 +128,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       }
     }
 
+
     // Process result and update service usage
     return await processResult(response, service);
   };
@@ -136,6 +138,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     request: DocumentRecognition
   ): Promise<DocumentExtractionResult> => {
+    console.log('response: ', response);
     const raw = response?.response;
     const extractedData =
       typeof raw === 'object' && raw !== null && !Array.isArray(raw)
@@ -179,6 +182,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     request: FaceSearch
   ): Promise<FaceDetectionResult> => {
+    console.log('response: ', response);
     const raw = response?.response;
     const data =
       typeof raw === 'object' && raw !== null && !Array.isArray(raw)
@@ -215,6 +219,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     request: FaceVerification
   ): Promise<FaceVerificationResult> => {
+    console.log('response: ', response);
     const raw = response?.response;
     const result =
       typeof raw === 'object' && raw !== null && !Array.isArray(raw)
@@ -248,6 +253,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     request: LivenessDetection
   ): Promise<LivenessResult> => {
+    console.log('response: ', response);
     const raw = response?.response;
     const result =
       typeof raw === 'object' && raw !== null && !Array.isArray(raw)
@@ -298,22 +304,19 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     },
 
     async faceVerify(request: FaceVerification): Promise<FaceVerificationResult> {
-      if (!request.image2) {
-        throw new Error('Second image required for verification');
-      }
 
       return executeAIModel(
         request.endpoint,
         request,
         getFaceComparisonPrompt(),
-        [request.image, request.image2],
+        [request.image],
         (response, service) => processFaceVerification(response, service, request)
       );
     },
 
     async livenessDetection(request: LivenessDetection): Promise<LivenessResult> {
       const prompt = getLivenessDetectionPrompt(request.isVideo);        
-
+      console.log('prompt: ', prompt);
       return executeAIModel(
         request.endpoint,
         request,

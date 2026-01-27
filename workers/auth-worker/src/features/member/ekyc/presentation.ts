@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createDocumentAIService } from './application';
 import { handleError, getIPAndUserAgent } from '../../../shared/utils';
-import { processFormData } from './utils';
+import { processFormData, mergeImages } from './utils';
 import { requirePermissions } from '../token/authMiddleware';
 import { EKYC_SERVICES } from './constant';
 
@@ -78,9 +78,12 @@ export function createEkycRoutes(bindingName: string) {
         throw new Error('Missing second image for verification');
       }
 
+      // Ghép 2 ảnh thành 1 ảnh trước khi gửi cho AI
+      const mergedImage = await mergeImages(image, image2, c.env);
+
       const result = await aiService.faceVerifyUseCase(token.identifier, { 
-        image, 
-        image2, 
+        image: mergedImage,
+        image2: null, // Không cần image2 nữa vì đã merge
         ...context 
       });
       return c.json(result);

@@ -42,6 +42,9 @@
 	"observability": {
 		"enabled": true
 	},
+	"images": {
+		"binding": "IMAGES", // i.e. available in your Worker on env.IMAGES
+	},
 	// "placement": { "mode": "smart" }
 	"vars": {
 		"ACCOUNT_ID": "e76b7bb989f93985402e1a61e6cd5ff3",  

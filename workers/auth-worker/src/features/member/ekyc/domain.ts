@@ -39,18 +39,11 @@ const BaseRequestSchema = z.object({
   options: BaseOptionsSchema.default({}),
 });
 
-/** Giá trị mặc định options cho nhận dạng giấy tờ – tối ưu chi phí (ít token, đủ cho JSON trích xuất). */
-const DEFAULT_DOCUMENT_OPTIONS = {
-  maxTokens: 400,
-  language: 'vi',
-  confidenceThreshold: 0.8,
-} as const;
-
 // Document Recognition Schemas
 export const DocumentRecognitionSchema = BaseRequestSchema.extend({
   image: ImageFileSchema,
   docType: z.enum(['driver', 'cmt', 'cccd_front', 'cccd_back', 'passport', 'general']).default('general'),
-  options: DocumentOptionsSchema.default(DEFAULT_DOCUMENT_OPTIONS),
+  options: DocumentOptionsSchema.default({}),
 });
 
 export const DocumentExtractionResultSchema = z.object({
@@ -103,10 +96,16 @@ export const FaceVerificationSchema = BaseRequestSchema.extend({
 });
 
 export const FaceVerificationResultSchema = z.object({
-  similarity: z.number().min(0).max(1),
+  similarity: z.union([
+    z.number().min(0).max(1),
+    z.nan()
+  ]),
   isMatch: z.boolean(),
   details: z.string(),
-  confidence: z.number().min(0).max(1),
+  confidence: z.union([
+    z.number().min(0).max(1),
+    z.nan()
+  ]),
   attributes: z.object({
     image1: z.object({
       age: z.number().optional(),
@@ -138,8 +137,6 @@ export const LivenessResultSchema = z.object({
   processingTime: z.number().optional(),
   recommendations: z.array(z.string()).optional(),
 });
-
-
 
 // Types
 export type DocumentRecognition = z.infer<typeof DocumentRecognitionSchema>;
