@@ -13,6 +13,7 @@ export interface JwtPayload {
 // II. OTP Schemas
 export const OTPRequestSchema = z.object({
   identifier: z.string().min(1, 'Identifier is required'),
+  language: z.enum(['vi', 'en']).optional(),
 });
 
 export const OTPVerificationSchema = z.object({
@@ -172,7 +173,7 @@ export interface ISessionRepository {
 export interface IOTPService {
   generateOTP(sessionId: string): Promise<string>;
   verifyOTP(otp: string, sessionId: string): Promise<boolean>;
-  sendEmailOTP(email: string, otp: string): Promise<void>;
+  sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void>;
   sendSmsOTP(phone: string, otp: string): Promise<void>;
 }
 

@@ -9,6 +9,9 @@ declare namespace Cloudflare {
         EMAIL_API_KEY: {
             get(): Promise<string>;
         };
+        BREVO_API_KEY: {
+            get(): Promise<string>;
+        };
         TWILIO_ACCOUNT_SID: {
             get(): Promise<string>;
         };
@@ -53,6 +56,9 @@ declare namespace Cloudflare {
             get(): Promise<string>;
         };
         TWITTER_CLIENT_SECRET: {
+            get(): Promise<string>;
+        };
+        CF_AIG_TOKEN: {
             get(): Promise<string>;
         };
         SMS_FROM_NUMBER: string;

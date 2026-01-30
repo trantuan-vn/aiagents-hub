@@ -4,13 +4,12 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -40,6 +39,7 @@ interface ErrorResponse {
 
 export function LoginForm() {
   const t = useTranslations("LoginForm");
+  const locale = useLocale();
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
@@ -47,23 +47,22 @@ export function LoginForm() {
   const isMounted = useRef(true);
   const router = useRouter();
 
-  // Schema for form validation with translations
+  // Ngôn ngữ gửi lên API: vi -> templateId=1, en -> templateId=2
+  const language = locale.startsWith("vi") ? "vi" : "en";
+
+  // Schema for form validation - email only
   const FormSchema = z.object({
-    username: z
+    email: z
       .string()
-      .min(1, { message: t("email_or_phone_required") })
-      .refine((value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) || /^\+?\d{10,15}$/.test(value), {
-        message: t("email_or_phone_invalid"),
-      }),
-    remember: z.boolean().optional(),
+      .min(1, { message: t("email_required") })
+      .email({ message: t("email_invalid") }),
   });
 
   // Form setup with react-hook-form
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      username: "",
-      remember: false,
+      email: "",
     },
     mode: "onChange",
   });
@@ -130,40 +129,44 @@ export function LoginForm() {
   }, [otp, identifier, form, router]);
 
   // Handle form submission
-  const onSubmit = useCallback(async (data: z.infer<typeof FormSchema>) => {
-    if (!isMounted.current) return;
-    setIsLoading(true);
-    try {
-      const requestResponse = await fetch("https://api.unitoken.trade/dashboard/auth/otp/request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          identifier: data.username.trim(),
-        }),
-      });
+  const onSubmit = useCallback(
+    async (data: z.infer<typeof FormSchema>) => {
+      if (!isMounted.current) return;
+      setIsLoading(true);
+      try {
+        const requestResponse = await fetch("https://api.unitoken.trade/dashboard/auth/otp/request", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            identifier: data.email.trim(),
+            language,
+          }),
+        });
 
-      if (!requestResponse.ok) {
-        const errorMessage = await getErrorMessage(requestResponse);
-        throw new Error(errorMessage);
-      }
+        if (!requestResponse.ok) {
+          const errorMessage = await getErrorMessage(requestResponse);
+          throw new Error(errorMessage);
+        }
 
-      if (isMounted.current) {
-        setIdentifier(data.username.trim());
-        setShowOtpPopup(true);
-        toast.success(t("otp_sent_success"));
+        if (isMounted.current) {
+          setIdentifier(data.email.trim());
+          setShowOtpPopup(true);
+          toast.success(t("otp_sent_success"));
+        }
+      } catch (error) {
+        if (isMounted.current) {
+          toast.error(error instanceof Error ? error.message : t("otp_send_error"));
+        }
+      } finally {
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
       }
-    } catch (error) {
-      if (isMounted.current) {
-        toast.error(error instanceof Error ? error.message : t("otp_send_error"));
-      }
-    } finally {
-      if (isMounted.current) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
+    },
+    [language]
+  );
 
   // Debounced OTP input handler
   const handleOtpChange = useCallback(
@@ -181,41 +184,21 @@ export function LoginForm() {
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <FormField
           control={form.control}
-          name="username"
+          name="email"
           render={({ field }) => (
             <FormItem>
-              <FormLabel htmlFor="username">{t("email_or_phone_label")}</FormLabel>
+              <FormLabel htmlFor="email">{t("email_label")}</FormLabel>
               <FormControl>
                 <Input
-                  id="username"
-                  type="text"
-                  placeholder={t("email_or_phone_placeholder")}
-                  autoComplete="username"
+                  id="email"
+                  type="email"
+                  placeholder={t("email_placeholder")}
+                  autoComplete="email"
                   aria-required="true"
                   {...field}
                 />
               </FormControl>
               <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="remember"
-          render={({ field }) => (
-            <FormItem className="flex flex-row items-center">
-              <FormControl>
-                <Checkbox
-                  id="login-remember"
-                  checked={field.value}
-                  onCheckedChange={field.onChange}
-                  className="size-4"
-                  aria-label={t("remember_me")}
-                />
-              </FormControl>
-              <FormLabel htmlFor="login-remember" className="text-muted-foreground ml-1 text-sm font-medium">
-                {t("remember_me")}
-              </FormLabel>
             </FormItem>
           )}
         />

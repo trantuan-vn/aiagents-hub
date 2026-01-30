@@ -104,10 +104,10 @@ export function createAuthRoutes(bindingName: string) {
 
   // II. OTP Routes
   app.post('/otp/request', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
-    const { identifier } = await parseBody(c, OTPRequestSchema);
-    
+    const { identifier, language } = await parseBody(c, OTPRequestSchema);
+
     const applicationService = createApplicationService(c, bindingName);
-    await applicationService.getRequestOtpUseCase(identifier, sessionId);
+    await applicationService.getRequestOtpUseCase(identifier, sessionId, language);
 
     return c.json({ ok: true });
   }, "OTP request failed"));

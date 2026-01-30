@@ -107,6 +107,11 @@
 		"secret_name": "EMAIL_API_KEY"
 		},
 		{
+		"binding": "BREVO_API_KEY",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "BREVO_API_KEY"
+		},
+		{
 		"binding": "TWILIO_ACCOUNT_SID",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "TWILIO_ACCOUNT_SID"
@@ -180,6 +185,11 @@
 		"binding": "TWITTER_CLIENT_SECRET",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "TWITTER_CLIENT_SECRET"
+		},
+		{
+		"binding": "CF_AIG_TOKEN",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "CF_AIG_TOKEN"
 		}  
 	],
   	"services": [

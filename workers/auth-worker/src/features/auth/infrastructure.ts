@@ -149,30 +149,30 @@ export function createKvService(env: Env): IKvService {
 export function createOTPService(env: Env): IOTPService {
   const kvService = createKvService(env);
   
-  const sendEmail = async (email: string, otp: string): Promise<void> => {
-    const emailApiKey= await env.EMAIL_API_KEY.get();
-    if (!emailApiKey) {
-      throw new Error("JWT_SECRET is not defined in environment variables");
+  const sendEmail = async (email: string, otp: string, language?: 'vi' | 'en'): Promise<void> => {
+    const brevoApiKey = await env.BREVO_API_KEY.get();
+    if (!brevoApiKey) {
+      throw new Error("BREVO_API_KEY is not defined in environment variables");
     }
 
+    // Tiếng Việt: templateId=1, Tiếng Anh: templateId=2
+    const templateId = language === 'en' ? 2 : 1;
+    const actionText = language === 'en' ? 'API login' : 'đăng nhập API';
+
     const emailData = {
-      personalizations: [{ to: [{ email }], subject: "Your OTP Code" }],
-      from: { email: "noreply@unitoken.trade", name: "Unitoken Auth" },
-      content: [{
-        type: "text/html",
-        value: `
-          <h2>Your OTP Code</h2>
-          <p>Your one-time password is: <strong>${otp}</strong></p>
-          <p>This code will expire in 10 minutes.</p>
-        `
-      }],
+      templateId,
+      to: [{ email }],
+      params: {
+        OTP: otp,
+        action: actionText,
+      },
     };
 
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${emailApiKey}`,
+        "api-key": brevoApiKey,
       },
       body: JSON.stringify(emailData),
     });
@@ -258,8 +258,8 @@ export function createOTPService(env: Env): IOTPService {
       return await kvService.validateNonce(sessionId, otp);
     },
 
-    async sendEmailOTP(email: string, otp: string): Promise<void> {
-      await sendEmail(email, otp);
+    async sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void> {
+      await sendEmail(email, otp, language);
     },
 
     async sendSmsOTP(phone: string, otp: string): Promise<void> {

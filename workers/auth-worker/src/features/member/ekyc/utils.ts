@@ -306,10 +306,12 @@ export function getDocumentPrompt(docType: string): string {
     "format_compliance": "Đúng định dạng/Sai định dạng"
   }
 }
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Đánh giá tổng thể về độ tin cậy của dữ liệu trích xuất.
-field_confidence: Độ chắc chắn cho từng trường thông tin cụ thể.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
+YÊU CẦU QUAN TRỌNG:
+1. CHỈ TRẢ LỜI BẰNG JSON DUY NHẤT - KHÔNG có văn bản, giải thích, ký tự nào khác
+2. Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
+3. confidence_score: Đánh giá tổng thể về độ tin cậy của dữ liệu trích xuất.
+4. field_confidence: Độ chắc chắn cho từng trường thông tin cụ thể.
+ĐẦU RA DUY NHẤT: MỘT JSON OBJECT.`,
 
     cccd_back: `Bạn là hệ thống trích xuất thông tin từ giấy tờ tùy thân Việt Nam. Hãy phân tích hình ảnh Căn cước công dân (CCCD) mặt sau Việt Nam và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
 {
@@ -333,9 +335,11 @@ CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
     "format_compliance": "Đúng định dạng/Sai định dạng"
   }
 }
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Đánh giá tổng thể về độ rõ và đầy đủ của thông tin.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
+YÊU CẦU QUAN TRỌNG:
+1. CHỈ TRẢ LỜI BẰNG JSON DUY NHẤT - KHÔNG có văn bản, giải thích, ký tự nào khác
+2. Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
+3. confidence_score: Đánh giá tổng thể về độ rõ và đầy đủ của thông tin.
+ĐẦU RA DUY NHẤT: MỘT JSON OBJECT.`,
 
     passport: `Bạn là hệ thống trích xuất thông tin từ hộ chiếu. Hãy phân tích hình ảnh Hộ chiếu và trích xuất các thông tin sau ĐÚNG NHƯ CHÚNG XUẤT HIỆN TRONG ẢNH. Chỉ trả lời bằng JSON với các khóa sau:
 {
@@ -372,10 +376,12 @@ CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`,
     "format_compliance": "Đúng định dạng/Sai định dạng"
   }
 }
-Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
-confidence_score: Độ tin cậy tổng thể dựa trên chất lượng ảnh và độ chính xác MRZ.
-field_confidence: Độ chắc chắn cho từng trường thông tin.
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ VĂN BẢN NÀO KHÁC.`
+YÊU CẦU QUAN TRỌNG:
+1. CHỈ TRẢ LỜI BẰNG JSON DUY NHẤT - KHÔNG có văn bản, giải thích, ký tự nào khác
+2. Nếu không tìm thấy thông tin cho một trường, để giá trị là "". 
+3. confidence_score: Độ tin cậy tổng thể dựa trên chất lượng ảnh và độ chính xác MRZ.
+4. field_confidence: Độ chắc chắn cho từng trường thông tin.
+ĐẦU RA DUY NHẤT: MỘT JSON OBJECT.`
   };
 
   return prompts[docType] || prompts.general_id;

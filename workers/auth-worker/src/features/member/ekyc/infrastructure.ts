@@ -9,7 +9,7 @@ import {
   LivenessResult,
   IAIDocumentService
 } from './domain';
-import { prepareImageForAI, dataUriFromBuffer, safeJsonParse, calculateConfidence, 
+import { prepareImageForAI, dataUriFromBuffer, calculateConfidence, 
   calculateFaceDetectionConfidence, calculateFaceVerificationConfidence } from './utils';
 import { getDocumentPrompt, getFaceSearchPrompt, getFaceComparisonPrompt, getLivenessDetectionPrompt } from './utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
@@ -113,7 +113,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       env.AI.run(LLAMA_VISION_MODEL, {
         messages,
         max_tokens: maxTokens,
-      });
+      }, { gateway: { id: "unitoken" } });
 
     let response: any;
     try {
@@ -133,17 +133,32 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     return await processResult(response, service);
   };
 
+  /** Lấy dữ liệu JSON từ response AI: ưu tiên response.response, fallback response; string → parse, object → dùng luôn. */
+  const extractResponseData = (response: any): Record<string, unknown> => {
+    const raw = response?.response ?? response;
+    if (typeof raw === 'string') {
+      try {
+        return JSON.parse(raw) as Record<string, unknown>;
+      } catch (err) {
+        console.error('JSON parse error:', err);
+        return { raw };
+      }
+    }
+    if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+      return raw as Record<string, unknown>;
+    }
+    return {};
+  };
+
   const processDocumentRecognition = async (
     response: any,
     service: any,
     request: DocumentRecognition
   ): Promise<DocumentExtractionResult> => {
-    console.log('response: ', response);
-    const raw = response?.response;
-    const extractedData =
-      typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-        ? raw
-        : safeJsonParse(String(raw ?? '{}'));
+    console.log('full response:', response);
+
+    const extractedData = extractResponseData(response) as any;
+
     const conf =
       typeof extractedData?.confidence_score === 'number' &&
       extractedData.confidence_score >= 0 &&
@@ -183,11 +198,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: FaceSearch
   ): Promise<FaceDetectionResult> => {
     console.log('response: ', response);
-    const raw = response?.response;
-    const data =
-      typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-        ? raw
-        : safeJsonParse(String(raw ?? '{}'));
+    const data = extractResponseData(response);
     const list = Array.isArray(data?.faces) ? data.faces : [];
     const faces = list.map((f: any) => {
       const box = f?.box && typeof f.box === 'object' ? f.box : {};
@@ -220,11 +231,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: FaceVerification
   ): Promise<FaceVerificationResult> => {
     console.log('response: ', response);
-    const raw = response?.response;
-    const result =
-      typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-        ? raw
-        : safeJsonParse(String(raw ?? '{}'));
+    const result = extractResponseData(response);
     const similarity = Math.min(1, Math.max(0, Number(result?.similarity) ?? 0));
     const threshold = request.options?.similarityThreshold ?? 0.75;
     const isMatch = result?.isMatch === true || (typeof result?.isMatch !== 'boolean' && similarity >= threshold);
@@ -254,18 +261,15 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: LivenessDetection
   ): Promise<LivenessResult> => {
     console.log('response: ', response);
-    const raw = response?.response;
-    const result =
-      typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-        ? raw
-        : safeJsonParse(String(raw ?? '{}'));
+    const result = extractResponseData(response);
     const risk = Math.min(1, Math.max(0, Number(result?.riskScore) ?? 0.8));
     const conf =
       typeof result?.confidence === 'number' && result.confidence >= 0 && result.confidence <= 1
         ? result.confidence
         : 1 - risk;
-    const recommendations = Array.isArray(result?.detectedSigns?.warnings)
-      ? result.detectedSigns.warnings
+    const detectedSigns = result?.detectedSigns as { warnings?: unknown } | undefined;
+    const recommendations = Array.isArray(detectedSigns?.warnings)
+      ? detectedSigns.warnings
       : Array.isArray(result?.recommendations)
         ? result.recommendations
         : [];

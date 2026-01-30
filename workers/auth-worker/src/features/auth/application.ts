@@ -21,7 +21,7 @@ interface IApplicationService {
   connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // II. EMAIL/PHONE
-  getRequestOtpUseCase(identifier: string, sessionId: string): Promise<void>;
+  getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
   verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // III. WALLET
@@ -152,13 +152,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     // II. EMAIL/PHONE
-    async getRequestOtpUseCase(identifier: string, sessionId: string): Promise<void> {
+    async getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void> {
       const otpService = createOTPService(c.env);
       const otp = await otpService.generateOTP(sessionId);
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
 
       if (validationUtils.isValidEmail(nIdentifier)) {
-        await otpService.sendEmailOTP(nIdentifier, otp);
+        await otpService.sendEmailOTP(nIdentifier, otp, language);
       } else if (validationUtils.isValidPhone(nIdentifier)) {
         await otpService.sendSmsOTP(nIdentifier, otp);
       }
