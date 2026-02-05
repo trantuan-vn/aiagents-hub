@@ -127,7 +127,8 @@ function DefaultBellTrigger({
   const badgeEl =
     unreadCount > 0 ? (
       <span
-        className="bg-destructive text-destructive-foreground absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium shadow-sm"
+        className="bg-destructive ring-background absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-white px-1 text-[10px] font-semibold shadow-md ring-2"
+        style={{ color: "white" }}
         aria-hidden
       >
         {unreadCount > 99 ? "99+" : unreadCount}
