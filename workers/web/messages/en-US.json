@@ -74,6 +74,13 @@
     "logging_out": "Logging out...",
     "log_in": "Log In"
   },
+  "Notifications": {
+    "aria_label": "Notifications",
+    "label": "Notifications",
+    "title": "Notifications",
+    "mark_all_read": "Mark all as read",
+    "empty": "No notifications yet"
+  },
   "UnauthorizedPage": {
     "title": "Unauthorized Access",
     "description": "You do not have permission to view the requested content. Please contact the site administrator if you believe this is an error.",

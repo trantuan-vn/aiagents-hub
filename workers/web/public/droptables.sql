@@ -14,3 +14,17 @@ drop table subscriptions;
 drop table users;
 drop table versions;
 drop table vouchers;
+
+drop table user_shards;
+drop table broadcasts;
+drop table service_configs;
+drop table delivery_records;
+drop table global_counters;
+
+drop table cleanup_operations;
+drop table shard_configs;
+drop table shard_performances;
+drop table user_registrations;
+
+
+

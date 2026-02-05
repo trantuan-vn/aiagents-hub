@@ -4,10 +4,11 @@ import { useState } from "react";
 
 import Link from "next/link";
 
-import { UserPen, CircleUser, CreditCard, MessageSquareDot, LogOut, LogIn } from "lucide-react";
+import { Bell, CircleUser, CreditCard, LogIn, LogOut, UserPen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useDisconnect, useAccount } from "wagmi";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -77,7 +78,12 @@ export function NavUser({ user }: { readonly user: User | null }) {
     ? [
         { title: t("account"), icon: CircleUser, url: "/dashboard/control/settings" },
         { title: t("billing"), icon: CreditCard, url: "/dashboard/control/billing" },
-        { title: t("notifications"), icon: MessageSquareDot, url: "/dashboard/control/notifications" },
+        {
+          title: t("notifications"),
+          icon: Bell,
+          url: "/dashboard/control/notifications",
+          isNotifications: true,
+        },
         { title: t("log_out"), icon: LogOut, url: "#", onClick: isLoggingOut ? undefined : handleLogout },
       ]
     : [{ title: t("log_in"), icon: LogIn, url: "/login" }];
@@ -101,14 +107,38 @@ export function NavUser({ user }: { readonly user: User | null }) {
               {user ? (
                 <>
                   <DropdownMenuGroup>
-                    {menuItems.slice(0, -1).map((item, index) => (
-                      <DropdownMenuItem key={`menu-${index}`}>
-                        <Link href={item.url} className="flex w-full items-center">
-                          <item.icon className="mr-2 h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    ))}
+                    {menuItems.slice(0, -1).map((item) =>
+                      "isNotifications" in item && item.isNotifications ? (
+                        <DropdownMenuItem
+                          key={item.title}
+                          onSelect={(e) => e.preventDefault()}
+                          className="cursor-pointer"
+                        >
+                          <NotificationBell
+                            user={user}
+                            size="sm"
+                            renderTrigger={({ unreadCount }) => (
+                              <span className="flex w-full items-center">
+                                <Bell className="mr-2 h-4 w-4" />
+                                {unreadCount > 0 && (
+                                  <span className="bg-destructive text-destructive-foreground mr-2 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium">
+                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                  </span>
+                                )}
+                                <span>{item.title}</span>
+                              </span>
+                            )}
+                          />
+                        </DropdownMenuItem>
+                      ) : (
+                        <DropdownMenuItem key={item.title}>
+                          <Link href={item.url} className="flex w-full items-center">
+                            <item.icon className="mr-2 h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      ),
+                    )}
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem disabled={isLoggingOut}>

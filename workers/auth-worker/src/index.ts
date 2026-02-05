@@ -73,9 +73,39 @@ function createRoutes(bindingName: string) {
 
 const routeApp = createRoutes("USER_DO");
 
+// Warmup BroadcastServiceDO once per isolate so its tables are created on deploy.
+// UserDO tables are created when the first user connects; BroadcastServiceDO is a
+// singleton and is only created when first requested — without warmup, tables never exist.
+// IMPORTANT: We await warmup so tables are guaranteed to exist before any request is processed.
+// Using waitUntil() caused a race where the first request could reach BroadcastServiceDO
+// before warmup completed, leading to "table not found" errors.
+let warmupPromise: Promise<void> | null = null;
+async function warmupBroadcastServiceDO(env: Env): Promise<void> {
+  if (warmupPromise) return warmupPromise;
+  warmupPromise = (async () => {
+    console.log("[auth-worker] BroadcastServiceDO warmup: triggering");
+    try {
+      const res = await env.BROADCAST_SERVICE_DO.get(
+        env.BROADCAST_SERVICE_DO.idFromName("global")
+      ).fetch("https://broadcast.service/dashboard/ws/health");
+      console.log("[auth-worker] BroadcastServiceDO warmup: done", res.status);
+      if (res.status !== 200) {
+        const text = await res.text();
+        console.warn("[auth-worker] BroadcastServiceDO warmup: non-200 response", text);
+      }
+    } catch (err) {
+      console.warn("[auth-worker] BroadcastServiceDO warmup: failed", err);
+      warmupPromise = null;
+      throw err;
+    }
+  })();
+  return warmupPromise;
+}
+
 // III. CREATE MAIN APP
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   }
 } satisfies ExportedHandler<Env, Error>;

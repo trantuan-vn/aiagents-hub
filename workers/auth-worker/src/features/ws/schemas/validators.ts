@@ -12,7 +12,7 @@ import {
 } from './broadcast-schemas';
 import { 
   ShardConfig, 
-  ShardConfigSchema, 
+  ShardConfigFieldsSchema, 
   BroadcastTrigger, 
   BroadcastTriggerSchema,
   UserRegistration,
@@ -57,7 +57,7 @@ export class BroadcastValidator {
 
 export class ShardValidator {
   static validateShardConfig(config: unknown): ShardConfig {
-    return ShardConfigSchema.parse(config);
+    return ShardConfigFieldsSchema.parse(config);
   }
 
   static validateBroadcastTrigger(input: unknown): BroadcastTrigger {

@@ -106,9 +106,8 @@ export class UserDO extends DurableObject {
       this.table('versions', VersionInfoSchema, this.TABLE_CONFIGS.userScoped);
       this.table('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.userScoped);
       
-      // Initialize states and alarms
+      // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();
-      await this.scheduleQueueAlarmIfNeeded();
     });
   }
 
@@ -168,6 +167,14 @@ export class UserDO extends DurableObject {
     return countResult[0]?.count || 0;
   }
 
+  /** True if any queue table has pending records (in-memory state). Used to decide whether to keep alarm. */
+  private hasPendingQueueWork(): boolean {
+    for (const state of this.tableStates.values()) {
+      if (state.pendingCount > 0) return true;
+    }
+    return false;
+  }
+
   private shouldFlushTable(tableName: string): boolean {
     const state = this.tableStates.get(tableName);
     if (!state) return false;
@@ -206,7 +213,8 @@ export class UserDO extends DurableObject {
         '/queue/flush': (req) => this.handleQueueFlush(req),
         '/queue/stats': () => this.handleQueueStats(),
         '/queue/health': () => this.handleQueueHealth(),
-        '/queue/cleanup': (req) => this.handleQueueCleanup(req)
+        '/queue/cleanup': (req) => this.handleQueueCleanup(req),
+        '/debug/id-counters': async () => this.handleDebugIdCounters()
       };
 
       const handler = routeHandlers[url.pathname];
@@ -242,7 +250,8 @@ export class UserDO extends DurableObject {
     if (this.shouldFlushTable(tableName)) {
       this.state.waitUntil(this.flushPendingRecords(tableName));
     }
-    
+    await this.scheduleQueueAlarmIfNeeded();
+
     return this.jsonResponse({ 
       success: true, 
       data: result,
@@ -262,7 +271,7 @@ export class UserDO extends DurableObject {
       if (this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      
+      await this.scheduleQueueAlarmIfNeeded();
       return this.jsonResponse({ 
         success: true, 
         data: result,
@@ -290,7 +299,7 @@ export class UserDO extends DurableObject {
       if (this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      
+      await this.scheduleQueueAlarmIfNeeded();
       return this.jsonResponse({ 
         success: true, 
         data: result,
@@ -354,7 +363,7 @@ export class UserDO extends DurableObject {
       if (this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      
+      await this.scheduleQueueAlarmIfNeeded();
       return this.jsonResponse({ 
         success: true, 
         data: results,
@@ -393,7 +402,7 @@ export class UserDO extends DurableObject {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
     }
-    
+    await this.scheduleQueueAlarmIfNeeded();
     return this.jsonResponse({ success: true, data: result });
   }
 
@@ -432,7 +441,7 @@ export class UserDO extends DurableObject {
     if (this.shouldFlushTable(table)) {
       this.state.waitUntil(this.flushPendingRecords(table));
     }
-
+    await this.scheduleQueueAlarmIfNeeded();
     return this.jsonResponse({ 
       success: true, 
       data: result,
@@ -524,7 +533,12 @@ export class UserDO extends DurableObject {
          LIMIT ${QUEUE_FLUSH_THRESHOLD}`
       );
 
-      if (pendingRecords.length === 0) return;
+      if (pendingRecords.length === 0) {
+        await this.updateTableState(tableName, {
+          pendingCount: 0
+        });
+        return;
+      }
 
       const maxId = Math.max(...pendingRecords.map(r => r.queueId));
 
@@ -688,6 +702,17 @@ export class UserDO extends DurableObject {
     });
   }
 
+  /** Debug: xem giá trị tất cả ID counters (tableName và tableName_queue) */
+  private async handleDebugIdCounters(): Promise<Response> {
+    const counters = this.database.getIdCounters();
+    return this.jsonResponse({
+      success: true,
+      data: counters,
+      userId: this.userId,
+      description: 'Số tiếp theo sẽ là: value + 1. Key [table]_queue = counter cho queueId'
+    });
+  }
+
   private async getQueueStatusStats(tableName: string): Promise<any[]> {
     return await this.database.execSelectSQL(`
       SELECT 
@@ -782,8 +807,13 @@ export class UserDO extends DurableObject {
         this.flushAllPendingRecords(),
         this.cleanupOldProcessedRecords()
       ]);
-      
-      if (this.state.getWebSockets().length > 0) {
+
+      // Re-schedule alarm only when there is a reason to wake again (WS or pending queue). Otherwise DO goes idle.
+      const hasWebSockets = this.state.getWebSockets().length > 0;
+      console.log(`[UserDO ${this.userId}] hasWebSockets: ${hasWebSockets}`);
+      const hasPending = this.hasPendingQueueWork();
+      console.log(`[UserDO ${this.userId}] hasPending: ${hasPending}`);
+      if (hasWebSockets || hasPending) {
         await this.storage.setAlarm(Date.now() + RETRY_ALARM_INTERVAL);
       }
     } catch (error) {
@@ -855,7 +885,12 @@ export class UserDO extends DurableObject {
     await this.updateTableState(tableName, { pendingCount });
   }
 
+  /** Set alarm only when DO has active reason to wake: WebSocket(s) or pending queue work. Otherwise DO stays idle. */
   private async scheduleQueueAlarmIfNeeded(): Promise<void> {
+    const hasWebSockets = this.state.getWebSockets().length > 0;
+    const hasPending = this.hasPendingQueueWork();
+    if (!hasWebSockets && !hasPending) return;
+
     const currentAlarm = await this.storage.getAlarm();
     if (currentAlarm === null) {
       await this.storage.setAlarm(Date.now() + RETRY_ALARM_INTERVAL);
@@ -885,7 +920,7 @@ export class UserDO extends DurableObject {
       }
 
       const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
-      await this.database.dynamicInsert("connections", {
+      await this.database.dynamicUpsert("connections", {
         connected: true, 
         lastConnected: Date.now(), 
         sessionId
@@ -897,7 +932,7 @@ export class UserDO extends DurableObject {
         this.sendPendingMessages(server)
       ]));
 
-      await this.storage.setAlarm(Date.now() + RETRY_ALARM_INTERVAL);
+      await this.scheduleQueueAlarmIfNeeded();
 
       return new Response(null, {
         status: 101,
@@ -965,6 +1000,7 @@ export class UserDO extends DurableObject {
       this.sessions.delete(ws);      
       await this.unregisterUser();
       await this.storage.deleteAlarm();
+      await this.scheduleQueueAlarmIfNeeded();
     } catch (e) {
       handleErrorWithoutIp(e, "UserDO WebSocket closed error");
     }
@@ -978,6 +1014,7 @@ export class UserDO extends DurableObject {
 
   // ========== MESSAGE & BROADCAST MANAGEMENT ==========
   private async sendMessage(ws: WebSocket, message: any): Promise<boolean> {
+    console.log(`[UserDO] sendMessage: sending to ws=${ws} message=${JSON.stringify(message)}`);
     try {
       if (ws.readyState !== WebSocket.OPEN) return false;
       
@@ -1048,6 +1085,7 @@ export class UserDO extends DurableObject {
 
   protected broadcast(event: string, data: any): void {
     const message = { event, data, timestamp: Date.now() };
+    console.log(`[UserDO] broadcast: sending to ${this.state.getWebSockets().length} websockets message=${JSON.stringify(message)}`);
     this.state.getWebSockets().forEach(ws => this.sendMessage(ws, message));
   }
 
@@ -1094,9 +1132,10 @@ export class UserDO extends DurableObject {
 
     const message = await request.json() as { type: string; [key: string]: any };
     if (message.type === 'broadcast') {
+      console.log(`[UserDO] internal message: broadcast received userId=${this.userId} broadcastId=${message.broadcastId}`);
       await this.handleDirectBroadcast(message);
     }
-    
+
     return this.jsonResponse({ success: true, status: 'processed' });
   }
 
@@ -1117,10 +1156,10 @@ export class UserDO extends DurableObject {
     }
   }
 
-  private async handleDirectBroadcast(message: any) {
-    const { broadcastId, message: messageContent } = message;
-    await this.broadcast("broadcast", messageContent);
-    this.state.waitUntil(this.recordLocalDelivery(broadcastId));      
+  private async handleDirectBroadcast(message: any) {    
+    console.log(`[UserDO] handleDirectBroadcast: delivering userId=${this.userId} broadcastId=${message.broadcastId} message=${message.message}`);
+    await this.broadcast("broadcast", message.message);
+    this.state.waitUntil(this.recordLocalDelivery(message.broadcastId));
   }
 
   private async recordLocalDelivery(broadcastId: string) {
@@ -1135,8 +1174,9 @@ export class UserDO extends DurableObject {
 
   private async reportDeliveryToShard(broadcastId: string, deliveredCount: number) {
     const shardName = this.getShardForUser(this.userId);
+    console.log(`[UserDO] reportDeliveryToShard: reporting userId=${this.userId} broadcastId=${broadcastId} deliveredCount=${deliveredCount} shardName=${shardName}`);
     const shardDO = this.env.USER_SHARD_DO.get(this.env.USER_SHARD_DO.idFromName(shardName));
-    
+
     await shardDO.fetch('https://shard.internal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

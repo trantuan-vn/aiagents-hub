@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { requireAuth } from '../../features/auth/authMiddleware';
+import { requireAuth, requireAdmin } from '../../features/auth/authMiddleware';
 import { requirePermissions } from '../../features/member/token/authMiddleware';
 import { createWebsocketApplicationService } from './application';
 import { handleError } from '../../shared/utils';
@@ -36,7 +36,19 @@ export function createDashboardWebSocketRoutes(bindingName: string) {
       return c.json(errorResponse, status);
     }
   });
-  
+
+  // Debug: tra cứu ID counters (tableName và tableName_queue)
+  app.get('/debug/id-counters', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const wsApplicationService = createWebsocketApplicationService(c, bindingName);
+      return wsApplicationService.getDebugIdCountersUseCase(user.identifier);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, "Failed to get id-counters");
+      return c.json(errorResponse, status);
+    }
+  });
+
   return app;
 }
 

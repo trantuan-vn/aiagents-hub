@@ -14,8 +14,8 @@ export const ShardPerformanceSchema = z.object({
   peakThroughput: z.number().nonnegative(),
   errorRate: z.number().min(0).max(1).default(0),
   retryRate: z.number().min(0).max(1).default(0),
-  storageUsage: z.number().nonnegative().optional(),
-  memoryUsage: z.number().nonnegative().optional()
+  storageUsage: z.number().nonnegative().nullish(),
+  memoryUsage: z.number().nonnegative().nullish()
 });
 
 export const BatchMetricsSchema = z.object({

@@ -1,10 +1,11 @@
 import { z } from 'zod';
 
 // User Domain Object Schemas
+// sessionId is a SHA256 hash from getSessionIdHash(), not a UUID
 export const ConnectionSchema = z.object({
   connected: z.boolean(),
   lastConnected: z.number(),
-  sessionId: z.string().uuid(),
+  sessionId: z.string().min(1),
 });
 
 export const PendingMessageSchema = z.object({
@@ -15,7 +16,7 @@ export const PendingMessageSchema = z.object({
   maxAttempts: z.number().min(1).default(3),
   lastAttempt: z.number().optional(),
   scheduledFor: z.number().optional(),
-  sessionId: z.string().uuid(),
+  sessionId: z.string().min(1),
 });
 
 export const SubscriptionSchema = z.object({

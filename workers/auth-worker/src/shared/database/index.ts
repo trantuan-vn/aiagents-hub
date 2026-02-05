@@ -619,6 +619,15 @@ export class UserDODatabase {
     return currentCounter;
   }
 
+  /** Trả về tất cả ID counters (bao gồm [tableName] và [tableName]_queue) - dùng cho debug */
+  getIdCounters(): Record<string, number> {
+    const counters: Record<string, number> = {};
+    this.idCounters.forEach((value, key) => {
+      counters[key] = value;
+    });
+    return counters;
+  }
+
   setOrganizationContext(organizationId?: string): void {
     this.organizationContext = organizationId;
   }
@@ -692,7 +701,6 @@ export class UserDODatabase {
     if (!this.tables.has(name)) {
       // Register table configuration
       this.registerTable(name, schema, options);
-      
       const table = new GenericTable<z.infer<T>>(
         name,
         schema,

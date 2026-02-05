@@ -18,6 +18,9 @@ export class UserShardDO extends DurableObject {
 
   private shardConfig: ShardConfig = DEFAULT_SHARD_CONFIGS['1M+'];
   private shardConfigName: ShardConfigName = '1M+';
+  /** Đảm bảo bảng được tạo xong trước khi xử lý request (constructor không await được async). */
+  private initializationPromise: Promise<void> | null = null;
+  private shardName = '';
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -25,41 +28,73 @@ export class UserShardDO extends DurableObject {
     this.storage = state.storage;
     this.env = env;
     this.database = new UserDODatabase(this.storage, this.userId);
-    this.state.blockConcurrencyWhile(async () => {
-      this.table('user_registrations', UserRegistrationSchema);
-      this.table('cleanup_operations', CleanupOperationSchema);
-      this.table('shard_performances', ShardPerformanceSchema);
-      this.table('shard_configs', ShardConfigSchema);
-      await this.initialize();
+  }
+
+  private getInitializationPromise(): Promise<void> {
+    if (!this.initializationPromise) {
+      this.initializationPromise = this.initializeTables();
+    }
+    return this.initializationPromise;
+  }
+
+  private async initializeTables(): Promise<void> {
+    await this.state.blockConcurrencyWhile(async () => {
+      // Phase 1: tạo hết các bảng trước (ensureTableExists sync)
+      this.table('user_registrations', UserRegistrationSchema, {
+        autoFields: { id: true, timestamps: true, user: true },
+      });
+      this.table('cleanup_operations', CleanupOperationSchema, {
+        autoFields: { id: true, timestamps: true, user: true },
+      });
+      this.table('shard_performances', ShardPerformanceSchema, {
+        autoFields: { id: true, timestamps: true, user: true },
+        conflictField: 'shardName',
+      });
+      this.table('shard_configs', ShardConfigSchema, {
+        autoFields: { id: true, timestamps: true, user: true },
+      });
     });
+    // Phase 2: bảng đã có sẵn, mới seed/load config
+    await this.initialize();
   }
 
   // =============================================
   // GETTERS & INITIALIZATION
   // =============================================
   get userId(): string { return this.state.id.toString(); }
-  get shardName(): string { return this.state.id.name!; }
+  /** Shard name from DO id (from idFromName). Fallback to id string so it is never undefined for DB. */
+  
+  async initShard(name: string) {
+    this.shardName = name;
+  }
 
   table<T extends z.ZodSchema>(name: string, schema: T, options?: TableOptions) {
     return this.database.table(name, schema, options);
   }
 
   private async initialize() {
-    
-    const existingConfig = await this.database.getTable("shard_configs")?.where('key', '==', 'scaleConfigName').first();
-    if (!existingConfig) {
+    const existingConfig = await this.database.dynamicSelect('shard_configs', { field: 'key', operator: '=', value: 'scaleConfigName' });
+    if (existingConfig.length === 0) {
       await Promise.all([
-        this.database.dynamicInsert('shard_configs', DEFAULT_SHARD_CONFIGS['1M+']),
-        this.database.dynamicInsert('shard_performances', this.getInitialPerformanceMetrics()),
+        this.database.dynamicInsert('shard_configs', { key: 'scaleConfigName', ...DEFAULT_SHARD_CONFIGS['1M+'] }),
+        this.database.dynamicInsert('shard_performances', this.getInitialPerformanceMetricsForInsert()),
       ]);
     }
-    this.shardConfig = existingConfig ?? DEFAULT_SHARD_CONFIGS['1M+'];
+    this.shardConfig = existingConfig.length > 0
+      ? {
+          BATCH_SIZE: existingConfig[0].BATCH_SIZE,
+          PARALLEL_BATCHES: existingConfig[0].PARALLEL_BATCHES,
+          DELAY_BETWEEN_BATCHES: existingConfig[0].DELAY_BETWEEN_BATCHES,
+          STAGGER_WINDOW: existingConfig[0].STAGGER_WINDOW,
+        }
+      : DEFAULT_SHARD_CONFIGS['1M+'];
   }
 
   // =============================================
   // REQUEST HANDLER
   // =============================================
   async fetch(request: Request): Promise<Response> {
+    await this.getInitializationPromise();
     try {
       const url = new URL(request.url);
       if (url.hostname === 'shard.internal') return await this.handleInternalMessage(request);
@@ -90,9 +125,10 @@ export class UserShardDO extends DurableObject {
       return await this.handleRepositoryOperations(request, url.pathname);
     }
 
-    const body = await request.json() as { action: string; [key: string]: any };
-    const { action, ...data } = body;
-    
+    const body = await request.json() as { action: string; shardName?: string; [key: string]: any };
+    const { action, shardName: bodyShardName, ...data } = body;
+    if (bodyShardName) this.shardName = bodyShardName;
+
     const actions: Record<string, Function> = {
       broadcast: () => this.handleFastBroadcast(data),
       user_delivery_report: () => this.handleUserDeliveryReport(data),
@@ -128,34 +164,42 @@ export class UserShardDO extends DurableObject {
   // =============================================
   private async handleFastBroadcast(data: any) {
     const { broadcastId, message, targetUsers } = data;
+    console.log(`[UserShardDO] handleFastBroadcast: received shardName=${this.shardName} broadcastId=${broadcastId} targetUsersCount=${targetUsers?.length ?? 'all'}`);
     this.ctx.waitUntil(this.processFastBroadcast(broadcastId, message, targetUsers));
     return { status: 'accepted' };
   }
 
   private async processFastBroadcast(broadcastId: number, message: any, targetUsers?: string[]) {
-    const users = targetUsers 
+    const users = targetUsers
       ? await this.getSpecificUsers(targetUsers)
       : await this.getActiveUsers();
 
-    if (users.length === 0) return;
+    if (users.length === 0) {
+      console.log(`[UserShardDO] processFastBroadcast: no users shardName=${this.shardName} broadcastId=${broadcastId}`);
+      return;
+    }
 
     const batches = this.createOptimizedBatches(users, broadcastId);
+    console.log(`[UserShardDO] processFastBroadcast: dispatching shardName=${this.shardName} broadcastId=${broadcastId} usersCount=${users.length} batchesCount=${batches.length}`);
     await this.sendBatchesWithMessage(batches, broadcastId, message);
     this.ctx.waitUntil(this.reportEstimatedDelivery(broadcastId, users.length));
   }
 
   private async getSpecificUsers(userIds: string[]): Promise<string[]> {
+    console.log(`[UserShardDO] getSpecificUsers: start shardName=${this.shardName} requestedCount=${userIds.length}`);
     const validUsers: string[] = [];
     for (const userId of userIds) {
-      const user = await this.database.getTable("user_registrations")?.where('userId', '==', userId).first();
-      if (user?.isActive) validUsers.push(userId);
+      const user = await this.database.dynamicSelect("user_registrations", { field: 'userId', operator: '=', value: userId });
+      const found = user.length > 0 && user[0].isActive;
+      if (found) validUsers.push(userId);
     }
+    console.log(`[UserShardDO] getSpecificUsers: done shardName=${this.shardName} validCount=${validUsers.length} invalidCount=${userIds.length - validUsers.length}`);
     return validUsers;
   }
 
   private async getActiveUsers(): Promise<string[]> {
-    const users = await this.database.getTable("user_registrations")?.where('isActive', '==', true).get();
-    return users ? users.map((user: any) => user.userId) : [];
+    const users = await this.database.dynamicSelect("user_registrations", { field: 'isActive', operator: '=', value: true });
+    return users.map((user: any) => user.userId);
   }
 
   private createOptimizedBatches(userIds: string[], broadcastId: number): UserBatch[] {
@@ -180,17 +224,20 @@ export class UserShardDO extends DurableObject {
   }
 
   private async sendBatchToUsersWithMessage(batch: UserBatch, broadcastId: number, message: any) {
+    console.log(`[UserShardDO] sendBatchToUsersWithMessage: batch shardName=${this.shardName} broadcastId=${broadcastId} batchId=${batch.batchId} size=${batch.userIds.length}`);
     const userPromises = batch.userIds.map(userId =>
       this.sendToUserDirect(userId, { type: 'broadcast', broadcastId, message, timestamp: Date.now() })
     );
 
     const results = await Promise.allSettled(userPromises);
     const successfulSends = results.filter(r => r.status === 'fulfilled').length;
+    console.log(`[UserShardDO] sendBatchToUsersWithMessage: done shardName=${this.shardName} broadcastId=${broadcastId} batchId=${batch.batchId} successfulSends=${successfulSends} total=${batch.userIds.length}`);
     await this.updateLocalMetrics(broadcastId, successfulSends);
   }
 
   private async sendToUserDirect(userId: string, message: any) {
-    const userDO = this.env.USER_DO.get(this.env.USER_DO.idFromName(userId));
+    console.log(`[UserShardDO] sendToUserDirect: sending to userId=${userId} message=${JSON.stringify(message)}`);
+    const userDO = this.env.USER_DO.get(this.env.USER_DO.idFromString(userId));
     const response = await userDO.fetch('https://user.internal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -228,55 +275,67 @@ export class UserShardDO extends DurableObject {
   // =============================================
   // USER MANAGEMENT
   // =============================================
-  async registerUser(userId: string) {    
-    const existingUser = await this.database.getTable("user_registrations")?.where('userId', '==', userId).first();
-    if (existingUser) {
-      await this.database.dynamicUpdate('user_registrations', existingUser.id, { isActive: true });      
+  async registerUser(userId: string) {
+    const existingUser = await this.database.dynamicSelect('user_registrations', { field: 'userId', operator: '=', value: userId });
+    if (existingUser.length > 0) {
+      await this.database.dynamicUpdate('user_registrations', existingUser[0].id, { isActive: true });
     } else {
-      const [userCount, activeCount] = await Promise.all([this.getUserCount(), this.getActiveUserCount()]);
+      const [userCount, activeCount, currentPerf] = await Promise.all([
+        this.getUserCount(),
+        this.getActiveUserCount(),
+        this.getPerformanceMetricsData(),
+      ]);
+      const performanceUpdate = {
+        ...currentPerf,
+        shardName: this.shardName,
+        totalUsers: userCount + 1,
+        activeUsers: activeCount + 1,
+        userGrowthRate: await this.calculateGrowthRate(),
+        timestamp: Math.floor(Date.now()),
+      };
       await this.database.dynamicMultiTableTransaction([
         {
           table: 'user_registrations',
           operation: 'insert',
-          data: { userId, shardName: this.shardName, tags: [], priority: 'normal', isActive: true }
+          data: { userId, shardName: this.shardName, tags: [], priority: 'normal', isActive: true },
         },
         {
-          table: 'shard_performances', 
+          table: 'shard_performances',
           operation: 'upsert',
-          data: {
-            shardName: this.shardName,
-            totalUsers: userCount + 1,
-            activeUsers: activeCount + 1,
-            userGrowthRate: await this.calculateGrowthRate(),
-            timestamp: Date.now()
-          }
-        }
-      ]);                  
+          data: performanceUpdate,
+        },
+      ]);
     }
   }
 
   async unregisterUser(userId: string) {
-    const existingUser = await this.database.getTable("user_registrations")?.where('userId', '==', userId).first();
-    if (!existingUser) throw new Error('User not found');
+    const existingUser = await this.database.dynamicSelect('user_registrations', { field: 'userId', operator: '=', value: userId });
+    if (existingUser.length === 0) throw new Error('User not found');
 
-    const [userCount, activeCount] = await Promise.all([this.getUserCount(), this.getActiveUserCount()]);
+    const [userCount, activeCount, currentPerf] = await Promise.all([
+      this.getUserCount(),
+      this.getActiveUserCount(),
+      this.getPerformanceMetricsData(),
+    ]);
+    const performanceUpdate = {
+      ...currentPerf,
+      shardName: this.shardName,
+      totalUsers: Math.max(0, userCount - 1),
+      activeUsers: Math.max(0, activeCount - 1),
+      userGrowthRate: await this.calculateGrowthRate(),
+      timestamp: Math.floor(Date.now()),
+    };
     await this.database.dynamicMultiTableTransaction([
       {
         table: 'user_registrations',
         operation: 'delete',
-        id: existingUser.id
+        id: existingUser[0].id,
       },
       {
         table: 'shard_performances',
-        operation: 'upsert', 
-        data: {
-          shardName: this.shardName,
-          totalUsers: Math.max(0, userCount - 1),
-          activeUsers: Math.max(0, activeCount - 1),
-          userGrowthRate: await this.calculateGrowthRate(),
-          timestamp: Date.now()
-        }
-      }
+        operation: 'upsert',
+        data: performanceUpdate,
+      },
     ]);
   }
 
@@ -300,7 +359,7 @@ export class UserShardDO extends DurableObject {
   }
 
   async getUsersList(): Promise<Response> {
-    const users = await this.database.getTable("user_registrations")?.getAll();
+    const users = await this.database.dynamicSelect('user_registrations');
     const userList = users ? users.map((user: any) => user.userId) : [];
     return new Response(JSON.stringify({ users: userList, count: userList.length, shardName: this.shardName }), {
       headers: { 'Content-Type': 'application/json' }
@@ -314,7 +373,7 @@ export class UserShardDO extends DurableObject {
   }
 
   private async getUserCount(): Promise<number> {
-    const users = await this.database.getTable("user_registrations")?.getAll();
+    const users = await this.database.dynamicSelect('user_registrations');
     return users ? users.length : 0;
   }
 
@@ -325,10 +384,10 @@ export class UserShardDO extends DurableObject {
 
   private async calculateGrowthRate(): Promise<number> {
     
-    const metrics = await this.database.getTable("shard_performances")?.where('shardName', '==', this.shardName).first();
-    if (!metrics) return 0;
+    const metrics = await this.database.dynamicSelect("shard_performances");
+    if (metrics.length===0) return 0;
     
-    const previousTotalUsers = metrics.totalUsers || 0;
+    const previousTotalUsers = metrics[0].totalUsers || 0;
     const currentTotalUsers = await this.getUserCount();
     if (previousTotalUsers === 0) return currentTotalUsers > 0 ? 1.0 : 0;
 
@@ -360,22 +419,41 @@ export class UserShardDO extends DurableObject {
     this.shardConfigName = scale;
     this.shardConfig = DEFAULT_SHARD_CONFIGS[scale];
     
-    const existingConfig = await this.database.getTable("shard_configs")?.where('key', '==', 'shardConfig').first();
-    if (existingConfig) {
-      await this.database.dynamicUpdate('shard_configs',  existingConfig.id, DEFAULT_SHARD_CONFIGS[scale]);
+    const existingConfig = await this.database.dynamicSelect("shard_configs", { field: 'key', operator: '=', value: 'shardConfig' });
+    if (existingConfig.length > 0) {
+      await this.database.dynamicUpdate('shard_configs', existingConfig[0].id, DEFAULT_SHARD_CONFIGS[scale]);
     } else {
-      await this.database.dynamicInsert('shard_configs', DEFAULT_SHARD_CONFIGS[scale]);
+      await this.database.dynamicInsert('shard_configs', { key: 'shardConfig', ...DEFAULT_SHARD_CONFIGS[scale] });
     }
   }
 
   private getInitialPerformanceMetrics(): ShardPerformance {
     return {
       shardName: this.shardName,
-      timestamp: Date.now(),
-      totalUsers: 0, activeUsers: 0, userGrowthRate: 0,
-      batchesProcessed: 0, averageBatchSize: 0, averageProcessingTime: 0,
-      usersPerSecond: 0, peakThroughput: 0, errorRate: 0, retryRate: 0
+      timestamp: Math.floor(Date.now()),
+      totalUsers: 0,
+      activeUsers: 0,
+      userGrowthRate: 0,
+      batchesProcessed: 0,
+      averageBatchSize: 0,
+      averageProcessingTime: 0,
+      usersPerSecond: 0,
+      peakThroughput: 0,
+      errorRate: 0,
+      retryRate: 0,
     };
+  }
+
+  /** Build metrics payload valid for DB insert (base schema only; auto-fields added by dynamicInsert). */
+  private getInitialPerformanceMetricsForInsert(): ShardPerformance {
+    const m = this.getInitialPerformanceMetrics();
+    return ShardPerformanceSchema.parse({
+      ...m,
+      timestamp: Math.floor(m.timestamp),
+      totalUsers: Math.floor(m.totalUsers),
+      activeUsers: Math.floor(m.activeUsers),
+      batchesProcessed: Math.floor(m.batchesProcessed),
+    });
   }
 
   async getPerformanceMetrics(): Promise<Response> {
@@ -384,8 +462,10 @@ export class UserShardDO extends DurableObject {
   }
 
   private async getPerformanceMetricsData(): Promise<ShardPerformance> {
-    const metrics = await this.database.getTable("shard_performances")?.where('shardName', '==', this.shardName).first();
-    return metrics || this.getInitialPerformanceMetrics();
+    const defaults = this.getInitialPerformanceMetrics();
+    const metrics = await this.database.dynamicSelect('shard_performances', { field: 'shardName', operator: '=', value: this.shardName });
+    if (metrics.length===0) return defaults;
+    return metrics[0] as ShardPerformance;
   }
 
   // =============================================
@@ -410,9 +490,9 @@ export class UserShardDO extends DurableObject {
       let removedCount = 0;
       for (const userId of inactiveUserIds) {
         
-        const userRecord = await this.database.getTable("user_registrations")?.where('userId', '==', userId).first();
-        if (userRecord) {
-          await this.database.dynamicDelete('user_registrations', userRecord.id);
+        const userRecord = await this.database.dynamicSelect("user_registrations", { field: 'userId', operator: '=', value: userId });
+        if (userRecord.length > 0) {
+          await this.database.dynamicDelete('user_registrations', userRecord[0].id);
           removedCount++;
         }
       }

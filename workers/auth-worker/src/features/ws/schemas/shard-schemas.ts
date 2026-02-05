@@ -1,12 +1,16 @@
 import { z } from 'zod';
 
-// Shard Configuration
+// Shard Configuration (key identifies the config row in DB, e.g. 'scaleConfigName' | 'shardConfig')
 export const ShardConfigSchema = z.object({
+  key: z.string(),
   BATCH_SIZE: z.number().int().positive().min(10).max(10000),
   PARALLEL_BATCHES: z.number().int().positive().min(1).max(50),
   DELAY_BETWEEN_BATCHES: z.number().int().nonnegative().max(5000),
   STAGGER_WINDOW: z.number().int().nonnegative().max(300000)
 });
+
+/** Config fields only (no key), for in-memory config and ShardInfo */
+export const ShardConfigFieldsSchema = ShardConfigSchema.omit({ key: true });
 
 export const ShardConfigNameSchema = z.enum(['10K', '100K', '1M+']);
 
@@ -14,7 +18,7 @@ export const ShardConfigNameSchema = z.enum(['10K', '100K', '1M+']);
 export const ShardInfoSchema = z.object({
   shardName: z.string(),
   userCount: z.number().int().nonnegative(),
-  config: ShardConfigSchema,
+  config: ShardConfigFieldsSchema,
   timestamp: z.number().int().positive(),
   processingLoad: z.number().min(0).max(1).default(0),
   averageBatchTime: z.number().nonnegative().optional(),
@@ -90,8 +94,8 @@ export const UserAlarmSchema = z.object({
   error: z.string().optional()
 });
 
-// Export types
-export type ShardConfig = z.infer<typeof ShardConfigSchema>;
+// Export types (ShardConfig = config-only; table rows use ShardConfigSchema which includes key)
+export type ShardConfig = z.infer<typeof ShardConfigFieldsSchema>;
 export type ShardConfigName = z.infer<typeof ShardConfigNameSchema>;
 export type ShardInfo = z.infer<typeof ShardInfoSchema>;
 export type ShardStorage = z.infer<typeof ShardStorageSchema>;

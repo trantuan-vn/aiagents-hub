@@ -74,6 +74,13 @@
     "logging_out": "Đang đăng xuất...",
     "log_in": "Đăng nhập"
   },
+  "Notifications": {
+    "aria_label": "Thông báo",
+    "label": "Thông báo",
+    "title": "Thông báo",
+    "mark_all_read": "Đánh dấu tất cả đã đọc",
+    "empty": "Chưa có thông báo"
+  },
   "UnauthorizedPage": {
     "title": "Truy cập không được phép",
     "description": "Bạn không có quyền xem nội dung được yêu cầu. Vui lòng liên hệ quản trị viên trang web nếu bạn cho rằng đây là lỗi.",

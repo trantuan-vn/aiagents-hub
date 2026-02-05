@@ -26,10 +26,17 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import type { User } from "@/data/users";
 import { type NavGroup, type NavMainItem } from "@/navigation/sidebar/sidebar-items";
+
+import { NotificationSidebarLink } from "./notification-sidebar-link";
+import { getTranslateTitle } from "./sidebar-translations";
+
+const NOTIFICATIONS_URL = "/dashboard/control/notifications";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
+  readonly user: User | null;
 }
 
 const IsComingSoon = ({ t }: { t: (key: string) => string }) => (
@@ -149,60 +156,12 @@ const NavItemCollapsed = ({
   );
 };
 
-export function NavMain({ items }: NavMainProps) {
+export function NavMain({ items, user }: NavMainProps) {
   const t = useTranslations("Sidebar");
   const path = usePathname();
   const { state, isMobile } = useSidebar();
-
-  // Translation mapping for sidebar items
-  const translateTitle = (title: string): string => {
-    const translationMap: Record<string, string> = {
-      Control: t("control"),
-      Monitor: t("monitor"),
-      Dashboards: t("dashboards"),
-      Pages: t("pages"),
-      Misc: t("misc"),
-      Build: t("build"),
-      "Useful Links": t("useful_links"),
-      Overview: t("overview"),
-      "API Keys": t("api_keys"),
-      Billing: t("billing"),
-      Notifications: t("notifications"),
-      Settings: t("settings"),
-      Logs: t("logs"),
-      Analytics: t("analytics"),
-      "Delivery & Quality": t("delivery_quality"),
-      Default: t("default"),
-      CRM: t("crm"),
-      Finance: t("finance"),
-      eKyc: t("ekyc"),
-      Messaging: t("messaging"),
-      "Ask AI": t("ask_ai"),
-      Documentation: t("documentation"),
-      Support: t("support"),
-      "Legal & Privacy": t("legal_privacy"),
-      "Privacy Policy": t("privacy_policy"),
-      "Cookie Settings": t("cookie_settings"),
-      "Your privacy choices": t("your_privacy_choices"),
-      "E-commerce": t("ecommerce"),
-      Academy: t("academy"),
-      Logistics: t("logistics"),
-      Email: t("email"),
-      Chat: t("chat"),
-      Calendar: t("calendar"),
-      Kanban: t("kanban"),
-      Invoice: t("invoice"),
-      Users: t("users"),
-      Roles: t("roles"),
-      Authentication: t("authentication"),
-      "Login v1": t("login_v1"),
-      "Login v2": t("login_v2"),
-      "Register v1": t("register_v1"),
-      "Register v2": t("register_v2"),
-      Others: t("others"),
-    };
-    return translationMap[title] || title;
-  };
+  const isCollapsed = state === "collapsed" && !isMobile;
+  const translateTitle = getTranslateTitle(t);
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -246,6 +205,17 @@ export function NavMain({ items }: NavMainProps) {
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               {group.items.map((item) => {
+                if (item.url === NOTIFICATIONS_URL) {
+                  return (
+                    <NotificationSidebarLink
+                      key={item.title}
+                      isActive={isItemActive}
+                      isCollapsed={isCollapsed}
+                      translateTitle={translateTitle}
+                      user={user}
+                    />
+                  );
+                }
                 if (state === "collapsed" && !isMobile) {
                   // If no subItems, just render the button as a link
                   if (!item.subItems) {
