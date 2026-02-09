@@ -26,17 +26,14 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { User } from "@/data/users";
 import { type NavGroup, type NavMainItem } from "@/navigation/sidebar/sidebar-items";
 
-import { NotificationSidebarLink } from "./notification-sidebar-link";
 import { getTranslateTitle } from "./sidebar-translations";
 
-const NOTIFICATIONS_URL = "/dashboard/control/notifications";
+const HIDDEN_NAV_URLS = ["/dashboard/control/notifications", "/dashboard/control/settings"];
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
-  readonly user: User | null;
 }
 
 const IsComingSoon = ({ t }: { t: (key: string) => string }) => (
@@ -156,11 +153,10 @@ const NavItemCollapsed = ({
   );
 };
 
-export function NavMain({ items, user }: NavMainProps) {
+export function NavMain({ items }: NavMainProps) {
   const t = useTranslations("Sidebar");
   const path = usePathname();
   const { state, isMobile } = useSidebar();
-  const isCollapsed = state === "collapsed" && !isMobile;
   const translateTitle = getTranslateTitle(t);
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
@@ -205,16 +201,8 @@ export function NavMain({ items, user }: NavMainProps) {
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               {group.items.map((item) => {
-                if (item.url === NOTIFICATIONS_URL) {
-                  return (
-                    <NotificationSidebarLink
-                      key={item.title}
-                      isActive={isItemActive}
-                      isCollapsed={isCollapsed}
-                      translateTitle={translateTitle}
-                      user={user}
-                    />
-                  );
+                if (HIDDEN_NAV_URLS.includes(item.url)) {
+                  return null;
                 }
                 if (state === "collapsed" && !isMobile) {
                   // If no subItems, just render the button as a link

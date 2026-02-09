@@ -13,6 +13,7 @@ import { createPriceRoutes } from './features/admin/policy/presentation';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
+import { createAccountRoutes } from './features/account/presentation';
 
 
 export { UserDO } from './features/ws/infrastructure/UserDO';
@@ -58,6 +59,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));
+  routes.route('/dashboard/account', createAccountRoutes(bindingName));
 
   // II. API
   // Security middleware

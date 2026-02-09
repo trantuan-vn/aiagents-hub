@@ -76,7 +76,7 @@ export function NavUser({ user }: { readonly user: User | null }) {
 
   const menuItems = user
     ? [
-        { title: t("account"), icon: CircleUser, url: "/dashboard/control/settings" },
+        { title: t("account"), icon: CircleUser, url: "/dashboard/control/account" },
         { title: t("billing"), icon: CreditCard, url: "/dashboard/control/billing" },
         {
           title: t("notifications"),

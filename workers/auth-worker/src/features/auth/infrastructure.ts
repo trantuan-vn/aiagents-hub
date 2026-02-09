@@ -70,6 +70,14 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
     return session[0] || null;
   },
 
+  async listAll(limit = 50): Promise<Session[]> {
+    const sessions = await executeUtils.executeDynamicAction(userDO, 'select', {
+      orderBy: { field: 'id', direction: 'DESC' },
+      limit,
+    }, 'sessions');
+    return Array.isArray(sessions) ? sessions : [];
+  },
+
   async update(sessionId: string, sessionData: Partial<Session>): Promise<void> {
     const session = await this.findById(sessionId);
     if (!session) {

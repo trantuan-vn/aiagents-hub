@@ -164,6 +164,7 @@ export interface IUserRepository {
 export interface ISessionRepository {
   create(sessionData: Session): Promise<any>;
   findById(sessionId: string): Promise<any>;
+  listAll(limit?: number): Promise<Session[]>;
   update(sessionId: string, sessionData: Partial<Session>): Promise<void>;
   delete(sessionId: string): Promise<void>;
   deactivateAllUserSessions(identifier: string): Promise<void>;

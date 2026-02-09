@@ -100,6 +100,7 @@
     "build": "Build",
     "useful_links": "Useful Links",
     "overview": "Overview",
+    "account": "Account",
     "api_keys": "API Keys",
     "billing": "Billing",
     "notifications": "Notifications",
@@ -891,6 +892,52 @@
       "price_policies": "Price Policies",
       "services": "Services",
       "vouchers": "Vouchers"
+    }
+  },
+  "AccountPage": {
+    "title": "Account",
+    "description": "Security, sessions, eKYC and DID for your API account",
+    "security": {
+      "title": "Two-factor & sign-in methods",
+      "description": "Authenticator, SMS, passkey and backup codes",
+      "authenticator_title": "Authenticator app",
+      "authenticator_desc": "Use an app like Google Authenticator for one-time codes",
+      "sms_title": "SMS",
+      "sms_desc": "Receive one-time codes by SMS",
+      "passkey_title": "Passkey",
+      "passkey_desc": "Sign in with fingerprint or device PIN",
+      "backup_codes_title": "Backup codes",
+      "backup_codes_desc": "One-time codes to recover access",
+      "optional": "Optional",
+      "setup": "Set up",
+      "enable": "Enable",
+      "add": "Add",
+      "generate": "Generate"
+    },
+    "sessions": {
+      "title": "Active sessions & devices",
+      "description": "Devices that have successfully signed in to your account",
+      "loading": "Loading sessions...",
+      "no_sessions": "No other sessions",
+      "fetch_error": "Failed to load sessions",
+      "current": "Current",
+      "unknown_device": "Unknown device",
+      "revoke": "Revoke",
+      "revoked": "Session revoked",
+      "revoked_description": "The session has been revoked",
+      "revoke_error": "Failed to revoke session"
+    },
+    "ekyc": {
+      "title": "eKYC",
+      "description": "Manage identity verification",
+      "detail": "Verify your identity with document and face recognition for higher trust levels.",
+      "manage": "Manage eKYC"
+    },
+    "did": {
+      "title": "DID verification",
+      "description": "Decentralized identity verification",
+      "detail": "Link and verify your decentralized identifier (DID) for API access.",
+      "manage": "Manage DID"
     }
   },
   "BillingPage": {

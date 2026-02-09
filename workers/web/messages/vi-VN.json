@@ -100,6 +100,7 @@
     "build": "Xây dựng",
     "useful_links": "Liên kết hữu ích",
     "overview": "Tổng quan",
+    "account": "Tài khoản",
     "api_keys": "Khóa API",
     "billing": "Thanh toán",
     "notifications": "Thông báo",
@@ -891,6 +892,52 @@
       "price_policies": "Chính sách Giá",
       "services": "Dịch vụ",
       "vouchers": "Voucher"
+    }
+  },
+  "AccountPage": {
+    "title": "Tài khoản",
+    "description": "Bảo mật, phiên đăng nhập, eKYC và DID cho tài khoản API",
+    "security": {
+      "title": "Xác thực hai lớp & phương thức đăng nhập",
+      "description": "Authenticator, SMS, passkey và mã dự phòng",
+      "authenticator_title": "Ứng dụng Authenticator",
+      "authenticator_desc": "Dùng app như Google Authenticator để nhận mã OTP",
+      "sms_title": "SMS",
+      "sms_desc": "Nhận mã xác thực qua SMS",
+      "passkey_title": "Passkey",
+      "passkey_desc": "Đăng nhập bằng vân tay hoặc mã PIN thiết bị",
+      "backup_codes_title": "Mã dự phòng",
+      "backup_codes_desc": "Mã dùng một lần để khôi phục truy cập",
+      "optional": "Tùy chọn",
+      "setup": "Thiết lập",
+      "enable": "Bật",
+      "add": "Thêm",
+      "generate": "Tạo mã"
+    },
+    "sessions": {
+      "title": "Phiên & thiết bị đang hoạt động",
+      "description": "Các thiết bị đã đăng nhập thành công vào tài khoản",
+      "loading": "Đang tải phiên...",
+      "no_sessions": "Không có phiên khác",
+      "fetch_error": "Không thể tải phiên",
+      "current": "Hiện tại",
+      "unknown_device": "Thiết bị không xác định",
+      "revoke": "Thu hồi",
+      "revoked": "Đã thu hồi phiên",
+      "revoked_description": "Phiên đã được thu hồi",
+      "revoke_error": "Không thể thu hồi phiên"
+    },
+    "ekyc": {
+      "title": "eKYC",
+      "description": "Quản lý xác thực danh tính",
+      "detail": "Xác minh danh tính bằng giấy tờ và nhận diện khuôn mặt để tăng mức độ tin cậy.",
+      "manage": "Quản lý eKYC"
+    },
+    "did": {
+      "title": "Xác thực DID",
+      "description": "Xác thực định danh phi tập trung",
+      "detail": "Liên kết và xác minh DID (Decentralized Identifier) để truy cập API.",
+      "manage": "Quản lý DID"
     }
   },
   "BillingPage": {

@@ -8,6 +8,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     Build: t("build"),
     "Useful Links": t("useful_links"),
     Overview: t("overview"),
+    Account: t("account"),
     "API Keys": t("api_keys"),
     Billing: t("billing"),
     Notifications: t("notifications"),

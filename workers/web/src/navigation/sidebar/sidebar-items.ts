@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Tag,
   Ticket,
+  UserCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +58,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Control",
     items: [
       { title: "Overview", url: "/dashboard/control/overview", icon: LayoutDashboard },
+      { title: "Account", url: "/dashboard/control/account", icon: UserCircle },
       { title: "API Keys", url: "/dashboard/control/token", icon: Key },
       { title: "Billing", url: "/dashboard/control/billing", icon: CreditCard },
       { title: "Notifications", url: "/dashboard/control/notifications", icon: Bell },
