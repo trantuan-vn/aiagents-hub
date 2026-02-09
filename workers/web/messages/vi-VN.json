@@ -925,7 +925,8 @@
       "revoke": "Thu hồi",
       "revoked": "Đã thu hồi phiên",
       "revoked_description": "Phiên đã được thu hồi",
-      "revoke_error": "Không thể thu hồi phiên"
+      "revoke_error": "Không thể thu hồi phiên",
+      "session_id_copied": "Đã sao chép ID phiên"
     },
     "ekyc": {
       "title": "eKYC",

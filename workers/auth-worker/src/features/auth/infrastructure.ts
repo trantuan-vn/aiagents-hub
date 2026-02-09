@@ -72,6 +72,7 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
 
   async listAll(limit = 50): Promise<Session[]> {
     const sessions = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [{ field: 'isActive', operator: '=', value: 1 }],
       orderBy: { field: 'id', direction: 'DESC' },
       limit,
     }, 'sessions');

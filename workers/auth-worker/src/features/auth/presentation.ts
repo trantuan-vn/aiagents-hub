@@ -197,5 +197,33 @@ export function createAuthRoutes(bindingName: string) {
     }
   });
 
+  // V. Session management (list & revoke)
+  app.get('/sessions', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const sessionId = getCookie(c, 'sessionId');
+      const applicationService = createApplicationService(c, bindingName);
+      const result = await applicationService.listSessionsUseCase(user.identifier, sessionId ?? undefined);
+      return c.json(result.sessions);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to list sessions');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sessions/:sessionId/revoke', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const sessionId = c.req.param('sessionId');
+      if (!sessionId) throw new Error('Session ID required');
+      const applicationService = createApplicationService(c, bindingName);
+      await applicationService.revokeSessionUseCase(user.identifier, sessionId);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to revoke session');
+      return c.json(errorResponse, status);
+    }
+  });
+
   return app;
 }

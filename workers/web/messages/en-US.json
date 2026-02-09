@@ -925,7 +925,8 @@
       "revoke": "Revoke",
       "revoked": "Session revoked",
       "revoked_description": "The session has been revoked",
-      "revoke_error": "Failed to revoke session"
+      "revoke_error": "Failed to revoke session",
+      "session_id_copied": "Session ID copied"
     },
     "ekyc": {
       "title": "eKYC",

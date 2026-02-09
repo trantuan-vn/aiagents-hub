@@ -32,6 +32,8 @@ interface IApplicationService {
   // IV. Common
   logoutUseCase(identifier: string, sessionId: string): Promise<void>;
   logoutAllUseCase(identifier: string): Promise<void>;
+  listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
+  revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
   verifyTokenUseCase(sessionId: string, token: string, refreshToken: string): Promise<{ ok: boolean; user: any }>;
   refreshTokenUseCase(sessionId: string, refreshToken: string): Promise<{ ok: boolean; user: any; token: string; refreshToken: string }>;
 }
@@ -202,6 +204,27 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async logoutAllUseCase(identifier: string): Promise<void> {
       const repository = getRepository(identifier);
       await repository.sessions.deactivateAllUserSessions(identifier);
+    },
+
+    async listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }> {
+      const repository = getRepository(identifier);
+      const list = await repository.sessions.listAll(50);
+      const sessions = list.map((s: any, index: number) => ({
+        id: s.id ?? index,
+        hashSessionId: s.hashSessionId,
+        type: s.type ?? 'unknown',
+        ipAddress: s.ipAddress,
+        userAgent: s.userAgent,
+        expiresAt: s.expiresAt,
+        isActive: !!s.isActive,
+        isCurrent: currentSessionId ? s.hashSessionId === currentSessionId : undefined,
+      }));
+      return { sessions };
+    },
+
+    async revokeSessionUseCase(identifier: string, sessionId: string): Promise<void> {
+      const repository = getRepository(identifier);
+      await repository.sessions.update(sessionId, { isActive: false });
     },
 
     async verifyTokenUseCase(sessionId: string, token: string, refreshToken: string): Promise<{ ok: boolean; user: any }> {
