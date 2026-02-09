@@ -169,10 +169,7 @@ export function SessionsDevicesCard() {
               const Icon = getDeviceIcon(s.userAgent);
               const summary = getDeviceSummary(s.userAgent) || t("unknown_device");
               return (
-                <li
-                  key={s.id}
-                  className="rounded-xl border bg-card/50 transition-colors hover:bg-muted/30"
-                >
+                <li key={s.id} className="bg-card/50 hover:bg-muted/30 rounded-xl border transition-colors">
                   <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex min-w-0 flex-1 gap-4">
                       <div className="bg-muted/80 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
@@ -180,7 +177,7 @@ export function SessionsDevicesCard() {
                       </div>
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-medium text-foreground">{summary}</span>
+                          <span className="text-foreground font-medium">{summary}</span>
                           {s.isCurrent && (
                             <Badge variant="secondary" className="shrink-0 font-medium">
                               {t("current")}
@@ -190,7 +187,7 @@ export function SessionsDevicesCard() {
                             {s.type}
                           </Badge>
                         </div>
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                           {s.ipAddress && (
                             <span className="flex items-center gap-1">
                               <Globe className="h-3.5 w-3.5 shrink-0" />
@@ -208,30 +205,26 @@ export function SessionsDevicesCard() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-auto px-0 py-1 text-xs text-muted-foreground hover:text-foreground"
+                                className="text-muted-foreground hover:text-foreground h-auto px-0 py-1 text-xs"
                               >
                                 User-Agent (full)
                               </Button>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                               <div className="bg-muted/50 mt-2 rounded-lg px-3 py-2">
-                                <p className="break-all font-mono text-xs text-muted-foreground">
-                                  {s.userAgent}
-                                </p>
+                                <p className="text-muted-foreground font-mono text-xs break-all">{s.userAgent}</p>
                               </div>
                             </CollapsibleContent>
                           </Collapsible>
                         )}
-                        {s.hashSessionId && (
-                          <SessionIdCopy value={s.hashSessionId} />
-                        )}
+                        {s.hashSessionId && <SessionIdCopy value={s.hashSessionId} />}
                       </div>
                     </div>
                     {!s.isCurrent && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-destructive shrink-0 hover:bg-destructive/10 hover:text-destructive"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
                         onClick={() => revokeSession(s.hashSessionId)}
                       >
                         {t("revoke")}
@@ -264,20 +257,9 @@ function SessionIdCopy({ value }: { value: string }) {
   const short = value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-8)}` : value;
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-xs text-muted-foreground">ID: {short}</span>
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 shrink-0"
-        onClick={copy}
-        title={value}
-      >
-        {copied ? (
-          <Check className="h-3.5 w-3.5 text-green-600" />
-        ) : (
-          <Copy className="h-3.5 w-3.5" />
-        )}
+      <span className="text-muted-foreground font-mono text-xs">ID: {short}</span>
+      <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={copy} title={value}>
+        {copied ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
       </Button>
     </div>
   );

@@ -1,5 +1,9 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
+
+import Link from "next/link";
+
 import { KeyRound, MessageSquare, ShieldCheck, Key } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -8,8 +12,36 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+
+interface AuthenticatorStatus {
+  enabled: boolean;
+  enabledAt?: string;
+}
+
 export function AccountSecurityCard() {
   const t = useTranslations("AccountPage.security");
+  const [authenticatorStatus, setAuthenticatorStatus] = useState<AuthenticatorStatus | null>(null);
+
+  const fetchAuthenticatorStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/authenticator/status`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data: { enabled?: boolean; enabledAt?: string } = await res.json();
+        setAuthenticatorStatus({ enabled: Boolean(data.enabled), enabledAt: data.enabledAt });
+      }
+    } catch {
+      setAuthenticatorStatus(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAuthenticatorStatus();
+  }, [fetchAuthenticatorStatus]);
 
   const methods = [
     {
@@ -19,6 +51,10 @@ export function AccountSecurityCard() {
       descKey: "authenticator_desc",
       status: "optional",
       actionKey: "setup",
+      manageKey: "manage",
+      href: "/dashboard/control/account/authenticator",
+      showStatus: true,
+      enabled: authenticatorStatus?.enabled ?? false,
     },
     {
       key: "sms",
@@ -27,6 +63,9 @@ export function AccountSecurityCard() {
       descKey: "sms_desc",
       status: "optional",
       actionKey: "enable",
+      href: null,
+      showStatus: false,
+      enabled: false,
     },
     {
       key: "passkey",
@@ -35,6 +74,9 @@ export function AccountSecurityCard() {
       descKey: "passkey_desc",
       status: "optional",
       actionKey: "add",
+      href: null,
+      showStatus: false,
+      enabled: false,
     },
     {
       key: "backup_codes",
@@ -43,6 +85,9 @@ export function AccountSecurityCard() {
       descKey: "backup_codes_desc",
       status: "optional",
       actionKey: "generate",
+      href: null,
+      showStatus: false,
+      enabled: false,
     },
   ];
 
@@ -55,6 +100,16 @@ export function AccountSecurityCard() {
       <CardContent className="space-y-4">
         {methods.map((m, i) => {
           const Icon = m.icon;
+          const actionLabel = m.showStatus && m.enabled ? t("manage") : t(m.actionKey);
+          const button = m.href ? (
+            <Button variant="outline" size="sm" className="shrink-0" asChild>
+              <Link href={m.href}>{actionLabel}</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="shrink-0" disabled>
+              {actionLabel}
+            </Button>
+          );
           return (
             <div key={m.key}>
               {i > 0 && <Separator className="my-4" />}
@@ -64,18 +119,22 @@ export function AccountSecurityCard() {
                     <Icon className="text-muted-foreground h-5 w-5" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{t(m.titleKey)}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {t("optional")}
-                      </Badge>
+                      {m.showStatus && m.enabled ? (
+                        <Badge variant="default" className="bg-emerald-600 text-xs">
+                          {t("enabled")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          {t("optional")}
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-muted-foreground text-sm">{t(m.descKey)}</p>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="shrink-0">
-                  {t(m.actionKey)}
-                </Button>
+                {button}
               </div>
             </div>
           );

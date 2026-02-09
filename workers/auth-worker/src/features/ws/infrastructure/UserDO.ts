@@ -10,7 +10,8 @@ import {
   DEFAULT_SCALE_CONFIGS, ScaleConfig, UserSchema, SessionSchema,
   PricePolicySchema, ServiceSchema, ServiceUsageSchema, VoucherSchema,
   OrderSchema, OrderItemSchema, OrderItemDiscountSchema, ApiTokenSchema,
-  PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema
+  PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
+  UserMfaSchema
 } from '../domain.js';
 
 const MAX_SEND_FAILURE_COUNT = 3;
@@ -105,6 +106,7 @@ export class UserDO extends DurableObject {
       this.table('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.userScoped);
       this.table('versions', VersionInfoSchema, this.TABLE_CONFIGS.userScoped);
       this.table('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.userScoped);
+      this.table('user_mfa', UserMfaSchema, this.TABLE_CONFIGS.userScoped);
       
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();

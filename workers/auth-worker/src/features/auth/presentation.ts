@@ -10,6 +10,8 @@ import {
   SIWEAuthSchema 
 } from './domain';
 import { cookieUtils, oauthUtils } from './utils';
+import { createAccountAuthenticatorApplication } from '../account/application';
+import { VerifyAuthenticatorSchema, DisableAuthenticatorSchema } from '../account/domain';
 
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -221,6 +223,60 @@ export function createAuthRoutes(bindingName: string) {
       return c.json({ ok: true });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to revoke session');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // VI. Authenticator (TOTP) – requires auth
+  app.get('/authenticator/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = createAccountAuthenticatorApplication(c, bindingName);
+      const status = await appService.getAuthenticatorStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get authenticator status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/authenticator/setup', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const body = await c.req.json().catch(() => ({}));
+      const issuer = typeof body.issuer === 'string' ? body.issuer : 'Unitoken';
+      const accountName = typeof body.accountName === 'string' ? body.accountName : user.identifier;
+      const appService = createAccountAuthenticatorApplication(c, bindingName);
+      const result = await appService.setupAuthenticatorUseCase(user.identifier, issuer, accountName);
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to setup authenticator');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/authenticator/verify', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const input = await parseBody(c, VerifyAuthenticatorSchema);
+      const appService = createAccountAuthenticatorApplication(c, bindingName);
+      await appService.verifyAuthenticatorUseCase(user.identifier, input);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to verify authenticator');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/authenticator/disable', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const input = await parseBody(c, DisableAuthenticatorSchema);
+      const appService = createAccountAuthenticatorApplication(c, bindingName);
+      await appService.disableAuthenticatorUseCase(user.identifier, input);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to disable authenticator');
       return c.json(errorResponse, status);
     }
   });
