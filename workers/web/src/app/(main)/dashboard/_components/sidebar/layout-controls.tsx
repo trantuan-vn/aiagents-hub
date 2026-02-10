@@ -35,9 +35,9 @@ export function LayoutControls(props: LayoutControlsProps) {
   const locale = usePreferencesStore((s) => s.locale);
   const setLocale = usePreferencesStore((s) => s.setLocale);
 
-  const handleValueChange = async (key: string, value: any) => {
+  const handleValueChange = async (key: string, value: ThemeMode | ThemePreset | string) => {
     if (key === "theme_mode") {
-      updateThemeMode(value);
+      updateThemeMode(value as ThemeMode);
       setThemeMode(value as ThemeMode);
     }
 
@@ -47,7 +47,7 @@ export function LayoutControls(props: LayoutControlsProps) {
     }
 
     if (key === "content_layout") {
-      updateContentLayout(value);
+      updateContentLayout(value as ContentLayout);
     }
 
     if (key === "locale") {

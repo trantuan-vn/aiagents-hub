@@ -10,6 +10,8 @@ import {
   IPasskeyRepository,
   BackupCodeStatus,
   IBackupCodeRepository,
+  EkycStatus,
+  IEkycRepository,
 } from './domain';
 import { executeUtils } from '../../shared/utils';
 
@@ -291,6 +293,130 @@ export function createBackupCodeRepository(
       const list = Array.isArray(rows) ? rows : [];
       for (const row of list) {
         await executeUtils.executeDynamicAction(userDO, 'delete', { id: row.id }, BACKUP_CODES_TABLE);
+      }
+    },
+  };
+}
+
+const USER_EKYC_TABLE = 'user_ekyc';
+
+async function getEkycRow(userDO: DurableObjectStub<UserDO>): Promise<any> {
+  const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, USER_EKYC_TABLE);
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+
+export function createEkycRepository(
+  userDO: DurableObjectStub<UserDO>
+): IEkycRepository {
+  return {
+    async getStatus(): Promise<EkycStatus> {
+      const row = await getEkycRow(userDO);
+      if (!row) {
+        return { status: 'not_started' };
+      }
+      return {
+        status: row.status ?? 'not_started',
+        documentVerifiedAt: row.documentVerifiedAt ?? undefined,
+        faceVerifiedAt: row.faceVerifiedAt ?? undefined,
+        updatedAt: row.updatedAt ?? undefined,
+      };
+    },
+    async setDocumentSubmitted(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const updatedAt = new Date().toISOString();
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'document_submitted',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          status: 'document_submitted',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      }
+    },
+    async setDocumentVerified(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const documentVerifiedAt = new Date().toISOString();
+      const updatedAt = documentVerifiedAt;
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'document_verified',
+          documentVerifiedAt,
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          status: 'document_verified',
+          documentVerifiedAt,
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      }
+    },
+    async setFaceSubmitted(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const updatedAt = new Date().toISOString();
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'face_submitted',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          status: 'face_submitted',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      }
+    },
+    async setFaceVerified(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const faceVerifiedAt = new Date().toISOString();
+      const updatedAt = faceVerifiedAt;
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'face_verified',
+          faceVerifiedAt,
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          status: 'face_verified',
+          faceVerifiedAt,
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      }
+    },
+    async setVerified(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const updatedAt = new Date().toISOString();
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'verified',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          status: 'verified',
+          updatedAt,
+        }, USER_EKYC_TABLE);
+      }
+    },
+    async reset(): Promise<void> {
+      const row = await getEkycRow(userDO);
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          status: 'not_started',
+          documentVerifiedAt: null,
+          faceVerifiedAt: null,
+          updatedAt: new Date().toISOString(),
+        }, USER_EKYC_TABLE);
       }
     },
   };

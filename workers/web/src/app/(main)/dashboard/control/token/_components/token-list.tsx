@@ -139,40 +139,25 @@ export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
             const maskedToken = `utk_${"•".repeat(32)}`;
 
             return (
-              <div
-                key={token.id}
-                className="bg-muted/50 flex items-center justify-between rounded-lg p-4"
-              >
-                <div className="flex items-center gap-3 flex-1">
+              <div key={token.id} className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
+                <div className="flex flex-1 items-center gap-3">
                   <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
                     <Key className="text-primary h-5 w-5" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex items-center gap-2">
                       <span className="text-sm font-medium">{token.name}</span>
                       <Badge
-                        variant={
-                          !token.isActive
-                            ? "secondary"
-                            : expired
-                              ? "destructive"
-                              : "default"
-                        }
+                        variant={!token.isActive ? "secondary" : expired ? "destructive" : "default"}
                         className="text-xs"
                       >
-                        {!token.isActive
-                          ? t("inactive")
-                          : expired
-                            ? t("expired")
-                            : t("active")}
+                        {!token.isActive ? t("inactive") : expired ? t("expired") : t("active")}
                       </Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="text-muted-foreground flex items-center gap-4 text-xs">
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {token.expiresAt
-                          ? formatDate(token.expiresAt)
-                          : t("never_expires")}
+                        {token.expiresAt ? formatDate(token.expiresAt) : t("never_expires")}
                       </div>
                       {token.permissions.length > 0 && (
                         <div className="flex items-center gap-1">
@@ -181,7 +166,7 @@ export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
                         </div>
                       )}
                     </div>
-                    <p className="text-muted-foreground font-mono text-xs mt-1">{maskedToken}</p>
+                    <p className="text-muted-foreground mt-1 font-mono text-xs">{maskedToken}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -190,26 +175,14 @@ export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
                     size="icon"
                     onClick={() => setShowToken(showToken === token.id ? null : token.id)}
                   >
-                    {showToken === token.id ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showToken === token.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(maskedToken)}
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(maskedToken)}>
                     <Copy className="h-4 w-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={revokingTokenId === token.id}
-                      >
+                      <Button variant="ghost" size="icon" disabled={revokingTokenId === token.id}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>

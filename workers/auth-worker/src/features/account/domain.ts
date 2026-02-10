@@ -138,3 +138,29 @@ export interface IBackupCodeRepository {
   consumeCode(normalizedCode: string): Promise<boolean>; // returns true if found and consumed
   deleteAll(): Promise<void>;
 }
+
+// eKYC – identity verification status (no PII stored, status only)
+export const UserEkycSchema = z.object({
+  status: z.enum(['not_started', 'document_submitted', 'document_verified', 'face_submitted', 'face_verified', 'verified']).default('not_started'),
+  documentVerifiedAt: z.string().datetime().nullish(),
+  faceVerifiedAt: z.string().datetime().nullish(),
+  updatedAt: z.string().datetime().nullish(),
+});
+export type UserEkycRow = z.infer<typeof UserEkycSchema>;
+
+export interface EkycStatus {
+  status: 'not_started' | 'document_submitted' | 'document_verified' | 'face_submitted' | 'face_verified' | 'verified';
+  documentVerifiedAt?: string;
+  faceVerifiedAt?: string;
+  updatedAt?: string;
+}
+
+export interface IEkycRepository {
+  getStatus(): Promise<EkycStatus>;
+  setDocumentSubmitted(): Promise<void>;
+  setDocumentVerified(): Promise<void>;
+  setFaceSubmitted(): Promise<void>;
+  setFaceVerified(): Promise<void>;
+  setVerified(): Promise<void>;
+  reset(): Promise<void>;
+}

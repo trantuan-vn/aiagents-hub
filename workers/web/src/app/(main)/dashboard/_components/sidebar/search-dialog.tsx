@@ -104,7 +104,8 @@ export function SearchDialog({ user }: SearchDialogProps) {
         "Register v2": t("register_v2"),
         Others: t("others"),
       };
-      return translationMap[title] ?? title;
+      const entry = Object.entries(translationMap).find(([k]) => k === title);
+      return entry ? entry[1] : title;
     },
     [t],
   );

@@ -13,6 +13,7 @@ import { cookieUtils, oauthUtils } from './utils';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createAccountPasskeyApplication } from '../account/passkey';
 import { createAccountBackupCodeApplication } from '../account/backup-codes';
+import { createAccountEkycApplication } from '../account/ekyc';
 import {
   VerifyAuthenticatorSchema,
   DisableAuthenticatorSchema,
@@ -20,6 +21,9 @@ import {
   VerifySmsSchema,
   DisableSmsSchema,
 } from '../account/domain';
+import { createDocumentAIService } from '../member/ekyc/application';
+import { EKYC_SERVICES } from '../member/ekyc/constant';
+import { processFormData, mergeImages } from '../member/ekyc/utils';
 
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -447,6 +451,127 @@ export function createAuthRoutes(bindingName: string) {
       return c.json(result);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to generate backup codes');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // X. eKYC – identity verification (dashboard auth, no API token)
+  const getEkycApp = (ctx: any) => createAccountEkycApplication(ctx, bindingName);
+  const getEkycAI = (ctx: any) => createDocumentAIService(ctx, bindingName);
+
+  app.get('/ekyc/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getEkycApp(c);
+      const status = await appService.getStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get eKYC status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/recognize-document', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const { image, docType } = await processFormData(c);
+      const aiService = getEkycAI(c);
+      const result = await aiService.recognizeDocumentUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.DOCUMENT.RECOGNIZE.path,
+        image,
+        docType,
+        ipAddress,
+        userAgent,
+      });
+      const ekycApp = getEkycApp(c);
+      if (result.confidence >= 0.7) {
+        await ekycApp.setDocumentVerifiedUseCase(user.identifier);
+      } else {
+        await ekycApp.setDocumentSubmittedUseCase(user.identifier);
+      }
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Document recognition failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/face-search', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const { image } = await processFormData(c);
+      const aiService = getEkycAI(c);
+      const result = await aiService.faceSearchUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.SEARCH.path,
+        image,
+        ipAddress,
+        userAgent,
+      });
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Face search failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/face-verify', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const { image, image2 } = await processFormData(c);
+      if (!image2) throw new Error('Missing second image for verification');
+      const mergedImage = await mergeImages(image, image2, c.env as any);
+      const aiService = getEkycAI(c);
+      const result = await aiService.faceVerifyUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.VERIFY.path,
+        image: mergedImage,
+        image2: null,
+        ipAddress,
+        userAgent,
+      });
+      const ekycApp = getEkycApp(c);
+      if (result.isMatch && result.confidence >= 0.75) {
+        await ekycApp.setFaceVerifiedUseCase(user.identifier);
+        await ekycApp.setVerifiedUseCase(user.identifier);
+      } else {
+        await ekycApp.setFaceSubmittedUseCase(user.identifier);
+      }
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Face verification failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/face-liveness', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const { image, isVideo } = await processFormData(c);
+      const aiService = getEkycAI(c);
+      const result = await aiService.livenessDetectionUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.LIVENESS.path,
+        image,
+        isVideo,
+        ipAddress,
+        userAgent,
+      });
+      const ekycApp = getEkycApp(c);
+      if (result.isLive && result.confidence >= 0.7) {
+        await ekycApp.setFaceVerifiedUseCase(user.identifier);
+        await ekycApp.setVerifiedUseCase(user.identifier);
+      } else {
+        await ekycApp.setFaceSubmittedUseCase(user.identifier);
+      }
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Liveness detection failed');
       return c.json(errorResponse, status);
     }
   });

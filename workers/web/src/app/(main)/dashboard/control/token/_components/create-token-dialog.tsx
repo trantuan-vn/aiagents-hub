@@ -17,15 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
@@ -110,14 +102,12 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
         {createdToken ? (
           <div className="space-y-4">
             <div className="bg-muted rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="mb-2 flex items-center gap-2">
                 <Key className="h-4 w-4" />
                 <span className="text-sm font-medium">{t("your_token")}</span>
               </div>
-              <p className="text-muted-foreground text-xs mb-3">{t("token_warning")}</p>
-              <div className="bg-background rounded border p-3 font-mono text-sm break-all">
-                {createdToken}
-              </div>
+              <p className="text-muted-foreground mb-3 text-xs">{t("token_warning")}</p>
+              <div className="bg-background rounded border p-3 font-mono text-sm break-all">{createdToken}</div>
             </div>
             <div className="flex gap-2">
               <Button onClick={copyToken} className="flex-1">

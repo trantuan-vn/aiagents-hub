@@ -31,7 +31,7 @@ export default function PolicyPage() {
         credentials: "include",
         headers: {
           "Content-Type": "application/json",
-        }
+        },
       });
 
       if (!response.ok) {

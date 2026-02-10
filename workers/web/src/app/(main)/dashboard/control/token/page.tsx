@@ -129,9 +129,7 @@ export default function TokenPage() {
   };
 
   const activeTokens = tokens.filter((t) => t.isActive);
-  const expiredTokens = tokens.filter(
-    (t) => t.isActive && t.expiresAt && new Date(t.expiresAt) < new Date()
-  );
+  const expiredTokens = tokens.filter((t) => t.isActive && t.expiresAt && new Date(t.expiresAt) < new Date());
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -197,11 +195,7 @@ export default function TokenPage() {
           </CardContent>
         </Card>
       ) : (
-        <TokenList
-          tokens={tokens}
-          onRevoke={handleRevokeToken}
-          onRevokeAll={handleRevokeAll}
-        />
+        <TokenList tokens={tokens} onRevoke={handleRevokeToken} onRevokeAll={handleRevokeAll} />
       )}
     </div>
   );

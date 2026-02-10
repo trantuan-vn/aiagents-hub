@@ -87,7 +87,13 @@ export default function OverviewPage() {
             icon: Activity,
             color: "from-blue-500 to-cyan-500",
           },
-          { label: t("stats.active_subscriptions"), value: "3", change: "+1", icon: Zap, color: "from-primary to-primary/70" },
+          {
+            label: t("stats.active_subscriptions"),
+            value: "3",
+            change: "+1",
+            icon: Zap,
+            color: "from-primary to-primary/70",
+          },
           {
             label: t("stats.success_rate"),
             value: "99.8%",
@@ -275,7 +281,7 @@ export default function OverviewPage() {
                   onClick={() => {
                     window.location.href = link.path;
                   }}
-                  className="hover:bg-muted flex w-full items-center justify-between rounded-lg p-3 transition-colors text-left"
+                  className="hover:bg-muted flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors"
                 >
                   <span className="text-sm">{link.name}</span>
                   <ExternalLink className="text-muted-foreground h-4 w-4" />
