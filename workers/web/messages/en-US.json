@@ -958,6 +958,24 @@
       "error_verify": "Invalid code. Please try again.",
       "error_disable": "Failed to disable SMS"
     },
+    "passkey": {
+      "title": "Passkey",
+      "subtitle": "Sign in with fingerprint, face or device PIN",
+      "add": "Add passkey",
+      "add_success": "Passkey added successfully.",
+      "back_to_account": "Back to Account",
+      "your_passkeys": "Your passkeys",
+      "no_passkeys": "No passkeys yet. Add one to sign in quickly and securely.",
+      "remove": "Remove",
+      "remove_confirm": "Remove this passkey? You will no longer be able to sign in with it.",
+      "removed": "Passkey removed",
+      "loading": "Loading...",
+      "error_fetch": "Failed to load passkeys",
+      "error_options": "Failed to start registration",
+      "error_verify": "Failed to add passkey. Please try again.",
+      "error_remove": "Failed to remove passkey",
+      "not_supported": "Passkeys are not supported in this browser."
+    },
     "sessions": {
       "title": "Active sessions & devices",
       "description": "Devices that have successfully signed in to your account",

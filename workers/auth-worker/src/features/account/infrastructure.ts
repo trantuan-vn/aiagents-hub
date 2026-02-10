@@ -5,6 +5,9 @@ import {
   IAuthenticatorRepository,
   SmsStatus,
   ISmsRepository,
+  PasskeyStatus,
+  PasskeyCredentialListItem,
+  IPasskeyRepository,
 } from './domain';
 import { executeUtils } from '../../shared/utils';
 
@@ -177,6 +180,59 @@ function mapRowToSessionListItem(row: any): SessionListItem {
   };
 }
 
+export function createPasskeyRepository(
+  userDO: DurableObjectStub<UserDO>
+): IPasskeyRepository {
+  const TABLE = 'passkey_credentials';
+  return {
+    async getStatus(): Promise<PasskeyStatus> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        orderBy: { field: 'id', direction: 'DESC' },
+        limit: 100,
+      }, TABLE);
+      const list = Array.isArray(rows) ? rows : [];
+      return {
+        enabled: list.length > 0,
+        credentialCount: list.length,
+      };
+    },
+    async listCredentials(): Promise<PasskeyCredentialListItem[]> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        orderBy: { field: 'id', direction: 'DESC' },
+        limit: 20,
+      }, TABLE);
+      const list = Array.isArray(rows) ? rows : [];
+      return list.map((row: any) => ({
+        id: row.id,
+        credentialId: row.credentialId,
+        deviceType: row.deviceType,
+        createdAt: row.createdAt,
+      }));
+    },
+    async getCredentialByCredentialId(credentialId: string): Promise<{ id: number; publicKey: string; counter: number } | null> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'credentialId', operator: '=', value: credentialId },
+        limit: 1,
+      }, TABLE);
+      const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (!row) return null;
+      return {
+        id: row.id,
+        publicKey: row.publicKey,
+        counter: row.counter,
+      };
+    },
+    async saveCredential(data: { credentialId: string; publicKey: string; counter: number; deviceType?: string; transports?: string }): Promise<void> {
+      await executeUtils.executeDynamicAction(userDO, 'upsert', data, TABLE);
+    },
+    async deleteCredential(credentialId: string): Promise<void> {
+      await executeUtils.executeDynamicAction(userDO, 'delete', {
+        where: { field: 'credentialId', operator: '=', value: credentialId },
+      }, TABLE);
+    },
+  };
+}
+
 export function createAccountRepository(
   userDO: DurableObjectStub<UserDO>
 ): IAccountSessionRepository {
@@ -192,12 +248,10 @@ export function createAccountRepository(
 
     async revokeSession(sessionId: string): Promise<void> {
       const session = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: 'hashSessionId', operator: '=', value: sessionId },
-          { field: 'isActive', operator: '=', value: 1 },
-        ],
+        where: { field: 'hashSessionId', operator: '=', value: sessionId },
+        limit: 1,
       }, 'sessions');
-      const row = Array.isArray(session) ? session[0] : null;
+      const row = Array.isArray(session) && session.length > 0 ? session[0] : null;
       if (!row) {
         throw new Error(ERROR_MESSAGES.SESSION_NOT_FOUND);
       }

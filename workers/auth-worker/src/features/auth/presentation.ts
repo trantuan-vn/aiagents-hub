@@ -11,6 +11,7 @@ import {
 } from './domain';
 import { cookieUtils, oauthUtils } from './utils';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
+import { createAccountPasskeyApplication } from '../account/passkey';
 import {
   VerifyAuthenticatorSchema,
   DisableAuthenticatorSchema,
@@ -335,6 +336,87 @@ export function createAuthRoutes(bindingName: string) {
       return c.json({ ok: true });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to disable SMS');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // VIII. Passkey (WebAuthn) – requires auth, origin check for security
+  const getPasskeyApp = (ctx: any) =>
+    createAccountPasskeyApplication(ctx, bindingName, {
+      rpName: 'Unitoken',
+      getOrigin: () => ctx.req.header('origin') || ctx.env.FRONTEND_URL || '',
+    });
+
+  app.get('/passkey/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getPasskeyApp(c);
+      const status = await appService.getPasskeyStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get passkey status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/passkey/registration/options', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+      if (!origin) throw new Error('Origin required');
+      const body = await c.req.json().catch(() => ({}));
+      const userName = typeof body.userName === 'string' ? body.userName : user.identifier;
+      const appService = getPasskeyApp(c);
+      const result = await appService.getRegistrationOptionsUseCase(user.identifier, userName, origin);
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get passkey registration options');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/passkey/registration/verify', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+      if (!origin) throw new Error('Origin required');
+      const body = await c.req.json() as { response: unknown; challengeKey?: string };
+      if (!body?.response || !body?.challengeKey) throw new Error('response and challengeKey required');
+      const appService = getPasskeyApp(c);
+      await appService.verifyRegistrationUseCase(
+        user.identifier,
+        { response: body.response as any, challengeKey: body.challengeKey },
+        origin
+      );
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to verify passkey registration');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/passkey/credentials', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getPasskeyApp(c);
+      const list = await appService.listCredentialsUseCase(user.identifier);
+      return c.json(list);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to list passkey credentials');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.delete('/passkey/credentials/:credentialId', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const credentialId = c.req.param('credentialId');
+      if (!credentialId) throw new Error('credentialId required');
+      const appService = getPasskeyApp(c);
+      await appService.removeCredentialUseCase(user.identifier, credentialId);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to remove passkey');
       return c.json(errorResponse, status);
     }
   });

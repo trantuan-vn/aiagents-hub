@@ -24,10 +24,16 @@ interface SmsStatus {
   enabledAt?: string;
 }
 
+interface PasskeyStatus {
+  enabled: boolean;
+  credentialCount: number;
+}
+
 export function AccountSecurityCard() {
   const t = useTranslations("AccountPage.security");
   const [authenticatorStatus, setAuthenticatorStatus] = useState<AuthenticatorStatus | null>(null);
   const [smsStatus, setSmsStatus] = useState<SmsStatus | null>(null);
+  const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus | null>(null);
 
   const fetchAuthenticatorStatus = useCallback(async () => {
     try {
@@ -61,10 +67,30 @@ export function AccountSecurityCard() {
     }
   }, []);
 
+  const fetchPasskeyStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/passkey/status`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data: { enabled?: boolean; credentialCount?: number } = await res.json();
+        setPasskeyStatus({
+          enabled: Boolean(data.enabled && (data.credentialCount ?? 0) > 0),
+          credentialCount: data.credentialCount ?? 0,
+        });
+      }
+    } catch {
+      setPasskeyStatus(null);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchAuthenticatorStatus();
     void fetchSmsStatus();
-  }, [fetchAuthenticatorStatus, fetchSmsStatus]);
+    void fetchPasskeyStatus();
+  }, [fetchAuthenticatorStatus, fetchSmsStatus, fetchPasskeyStatus]);
 
   const methods = [
     {
@@ -98,9 +124,10 @@ export function AccountSecurityCard() {
       descKey: "passkey_desc",
       status: "optional",
       actionKey: "add",
-      href: null,
-      showStatus: false,
-      enabled: false,
+      manageKey: "manage",
+      href: "/dashboard/control/account/passkey",
+      showStatus: true,
+      enabled: passkeyStatus?.enabled ?? false,
     },
     {
       key: "backup_codes",

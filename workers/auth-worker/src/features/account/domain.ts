@@ -88,3 +88,33 @@ export interface ISmsRepository {
   confirmPendingSmsAsEnabled(): Promise<void>;
   clearSms(): Promise<void>;
 }
+
+// Passkey (WebAuthn) domain – secure, phishing-resistant auth
+export const PasskeyCredentialSchema = z.object({
+  credentialId: z.string(), // base64url – unique per authenticator
+  publicKey: z.string(), // base64url – for signature verification
+  counter: z.number().int().min(0),
+  deviceType: z.string().optional(), // e.g. "singleDevice" | "multiDevice"
+  transports: z.string().optional(), // JSON array of transport hints
+});
+export type PasskeyCredentialRow = z.infer<typeof PasskeyCredentialSchema>;
+
+export interface PasskeyStatus {
+  enabled: boolean;
+  credentialCount: number;
+}
+
+export interface PasskeyCredentialListItem {
+  id: number;
+  credentialId: string;
+  deviceType?: string;
+  createdAt?: string;
+}
+
+export interface IPasskeyRepository {
+  getStatus(): Promise<PasskeyStatus>;
+  listCredentials(): Promise<PasskeyCredentialListItem[]>;
+  getCredentialByCredentialId(credentialId: string): Promise<{ id: number; publicKey: string; counter: number } | null>;
+  saveCredential(data: { credentialId: string; publicKey: string; counter: number; deviceType?: string; transports?: string }): Promise<void>;
+  deleteCredential(credentialId: string): Promise<void>;
+}

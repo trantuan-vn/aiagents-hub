@@ -958,6 +958,24 @@
       "error_verify": "Mã không đúng. Vui lòng thử lại.",
       "error_disable": "Không thể tắt SMS"
     },
+    "passkey": {
+      "title": "Passkey",
+      "subtitle": "Đăng nhập bằng vân tay, khuôn mặt hoặc mã PIN thiết bị",
+      "add": "Thêm passkey",
+      "add_success": "Đã thêm passkey thành công.",
+      "back_to_account": "Về Tài khoản",
+      "your_passkeys": "Passkey của bạn",
+      "no_passkeys": "Chưa có passkey. Thêm một cái để đăng nhập nhanh và an toàn.",
+      "remove": "Xóa",
+      "remove_confirm": "Xóa passkey này? Bạn sẽ không thể đăng nhập bằng nó nữa.",
+      "removed": "Đã xóa passkey",
+      "loading": "Đang tải...",
+      "error_fetch": "Không thể tải passkey",
+      "error_options": "Không thể bắt đầu đăng ký",
+      "error_verify": "Không thể thêm passkey. Vui lòng thử lại.",
+      "error_remove": "Không thể xóa passkey",
+      "not_supported": "Trình duyệt này không hỗ trợ passkey."
+    },
     "sessions": {
       "title": "Phiên & thiết bị đang hoạt động",
       "description": "Các thiết bị đã đăng nhập thành công vào tài khoản",
