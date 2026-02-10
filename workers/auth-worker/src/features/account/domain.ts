@@ -1,12 +1,17 @@
 import { z } from 'zod';
 
-// One row per user (userScoped) for TOTP; pending secret until verified
+// One row per user (userScoped) for TOTP and SMS 2FA; pending until verified
 // Use .nullish() so DB nulls pass validation (optional() only allows undefined)
 export const UserMfaSchema = z.object({
   totpSecret: z.string().nullish(),
   enabledAt: z.string().datetime().nullish(),
   pendingSecret: z.string().nullish(),
   pendingAt: z.string().datetime().nullish(),
+  // SMS 2FA: store only hash of phone (no PII), pending until OTP verified
+  phoneHash: z.string().nullish(),
+  smsEnabledAt: z.string().datetime().nullish(),
+  pendingPhoneHash: z.string().nullish(),
+  pendingPhoneAt: z.string().datetime().nullish(),
 });
 export type UserMfa = z.infer<typeof UserMfaSchema>;
 
@@ -52,4 +57,34 @@ export interface IAuthenticatorRepository {
   setSecret(secret: string): Promise<void>;
   clearSecret(): Promise<void>;
   confirmPendingAsEnabled(): Promise<void>;
+}
+
+// SMS 2FA domain
+export interface SmsStatus {
+  enabled: boolean;
+  enabledAt?: string;
+}
+
+export const RequestSmsSchema = z.object({
+  phone: z.string().min(10, 'Invalid phone').max(20),
+});
+export type RequestSmsInput = z.infer<typeof RequestSmsSchema>;
+
+export const VerifySmsSchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+export type VerifySmsInput = z.infer<typeof VerifySmsSchema>;
+
+export const DisableSmsSchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+export type DisableSmsInput = z.infer<typeof DisableSmsSchema>;
+
+export interface ISmsRepository {
+  getSmsStatus(): Promise<SmsStatus>;
+  getPhoneHash(): Promise<string | null>;
+  getPendingPhoneHash(): Promise<string | null>;
+  setPendingPhoneHash(phoneHash: string): Promise<void>;
+  confirmPendingSmsAsEnabled(): Promise<void>;
+  clearSms(): Promise<void>;
 }

@@ -937,6 +937,27 @@
       "error_verify": "Mã không đúng. Vui lòng thử lại.",
       "error_disable": "Không thể tắt"
     },
+    "sms": {
+      "title": "Xác thực SMS",
+      "subtitle": "Nhận mã xác thực một lần qua SMS cho tài khoản",
+      "enter_phone": "Nhập số điện thoại (E.164, ví dụ +84123456789)",
+      "phone_number": "Số điện thoại",
+      "send_code": "Gửi mã",
+      "enter_code_sent": "Nhập mã 6 số đã gửi đến điện thoại của bạn",
+      "verify": "Xác minh",
+      "verified_success": "SMS đã được bật.",
+      "code_sent": "Mã đã gửi. Kiểm tra tin nhắn của bạn.",
+      "sms_enabled_hint": "Xác thực SMS đang bật cho tài khoản của bạn.",
+      "disable": "Tắt SMS",
+      "disable_confirm": "Nhập mã 6 số từ ứng dụng Authenticator để tắt SMS.",
+      "disable_totp_hint": "Cần bật Authenticator trước khi có thể tắt SMS.",
+      "disable_success": "SMS đã được tắt.",
+      "back_to_account": "Về Tài khoản",
+      "error_fetch": "Không thể tải trạng thái",
+      "error_request": "Không thể gửi mã",
+      "error_verify": "Mã không đúng. Vui lòng thử lại.",
+      "error_disable": "Không thể tắt SMS"
+    },
     "sessions": {
       "title": "Phiên & thiết bị đang hoạt động",
       "description": "Các thiết bị đã đăng nhập thành công vào tài khoản",

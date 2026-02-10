@@ -937,6 +937,27 @@
       "error_verify": "Invalid code. Please try again.",
       "error_disable": "Failed to disable"
     },
+    "sms": {
+      "title": "SMS verification",
+      "subtitle": "Receive one-time verification codes by SMS for your account",
+      "enter_phone": "Enter phone number (E.164, e.g. +84123456789)",
+      "phone_number": "Phone number",
+      "send_code": "Send code",
+      "enter_code_sent": "Enter the 6-digit code sent to your phone",
+      "verify": "Verify",
+      "verified_success": "SMS is now enabled.",
+      "code_sent": "Code sent. Check your messages.",
+      "sms_enabled_hint": "SMS verification is enabled for your account.",
+      "disable": "Disable SMS",
+      "disable_confirm": "Enter the 6-digit code from your Authenticator app to disable SMS.",
+      "disable_totp_hint": "Authenticator must be enabled before you can disable SMS.",
+      "disable_success": "SMS has been disabled.",
+      "back_to_account": "Back to Account",
+      "error_fetch": "Failed to load status",
+      "error_request": "Failed to send code",
+      "error_verify": "Invalid code. Please try again.",
+      "error_disable": "Failed to disable SMS"
+    },
     "sessions": {
       "title": "Active sessions & devices",
       "description": "Devices that have successfully signed in to your account",

@@ -3,7 +3,9 @@ import {
   SessionListItem,
   AuthenticatorStatus,
   IAuthenticatorRepository,
-} from './domain'; 
+  SmsStatus,
+  ISmsRepository,
+} from './domain';
 import { executeUtils } from '../../shared/utils';
 
 const ERROR_MESSAGES = {
@@ -96,6 +98,68 @@ export function createAuthenticatorRepository(
         enabledAt,
         pendingSecret: null,
         pendingAt: null,
+      }, 'user_mfa');
+    },
+  };
+}
+
+export function createSmsRepository(
+  userDO: DurableObjectStub<UserDO>
+): ISmsRepository {
+  return {
+    async getSmsStatus(): Promise<SmsStatus> {
+      const row = await getMfaRow(userDO);
+      if (!row || !row.phoneHash) return { enabled: false };
+      return {
+        enabled: true,
+        enabledAt: row.smsEnabledAt ?? undefined,
+      };
+    },
+    async getPhoneHash(): Promise<string | null> {
+      const row = await getMfaRow(userDO);
+      return row?.phoneHash ?? null;
+    },
+    async getPendingPhoneHash(): Promise<string | null> {
+      const row = await getMfaRow(userDO);
+      return row?.pendingPhoneHash ?? null;
+    },
+    async setPendingPhoneHash(phoneHash: string): Promise<void> {
+      const row = await getMfaRow(userDO);
+      const pendingPhoneAt = new Date().toISOString();
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          pendingPhoneHash: phoneHash,
+          pendingPhoneAt,
+        }, 'user_mfa');
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          pendingPhoneHash: phoneHash,
+          pendingPhoneAt,
+        }, 'user_mfa');
+      }
+    },
+    async confirmPendingSmsAsEnabled(): Promise<void> {
+      const row = await getMfaRow(userDO);
+      if (!row?.pendingPhoneHash) throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      const smsEnabledAt = new Date().toISOString();
+      await executeUtils.executeDynamicAction(userDO, 'update', {
+        id: row.id,
+        phoneHash: row.pendingPhoneHash,
+        smsEnabledAt,
+        pendingPhoneHash: null,
+        pendingPhoneAt: null,
+      }, 'user_mfa');
+    },
+    async clearSms(): Promise<void> {
+      const row = await getMfaRow(userDO);
+      if (!row) return;
+      await executeUtils.executeDynamicAction(userDO, 'update', {
+        id: row.id,
+        phoneHash: null,
+        smsEnabledAt: null,
+        pendingPhoneHash: null,
+        pendingPhoneAt: null,
       }, 'user_mfa');
     },
   };

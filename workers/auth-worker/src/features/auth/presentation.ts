@@ -10,8 +10,14 @@ import {
   SIWEAuthSchema 
 } from './domain';
 import { cookieUtils, oauthUtils } from './utils';
-import { createAccountAuthenticatorApplication } from '../account/application';
-import { VerifyAuthenticatorSchema, DisableAuthenticatorSchema } from '../account/domain';
+import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
+import {
+  VerifyAuthenticatorSchema,
+  DisableAuthenticatorSchema,
+  RequestSmsSchema,
+  VerifySmsSchema,
+  DisableSmsSchema,
+} from '../account/domain';
 
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -277,6 +283,58 @@ export function createAuthRoutes(bindingName: string) {
       return c.json({ ok: true });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to disable authenticator');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // VII. SMS 2FA – requires auth
+  app.get('/sms/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = createAccountSmsApplication(c, bindingName);
+      const status = await appService.getSmsStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get SMS status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sms/request', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const input = await parseBody(c, RequestSmsSchema);
+      const appService = createAccountSmsApplication(c, bindingName);
+      await appService.requestSmsUseCase(user.identifier, input);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to request SMS code');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sms/verify', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const input = await parseBody(c, VerifySmsSchema);
+      const appService = createAccountSmsApplication(c, bindingName);
+      await appService.verifySmsUseCase(user.identifier, input);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to verify SMS code');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sms/disable', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const input = await parseBody(c, DisableSmsSchema);
+      const appService = createAccountSmsApplication(c, bindingName);
+      await appService.disableSmsUseCase(user.identifier, input);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to disable SMS');
       return c.json(errorResponse, status);
     }
   });

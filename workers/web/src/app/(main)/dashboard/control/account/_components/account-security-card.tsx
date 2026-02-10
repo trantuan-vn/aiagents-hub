@@ -19,9 +19,15 @@ interface AuthenticatorStatus {
   enabledAt?: string;
 }
 
+interface SmsStatus {
+  enabled: boolean;
+  enabledAt?: string;
+}
+
 export function AccountSecurityCard() {
   const t = useTranslations("AccountPage.security");
   const [authenticatorStatus, setAuthenticatorStatus] = useState<AuthenticatorStatus | null>(null);
+  const [smsStatus, setSmsStatus] = useState<SmsStatus | null>(null);
 
   const fetchAuthenticatorStatus = useCallback(async () => {
     try {
@@ -39,9 +45,26 @@ export function AccountSecurityCard() {
     }
   }, []);
 
+  const fetchSmsStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/sms/status`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        const data: { enabled?: boolean; enabledAt?: string } = await res.json();
+        setSmsStatus({ enabled: Boolean(data.enabled), enabledAt: data.enabledAt });
+      }
+    } catch {
+      setSmsStatus(null);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchAuthenticatorStatus();
-  }, [fetchAuthenticatorStatus]);
+    void fetchSmsStatus();
+  }, [fetchAuthenticatorStatus, fetchSmsStatus]);
 
   const methods = [
     {
@@ -63,9 +86,10 @@ export function AccountSecurityCard() {
       descKey: "sms_desc",
       status: "optional",
       actionKey: "enable",
-      href: null,
-      showStatus: false,
-      enabled: false,
+      manageKey: "manage",
+      href: "/dashboard/control/account/sms",
+      showStatus: true,
+      enabled: smsStatus?.enabled ?? false,
     },
     {
       key: "passkey",
