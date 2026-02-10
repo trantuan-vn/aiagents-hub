@@ -8,6 +8,8 @@ import {
   PasskeyStatus,
   PasskeyCredentialListItem,
   IPasskeyRepository,
+  BackupCodeStatus,
+  IBackupCodeRepository,
 } from './domain';
 import { executeUtils } from '../../shared/utils';
 
@@ -229,6 +231,67 @@ export function createPasskeyRepository(
       await executeUtils.executeDynamicAction(userDO, 'delete', {
         where: { field: 'credentialId', operator: '=', value: credentialId },
       }, TABLE);
+    },
+  };
+}
+
+const BACKUP_CODES_TABLE = 'backup_codes';
+const BACKUP_CODE_COUNT = 10;
+
+async function hashBackupCode(normalized: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+export function createBackupCodeRepository(
+  userDO: DurableObjectStub<UserDO>
+): IBackupCodeRepository {
+  return {
+    async getStatus(): Promise<BackupCodeStatus> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        limit: 1000,
+      }, BACKUP_CODES_TABLE);
+      const list = Array.isArray(rows) ? rows : [];
+      const remainingCount = list.filter((r: { usedAt?: string | null }) => !r.usedAt).length;
+      return {
+        enabled: remainingCount > 0,
+        remainingCount,
+      };
+    },
+    async countUnused(): Promise<number> {
+      const status = await this.getStatus();
+      return status.remainingCount;
+    },
+    async addCodes(hashes: string[]): Promise<void> {
+      if (hashes.length === 0) return;
+      const rows = hashes.map((codeHash) => ({ codeHash, usedAt: null }));
+      await executeUtils.executeDynamicAction(userDO, 'batch-insert', rows, BACKUP_CODES_TABLE);
+    },
+    async consumeCode(normalizedCode: string): Promise<boolean> {
+      const codeHash = await hashBackupCode(normalizedCode);
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'codeHash', operator: '=', value: codeHash },
+        limit: 1,
+      }, BACKUP_CODES_TABLE);
+      const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (!row || row.usedAt) return false;
+      const usedAt = new Date().toISOString();
+      await executeUtils.executeDynamicAction(userDO, 'update', {
+        id: row.id,
+        usedAt,
+      }, BACKUP_CODES_TABLE);
+      return true;
+    },
+    async deleteAll(): Promise<void> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        limit: 1000,
+      }, BACKUP_CODES_TABLE);
+      const list = Array.isArray(rows) ? rows : [];
+      for (const row of list) {
+        await executeUtils.executeDynamicAction(userDO, 'delete', { id: row.id }, BACKUP_CODES_TABLE);
+      }
     },
   };
 }

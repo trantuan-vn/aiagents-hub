@@ -12,6 +12,7 @@ import {
 import { cookieUtils, oauthUtils } from './utils';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createAccountPasskeyApplication } from '../account/passkey';
+import { createAccountBackupCodeApplication } from '../account/backup-codes';
 import {
   VerifyAuthenticatorSchema,
   DisableAuthenticatorSchema,
@@ -417,6 +418,35 @@ export function createAuthRoutes(bindingName: string) {
       return c.json({ ok: true });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to remove passkey');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // IX. Backup codes – status, generate, regenerate (replace existing)
+  const getBackupCodesApp = (ctx: any) => createAccountBackupCodeApplication(ctx, bindingName);
+
+  app.get('/backup-codes/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getBackupCodesApp(c);
+      const status = await appService.getStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get backup codes status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/backup-codes/generate', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const body = (await c.req.json().catch(() => ({}))) as { replaceExisting?: boolean };
+      const replaceExisting = Boolean(body.replaceExisting);
+      const appService = getBackupCodesApp(c);
+      const result = await appService.generateUseCase(user.identifier, replaceExisting);
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to generate backup codes');
       return c.json(errorResponse, status);
     }
   });

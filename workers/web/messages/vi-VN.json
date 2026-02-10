@@ -914,7 +914,8 @@
       "setup": "Thiết lập",
       "enable": "Bật",
       "add": "Thêm",
-      "generate": "Tạo mã"
+      "generate": "Tạo mã",
+      "remaining_codes": "{count} còn lại"
     },
     "authenticator": {
       "title": "Ứng dụng Authenticator",
@@ -957,6 +958,30 @@
       "error_request": "Không thể gửi mã",
       "error_verify": "Mã không đúng. Vui lòng thử lại.",
       "error_disable": "Không thể tắt SMS"
+    },
+    "backup_codes": {
+      "title": "Mã dự phòng",
+      "subtitle": "Mã dùng một lần để đăng nhập khi không dùng được phương thức khác",
+      "back_to_account": "Về Tài khoản",
+      "loading": "Đang tải...",
+      "no_codes": "Bạn chưa có mã dự phòng. Tạo một bộ và lưu ở nơi an toàn.",
+      "remaining_count": "Bạn còn {count} mã dự phòng.",
+      "generate": "Tạo mã",
+      "regenerate": "Tạo lại mã",
+      "regenerate_confirm_title": "Tạo lại mã dự phòng?",
+      "regenerate_confirm_desc": "Mã dự phòng hiện tại sẽ không dùng được nữa. Bạn sẽ nhận bộ mã mới để lưu. Không thể hoàn tác.",
+      "cancel": "Hủy",
+      "generate_success": "Đã tạo mã dự phòng. Hãy lưu ngay; chúng sẽ không hiển thị lại.",
+      "regenerate_success": "Đã tạo bộ mã dự phòng mới. Lưu chúng và bỏ bộ cũ.",
+      "error_fetch": "Không thể tải trạng thái mã dự phòng",
+      "error_generate": "Không thể tạo mã dự phòng",
+      "error_regenerate": "Không thể tạo lại mã dự phòng",
+      "save_codes_warning": "Lưu các mã này ở nơi an toàn. Mỗi mã chỉ dùng được một lần.",
+      "your_codes": "Mã dự phòng của bạn",
+      "copy_all": "Sao chép tất cả",
+      "copied": "Đã sao chép",
+      "show_once_hint": "Các mã này chỉ hiển thị một lần. Sao chép hoặc tải xuống trước khi đóng trang.",
+      "regenerate_hint": "Tạo lại sẽ vô hiệu hóa tất cả mã hiện có và cấp bộ mã mới."
     },
     "passkey": {
       "title": "Passkey",

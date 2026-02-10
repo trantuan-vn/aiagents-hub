@@ -914,7 +914,8 @@
       "setup": "Set up",
       "enable": "Enable",
       "add": "Add",
-      "generate": "Generate"
+      "generate": "Generate",
+      "remaining_codes": "{count} remaining"
     },
     "authenticator": {
       "title": "Authenticator app",
@@ -957,6 +958,30 @@
       "error_request": "Failed to send code",
       "error_verify": "Invalid code. Please try again.",
       "error_disable": "Failed to disable SMS"
+    },
+    "backup_codes": {
+      "title": "Backup codes",
+      "subtitle": "One-time recovery codes to sign in when you don't have your other methods",
+      "back_to_account": "Back to Account",
+      "loading": "Loading...",
+      "no_codes": "You don't have any backup codes yet. Generate a set and store them securely.",
+      "remaining_count": "You have {count} backup code(s) remaining.",
+      "generate": "Generate codes",
+      "regenerate": "Regenerate codes",
+      "regenerate_confirm_title": "Regenerate backup codes?",
+      "regenerate_confirm_desc": "Your existing backup codes will stop working. You will get a new set to save. This cannot be undone.",
+      "cancel": "Cancel",
+      "generate_success": "Backup codes generated. Save them now; they won't be shown again.",
+      "regenerate_success": "New backup codes generated. Save them and discard the old set.",
+      "error_fetch": "Failed to load backup codes status",
+      "error_generate": "Failed to generate backup codes",
+      "error_regenerate": "Failed to regenerate backup codes",
+      "save_codes_warning": "Save these codes in a secure place. Each code can only be used once.",
+      "your_codes": "Your backup codes",
+      "copy_all": "Copy all",
+      "copied": "Copied to clipboard",
+      "show_once_hint": "These codes are shown only once. Copy or download them before closing this page.",
+      "regenerate_hint": "Regenerating will invalidate all existing codes and give you a new set."
     },
     "passkey": {
       "title": "Passkey",

@@ -118,3 +118,23 @@ export interface IPasskeyRepository {
   saveCredential(data: { credentialId: string; publicKey: string; counter: number; deviceType?: string; transports?: string }): Promise<void>;
   deleteCredential(credentialId: string): Promise<void>;
 }
+
+// Backup codes – single-use recovery codes, hashed storage only
+export const BackupCodeSchema = z.object({
+  codeHash: z.string(), // SHA-256 hex of normalized code
+  usedAt: z.string().datetime().nullish(), // when consumed (null = unused)
+});
+export type BackupCodeRow = z.infer<typeof BackupCodeSchema>;
+
+export interface BackupCodeStatus {
+  enabled: boolean;
+  remainingCount: number;
+}
+
+export interface IBackupCodeRepository {
+  getStatus(): Promise<BackupCodeStatus>;
+  countUnused(): Promise<number>;
+  addCodes(hashes: string[]): Promise<void>;
+  consumeCode(normalizedCode: string): Promise<boolean>; // returns true if found and consumed
+  deleteAll(): Promise<void>;
+}
