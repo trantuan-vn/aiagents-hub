@@ -132,6 +132,11 @@
 		"secret_name": "VONAGE_API_KEY"
 		},	
 		{
+		"binding": "VONAGE_AUTH_TOKEN",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "VONAGE_AUTH_TOKEN"
+		},
+		{
 		"binding": "ENCRYPTION_SECRET",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "ENCRYPTION_SECRET"

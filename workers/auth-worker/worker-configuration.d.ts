@@ -24,6 +24,9 @@ declare namespace Cloudflare {
         VONAGE_API_KEY: {
             get(): Promise<string>;
         };
+        VONAGE_AUTH_TOKEN: {
+            get(): Promise<string>;
+        };
         ENCRYPTION_SECRET: {
             get(): Promise<string>;
         };

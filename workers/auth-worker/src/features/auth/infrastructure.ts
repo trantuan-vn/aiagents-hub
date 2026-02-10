@@ -192,10 +192,14 @@ export function createOTPService(env: Env): IOTPService {
   };
 
   const sendSMS = async (phone: string, otp: string): Promise<void> => {    
-    const apiKey= await env.VONAGE_API_KEY.get();
-    const apiSecret= await env.VONAGE_API_SECRET.get();
-    if (!apiKey || !apiSecret) {
-      throw new Error("VONAGE_API_KEY or VONAGE_API_SECRET is not defined in environment variables");
+    // const apiKey= await env.VONAGE_API_KEY.get();
+    // const apiSecret= await env.VONAGE_API_SECRET.get();
+    // if (!apiKey || !apiSecret) {
+    //   throw new Error("VONAGE_API_KEY or VONAGE_API_SECRET is not defined in environment variables");
+    // }
+    const authToken= await env.VONAGE_AUTH_TOKEN.get();
+    if (!authToken) {
+      throw new Error("AUTH_TOKEN is not defined in environment variables");
     }
     const messageText = `Your OTP code is: ${otp}. This code will expire in 10 minutes.`;
     
@@ -239,12 +243,13 @@ export function createOTPService(env: Env): IOTPService {
       ]      
     };    
 
-    const auth = btoa(`${apiKey}:${apiSecret}`);
+    // const auth = btoa(`${apiKey}:${apiSecret}`);
     const response = await fetch("https://api.nexmo.com/v1/messages", {  
     //const response = await fetch("https://messages-sandbox.nexmo.com/v1/messages", {  
       method: "POST",
       headers: {
-        "Authorization": `Basic ${auth}`,
+        // "Authorization": `Basic ${auth}`,
+        "Authorization": `Bearer ${authToken}`,
         "Content-Type": "application/json",
         "Accept": "application/json",
       },
