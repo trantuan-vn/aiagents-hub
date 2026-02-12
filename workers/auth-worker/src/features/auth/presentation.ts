@@ -9,11 +9,13 @@ import {
   OAuthCallbackSchema, 
   SIWEAuthSchema 
 } from './domain';
+// SIWEAuthSchema also used for DID link/unlink
 import { cookieUtils, oauthUtils } from './utils';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createAccountPasskeyApplication } from '../account/passkey';
 import { createAccountBackupCodeApplication } from '../account/backup-codes';
 import { createAccountEkycApplication } from '../account/ekyc';
+import { createAccountDidApplication } from '../account/did';
 import {
   VerifyAuthenticatorSchema,
   DisableAuthenticatorSchema,
@@ -572,6 +574,91 @@ export function createAuthRoutes(bindingName: string) {
       return c.json(result);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Liveness detection failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // XI. DID (Decentralized Identity) – did:ethr for EVM wallet
+  const getDidApp = (ctx: any) => createAccountDidApplication(ctx, bindingName);
+
+  app.get('/did/status', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getDidApp(c);
+      const status = await appService.getDidStatusUseCase(user.identifier);
+      return c.json(status);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get DID status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/did/nonce', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
+      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const appService = getDidApp(c);
+      const nonce = await appService.getDidNonceUseCase(sessionId);
+      return c.json({ nonce });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get DID nonce');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/did/link', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
+      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const { message, signature } = await parseBody(c, SIWEAuthSchema);
+      const appService = getDidApp(c);
+      const result = await appService.linkDidUseCase(user.identifier, sessionId, message, signature);
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to link DID');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/did/unlink/nonce', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
+      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const appService = getDidApp(c);
+      const nonce = await appService.getDidUnlinkNonceUseCase(sessionId);
+      return c.json({ nonce });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get DID unlink nonce');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/did/unlink', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
+      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const { message, signature } = await parseBody(c, SIWEAuthSchema);
+      const appService = getDidApp(c);
+      await appService.unlinkDidUseCase(user.identifier, sessionId, message, signature);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to unlink DID');
       return c.json(errorResponse, status);
     }
   });

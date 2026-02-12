@@ -164,3 +164,27 @@ export interface IEkycRepository {
   setVerified(): Promise<void>;
   reset(): Promise<void>;
 }
+
+// DID (Decentralized Identity) – did:ethr for EVM wallet ownership
+export const UserDidSchema = z.object({
+  did: z.string(), // e.g. did:ethr:1:0x...
+  method: z.string().default('ethr'),
+  chainId: z.number().int().optional(),
+  addressHash: z.string(), // SHA-256 hash of address for privacy
+  linkedAt: z.string().datetime(),
+});
+export type UserDidRow = z.infer<typeof UserDidSchema>;
+
+export interface DidStatus {
+  enabled: boolean;
+  did?: string;
+  method?: string;
+  linkedAt?: string;
+}
+
+export interface IDidRepository {
+  getStatus(): Promise<DidStatus>;
+  getByAddressHash(addressHash: string): Promise<{ did: string; method: string; linkedAt: string } | null>;
+  save(data: { did: string; method: string; chainId?: number; addressHash: string }): Promise<void>;
+  delete(): Promise<void>;
+}

@@ -12,6 +12,8 @@ import {
   IBackupCodeRepository,
   EkycStatus,
   IEkycRepository,
+  DidStatus,
+  IDidRepository,
 } from './domain';
 import { executeUtils } from '../../shared/utils';
 
@@ -417,6 +419,68 @@ export function createEkycRepository(
           faceVerifiedAt: null,
           updatedAt: new Date().toISOString(),
         }, USER_EKYC_TABLE);
+      }
+    },
+  };
+}
+
+const USER_DID_TABLE = 'user_did';
+
+async function getDidRow(userDO: DurableObjectStub<UserDO>): Promise<any> {
+  const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, USER_DID_TABLE);
+  return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+
+export function createDidRepository(
+  userDO: DurableObjectStub<UserDO>
+): IDidRepository {
+  return {
+    async getStatus(): Promise<DidStatus> {
+      const row = await getDidRow(userDO);
+      if (!row || !row.did) return { enabled: false };
+      return {
+        enabled: true,
+        did: row.did,
+        method: row.method ?? 'ethr',
+        linkedAt: row.linkedAt,
+      };
+    },
+    async getByAddressHash(addressHash: string): Promise<{ did: string; method: string; linkedAt: string } | null> {
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'addressHash', operator: '=', value: addressHash },
+        limit: 1,
+      }, USER_DID_TABLE);
+      const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (!row) return null;
+      return { did: row.did, method: row.method ?? 'ethr', linkedAt: row.linkedAt };
+    },
+    async save(data: { did: string; method: string; chainId?: number; addressHash: string }): Promise<void> {
+      const linkedAt = new Date().toISOString();
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, USER_DID_TABLE);
+      const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+      if (existing) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: existing.id,
+          did: data.did,
+          method: data.method,
+          chainId: data.chainId ?? null,
+          addressHash: data.addressHash,
+          linkedAt,
+        }, USER_DID_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          did: data.did,
+          method: data.method,
+          chainId: data.chainId ?? null,
+          addressHash: data.addressHash,
+          linkedAt,
+        }, USER_DID_TABLE);
+      }
+    },
+    async delete(): Promise<void> {
+      const row = await getDidRow(userDO);
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'delete', { id: row.id }, USER_DID_TABLE);
       }
     },
   };
