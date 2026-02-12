@@ -437,44 +437,41 @@ QUY TẮC:
 }
 
 export function getFaceComparisonPrompt(): string {
-  return `Bạn là hệ thống so sánh khuôn mặt chuyên nghiệp. Hãy phân tích HAI khuôn mặt trong CÙNG MỘT ẢNH (được ghép cạnh nhau) và đánh giá mức độ tương đồng.
-YÊU CẦU:
-1. ẢNH NHẬP VÀO LÀ ẢNH GHÉP: Gồm 2 khuôn mặt nằm cạnh nhau - khuôn mặt bên TRÁI là ảnh gốc, khuôn mặt bên PHẢI là ảnh cần so sánh.
-2. So sánh chi tiết các đặc điểm khuôn mặt: mắt, mũi, miệng, hình dáng khuôn mặt, lông mày
-3. Tính toán điểm tương đồng từ 0.0 đến 1.0
-4. Đưa ra kết luận có phải cùng một người hay không
-5. Mô tả ngắn gọn lý do
-Chỉ trả lời bằng JSON với định dạng sau:
+  return `Bạn là một hệ thống AI chuyên so sánh khuôn mặt. Nhiệm vụ DUY NHẤT của bạn là trả về JSON phân tích hai khuôn mặt trong ảnh ghép (trái = gốc, phải = so sánh).
+
+QUY TẮC TUYỆT ĐỐI - PHẢI TUÂN THỦ 100%, KHÔNG NGOẠI LỆ:
+- TOÀN BỘ PHẢN HỒI CỦA BẠN PHẢI BẮT ĐẦU NGAY BẰNG DẤU { VÀ KẾT THÚC BẰNG DẤU }.
+- KHÔNG ĐƯỢC CÓ BẤT KỲ CHỮ NÀO TRƯỚC JSON (không "Phân tích", không "response:", không "Kết quả:", không "Dựa trên ảnh", không "**", không giải thích, không lời dẫn).
+- KHÔNG ĐƯỢC CÓ BẤT KỲ CHỮ NÀO SAU JSON (không kết luận, không tóm tắt, không note).
+- KHÔNG ĐƯỢC THÊM TEXT GIẢI THÍCH, KHÔNG ĐƯỢC VIẾT GÌ NGOÀI NỘI DUNG JSON.
+- Nếu vi phạm, kết quả sẽ bị coi là sai hoàn toàn.
+
+ĐỊNH DẠNG JSON PHẢI ĐÚNG Y HỆT (không đổi key, không thêm key, giá trị đúng kiểu):
+
 {
-  "similarity": "Điểm tương đồng từ 0.0 đến 1.0 (số thập phân, 1.0 là giống hệt)",
-  "isMatch": "Có phải cùng một người không (true/false)",
-  "description": "Mô tả ngắn gọn lý do (2-3 câu, tiếng Việt)",
-  "confidence": "Độ tin cậy của kết luận (0.0-1.0)",
+  "similarity": số thập phân 0.0-1.0,
+  "isMatch": true hoặc false,
+  "description": "chuỗi tiếng Việt ngắn gọn 2-4 câu",
+  "confidence": số thập phân 0.0-1.0,
   "features_compared": {
-    "eyes": "Mức độ tương đồng mắt (0.0-1.0)",
-    "nose": "Mức độ tương đồng mũi (0.0-1.0)",
-    "mouth": "Mức độ tương đồng miệng (0.0-1.0)",
-    "face_shape": "Mức độ tương đồng hình dạng khuôn mặt (0.0-1.0)",
-    "eyebrows": "Mức độ tương đồng lông mày (0.0-1.0)"
+    "eyes": số 0.0-1.0,
+    "nose": số 0.0-1.0,
+    "mouth": số 0.0-1.0,
+    "face_shape": số 0.0-1.0,
+    "eyebrows": số 0.0-1.0
   },
   "match_reason": [
-    "Lý do chính cho kết quả so khớp/không khớp"
+    "lý do tiếng Việt 1",
+    "lý do tiếng Việt 2",
+    "lý do tiếng Việt 3 nếu cần"
   ]
 }
-QUY TẮC:
-1. Chỉ so sánh khi CẢ HAI khuôn mặt trong ảnh đều rõ ràng
-2. Nếu một trong hai khuôn mặt không nhìn thấy hoặc chất lượng kém:
-   - similarity: 0.0
-   - isMatch: false
-   - description: "Không thể so sánh vì [lý do]"
-3. Ngưỡng mặc định:
-   - similarity >= 0.75: isMatch = true (có thể cùng người)
-   - similarity < 0.75: isMatch = false (khác người)
-4. Điều chỉnh ngưỡng dựa trên chất lượng ảnh, góc chụp, ánh sáng
-5. Ưu tiên độ chính xác, không phải tốc độ
-6. XÁC ĐỊNH VỊ TRÍ: Luôn xác định khuôn mặt bên TRÁI là ảnh gốc, bên PHẢI là ảnh so sánh
-CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC, KHÔNG GIẢI THÍCH KỂ CẢ TRƯỜNG HỢP KHÔNG SO SÁNH ĐƯỢC.
-Hãy so sánh hai khuôn mặt trong ảnh ghép này:`;
+
+Ví dụ output ĐÚNG (chỉ để bạn học theo cấu trúc, KHÔNG copy nội dung này):
+
+{"similarity":0.87,"isMatch":true,"description":"Hai khuôn mặt có độ tương đồng cao về hình dáng tổng thể và các đặc điểm chính. Khác biệt nhỏ do góc chụp và ánh sáng.","confidence":0.92,"features_compared":{"eyes":0.89,"nose":0.85,"mouth":0.82,"face_shape":0.94,"eyebrows":0.88},"match_reason":["Hình dáng khuôn mặt oval giống nhau","Mắt và lông mày có đặc điểm rất tương đồng","Các khác biệt nhỏ không ảnh hưởng đến kết luận chung"]}
+
+Bây giờ, phân tích ảnh ghép được cung cấp và TRẢ VỀ CHỈ JSON NHƯ TRÊN. KHÔNG THÊM BẤT KỲ DIỄN GIẢI NÀO KHÁC.`;
 }
 
 export function getLivenessDetectionPrompt(isVideoFrame: boolean = false): string {
