@@ -438,16 +438,13 @@ QUY TẮC:
 
 export function getFaceComparisonPrompt(): string {
   return `Bạn là hệ thống so sánh khuôn mặt chuyên nghiệp. Hãy phân tích HAI khuôn mặt trong CÙNG MỘT ẢNH (được ghép cạnh nhau) và đánh giá mức độ tương đồng.
-
 YÊU CẦU:
 1. ẢNH NHẬP VÀO LÀ ẢNH GHÉP: Gồm 2 khuôn mặt nằm cạnh nhau - khuôn mặt bên TRÁI là ảnh gốc, khuôn mặt bên PHẢI là ảnh cần so sánh.
 2. So sánh chi tiết các đặc điểm khuôn mặt: mắt, mũi, miệng, hình dáng khuôn mặt, lông mày
 3. Tính toán điểm tương đồng từ 0.0 đến 1.0
 4. Đưa ra kết luận có phải cùng một người hay không
 5. Mô tả ngắn gọn lý do
-
 Chỉ trả lời bằng JSON với định dạng sau:
-
 {
   "similarity": "Điểm tương đồng từ 0.0 đến 1.0 (số thập phân, 1.0 là giống hệt)",
   "isMatch": "Có phải cùng một người không (true/false)",
@@ -464,7 +461,6 @@ Chỉ trả lời bằng JSON với định dạng sau:
     "Lý do chính cho kết quả so khớp/không khớp"
   ]
 }
-
 QUY TẮC:
 1. Chỉ so sánh khi CẢ HAI khuôn mặt trong ảnh đều rõ ràng
 2. Nếu một trong hai khuôn mặt không nhìn thấy hoặc chất lượng kém:
@@ -477,9 +473,7 @@ QUY TẮC:
 4. Điều chỉnh ngưỡng dựa trên chất lượng ảnh, góc chụp, ánh sáng
 5. Ưu tiên độ chính xác, không phải tốc độ
 6. XÁC ĐỊNH VỊ TRÍ: Luôn xác định khuôn mặt bên TRÁI là ảnh gốc, bên PHẢI là ảnh so sánh
-
 CHỈ TRẢ LỜI BẰNG JSON, KHÔNG CÓ BẤT KỲ VĂN BẢN NÀO KHÁC, KHÔNG GIẢI THÍCH KỂ CẢ TRƯỜNG HỢP KHÔNG SO SÁNH ĐƯỢC.
-
 Hãy so sánh hai khuôn mặt trong ảnh ghép này:`;
 }
 

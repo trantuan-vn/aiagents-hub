@@ -7,6 +7,7 @@ interface IWebsocketApplicationService {
     connectWebSocketUseCase: (identifier: string) => Promise<Response>;
     broadcastMessageUseCase: (request: Request) => Promise<Response>;
     getDebugIdCountersUseCase: (identifier: string) => Promise<Response>;
+    deleteTableStateUseCase: (identifier: string, tableName: string) => Promise<Response>;
 }
 
 export function createWebsocketApplicationService(c: Context, bindingName: string): IWebsocketApplicationService {
@@ -34,6 +35,17 @@ export function createWebsocketApplicationService(c: Context, bindingName: strin
             const response = await userDO.fetch('https://user.do/debug/id-counters');
             if (!response.ok) {
                 throw new Error(`Failed to get id-counters, status: ${response.status}`);
+            }
+            return response;
+        },
+        deleteTableStateUseCase: async (identifier: string, tableName: string) => {
+            const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+            const response = await userDO.fetch(`https://user.do/queue/table-state-reset?tableName=${encodeURIComponent(tableName)}`, {
+                method: 'GET'
+            });
+            if (!response.ok) {
+                const body = await response.text();
+                throw new Error(`Failed to reset table state, status: ${response.status}, body: ${body}`);
             }
             return response;
         }

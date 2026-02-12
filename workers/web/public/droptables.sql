@@ -14,6 +14,10 @@ drop table subscriptions;
 drop table users;
 drop table versions;
 drop table vouchers;
+drop table backup_codes;
+drop table passkey_credentials;
+drop table user_ekyc;
+drop table user_mfa;
 
 drop table user_shards;
 drop table broadcasts;

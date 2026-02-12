@@ -40,11 +40,27 @@ export function createDashboardWebSocketRoutes(bindingName: string) {
   // Debug: tra cứu ID counters (tableName và tableName_queue)
   app.get('/debug/id-counters', async (c) => {
     try {
-      const user = requireAdmin(c);
+      const user = requireAuth(c);
       const wsApplicationService = createWebsocketApplicationService(c, bindingName);
       return wsApplicationService.getDebugIdCountersUseCase(user.identifier);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, "Failed to get id-counters");
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // Xoá table_state_${tableName} khỏi storage (admin only)
+  app.get('/queue/table-state-reset', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const tableName = c.req.query('tableName');
+      if (!tableName) {
+        return c.json({ success: false, error: 'tableName is required' }, 400);
+      }
+      const wsApplicationService = createWebsocketApplicationService(c, bindingName);
+      return wsApplicationService.deleteTableStateUseCase(user.identifier, tableName);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, "Failed to reset table state");
       return c.json(errorResponse, status);
     }
   });

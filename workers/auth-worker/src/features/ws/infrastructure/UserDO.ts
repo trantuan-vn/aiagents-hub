@@ -175,6 +175,7 @@ export class UserDO extends DurableObject {
   /** True if any queue table has pending records (in-memory state). Used to decide whether to keep alarm. */
   private hasPendingQueueWork(): boolean {
     for (const state of this.tableStates.values()) {
+      console.log(`[UserDO ${this.userId}] hasPendingQueueWork: ${state.tableName} - ${state.pendingCount}`);
       if (state.pendingCount > 0) return true;
     }
     return false;
@@ -219,6 +220,7 @@ export class UserDO extends DurableObject {
         '/queue/stats': () => this.handleQueueStats(),
         '/queue/health': () => this.handleQueueHealth(),
         '/queue/cleanup': (req) => this.handleQueueCleanup(req),
+        '/queue/table-state-reset': (req) => this.handleTableStateReset(req),
         '/debug/id-counters': async () => this.handleDebugIdCounters()
       };
 
@@ -520,6 +522,55 @@ export class UserDO extends DurableObject {
       return this.jsonResponse({ 
         success: false, 
         error: 'Cleanup failed',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, 500);
+    }
+  }
+
+  /** Xoá table_state_${tableName} khỏi storage và reset in-memory state */
+  private async handleTableStateReset(request: Request): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+      const tableName = url.searchParams.get('tableName');
+      
+      if (!tableName || typeof tableName !== 'string') {
+        return this.jsonResponse({ 
+          success: false, 
+          error: 'tableName is required' 
+        }, 400);
+      }
+      
+      if (!this.isQueueTable(tableName)) {
+        return this.jsonResponse({ 
+          success: false, 
+          error: `Table ${tableName} is not a queue table` 
+        }, 400);
+      }
+      
+      const storageKey = `table_state_${tableName}`;
+      await this.storage.delete(storageKey);
+      
+      const initialState: TableState = {
+        tableName,
+        lastFlushedId: 0,
+        lastProcessedId: 0,
+        pendingCount: 0,
+        updatedAt: Date.now()
+      };
+      console.log(`[UserDO ${this.userId}] Reset table state for ${tableName} to ${JSON.stringify(initialState)}`);
+      this.tableStates.set(tableName, initialState);
+      
+      return this.jsonResponse({
+        success: true,
+        message: `Reset table state for ${tableName}`,
+        tableName,
+        userId: this.userId
+      });
+    } catch (error) {
+      handleErrorWithoutIp(error, `Table state reset error for UserDO ${this.userId}`);
+      return this.jsonResponse({ 
+        success: false, 
+        error: 'Table state reset failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       }, 500);
     }
