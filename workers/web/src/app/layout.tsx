@@ -7,6 +7,7 @@ import { getMessages } from "next-intl/server";
 import { cookieToInitialState } from "wagmi";
 
 import { Toaster } from "@/components/ui/sonner";
+import { Toaster as ShadcnToaster } from "@/components/ui/toaster";
 import { APP_CONFIG } from "@/config/app-config";
 import { getPreference } from "@/server/server-actions";
 import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
@@ -54,6 +55,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <AuthProvider initialState={initialState}>
               {children}
               <Toaster />
+              <ShadcnToaster />
             </AuthProvider>
           </NextIntlClientProvider>
         </PreferencesStoreProvider>

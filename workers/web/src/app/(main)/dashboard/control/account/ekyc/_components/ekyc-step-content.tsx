@@ -126,7 +126,14 @@ function FaceStepBlock({
             </>
           )}
         </div>
-        <Button className="mt-4 w-full" disabled={!selfieFile || submitting} onClick={onSubmitFace}>
+        <Button
+          className="mt-4 w-full"
+          disabled={!selfieFile || submitting}
+          onClick={() => {
+            console.log("[ekyc] Verify face button clicked", { hasSelfie: !!selfieFile, submitting });
+            onSubmitFace();
+          }}
+        >
           {submitting ? t("processing") : t("submit_face")}
         </Button>
       </CardContent>

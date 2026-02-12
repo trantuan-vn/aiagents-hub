@@ -20,19 +20,24 @@ async function postFaceVerify(
   selfieFile: File,
   t: ReturnType<typeof useTranslations<"AccountPage.ekyc">>,
 ): Promise<boolean> {
+  const url = `${API_BASE_URL}/dashboard/auth/ekyc/face-verify`;
+  console.log("[ekyc] postFaceVerify start", { url, docName: documentFile.name, selfieName: selfieFile.name });
   const form = new FormData();
   form.append("image", documentFile);
   form.append("image2", selfieFile);
-  const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/face-verify`, {
+  const res = await fetch(url, {
     method: "POST",
     credentials: "include",
     body: form,
   });
+  console.log("[ekyc] postFaceVerify response", { ok: res.ok, status: res.status });
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
+    console.log("[ekyc] postFaceVerify error", err);
     throw new Error(err.error ?? t("error_face"));
   }
   const result: { isMatch?: boolean } = await res.json();
+  console.log("[ekyc] postFaceVerify result", result);
   return Boolean(result?.isMatch);
 }
 
@@ -133,7 +138,16 @@ export default function EkycPage() {
   };
 
   const submitFace = async () => {
-    if (!selfieFile || !documentFile) return;
+    console.log("[ekyc] submitFace called", {
+      hasSelfie: !!selfieFile,
+      hasDocument: !!documentFile,
+      selfieName: selfieFile?.name,
+      documentName: documentFile?.name,
+    });
+    if (!selfieFile || !documentFile) {
+      console.log("[ekyc] submitFace early return: missing selfie or document");
+      return;
+    }
     if (!selfieFile.type.match(/^image\/(jpeg|png)$/)) {
       toast({
         title: t("error_face"),
@@ -151,8 +165,10 @@ export default function EkycPage() {
       return;
     }
     setSubmitting(true);
+    console.log("[ekyc] submitFace submitting...");
     try {
       const isMatch = await postFaceVerify(documentFile, selfieFile, t);
+      console.log("[ekyc] submitFace isMatch", isMatch);
       if (isMatch) {
         setStep("success");
         void fetchStatus();
@@ -165,6 +181,7 @@ export default function EkycPage() {
         });
       }
     } catch (e) {
+      console.log("[ekyc] submitFace catch", e);
       toast({
         title: t("error_face"),
         description: e instanceof Error ? e.message : undefined,
@@ -172,6 +189,7 @@ export default function EkycPage() {
       });
     } finally {
       setSubmitting(false);
+      console.log("[ekyc] submitFace done");
     }
   };
 
