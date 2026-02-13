@@ -1004,6 +1004,9 @@
     "sessions": {
       "title": "Phiên & thiết bị đang hoạt động",
       "description": "Các thiết bị đã đăng nhập thành công vào tài khoản",
+      "manage": "Quản lý",
+      "back_to_account": "Về Tài khoản",
+      "sessions_count": "{count} phiên đang hoạt động",
       "loading": "Đang tải phiên...",
       "no_sessions": "Không có phiên khác",
       "fetch_error": "Không thể tải phiên",

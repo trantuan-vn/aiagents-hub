@@ -171,7 +171,7 @@ export default function DidPage() {
 
   const handleUnlinkDid = useCallback(async () => {
     if (!address || !status?.enabled || unlinking) return;
-    console.log("[did] handleUnlinkDid start", { address, enabled: status?.enabled, unlinking });
+    console.log("[did] handleUnlinkDid start", { address, enabled: status.enabled, unlinking });
 
     setUnlinking(true);
     setShowUnlinkConfirm(false);

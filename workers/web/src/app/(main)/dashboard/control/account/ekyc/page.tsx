@@ -38,7 +38,7 @@ async function postFaceVerify(
   }
   const result: { isMatch?: boolean } = await res.json();
   console.log("[ekyc] postFaceVerify result", result);
-  return Boolean(result?.isMatch);
+  return Boolean(result.isMatch);
 }
 
 interface EkycStatus {

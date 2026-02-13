@@ -1004,6 +1004,9 @@
     "sessions": {
       "title": "Active sessions & devices",
       "description": "Devices that have successfully signed in to your account",
+      "manage": "Manage",
+      "back_to_account": "Back to Account",
+      "sessions_count": "{count} active session(s)",
       "loading": "Loading sessions...",
       "no_sessions": "No other sessions",
       "fetch_error": "Failed to load sessions",
