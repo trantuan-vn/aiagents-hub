@@ -37,6 +37,7 @@ export function DidLinkedContent({
   onUnlink: () => void;
   t: (key: string, values?: Record<string, string>) => string;
 }) {
+  console.log("[did] DidLinkedContent render", { status, showUnlinkConfirm, unlinking });
   return (
     <div className="space-y-4">
       <div className="bg-muted/30 rounded-lg border px-4 py-3">
@@ -53,7 +54,10 @@ export function DidLinkedContent({
           variant="outline"
           size="sm"
           className="text-destructive hover:text-destructive"
-          onClick={() => setShowUnlinkConfirm(true)}
+          onClick={() => {
+            console.log("[did] Unlink confirm clicked");
+            setShowUnlinkConfirm(true);
+          }}
           disabled={unlinking}
         >
           <Unlink className="mr-2 h-4 w-4" />
@@ -68,7 +72,10 @@ export function DidLinkedContent({
             <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => void onUnlink()}
+              onClick={() => {
+                console.log("[did] Unlink confirmed, calling onUnlink");
+                void onUnlink();
+              }}
             >
               {t("unlink")}
             </AlertDialogAction>
