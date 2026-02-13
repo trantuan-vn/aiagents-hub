@@ -321,6 +321,7 @@ export function createEkycRepository(
         documentVerifiedAt: row.documentVerifiedAt ?? undefined,
         faceVerifiedAt: row.faceVerifiedAt ?? undefined,
         updatedAt: row.updatedAt ?? undefined,
+        docType: row.docType ?? undefined,
       };
     },
     async setDocumentSubmitted(): Promise<void> {
@@ -417,9 +418,50 @@ export function createEkycRepository(
           status: 'not_started',
           documentVerifiedAt: null,
           faceVerifiedAt: null,
+          docType: null,
+          docExtractedData: null,
+          docFrontKey: null,
+          docBackKey: null,
+          faceMediaKey: null,
           updatedAt: new Date().toISOString(),
         }, USER_EKYC_TABLE);
       }
+    },
+    async saveDocumentData(data: { docType: 'passport' | 'cccd'; docExtractedData: string; docFrontKey: string; docBackKey?: string }): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const updatedAt = new Date().toISOString();
+      const updateData: Record<string, unknown> = {
+        docType: data.docType,
+        docExtractedData: data.docExtractedData,
+        docFrontKey: data.docFrontKey,
+        docBackKey: data.docBackKey ?? null,
+        updatedAt,
+      };
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', { id: row.id, ...updateData }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', { status: 'document_submitted', ...updateData }, USER_EKYC_TABLE);
+      }
+    },
+    async saveFaceMediaKey(faceMediaKey: string): Promise<void> {
+      const row = await getEkycRow(userDO);
+      const updatedAt = new Date().toISOString();
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', { id: row.id, faceMediaKey, updatedAt }, USER_EKYC_TABLE);
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', { status: 'face_submitted', faceMediaKey, updatedAt }, USER_EKYC_TABLE);
+      }
+    },
+    async getDocumentKeys(): Promise<{ docFrontKey: string | null; docBackKey: string | null }> {
+      const row = await getEkycRow(userDO);
+      return {
+        docFrontKey: row?.docFrontKey ?? null,
+        docBackKey: row?.docBackKey ?? null,
+      };
+    },
+    async getFaceMediaKey(): Promise<string | null> {
+      const row = await getEkycRow(userDO);
+      return row?.faceMediaKey ?? null;
     },
   };
 }

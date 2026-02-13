@@ -78,6 +78,10 @@
 		{
 		"binding": "R2_VERSION_BUCKET",
 		"bucket_name": "version-backup-bucket"
+		},
+		{
+		"binding": "R2_EKYC_BUCKET",
+		"bucket_name": "ekyc-storage-bucket"
 		}
 	],	
 	"kv_namespaces": [

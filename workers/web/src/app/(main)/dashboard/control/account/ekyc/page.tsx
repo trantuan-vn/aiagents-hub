@@ -11,41 +11,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-import { EkycStepContent, type EkycStep } from "./_components/ekyc-step-content";
+import { EkycStepContent, type EkycStep, type DocType } from "./_components/ekyc-step-content";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
-
-async function postFaceVerify(
-  documentFile: File,
-  selfieFile: File,
-  t: ReturnType<typeof useTranslations<"AccountPage.ekyc">>,
-): Promise<boolean> {
-  const url = `${API_BASE_URL}/dashboard/auth/ekyc/face-verify`;
-  console.log("[ekyc] postFaceVerify start", { url, docName: documentFile.name, selfieName: selfieFile.name });
-  const form = new FormData();
-  form.append("image", documentFile);
-  form.append("image2", selfieFile);
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "include",
-    body: form,
-  });
-  console.log("[ekyc] postFaceVerify response", { ok: res.ok, status: res.status });
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string };
-    console.log("[ekyc] postFaceVerify error", err);
-    throw new Error(err.error ?? t("error_face"));
-  }
-  const result: { isMatch?: boolean } = await res.json();
-  console.log("[ekyc] postFaceVerify result", result);
-  return Boolean(result.isMatch);
-}
 
 interface EkycStatus {
   status: string;
   documentVerifiedAt?: string;
   faceVerifiedAt?: string;
   updatedAt?: string;
+}
+
+interface FaceApiResponse {
+  error?: string;
+  isMatch?: boolean;
 }
 
 function getStepFromStatus(status: string): EkycStep {
@@ -60,9 +39,18 @@ export default function EkycPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<EkycStatus | null>(null);
   const [step, setStep] = useState<EkycStep>("document");
+  const [docType, setDocType] = useState<DocType>("cccd");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentBackFile, setDocumentBackFile] = useState<File | null>(null);
+  const handleDocTypeChange = useCallback((newType: DocType) => {
+    setDocType(newType);
+    if (newType === "passport") setDocumentBackFile(null);
+  }, []);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [faceImages, setFaceImages] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [verifyTesting, setVerifyTesting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -92,33 +80,40 @@ export default function EkycPage() {
     void fetchStatus();
   }, [fetchStatus]);
 
+  const validateDocFiles = (front: File, back: File | null) => {
+    if (!front.type.match(/^image\/(jpeg|png)$/) || (back && !back.type.match(/^image\/(jpeg|png)$/))) {
+      toast({ title: t("error_document"), description: "Use JPEG or PNG.", variant: "destructive" });
+      return false;
+    }
+    if (front.size > 2 * 1024 * 1024 || (back && back.size > 2 * 1024 * 1024)) {
+      toast({ title: t("error_document"), description: "File must be under 2MB.", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
+  const buildDocumentForm = () => {
+    const front = documentFile!;
+    const back = docType === "cccd" ? documentBackFile : null;
+    const form = new FormData();
+    form.append("docType", docType);
+    form.append("image_front", front);
+    if (back) form.append("image_back", back);
+    return form;
+  };
+
   const submitDocument = async () => {
-    if (!documentFile) return;
-    if (!documentFile.type.match(/^image\/(jpeg|png)$/)) {
-      toast({
-        title: t("error_document"),
-        description: "Use JPEG or PNG.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (documentFile.size > 2 * 1024 * 1024) {
-      toast({
-        title: t("error_document"),
-        description: "File must be under 2MB.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const front = documentFile;
+    const back = docType === "cccd" ? documentBackFile : null;
+    if (!front || (docType === "cccd" && !back)) return;
+    if (!validateDocFiles(front, back)) return;
+
     setSubmitting(true);
     try {
-      const form = new FormData();
-      form.append("image", documentFile);
-      form.append("type", "cccd_front");
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/recognize-document`, {
         method: "POST",
         credentials: "include",
-        body: form,
+        body: buildDocumentForm(),
       });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
@@ -137,51 +132,46 @@ export default function EkycPage() {
     }
   };
 
+  const validateFaceFile = (file: File) => {
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      toast({ title: t("error_face"), description: "Use JPEG or PNG.", variant: "destructive" });
+      return false;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: t("error_face"), description: "File must be under 2MB.", variant: "destructive" });
+      return false;
+    }
+    return true;
+  };
+
   const submitFace = async () => {
-    console.log("[ekyc] submitFace called", {
-      hasSelfie: !!selfieFile,
-      hasDocument: !!documentFile,
-      selfieName: selfieFile?.name,
-      documentName: documentFile?.name,
-    });
-    if (!selfieFile || !documentFile) {
-      console.log("[ekyc] submitFace early return: missing selfie or document");
-      return;
-    }
-    if (!selfieFile.type.match(/^image\/(jpeg|png)$/)) {
-      toast({
-        title: t("error_face"),
-        description: "Use JPEG or PNG.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (selfieFile.size > 2 * 1024 * 1024) {
-      toast({
-        title: t("error_face"),
-        description: "File must be under 2MB.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const primary = faceImages.length > 0 ? faceImages[0] : selfieFile;
+    if (!primary || !validateFaceFile(primary)) return;
+
     setSubmitting(true);
-    console.log("[ekyc] submitFace submitting...");
     try {
-      const isMatch = await postFaceVerify(documentFile, selfieFile, t);
-      console.log("[ekyc] submitFace isMatch", isMatch);
-      if (isMatch) {
+      const form = new FormData();
+      if (faceImages.length > 0) {
+        faceImages.forEach((f) => form.append("face_images", f));
+      } else {
+        form.append("image", primary);
+      }
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/face-submit`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const data = (await res.json().catch(() => ({}))) as FaceApiResponse;
+      if (!res.ok) throw new Error(data.error ?? t("error_face"));
+
+      if (data.isMatch) {
         setStep("success");
         void fetchStatus();
         toast({ title: t("face_success") });
       } else {
-        toast({
-          title: t("error_face"),
-          description: t("face_mismatch"),
-          variant: "destructive",
-        });
+        toast({ title: t("error_face"), description: t("face_mismatch"), variant: "destructive" });
       }
     } catch (e) {
-      console.log("[ekyc] submitFace catch", e);
       toast({
         title: t("error_face"),
         description: e instanceof Error ? e.message : undefined,
@@ -189,7 +179,52 @@ export default function EkycPage() {
       });
     } finally {
       setSubmitting(false);
-      console.log("[ekyc] submitFace done");
+    }
+  };
+
+  const removeEkyc = async () => {
+    setRemoving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/remove`, {
+        method: "POST",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to remove eKYC");
+      setStep("document");
+      setDocumentFile(null);
+      setDocumentBackFile(null);
+      setSelfieFile(null);
+      setFaceImages([]);
+      void fetchStatus();
+      toast({ title: t("remove_success") });
+    } catch {
+      toast({ title: t("error_remove"), variant: "destructive" });
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const verifyTest = async (file: File) => {
+    setVerifyTesting(true);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/face-verify-test`, {
+        method: "POST",
+        credentials: "include",
+        body: form,
+      });
+      const data = (await res.json().catch(() => ({}))) as FaceApiResponse;
+      if (!res.ok) throw new Error(data.error ?? t("error_face"));
+      if (data.isMatch) {
+        toast({ title: t("verify_test_success") });
+      } else {
+        toast({ title: t("verify_test_fail"), variant: "destructive" });
+      }
+    } catch {
+      toast({ title: t("error_face"), variant: "destructive" });
+    } finally {
+      setVerifyTesting(false);
     }
   };
 
@@ -229,12 +264,22 @@ export default function EkycPage() {
             step={step}
             status={status?.status ?? null}
             documentFile={documentFile}
+            documentBackFile={documentBackFile}
+            docType={docType}
             selfieFile={selfieFile}
+            faceImages={faceImages}
             submitting={submitting}
+            removing={removing}
+            verifyTesting={verifyTesting}
             onDocumentSelect={setDocumentFile}
+            onDocumentBackSelect={setDocumentBackFile}
+            onDocTypeChange={handleDocTypeChange}
             onSelfieSelect={setSelfieFile}
+            onFaceImagesSelect={setFaceImages}
             onSubmitDocument={submitDocument}
             onSubmitFace={submitFace}
+            onRemoveEkyc={removeEkyc}
+            onVerifyTest={verifyTest}
             t={t}
           />
         </CardContent>

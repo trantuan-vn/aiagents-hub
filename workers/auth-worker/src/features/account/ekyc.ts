@@ -14,6 +14,10 @@ export interface IAccountEkycApplication {
   setFaceVerifiedUseCase(identifier: string): Promise<void>;
   setVerifiedUseCase(identifier: string): Promise<void>;
   resetUseCase(identifier: string): Promise<void>;
+  saveDocumentDataUseCase(identifier: string, data: { docType: 'passport' | 'cccd'; docExtractedData: string; docFrontKey: string; docBackKey?: string }): Promise<void>;
+  saveFaceMediaKeyUseCase(identifier: string, faceMediaKey: string): Promise<void>;
+  getDocumentKeysUseCase(identifier: string): Promise<{ docFrontKey: string | null; docBackKey: string | null }>;
+  getFaceMediaKeyUseCase(identifier: string): Promise<string | null>;
 }
 
 export function createAccountEkycApplication(
@@ -47,6 +51,18 @@ export function createAccountEkycApplication(
     },
     async resetUseCase(identifier: string): Promise<void> {
       await getRepo(identifier).reset();
+    },
+    async saveDocumentDataUseCase(identifier: string, data: { docType: 'passport' | 'cccd'; docExtractedData: string; docFrontKey: string; docBackKey?: string }): Promise<void> {
+      await getRepo(identifier).saveDocumentData(data);
+    },
+    async saveFaceMediaKeyUseCase(identifier: string, faceMediaKey: string): Promise<void> {
+      await getRepo(identifier).saveFaceMediaKey(faceMediaKey);
+    },
+    async getDocumentKeysUseCase(identifier: string): Promise<{ docFrontKey: string | null; docBackKey: string | null }> {
+      return getRepo(identifier).getDocumentKeys();
+    },
+    async getFaceMediaKeyUseCase(identifier: string): Promise<string | null> {
+      return getRepo(identifier).getFaceMediaKey();
     },
   };
 }

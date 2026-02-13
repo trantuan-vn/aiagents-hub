@@ -73,6 +73,7 @@ declare namespace Cloudflare {
         USER_DO: DurableObjectNamespace<import("./src/features/ws/infrastructure/UserDO").UserDO>;
 		ASSETS: Fetcher;
         R2_VERSION_BUCKET: R2Bucket;
+        R2_EKYC_BUCKET: R2Bucket;
         NONCE_KV: KVNamespace;
         DEBUG: string;
         AI: Ai;

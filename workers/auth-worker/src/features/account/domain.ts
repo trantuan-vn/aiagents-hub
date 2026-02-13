@@ -139,12 +139,18 @@ export interface IBackupCodeRepository {
   deleteAll(): Promise<void>;
 }
 
-// eKYC – identity verification status (no PII stored, status only)
+// eKYC – identity verification status
 export const UserEkycSchema = z.object({
   status: z.enum(['not_started', 'document_submitted', 'document_verified', 'face_submitted', 'face_verified', 'verified']).default('not_started'),
   documentVerifiedAt: z.string().datetime().nullish(),
   faceVerifiedAt: z.string().datetime().nullish(),
   updatedAt: z.string().datetime().nullish(),
+  // Document: passport (1 img) or cccd (2 imgs: front, back)
+  docType: z.enum(['passport', 'cccd']).nullish(),
+  docExtractedData: z.string().nullish(), // JSON string of extracted fields
+  docFrontKey: z.string().nullish(), // R2 key for passport or cccd front
+  docBackKey: z.string().nullish(), // R2 key for cccd back (null for passport)
+  faceMediaKey: z.string().nullish(), // R2 key for face clip or images
 });
 export type UserEkycRow = z.infer<typeof UserEkycSchema>;
 
@@ -153,6 +159,7 @@ export interface EkycStatus {
   documentVerifiedAt?: string;
   faceVerifiedAt?: string;
   updatedAt?: string;
+  docType?: 'passport' | 'cccd';
 }
 
 export interface IEkycRepository {
@@ -163,6 +170,10 @@ export interface IEkycRepository {
   setFaceVerified(): Promise<void>;
   setVerified(): Promise<void>;
   reset(): Promise<void>;
+  saveDocumentData(data: { docType: 'passport' | 'cccd'; docExtractedData: string; docFrontKey: string; docBackKey?: string }): Promise<void>;
+  saveFaceMediaKey(faceMediaKey: string): Promise<void>;
+  getDocumentKeys(): Promise<{ docFrontKey: string | null; docBackKey: string | null }>;
+  getFaceMediaKey(): Promise<string | null>;
 }
 
 // DID (Decentralized Identity) – did:ethr for EVM wallet ownership

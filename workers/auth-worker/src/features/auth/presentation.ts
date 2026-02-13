@@ -25,7 +25,7 @@ import {
 } from '../account/domain';
 import { createDocumentAIService } from '../member/ekyc/application';
 import { EKYC_SERVICES } from '../member/ekyc/constant';
-import { processFormData, mergeImages } from '../member/ekyc/utils';
+import { processFormData, processDocumentFormData, processFaceFormData, mergeImages, hashIdentifier, saveToEkycR2, getFromEkycR2 } from '../member/ekyc/utils';
 
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -473,27 +473,73 @@ export function createAuthRoutes(bindingName: string) {
     }
   });
 
+  app.post('/ekyc/remove', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const appService = getEkycApp(c);
+      await appService.resetUseCase(user.identifier);
+      return c.json({ success: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to remove eKYC');
+      return c.json(errorResponse, status);
+    }
+  });
+
   app.post('/ekyc/recognize-document', async (c) => {
     try {
       const user = requireAuth(c);
       const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
       if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
-      const { image, docType } = await processFormData(c);
+      const { docType, images } = await processDocumentFormData(c);
       const aiService = getEkycAI(c);
-      const result = await aiService.recognizeDocumentUseCase(user.identifier, {
-        endpoint: EKYC_SERVICES.DOCUMENT.RECOGNIZE.path,
-        image,
-        docType,
-        ipAddress,
-        userAgent,
-      });
       const ekycApp = getEkycApp(c);
-      if (result.confidence >= 0.7) {
+      const userPrefix = await hashIdentifier(user.identifier);
+
+      const docTypes = docType === 'passport' ? ['passport'] : ['cccd_front', 'cccd_back'];
+      const extractedParts: Record<string, unknown>[] = [];
+      const r2Keys: { front: string; back?: string } = { front: '' };
+
+      for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const dt = docTypes[i];
+        const result = await aiService.recognizeDocumentUseCase(user.identifier, {
+          endpoint: EKYC_SERVICES.DOCUMENT.RECOGNIZE.path,
+          image: img,
+          docType: dt,
+          ipAddress,
+          userAgent,
+        });
+        extractedParts.push(result.extractedData);
+
+        const suffix = docType === 'passport' ? 'passport.jpg' : dt === 'cccd_front' ? 'front.jpg' : 'back.jpg';
+        const key = await saveToEkycR2(c.env as any, userPrefix, `doc-${suffix}`, img);
+        if (i === 0) r2Keys.front = key;
+        else (r2Keys as any).back = key;
+      }
+
+      const mergedData = Object.assign({}, ...extractedParts);
+      const avgConfidence = extractedParts.length > 0
+        ? extractedParts.reduce((sum, p) => sum + (Number((p as any)?.confidence_score) || 0.7), 0) / extractedParts.length
+        : 0.7;
+
+      await ekycApp.saveDocumentDataUseCase(user.identifier, {
+        docType,
+        docExtractedData: JSON.stringify(mergedData),
+        docFrontKey: r2Keys.front,
+        docBackKey: r2Keys.back,
+      });
+      if (avgConfidence >= 0.7) {
         await ekycApp.setDocumentVerifiedUseCase(user.identifier);
       } else {
         await ekycApp.setDocumentSubmittedUseCase(user.identifier);
       }
-      return c.json(result);
+
+      return c.json({
+        documentType: docType,
+        extractedData: mergedData,
+        confidence: avgConfidence,
+        processingTime: Date.now(),
+      });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Document recognition failed');
       return c.json(errorResponse, status);
@@ -527,7 +573,20 @@ export function createAuthRoutes(bindingName: string) {
       if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
       const { image, image2 } = await processFormData(c);
       if (!image2) throw new Error('Missing second image for verification');
-      const mergedImage = await mergeImages(image, image2, c.env as any);
+
+      let docImage: File;
+      if (image) {
+        docImage = image;
+      } else {
+        const ekycApp = getEkycApp(c);
+        const { docFrontKey } = await ekycApp.getDocumentKeysUseCase(user.identifier);
+        if (!docFrontKey) throw new Error('No document on file. Complete document step first.');
+        const buf = await getFromEkycR2(c.env as any, docFrontKey);
+        if (!buf) throw new Error('Document image not found');
+        docImage = new File([buf], 'doc.jpg', { type: 'image/jpeg' });
+      }
+
+      const mergedImage = await mergeImages(docImage, image2, c.env as any);
       const aiService = getEkycAI(c);
       const result = await aiService.faceVerifyUseCase(user.identifier, {
         endpoint: EKYC_SERVICES.FACE.VERIFY.path,
@@ -546,6 +605,104 @@ export function createAuthRoutes(bindingName: string) {
       return c.json(result);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Face verification failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/face-verify-test', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const { image } = await processFormData(c);
+      if (!image) throw new Error('Missing selfie image for verification test');
+
+      const ekycApp = getEkycApp(c);
+      const { docFrontKey } = await ekycApp.getDocumentKeysUseCase(user.identifier);
+      if (!docFrontKey) throw new Error('No document on file. Complete eKYC first.');
+
+      const buf = await getFromEkycR2(c.env as any, docFrontKey);
+      if (!buf) throw new Error('Document image not found');
+      const docImage = new File([buf], 'doc.jpg', { type: 'image/jpeg' });
+
+      const mergedImage = await mergeImages(docImage, image, c.env as any);
+      const aiService = getEkycAI(c);
+      const result = await aiService.faceVerifyUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.VERIFY.path,
+        image: mergedImage,
+        image2: null,
+        ipAddress,
+        userAgent,
+      });
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Face verification test failed');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/ekyc/face-submit', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
+      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const faceData = await processFaceFormData(c);
+      const ekycApp = getEkycApp(c);
+      const { docFrontKey } = await ekycApp.getDocumentKeysUseCase(user.identifier);
+      if (!docFrontKey) throw new Error('Complete document step first');
+
+      const firstFrame = faceData.type === 'video' ? faceData.frame : faceData.type === 'images' ? faceData.files[0] : faceData.file;
+      const aiService = getEkycAI(c);
+
+      const livenessResult = await aiService.livenessDetectionUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.LIVENESS.path,
+        image: firstFrame,
+        isVideo: faceData.type === 'video',
+        ipAddress,
+        userAgent,
+      });
+      if (!livenessResult.isLive || livenessResult.confidence < 0.7) {
+        return c.json({ error: 'Liveness check failed', ...livenessResult }, 400);
+      }
+
+      const userPrefix = await hashIdentifier(user.identifier);
+      let faceMediaKey: string;
+      if (faceData.type === 'video') {
+        faceMediaKey = await saveToEkycR2(c.env as any, userPrefix, 'face-clip.webm', faceData.file);
+      } else if (faceData.type === 'images') {
+        faceMediaKey = await saveToEkycR2(c.env as any, userPrefix, 'face-1.jpg', firstFrame);
+        for (let i = 1; i < faceData.files.length; i++) {
+          await saveToEkycR2(c.env as any, userPrefix, `face-${i + 1}.jpg`, faceData.files[i]);
+        }
+      } else {
+        faceMediaKey = await saveToEkycR2(c.env as any, userPrefix, 'face.jpg', faceData.file);
+      }
+
+      await ekycApp.saveFaceMediaKeyUseCase(user.identifier, faceMediaKey);
+
+      const docBuf = await getFromEkycR2(c.env as any, docFrontKey);
+      if (!docBuf) throw new Error('Document image not found');
+      const docImage = new File([docBuf], 'doc.jpg', { type: 'image/jpeg' });
+      const mergedImage = await mergeImages(docImage, firstFrame, c.env as any);
+
+      const verifyResult = await aiService.faceVerifyUseCase(user.identifier, {
+        endpoint: EKYC_SERVICES.FACE.VERIFY.path,
+        image: mergedImage,
+        image2: null,
+        ipAddress,
+        userAgent,
+      });
+
+      if (verifyResult.isMatch && verifyResult.confidence >= 0.75) {
+        await ekycApp.setFaceVerifiedUseCase(user.identifier);
+        await ekycApp.setVerifiedUseCase(user.identifier);
+      } else {
+        await ekycApp.setFaceSubmittedUseCase(user.identifier);
+      }
+
+      return c.json({ ...verifyResult, liveness: livenessResult });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Face submit failed');
       return c.json(errorResponse, status);
     }
   });

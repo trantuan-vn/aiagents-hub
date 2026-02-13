@@ -1,5 +1,36 @@
 import { AI_IMAGE_LIMITS } from './constant';
 
+/** Hash identifier for R2 key prefix (privacy-safe) */
+export async function hashIdentifier(identifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(identifier);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+/** Save file to R2 eKYC bucket, return key */
+export async function saveToEkycR2(
+  env: { R2_EKYC_BUCKET: R2Bucket },
+  userPrefix: string,
+  filename: string,
+  file: File | Blob
+): Promise<string> {
+  const key = `ekyc/${userPrefix}/${filename}`;
+  const buffer = await (file instanceof File ? file.arrayBuffer() : file.arrayBuffer());
+  await env.R2_EKYC_BUCKET.put(key, buffer, {
+    httpMetadata: { contentType: file instanceof File ? file.type : 'application/octet-stream' },
+  });
+  return key;
+}
+
+/** Get file from R2 as ArrayBuffer for face verification */
+export async function getFromEkycR2(env: { R2_EKYC_BUCKET: R2Bucket }, key: string): Promise<ArrayBuffer | null> {
+  const obj = await env.R2_EKYC_BUCKET.get(key);
+  if (!obj) return null;
+  return obj.arrayBuffer();
+}
+
 export const processFormData = async (c: any) => {
   const formData = await c.req.formData();
   const image = formData.get('image') as File;
@@ -13,6 +44,54 @@ export const processFormData = async (c: any) => {
   }
 
   return { image, image2, docType, isVideo };
+};
+
+/** Form data for document step: passport (1 img) or cccd (2 imgs) */
+export const processDocumentFormData = async (c: any) => {
+  const formData = await c.req.formData();
+  const docType = (formData.get('docType') as string) || (formData.get('type') as string) || 'cccd';
+  const image = formData.get('image') as File | null;
+  const imageFront = formData.get('image_front') as File | null;
+  const imageBack = formData.get('image_back') as File | null;
+
+  if (docType === 'passport') {
+    const img = image ?? imageFront;
+    if (!img) throw new Error('Missing passport image');
+    if (!['image/jpeg', 'image/png'].includes(img.type)) throw new Error('Invalid file type');
+    return { docType: 'passport' as const, images: [img] };
+  }
+  if (docType === 'cccd') {
+    const front = image ?? imageFront;
+    if (!front) throw new Error('Missing CCCD front image');
+    if (!imageBack) throw new Error('Missing CCCD back image');
+    if (!['image/jpeg', 'image/png'].includes(front.type) || !['image/jpeg', 'image/png'].includes(imageBack.type)) {
+      throw new Error('Invalid file type');
+    }
+    return { docType: 'cccd' as const, images: [front, imageBack] };
+  }
+  throw new Error('Invalid docType. Use passport or cccd.');
+};
+
+/** Form data for face step: video clip or multiple images. When video is sent, face_frame (first frame) is required for liveness/verify. */
+export const processFaceFormData = async (c: any) => {
+  const formData = await c.req.formData();
+  const faceVideo = formData.get('face_video') as File | null;
+  const faceFrame = formData.get('face_frame') as File | null;
+  const faceImages = formData.getAll('face_images') as File[];
+  const image = formData.get('image') as File | null;
+
+  if (faceVideo && faceVideo.size > 0) {
+    const frame = faceFrame ?? image;
+    if (!frame) throw new Error('When sending video, also send face_frame (first frame) for liveness check');
+    return { type: 'video' as const, file: faceVideo, frame };
+  }
+  if (faceImages.length > 0) {
+    return { type: 'images' as const, files: faceImages };
+  }
+  if (image) {
+    return { type: 'image' as const, file: image };
+  }
+  throw new Error('Missing face video or images');
 };
 
 export async function toBase64(img: File): Promise<string> {
