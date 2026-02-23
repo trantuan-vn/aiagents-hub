@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
+import { log } from "./_components/ekyc-debug";
 import { EkycStepContent, type EkycStep, type DocType } from "./_components/ekyc-step-content";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
@@ -53,21 +54,26 @@ export default function EkycPage() {
   const [verifyTesting, setVerifyTesting] = useState(false);
 
   const fetchStatus = useCallback(async () => {
+    log("fetchStatus: start");
     try {
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/status`, {
         method: "GET",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
+      log("fetchStatus: response", { ok: res.ok, status: res.status });
       if (res.ok) {
         const data: EkycStatus = await res.json();
+        log("fetchStatus: success", { data });
         setStatus(data);
         setStep(getStepFromStatus(data.status));
       } else {
+        log("fetchStatus: not ok, fallback to not_started");
         setStatus({ status: "not_started" });
         setStep("document");
       }
-    } catch {
+    } catch (e) {
+      log("fetchStatus: error", e);
       setStatus({ status: "not_started" });
       setStep("document");
       toast({ title: t("error_fetch"), variant: "destructive" });
@@ -105,23 +111,36 @@ export default function EkycPage() {
   const submitDocument = async () => {
     const front = documentFile;
     const back = docType === "cccd" ? documentBackFile : null;
-    if (!front || (docType === "cccd" && !back)) return;
-    if (!validateDocFiles(front, back)) return;
+    log("submitDocument: start", { docType, hasFront: !!front, hasBack: !!back });
+    if (!front || (docType === "cccd" && !back)) {
+      log("submitDocument: abort - missing files");
+      return;
+    }
+    if (!validateDocFiles(front, back)) {
+      log("submitDocument: abort - validation failed");
+      return;
+    }
 
     setSubmitting(true);
     try {
+      const form = buildDocumentForm();
+      log("submitDocument: sending");
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/recognize-document`, {
         method: "POST",
         credentials: "include",
-        body: buildDocumentForm(),
+        body: form,
       });
+      log("submitDocument: response", { ok: res.ok, status: res.status });
       if (!res.ok) {
         const err = (await res.json().catch(() => ({}))) as { error?: string };
+        log("submitDocument: error response", err);
         throw new Error(err.error ?? t("error_document"));
       }
+      log("submitDocument: success, moving to face step");
       setStep("face");
       toast({ title: t("document_success") });
     } catch (e) {
+      log("submitDocument: catch", e);
       toast({
         title: t("error_document"),
         description: e instanceof Error ? e.message : undefined,
@@ -146,7 +165,11 @@ export default function EkycPage() {
 
   const submitFace = async () => {
     const primary = faceImages.length > 0 ? faceImages[0] : selfieFile;
-    if (!primary || !validateFaceFile(primary)) return;
+    log("submitFace: start", { hasPrimary: !!primary, faceImagesCount: faceImages.length });
+    if (!primary || !validateFaceFile(primary)) {
+      log("submitFace: abort - no primary or validation failed");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -156,22 +179,27 @@ export default function EkycPage() {
       } else {
         form.append("image", primary);
       }
+      log("submitFace: sending", { url: `${API_BASE_URL}/dashboard/auth/ekyc/face-submit` });
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/face-submit`, {
         method: "POST",
         credentials: "include",
         body: form,
       });
       const data = (await res.json().catch(() => ({}))) as FaceApiResponse;
+      log("submitFace: response", { ok: res.ok, status: res.status, data });
       if (!res.ok) throw new Error(data.error ?? t("error_face"));
 
       if (data.isMatch) {
+        log("submitFace: success, isMatch=true");
         setStep("success");
         void fetchStatus();
         toast({ title: t("face_success") });
       } else {
+        log("submitFace: face_mismatch");
         toast({ title: t("error_face"), description: t("face_mismatch"), variant: "destructive" });
       }
     } catch (e) {
+      log("submitFace: catch", e);
       toast({
         title: t("error_face"),
         description: e instanceof Error ? e.message : undefined,
@@ -183,12 +211,14 @@ export default function EkycPage() {
   };
 
   const removeEkyc = async () => {
+    log("removeEkyc: start");
     setRemoving(true);
     try {
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/ekyc/remove`, {
         method: "POST",
         credentials: "include",
       });
+      log("removeEkyc: response", { ok: res.ok, status: res.status });
       if (!res.ok) throw new Error("Failed to remove eKYC");
       setStep("document");
       setDocumentFile(null);
@@ -197,7 +227,8 @@ export default function EkycPage() {
       setFaceImages([]);
       void fetchStatus();
       toast({ title: t("remove_success") });
-    } catch {
+    } catch (e) {
+      log("removeEkyc: catch", e);
       toast({ title: t("error_remove"), variant: "destructive" });
     } finally {
       setRemoving(false);
@@ -205,6 +236,7 @@ export default function EkycPage() {
   };
 
   const verifyTest = async (file: File) => {
+    log("verifyTest: start", { fileName: file.name, size: file.size });
     setVerifyTesting(true);
     try {
       const form = new FormData();
@@ -215,13 +247,17 @@ export default function EkycPage() {
         body: form,
       });
       const data = (await res.json().catch(() => ({}))) as FaceApiResponse;
+      log("verifyTest: response", { ok: res.ok, status: res.status, data });
       if (!res.ok) throw new Error(data.error ?? t("error_face"));
       if (data.isMatch) {
+        log("verifyTest: success, isMatch=true");
         toast({ title: t("verify_test_success") });
       } else {
+        log("verifyTest: fail, isMatch=false");
         toast({ title: t("verify_test_fail"), variant: "destructive" });
       }
-    } catch {
+    } catch (e) {
+      log("verifyTest: catch", e);
       toast({ title: t("error_face"), variant: "destructive" });
     } finally {
       setVerifyTesting(false);
