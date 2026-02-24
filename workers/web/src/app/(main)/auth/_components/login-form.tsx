@@ -109,6 +109,70 @@ function OtpDialog({
   );
 }
 
+function SmsDialog({
+  open,
+  onOpenChange,
+  smsCode,
+  onSmsCodeChange,
+  onVerify,
+  isLoading,
+  t,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  smsCode: string;
+  onSmsCodeChange: (value: string) => void;
+  onVerify: () => void;
+  isLoading: boolean;
+  t: (key: string) => string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" aria-describedby="sms-dialog-description">
+        <DialogHeader>
+          <DialogTitle>{t("sms_dialog_title")}</DialogTitle>
+          <div id="sms-dialog-description" className="text-muted-foreground text-sm">
+            {t("sms_dialog_description")}
+          </div>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FormLabel htmlFor="sms-input">{t("sms_label")}</FormLabel>
+            <Input
+              id="sms-input"
+              type="text"
+              placeholder={t("otp_placeholder")}
+              value={smsCode}
+              onChange={(e) => onSmsCodeChange(e.target.value)}
+              maxLength={6}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="text-center font-mono text-lg tracking-widest"
+              aria-required="true"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                onSmsCodeChange("");
+                onOpenChange(false);
+              }}
+            >
+              {t("cancel")}
+            </Button>
+            <Button type="button" className="flex-1" onClick={onVerify} disabled={isLoading || smsCode.length !== 6}>
+              {isLoading ? t("verifying") : t("verify_sms")}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function TotpDialog({
   open,
   onOpenChange,
@@ -179,9 +243,11 @@ export function LoginForm() {
   const router = useRouter();
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [showTotpPopup, setShowTotpPopup] = useState(false);
+  const [showSmsPopup, setShowSmsPopup] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const [totpCode, setTotpCode] = useState("");
+  const [smsCode, setSmsCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyStatus, setPasskeyStatus] = useState<{ enabled: boolean } | null>(null);
   const [usePasskeyMode, setUsePasskeyMode] = useState<"local" | "cross-device" | null>(null);
@@ -315,13 +381,22 @@ export function LoginForm() {
         body: JSON.stringify({ identifier: identifier.trim(), otp }),
         credentials: "include",
       });
-      const data = (await response.json().catch(() => ({}))) as { requiresTotp?: boolean; error?: string };
+      const data = (await response.json().catch(() => ({}))) as {
+        requiresTotp?: boolean;
+        requiresSms?: boolean;
+        error?: string;
+      };
 
       if (data.requiresTotp) {
         setShowOtpPopup(false);
         setShowTotpPopup(true);
         setOtp("");
         toast.success(t("totp_required"));
+      } else if (data.requiresSms) {
+        setShowOtpPopup(false);
+        setShowSmsPopup(true);
+        setOtp("");
+        toast.success(t("sms_required"));
       } else if (response.ok) {
         setShowOtpPopup(false);
         setOtp("");
@@ -337,6 +412,34 @@ export function LoginForm() {
       if (isMounted.current) setIsLoading(false);
     }
   }, [otp, identifier, form, router, t]);
+
+  const handleSmsVerify = useCallback(async () => {
+    if (!/^\d{6}$/.test(smsCode)) {
+      toast.error(t("otp_invalid"));
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}/sms/verify-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: smsCode }),
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? t("sms_verify_error"));
+      }
+      setShowSmsPopup(false);
+      setSmsCode("");
+      form.reset();
+      router.push("/dashboard");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("sms_verify_error"));
+    } finally {
+      if (isMounted.current) setIsLoading(false);
+    }
+  }, [smsCode, form, router, t]);
 
   const handleTotpVerify = useCallback(async () => {
     if (!/^\d{6}$/.test(totpCode)) {
@@ -409,6 +512,15 @@ export function LoginForm() {
     debounce((value: string) => {
       if (isMounted.current) {
         setTotpCode(value.replace(/\D/g, "").slice(0, 6));
+      }
+    }, 300),
+    [],
+  );
+
+  const handleSmsCodeChange = useCallback(
+    debounce((value: string) => {
+      if (isMounted.current) {
+        setSmsCode(value.replace(/\D/g, "").slice(0, 6));
       }
     }, 300),
     [],
@@ -513,6 +625,19 @@ export function LoginForm() {
         totpCode={totpCode}
         onTotpChange={handleTotpChange}
         onVerify={handleTotpVerify}
+        isLoading={isLoading}
+        t={t}
+      />
+
+      <SmsDialog
+        open={showSmsPopup}
+        onOpenChange={(open) => {
+          if (!open) setSmsCode("");
+          setShowSmsPopup(open);
+        }}
+        smsCode={smsCode}
+        onSmsCodeChange={handleSmsCodeChange}
+        onVerify={handleSmsVerify}
         isLoading={isLoading}
         t={t}
       />

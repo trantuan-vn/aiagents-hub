@@ -1,3 +1,4 @@
+import CryptoJS from 'crypto-js';
 import { Context } from 'hono';
 import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
@@ -149,7 +150,7 @@ export function createAccountSmsApplication(
 
       const otp = otpUtils.generateOTP(6);
       const kvKey = `Sms2FA:${identifier}`;
-      await c.env.NONCE_KV.put(kvKey, JSON.stringify({ otp }), { expirationTtl: SMS_VERIFY_TTL });
+      await c.env.NONCE_KV.put(kvKey, JSON.stringify({ otp, phone }), { expirationTtl: SMS_VERIFY_TTL });
 
       const otpService = createOTPService(c.env);
       await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp);
@@ -167,10 +168,18 @@ export function createAccountSmsApplication(
       const kvKey = `Sms2FA:${identifier}`;
       const raw = await c.env.NONCE_KV.get(kvKey);
       if (!raw) throw new Error(ERROR_MESSAGES.INVALID_CODE);
-      const { otp } = JSON.parse(raw) as { otp: string };
+      const { otp, phone } = JSON.parse(raw) as { otp: string; phone?: string };
       if (otp !== input.code) throw new Error(ERROR_MESSAGES.INVALID_CODE);
       await c.env.NONCE_KV.delete(kvKey);
-      await smsRepo.confirmPendingSmsAsEnabled();
+
+      let encryptedPhone: string | undefined;
+      if (phone) {
+        const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+        if (encryptSecret) {
+          encryptedPhone = CryptoJS.AES.encrypt(phone, encryptSecret).toString();
+        }
+      }
+      await smsRepo.confirmPendingSmsAsEnabled(encryptedPhone);
     },
 
     async disableSmsUseCase(identifier: string, input: DisableSmsInput): Promise<void> {

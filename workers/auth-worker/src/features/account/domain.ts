@@ -12,6 +12,8 @@ export const UserMfaSchema = z.object({
   smsEnabledAt: z.string().datetime().nullish(),
   pendingPhoneHash: z.string().nullish(),
   pendingPhoneAt: z.string().datetime().nullish(),
+  // Encrypted phone for SMS 2FA login (needed to send codes)
+  smsPhoneEncrypted: z.string().nullish(),
 });
 export type UserMfa = z.infer<typeof UserMfaSchema>;
 
@@ -83,9 +85,11 @@ export type DisableSmsInput = z.infer<typeof DisableSmsSchema>;
 export interface ISmsRepository {
   getSmsStatus(): Promise<SmsStatus>;
   getPhoneHash(): Promise<string | null>;
+  getSmsPhoneEncrypted(): Promise<string | null>;
+  setSmsPhoneEncrypted(encrypted: string): Promise<void>;
   getPendingPhoneHash(): Promise<string | null>;
   setPendingPhoneHash(phoneHash: string): Promise<void>;
-  confirmPendingSmsAsEnabled(): Promise<void>;
+  confirmPendingSmsAsEnabled(encryptedPhone?: string): Promise<void>;
   clearSms(): Promise<void>;
 }
 

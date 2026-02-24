@@ -4,16 +4,19 @@ import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
 
 import { OAuthProvider, Session } from './domain';
+import CryptoJS from 'crypto-js';
 import { 
   jwtUtils, 
   validationUtils, 
   walletUtils, 
   oauthUtils,
+  hashPhone,
+  otpUtils,
 } from './utils';
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
 import { createPasskeyAuthApplication } from '../account/passkey';
-import { createAccountAuthenticatorApplication } from '../account/application';
-import { createAuthenticatorRepository } from '../account/infrastructure';
+import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
+import { createAuthenticatorRepository, createSmsRepository } from '../account/infrastructure';
 import { verifyTotpCode } from '../account/totp';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
@@ -26,8 +29,9 @@ interface IApplicationService {
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
-  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true }>;
+  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
@@ -174,7 +178,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true }> {
+    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }> {
       const otpService = createOTPService(c.env);
       const isValid = await otpService.verifyOTP(otp, sessionId);
       if (!isValid) {
@@ -185,12 +189,50 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const user = await getOrCreateUser(repository, identifier);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+      const smsApp = createAccountSmsApplication(c, bindingName);
       const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
+      const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
+
+      // 1. Cả authenticator và SMS đều bật -> chọn authenticator
       if (totpStatus.enabled) {
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, identifier, { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
+      // 2. Chỉ SMS bật -> chọn SMS
+      if (smsStatus.enabled) {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        const smsRepo = createSmsRepository(userDO);
+        let phone: string | null = null;
+
+        const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
+        if (encryptedPhone) {
+          const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+          if (encryptSecret) {
+            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
+            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+          }
+        }
+
+        if (!phone && validationUtils.isValidPhone(identifier)) {
+          const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(identifier));
+          const storedHash = await smsRepo.getPhoneHash();
+          if (storedHash === identifierHash) {
+            phone = identifier.startsWith('+') ? identifier : `+${identifier}`;
+          }
+        }
+
+        if (!phone) {
+          throw new Error('Cannot send SMS 2FA: phone not available. Please re-enable SMS 2FA.');
+        }
+
+        const smsOtp = otpUtils.generateOTP(6);
+        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier, otp: smsOtp }), { expirationTtl: 300 });
+        await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+        return { requiresSms: true };
+      }
+
+      // 3. Cả hai đều không bật -> đăng nhập bình thường
       return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
     },
 
@@ -210,6 +252,21 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       if (!valid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
 
       await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
+
+      const repository = getRepository(identifier);
+      const user = await repository.users.get();
+      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+    },
+
+    async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+      const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
+      if (!raw) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
+      const { identifier, otp } = JSON.parse(raw) as { identifier: string; otp: string };
+      if (otp !== code) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
+      await c.env.NONCE_KV.delete(`PendingSmsLogin:${sessionId}`);
 
       const repository = getRepository(identifier);
       const user = await repository.users.get();

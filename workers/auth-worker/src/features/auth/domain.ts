@@ -25,9 +25,14 @@ export const TotpVerifySchema = z.object({
   code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
 });
 
+export const SmsVerifyLoginSchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+
 export type OTPRequest = z.infer<typeof OTPRequestSchema>;
 export type OTPVerification = z.infer<typeof OTPVerificationSchema>;
 export type TotpVerify = z.infer<typeof TotpVerifySchema>;
+export type SmsVerifyLogin = z.infer<typeof SmsVerifyLoginSchema>;
 
 // III. Wallet Schemas
 export const SIWEAuthSchema = z.object({

@@ -168,6 +168,15 @@ export const walletUtils = {
   }
 };
 
+// IIIb. Phone hash (for SMS 2FA login matching)
+export async function hashPhone(phone: string): Promise<string> {
+  const normalized = phone.replace(/\D/g, '').trim();
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
 // IV. OTP Utilities
 export const otpUtils = {
   generateOTP(length = 6): string {

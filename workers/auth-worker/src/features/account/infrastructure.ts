@@ -128,6 +128,23 @@ export function createSmsRepository(
       const row = await getMfaRow(userDO);
       return row?.phoneHash ?? null;
     },
+    async getSmsPhoneEncrypted(): Promise<string | null> {
+      const row = await getMfaRow(userDO);
+      return row?.smsPhoneEncrypted ?? null;
+    },
+    async setSmsPhoneEncrypted(encrypted: string): Promise<void> {
+      const row = await getMfaRow(userDO);
+      if (row) {
+        await executeUtils.executeDynamicAction(userDO, 'update', {
+          id: row.id,
+          smsPhoneEncrypted: encrypted,
+        }, 'user_mfa');
+      } else {
+        await executeUtils.executeDynamicAction(userDO, 'insert', {
+          smsPhoneEncrypted: encrypted,
+        }, 'user_mfa');
+      }
+    },
     async getPendingPhoneHash(): Promise<string | null> {
       const row = await getMfaRow(userDO);
       return row?.pendingPhoneHash ?? null;
@@ -148,17 +165,21 @@ export function createSmsRepository(
         }, 'user_mfa');
       }
     },
-    async confirmPendingSmsAsEnabled(): Promise<void> {
+    async confirmPendingSmsAsEnabled(encryptedPhone?: string): Promise<void> {
       const row = await getMfaRow(userDO);
       if (!row?.pendingPhoneHash) throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
       const smsEnabledAt = new Date().toISOString();
-      await executeUtils.executeDynamicAction(userDO, 'update', {
+      const updateData: Record<string, unknown> = {
         id: row.id,
         phoneHash: row.pendingPhoneHash,
         smsEnabledAt,
         pendingPhoneHash: null,
         pendingPhoneAt: null,
-      }, 'user_mfa');
+      };
+      if (encryptedPhone !== undefined) {
+        updateData.smsPhoneEncrypted = encryptedPhone;
+      }
+      await executeUtils.executeDynamicAction(userDO, 'update', updateData, 'user_mfa');
     },
     async clearSms(): Promise<void> {
       const row = await getMfaRow(userDO);
@@ -167,6 +188,7 @@ export function createSmsRepository(
         id: row.id,
         phoneHash: null,
         smsEnabledAt: null,
+        smsPhoneEncrypted: null,
         pendingPhoneHash: null,
         pendingPhoneAt: null,
       }, 'user_mfa');

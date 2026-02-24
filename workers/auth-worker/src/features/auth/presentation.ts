@@ -7,6 +7,7 @@ import {
   OTPRequestSchema, 
   OTPVerificationSchema, 
   TotpVerifySchema,
+  SmsVerifyLoginSchema,
   OAuthCallbackSchema, 
   SIWEAuthSchema 
 } from './domain';
@@ -140,6 +141,9 @@ export function createAuthRoutes(bindingName: string) {
     if ('requiresTotp' in result && result.requiresTotp) {
       return c.json({ requiresTotp: true });
     }
+    if ('requiresSms' in result && result.requiresSms) {
+      return c.json({ requiresSms: true });
+    }
 
     const { token, refreshToken } = result as { token: string; refreshToken: string };
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
@@ -155,6 +159,16 @@ export function createAuthRoutes(bindingName: string) {
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "TOTP verification failed"));
+
+  app.post('/sms/verify-login', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    const { code } = await parseBody(c, SmsVerifyLoginSchema);
+    const applicationService = createApplicationService(c, bindingName);
+    const { token, refreshToken } = await applicationService.verifySmsLoginUseCase(
+      sessionId, code, ipAddress, userAgent
+    );
+    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    return c.json({ ok: true });
+  }, "SMS verification failed"));
 
   // IIb. Passkey Auth (login) – public, no auth required
   const getPasskeyAuthApp = (ctx: any) =>
