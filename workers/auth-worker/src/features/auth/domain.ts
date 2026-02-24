@@ -21,8 +21,13 @@ export const OTPVerificationSchema = z.object({
   otp: z.string().length(6, 'OTP must be 6 digits'),
 });
 
+export const TotpVerifySchema = z.object({
+  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+});
+
 export type OTPRequest = z.infer<typeof OTPRequestSchema>;
 export type OTPVerification = z.infer<typeof OTPVerificationSchema>;
+export type TotpVerify = z.infer<typeof TotpVerifySchema>;
 
 // III. Wallet Schemas
 export const SIWEAuthSchema = z.object({
@@ -134,7 +139,7 @@ export type User = z.infer<typeof UserSchema>;
 // VI. Session Schemas
 export const SessionSchema = z.object({
   hashSessionId: z.string(),
-  type: z.enum(['otp', 'siwe', 'oauth']),
+  type: z.enum(['otp', 'siwe', 'oauth', 'passkey']),
   token: z.string().optional(),
   refreshToken: z.string().optional(),
   expiresAt: z.string().datetime(),

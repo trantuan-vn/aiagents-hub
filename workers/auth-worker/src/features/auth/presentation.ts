@@ -6,13 +6,14 @@ import { createApplicationService } from './application';
 import { 
   OTPRequestSchema, 
   OTPVerificationSchema, 
+  TotpVerifySchema,
   OAuthCallbackSchema, 
   SIWEAuthSchema 
 } from './domain';
 // SIWEAuthSchema also used for DID link/unlink
 import { cookieUtils, oauthUtils } from './utils';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
-import { createAccountPasskeyApplication } from '../account/passkey';
+import { createAccountPasskeyApplication, createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountBackupCodeApplication } from '../account/backup-codes';
 import { createAccountEkycApplication } from '../account/ekyc';
 import { createAccountDidApplication } from '../account/did';
@@ -132,13 +133,75 @@ export function createAuthRoutes(bindingName: string) {
     const { identifier, otp } = await parseBody(c, OTPVerificationSchema);
     
     const applicationService = createApplicationService(c, bindingName);
-    const { token, refreshToken } = await applicationService.verifyOtpUseCase(
+    const result = await applicationService.verifyOtpUseCase(
       identifier, sessionId, otp, ipAddress, userAgent
     );
 
+    if ('requiresTotp' in result && result.requiresTotp) {
+      return c.json({ requiresTotp: true });
+    }
+
+    const { token, refreshToken } = result as { token: string; refreshToken: string };
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "OTP verification failed"));
+
+  app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    const { code } = await parseBody(c, TotpVerifySchema);
+    const applicationService = createApplicationService(c, bindingName);
+    const { token, refreshToken } = await applicationService.verifyTotpLoginUseCase(
+      sessionId, code, ipAddress, userAgent
+    );
+    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    return c.json({ ok: true });
+  }, "TOTP verification failed"));
+
+  // IIb. Passkey Auth (login) – public, no auth required
+  const getPasskeyAuthApp = (ctx: any) =>
+    createPasskeyAuthApplication(ctx, bindingName, {
+      rpName: 'Unitoken',
+      getOrigin: () => ctx.req.header('origin') || ctx.env.FRONTEND_URL || '',
+    });
+
+  app.get('/passkey/auth/status', createRouteHandler(async (c: any) => {
+    const identifier = c.req.query('identifier');
+    if (!identifier || typeof identifier !== 'string') {
+      return c.json({ enabled: false, credentialCount: 0 });
+    }
+    const appService = getPasskeyAuthApp(c);
+    const status = await appService.getPasskeyAuthStatusUseCase(identifier.trim());
+    return c.json(status);
+  }, "Passkey status failed"));
+
+  app.post('/passkey/auth/options', createRouteHandler(async (c: any) => {
+    const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+    if (!origin) throw new Error('Origin required');
+    const body = (await c.req.json().catch(() => ({}))) as { identifier?: string };
+    const identifier = typeof body.identifier === 'string' ? body.identifier.trim() || undefined : undefined;
+    const appService = getPasskeyAuthApp(c);
+    const result = await appService.getAuthenticationOptionsUseCase(identifier, origin);
+    return c.json(result);
+  }, "Passkey auth options failed", true));
+
+  app.post('/passkey/auth/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+    if (!origin) throw new Error('Origin required');
+    const body = (await c.req.json()) as { response: unknown; identifier?: string; challengeKey?: string };
+    if (!body?.response || !body?.challengeKey) throw new Error('response and challengeKey required');
+    const appService = getPasskeyAuthApp(c);
+    const applicationService = createApplicationService(c, bindingName);
+    const { identifier } = await appService.verifyAuthenticationUseCase(
+      body.response,
+      typeof body.identifier === 'string' ? body.identifier.trim() || undefined : undefined,
+      body.challengeKey,
+      origin
+    );
+    const { token, refreshToken } = await applicationService.connectPasskeyUseCase(
+      sessionId, identifier, ipAddress, userAgent
+    );
+    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    return c.json({ ok: true });
+  }, "Passkey auth verify failed", true));
 
   // III. Wallet Routes
   app.get('/wallet/nonce', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {

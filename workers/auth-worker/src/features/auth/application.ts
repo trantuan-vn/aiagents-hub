@@ -11,6 +11,10 @@ import {
   oauthUtils,
 } from './utils';
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
+import { createPasskeyAuthApplication } from '../account/passkey';
+import { createAccountAuthenticatorApplication } from '../account/application';
+import { createAuthenticatorRepository } from '../account/infrastructure';
+import { verifyTotpCode } from '../account/totp';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
 
@@ -22,12 +26,16 @@ interface IApplicationService {
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
-  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true }>;
+  verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
   verifySignatureUseCase(sessionId: string, message: string, signature: string): Promise<SiweMessage>;
   connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+
+  // IIIb. PASSKEY (login)
+  connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // IV. Common
   logoutUseCase(identifier: string, sessionId: string): Promise<void>;
@@ -49,7 +57,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     repository: any,
     sessionId: string,
     user: any,
-    type: 'otp' | 'siwe' | 'oauth',
+    type: 'otp' | 'siwe' | 'oauth' | 'passkey',
     ipAddress: string,
     userAgent: string
   ) => {
@@ -166,7 +174,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true }> {
       const otpService = createOTPService(c.env);
       const isValid = await otpService.verifyOTP(otp, sessionId);
       if (!isValid) {
@@ -175,6 +183,37 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       const repository = getRepository(identifier);
       const user = await getOrCreateUser(repository, identifier);
+
+      const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
+      if (totpStatus.enabled) {
+        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, identifier, { expirationTtl: 300 });
+        return { requiresTotp: true };
+      }
+
+      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+    },
+
+    async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+      const identifier = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
+      if (!identifier) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
+      const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
+      if (!totpStatus.enabled) throw new Error('TOTP not enabled');
+
+      const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+      const authRepo = createAuthenticatorRepository(userDO);
+      const secret = await authRepo.getSecret();
+      if (!secret) throw new Error('TOTP not configured');
+      const valid = await verifyTotpCode(secret, code);
+      if (!valid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
+      await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
+
+      const repository = getRepository(identifier);
+      const user = await repository.users.get();
+      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
     },
 
@@ -193,6 +232,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(address);
       const user = await getOrCreateUser(repository, address, { address });
       return await createUserSession(repository, sessionId, user, 'siwe', ipAddress, userAgent);
+    },
+
+    async connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+      const repository = getRepository(identifier);
+      const user = await repository.users.get();
+      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      return await createUserSession(repository, sessionId, user, 'passkey', ipAddress, userAgent);
     },
 
     // IV. Common

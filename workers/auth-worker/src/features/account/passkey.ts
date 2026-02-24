@@ -6,6 +6,8 @@ import type { Context } from 'hono';
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
+  generateAuthenticationOptions,
+  verifyAuthenticationResponse,
   type VerifyRegistrationResponseOpts,
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
@@ -17,6 +19,8 @@ import type { UserDO } from '../ws/infrastructure/UserDO';
 type RegistrationResponseJSON = VerifyRegistrationResponseOpts['response'];
 
 const CHALLENGE_KV_PREFIX = 'PasskeyChallenge:';
+const CHALLENGE_AUTH_PREFIX = 'PasskeyAuthChallenge:';
+const CREDENTIAL_LOOKUP_PREFIX = 'PasskeyCredential:';
 const CHALLENGE_TTL = 300; // 5 minutes
 
 function getRpId(origin: string): string {
@@ -128,6 +132,9 @@ export function createAccountPasskeyApplication(
         counter,
         deviceType: verification.registrationInfo.credentialDeviceType === 'singleDevice' ? 'singleDevice' : 'multiDevice',
       });
+
+      // Store credentialId -> identifier for passkey login lookup (discoverable credentials)
+      await c.env.NONCE_KV.put(`${CREDENTIAL_LOOKUP_PREFIX}${credentialIdB64}`, identifier);
     },
 
     async listCredentialsUseCase(identifier: string): Promise<PasskeyCredentialListItem[]> {
@@ -136,6 +143,128 @@ export function createAccountPasskeyApplication(
 
     async removeCredentialUseCase(identifier: string, credentialId: string): Promise<void> {
       await getRepo(identifier).deleteCredential(credentialId);
+      await c.env.NONCE_KV.delete(`${CREDENTIAL_LOOKUP_PREFIX}${credentialId}`);
+    },
+  };
+}
+
+/** Passkey auth (login) – public, no auth required */
+export interface IPasskeyAuthApplication {
+  getPasskeyAuthStatusUseCase(identifier: string): Promise<PasskeyStatus>;
+  getAuthenticationOptionsUseCase(identifier: string | undefined, origin: string): Promise<{ options: Record<string, unknown>; challengeKey: string }>;
+  verifyAuthenticationUseCase(
+    response: unknown,
+    identifier: string | undefined,
+    challengeKey: string,
+    origin: string
+  ): Promise<{ identifier: string }>;
+}
+
+export function createPasskeyAuthApplication(
+  c: Context,
+  bindingName: string,
+  config: PasskeyApplicationConfig
+): IPasskeyAuthApplication {
+  const getRepo = (identifier: string): IPasskeyRepository => {
+    const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO> | null;
+    if (!userDO) throw new Error('User not found');
+    return createPasskeyRepository(userDO);
+  };
+
+  return {
+    async getPasskeyAuthStatusUseCase(identifier: string): Promise<PasskeyStatus> {
+      try {
+        return await getRepo(identifier).getStatus();
+      } catch {
+        return { enabled: false, credentialCount: 0 };
+      }
+    },
+
+    async getAuthenticationOptionsUseCase(
+      identifier: string | undefined,
+      origin: string
+    ): Promise<{ options: Record<string, unknown>; challengeKey: string }> {
+      const rpId = getRpId(origin);
+      let allowCredentials: { id: string }[] = [];
+
+      if (identifier) {
+        try {
+          const credentials = await getRepo(identifier).listCredentials();
+          allowCredentials = credentials.map((cred) => ({ id: cred.credentialId }));
+        } catch {
+          // User not found or no passkeys
+        }
+      }
+
+      const options = await generateAuthenticationOptions({
+        rpID: rpId,
+        userVerification: 'preferred',
+        allowCredentials: allowCredentials.length > 0 ? allowCredentials : undefined,
+      });
+
+      const challengeKey = `${CHALLENGE_AUTH_PREFIX}${identifier ?? 'discoverable'}`;
+      await c.env.NONCE_KV.put(challengeKey, options.challenge, { expirationTtl: CHALLENGE_TTL });
+
+      return {
+        options: options as unknown as Record<string, unknown>,
+        challengeKey,
+      };
+    },
+
+    async verifyAuthenticationUseCase(
+      response: unknown,
+      identifier: string | undefined,
+      challengeKey: string,
+      origin: string
+    ): Promise<{ identifier: string }> {
+      const res = response as { id?: string; response?: { userHandle?: ArrayBuffer } };
+      const credentialId = res?.id;
+      if (!credentialId) throw new Error('Invalid passkey response');
+
+      let resolvedIdentifier = identifier;
+      if (!resolvedIdentifier && res?.response?.userHandle) {
+        resolvedIdentifier = new TextDecoder().decode(res.response.userHandle);
+      }
+      if (!resolvedIdentifier) {
+        const lookup = await c.env.NONCE_KV.get(`${CREDENTIAL_LOOKUP_PREFIX}${credentialId}`);
+        resolvedIdentifier = lookup ?? undefined;
+      }
+      if (!resolvedIdentifier) throw new Error('Could not identify user from passkey');
+
+      const storedChallenge = await c.env.NONCE_KV.get(challengeKey);
+      if (!storedChallenge) throw new Error('Challenge expired or invalid');
+      await c.env.NONCE_KV.delete(challengeKey);
+
+      const repo = getRepo(resolvedIdentifier);
+      const credential = await repo.getCredentialByCredentialId(credentialId);
+      if (!credential) throw new Error('Passkey not found');
+
+      const rpId = getRpId(origin);
+      const publicKey = isoBase64URL.toBuffer(credential.publicKey);
+
+      const verification = await verifyAuthenticationResponse({
+        response: response as Parameters<typeof verifyAuthenticationResponse>[0]['response'],
+        expectedChallenge: storedChallenge,
+        expectedOrigin: origin,
+        expectedRPID: rpId,
+        authenticator: {
+          credentialID: credentialId,
+          credentialPublicKey: publicKey,
+          counter: credential.counter,
+        },
+      });
+
+      if (!verification.verified || !verification.authenticationInfo) {
+        throw new Error('Passkey verification failed');
+      }
+
+      await repo.saveCredential({
+        credentialId,
+        publicKey: credential.publicKey,
+        counter: verification.authenticationInfo.newCounter,
+      });
+
+      return { identifier: resolvedIdentifier };
     },
   };
 }
