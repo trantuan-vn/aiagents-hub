@@ -384,7 +384,7 @@ export function createAuthRoutes(bindingName: string) {
       return c.json(errorResponse, status);
     }
   });
-
+ 
   app.post('/sms/request', async (c) => {
     try {
       const user = requireAuth(c);

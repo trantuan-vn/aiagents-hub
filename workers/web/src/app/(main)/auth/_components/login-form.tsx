@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startAuthentication } from "@simplewebauthn/browser";
-import { Fingerprint, KeyRound } from "lucide-react";
+import { Fingerprint } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -250,7 +250,7 @@ export function LoginForm() {
   const [smsCode, setSmsCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyStatus, setPasskeyStatus] = useState<{ enabled: boolean } | null>(null);
-  const [usePasskeyMode, setUsePasskeyMode] = useState<"local" | "cross-device" | null>(null);
+  const [usePasskeyMode, setUsePasskeyMode] = useState(false);
   const isMounted = useRef(true);
 
   const language = locale.startsWith("vi") ? "vi" : "en";
@@ -300,9 +300,9 @@ export function LoginForm() {
   );
 
   const handlePasskeyLogin = useCallback(
-    async (emailValue?: string, mode: "local" | "cross-device" = "local") => {
+    async (emailValue?: string) => {
       const email = emailValue ?? form.getValues("email")?.trim();
-      if (!email && mode === "local") {
+      if (!email) {
         toast.error(t("email_required"));
         return;
       }
@@ -312,13 +312,13 @@ export function LoginForm() {
       }
 
       setIsLoading(true);
-      setUsePasskeyMode(mode);
+      setUsePasskeyMode(true);
       try {
         const optRes = await fetch(`${AUTH_API_URL}/passkey/auth/options`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier: email || undefined }),
+          body: JSON.stringify({ identifier: email }),
         });
         if (!optRes.ok) {
           const err = (await optRes.json().catch(() => ({}))) as { error?: string };
@@ -336,7 +336,7 @@ export function LoginForm() {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ response, identifier: email || undefined, challengeKey }),
+          body: JSON.stringify({ response, identifier: email, challengeKey }),
         });
         if (!verifyRes.ok) {
           const err = (await verifyRes.json().catch(() => ({}))) as { error?: string };
@@ -361,7 +361,7 @@ export function LoginForm() {
       } finally {
         if (isMounted.current) {
           setIsLoading(false);
-          setUsePasskeyMode(null);
+          setUsePasskeyMode(false);
         }
       }
     },
@@ -560,31 +560,19 @@ export function LoginForm() {
         />
 
         {showPasskeyOption && (
-          <div className="space-y-2">
-            <Button
-              type="button"
-              variant="default"
-              className="w-full"
-              disabled={isLoading || !form.formState.isValid}
-              onClick={() => handlePasskeyLogin(undefined, "local")}
-            >
-              <Fingerprint className="mr-2 size-4" />
-              {isLoading && usePasskeyMode === "local" ? t("passkey_authenticating") : t("use_passkey")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={isLoading || !form.formState.isValid}
-              onClick={() => handlePasskeyLogin(undefined, "cross-device")}
-            >
-              <KeyRound className="mr-2 size-4" />
-              {t("use_passkey_another_device")}
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="default"
+            className="w-full"
+            disabled={isLoading || !form.formState.isValid}
+            onClick={() => handlePasskeyLogin()}
+          >
+            <Fingerprint className="mr-2 size-4" />
+            {isLoading && usePasskeyMode ? t("passkey_authenticating") : t("use_passkey")}
+          </Button>
         )}
 
-        {passkeySupported && !showPasskeyOption && (
+        {passkeySupported && !showPasskeyOption && passkeyStatus !== null && (
           <p className="text-muted-foreground text-xs">{t("passkey_no_credentials")}</p>
         )}
 

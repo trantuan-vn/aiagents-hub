@@ -56,7 +56,6 @@
     "login_with_otp": "Đăng nhập bằng OTP",
     "or_continue_with": "hoặc tiếp tục với",
     "use_passkey": "Đăng nhập bằng passkey",
-    "use_passkey_another_device": "Dùng passkey từ thiết bị khác",
     "passkey_authenticating": "Đang xác thực...",
     "passkey_error": "Xác thực passkey thất bại",
     "passkey_cancelled": "Đã hủy xác thực passkey",
@@ -420,62 +419,62 @@
         "name": "API Xử lý Dữ liệu",
         "description": "Pipeline xử lý và chuyển đổi dữ liệu hiệu suất cao cho dữ liệu có cấu trúc và không cấu trúc.",
         "features": {
-        "0": "Phân tích cú pháp JSON/XML",
-        "1": "Xử lý hàng loạt",
-        "2": "Streaming thời gian thực",
-        "3": "Chuyển đổi tùy chỉnh"
+          "0": "Phân tích cú pháp JSON/XML",
+          "1": "Xử lý hàng loạt",
+          "2": "Streaming thời gian thực",
+          "3": "Chuyển đổi tùy chỉnh"
+        }
+      },
+      "ai_vision": {
+        "name": "API Thị giác AI",
+        "description": "Nhận dạng hình ảnh tiên tiến, phát hiện đối tượng và phân tích nội dung trực quan được hỗ trợ bởi machine learning.",
+        "features": {
+          "0": "Phát hiện đối tượng",
+          "1": "Nhận dạng khuôn mặt",
+          "2": "OCR",
+          "3": "Kiểm duyệt nội dung"
+        }
+      },
+      "geolocation": {
+        "name": "API Định vị Địa lý",
+        "description": "Dịch vụ định vị IP chính xác, xác thực địa chỉ và tính toán khoảng cách.",
+        "features": {
+          "0": "IP đến vị trí",
+          "1": "Xác thực địa chỉ",
+          "2": "Ma trận khoảng cách",
+          "3": "Phát hiện múi giờ"
+        }
+      },
+      "authentication": {
+        "name": "API Xác thực",
+        "description": "Xác thực người dùng an toàn, SSO và xác minh danh tính cho ứng dụng của bạn.",
+        "features": {
+          "0": "OAuth 2.0",
+          "1": "SAML SSO",
+          "2": "Hỗ trợ MFA",
+          "3": "Quản lý phiên"
+        }
+      },
+      "natural_language": {
+        "name": "API Ngôn ngữ Tự nhiên",
+        "description": "Dịch vụ phân tích văn bản, phát hiện cảm xúc, trích xuất thực thể và dịch ngôn ngữ.",
+        "features": {
+          "0": "Phân tích cảm xúc",
+          "1": "Trích xuất thực thể",
+          "2": "Dịch thuật",
+          "3": "Tóm tắt"
+        }
+      },
+      "realtime_events": {
+        "name": "API Sự kiện Thời gian thực",
+        "description": "Cơ sở hạ tầng streaming sự kiện thời gian thực và nhắn tin pub/sub dựa trên WebSocket.",
+        "features": {
+          "0": "Hỗ trợ WebSocket",
+          "1": "Nhắn tin Pub/Sub",
+          "2": "Lịch sử sự kiện",
+          "3": "Kênh tùy chỉnh"
+        }
       }
-    },
-    "ai_vision": {
-      "name": "API Thị giác AI",
-      "description": "Nhận dạng hình ảnh tiên tiến, phát hiện đối tượng và phân tích nội dung trực quan được hỗ trợ bởi machine learning.",
-      "features": {
-        "0": "Phát hiện đối tượng",
-        "1": "Nhận dạng khuôn mặt",
-        "2": "OCR",
-        "3": "Kiểm duyệt nội dung"
-      }
-    },
-    "geolocation": {
-      "name": "API Định vị Địa lý",
-      "description": "Dịch vụ định vị IP chính xác, xác thực địa chỉ và tính toán khoảng cách.",
-      "features": {
-        "0": "IP đến vị trí",
-        "1": "Xác thực địa chỉ",
-        "2": "Ma trận khoảng cách",
-        "3": "Phát hiện múi giờ"
-      }
-    },
-    "authentication": {
-      "name": "API Xác thực",
-      "description": "Xác thực người dùng an toàn, SSO và xác minh danh tính cho ứng dụng của bạn.",
-      "features": {
-        "0": "OAuth 2.0",
-        "1": "SAML SSO",
-        "2": "Hỗ trợ MFA",
-        "3": "Quản lý phiên"
-      }
-    },
-    "natural_language": {
-      "name": "API Ngôn ngữ Tự nhiên",
-      "description": "Dịch vụ phân tích văn bản, phát hiện cảm xúc, trích xuất thực thể và dịch ngôn ngữ.",
-      "features": {
-        "0": "Phân tích cảm xúc",
-        "1": "Trích xuất thực thể",
-        "2": "Dịch thuật",
-        "3": "Tóm tắt"
-      }
-    },
-    "realtime_events": {
-      "name": "API Sự kiện Thời gian thực",
-      "description": "Cơ sở hạ tầng streaming sự kiện thời gian thực và nhắn tin pub/sub dựa trên WebSocket.",
-      "features": {
-        "0": "Hỗ trợ WebSocket",
-        "1": "Nhắn tin Pub/Sub",
-        "2": "Lịch sử sự kiện",
-        "3": "Kênh tùy chỉnh"
-      }
-    }
     }
   },
   "SupportPage": {

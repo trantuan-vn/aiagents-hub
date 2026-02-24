@@ -16,32 +16,29 @@ export const voucherSchema = z.object({
   applicableUsers: z.array(z.number()).optional(),
   userRoles: z.array(z.enum(["member", "admin"])).default([]),
   expiresAt: z
-    .preprocess(
-      (val) => {
-        if (val === null || val === undefined || val === "") return undefined;
-        // Xử lý cả string số và number
-        const num = Number(val);
+    .preprocess((val) => {
+      if (val === null || val === undefined || val === "") return undefined;
+      // Xử lý cả string số và number
+      const num = Number(val);
 
-        if (!isNaN(num)) {
-          const date = new Date();
+      if (!isNaN(num)) {
+        const date = new Date();
 
-          // Phân biệt: số nhỏ là ngày, số lớn là timestamp
-          if (num < 10000) {
-            // Giả sử < 10000 là số ngày
-            // Giới hạn tối đa 360 ngày nếu cần
-            const daysToAdd = num > 360 ? 360 : num;
-            date.setDate(date.getDate() + daysToAdd);
-            return date.toISOString();
-          } else {
-            // Số lớn: coi như timestamp
-            return new Date(num).toISOString();
-          }
+        // Phân biệt: số nhỏ là ngày, số lớn là timestamp
+        if (num < 10000) {
+          // Giả sử < 10000 là số ngày
+          // Giới hạn tối đa 360 ngày nếu cần
+          const daysToAdd = num > 360 ? 360 : num;
+          date.setDate(date.getDate() + daysToAdd);
+          return date.toISOString();
+        } else {
+          // Số lớn: coi như timestamp
+          return new Date(num).toISOString();
         }
+      }
 
-        return val;
-      },
-      z.string().datetime().optional(),
-    )
+      return val;
+    }, z.string().datetime().optional())
     .optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "EXPIRED"]).default("ACTIVE"),
   conditions: z

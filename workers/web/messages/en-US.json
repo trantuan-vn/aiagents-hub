@@ -56,7 +56,6 @@
     "login_with_otp": "Sign in with OTP",
     "or_continue_with": "or continue with",
     "use_passkey": "Sign in with passkey",
-    "use_passkey_another_device": "Use passkey from another device",
     "passkey_authenticating": "Authenticating...",
     "passkey_error": "Passkey authentication failed",
     "passkey_cancelled": "Passkey authentication cancelled",

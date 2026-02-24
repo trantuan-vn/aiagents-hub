@@ -156,9 +156,7 @@ export function MobileMenu({
           </Link>
         ))}
         <div className="flex flex-col gap-1 px-4 py-2">
-          <div className="text-muted-foreground mb-1 text-xs font-semibold tracking-wider">
-            {t("resources")}
-          </div>
+          <div className="text-muted-foreground mb-1 text-xs font-semibold tracking-wider">{t("resources")}</div>
           <Link
             to="/support"
             onClick={() => setIsMobileMenuOpen(false)}

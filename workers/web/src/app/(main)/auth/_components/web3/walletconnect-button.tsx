@@ -133,7 +133,11 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         const errorMsg = error.message.toLowerCase();
         if (errorMsg.includes("sign") && (errorMsg.includes("failed") || errorMsg.includes("thất bại"))) {
           toast.error(t("sign_failed_retry"));
-        } else if (errorMsg.includes("user rejected") || errorMsg.includes("người dùng từ chối") || errorMsg.includes("rejected")) {
+        } else if (
+          errorMsg.includes("user rejected") ||
+          errorMsg.includes("người dùng từ chối") ||
+          errorMsg.includes("rejected")
+        ) {
           toast.error(t("user_rejected_sign"));
         } else {
           toast.error(t("error", { error: error.message }));
