@@ -657,7 +657,9 @@
     "connect_failed_retry": "Wallet connection failed. Please try again.",
     "connecting": "Connecting wallet...",
     "waiting_sign": "Waiting for signature...",
-    "continue_with_walletconnect": "Continue with WalletConnect"
+    "continue_with_walletconnect": "Continue with WalletConnect",
+    "totp_required": "Please enter your Authenticator code",
+    "sms_required": "SMS verification required"
   },
   "PolicyPage": {
     "title": "Price Policy Management",

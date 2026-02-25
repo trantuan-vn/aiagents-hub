@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 
 import { useTranslations } from "next-intl";
@@ -47,11 +48,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     }
 
     const data = await nonceResponse.json();
-    // eslint-disable-next-line no-console
-    console.log("Phản hồi nonce:", nonceResponse.status, data);
     const result = NonceSchema.parse(data);
-    // eslint-disable-next-line no-console
-    console.log("Parsed nonce:", result.nonce);
 
     return result.nonce;
   }, [t, NonceSchema]);
@@ -74,8 +71,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       });
 
       const message = siweMessage.prepareMessage();
-      // eslint-disable-next-line no-console
-      console.log("SIWE message:", message);
 
       toast.info(t("open_wallet_sign"), {
         duration: 5000,
@@ -84,9 +79,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       const signature = await signMessageAsync({ message }).catch((err) => {
         throw new Error(t("sign_failed", { error: err.message }));
       });
-
-      // eslint-disable-next-line no-console
-      console.log("Signature:", signature);
 
       return { message, signature: signature.startsWith("0x") ? signature : `0x${signature}` };
     },
@@ -110,11 +102,26 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         credentials: "include",
       });
 
+      const data = (await connectResponse.json().catch(() => ({}))) as {
+        ok?: boolean;
+        requiresTotp?: boolean;
+        requiresSms?: boolean;
+        error?: string;
+      };
+
+      if (data.requiresTotp) {
+        toast.success(t("totp_required"));
+        router.replace("/auth/v3/login?requiresTotp=1");
+        return;
+      }
+      if (data.requiresSms) {
+        toast.success(t("sms_required"));
+        router.replace("/auth/v3/login?requiresSms=1");
+        return;
+      }
+
       if (!connectResponse.ok) {
-        const errorData = await connectResponse.json();
-        // eslint-disable-next-line no-console
-        console.log("Connect response error:", errorData);
-        const errorText = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
+        const errorText = typeof data === "string" ? data : (data.error ?? JSON.stringify(data));
         throw new Error(t("connect_failed", { error: errorText }));
       }
 
@@ -126,9 +133,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
 
   const handleError = useCallback(
     (error: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error("Lỗi sau kết nối:", error);
-
       if (error instanceof Error) {
         const errorMsg = error.message.toLowerCase();
         if (errorMsg.includes("sign") && (errorMsg.includes("failed") || errorMsg.includes("thất bại"))) {
@@ -165,8 +169,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
 
   useEffect(() => {
     if (isConnected && address) {
-      // eslint-disable-next-line no-console
-      console.log("Đã kết nối địa chỉ:", address);
       handlePostConnection();
     }
   }, [isConnected, address, handlePostConnection]);
@@ -183,24 +185,15 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       const walletConnectConnector = connectors.find((c) => c.id === "walletConnect");
 
       if (injectedConnector && window.ethereum) {
-        // eslint-disable-next-line no-console
-        console.log("Kết nối bằng injected connector...");
         toast.info(t("open_wallet_accept"));
         await connect({ connector: injectedConnector });
       } else if (walletConnectConnector) {
-        // eslint-disable-next-line no-console
-        console.log("Kết nối bằng WalletConnect...");
         toast.info(t("opening_walletconnect"));
         await connect({ connector: walletConnectConnector });
       } else {
         toast.error(t("no_wallet_found"));
-        // eslint-disable-next-line no-console
-        console.error("Không tìm thấy connector injected hoặc walletConnect.");
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Lỗi kết nối ví:", error);
-
       if (error instanceof Error) {
         if (error.message.includes("User rejected")) {
           toast.error(t("user_rejected_connect"));
@@ -227,7 +220,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       disabled={isConnecting || isSigning}
       {...props}
     >
-      <img src="/walletconnect.svg" className="mr-2 h-4 w-4" alt="WalletConnect" />
+      <Image src="/walletconnect.svg" width={16} height={16} className="mr-2 h-4 w-4" alt="WalletConnect" />
       {getButtonText()}
     </Button>
   );

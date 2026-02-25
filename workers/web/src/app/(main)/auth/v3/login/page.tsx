@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import { getTranslations } from "next-intl/server";
 
 import { APP_CONFIG } from "@/config/app-config";
@@ -20,7 +22,9 @@ export default async function Page() {
           <p className="text-muted-foreground text-sm">{t("description")}</p>
         </div>
         <div className="space-y-4">
-          <LoginForm />
+          <Suspense fallback={null}>
+            <LoginForm />
+          </Suspense>
           <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
             <span className="bg-background text-muted-foreground relative z-10 px-2">{t("or_continue_with")}</span>
           </div>

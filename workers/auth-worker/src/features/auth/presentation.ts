@@ -113,11 +113,19 @@ export function createAuthRoutes(bindingName: string) {
     // Exchange code for tokens and connect user
     const validatedUserInfo = await applicationService.exchangeOAuthCodeUseCase(provider, sessionId, state, code);
     const identifier = oauthUtils.normalizeOAuthIdentifier(provider, validatedUserInfo);
-    
-    const { token, refreshToken } = await applicationService.connectOAuthUseCase(
+
+    const result = await applicationService.connectOAuthUseCase(
       sessionId, identifier, ipAddress, userAgent
     );
 
+    if ('requiresTotp' in result && result.requiresTotp) {
+      return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresTotp=1`);
+    }
+    if ('requiresSms' in result && result.requiresSms) {
+      return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresSms=1`);
+    }
+
+    const { token, refreshToken } = result as { token: string; refreshToken: string };
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
@@ -249,15 +257,23 @@ export function createAuthRoutes(bindingName: string) {
 
   app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const { message, signature } = await parseBody(c, SIWEAuthSchema);
-    
+
     const applicationService = createApplicationService(c, bindingName);
     const fields = await applicationService.verifySignatureUseCase(sessionId, message, signature);
     const address = fields.address.toLowerCase();
 
-    const { token, refreshToken } = await applicationService.connectWalletUseCase(
+    const result = await applicationService.connectWalletUseCase(
       sessionId, address, ipAddress, userAgent
     );
 
+    if ('requiresTotp' in result && result.requiresTotp) {
+      return c.json({ requiresTotp: true });
+    }
+    if ('requiresSms' in result && result.requiresSms) {
+      return c.json({ requiresSms: true });
+    }
+
+    const { token, refreshToken } = result as { token: string; refreshToken: string };
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "Wallet connection failed"));

@@ -657,7 +657,9 @@
     "connect_failed_retry": "Kết nối ví thất bại. Vui lòng thử lại.",
     "connecting": "Đang kết nối ví...",
     "waiting_sign": "Đang chờ ký số...",
-    "continue_with_walletconnect": "Tiếp tục với WalletConnect"
+    "continue_with_walletconnect": "Tiếp tục với WalletConnect",
+    "totp_required": "Vui lòng nhập mã Authenticator",
+    "sms_required": "Yêu cầu xác minh SMS"
   },
   "PolicyPage": {
     "title": "Quản lý Chính sách Giá",

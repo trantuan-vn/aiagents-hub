@@ -4,7 +4,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { startAuthentication } from "@simplewebauthn/browser";
@@ -322,6 +322,7 @@ export function LoginForm() {
   const t = useTranslations("LoginForm");
   const locale = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [showTotpPopup, setShowTotpPopup] = useState(false);
   const [showSmsPopup, setShowSmsPopup] = useState(false);
@@ -359,6 +360,17 @@ export function LoginForm() {
       isMounted.current = false;
     };
   }, []);
+
+  // Xử lý 2FA khi quay về từ OAuth (Google, Facebook, Github) hoặc WalletConnect
+  useEffect(() => {
+    const requiresTotp = searchParams.get("requiresTotp");
+    const requiresSms = searchParams.get("requiresSms");
+    if (requiresTotp === "1") {
+      setShowTotpPopup(true);
+    } else if (requiresSms === "1") {
+      setShowSmsPopup(true);
+    }
+  }, [searchParams]);
 
   const fetchPasskeyStatus = useCallback(async (email: string) => {
     if (!email.trim()) return;

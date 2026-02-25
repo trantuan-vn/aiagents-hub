@@ -26,7 +26,7 @@ interface IApplicationService {
   // I. OAUTH
   getAuthUrlUseCase(provider: OAuthProvider, sessionId: string): Promise<string>;
   exchangeOAuthCodeUseCase(provider: string, sessionId: string, state: string, code: string): Promise<any>;
-  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }>;
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
@@ -39,7 +39,7 @@ interface IApplicationService {
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
   verifySignatureUseCase(sessionId: string, message: string, signature: string): Promise<SiweMessage>;
-  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }>;
 
   // IIIb. PASSKEY (login)
   connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
@@ -162,9 +162,55 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return await oauthService.getUserInfoFromProvider(provider, tokenData.access_token);      
     },
 
-    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(identifier);
       const user = await getOrCreateUser(repository, identifier);
+
+      const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+      const smsApp = createAccountSmsApplication(c, bindingName);
+      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
+      const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
+
+      // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
+      if (totpStatus.enabled) {
+        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, identifier, { expirationTtl: 300 });
+        return { requiresTotp: true };
+      }
+
+      // 2. Chỉ SMS bật -> chọn SMS
+      if (smsStatus.enabled) {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        const smsRepo = createSmsRepository(userDO);
+        let phone: string | null = null;
+
+        const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
+        if (encryptedPhone) {
+          const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+          if (encryptSecret) {
+            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
+            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+          }
+        }
+
+        if (!phone && validationUtils.isValidPhone(identifier)) {
+          const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(identifier));
+          const storedHash = await smsRepo.getPhoneHash();
+          if (storedHash === identifierHash) {
+            phone = identifier.startsWith('+') ? identifier : `+${identifier}`;
+          }
+        }
+
+        if (!phone) {
+          throw new Error('Cannot send SMS 2FA: phone not available. Please re-enable SMS 2FA.');
+        }
+
+        const smsOtp = otpUtils.generateOTP(6);
+        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier, otp: smsOtp }), { expirationTtl: 300 });
+        await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+        return { requiresSms: true };
+      }
+
+      // 3. Cả hai đều không bật -> đăng nhập bình thường
       return await createUserSession(repository, sessionId, user, 'oauth', ipAddress, userAgent);
     },
 
@@ -327,9 +373,55 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return await walletService.verifySignature(sessionId, message, signature, c.env.SIWE_DOMAIN, c.env.FRONTEND_URL);
     },
 
-    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(address);
       const user = await getOrCreateUser(repository, address, { address });
+
+      const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+      const smsApp = createAccountSmsApplication(c, bindingName);
+      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(address);
+      const smsStatus = await smsApp.getSmsStatusUseCase(address);
+
+      // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
+      if (totpStatus.enabled) {
+        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, address, { expirationTtl: 300 });
+        return { requiresTotp: true };
+      }
+
+      // 2. Chỉ SMS bật -> chọn SMS
+      if (smsStatus.enabled) {
+        const userDO = getIdFromName(c, address, bindingName) as DurableObjectStub<UserDO>;
+        const smsRepo = createSmsRepository(userDO);
+        let phone: string | null = null;
+
+        const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
+        if (encryptedPhone) {
+          const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+          if (encryptSecret) {
+            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
+            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+          }
+        }
+
+        if (!phone && validationUtils.isValidPhone(address)) {
+          const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(address));
+          const storedHash = await smsRepo.getPhoneHash();
+          if (storedHash === identifierHash) {
+            phone = address.startsWith('+') ? address : `+${address}`;
+          }
+        }
+
+        if (!phone) {
+          throw new Error('Cannot send SMS 2FA: phone not available. Please re-enable SMS 2FA.');
+        }
+
+        const smsOtp = otpUtils.generateOTP(6);
+        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier: address, otp: smsOtp }), { expirationTtl: 300 });
+        await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+        return { requiresSms: true };
+      }
+
+      // 3. Cả hai đều không bật -> đăng nhập bình thường
       return await createUserSession(repository, sessionId, user, 'siwe', ipAddress, userAgent);
     },
 
