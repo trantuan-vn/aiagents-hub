@@ -29,10 +29,29 @@ export const SmsVerifyLoginSchema = z.object({
   code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
 });
 
+export const BackupCodeVerifySchema = z.object({
+  code: z
+    .string()
+    .min(1, 'Backup code is required')
+    .transform((s) => s.replace(/\s/g, '').replace(/-/g, '').toUpperCase())
+    .refine((s) => /^[0-9A-F]{16}$/.test(s), 'Backup code must be 16 hex characters (e.g. XXXXXXXX-XXXXXXXX)'),
+});
+
+export const BackupCodeRecoverSchema = z.object({
+  identifier: z.string().min(1, 'Identifier is required'),
+  code: z
+    .string()
+    .min(1, 'Backup code is required')
+    .transform((s) => s.replace(/\s/g, '').replace(/-/g, '').toUpperCase())
+    .refine((s) => /^[0-9A-F]{16}$/.test(s), 'Backup code must be 16 hex characters (e.g. XXXXXXXX-XXXXXXXX)'),
+});
+
 export type OTPRequest = z.infer<typeof OTPRequestSchema>;
 export type OTPVerification = z.infer<typeof OTPVerificationSchema>;
 export type TotpVerify = z.infer<typeof TotpVerifySchema>;
 export type SmsVerifyLogin = z.infer<typeof SmsVerifyLoginSchema>;
+export type BackupCodeVerify = z.infer<typeof BackupCodeVerifySchema>;
+export type BackupCodeRecover = z.infer<typeof BackupCodeRecoverSchema>;
 
 // III. Wallet Schemas
 export const SIWEAuthSchema = z.object({

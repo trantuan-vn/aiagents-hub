@@ -8,6 +8,8 @@ import {
   OTPVerificationSchema, 
   TotpVerifySchema,
   SmsVerifyLoginSchema,
+  BackupCodeVerifySchema,
+  BackupCodeRecoverSchema,
   OAuthCallbackSchema, 
   SIWEAuthSchema 
 } from './domain';
@@ -169,6 +171,26 @@ export function createAuthRoutes(bindingName: string) {
     cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "SMS verification failed"));
+
+  app.post('/backup-code/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    const { code } = await parseBody(c, BackupCodeVerifySchema);
+    const applicationService = createApplicationService(c, bindingName);
+    const { token, refreshToken } = await applicationService.verifyBackupCodeLoginUseCase(
+      sessionId, code, ipAddress, userAgent
+    );
+    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    return c.json({ ok: true });
+  }, "Backup code verification failed"));
+
+  app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
+    const applicationService = createApplicationService(c, bindingName);
+    const { token, refreshToken } = await applicationService.recoverWithBackupCodeUseCase(
+      identifier, code, sessionId, ipAddress, userAgent
+    );
+    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    return c.json({ ok: true });
+  }, "Backup code recovery failed"));
 
   // IIb. Passkey Auth (login) – public, no auth required
   const getPasskeyAuthApp = (ctx: any) =>

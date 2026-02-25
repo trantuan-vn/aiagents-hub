@@ -109,76 +109,13 @@ function OtpDialog({
   );
 }
 
-function SmsDialog({
-  open,
-  onOpenChange,
-  smsCode,
-  onSmsCodeChange,
-  onVerify,
-  isLoading,
-  t,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  smsCode: string;
-  onSmsCodeChange: (value: string) => void;
-  onVerify: () => void;
-  isLoading: boolean;
-  t: (key: string) => string;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md" aria-describedby="sms-dialog-description">
-        <DialogHeader>
-          <DialogTitle>{t("sms_dialog_title")}</DialogTitle>
-          <div id="sms-dialog-description" className="text-muted-foreground text-sm">
-            {t("sms_dialog_description")}
-          </div>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <FormLabel htmlFor="sms-input">{t("sms_label")}</FormLabel>
-            <Input
-              id="sms-input"
-              type="text"
-              placeholder={t("otp_placeholder")}
-              value={smsCode}
-              onChange={(e) => onSmsCodeChange(e.target.value)}
-              maxLength={6}
-              inputMode="numeric"
-              pattern="[0-9]*"
-              className="text-center font-mono text-lg tracking-widest"
-              aria-required="true"
-            />
-          </div>
-          <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => {
-                onSmsCodeChange("");
-                onOpenChange(false);
-              }}
-            >
-              {t("cancel")}
-            </Button>
-            <Button type="button" className="flex-1" onClick={onVerify} disabled={isLoading || smsCode.length !== 6}>
-              {isLoading ? t("verifying") : t("verify_sms")}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function TotpDialog({
   open,
   onOpenChange,
   totpCode,
   onTotpChange,
   onVerify,
+  onUseBackupCode,
   isLoading,
   t,
 }: {
@@ -187,6 +124,7 @@ function TotpDialog({
   totpCode: string;
   onTotpChange: (value: string) => void;
   onVerify: () => void;
+  onUseBackupCode: () => void;
   isLoading: boolean;
   t: (key: string) => string;
 }) {
@@ -231,6 +169,149 @@ function TotpDialog({
               {isLoading ? t("verifying") : t("verify_totp")}
             </Button>
           </div>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-sm underline"
+            onClick={onUseBackupCode}
+          >
+            {t("use_backup_code")}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function BackupCodeDialog({
+  open,
+  onOpenChange,
+  backupCode,
+  onBackupCodeChange,
+  onVerify,
+  isLoading,
+  t,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  backupCode: string;
+  onBackupCodeChange: (value: string) => void;
+  onVerify: () => void;
+  isLoading: boolean;
+  t: (key: string) => string;
+}) {
+  const isValidFormat = /^[0-9A-Fa-f\s-]*$/.test(backupCode) && backupCode.replace(/\s|-/g, "").length === 16;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" aria-describedby="backup-code-dialog-description">
+        <DialogHeader>
+          <DialogTitle>{t("backup_code_dialog_title")}</DialogTitle>
+          <div id="backup-code-dialog-description" className="text-muted-foreground text-sm">
+            {t("backup_code_dialog_description")}
+          </div>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FormLabel htmlFor="backup-code-input">{t("backup_code_label")}</FormLabel>
+            <Input
+              id="backup-code-input"
+              type="text"
+              placeholder={t("backup_code_placeholder")}
+              value={backupCode}
+              onChange={(e) => onBackupCodeChange(e.target.value)}
+              maxLength={17}
+              className="text-center font-mono tracking-widest uppercase"
+              aria-required="true"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                onBackupCodeChange("");
+                onOpenChange(false);
+              }}
+            >
+              {t("cancel")}
+            </Button>
+            <Button type="button" className="flex-1" onClick={onVerify} disabled={isLoading || !isValidFormat}>
+              {isLoading ? t("verifying") : t("verify_backup_code")}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function SmsDialogWithBackup({
+  open,
+  onOpenChange,
+  smsCode,
+  onSmsCodeChange,
+  onVerify,
+  onUseBackupCode,
+  isLoading,
+  t,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  smsCode: string;
+  onSmsCodeChange: (value: string) => void;
+  onVerify: () => void;
+  onUseBackupCode: () => void;
+  isLoading: boolean;
+  t: (key: string) => string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md" aria-describedby="sms-dialog-description">
+        <DialogHeader>
+          <DialogTitle>{t("sms_dialog_title")}</DialogTitle>
+          <div id="sms-dialog-description" className="text-muted-foreground text-sm">
+            {t("sms_dialog_description")}
+          </div>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <FormLabel htmlFor="sms-input">{t("sms_label")}</FormLabel>
+            <Input
+              id="sms-input"
+              type="text"
+              placeholder={t("otp_placeholder")}
+              value={smsCode}
+              onChange={(e) => onSmsCodeChange(e.target.value)}
+              maxLength={6}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className="text-center font-mono text-lg tracking-widest"
+              aria-required="true"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => {
+                onSmsCodeChange("");
+                onOpenChange(false);
+              }}
+            >
+              {t("cancel")}
+            </Button>
+            <Button type="button" className="flex-1" onClick={onVerify} disabled={isLoading || smsCode.length !== 6}>
+              {isLoading ? t("verifying") : t("verify_sms")}
+            </Button>
+          </div>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-sm underline"
+            onClick={onUseBackupCode}
+          >
+            {t("use_backup_code")}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
@@ -244,10 +325,14 @@ export function LoginForm() {
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [showTotpPopup, setShowTotpPopup] = useState(false);
   const [showSmsPopup, setShowSmsPopup] = useState(false);
+  const [showBackupCodePopup, setShowBackupCodePopup] = useState(false);
+  const [showRecoverSection, setShowRecoverSection] = useState(false);
+  const [recoverBackupCode, setRecoverBackupCode] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [otp, setOtp] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [smsCode, setSmsCode] = useState("");
+  const [backupCode, setBackupCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyStatus, setPasskeyStatus] = useState<{ enabled: boolean } | null>(null);
   const [usePasskeyMode, setUsePasskeyMode] = useState(false);
@@ -469,6 +554,80 @@ export function LoginForm() {
     }
   }, [totpCode, form, router, t]);
 
+  const handleBackupCodeVerify = useCallback(async () => {
+    const normalized = backupCode.replace(/\s/g, "").replace(/-/g, "").toUpperCase();
+    if (!/^[0-9A-F]{16}$/.test(normalized)) {
+      toast.error(t("backup_code_verify_error"));
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${AUTH_API_URL}/backup-code/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: normalized }),
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const err = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(err.error ?? t("backup_code_verify_error"));
+      }
+      setShowBackupCodePopup(false);
+      setShowTotpPopup(false);
+      setShowSmsPopup(false);
+      setBackupCode("");
+      form.reset();
+      router.push("/dashboard");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
+    } finally {
+      if (isMounted.current) setIsLoading(false);
+    }
+  }, [backupCode, form, router, t]);
+
+  const handleUseBackupCode = useCallback(() => {
+    setShowTotpPopup(false);
+    setShowSmsPopup(false);
+    setShowBackupCodePopup(true);
+  }, []);
+
+  const handleRecoverWithBackupCode = useCallback(
+    async (emailValue: string) => {
+      const email = emailValue?.trim() ?? form.getValues("email")?.trim();
+      if (!email) {
+        toast.error(t("email_required"));
+        return;
+      }
+      const normalized = recoverBackupCode.replace(/\s/g, "").replace(/-/g, "").toUpperCase();
+      if (!/^[0-9A-F]{16}$/.test(normalized)) {
+        toast.error(t("backup_code_verify_error"));
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const response = await fetch(`${AUTH_API_URL}/backup-code/recover`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier: email, code: normalized }),
+          credentials: "include",
+        });
+        if (!response.ok) {
+          const err = (await response.json().catch(() => ({}))) as { error?: string };
+          throw new Error(err.error ?? t("backup_code_verify_error"));
+        }
+        setShowRecoverSection(false);
+        setRecoverBackupCode("");
+        form.reset();
+        router.push("/dashboard");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
+      } finally {
+        if (isMounted.current) setIsLoading(false);
+      }
+    },
+    [recoverBackupCode, form, router, t],
+  );
+
   const onSubmit = useCallback(
     async (data: z.infer<typeof FormSchema>) => {
       if (!isMounted.current) return;
@@ -525,6 +684,13 @@ export function LoginForm() {
     }, 300),
     [],
   );
+
+  const handleBackupCodeChange = useCallback((value: string) => {
+    if (isMounted.current) {
+      const cleaned = value.replace(/[^0-9A-Fa-f-]/g, "").slice(0, 17);
+      setBackupCode(cleaned);
+    }
+  }, []);
 
   const email = form.watch("email");
   useEffect(() => {
@@ -588,6 +754,69 @@ export function LoginForm() {
         <Button type="submit" variant="outline" className="w-full" disabled={isLoading || !form.formState.isValid}>
           {isLoading && !usePasskeyMode ? t("sending_otp") : t("login_with_otp")}
         </Button>
+
+        {!showRecoverSection ? (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-sm underline"
+            onClick={() => setShowRecoverSection(true)}
+          >
+            {t("recover_with_backup_code")}
+          </button>
+        ) : (
+          <div className="space-y-3 rounded-lg border p-4">
+            <p className="text-muted-foreground text-sm">{t("recover_with_backup_code_desc")}</p>
+            <div className="space-y-2">
+              <FormLabel htmlFor="recover-email">{t("email_label")}</FormLabel>
+              <Input
+                id="recover-email"
+                type="email"
+                placeholder={t("email_placeholder")}
+                value={form.watch("email")}
+                onChange={(e) => form.setValue("email", e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <FormLabel htmlFor="recover-backup-code">{t("backup_code_label")}</FormLabel>
+              <Input
+                id="recover-backup-code"
+                type="text"
+                placeholder={t("backup_code_placeholder")}
+                value={recoverBackupCode}
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^0-9A-Fa-f-]/g, "").slice(0, 17);
+                  setRecoverBackupCode(cleaned);
+                }}
+                className="font-mono tracking-widest uppercase"
+                disabled={isLoading}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowRecoverSection(false);
+                  setRecoverBackupCode("");
+                }}
+              >
+                {t("cancel")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={
+                  isLoading || !form.watch("email")?.trim() || recoverBackupCode.replace(/\s|-/g, "").length !== 16
+                }
+                onClick={() => handleRecoverWithBackupCode(form.getValues("email"))}
+              >
+                {isLoading ? t("verifying") : t("verify_backup_code")}
+              </Button>
+            </div>
+          </div>
+        )}
       </form>
 
       <OtpDialog
@@ -613,11 +842,12 @@ export function LoginForm() {
         totpCode={totpCode}
         onTotpChange={handleTotpChange}
         onVerify={handleTotpVerify}
+        onUseBackupCode={handleUseBackupCode}
         isLoading={isLoading}
         t={t}
       />
 
-      <SmsDialog
+      <SmsDialogWithBackup
         open={showSmsPopup}
         onOpenChange={(open) => {
           if (!open) setSmsCode("");
@@ -626,6 +856,20 @@ export function LoginForm() {
         smsCode={smsCode}
         onSmsCodeChange={handleSmsCodeChange}
         onVerify={handleSmsVerify}
+        onUseBackupCode={handleUseBackupCode}
+        isLoading={isLoading}
+        t={t}
+      />
+
+      <BackupCodeDialog
+        open={showBackupCodePopup}
+        onOpenChange={(open) => {
+          if (!open) setBackupCode("");
+          setShowBackupCodePopup(open);
+        }}
+        backupCode={backupCode}
+        onBackupCodeChange={handleBackupCodeChange}
+        onVerify={handleBackupCodeVerify}
         isLoading={isLoading}
         t={t}
       />

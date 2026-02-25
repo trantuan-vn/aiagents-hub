@@ -84,7 +84,16 @@
     "otp_invalid": "Please enter a valid 6-digit OTP",
     "otp_verify_error": "Invalid OTP. Please try again.",
     "otp_send_error": "Failed to send OTP. Please try again.",
-    "unexpected_error": "An unexpected error occurred"
+    "unexpected_error": "An unexpected error occurred",
+    "use_backup_code": "Use backup code instead",
+    "backup_code_dialog_title": "Recover with backup code",
+    "backup_code_dialog_description": "Enter one of your backup codes to sign in. Each code can only be used once.",
+    "backup_code_label": "Backup code",
+    "backup_code_placeholder": "XXXXXXXX-XXXXXXXX",
+    "verify_backup_code": "Verify",
+    "backup_code_verify_error": "Invalid backup code. Please try again.",
+    "recover_with_backup_code": "Recover account with backup code",
+    "recover_with_backup_code_desc": "If you've lost access to your 2FA device, enter your email and a backup code to sign in."
   },
   "AccountSwitcher": {
     "account": "Account",

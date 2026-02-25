@@ -84,7 +84,16 @@
     "otp_invalid": "Vui lòng nhập mã OTP 6 chữ số hợp lệ",
     "otp_verify_error": "Mã OTP không hợp lệ. Vui lòng thử lại.",
     "otp_send_error": "Gửi OTP thất bại. Vui lòng thử lại.",
-    "unexpected_error": "Đã xảy ra lỗi không mong muốn"
+    "unexpected_error": "Đã xảy ra lỗi không mong muốn",
+    "use_backup_code": "Dùng mã dự phòng thay thế",
+    "backup_code_dialog_title": "Khôi phục bằng mã dự phòng",
+    "backup_code_dialog_description": "Nhập một trong các mã dự phòng để đăng nhập. Mỗi mã chỉ dùng được một lần.",
+    "backup_code_label": "Mã dự phòng",
+    "backup_code_placeholder": "XXXXXXXX-XXXXXXXX",
+    "verify_backup_code": "Xác minh",
+    "backup_code_verify_error": "Mã dự phòng không hợp lệ. Vui lòng thử lại.",
+    "recover_with_backup_code": "Lấy lại tài khoản bằng mã dự phòng",
+    "recover_with_backup_code_desc": "Nếu bạn mất quyền truy cập thiết bị 2FA, nhập email và mã dự phòng để đăng nhập."
   },
   "AccountSwitcher": {
     "account": "Tài khoản",

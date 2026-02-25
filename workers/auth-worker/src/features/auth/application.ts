@@ -16,7 +16,8 @@ import {
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
 import { createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
-import { createAuthenticatorRepository, createSmsRepository } from '../account/infrastructure';
+import { createAuthenticatorRepository, createSmsRepository, createBackupCodeRepository } from '../account/infrastructure';
+import { normalizeBackupCodeInput } from '../account/backup-codes';
 import { verifyTotpCode } from '../account/totp';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
@@ -32,6 +33,8 @@ interface IApplicationService {
   verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
+  recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }>;
   
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
@@ -271,6 +274,45 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+    },
+
+    async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+      let identifier = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
+      if (!identifier) {
+        const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
+        if (!raw) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+        const parsed = JSON.parse(raw) as { identifier: string };
+        identifier = parsed.identifier;
+      }
+
+      const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+      const backupRepo = createBackupCodeRepository(userDO);
+      const normalized = normalizeBackupCodeInput(code);
+      const consumed = await backupRepo.consumeCode(normalized);
+      if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
+      await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
+      await c.env.NONCE_KV.delete(`PendingSmsLogin:${sessionId}`);
+
+      const repository = getRepository(identifier);
+      const user = await repository.users.get();
+      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+    },
+
+    async recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
+      const nIdentifier = validationUtils.normalizeIdentifier(identifier);
+      const repository = getRepository(nIdentifier);
+      const user = await repository.users.get();
+      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+
+      const userDO = getIdFromName(c, nIdentifier, bindingName) as DurableObjectStub<UserDO>;
+      const backupRepo = createBackupCodeRepository(userDO);
+      const normalized = normalizeBackupCodeInput(code);
+      const consumed = await backupRepo.consumeCode(normalized);
+      if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+
       return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
     },
 
