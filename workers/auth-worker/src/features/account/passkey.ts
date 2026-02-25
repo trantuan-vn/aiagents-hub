@@ -87,7 +87,8 @@ export function createAccountPasskeyApplication(
         authenticatorSelection: {
           residentKey: 'preferred',
           userVerification: 'preferred',
-          authenticatorAttachment: 'platform',
+          // Omit authenticatorAttachment to allow both platform (fingerprint/Face ID)
+          // and cross-platform (USB security key) – shows "Use another device" option
         },
       });
 
