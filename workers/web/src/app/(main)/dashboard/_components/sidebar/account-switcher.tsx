@@ -19,10 +19,14 @@ import {
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { User } from "@/data/users";
+import { useNotificationsWs } from "@/stores/notifications/use-notifications-ws";
 
 export function AccountSwitcher({ user }: { readonly user: User | null }) {
   const t = useTranslations("AccountSwitcher");
   const { disconnect } = useDisconnect();
+
+  // Kết nối WebSocket ngay khi đăng nhập, không chờ mở dropdown profile
+  useNotificationsWs(user ?? null);
   const { isConnected } = useAccount();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
