@@ -1,4 +1,4 @@
-drop table api_tokens;
+drop table api_tokens; 
 drop table connections;
 drop table order_discounts;
 drop table order_items;
@@ -18,11 +18,7 @@ drop table backup_codes;
 drop table passkey_credentials;
 drop table user_ekyc;
 drop table user_mfa;
-drop table user_backup_codes;
 drop table user_did;
-drop table user_passkeys;
-drop table user_sms_2fa;
-drop table user_totp;
 
 
 drop table user_shards;

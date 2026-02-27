@@ -1,5 +1,6 @@
 {
 	"compilerOptions": {
+		"baseUrl": ".",
 		/* Visit https://aka.ms/tsconfig.json to read more about this file */
 
     /* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
@@ -40,7 +41,9 @@
 			"./worker-configuration.d.ts"
 		],
 		"paths": {
-			"@auth-worker/*": ["../auth-worker/src/*"]
+			"@auth-worker/*": ["../auth-worker/src/*"],
+			"zod": ["../auth-worker/node_modules/zod"],
+			"zod/*": ["../auth-worker/node_modules/zod/*"]
 		}
 	}
 }

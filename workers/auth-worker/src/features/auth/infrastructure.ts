@@ -101,12 +101,17 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
   },
 
   async deactivateAllUserSessions(identifier: string): Promise<void> {
-    await executeUtils.executeTransaction(userDO, [
-      {
-        sql: 'UPDATE sessions SET isActive = 0 WHERE user_id IN (SELECT user_id FROM users WHERE identifier = ?)',
-        params: [identifier]
-      }
-    ]);
+    const sessions = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [{ field: 'isActive', operator: '=', value: 1 }],
+      limit: 500
+    }, 'sessions');
+    const list = Array.isArray(sessions) ? sessions : [];
+    for (const session of list) {
+      await executeUtils.executeDynamicAction(userDO, 'update', {
+        id: session.id,
+        isActive: false
+      }, 'sessions');
+    }
   },
 });
 

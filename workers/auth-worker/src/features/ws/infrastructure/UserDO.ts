@@ -40,9 +40,20 @@ export class UserDO extends DurableObject {
   private sessions = new WeakMap<WebSocket, string>();
   private tableStates = new Map<string, TableState>();
   
+  /** Bảng cần xoá record khi cleanup để tiết kiệm không gian lưu trữ */
   private readonly QUEUE_TABLE_NAMES = [
     "service_usages", "orders", "order_items", "order_discounts", 
     "payments", "refunds"
+  ];
+
+  /** Bảng danh mục: xử lý giống queue nhưng KHÔNG xoá khi cleanup (giữ lại record) */
+  private readonly SYNC_TABLE_NAMES = [
+    ...this.QUEUE_TABLE_NAMES,
+    "price_policies", "services", "vouchers", "versions",
+    "users", "sessions", "connections", "subscriptions",
+    "api_tokens", "pending_messages",
+    "user_mfa", "user_ekyc", "user_did",
+    "passkey_credentials", "backup_codes"
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -56,6 +67,13 @@ export class UserDO extends DurableObject {
     queueTable: () => ({
       userScoped: true,
       autoFields: { id: true, timestamps: true, user: true, queue: true }
+    }),
+    /** Bảng danh mục: queue flow + unique index, nhưng không xoá khi cleanup */
+    queueTableWithUniqueIndex: (conflictField: string) => ({
+      userScoped: true,
+      uniqueIndexes: [conflictField],
+      conflictField,
+      autoFields: { id: true, timestamps: true, user: true, queue: true }
     })
   };
 
@@ -68,21 +86,30 @@ export class UserDO extends DurableObject {
     this.initializeTables();
   }
 
+  private readonly QUEUE_SCHEMA_EXTENSION = {
+    queueId: z.number().int().optional(),
+    queueStatus: z.enum(['pending', 'flushed', 'processed']).optional(),
+    flushedAt: z.number().optional(),
+    processedAt: z.number().optional()
+  };
+
   // ========== INITIALIZATION ==========
   private async initializeTables(): Promise<void> {
     await this.state.blockConcurrencyWhile(async () => {
-      // Core tables
-      this.table('price_policies', PricePolicySchema, this.TABLE_CONFIGS.withUniqueIndex('code'));
-      this.table('services', ServiceSchema, this.TABLE_CONFIGS.withUniqueIndex('endpoint'));
-      this.table('vouchers', VoucherSchema, this.TABLE_CONFIGS.withUniqueIndex('code'));
+      const extendWithQueue = <T extends z.ZodObject<any>>(schema: T) =>
+        schema.extend(this.QUEUE_SCHEMA_EXTENSION);
+
+      // Bảng danh mục (catalog): queue flow nhưng KHÔNG xoá khi cleanup
+      this.table('price_policies', extendWithQueue(PricePolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+      this.table('services', extendWithQueue(ServiceSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
+      this.table('vouchers', extendWithQueue(VoucherSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       
-      // User tables
-      this.table('users', UserSchema, this.TABLE_CONFIGS.withUniqueIndex('identifier'));
-      this.table('sessions', SessionSchema, this.TABLE_CONFIGS.withUniqueIndex('hashSessionId'));
-      this.table('connections', ConnectionSchema, this.TABLE_CONFIGS.withUniqueIndex('sessionId'));
-      this.table('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.withUniqueIndex('channel'));
+      this.table('users', extendWithQueue(UserSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
+      this.table('sessions', extendWithQueue(SessionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
+      this.table('connections', extendWithQueue(ConnectionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('sessionId'));
+      this.table('subscriptions', extendWithQueue(SubscriptionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
       
-      // Queue tables với extended schema
+      // Queue tables (xoá khi cleanup để tiết kiệm storage)
       const queueSchemas = [
         { name: 'orders', schema: OrderSchema },
         { name: 'service_usages', schema: ServiceUsageSchema },
@@ -93,24 +120,18 @@ export class UserDO extends DurableObject {
       ];
       
       queueSchemas.forEach(({ name, schema }) => {
-        const extendedSchema = schema.extend({
-          queueId: z.number().int().optional(),
-          queueStatus: z.enum(['pending', 'flushed', 'processed']).optional(),
-          flushedAt: z.number().optional(),
-          processedAt: z.number().optional()
-        });
-        this.table(name, extendedSchema, this.TABLE_CONFIGS.queueTable());
+        this.table(name, extendWithQueue(schema), this.TABLE_CONFIGS.queueTable());
       });
       
-      // Other tables
-      this.table('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.userScoped);
-      this.table('versions', VersionInfoSchema, this.TABLE_CONFIGS.userScoped);
-      this.table('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.userScoped);
-      this.table('user_mfa', UserMfaSchema, this.TABLE_CONFIGS.userScoped);
-      this.table('passkey_credentials', PasskeyCredentialSchema, this.TABLE_CONFIGS.withUniqueIndex('credentialId'));
-      this.table('backup_codes', BackupCodeSchema, this.TABLE_CONFIGS.withUniqueIndex('codeHash'));
-      this.table('user_ekyc', UserEkycSchema, this.TABLE_CONFIGS.userScoped);
-      this.table('user_did', UserDidSchema, this.TABLE_CONFIGS.userScoped);
+      // Bảng danh mục (userScoped, không unique index)
+      this.table('api_tokens', extendWithQueue(ApiTokenSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('versions', extendWithQueue(VersionInfoSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('pending_messages', extendWithQueue(PendingMessageSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('user_mfa', extendWithQueue(UserMfaSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('user_ekyc', extendWithQueue(UserEkycSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('user_did', extendWithQueue(UserDidSchema), this.TABLE_CONFIGS.queueTable());
+      this.table('passkey_credentials', extendWithQueue(PasskeyCredentialSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
+      this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();
@@ -127,7 +148,7 @@ export class UserDO extends DurableObject {
 
   // ========== TABLE STATE MANAGEMENT ==========
   private async loadTableStates(): Promise<void> {
-    for (const tableName of this.QUEUE_TABLE_NAMES) {
+    for (const tableName of this.SYNC_TABLE_NAMES) {
       const storedState = await this.storage.get<TableState>(`table_state_${tableName}`);
       
       if (storedState) {
@@ -167,10 +188,14 @@ export class UserDO extends DurableObject {
 
 
   private async getPendingCount(tableName: string): Promise<number> {
-    const countResult = await this.database.execSelectSQL(
-      `SELECT COUNT(*) as count FROM ${tableName} WHERE queueStatus = 'pending'`
-    );
-    return countResult[0]?.count || 0;
+    try {
+      const countResult = await this.database.execSelectSQL(
+        `SELECT COUNT(*) as count FROM ${tableName} WHERE queueStatus = 'pending'`
+      );
+      return countResult[0]?.count || 0;
+    } catch {
+      return 0;
+    }
   }
 
   /** True if any queue table has pending records (in-memory state). Used to decide whether to keep alarm. */
@@ -241,7 +266,7 @@ export class UserDO extends DurableObject {
   private async handleDynamicInsert(request: Request): Promise<Response> {
     const { table, data } = await request.json() as { table: string; data: any };
     
-    if (this.isQueueTable(table)) {
+    if (this.isSyncTable(table)) {
       return await this.handleQueueInsert(table, data);
     }
     
@@ -250,8 +275,8 @@ export class UserDO extends DurableObject {
   }
 
   private async handleQueueInsert(tableName: string, data: any): Promise<Response> {
-    
-    const result = await this.database.dynamicInsert(tableName, data);
+    const dataWithQueue = this.ensureCatalogQueueStatus(tableName, data);
+    const result = await this.database.dynamicInsert(tableName, dataWithQueue);
     
     await this.updateTablePendingCount(tableName);
     
@@ -270,9 +295,9 @@ export class UserDO extends DurableObject {
   private async handleDynamicUpdate(request: Request): Promise<Response> {
     const { table, id, data } = await request.json() as { table: string; id: number; data: any };
     
-    if (this.isQueueTable(table)) {
-      
-      const result = await this.database.dynamicUpdate(table, id, data);
+    if (this.isSyncTable(table)) {
+      const dataWithQueue = this.ensureCatalogQueueStatus(table, data);
+      const result = await this.database.dynamicUpdate(table, id, dataWithQueue);
       
       await this.updateTablePendingCount(table);
       
@@ -298,9 +323,9 @@ export class UserDO extends DurableObject {
       conflictField?: string 
     };
     
-    if (this.isQueueTable(table)) {
-      
-      const result = await this.database.dynamicUpsert(table, data, conflictField);
+    if (this.isSyncTable(table)) {
+      const dataWithQueue = this.ensureCatalogQueueStatus(table, data);
+      const result = await this.database.dynamicUpsert(table, dataWithQueue, conflictField);
       
       await this.updateTablePendingCount(table);
       
@@ -337,7 +362,7 @@ export class UserDO extends DurableObject {
       throw new Error('Either id or where condition is required');
     }
     
-    if (this.isQueueTable(table)) {
+    if (this.isSyncTable(table)) {
       await this.updateTablePendingCount(table);
     }
     
@@ -359,10 +384,10 @@ export class UserDO extends DurableObject {
   private async handleDynamicBatchInsert(request: Request): Promise<Response> {
     const { table, data } = await request.json() as { table: string; data: any[] };
     
-    if (this.isQueueTable(table)) {
+    if (this.isSyncTable(table)) {
       const results = await Promise.all(
         data.map(record => 
-          this.database.dynamicInsert(table, record)
+          this.database.dynamicInsert(table, this.ensureCatalogQueueStatus(table, record))
         )
       );
       
@@ -395,12 +420,17 @@ export class UserDO extends DurableObject {
       }>;
     };
     
-    
-    const result = await this.database.dynamicMultiTableTransaction(operations);
+    const processedOps = operations.map(op => {
+      if (op.data && (op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert')) {
+        return { ...op, data: this.ensureCatalogQueueStatus(op.table, op.data) };
+      }
+      return op;
+    });
+    const result = await this.database.dynamicMultiTableTransaction(processedOps);
     
     const updatedTables = new Set(
       operations
-        .filter(op => this.isQueueTable(op.table))
+        .filter(op => this.isSyncTable(op.table))
         .map(op => op.table)
     );
     
@@ -422,21 +452,22 @@ export class UserDO extends DurableObject {
       operation?: "insert" | "update" | "upsert" | "delete";
     };
     
-    if (!this.isQueueTable(table)) {
+    if (!this.isSyncTable(table)) {
       return this.jsonResponse({ error: `Table ${table} not found` }, 400);
     }
 
     let result: any;
     
+    const dataWithQueue = this.ensureCatalogQueueStatus(table, data);
     switch (operation) {
       case "insert":
-        result = await this.database.dynamicInsert(table, data);
+        result = await this.database.dynamicInsert(table, dataWithQueue);
         break;
       case "update":
-        result = await this.database.dynamicUpdate(table, data.id, data);
+        result = await this.database.dynamicUpdate(table, data.id, dataWithQueue);
         break;
       case "upsert":
-        result = await this.database.dynamicUpsert(table, data);
+        result = await this.database.dynamicUpsert(table, dataWithQueue);
         break;
       case "delete":
         await this.database.dynamicDelete(table, data.id);
@@ -464,8 +495,8 @@ export class UserDO extends DurableObject {
     };
     
     if (table) {
-      if (!this.isQueueTable(table)) {
-        return this.jsonResponse({ error: `Table ${table} is not a queue table` }, 400);
+      if (!this.isSyncTable(table)) {
+        return this.jsonResponse({ error: `Table ${table} is not a sync table` }, 400);
       }
       
       await this.flushPendingRecords(table, force);
@@ -478,7 +509,7 @@ export class UserDO extends DurableObject {
     }
     
     const results = [];
-    for (const tableName of this.QUEUE_TABLE_NAMES) {
+    for (const tableName of this.SYNC_TABLE_NAMES) {
       if (force || this.shouldFlushTable(tableName)) {
         await this.flushPendingRecords(tableName, force);
         results.push({
@@ -504,10 +535,10 @@ export class UserDO extends DurableObject {
         upToId: number;
       };
       
-      if (!this.isQueueTable(table)) {
+      if (!this.isSyncTable(table)) {
         return this.jsonResponse({ 
           success: false, 
-          error: `Table ${table} is not a queue table` 
+          error: `Table ${table} is not a sync table` 
         }, 400);
       }
       
@@ -541,10 +572,10 @@ export class UserDO extends DurableObject {
         }, 400);
       }
       
-      if (!this.isQueueTable(tableName)) {
+      if (!this.isSyncTable(tableName)) {
         return this.jsonResponse({ 
           success: false, 
-          error: `Table ${tableName} is not a queue table` 
+          error: `Table ${tableName} is not a sync table` 
         }, 400);
       }
       
@@ -597,6 +628,7 @@ export class UserDO extends DurableObject {
         return;
       }
 
+      const minId = pendingRecords[0].queueId;
       const maxId = Math.max(...pendingRecords.map(r => r.queueId));
 
       await this.env.INPUT_QUEUE.send(
@@ -610,7 +642,7 @@ export class UserDO extends DurableObject {
               userId: this.userId,
               table: tableName,
               batchSize: pendingRecords.length,
-              minId: pendingRecords[0].queueId,
+              minId,
               maxId,
               previousFlushedId: state.lastFlushedId,
               timestamp: Date.now()
@@ -619,7 +651,7 @@ export class UserDO extends DurableObject {
         }))
       );
 
-      await this.markRecordsAsFlushed(tableName, state.lastFlushedId, maxId);
+      await this.markRecordsAsFlushed(tableName, minId, maxId);
       await this.updateTableState(tableName, { 
         lastFlushedId: maxId, 
         lastFlushTime: Date.now(),
@@ -630,37 +662,34 @@ export class UserDO extends DurableObject {
 
     } catch (error) {
       console.error(`[UserDO ${this.userId}] Failed to flush records from ${tableName}:`, error);
-      
-      this.state.waitUntil(
-        (async () => {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          await this.flushPendingRecords(tableName, force);
-        })()
-      );
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (!errMsg.includes('no such column') && !errMsg.includes('SQLITE_ERROR')) {
+        this.state.waitUntil(
+          (async () => {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await this.flushPendingRecords(tableName, force);
+          })()
+        );
+      }
     }
   }
 
-  private async markRecordsAsFlushed(tableName: string, fromId: number, toId: number): Promise<number> {
-    console.log(`UPDATE ${tableName} 
-            SET queueStatus = 'flushed', flushedAt = ${Date.now()} 
-            WHERE queueStatus = 'pending' 
-            AND queueId > ${fromId}  
-            AND queueId <= ${toId}`);
+  private async markRecordsAsFlushed(tableName: string, minId: number, maxId: number): Promise<number> {
     await this.database.execTransaction([{
       sql: `UPDATE ${tableName} 
             SET queueStatus = 'flushed', flushedAt = ? 
             WHERE queueStatus = 'pending' 
-            AND queueId > ? 
+            AND queueId >= ? 
             AND queueId <= ?`,
-      params: [Date.now(), fromId, toId]
+      params: [Date.now(), minId, maxId]
     }]);
     
     const countResult = await this.database.execSelectSQL(
       `SELECT COUNT(*) as count FROM ${tableName} 
        WHERE queueStatus = 'flushed' 
-       AND queueId > ? 
+       AND queueId >= ? 
        AND queueId <= ?`,
-      [fromId, toId]
+      [minId, maxId]
     );
     
     return countResult[0]?.count || 0;
@@ -678,7 +707,9 @@ export class UserDO extends DurableObject {
       throw new Error(`Table state not found for ${tableName}`);
     }
 
-    if (method === 'delete' && state.lastProcessedId < upToId) {
+    // Bảng danh mục: KHÔNG xoá record khi cleanup (giữ lại để tiết kiệm tra cứu)
+    const shouldDelete = this.shouldDeleteOnCleanup(tableName) && method === 'delete' && state.lastProcessedId < upToId;
+    if (shouldDelete) {
       const deletedCount = await this.deleteProcessedRecords(tableName, upToId);
       return { deletedCount, markedCount: 0, table: tableName, timestamp: Date.now(), processedUpTo: upToId };
     } else {
@@ -740,7 +771,7 @@ export class UserDO extends DurableObject {
     const now = Date.now();
     const stats: Record<string, any> = {};
     
-    for (const tableName of this.QUEUE_TABLE_NAMES) {
+    for (const tableName of this.SYNC_TABLE_NAMES) {
       const state = this.tableStates.get(tableName);
       const statusStats = await this.getQueueStatusStats(tableName);
       
@@ -771,15 +802,19 @@ export class UserDO extends DurableObject {
   }
 
   private async getQueueStatusStats(tableName: string): Promise<any[]> {
-    return await this.database.execSelectSQL(`
-      SELECT 
-        queueStatus,
-        COUNT(*) as count,
-        MIN(queueId) as minId,
-        MAX(queueId) as maxId
-      FROM ${tableName}
-      GROUP BY queueStatus
-    `);
+    try {
+      return await this.database.execSelectSQL(`
+        SELECT 
+          queueStatus,
+          COUNT(*) as count,
+          MIN(queueId) as minId,
+          MAX(queueId) as maxId
+        FROM ${tableName}
+        GROUP BY queueStatus
+      `);
+    } catch {
+      return [];
+    }
   }
 
   private calculateTableMetrics(statusStats: any[], now: number, state?: TableState) {
@@ -810,7 +845,7 @@ export class UserDO extends DurableObject {
     let totalProcessed = 0;
     let unhealthyTables = 0;
     
-    for (const tableName of this.QUEUE_TABLE_NAMES) {
+    for (const tableName of this.SYNC_TABLE_NAMES) {
       const state = this.tableStates.get(tableName);
       if (!state) continue;
       
@@ -847,7 +882,7 @@ export class UserDO extends DurableObject {
       success: true,
       status: healthStatus,
       queueEnabled: true,
-      tablesCount: this.QUEUE_TABLE_NAMES.length,
+      tablesCount: this.SYNC_TABLE_NAMES.length,
       pendingTotal: totalPending,
       processedTotal: totalProcessed,
       unhealthyTables,
@@ -879,7 +914,7 @@ export class UserDO extends DurableObject {
   }
 
   private async flushAllPendingRecords(): Promise<void> {
-    const promises = this.QUEUE_TABLE_NAMES
+    const promises = this.SYNC_TABLE_NAMES
       .filter(tableName => this.shouldFlushTable(tableName))
       .map(tableName => {
         console.log(`[UserDO ${this.userId}] Auto-flushing ${tableName}`);
@@ -933,8 +968,23 @@ export class UserDO extends DurableObject {
   }
 
   // ========== HELPER METHODS ==========
-  private isQueueTable(tableName: string): boolean {
+  private isSyncTable(tableName: string): boolean {
+    return this.SYNC_TABLE_NAMES.includes(tableName);
+  }
+
+  /** Chỉ bảng QUEUE_TABLE_NAMES mới xoá record khi cleanup (tiết kiệm storage). Bảng danh mục giữ lại. */
+  private shouldDeleteOnCleanup(tableName: string): boolean {
     return this.QUEUE_TABLE_NAMES.includes(tableName);
+  }
+
+  /** Chỉ bảng danh mục (không thuộc QUEUE_TABLE_NAMES): mặc định queueStatus = 'pending' khi insert nếu chưa có. */
+  private ensureCatalogQueueStatus(tableName: string, data: any): any {
+    if (this.isSyncTable(tableName) && !this.shouldDeleteOnCleanup(tableName)) {
+      if (data.queueStatus === undefined || data.queueStatus === null) {
+        return { ...data, queueStatus: 'pending' as const };
+      }
+    }
+    return data;
   }
 
   private async updateTablePendingCount(tableName: string): Promise<void> {
@@ -980,7 +1030,8 @@ export class UserDO extends DurableObject {
       await this.database.dynamicUpsert("connections", {
         connected: true, 
         lastConnected: Date.now(), 
-        sessionId
+        sessionId,
+        queueStatus: 'pending' as const
       });      
       
       this.sessions.set(server, sessionId);
@@ -1050,8 +1101,8 @@ export class UserDO extends DurableObject {
       const sessionId = this.sessions.get(ws);
       if (sessionId) {
         await this.database.execTransaction([{
-          sql: 'UPDATE connections SET connected = false WHERE sessionId = ?',
-          params: [sessionId]
+          sql: 'UPDATE connections SET connected = false, queueStatus = ? WHERE sessionId = ?',
+          params: ['pending' as const, sessionId]
         }]); 
       }
       this.sessions.delete(ws);      
@@ -1117,7 +1168,8 @@ export class UserDO extends DurableObject {
       attempts: 0,
       maxAttempts: 3,
       scheduledFor: Date.now(),
-      sessionId
+      sessionId,
+      queueStatus: 'pending' as const
     });
   }
 
@@ -1160,14 +1212,15 @@ export class UserDO extends DurableObject {
     await this.database.dynamicUpsert('subscriptions', {
       channel,
       subscribedAt: Date.now(),
-      isActive: true
+      isActive: true,
+      queueStatus: 'pending' as const
     });
   }
 
   private async handleUnsubscribe(channel: string) {
     await this.database.execTransaction([{
-      sql: 'UPDATE subscriptions SET isActive = false WHERE channel = ?',
-      params: [channel]
+      sql: 'UPDATE subscriptions SET isActive = false, queueStatus=? WHERE channel = ?',
+      params: ['pending' as const, channel]
     }]);
   }
 

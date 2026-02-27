@@ -35,9 +35,20 @@ interface CleanupResult {
   error?: string;
 }
 
+/** Bảng cần xoá khi cleanup (tiết kiệm storage) */
 const QUEUE_TABLE_NAMES = [
   "service_usages", "orders", "order_items",
   "order_discounts", "payments", "refunds"
+];
+
+/** Tất cả bảng sync (queue + catalog). Bảng catalog không xoá khi cleanup. */
+const SYNC_TABLE_NAMES = [
+  ...QUEUE_TABLE_NAMES,
+  "price_policies", "services", "vouchers", "versions",
+  "users", "sessions", "connections", "subscriptions",
+  "api_tokens", "pending_messages",
+  "user_mfa", "user_ekyc", "user_did",
+  "passkey_credentials", "backup_codes"
 ];
 
 
@@ -119,7 +130,7 @@ const processChunk = async (
     const dataArray = chunk.map(item => item.recordData);
     
     // Batch insert all records into D1 (preserves id from message)
-    await database.batchInsertRecords(table, dataArray);
+    await database.batchInsertOrUpsertRecords(table, dataArray);
 
     // After successful insert, cleanup records from UserDO
     if (maxId > 0) {
@@ -179,8 +190,8 @@ const parseMessage = (message: Message): {
 				return null;
 			}
 
-			if (!QUEUE_TABLE_NAMES.includes(table)) {
-				console.warn(`[QueueWorker] Table ${table} is not a queue table`);
+			if (!SYNC_TABLE_NAMES.includes(table)) {
+				console.warn(`[QueueWorker] Table ${table} is not a sync table`);
 				return null;
 			}
 			returnArr.push({

@@ -248,7 +248,8 @@ export class DynamicDataBuilder {
   }
 
   /**
-   * Xử lý logic queue: nếu queueStatus = 'pending' thì tạo queueId
+   * Xử lý logic queue: tạo queueId khi queueStatus = 'pending'.
+   * Lưu ý: Chỉ bảng không thuộc QUEUE_TABLE_NAMES mới auto-set queueStatus = 'pending' (xử lý ở UserDO).
    */
   private static async handleQueueLogic(
     data: any,
@@ -257,9 +258,7 @@ export class DynamicDataBuilder {
       tableName?: string;
     }
   ): Promise<void> {
-    // Kiểm tra nếu có trường queueStatus và giá trị là 'pending'
     if (data.queueStatus === 'pending' && context.getNextId && context.tableName) {
-      // Tạo queueId mới
       data.queueId = await context.getNextId(`${context.tableName}_queue`);
     }
   }
@@ -1122,7 +1121,7 @@ export class UserDODatabase {
       }
     }
 
-    // Add columns from schema
+    // Add columns from schema (extendWithQueue trong UserDO đã thêm queueId, queueStatus, flushedAt, processedAt)
     for (const [key, value] of Object.entries(schemaShape)) {
       const columnType = this.getColumnType(value as z.ZodTypeAny);
       columns.push(`"${key}" ${columnType}`);

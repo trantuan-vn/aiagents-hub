@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod'; 
 
 import {
 	PricePolicySchema,
@@ -17,6 +17,11 @@ import {
 	ApiTokenSchema,
 	VersionInfoSchema,
 	PendingMessageSchema,
+	UserMfaSchema,
+	UserEkycSchema,
+	UserDidSchema,
+	PasskeyCredentialSchema,
+	BackupCodeSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -75,23 +80,51 @@ export class DynamicSchemaManager {
     table: string,
     insertData: any,
     updateData: any,
-    conflictField: string
+    conflictFields: string[]
   ): DynamicOperation {
     const insertFields = Object.keys(insertData);
     const insertPlace = insertFields.map(() => '?').join(', ');
+    const excludeSet = new Set(conflictFields);
+    const updateFields = Object.keys(updateData).filter(field => !excludeSet.has(field));
+    const setUpdateClause = updateFields.map(field => `"${field}" = excluded."${field}"`).join(', ');
+    const conflictClause = conflictFields.map(f => `"${f}"`).join(', ');
 
-    const updateFields = Object.keys(updateData).filter(field => field !== conflictField);
-    const setUpdateClause = updateFields.map(field => `"${field}" = ?`).join(', ');
-
-    let values = insertFields.map(field => insertData[field]);
-    values.push(...updateFields.map(field => updateData[field]));
+    const values = insertFields.map(field => insertData[field]);
 
     return {
       sql: `INSERT INTO "${table}" (${insertFields.map(f => `"${f}"`).join(', ')})
             VALUES (${insertPlace})
-            ON CONFLICT("${conflictField}")
+            ON CONFLICT(${conflictClause})
             DO UPDATE SET ${setUpdateClause}`,
       params: values
+    };
+  }
+
+  /** Batch upsert: INSERT multiple rows with ON CONFLICT DO UPDATE (SQLite excluded) */
+  static createBatchUpsertOperation(
+    table: string,
+    dataArray: any[],
+    conflictFields: string[]
+  ): DynamicOperation {
+    if (dataArray.length === 0) {
+      return { sql: '', params: [] };
+    }
+    const allKeys = [...new Set(dataArray.flatMap(d => Object.keys(d)))].filter(f => f !== 'globalId');
+    const insertFields = allKeys;
+    const excludeSet = new Set(conflictFields);
+    const updateFields = insertFields.filter(f => !excludeSet.has(f));
+    const setUpdateClause = updateFields.map(f => `"${f}" = excluded."${f}"`).join(', ');
+    const conflictClause = conflictFields.map(f => `"${f}"`).join(', ');
+    const placeholders = insertFields.map(() => '?').join(', ');
+    const valuesRows = dataArray.map(() => `(${placeholders})`).join(',\n            ');
+    const params = dataArray.flatMap(d => insertFields.map(f => d[f] ?? null));
+
+    return {
+      sql: `INSERT INTO "${table}" (${insertFields.map(f => `"${f}"`).join(', ')})
+            VALUES ${valuesRows}
+            ON CONFLICT(${conflictClause})
+            DO UPDATE SET ${setUpdateClause}`,
+      params
     };
   }
 
@@ -523,7 +556,7 @@ export class DynamicDataBuilder {
 
 export class D1DatabaseManager {
   private tableConfigs = new Map<string, TableConfig>();
-	private readonly TABLE_CONFIGS = {
+  private readonly TABLE_CONFIGS = {
     userScoped: { userScoped: true, autoFields: { id: true, timestamps: true, user: true } },
     withUniqueIndex: (conflictField: string) => ({
       userScoped: true,
@@ -533,6 +566,13 @@ export class D1DatabaseManager {
     }),
     queueTable: () => ({
       userScoped: true,
+      autoFields: { id: true, timestamps: true, user: true, queue: true }
+    }),
+    /** Bảng danh mục: queue flow + unique index, tương thích với auth worker UserDO */
+    queueTableWithUniqueIndex: (conflictField: string) => ({
+      userScoped: true,
+      uniqueIndexes: [conflictField],
+      conflictField,
       autoFields: { id: true, timestamps: true, user: true, queue: true }
     })
   };
@@ -546,35 +586,37 @@ export class D1DatabaseManager {
 
 
   private async initializeTables(): Promise<void> {
-		// Core tables
-		this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.withUniqueIndex('code'));
-		this.registerTable('services', ServiceSchema, this.TABLE_CONFIGS.withUniqueIndex('endpoint'));
-		this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.withUniqueIndex('code'));
+    // Bảng danh mục (catalog): queue flow + unique index - tương thích với auth worker UserDO
+    this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+    this.registerTable('services', ServiceSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
+    this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+    this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
+    this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
+    this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('sessionId'));
+    this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
 
-		// User tables
-		this.registerTable('users', UserSchema, this.TABLE_CONFIGS.withUniqueIndex('identifier'));
-		this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.withUniqueIndex('hashSessionId'));
-		this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.withUniqueIndex('sessionId'));
-		this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.withUniqueIndex('channel'));
+    // Queue tables (xoá khi cleanup): queue flow, không unique index
+    const queueSchemas = [
+      { name: 'orders', schema: OrderSchema },
+      { name: 'service_usages', schema: ServiceUsageSchema },
+      { name: 'order_items', schema: OrderItemSchema },
+      { name: 'order_discounts', schema: OrderItemDiscountSchema },
+      { name: 'payments', schema: PaymentSchema },
+      { name: 'refunds', schema: RefundSchema }
+    ];
+    queueSchemas.forEach(({ name, schema }) => {
+      this.registerTable(name, schema, this.TABLE_CONFIGS.queueTable());
+    });
 
-		// Queue tables với extended schema
-		const queueSchemas = [
-			{ name: 'orders', schema: OrderSchema },
-			{ name: 'service_usages', schema: ServiceUsageSchema },
-			{ name: 'order_items', schema: OrderItemSchema },
-			{ name: 'order_discounts', schema: OrderItemDiscountSchema },
-			{ name: 'payments', schema: PaymentSchema },
-			{ name: 'refunds', schema: RefundSchema }
-		];
-
-		queueSchemas.forEach(({ name, schema }) => {			
-			this.registerTable(name, schema, this.TABLE_CONFIGS.queueTable());
-		});
-
-		// Other tables
-		this.registerTable('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.userScoped);
-		this.registerTable('versions', VersionInfoSchema, this.TABLE_CONFIGS.userScoped);
-		this.registerTable('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.userScoped);
+    // Bảng danh mục: queue flow, không xoá khi cleanup
+    this.registerTable('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('versions', VersionInfoSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('user_mfa', UserMfaSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('user_ekyc', UserEkycSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('user_did', UserDidSchema, this.TABLE_CONFIGS.queueTable());
+    this.registerTable('passkey_credentials', PasskeyCredentialSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
+    this.registerTable('backup_codes', BackupCodeSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
   }
 
   registerTable(name: string, schema: z.ZodSchema, options: TableOptions = {}): void {
@@ -657,26 +699,71 @@ export class D1DatabaseManager {
 
   // Batch insert records from UserDO - preserves original values including id
   async batchInsertRecords(tableName: string, dataArray: any[]): Promise<void> {
+    if (dataArray.length === 0) return;
+
     const statements: D1PreparedStatement[] = [];
-    
-    for (const data of dataArray) {            
-      // Create insert operation
-      const operation = DynamicSchemaManager.createInsertOperation(tableName, data);
+    for (const data of dataArray) {
+      const filtered = this.filterDataForTable(tableName, data);
+      const operation = DynamicSchemaManager.createInsertOperation(tableName, filtered);
       statements.push(this.db.prepare(operation.sql).bind(...operation.params));
     }
-    
-    // Execute batch insert
+
     const batchResults = await this.db.batch(statements);
-    let isError: boolean = false
-    for (const result of batchResults) {
-      if (!result.success){
-        console.error(`Failed to batch insert records into ${result.error}`);
-        isError = true;
+    const failed = batchResults.filter(r => !r.success);
+    if (failed.length > 0) {
+      console.error(`Failed to batch insert into ${tableName}:`, failed);
+      throw new Error(`Failed to batch insert records into ${tableName}`);
+    }
+  }
+
+  /** Batch upsert cho bảng có conflictField - dùng ON CONFLICT DO UPDATE */
+  async batchUpsertRecords(tableName: string, dataArray: any[]): Promise<void> {
+    if (dataArray.length === 0) return;
+
+    const config = this.tableConfigs.get(tableName);
+    const conflictField = config?.options?.conflictField;
+    if (!conflictField) {
+      throw new Error(`Table ${tableName} requires conflictField for batchUpsert`);
+    }
+    const conflictFields = config?.options?.userScoped ? ['user_id', conflictField] : [conflictField];
+
+    const filteredArray = dataArray.map(d => this.filterDataForTable(tableName, d));
+    const operation = DynamicSchemaManager.createBatchUpsertOperation(tableName, filteredArray, conflictFields);
+    if (operation.params.length === 0) return;
+
+    const result = await this.execD1SQL(operation.sql, operation.params);
+    if (!result.success) {
+      throw new Error(`Failed to batch upsert records into ${tableName}`);
+    }
+  }
+
+  /**
+   * Insert hoặc upsert dựa trên table config - tối ưu cho sync từ DO sang D1
+   */
+  async batchInsertOrUpsertRecords(tableName: string, dataArray: any[]): Promise<void> {
+    if (dataArray.length === 0) return;
+
+    const config = this.tableConfigs.get(tableName);
+    if (config?.options?.conflictField) {
+      await this.batchUpsertRecords(tableName, dataArray);
+    } else {
+      await this.batchInsertRecords(tableName, dataArray);
+    }
+  }
+
+  private filterDataForTable(tableName: string, data: any): Record<string, unknown> {
+    const config = this.tableConfigs.get(tableName);
+    if (!config) return { ...data };
+    const extendedSchema = this.createExtendedSchema(config.schema, config.options);
+    const shape = this.extractSchemaShape(extendedSchema);
+    const allowedKeys = new Set(['globalId', ...Object.keys(shape)]);
+    const filtered: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (allowedKeys.has(k) && k !== 'globalId' && v !== undefined) {
+        filtered[k] = v;
       }
     }
-    if (isError){
-      throw new Error(`Failed to batch insert records into ${tableName}`);
-    }    
+    return filtered;
   }
 
   async dynamicUpdate(tableName: string, id: number, data: any, userId?: string): Promise<any> {
@@ -734,11 +821,12 @@ export class D1DatabaseManager {
     });
 
     const updateData = DynamicDataBuilder.transformData(DynamicDataBuilder.preprocessData(data, config.schema), config.schema);
+    const conflictFields = config.options.userScoped ? ['user_id', conflictFieldToUse] : [conflictFieldToUse];
     const operation = DynamicSchemaManager.createUpsertOperation(
       tableName,
       processedData,
       updateData,
-      conflictFieldToUse
+      conflictFields
     );
 
     const result = await this.execD1SQL(operation.sql, operation.params);
@@ -943,6 +1031,7 @@ export class D1DatabaseManager {
           if (!conflictField) {
             throw new Error('Conflict field required for upsert operation');
           }
+          const conflictFields = config.options.userScoped ? ['user_id', conflictField] : [conflictField];
 
           const updateDataForUpsert = DynamicDataBuilder.transformData(
             DynamicDataBuilder.preprocessData(op.data, config.schema),
@@ -953,7 +1042,7 @@ export class D1DatabaseManager {
             op.table,
             upsertData,
             updateDataForUpsert,
-            conflictField
+            conflictFields
           );
 
           statements.push(this.db.prepare(upsertOp.sql).bind(...upsertOp.params));
@@ -1172,9 +1261,13 @@ export class D1DatabaseManager {
       columns.push(`"${key}" ${columnType}`);
     }
 
-    // Add UNIQUE constraints for conflictField
+    // Add UNIQUE constraints: D1 tổng hợp từ nhiều user nên user-scoped cần (user_id, conflictField)
     if (options.conflictField) {
-      columns.push(`UNIQUE("${options.conflictField}")`);
+      if (options.userScoped) {
+        columns.push(`UNIQUE("user_id", "${options.conflictField}")`);
+      } else {
+        columns.push(`UNIQUE("${options.conflictField}")`);
+      }
     }
 
     return columns;
@@ -1364,14 +1457,29 @@ export class D1DatabaseManager {
       }
     }
 
-    // Create unique indexes
-    for (const uniqueIndex of options.uniqueIndexes || []) {
+    // Create unique indexes (bỏ qua conflictField khi userScoped - dùng composite bên dưới)
+    const uniqueIndexesToCreate = (options.uniqueIndexes || []).filter(
+      idx => !(options.userScoped && options.conflictField && idx === options.conflictField)
+    );
+    for (const uniqueIndex of uniqueIndexesToCreate) {
       const uniqueIndexSQL = `CREATE UNIQUE INDEX IF NOT EXISTS "uidx_${tableName}_${uniqueIndex}" ON "${tableName}" ("${uniqueIndex}")`;
       try {
         await this.db.prepare(uniqueIndexSQL).run();
       }
       catch (e) {
         console.error(`Error creating unique index for ${tableName}:`, e);
+        throw e;
+      }
+    }
+
+    // Composite unique index (user_id, conflictField) cho bảng user-scoped - D1 tổng hợp từ nhiều user
+    if (options.userScoped && options.conflictField) {
+      const compositeCols = `"user_id", "${options.conflictField}"`;
+      const compositeUniqueSQL = `CREATE UNIQUE INDEX IF NOT EXISTS "uidx_${tableName}_user_${options.conflictField}" ON "${tableName}" (${compositeCols})`;
+      try {
+        await this.db.prepare(compositeUniqueSQL).run();
+      } catch (e) {
+        console.error(`Error creating composite unique index for ${tableName}:`, e);
         throw e;
       }
     }
