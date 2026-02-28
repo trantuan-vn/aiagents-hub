@@ -300,7 +300,8 @@ export class PipelineManager {
 			console.log(`  Cutoff date (96 days ago): ${cutoffDate.toISOString().split('T')[0]}`);
 
 			// Lấy created_at nhỏ nhất trong bảng, nhưng chỉ tìm các record trước cutoff
-			const query = `SELECT MIN(created_at) as min_created_at FROM ${tableName} WHERE created_at < ?`;
+			// Dùng quoted identifiers để tương thích với queue-worker (columns: "globalId", "created_at", ...)
+			const query = `SELECT MIN("created_at") as min_created_at FROM "${tableName}" WHERE "created_at" < ?`;
 			const result = await this.db.prepare(query).bind(cutoffTimestamp).first();
 
 			if (!result || !(result as any).min_created_at) {
@@ -355,8 +356,8 @@ export class PipelineManager {
 			while (hasMore || processingQueue.length > 0) {
 				// Query batch tiếp theo nếu còn data và chưa đạt giới hạn concurrency
 				while (hasMore && processingQueue.length < concurrencyLimit) {
-					// Query batch từ D1
-					const query = `SELECT * FROM ${config.tableName} WHERE created_at >= ? AND created_at <= ? LIMIT ${batchSize} OFFSET ${offset}`;
+					// Query batch từ D1 - quoted identifiers tương thích queue-worker
+					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? LIMIT ${batchSize} OFFSET ${offset}`;
 					const result = await this.db.prepare(query).bind(startTimestamp, endTimestamp).all();
 
 					if (!result.results || result.results.length === 0) {
@@ -495,9 +496,9 @@ export class PipelineManager {
 	 */
 	private async deleteBatchFromD1(tableName: string, recordIds: number[]): Promise<void> {
 		try {
-			// Xóa batch records
+			// Xóa batch records - quoted identifiers tương thích queue-worker
 			const placeholders = recordIds.map(() => '?').join(',');
-			const query = `DELETE FROM ${tableName} WHERE globalId IN (${placeholders})`;
+			const query = `DELETE FROM "${tableName}" WHERE "globalId" IN (${placeholders})`;
 			const params = [...recordIds];
 			
 			await this.db.prepare(query).bind(...params).run();
