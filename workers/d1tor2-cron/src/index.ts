@@ -53,7 +53,7 @@ export default {
 
 	// The scheduled handler is invoked at the interval set in wrangler.jsonc's triggers configuration
 	// Chạy hàng ngày để đẩy dữ liệu ngày xa nhất từ D1 sang R2, sau đó xóa khỏi D1
-	// Đảm bảo giữ lại 96 ngày gần nhất trong D1
+	// Đảm bảo giữ lại D1_RETENTION_DAYS ngày gần nhất trong D1
 	async scheduled(event, env, ctx): Promise<void> {
 		const now = new Date();
 		console.log(`[${now.toISOString()}] Cron trigger fired: ${event.cron}`);

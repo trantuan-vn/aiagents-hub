@@ -17,8 +17,8 @@
 			"49 15 * * *"  // Chạy hàng ngày lúc 09:20 GMT+7 (02:20 UTC)
 			// Format: phút giờ ngày tháng thứ (sử dụng UTC time)
 			// 09:20 GMT+7 (Hà Nội) = 02:20 UTC
-			// Worker sẽ đẩy dữ liệu ngày xa nhất (trước cutoff = 96 ngày trước) từ D1 sang R2, sau đó xóa khỏi D1
-			// Đảm bảo D1 chỉ giữ lại 96 ngày dữ liệu gần nhất
+			// Worker sẽ đẩy dữ liệu ngày xa nhất (trước cutoff = D1_RETENTION_DAYS) từ D1 sang R2, sau đó xóa khỏi D1
+			// Đảm bảo D1 chỉ giữ lại D1_RETENTION_DAYS ngày dữ liệu gần nhất
 			// 
 			// Lưu ý: Cloudflare Workers cron sử dụng UTC time
 			// Để chạy vào giờ khác theo GMT+7, chuyển đổi: giờ_GMT+7 - 7 = giờ_UTC
@@ -75,7 +75,8 @@
 		// - Mỗi batch tạo ~2-3 subrequests (D1 query + HTTP send + D1 delete)
 		// Nên điều chỉnh concurrency limits dựa trên số lượng pipelines/batches và tài nguyên worker
 		"PIPELINE_CONCURRENCY_LIMIT": "5",  // Số lượng pipelines chạy song song (default: 5, max: 20)
-		"BATCH_CONCURRENCY_LIMIT": "3",     // Số lượng batches xử lý song song trong mỗi pipeline (default: 3, max: 20)		
+		"BATCH_CONCURRENCY_LIMIT": "3",     // Số lượng batches xử lý song song trong mỗi pipeline (default: 3, max: 20)
+		"D1_RETENTION_DAYS": "96",          // Số ngày giữ dữ liệu gần nhất trong D1, cutoff = ngày hiện tại - N ngày
 	},
 	"d1_databases": [
 		{

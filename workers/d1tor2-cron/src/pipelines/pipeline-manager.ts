@@ -105,7 +105,7 @@ export class PipelineManager {
 
 	/**
 	 * Chạy tất cả các pipelines song song
-	 * Mỗi pipeline sẽ tự động tìm ngày xa nhất có dữ liệu (trước cutoff = 96 ngày trước) và xử lý
+	 * Mỗi pipeline sẽ tự động tìm ngày xa nhất có dữ liệu (trước cutoff = D1_RETENTION_DAYS ngày trước) và xử lý
 	 * Xử lý nhiều pipelines cùng lúc để tăng hiệu suất
 	 */
 	async runAllPipelines(): Promise<PipelineStats> {
@@ -201,7 +201,7 @@ export class PipelineManager {
 
 	/**
 	 * Chạy một pipeline cụ thể
-	 * Tự động tìm ngày xa nhất có dữ liệu (trước cutoff = 96 ngày trước) và xử lý
+	 * Tự động tìm ngày xa nhất có dữ liệu (trước cutoff = D1_RETENTION_DAYS ngày trước) và xử lý
 	 * @param config Pipeline configuration
 	 */
 	async runPipeline(config: PipelineConfig): Promise<PipelineResult> {
@@ -212,7 +212,7 @@ export class PipelineManager {
 			// 0. Đảm bảo pipeline, stream và sink đã được tạo
 			await this.ensurePipelineSetup(config);
 
-			// 1. Tìm ngày xa nhất có dữ liệu (trước cutoff = 96 ngày trước)
+			// 1. Tìm ngày xa nhất có dữ liệu (trước cutoff = D1_RETENTION_DAYS ngày trước)
 			const targetDate = await this.findOldestDateWithData(config.tableName);
 			
 			if (!targetDate) {
@@ -283,21 +283,36 @@ export class PipelineManager {
 	}
 
 	/**
-	 * Tìm ngày xa nhất có dữ liệu trong bảng, đảm bảo giữ lại 96 ngày gần nhất
+	 * Lấy số ngày retention từ env, mặc định 96
+	 */
+	private getRetentionDays(): number {
+		const envValue = (this.env as any).D1_RETENTION_DAYS;
+		if (envValue !== undefined) {
+			const days = parseInt(String(envValue), 10);
+			if (!isNaN(days) && days > 0) {
+				return Math.min(days, 365); // Cap 365 để tránh giá trị bất thường
+			}
+		}
+		return 96;
+	}
+
+	/**
+	 * Tìm ngày xa nhất có dữ liệu trong bảng, đảm bảo giữ lại N ngày gần nhất (N = D1_RETENTION_DAYS)
 	 * @param tableName Tên bảng
-	 * @returns Ngày xa nhất có dữ liệu (trước cutoff = 96 ngày trước), hoặc null nếu không tìm thấy
+	 * @returns Ngày xa nhất có dữ liệu (trước cutoff = N ngày trước), hoặc null nếu không tìm thấy
 	 */
 	private async findOldestDateWithData(tableName: string): Promise<Date | null> {
 		try {
+			const retentionDays = this.getRetentionDays();
 			const now = new Date();
-			
-			// Tính cutoff date: 96 ngày trước (để giữ lại 96 ngày gần nhất)
+
+			// Tính cutoff date: N ngày trước (để giữ lại N ngày gần nhất)
 			const cutoffDate = new Date(now);
-			cutoffDate.setDate(cutoffDate.getDate() - 96);
+			cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
 			cutoffDate.setHours(0, 0, 0, 0);
 			const cutoffTimestamp = Math.floor(cutoffDate.getTime());
 
-			console.log(`  Cutoff date (96 days ago): ${cutoffDate.toISOString().split('T')[0]}`);
+			console.log(`  Cutoff date (${retentionDays} days ago): ${cutoffDate.toISOString().split('T')[0]}`);
 
 			// Lấy created_at nhỏ nhất trong bảng, nhưng chỉ tìm các record trước cutoff
 			// Dùng quoted identifiers để tương thích với queue-worker (columns: "globalId", "created_at", ...)
@@ -305,8 +320,8 @@ export class PipelineManager {
 			const result = await this.db.prepare(query).bind(cutoffTimestamp).first();
 
 			if (!result || !(result as any).min_created_at) {
-				// Không có dữ liệu nào trước cutoff, đã đủ 96 ngày gần nhất
-				console.log(`  No data before cutoff date, keeping 96 most recent days`);
+				// Không có dữ liệu nào trước cutoff, đã đủ N ngày gần nhất
+				console.log(`  No data before cutoff date, keeping ${retentionDays} most recent days`);
 				return null;
 			}
 
