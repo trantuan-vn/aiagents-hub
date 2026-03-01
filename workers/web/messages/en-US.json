@@ -546,9 +546,15 @@
     "title": "Dashboard",
     "description": "Welcome back! Here's your API overview.",
     "add_api": "Add API",
+    "loading": "Loading dashboard...",
+    "fetch_error": "Failed to load dashboard data",
+    "no_subscriptions": "No active subscriptions",
+    "no_api_keys": "No API keys yet",
     "stats": {
       "total_api_calls": "Total API Calls",
       "active_subscriptions": "Active Subscriptions",
+      "active_tokens": "Active Tokens",
+      "total_orders": "Total Orders",
       "success_rate": "Success Rate",
       "avg_response_time": "Avg Response Time",
       "this_month": "this month"
@@ -570,7 +576,8 @@
     },
     "activity": {
       "title": "Recent Activity",
-      "description": "Latest API calls and events"
+      "description": "Latest API calls and events",
+      "no_activity": "No recent activity"
     },
     "quick_links": {
       "title": "Quick Links",

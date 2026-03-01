@@ -14,6 +14,7 @@ import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
 import { createSystemConfigRoutes } from './features/admin/system-config/presentation';
+import { createOverviewRoutes } from './features/dashboard/overview/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
@@ -58,6 +59,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));
   routes.route('/dashboard/admin/system-config', createSystemConfigRoutes(bindingName));
+  routes.route('/dashboard/overview', createOverviewRoutes(bindingName));
 
   // II. API
   // Security middleware

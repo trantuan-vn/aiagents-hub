@@ -546,9 +546,15 @@
     "title": "Bảng điều khiển",
     "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",
     "add_api": "Thêm API",
+    "loading": "Đang tải bảng điều khiển...",
+    "fetch_error": "Không thể tải dữ liệu bảng điều khiển",
+    "no_subscriptions": "Chưa có gói đăng ký",
+    "no_api_keys": "Chưa có khóa API",
     "stats": {
       "total_api_calls": "Tổng lượt gọi API",
       "active_subscriptions": "Gói đăng ký đang hoạt động",
+      "active_tokens": "Token đang hoạt động",
+      "total_orders": "Tổng đơn hàng",
       "success_rate": "Tỷ lệ thành công",
       "avg_response_time": "Thời gian phản hồi trung bình",
       "this_month": "tháng này"
@@ -570,7 +576,8 @@
     },
     "activity": {
       "title": "Hoạt động gần đây",
-      "description": "Các lượt gọi API và sự kiện mới nhất"
+      "description": "Các lượt gọi API và sự kiện mới nhất",
+      "no_activity": "Chưa có hoạt động"
     },
     "quick_links": {
       "title": "Liên kết nhanh",
