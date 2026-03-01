@@ -65,8 +65,8 @@ function ServiceItemContent({
           <div className="flex items-center gap-1">
             <span>
               {t("calls", {
-                current: String(service.currentCalls),
-                max: service.maxCalls === 0 ? "∞" : String(service.maxCalls),
+                current: String(service.currentCalls ?? 0),
+                max: String(service.maxCalls ?? 0),
               })}
             </span>
           </div>
