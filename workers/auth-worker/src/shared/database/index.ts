@@ -97,8 +97,13 @@ export class DynamicSchemaManager {
         const whereClauses: string[] = [];
         
         conditions.forEach(condition => {
-          whereClauses.push(`"${condition.field}" ${condition.operator} ?`);
-          params.push(condition.value);
+          const isColumnRef = condition.value && typeof condition.value === 'object' && '$column' in condition.value;
+          if (isColumnRef) {
+            whereClauses.push(`"${condition.field}" ${condition.operator} "${condition.value.$column}"`);
+          } else {
+            whereClauses.push(`"${condition.field}" ${condition.operator} ?`);
+            params.push(condition.value);
+          }
         });
         
         sql += ` WHERE ${whereClauses.join(' AND ')}`;

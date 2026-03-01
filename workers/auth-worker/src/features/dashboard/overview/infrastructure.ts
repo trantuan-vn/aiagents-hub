@@ -5,7 +5,10 @@ import type { OverviewResponse, OverviewSubscription, OverviewApiKey, OverviewAc
 export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promise<OverviewResponse> {
   const [services, tokens, serviceUsages] = await Promise.all([
     executeUtils.executeDynamicAction(userDO, 'select', {
-      where: { field: 'isActive', operator: '=', value: 1 },
+      where: [
+        { field: 'isActive', operator: '=', value: 1 },
+        { field: 'maxCalls', operator: '>', value: { $column: 'currentCalls' } },
+      ],
       orderBy: { field: 'createdAt', direction: 'DESC' },
       limit: 20,
     }, 'services'),
