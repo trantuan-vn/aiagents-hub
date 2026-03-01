@@ -120,6 +120,12 @@ export const sidebarItems: NavGroup[] = [
         icon: RefreshCw,
         adminOnly: true,
       },
+      {
+        title: "Cấu hình hệ thống",
+        url: "/dashboard/system-config",
+        icon: Settings,
+        adminOnly: true,
+      },
     ],
   },
   {

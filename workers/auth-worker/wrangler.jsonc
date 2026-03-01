@@ -88,6 +88,10 @@
 		{
 			"binding": "NONCE_KV",
 			"id": "fbaaa47d74ba4fd4b2342d9abae94491"
+		},
+		{
+			"binding": "SYSTEM_CONFIG_KV",
+			"id": "529353fcfe7641c9bcbd5dda5d01d5da"
 		}
 	],
 	"ai": {

@@ -62,7 +62,38 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
   return chunks;
 };
 
+const KV_KEY = 'system_config';
 
+/** Đọc cấu hình queue_worker từ KV. Có hiệu lực ngay khi admin thiết lập. */
+async function getQueueWorkerConfig(env: Env): Promise<{
+  BATCH_SIZE: number;
+  MAX_RETRIES: number;
+  AE_BATCH_SIZE: number;
+  QUEUE_PROCESSING_TIMEOUT: number;
+}> {
+  const defaults = {
+    BATCH_SIZE: parseInt(env.BATCH_SIZE || '100', 10),
+    MAX_RETRIES: parseInt(env.MAX_RETRIES || '3', 10),
+    AE_BATCH_SIZE: parseInt(env.AE_BATCH_SIZE || '1000', 10),
+    QUEUE_PROCESSING_TIMEOUT: parseInt(env.QUEUE_PROCESSING_TIMEOUT || '30000', 10),
+  };
+  const kv = (env as any).SYSTEM_CONFIG_KV;
+  if (!kv) return defaults;
+  try {
+    const raw = await kv.get(KV_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw);
+    const qw = parsed.queue_worker || {};
+    return {
+      BATCH_SIZE: qw.BATCH_SIZE ?? defaults.BATCH_SIZE,
+      MAX_RETRIES: qw.MAX_RETRIES ?? defaults.MAX_RETRIES,
+      AE_BATCH_SIZE: qw.AE_BATCH_SIZE ?? defaults.AE_BATCH_SIZE,
+      QUEUE_PROCESSING_TIMEOUT: qw.QUEUE_PROCESSING_TIMEOUT ?? defaults.QUEUE_PROCESSING_TIMEOUT,
+    };
+  } catch {
+    return defaults;
+  }
+}
 
 
 
@@ -211,7 +242,8 @@ const parseMessage = (message: Message): {
 };
 
 const processInputQueue = async (batch: MessageBatch, env: Env): Promise<void> => {
-  const BATCH_SIZE = parseInt(env.BATCH_SIZE || '100');
+  const config = await getQueueWorkerConfig(env);
+  const BATCH_SIZE = config.BATCH_SIZE;
   const database = getDatabaseManager(env.D1DB);
   const userTableGroups = new Map<string, Map<string, ProcessedItem[]>>();
 

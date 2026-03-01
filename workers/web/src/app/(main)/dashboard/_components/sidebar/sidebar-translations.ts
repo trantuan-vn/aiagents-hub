@@ -44,6 +44,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     "Register v1": t("register_v1"),
     "Register v2": t("register_v2"),
     Others: t("others"),
+    "Cấu hình hệ thống": t("system_config"),
   };
   return (title: string) =>
     // eslint-disable-next-line security/detect-object-injection -- title is validated via Object.hasOwn

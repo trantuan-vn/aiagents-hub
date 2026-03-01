@@ -19,6 +19,8 @@ const RETRY_ALARM_INTERVAL = 60000;
 const QUEUE_FLUSH_INTERVAL = 5000;
 const QUEUE_FLUSH_THRESHOLD = 200;
 
+const KV_KEY = 'system_config';
+
 const TableStateSchema = z.object({
   tableName: z.string(),
   lastFlushedId: z.number().int().default(0),
@@ -207,16 +209,49 @@ export class UserDO extends DurableObject {
     return false;
   }
 
-  private shouldFlushTable(tableName: string): boolean {
+  /** Đọc cấu hình auth_worker từ KV (override) hoặc env vars. Có hiệu lực ngay khi admin thiết lập. */
+  private async getAuthQueueConfig(): Promise<{
+    QUEUE_BATCH_SIZE: number;
+    QUEUE_FLUSH_THRESHOLD: number;
+    QUEUE_FLUSH_INTERVAL: number;
+    MAX_SEND_FAILURE_COUNT: number;
+    RETRY_ALARM_INTERVAL: number;
+  }> {
+    const defaults = {
+      QUEUE_BATCH_SIZE: parseInt(this.env.QUEUE_BATCH_SIZE || '100', 10),
+      QUEUE_FLUSH_THRESHOLD: parseInt(this.env.QUEUE_FLUSH_THRESHOLD || QUEUE_FLUSH_THRESHOLD.toString(), 10),
+      QUEUE_FLUSH_INTERVAL: parseInt(this.env.QUEUE_FLUSH_INTERVAL || QUEUE_FLUSH_INTERVAL.toString(), 10),
+      MAX_SEND_FAILURE_COUNT: parseInt(this.env.MAX_SEND_FAILURE_COUNT || MAX_SEND_FAILURE_COUNT.toString(), 10),
+      RETRY_ALARM_INTERVAL: parseInt(this.env.RETRY_ALARM_INTERVAL || RETRY_ALARM_INTERVAL.toString(), 10),
+    };
+    const kv = (this.env as any).SYSTEM_CONFIG_KV;
+    if (!kv) return defaults;
+    try {
+      const raw = await kv.get(KV_KEY);
+      if (!raw) return defaults;
+      const parsed = JSON.parse(raw);
+      const auth = parsed.auth_worker || {};
+      return {
+        QUEUE_BATCH_SIZE: auth.QUEUE_BATCH_SIZE ?? defaults.QUEUE_BATCH_SIZE,
+        QUEUE_FLUSH_THRESHOLD: auth.QUEUE_FLUSH_THRESHOLD ?? defaults.QUEUE_FLUSH_THRESHOLD,
+        QUEUE_FLUSH_INTERVAL: auth.QUEUE_FLUSH_INTERVAL ?? defaults.QUEUE_FLUSH_INTERVAL,
+        MAX_SEND_FAILURE_COUNT: auth.MAX_SEND_FAILURE_COUNT ?? defaults.MAX_SEND_FAILURE_COUNT,
+        RETRY_ALARM_INTERVAL: auth.RETRY_ALARM_INTERVAL ?? defaults.RETRY_ALARM_INTERVAL,
+      };
+    } catch {
+      return defaults;
+    }
+  }
+
+  private async shouldFlushTable(tableName: string): Promise<boolean> {
     const state = this.tableStates.get(tableName);
     if (!state) return false;
 
+    const config = await this.getAuthQueueConfig();
     const now = Date.now();
     const lastFlushTime = state.lastFlushTime || 0;
-    const flushInterval = parseInt(this.env.QUEUE_FLUSH_INTERVAL || QUEUE_FLUSH_INTERVAL.toString());
-    const flushThreshold = parseInt(this.env.QUEUE_FLUSH_THRESHOLD || QUEUE_FLUSH_THRESHOLD.toString());
 
-    return state.pendingCount >= flushThreshold || (now - lastFlushTime) > flushInterval;
+    return state.pendingCount >= config.QUEUE_FLUSH_THRESHOLD || (now - lastFlushTime) > config.QUEUE_FLUSH_INTERVAL;
   }
 
   // ========== FETCH HANDLER ==========
@@ -280,7 +315,7 @@ export class UserDO extends DurableObject {
     
     await this.updateTablePendingCount(tableName);
     
-    if (this.shouldFlushTable(tableName)) {
+    if (await this.shouldFlushTable(tableName)) {
       this.state.waitUntil(this.flushPendingRecords(tableName));
     }
     await this.scheduleQueueAlarmIfNeeded();
@@ -301,7 +336,7 @@ export class UserDO extends DurableObject {
       
       await this.updateTablePendingCount(table);
       
-      if (this.shouldFlushTable(table)) {
+      if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
       await this.scheduleQueueAlarmIfNeeded();
@@ -329,7 +364,7 @@ export class UserDO extends DurableObject {
       
       await this.updateTablePendingCount(table);
       
-      if (this.shouldFlushTable(table)) {
+      if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
       await this.scheduleQueueAlarmIfNeeded();
@@ -393,7 +428,7 @@ export class UserDO extends DurableObject {
       
       await this.updateTablePendingCount(table);
       
-      if (this.shouldFlushTable(table)) {
+      if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
       await this.scheduleQueueAlarmIfNeeded();
@@ -436,7 +471,7 @@ export class UserDO extends DurableObject {
     
     for (const tableName of updatedTables) {
       await this.updateTablePendingCount(tableName);
-      if (this.shouldFlushTable(tableName)) {
+      if (await this.shouldFlushTable(tableName)) {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
     }
@@ -477,7 +512,7 @@ export class UserDO extends DurableObject {
 
     await this.updateTablePendingCount(table);
 
-    if (this.shouldFlushTable(table)) {
+    if (await this.shouldFlushTable(table)) {
       this.state.waitUntil(this.flushPendingRecords(table));
     }
     await this.scheduleQueueAlarmIfNeeded();
@@ -510,7 +545,7 @@ export class UserDO extends DurableObject {
     
     const results = [];
     for (const tableName of this.SYNC_TABLE_NAMES) {
-      if (force || this.shouldFlushTable(tableName)) {
+      if (force || (await this.shouldFlushTable(tableName))) {
         await this.flushPendingRecords(tableName, force);
         results.push({
           table: tableName,
@@ -613,12 +648,15 @@ export class UserDO extends DurableObject {
     const state = this.tableStates.get(tableName);
     if (!state) return;
 
+    const config = await this.getAuthQueueConfig();
+    const batchSize = config.QUEUE_BATCH_SIZE;
+
     try {
       const pendingRecords = await this.database.execSelectSQL(
         `SELECT * FROM ${tableName} 
          WHERE queueStatus = 'pending' 
          ORDER BY queueId ASC
-         LIMIT ${QUEUE_FLUSH_THRESHOLD}`
+         LIMIT ${batchSize}`
       );
 
       if (pendingRecords.length === 0) {
@@ -778,7 +816,7 @@ export class UserDO extends DurableObject {
       stats[tableName] = {
         tableState: state,
         ...this.calculateTableMetrics(statusStats, now, state),
-        shouldFlush: this.shouldFlushTable(tableName)
+        shouldFlush: await this.shouldFlushTable(tableName)
       };
     }
 
@@ -906,7 +944,8 @@ export class UserDO extends DurableObject {
       const hasPending = this.hasPendingQueueWork();
       console.log(`[UserDO ${this.userId}] hasPending: ${hasPending}`);
       if (hasWebSockets || hasPending) {
-        await this.storage.setAlarm(Date.now() + RETRY_ALARM_INTERVAL);
+        const config = await this.getAuthQueueConfig();
+        await this.storage.setAlarm(Date.now() + config.RETRY_ALARM_INTERVAL);
       }
     } catch (error) {
       handleErrorWithoutIp(error, "Alarm execution error");
@@ -914,9 +953,11 @@ export class UserDO extends DurableObject {
   }
 
   private async flushAllPendingRecords(): Promise<void> {
-    const promises = this.SYNC_TABLE_NAMES
-      .filter(tableName => this.shouldFlushTable(tableName))
-      .map(tableName => {
+    const tablesToFlush: string[] = [];
+    for (const tableName of this.SYNC_TABLE_NAMES) {
+      if (await this.shouldFlushTable(tableName)) tablesToFlush.push(tableName);
+    }
+    const promises = tablesToFlush.map(tableName => {
         console.log(`[UserDO ${this.userId}] Auto-flushing ${tableName}`);
         return this.flushPendingRecords(tableName);
       });
@@ -1000,7 +1041,8 @@ export class UserDO extends DurableObject {
 
     const currentAlarm = await this.storage.getAlarm();
     if (currentAlarm === null) {
-      await this.storage.setAlarm(Date.now() + RETRY_ALARM_INTERVAL);
+      const config = await this.getAuthQueueConfig();
+      await this.storage.setAlarm(Date.now() + config.RETRY_ALARM_INTERVAL);
     }
   }
 
@@ -1154,7 +1196,8 @@ export class UserDO extends DurableObject {
       }
     }
 
-    if (newFailures >= MAX_SEND_FAILURE_COUNT) {
+    const config = await this.getAuthQueueConfig();
+    if (newFailures >= config.MAX_SEND_FAILURE_COUNT) {
       try { ws.close(1011, 'Send failure'); } 
       catch (closeError) { handleErrorWithoutIp(closeError, "Close webSocket error"); }
     }

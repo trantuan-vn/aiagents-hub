@@ -1,0 +1,60 @@
+import { z } from 'zod';
+
+/** Cấu hình Auth Worker - Queue parameters cho UserDO */
+export const AuthWorkerConfigSchema = z.object({
+	QUEUE_BATCH_SIZE: z.number().int().min(1).max(1000).optional(),
+	QUEUE_FLUSH_THRESHOLD: z.number().int().min(1).max(2000).optional(),
+	QUEUE_FLUSH_INTERVAL: z.number().int().min(1000).max(120000).optional(),
+	MAX_SEND_FAILURE_COUNT: z.number().int().min(1).max(10).optional(),
+	RETRY_ALARM_INTERVAL: z.number().int().min(10000).max(300000).optional(),
+});
+export type AuthWorkerConfig = z.infer<typeof AuthWorkerConfigSchema>;
+
+/** Cấu hình Queue Worker */
+export const QueueWorkerConfigSchema = z.object({
+	BATCH_SIZE: z.number().int().min(1).max(500).optional(),
+	MAX_RETRIES: z.number().int().min(1).max(10).optional(),
+	AE_BATCH_SIZE: z.number().int().min(100).max(5000).optional(),
+	QUEUE_PROCESSING_TIMEOUT: z.number().int().min(5000).max(120000).optional(),
+});
+export type QueueWorkerConfig = z.infer<typeof QueueWorkerConfigSchema>;
+
+/** Cấu hình D1tor2 Cron Worker */
+export const D1tor2CronConfigSchema = z.object({
+	PIPELINE_CONCURRENCY_LIMIT: z.number().int().min(1).max(20).optional(),
+	BATCH_CONCURRENCY_LIMIT: z.number().int().min(1).max(20).optional(),
+	D1_RETENTION_DAYS: z.number().int().min(7).max(365).optional(),
+});
+export type D1tor2CronConfig = z.infer<typeof D1tor2CronConfigSchema>;
+
+/** Toàn bộ cấu hình hệ thống */
+export const SystemConfigSchema = z.object({
+	auth_worker: AuthWorkerConfigSchema.optional(),
+	queue_worker: QueueWorkerConfigSchema.optional(),
+	d1tor2_cron: D1tor2CronConfigSchema.optional(),
+});
+export type SystemConfig = z.infer<typeof SystemConfigSchema>;
+
+/** Default values từ wrangler vars */
+export const DEFAULT_AUTH_CONFIG: AuthWorkerConfig = {
+	QUEUE_BATCH_SIZE: 100,
+	QUEUE_FLUSH_THRESHOLD: 200,
+	QUEUE_FLUSH_INTERVAL: 5000,
+	MAX_SEND_FAILURE_COUNT: 3,
+	RETRY_ALARM_INTERVAL: 60000,
+};
+
+export const DEFAULT_QUEUE_CONFIG: QueueWorkerConfig = {
+	BATCH_SIZE: 100,
+	MAX_RETRIES: 3,
+	AE_BATCH_SIZE: 1000,
+	QUEUE_PROCESSING_TIMEOUT: 30000,
+};
+
+export const DEFAULT_D1TOR2_CONFIG: D1tor2CronConfig = {
+	PIPELINE_CONCURRENCY_LIMIT: 5,
+	BATCH_CONCURRENCY_LIMIT: 3,
+	D1_RETENTION_DAYS: 96,
+};
+
+export const KV_KEY = 'system_config';

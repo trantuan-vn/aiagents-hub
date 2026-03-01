@@ -170,7 +170,8 @@
     "inbox": "Hộp thư đến",
     "search": "Tìm kiếm",
     "search_placeholder": "Tìm kiếm bảng điều khiển, người dùng và nhiều hơn nữa…",
-    "no_results": "Không tìm thấy kết quả."
+    "no_results": "Không tìm thấy kết quả.",
+    "system_config": "Cấu hình hệ thống"
   },
   "CRM": {
     "new_leads": "Khách hàng tiềm năng mới",
@@ -923,6 +924,38 @@
       "price_policies": "Chính sách Giá",
       "services": "Dịch vụ",
       "vouchers": "Voucher"
+    }
+  },
+  "SystemConfigPage": {
+    "title": "Cấu hình hệ thống",
+    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker và D1tor2-Cron. Thay đổi có hiệu lực ngay khi lưu.",
+    "loading": "Đang tải cấu hình...",
+    "save_config": "Lưu cấu hình",
+    "saving": "Đang lưu...",
+    "error": "Lỗi",
+    "saved": "Đã lưu",
+    "saved_description": "Cấu hình đã được lưu. Thay đổi có hiệu lực ngay lập tức.",
+    "fetch_error": "Không thể tải cấu hình",
+    "save_error": "Không thể lưu cấu hình",
+    "auth_worker": "Auth Worker",
+    "auth_worker_desc": "Tham số queue trong UserDO (flush, batch, alarm)",
+    "queue_worker": "Queue Worker",
+    "queue_worker_desc": "Tham số xử lý batch và retry",
+    "d1tor2_worker": "D1tor2-Cron Worker",
+    "d1tor2_worker_desc": "Pipeline và retention D1 → R2",
+    "fields": {
+      "QUEUE_BATCH_SIZE": "Kích thước Batch Queue (1-1000)",
+      "QUEUE_FLUSH_THRESHOLD": "Ngưỡng Flush Queue",
+      "QUEUE_FLUSH_INTERVAL": "Chu kỳ Flush Queue (ms)",
+      "MAX_SEND_FAILURE_COUNT": "Số lần gửi thất bại tối đa",
+      "RETRY_ALARM_INTERVAL": "Chu kỳ Alarm thử lại (ms)",
+      "BATCH_SIZE": "Kích thước Batch",
+      "MAX_RETRIES": "Số lần thử lại tối đa",
+      "AE_BATCH_SIZE": "Kích thước Batch AE",
+      "QUEUE_PROCESSING_TIMEOUT": "Timeout xử lý Queue (ms)",
+      "PIPELINE_CONCURRENCY_LIMIT": "Giới hạn Pipeline đồng thời",
+      "BATCH_CONCURRENCY_LIMIT": "Giới hạn Batch đồng thời",
+      "D1_RETENTION_DAYS": "Số ngày lưu D1"
     }
   },
   "AccountPage": {

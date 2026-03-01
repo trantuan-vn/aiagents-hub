@@ -25,9 +25,19 @@ export interface PipelineStats {
  * 
  * Reference: https://developers.cloudflare.com/pipelines/getting-started/
  */
+const KV_KEY = 'system_config';
+
+/** Cấu hình d1tor2 đọc từ KV (có hiệu lực ngay khi admin thiết lập) */
+interface D1tor2RuntimeConfig {
+	PIPELINE_CONCURRENCY_LIMIT: number;
+	BATCH_CONCURRENCY_LIMIT: number;
+	D1_RETENTION_DAYS: number;
+}
+
 export class PipelineManager {
 	private apiService: CloudflarePipelineAPIService | null = null;
 	private endpointCache: Map<string, string> = new Map();
+	private d1tor2Config: D1tor2RuntimeConfig | null = null;
 
 	constructor(
 		private db: D1Database,
@@ -48,6 +58,38 @@ export class PipelineManager {
 	}
 
 	/**
+	 * Đọc cấu hình d1tor2 từ KV. Có hiệu lực ngay khi admin thiết lập.
+	 */
+	private async loadD1tor2Config(): Promise<void> {
+		const defaults: D1tor2RuntimeConfig = {
+			PIPELINE_CONCURRENCY_LIMIT: parseInt(String((this.env as any).PIPELINE_CONCURRENCY_LIMIT || '5'), 10),
+			BATCH_CONCURRENCY_LIMIT: parseInt(String((this.env as any).BATCH_CONCURRENCY_LIMIT || '3'), 10),
+			D1_RETENTION_DAYS: parseInt(String((this.env as any).D1_RETENTION_DAYS || '96'), 10),
+		};
+		const kv = (this.env as any).SYSTEM_CONFIG_KV;
+		if (!kv) {
+			this.d1tor2Config = defaults;
+			return;
+		}
+		try {
+			const raw = await kv.get(KV_KEY);
+			if (!raw) {
+				this.d1tor2Config = defaults;
+				return;
+			}
+			const parsed = JSON.parse(raw);
+			const dc = parsed.d1tor2_cron || {};
+			this.d1tor2Config = {
+				PIPELINE_CONCURRENCY_LIMIT: dc.PIPELINE_CONCURRENCY_LIMIT ?? defaults.PIPELINE_CONCURRENCY_LIMIT,
+				BATCH_CONCURRENCY_LIMIT: dc.BATCH_CONCURRENCY_LIMIT ?? defaults.BATCH_CONCURRENCY_LIMIT,
+				D1_RETENTION_DAYS: dc.D1_RETENTION_DAYS ?? defaults.D1_RETENTION_DAYS,
+			};
+		} catch {
+			this.d1tor2Config = defaults;
+		}
+	}
+
+	/**
 	 * Tính toán concurrency limit tối ưu dựa trên Cloudflare Workers limits và environment variables
 	 * 
 	 * Cloudflare Workers limits:
@@ -60,11 +102,20 @@ export class PipelineManager {
 	 * @returns Concurrency limit tối ưu
 	 */
 	private getConcurrencyLimit(type: 'pipeline' | 'batch', totalItems?: number): number {
-		// Ưu tiên lấy từ environment variables
 		const envKey = type === 'pipeline' 
 			? 'PIPELINE_CONCURRENCY_LIMIT' 
 			: 'BATCH_CONCURRENCY_LIMIT';
 		
+		// Ưu tiên lấy từ KV config (admin đã thiết lập)
+		if (this.d1tor2Config) {
+			const limit = type === 'pipeline' 
+				? this.d1tor2Config.PIPELINE_CONCURRENCY_LIMIT 
+				: this.d1tor2Config.BATCH_CONCURRENCY_LIMIT;
+			console.log(`  Using ${envKey} from system config: ${limit}`);
+			return Math.min(limit, 20);
+		}
+		
+		// Fallback: env vars
 		const envValue = (this.env as any)[envKey];
 		if (envValue !== undefined) {
 			const limit = parseInt(String(envValue), 10);
@@ -109,6 +160,7 @@ export class PipelineManager {
 	 * Xử lý nhiều pipelines cùng lúc để tăng hiệu suất
 	 */
 	async runAllPipelines(): Promise<PipelineStats> {
+		await this.loadD1tor2Config();
 		const concurrencyLimit = this.getConcurrencyLimit('pipeline', PIPELINE_CONFIGS.length);
 		const results: PipelineResult[] = [];
 		let successful = 0;
@@ -283,9 +335,12 @@ export class PipelineManager {
 	}
 
 	/**
-	 * Lấy số ngày retention từ env, mặc định 96
+	 * Lấy số ngày retention. Ưu tiên KV config (admin), fallback env, mặc định 96
 	 */
 	private getRetentionDays(): number {
+		if (this.d1tor2Config) {
+			return Math.min(this.d1tor2Config.D1_RETENTION_DAYS, 365);
+		}
 		const envValue = (this.env as any).D1_RETENTION_DAYS;
 		if (envValue !== undefined) {
 			const days = parseInt(String(envValue), 10);

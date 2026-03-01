@@ -170,7 +170,8 @@
     "inbox": "Inbox",
     "search": "Search",
     "search_placeholder": "Search dashboards, users, and more…",
-    "no_results": "No results found."
+    "no_results": "No results found.",
+    "system_config": "System Configuration"
   },
   "CRM": {
     "new_leads": "New Leads",
@@ -923,6 +924,38 @@
       "price_policies": "Price Policies",
       "services": "Services",
       "vouchers": "Vouchers"
+    }
+  },
+  "SystemConfigPage": {
+    "title": "System Configuration",
+    "description": "Configure parameters for Auth Worker, Queue Worker and D1tor2-Cron. Changes take effect immediately when saved.",
+    "loading": "Loading configuration...",
+    "save_config": "Save Configuration",
+    "saving": "Saving...",
+    "error": "Error",
+    "saved": "Saved",
+    "saved_description": "Configuration has been saved. Changes take effect immediately.",
+    "fetch_error": "Failed to load configuration",
+    "save_error": "Failed to save configuration",
+    "auth_worker": "Auth Worker",
+    "auth_worker_desc": "Queue parameters in UserDO (flush, batch, alarm)",
+    "queue_worker": "Queue Worker",
+    "queue_worker_desc": "Batch processing and retry parameters",
+    "d1tor2_worker": "D1tor2-Cron Worker",
+    "d1tor2_worker_desc": "Pipeline and D1 → R2 retention",
+    "fields": {
+      "QUEUE_BATCH_SIZE": "Queue Batch Size (1-1000)",
+      "QUEUE_FLUSH_THRESHOLD": "Queue Flush Threshold",
+      "QUEUE_FLUSH_INTERVAL": "Queue Flush Interval (ms)",
+      "MAX_SEND_FAILURE_COUNT": "Max Send Failure Count",
+      "RETRY_ALARM_INTERVAL": "Retry Alarm Interval (ms)",
+      "BATCH_SIZE": "Batch Size",
+      "MAX_RETRIES": "Max Retries",
+      "AE_BATCH_SIZE": "AE Batch Size",
+      "QUEUE_PROCESSING_TIMEOUT": "Queue Processing Timeout (ms)",
+      "PIPELINE_CONCURRENCY_LIMIT": "Pipeline Concurrency Limit",
+      "BATCH_CONCURRENCY_LIMIT": "Batch Concurrency Limit",
+      "D1_RETENTION_DAYS": "D1 Retention Days"
     }
   },
   "AccountPage": {

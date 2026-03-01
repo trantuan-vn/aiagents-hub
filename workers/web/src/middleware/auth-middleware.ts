@@ -1,9 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getUserFromToken } from "@/data/users";
+import { getUserFromToken, type User } from "@/data/users";
 
 function requiresAdminAccess(pathname: string): boolean {
-  return pathname.startsWith("/dashboard/crm") || pathname.startsWith("/dashboard/finance");
+  return (
+    pathname.startsWith("/dashboard/crm") ||
+    pathname.startsWith("/dashboard/finance") ||
+    pathname.startsWith("/dashboard/system-config")
+  );
 }
 
 function handleUnauthenticatedDashboard(req: NextRequest, pathname: string): NextResponse {
@@ -35,13 +39,13 @@ function handleDashboardAccess(
   req: NextRequest,
   pathname: string,
   isLoggedIn: boolean,
-  user: any,
+  user: User | null,
 ): NextResponse | null {
   if (!isLoggedIn && pathname.startsWith("/dashboard")) {
     return handleUnauthenticatedDashboard(req, pathname);
   }
 
-  if (isLoggedIn && requiresAdminAccess(pathname) && user.role !== "admin") {
+  if (isLoggedIn && requiresAdminAccess(pathname) && user?.role !== "admin") {
     return handleInsufficientPermissions(req, pathname);
   }
 

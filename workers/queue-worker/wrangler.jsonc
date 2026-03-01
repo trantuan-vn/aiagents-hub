@@ -76,5 +76,11 @@
       "database_name": "unitoken_db",
       "database_id": "02704177-c811-4132-92e4-622f955a7ae8"
     }
+  ],
+	"kv_namespaces": [
+    {
+      "binding": "SYSTEM_CONFIG_KV",
+      "id": "529353fcfe7641c9bcbd5dda5d01d5da"
+    }
   ]
 }
