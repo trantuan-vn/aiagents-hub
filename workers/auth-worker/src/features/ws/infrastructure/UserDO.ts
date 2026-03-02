@@ -1139,15 +1139,16 @@ export class UserDO extends DurableObject {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
     try {
+      console.log(`[UserDO ${this.userId}] webSocketClose: code=${code}, reason=${reason}, wasClean=${wasClean}`);
       this.sendFailureCount.delete(ws);
       const sessionId = this.sessions.get(ws);
       if (sessionId) {
         await this.database.execTransaction([{
-          sql: 'UPDATE connections SET connected = false, queueStatus = ? WHERE sessionId = ?',
+          sql: 'UPDATE connections SET connected = 0, queueStatus = ? WHERE sessionId = ?',
           params: ['pending' as const, sessionId]
-        }]); 
+        }]);
       }
-      this.sessions.delete(ws);      
+      this.sessions.delete(ws);
       await this.unregisterUser();
       await this.storage.deleteAlarm();
       await this.scheduleQueueAlarmIfNeeded();
