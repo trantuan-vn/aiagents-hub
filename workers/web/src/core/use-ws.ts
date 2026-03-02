@@ -174,10 +174,15 @@ function createConnectionManager(options: UseWsOptions = {}) {
     };
   }
 
-  return { subscribe };
+  return { subscribe, disconnect };
 }
 
 const defaultManager = createConnectionManager();
+
+/** Ngắt kết nối WebSocket chủ động. Dùng khi logout để đảm bảo không còn kết nối với server. */
+export function disconnectWs(): void {
+  defaultManager.disconnect();
+}
 
 /**
  * Hook core WebSocket: một kết nối dùng chung, dispatch message theo event.

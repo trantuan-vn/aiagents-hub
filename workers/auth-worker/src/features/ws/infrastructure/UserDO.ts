@@ -1077,6 +1077,8 @@ export class UserDO extends DurableObject {
       });      
       
       this.sessions.set(server, sessionId);
+      // Persist sessionId với WebSocket để survive hibernation (khi DO hibernate, in-memory state bị mất)
+      server.serializeAttachment({ sessionId });
       this.state.waitUntil(Promise.all([
         this.registerUser(), 
         this.sendPendingMessages(server)
@@ -1141,7 +1143,8 @@ export class UserDO extends DurableObject {
     try {
       console.log(`[UserDO ${this.userId}] webSocketClose: code=${code}, reason=${reason}, wasClean=${wasClean}`);
       this.sendFailureCount.delete(ws);
-      const sessionId = this.sessions.get(ws);
+      // Lấy sessionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
+      const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
       if (sessionId) {
         await this.database.execTransaction([{
           sql: 'UPDATE connections SET connected = 0, queueStatus = ? WHERE sessionId = ?',
@@ -1188,7 +1191,7 @@ export class UserDO extends DurableObject {
         
     if (!error.message?.includes("Invalid") && !error.message?.includes("too large")) {
       try { 
-        const sessionId = this.sessions.get(ws);
+        const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
         if (sessionId) {
           await this.storePendingMessage(sessionId, message); 
         }
@@ -1219,7 +1222,7 @@ export class UserDO extends DurableObject {
 
   private async sendPendingMessages(ws: WebSocket) {
     if (ws.readyState !== WebSocket.OPEN) return;
-    const sessionId = this.sessions.get(ws);  
+    const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
     if (!sessionId) return;
 
     const pendingMessages = await this.database.execSelectSQL(
