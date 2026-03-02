@@ -46,7 +46,7 @@ export function VoucherSelect({ control, vouchers, isLoadingVouchers }: VoucherS
             <SelectContent>
               <SelectItem value="none">{t("no_voucher")}</SelectItem>
               {vouchers.length === 0 && !isLoadingVouchers ? (
-                <SelectItem value="" disabled>
+                <SelectItem value="__no_vouchers__" disabled>
                   {t("no_vouchers_available")}
                 </SelectItem>
               ) : (

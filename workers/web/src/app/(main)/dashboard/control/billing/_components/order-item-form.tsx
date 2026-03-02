@@ -67,7 +67,7 @@ export function OrderItemForm({
               </FormControl>
               <SelectContent>
                 {services.length === 0 && !isLoadingServices ? (
-                  <SelectItem value="" disabled>
+                  <SelectItem value="__no_services__" disabled>
                     {t("no_services_available")}
                   </SelectItem>
                 ) : (

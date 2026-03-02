@@ -969,7 +969,8 @@ export class UserDODatabase {
           });
           const conflictField = op.conflictField || config.options.conflictField;
           if (!conflictField) throw new Error('Conflict field required for upsert operation');
-          sqlOp = DynamicSchemaManager.createUpsertOperation(op.table, upsertData, op.data, conflictField);
+          const updateUpsertData = DynamicDataBuilder.transformData(DynamicDataBuilder.preprocessData(op.data, config.schema), config.schema);          
+          sqlOp = DynamicSchemaManager.createUpsertOperation(op.table, upsertData, updateUpsertData, conflictField);
           results.push(upsertData);
           sqlOperations.push(sqlOp);
           break;
