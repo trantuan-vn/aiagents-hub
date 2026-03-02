@@ -82,6 +82,6 @@ export function getD1tor2Fields(config: SystemConfigData): FieldDef[] {
       min: 1,
       max: 20,
     },
-    { key: "D1_RETENTION_DAYS", label: "D1 Retention Days", value: dc.D1_RETENTION_DAYS ?? 96, min: 7, max: 365 },
+    { key: "D1_RETENTION_DAYS", label: "D1 Retention Days", value: dc.D1_RETENTION_DAYS ?? 96, min: 1, max: 365 },
   ];
 }

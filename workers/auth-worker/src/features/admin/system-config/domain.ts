@@ -23,7 +23,7 @@ export type QueueWorkerConfig = z.infer<typeof QueueWorkerConfigSchema>;
 export const D1tor2CronConfigSchema = z.object({
 	PIPELINE_CONCURRENCY_LIMIT: z.number().int().min(1).max(20).optional(),
 	BATCH_CONCURRENCY_LIMIT: z.number().int().min(1).max(20).optional(),
-	D1_RETENTION_DAYS: z.number().int().min(7).max(365).optional(),
+	D1_RETENTION_DAYS: z.number().int().min(1).max(365).optional(),
 });
 export type D1tor2CronConfig = z.infer<typeof D1tor2CronConfigSchema>;
 
