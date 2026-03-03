@@ -72,10 +72,10 @@ async function getQueueWorkerConfig(env: Env): Promise<{
   QUEUE_PROCESSING_TIMEOUT: number;
 }> {
   const defaults = {
-    BATCH_SIZE: parseInt(env.BATCH_SIZE || '100', 10),
-    MAX_RETRIES: parseInt(env.MAX_RETRIES || '3', 10),
-    AE_BATCH_SIZE: parseInt(env.AE_BATCH_SIZE || '1000', 10),
-    QUEUE_PROCESSING_TIMEOUT: parseInt(env.QUEUE_PROCESSING_TIMEOUT || '30000', 10),
+    BATCH_SIZE: parseInt('100', 10),
+    MAX_RETRIES: parseInt('3', 10),
+    AE_BATCH_SIZE: parseInt('1000', 10),
+    QUEUE_PROCESSING_TIMEOUT: parseInt('30000', 10),
   };
   const kv = (env as any).SYSTEM_CONFIG_KV;
   if (!kv) return defaults;
@@ -339,7 +339,7 @@ const handleHttpRequest = async (req: Request, env: Env): Promise<Response> => {
       status: 'healthy',
       service: 'Queue Worker',
       timestamp: Date.now(),
-      environment: env.ENVIRONMENT || 'production'
+      environment: 'production'
     }), {
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' }
     }),
@@ -347,8 +347,8 @@ const handleHttpRequest = async (req: Request, env: Env): Promise<Response> => {
     '/metrics': async () => new Response(JSON.stringify({
       queues: { input: 'input-part-0', error: 'error-queue-dlq' },
       settings: {
-        batch_size: env.BATCH_SIZE || '100',
-        max_retries: env.MAX_RETRIES || '3'
+        batch_size: '100',
+        max_retries: '3'
       },
       queue_tables: QUEUE_TABLE_NAMES
     }), {
