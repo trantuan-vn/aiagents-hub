@@ -650,16 +650,30 @@ export class PipelineManager {
 	}
 
 	/**
+	 * Chuẩn hóa row từ D1: chuyển null -> undefined (giống queue-worker parseFromDatabase)
+	 * D1 trả về NULL dưới dạng JavaScript null, schema dùng .optional()/.nullish()
+	 */
+	private normalizeD1Row(row: any): any {
+		if (!row || typeof row !== 'object') return row;
+		const normalized: Record<string, unknown> = {};
+		for (const [k, v] of Object.entries(row)) {
+			normalized[k] = v === null ? undefined : v;
+		}
+		return normalized;
+	}
+
+	/**
 	 * Validate records với Zod schema
 	 * Đảm bảo data đúng format trước khi gửi đến pipeline
+	 * Normalize D1 rows (null -> undefined) để tương thích với schema
 	 */
 	private validateRecords(records: any[], schema: z.ZodSchema): any[] {
 		const validatedRecords: any[] = [];
 		const errors: string[] = [];
 
 		for (let i = 0; i < records.length; i++) {
-			console.log(`Validating record ${i}:`, JSON.stringify(records[i]));
-			const result = schema.safeParse(records[i]);
+			const normalized = this.normalizeD1Row(records[i]);
+			const result = schema.safeParse(normalized);
 			if (result.success) {
 				validatedRecords.push(result.data);
 			} else {

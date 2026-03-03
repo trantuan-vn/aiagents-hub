@@ -338,38 +338,39 @@ export function exportPipelineSchemaAsJSON(config: PipelineConfig): string {
 }
 
 /**
- * Pipeline configurations
- * Mỗi pipeline sẽ gửi data đến R2 Data Catalog dưới dạng Apache Iceberg table
- * 
- * Lưu ý: pipelineEndpoint sẽ được set qua environment variable hoặc được tạo tự động
- * khi pipeline được setup qua Wrangler CLI hoặc Dashboard
- * 
- * Để export schema JSON cho một pipeline:
- * import { PIPELINE_CONFIGS, exportPipelineSchemaAsJSON } from './config';
- * const schema = exportPipelineSchemaAsJSON(PIPELINE_CONFIGS[0]);
- * console.log(schema);
+ * Tạo extended schema tương thích với D1 tables trong queue-worker
+ * Queue worker's D1DatabaseManager.createExtendedSchema thêm các cột:
+ * - globalId, id, created_at, updated_at, user_id, organization_id
+ * - queueId, queueStatus, flushedAt, processedAt (queue flow)
+ *
+ * Dùng .nullish() cho các cột có thể NULL trong D1 khi đọc (id, organization_id,
+ * queueId, queueStatus, flushedAt, processedAt)
  */
 function createExtendedSchema(schema: z.ZodSchema): z.ZodSchema {
 	return (schema as any).extend({
 		globalId: z.number().int().optional(),
-		id: z.number().int().optional(),
+		id: z.number().int().nullish(),
 		created_at: z.number().optional(),
 		updated_at: z.number().optional(),
 		user_id: z.string().optional(),
-		organization_id: z.string().optional().nullable(),
-		queueId: z.number().int().optional(),
-		queueStatus: z.enum(['pending', 'flushed', 'processed']).optional(),
-		flushedAt: z.number().optional().nullable(),
-		processedAt: z.number().optional().nullable()
+		organization_id: z.string().nullish(),
+		queueId: z.number().int().nullish(),
+		queueStatus: z.enum(['pending', 'flushed', 'processed']).nullish(),
+		flushedAt: z.number().nullish(),
+		processedAt: z.number().nullish(),
 	});
 }
+/**
+ * Pipeline configurations - phải khớp với D1 tables trong queue-worker
+ * Tham chiếu: workers/queue-worker/src/database/index.ts -> initializeTables()
+ */
 export const PIPELINE_CONFIGS: PipelineConfig[] = [
 	{
 		schemaName: 'PricePolicySchema',
 		tableName: 'price_policies',
 		schema: createExtendedSchema(PricePolicySchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(PricePolicySchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -377,7 +378,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'services',
 		schema: createExtendedSchema(ServiceSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(ServiceSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -385,7 +386,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'vouchers',
 		schema: createExtendedSchema(VoucherSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(VoucherSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -393,7 +394,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'users',
 		schema: createExtendedSchema(UserSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(UserSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -401,7 +402,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'sessions',
 		schema: createExtendedSchema(SessionSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(SessionSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -409,7 +410,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'connections',
 		schema: createExtendedSchema(ConnectionSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(ConnectionSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -417,7 +418,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'subscriptions',
 		schema: createExtendedSchema(SubscriptionSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(SubscriptionSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -425,7 +426,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'orders',
 		schema: createExtendedSchema(OrderSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -433,7 +434,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'service_usages',
 		schema: createExtendedSchema(ServiceUsageSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(ServiceUsageSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -441,7 +442,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'order_items',
 		schema: createExtendedSchema(OrderItemSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -449,7 +450,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'order_discounts',
 		schema: createExtendedSchema(OrderItemDiscountSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemDiscountSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -457,7 +458,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'payments',
 		schema: createExtendedSchema(PaymentSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(PaymentSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -465,7 +466,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'refunds',
 		schema: createExtendedSchema(RefundSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(RefundSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -473,23 +474,23 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'api_tokens',
 		schema: createExtendedSchema(ApiTokenSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(ApiTokenSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
-	{
-		schemaName: 'VersionInfoSchema',
-		tableName: 'versions',
-		schema: createExtendedSchema(VersionInfoSchema),
-		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(VersionInfoSchema)),
-		namespace: 'v009',
-		r2BucketName: 'lakehouse',
-	},
+	// {
+	// 	schemaName: 'VersionInfoSchema',
+	// 	tableName: 'versions',
+	// 	schema: createExtendedSchema(VersionInfoSchema),
+	// 	pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(VersionInfoSchema)),
+	// 	namespace: 'v010',
+	// 	r2BucketName: 'lakehouse',
+	// },
 	{
 		schemaName: 'PendingMessageSchema',
 		tableName: 'pending_messages',
 		schema: createExtendedSchema(PendingMessageSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(PendingMessageSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -497,7 +498,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'user_mfa',
 		schema: createExtendedSchema(UserMfaSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(UserMfaSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -505,7 +506,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'user_ekyc',
 		schema: createExtendedSchema(UserEkycSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(UserEkycSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -513,7 +514,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'user_did',
 		schema: createExtendedSchema(UserDidSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(UserDidSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -521,7 +522,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'passkey_credentials',
 		schema: createExtendedSchema(PasskeyCredentialSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(PasskeyCredentialSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 	{
@@ -529,7 +530,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'backup_codes',
 		schema: createExtendedSchema(BackupCodeSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(BackupCodeSchema)),
-		namespace: 'v009',
+		namespace: 'v010',
 		r2BucketName: 'lakehouse',
 	},
 ];

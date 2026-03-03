@@ -14,7 +14,7 @@
 	},
 	"triggers": {
 		"crons": [
-			"57 9 * * *"  // Chạy hàng ngày lúc 09:20 GMT+7 (02:20 UTC)
+			"33 7 * * *"  // Chạy hàng ngày lúc 09:20 GMT+7 (02:20 UTC)
 			// Format: phút giờ ngày tháng thứ (sử dụng UTC time)
 			// 09:20 GMT+7 (Hà Nội) = 02:20 UTC
 			// Worker sẽ đẩy dữ liệu ngày xa nhất (trước cutoff = D1_RETENTION_DAYS) từ D1 sang R2, sau đó xóa khỏi D1
