@@ -338,6 +338,69 @@ export function exportPipelineSchemaAsJSON(config: PipelineConfig): string {
 }
 
 /**
+ * Parse/chuẩn hóa các cột từ D1 về đúng type trước khi validate.
+ * D1/SQLite và queue-worker serialize khác JS: boolean->0/1, array/object->JSON string.
+ * Tham chiếu: queue-worker parseFromDatabase, preprocessData.
+ */
+export function parseD1JsonFields(row: any, schema: z.ZodSchema): any {
+	if (!row || typeof row !== 'object') return row;
+	const shape = isZodObject(schema) ? (schema as any).shape : {};
+	const result = { ...row };
+
+	for (const [key, value] of Object.entries(result)) {
+		const fieldSchema = shape[key];
+		if (!fieldSchema) continue;
+
+		const unwrapped = unwrapZodType(fieldSchema);
+		const typeName = getSchemaTypeName(unwrapped);
+
+		// Boolean: D1/SQLite lưu 0/1, schema mong boolean
+		if (typeName === 'ZodBoolean') {
+			if (value === 1 || value === '1' || value === 'true') {
+				result[key] = true;
+			} else if (value === 0 || value === '0' || value === 'false') {
+				result[key] = false;
+			}
+			continue;
+		}
+
+		// Number: D1 đôi khi trả string (INTEGER), schema mong number
+		if (typeName === 'ZodNumber' && typeof value === 'string') {
+			const num = Number(value);
+			if (!isNaN(num)) result[key] = num;
+			continue;
+		}
+
+		// Array, Object, Record: lưu dưới dạng JSON string
+		if (typeName === 'ZodArray' || typeName === 'ZodObject' || typeName === 'ZodRecord' || typeName === 'ZodTuple') {
+			if (typeof value !== 'string') continue;
+			try {
+				const parsed = JSON.parse(value);
+				if (Array.isArray(parsed) || (typeof parsed === 'object' && parsed !== null)) {
+					result[key] = parsed;
+				}
+			} catch {
+				// Giữ nguyên string nếu parse thất bại
+			}
+			continue;
+		}
+
+		// Map: lưu dạng JSON string của object
+		if (typeName === 'ZodMap' && typeof value === 'string') {
+			try {
+				const parsed = JSON.parse(value);
+				if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+					result[key] = new Map(Object.entries(parsed));
+				}
+			} catch {
+				// Giữ nguyên
+			}
+		}
+	}
+	return result;
+}
+
+/**
  * Tạo extended schema tương thích với D1 tables trong queue-worker
  * Queue worker's D1DatabaseManager.createExtendedSchema thêm các cột:
  * - globalId, id, created_at, updated_at, user_id, organization_id

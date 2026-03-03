@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PIPELINE_CONFIGS, PipelineConfig } from './config';
+import { PIPELINE_CONFIGS, PipelineConfig, parseD1JsonFields } from './config';
 import { CloudflarePipelineAPIService } from './pipeline-api-service';
 
 export interface PipelineResult {
@@ -672,12 +672,23 @@ export class PipelineManager {
 		const errors: string[] = [];
 
 		for (let i = 0; i < records.length; i++) {
-			const normalized = this.normalizeD1Row(records[i]);
-			const result = schema.safeParse(normalized);
+			const raw = records[i];
+			const normalized = this.normalizeD1Row(raw);
+			const parsed = parseD1JsonFields(normalized, schema);
+			const result = schema.safeParse(parsed);
 			if (result.success) {
 				validatedRecords.push(result.data);
 			} else {
-				errors.push(`Record ${i}: ${result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')}`);
+				const errDetails = result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+				errors.push(`Record ${i}: ${errDetails}`);
+
+				// Debug: log raw/normalized data và chi tiết Zod error cho record lỗi
+				console.warn(`[validateRecords] Record ${i} FAILED - raw:`, JSON.stringify(raw, null, 0));
+				console.warn(`[validateRecords] Record ${i} FAILED - normalized:`, JSON.stringify(normalized, null, 0));
+				console.warn(
+					`[validateRecords] Record ${i} FAILED - Zod issues:`,
+					result.error.errors.map((e) => ({ path: e.path, message: e.message, code: e.code })),
+				);
 			}
 		}
 
