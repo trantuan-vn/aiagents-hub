@@ -171,7 +171,11 @@
     "search": "Tìm kiếm",
     "search_placeholder": "Tìm kiếm bảng điều khiển, người dùng và nhiều hơn nữa…",
     "no_results": "Không tìm thấy kết quả.",
-    "system_config": "Cấu hình hệ thống"
+    "system_config": "Cấu hình hệ thống",
+    "price_policy": "Chính sách giá",
+    "api_service": "Dịch vụ API",
+    "discount_vouchers": "Voucher giảm giá",
+    "version_updates": "Phiên bản cập nhật"
   },
   "CRM": {
     "new_leads": "Khách hàng tiềm năng mới",

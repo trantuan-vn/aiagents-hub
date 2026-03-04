@@ -171,7 +171,11 @@
     "search": "Search",
     "search_placeholder": "Search dashboards, users, and more…",
     "no_results": "No results found.",
-    "system_config": "System Configuration"
+    "system_config": "System Configuration",
+    "price_policy": "Price Policy",
+    "api_service": "API Service",
+    "discount_vouchers": "Discount Vouchers",
+    "version_updates": "Version Updates"
   },
   "CRM": {
     "new_leads": "New Leads",
