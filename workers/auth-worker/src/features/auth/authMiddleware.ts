@@ -31,6 +31,17 @@ export function createAuthMiddleware(bindingName: string) {
       await processAuthentication(c, bindingName, sessionId, token, refreshToken);
     } catch (error) {
       handleErrorWithoutIp(error, "Auth middleware error");
+      const sessionId = getCookie(c, 'sessionId');
+      const refreshToken = getCookie(c, 'refreshToken');
+      const token = getCookie(c, 'token');
+      if (sessionId && (refreshToken || token)) {
+        try {
+          const applicationService = createApplicationService(c, bindingName);
+          await applicationService.deactivateSessionOnAuthFailureUseCase(sessionId, refreshToken ?? '', token);
+        } catch {
+          // Ignore - auth already failed
+        }
+      }
       cookieUtils.clearAuthCookies(c);
     }
     

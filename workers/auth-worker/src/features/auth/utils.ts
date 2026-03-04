@@ -80,6 +80,18 @@ export const jwtUtils = {
     }, secret);
   },
 
+  /** Decode JWT payload without verification. Use only when auth has failed, to locate session for deactivation. */
+  decodePayloadWithoutVerify(token: string): { identifier?: string } | null {
+    try {
+      if (!token || typeof token !== 'string') return null;
+      const decoded = jwt.decode(token);
+      const payload = decoded?.payload as JwtPayload | undefined;
+      return payload?.identifier ? { identifier: payload.identifier } : null;
+    } catch {
+      return null;
+    }
+  },
+
   async generateRefreshToken(
     userId: number,
     identifier: string, 

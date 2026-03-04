@@ -52,6 +52,7 @@ interface IApplicationService {
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
   verifyTokenUseCase(sessionId: string, token: string, refreshToken: string): Promise<{ ok: boolean; user: any }>;
   refreshTokenUseCase(sessionId: string, refreshToken: string): Promise<{ ok: boolean; user: any; token: string; refreshToken: string }>;
+  deactivateSessionOnAuthFailureUseCase(sessionId: string, refreshToken: string, token?: string): Promise<void>;
 }
 
 export function createApplicationService(c: Context, bindingName: string): IApplicationService {
@@ -569,6 +570,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         token: newToken, 
         refreshToken: newRefreshToken 
       };
+    },
+
+    async deactivateSessionOnAuthFailureUseCase(sessionId: string, refreshToken: string, token?: string): Promise<void> {
+      try {
+        const decoded = jwtUtils.decodePayloadWithoutVerify(refreshToken) ?? jwtUtils.decodePayloadWithoutVerify(token ?? '');
+        const identifier = decoded?.identifier;
+        if (!identifier) return;
+        const repository = getRepository(identifier);
+        await repository.sessions.update(sessionId, { isActive: false });
+      } catch {
+        // Auth already failed - silently ignore deactivation errors
+      }
     }
   };
 }

@@ -1171,7 +1171,16 @@ export class UserDO extends DurableObject {
   private async sendMessage(ws: WebSocket, message: any): Promise<boolean> {
     console.log(`[UserDO] sendMessage: sending to ws=${ws} message=${JSON.stringify(message)}`);
     try {
-      if (ws.readyState !== WebSocket.OPEN) return false;
+      if (ws.readyState !== WebSocket.OPEN) {
+        const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
+        if (sessionId) {
+          await this.database.execTransaction([{
+            sql: 'UPDATE connections SET connected = 0, queueStatus = ? WHERE sessionId = ?',
+            params: ['pending' as const, sessionId]
+          }]);
+        }
+        return false;
+      }
       
       const messageStr = JSON.stringify(message);
       if (messageStr.length > 1024 * 1024) return false;
