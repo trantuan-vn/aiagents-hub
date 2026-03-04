@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import Link from "next/link";
+
 import { formatDistanceToNow } from "date-fns";
 import { Bell } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -25,6 +27,7 @@ function NotificationDetailDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const markAsRead = useNotificationsStore((s) => s.markAsRead);
+  const t = useTranslations("Notifications");
 
   if (!notification) return null;
 
@@ -33,6 +36,8 @@ function NotificationDetailDialog({
     onOpenChange(next);
   };
 
+  const link = notification.data && typeof notification.data.link === "string" ? notification.data.link : null;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -40,9 +45,20 @@ function NotificationDetailDialog({
           <DialogTitle className="pr-8">{notification.title}</DialogTitle>
         </DialogHeader>
         <div className="text-muted-foreground text-sm">{notification.body ?? ""}</div>
-        {notification.data && Object.keys(notification.data).length > 0 && (
+        {link ? (
+          <Button asChild className="mt-3" variant="default" size="sm">
+            <Link href={link} onClick={() => handleOpenChange(false)}>
+              {t("open_link")}
+            </Link>
+          </Button>
+        ) : null}
+        {notification.data && Object.keys(notification.data).filter((k) => k !== "link").length > 0 && (
           <pre className="border-border bg-muted text-muted-foreground mt-2 max-h-40 overflow-auto rounded-md border p-2 text-xs">
-            {JSON.stringify(notification.data, null, 2)}
+            {JSON.stringify(
+              Object.fromEntries(Object.entries(notification.data).filter(([k]) => k !== "link")),
+              null,
+              2,
+            )}
           </pre>
         )}
         <div className="text-muted-foreground text-xs">

@@ -21,6 +21,7 @@ import { normalizeBackupCodeInput } from '../account/backup-codes';
 import { verifyTotpCode } from '../account/totp';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
+import { createWebsocketApplicationService } from '../ws/application';
 
 interface IApplicationService {
   // I. OAUTH
@@ -94,15 +95,16 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     return { token, refreshToken };
   };
 
-  const getOrCreateUser = async (repository: any, identifier: string, additionalData: any = {}) => {
+  const getOrCreateUser = async (repository: any, identifier: string, additionalData: any = {}): Promise<{ user: any; isNewUser: boolean }> => {
     const encryptSecret= await c.env.ENCRYPTION_SECRET.get();
     if (!encryptSecret) {
       throw new Error("ENCRYPTION_SECRET is not defined in environment variables");
     }
 
-    const user = await repository.users.get();
-    
-    if (user) return user;
+    const existingUser = await repository.users.get();
+    console.log('[Auth] getOrCreateUser: identifier=', identifier, 'existingUser=', !!existingUser, 'isNewUser=', !existingUser);
+
+    if (existingUser) return { user: existingUser, isNewUser: false };
 
     const baseUser = {
       identifier: validationUtils.normalizeIdentifier(identifier),
@@ -127,7 +129,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       Object.assign(baseUser, { phone: identifier });
     }
 
-    return await repository.users.save(baseUser);
+    const user = await repository.users.save(baseUser);
+    return { user, isNewUser: true };
   };
 
   return {
@@ -164,7 +167,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(identifier);
-      const user = await getOrCreateUser(repository, identifier);
+      const { user, isNewUser } = await getOrCreateUser(repository, identifier);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -173,12 +176,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
+        console.log('[Auth] OAuth: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, identifier, { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
+        console.log('[Auth] OAuth: requiresSms branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -211,7 +216,15 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      return await createUserSession(repository, sessionId, user, 'oauth', ipAddress, userAgent);
+      const result = await createUserSession(repository, sessionId, user, 'oauth', ipAddress, userAgent);
+      console.log('[Auth] OAuth login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
+      // Notification gửi khi WS connect (đúng flow: login → token → client connect WS → gửi notification)
+      if (isNewUser) {
+        console.log('[Auth] Storing pending 2FA notification for new user (OAuth):', identifier);
+        const wsApp = createWebsocketApplicationService(c, bindingName);
+        await wsApp.storePendingFirstLoginNotificationUseCase(identifier);
+      }
+      return result;
     },
 
     // II. EMAIL/PHONE
@@ -235,7 +248,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       const repository = getRepository(identifier);
-      const user = await getOrCreateUser(repository, identifier);
+      const { user, isNewUser } = await getOrCreateUser(repository, identifier);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -244,12 +257,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Cả authenticator và SMS đều bật -> chọn authenticator
       if (totpStatus.enabled) {
+        console.log('[Auth] OTP: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, identifier, { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
+        console.log('[Auth] OTP: requiresSms branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -282,7 +297,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      const result = await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      console.log('[Auth] OTP login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
+      if (isNewUser) {
+        console.log('[Auth] Storing pending 2FA notification for new user (OTP):', identifier);
+        const wsApp = createWebsocketApplicationService(c, bindingName);
+        await wsApp.storePendingFirstLoginNotificationUseCase(identifier);
+      }
+      return result;
     },
 
     async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {
@@ -305,6 +327,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      console.log('[Auth] verifyTotpLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
       return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
     },
 
@@ -320,6 +343,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      console.log('[Auth] verifySmsLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
       return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
     },
 
@@ -375,7 +399,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(address);
-      const user = await getOrCreateUser(repository, address, { address });
+      const { user, isNewUser } = await getOrCreateUser(repository, address, { address });
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -384,12 +408,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
+        console.log('[Auth] SIWE: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'address=', address);
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, address, { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
+        console.log('[Auth] SIWE: requiresSms branch (no session yet) isNewUser=', isNewUser, 'address=', address);
         const userDO = getIdFromName(c, address, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -422,7 +448,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      return await createUserSession(repository, sessionId, user, 'siwe', ipAddress, userAgent);
+      const result = await createUserSession(repository, sessionId, user, 'siwe', ipAddress, userAgent);
+      console.log('[Auth] SIWE login: isNewUser=', isNewUser, 'address=', address, 'flow=normal');
+      if (isNewUser) {
+        console.log('[Auth] Storing pending 2FA notification for new user (SIWE):', address);
+        const wsApp = createWebsocketApplicationService(c, bindingName);
+        await wsApp.storePendingFirstLoginNotificationUseCase(address);
+      }
+      return result;
     },
 
     async connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string): Promise<{ token: string; refreshToken: string }> {

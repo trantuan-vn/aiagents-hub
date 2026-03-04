@@ -1081,7 +1081,8 @@ export class UserDO extends DurableObject {
       server.serializeAttachment({ sessionId });
       this.state.waitUntil(Promise.all([
         this.registerUser(), 
-        this.sendPendingMessages(server)
+        this.sendPendingMessages(server),
+        this.sendPendingFirstLoginNotificationIfAny()
       ]));
 
       await this.scheduleQueueAlarmIfNeeded();
@@ -1245,6 +1246,20 @@ export class UserDO extends DurableObject {
     this.state.getWebSockets().forEach(ws => this.sendMessage(ws, message));
   }
 
+  /** Gửi notification 2FA khi user connect WS lần đầu (đúng flow: login → token → WS connect → notification) */
+  private async sendPendingFirstLoginNotificationIfAny(): Promise<void> {
+    try {
+      const stored = await this.storage.get<string>('pending_first_login_notification');
+      if (!stored) return;
+      const payload = JSON.parse(stored) as { title: string; body?: string; data?: Record<string, unknown> };
+      await this.storage.delete('pending_first_login_notification');
+      this.broadcast('broadcast', payload);
+      console.log(`[UserDO] sent pending_first_login_notification to userId=${this.userId}`);
+    } catch (e) {
+      handleErrorWithoutIp(e, 'sendPendingFirstLoginNotificationIfAny error');
+    }
+  }
+
   private async sendHeartbeat(): Promise<void> {
     const webSockets = this.state.getWebSockets();
     this.broadcast('heartbeat', { 
@@ -1291,6 +1306,10 @@ export class UserDO extends DurableObject {
     if (message.type === 'broadcast') {
       console.log(`[UserDO] internal message: broadcast received userId=${this.userId} broadcastId=${message.broadcastId}`);
       await this.handleDirectBroadcast(message);
+    } else if (message.type === 'storePendingFirstLoginNotification') {
+      const payload = message.message as { title: string; body?: string; data?: Record<string, unknown> };
+      await this.storage.put('pending_first_login_notification', JSON.stringify(payload));
+      console.log(`[UserDO] stored pending_first_login_notification for userId=${this.userId}`);
     }
 
     return this.jsonResponse({ success: true, status: 'processed' });

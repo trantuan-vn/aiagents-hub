@@ -108,7 +108,8 @@
     "label": "Thông báo",
     "title": "Thông báo",
     "mark_all_read": "Đánh dấu tất cả đã đọc",
-    "empty": "Chưa có thông báo"
+    "empty": "Chưa có thông báo",
+    "open_link": "Mở"
   },
   "UnauthorizedPage": {
     "title": "Truy cập không được phép",

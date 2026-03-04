@@ -108,7 +108,8 @@
     "label": "Notifications",
     "title": "Notifications",
     "mark_all_read": "Mark all as read",
-    "empty": "No notifications yet"
+    "empty": "No notifications yet",
+    "open_link": "Open"
   },
   "UnauthorizedPage": {
     "title": "Unauthorized Access",

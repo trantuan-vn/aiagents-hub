@@ -99,6 +99,17 @@ export class BroadcastServiceDO extends DurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
     console.log(`[BroadcastServiceDO] fetch: ${url.pathname}`);
+
+    // Read request body IMMEDIATELY before any long-running work (e.g. getInitializationPromise).
+    // If we delay, the client may disconnect and we get "Can't read from request stream because client disconnected".
+    let createBroadcastBody: unknown = null;
+    let updateScaleBody: unknown = null;
+    if (url.pathname === '/dashboard/ws/broadcast' && request.method === 'POST') {
+      createBroadcastBody = await request.json();
+    } else if (url.pathname === '/dashboard/ws/scale' && request.method === 'POST') {
+      updateScaleBody = await request.json();
+    }
+
     await this.getInitializationPromise();
     console.log(`[BroadcastServiceDO] fetch: init done, handling ${url.pathname}`);
     try {
@@ -108,9 +119,9 @@ export class BroadcastServiceDO extends DurableObject {
       }
 
       const routes: { [key: string]: Function } = {
-        '/dashboard/ws/broadcast': () => request.method === 'POST' ? this.handleCreateBroadcast(request) : null,
+        '/dashboard/ws/broadcast': () => request.method === 'POST' && createBroadcastBody !== null ? this.handleCreateBroadcast(createBroadcastBody) : null,
         '/dashboard/ws/analytics': () => request.method === 'GET' ? this.getBroadcastAnalytics(parseInt(url.searchParams.get('broadcastId') || '0')) : null,
-        '/dashboard/ws/scale': () => request.method === 'POST' ? this.handleUpdateScaleConfig(request) : null,
+        '/dashboard/ws/scale': () => request.method === 'POST' && updateScaleBody !== null ? this.handleUpdateScaleConfig(updateScaleBody) : null,
         '/dashboard/ws/health': () => this.getHealthStatus(),
         '/dashboard/ws/stats': () => this.getServiceStats()
       };
@@ -177,9 +188,9 @@ export class BroadcastServiceDO extends DurableObject {
   // =============================================
   // BROADCAST MANAGEMENT
   // =============================================
-  private async handleCreateBroadcast(request: Request): Promise<Response> {
-    const createData: CreateBroadcast = BroadcastValidator.validateCreateBroadcast(await request.json());
-    console.log(`[BroadcastServiceDO] handleCreateBroadcast: received targetUsersCount=${createData.targetUsers?.length ?? 'all'} priority=${createData.priority} expiresIn=${createData.expiresIn}`);
+  private async handleCreateBroadcast(body: unknown): Promise<Response> {
+    const createData: CreateBroadcast = BroadcastValidator.validateCreateBroadcast(body);
+    console.log(`[BroadcastServiceDO] handleCreateBroadcast: received targetUsersCount=${createData.targetUsers?.length ?? 'all'} targetUsers=${JSON.stringify(createData.targetUsers)} priority=${createData.priority} expiresIn=${createData.expiresIn}`);
     const broadcastId = await this.createBroadcast(createData);
     console.log(`[BroadcastServiceDO] handleCreateBroadcast: created broadcastId=${broadcastId}`);
 
@@ -487,8 +498,8 @@ export class BroadcastServiceDO extends DurableObject {
   // =============================================
   // SCALING & HEALTH
   // =============================================
-  private async handleUpdateScaleConfig(request: Request): Promise<Response> {
-    const { scale } = await request.json() as { scale: string };
+  private async handleUpdateScaleConfig(body: unknown): Promise<Response> {
+    const { scale } = body as { scale: string };
     if (!scale || !DEFAULT_SCALE_CONFIGS[scale as ScaleConfigName]) {
       throw new Error('Invalid scale');
     }

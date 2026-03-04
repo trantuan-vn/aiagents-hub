@@ -4,17 +4,22 @@ import { useWs } from "@/core/use-ws";
 
 import { notificationsStore } from "./notifications-store";
 
-type NotificationPayload = { title: string; body?: string };
+type NotificationPayload = {
+  title: string;
+  body?: string;
+  data?: Record<string, unknown>;
+};
 
 function parseNotificationPayload(data: unknown): NotificationPayload | null {
   if (typeof data === "string") {
     return { title: "Thông báo", body: data };
   }
   if (typeof data === "object" && data !== null && !Array.isArray(data)) {
-    const payload = data as { title?: string; body?: string; message?: string };
+    const payload = data as { title?: string; body?: string; message?: string; data?: Record<string, unknown> };
     return {
       title: payload.title ?? "Thông báo",
       body: payload.body ?? payload.message,
+      data: payload.data,
     };
   }
   return null;
@@ -28,6 +33,7 @@ const notificationsWsHandlers = {
     notificationsStore.getState().addNotification({
       title: payload.title,
       body: payload.body,
+      data: payload.data,
     });
   },
 };
