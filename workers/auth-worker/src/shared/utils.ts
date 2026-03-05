@@ -195,7 +195,8 @@ export const executeUtils = {
           table, 
           where: data.where, 
           orderBy: data.orderBy, 
-          limit: data.limit 
+          limit: data.limit,
+          offset: data.offset 
         };
         break;
         

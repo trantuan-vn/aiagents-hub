@@ -405,14 +405,15 @@ export class UserDO extends DurableObject {
   }
 
   private async handleDynamicSelect(request: Request): Promise<Response> {
-    const { table, where, orderBy, limit } = await request.json() as {
+    const { table, where, orderBy, limit, offset } = await request.json() as {
       table: string;
-      where?: { field: string; operator: string; value: any };
+      where?: { field: string; operator: string; value: any } | { field: string; operator: string; value: any }[];
       orderBy?: { field: string; direction: 'ASC' | 'DESC' };
       limit?: number;
+      offset?: number;
     };
         
-    const result = await this.database.dynamicSelect(table, where, orderBy, limit);
+    const result = await this.database.dynamicSelect(table, where, orderBy, limit, offset);
     return this.jsonResponse({ success: true, data: result });
   }
 

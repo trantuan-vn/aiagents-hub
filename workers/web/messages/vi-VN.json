@@ -813,6 +813,47 @@
       "is_active_description": "Dịch vụ có đang hoạt động hay không"
     }
   },
+  "MonitorLogsPage": {
+    "title": "Nhật ký Sử dụng Dịch vụ",
+    "description": "Xem và quản lý nhật ký sử dụng API. Tìm kiếm, lọc và theo dõi từng lượt gọi API.",
+    "fetch_error": "Không thể tải nhật ký",
+    "error": "Lỗi",
+    "refresh": "Làm mới",
+    "retry": "Thử lại",
+    "empty": "Chưa có nhật ký",
+    "empty_hint": "Nhật ký sử dụng API sẽ hiển thị tại đây khi bạn thực hiện các lượt gọi API qua dịch vụ.",
+    "stats": {
+      "total_logs": "Nhật ký",
+      "on_this_page": "trên trang này",
+      "services": "Dịch vụ",
+      "active_services": "dịch vụ đang hoạt động",
+      "status": "Trạng thái",
+      "live": "Trực tiếp",
+      "realtime": "Dữ liệu theo thời gian thực"
+    },
+    "filters": {
+      "title": "Tìm kiếm & Lọc",
+      "description": "Tìm theo endpoint, lọc theo dịch vụ hoặc khoảng thời gian",
+      "search_placeholder": "Tìm kiếm endpoint...",
+      "service_placeholder": "Chọn dịch vụ",
+      "all_services": "Tất cả dịch vụ",
+      "apply": "Áp dụng"
+    },
+    "table": {
+      "title": "Lịch sử Sử dụng",
+      "description": "Các lượt gọi API gần đây từ dịch vụ của bạn",
+      "time": "Thời gian",
+      "service": "Dịch vụ",
+      "endpoint": "Endpoint",
+      "ip": "Địa chỉ IP",
+      "user_agent": "User Agent"
+    },
+    "pagination": {
+      "showing": "Hiển thị {from}–{to}",
+      "prev": "Trước",
+      "next": "Tiếp"
+    }
+  },
   "VoucherPage": {
     "title": "Quản lý Voucher",
     "description": "Tạo và quản lý các mã giảm giá",

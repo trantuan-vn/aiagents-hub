@@ -11,7 +11,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { updateThemeMode, updateThemePreset } from "@/lib/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
-import Dashboard from "./pages/dashboard";
 import Index from "./pages/index";
 import Packages from "./pages/packages";
 import Support from "./pages/support";

@@ -813,6 +813,47 @@
       "is_active_description": "Whether the service is currently active"
     }
   },
+  "MonitorLogsPage": {
+    "title": "Service Usage Logs",
+    "description": "View and manage your API service usage logs. Search, filter, and track every API call.",
+    "fetch_error": "Failed to load logs",
+    "error": "Error",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "empty": "No logs found",
+    "empty_hint": "API usage logs will appear here when you make API calls through your services.",
+    "stats": {
+      "total_logs": "Logs",
+      "on_this_page": "on this page",
+      "services": "Services",
+      "active_services": "active services",
+      "status": "Status",
+      "live": "Live",
+      "realtime": "Real-time data"
+    },
+    "filters": {
+      "title": "Search & Filter",
+      "description": "Search by endpoint, filter by service or date range",
+      "search_placeholder": "Search endpoint...",
+      "service_placeholder": "Select service",
+      "all_services": "All services",
+      "apply": "Apply"
+    },
+    "table": {
+      "title": "Usage History",
+      "description": "Recent API calls from your services",
+      "time": "Time",
+      "service": "Service",
+      "endpoint": "Endpoint",
+      "ip": "IP Address",
+      "user_agent": "User Agent"
+    },
+    "pagination": {
+      "showing": "Showing {from}–{to}",
+      "prev": "Previous",
+      "next": "Next"
+    }
+  },
   "VoucherPage": {
     "title": "Voucher Management",
     "description": "Create and manage discount vouchers",

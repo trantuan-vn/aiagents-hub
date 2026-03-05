@@ -27,24 +27,24 @@ export function ActivityCard({ activities, t }: ActivityCardProps) {
             <p className="text-muted-foreground py-4 text-center text-sm">{t("activity.no_activity")}</p>
           ) : (
             activities.map((activity) => (
-            <div key={`${activity.action}-${activity.endpoint}-${activity.time}`} className="flex items-start gap-3">
-              <div
-                className={`mt-2 h-2 w-2 rounded-full ${
-                  activity.status === "success"
-                    ? "bg-accent"
-                    : activity.status === "error"
-                      ? "bg-destructive"
-                      : "bg-primary"
-                }`}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{activity.endpoint}</p>
-                <p className="text-muted-foreground text-xs">
-                  {activity.action} • {activity.time}
-                </p>
+              <div key={`${activity.action}-${activity.endpoint}-${activity.time}`} className="flex items-start gap-3">
+                <div
+                  className={`mt-2 h-2 w-2 rounded-full ${
+                    activity.status === "success"
+                      ? "bg-accent"
+                      : activity.status === "error"
+                        ? "bg-destructive"
+                        : "bg-primary"
+                  }`}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{activity.endpoint}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {activity.action} • {activity.time}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))
+            ))
           )}
         </div>
       </CardContent>

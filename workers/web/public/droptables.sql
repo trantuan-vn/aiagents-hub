@@ -32,5 +32,8 @@ drop table shard_configs;
 drop table shard_performances;
 drop table user_registrations;
 
-
+CREATE INDEX IF NOT EXISTS idx_service_usages_user_created 
+ON service_usages ("user_id", "created_at" DESC);
+CREATE INDEX IF NOT EXISTS idx_service_usages_user_service_created 
+ON service_usages ("user_id", "serviceId", "created_at" DESC);
 

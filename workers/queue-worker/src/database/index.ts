@@ -1495,6 +1495,22 @@ export class D1DatabaseManager {
         throw e;
       }
     }
+
+    // Custom composite indexes for service_usages (optimize logs query by user_id, serviceId, created_at)
+    if (tableName === 'service_usages') {
+      const serviceUsagesIndexes = [
+        `CREATE INDEX IF NOT EXISTS "idx_service_usages_user_created" ON "service_usages" ("user_id", "created_at" DESC)`,
+        `CREATE INDEX IF NOT EXISTS "idx_service_usages_user_service_created" ON "service_usages" ("user_id", "serviceId", "created_at" DESC)`,
+      ];
+      for (const indexSQL of serviceUsagesIndexes) {
+        try {
+          await this.db.prepare(indexSQL).run();
+        } catch (e) {
+          console.error(`Error creating service_usages index:`, e);
+          throw e;
+        }
+      }
+    }
   }
 
   // D1 TRANSACTION HANDLING
