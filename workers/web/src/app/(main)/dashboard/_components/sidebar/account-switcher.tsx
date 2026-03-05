@@ -69,10 +69,10 @@ export function AccountSwitcher({ user }: { readonly user: User | null }) {
       });
 
       if (response.ok) {
-        // Handle successful logout (e.g., redirect or update state)
         window.location.href = "/"; // Redirect to login page
       } else {
-        console.error("Logout failed");
+        // Session có thể đã hết hạn (401) - vẫn redirect để clear state và quay về trang đăng nhập
+        window.location.href = "/";
       }
     } catch (error) {
       console.error("Error during logout:", error);
