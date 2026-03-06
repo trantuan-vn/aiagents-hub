@@ -1496,6 +1496,17 @@ export class D1DatabaseManager {
       }
     }
 
+    // Index on created_at for d1tor2 queries (MIN, range, ORDER BY created_at)
+    if (options.autoFields?.timestamps !== false) {
+      const createdAtIndexSQL = `CREATE INDEX IF NOT EXISTS "idx_${tableName}_created_at" ON "${tableName}" ("created_at")`;
+      try {
+        await this.db.prepare(createdAtIndexSQL).run();
+      } catch (e) {
+        console.error(`Error creating created_at index for ${tableName}:`, e);
+        throw e;
+      }
+    }
+
     // Custom composite indexes for service_usages (optimize logs query by user_id, serviceId, created_at)
     if (tableName === 'service_usages') {
       const serviceUsagesIndexes = [
