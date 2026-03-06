@@ -364,7 +364,7 @@ export class PipelineManager {
 			// Tính cutoff date: N ngày trước (để giữ lại N ngày gần nhất)
 			const cutoffDate = new Date(now);
 			cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-			cutoffDate.setHours(23, 59, 59, 999);
+			cutoffDate.setHours(0, 0, 0, 0);
 			const cutoffTimestamp = Math.floor(cutoffDate.getTime());
 
 			console.log(`  Cutoff date (${retentionDays} days ago): ${cutoffDate.toISOString().split('T')[0]}`);
