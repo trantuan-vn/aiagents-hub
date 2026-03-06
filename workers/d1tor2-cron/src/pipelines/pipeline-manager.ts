@@ -427,7 +427,7 @@ export class PipelineManager {
 				// Query batch tiếp theo nếu còn data và chưa đạt giới hạn concurrency
 				while (hasMore && processingQueue.length < concurrencyLimit) {
 					// Query batch từ D1 - quoted identifiers tương thích queue-worker
-					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? ORDER BY "created_at" ASC LIMIT ${batchSize} OFFSET ${offset}`;
+					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? ORDER BY "globalId" ASC LIMIT ${batchSize} OFFSET ${offset}`;
 					const result = await this.db.prepare(query).bind(startTimestamp, endTimestamp).all();
 
 					if (!result.results || result.results.length === 0) {
