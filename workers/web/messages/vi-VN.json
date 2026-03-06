@@ -854,6 +854,37 @@
       "next": "Tiếp"
     }
   },
+  "MonitorAnalyticsPage": {
+    "title": "Phân tích API",
+    "description": "Theo dõi sử dụng API theo thời gian. Xem số lượng request và chi phí theo ngày.",
+    "fetch_error": "Không thể tải dữ liệu phân tích",
+    "error": "Lỗi",
+    "refresh": "Làm mới",
+    "retry": "Thử lại",
+    "duration_label": "Chọn khoảng thời gian",
+    "duration": {
+      "week": "7 ngày gần nhất",
+      "month": "30 ngày gần nhất",
+      "quarter": "90 ngày gần nhất",
+      "year": "365 ngày gần nhất"
+    },
+    "empty_chart": "Không có dữ liệu cho khoảng thời gian này",
+    "empty_table": "Không tìm thấy dữ liệu sử dụng",
+    "empty_hint": "Dữ liệu sử dụng API sẽ hiển thị tại đây khi bạn thực hiện request qua dịch vụ.",
+    "chart": {
+      "title": "Request API theo thời gian",
+      "description": "Số lượng request API mỗi ngày trong khoảng thời gian đã chọn",
+      "requests": "Requests"
+    },
+    "table": {
+      "title": "Tổng quan theo ngày",
+      "description": "Chi tiết số request API và chi phí theo ngày",
+      "date": "Ngày",
+      "requests": "Request API",
+      "cost": "Chi phí",
+      "total": "Tổng cộng"
+    }
+  },
   "VoucherPage": {
     "title": "Quản lý Voucher",
     "description": "Tạo và quản lý các mã giảm giá",

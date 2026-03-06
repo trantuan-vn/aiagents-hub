@@ -854,6 +854,37 @@
       "next": "Next"
     }
   },
+  "MonitorAnalyticsPage": {
+    "title": "API Analytics",
+    "description": "Track your API usage over time. View request volume and costs by day.",
+    "fetch_error": "Failed to load analytics",
+    "error": "Error",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "duration_label": "Select duration",
+    "duration": {
+      "week": "Last 7 days",
+      "month": "Last 30 days",
+      "quarter": "Last 90 days",
+      "year": "Last 365 days"
+    },
+    "empty_chart": "No data for this period",
+    "empty_table": "No usage data found",
+    "empty_hint": "API usage will appear here when you make requests through your services.",
+    "chart": {
+      "title": "API Requests Over Time",
+      "description": "Daily API request count for the selected period",
+      "requests": "Requests"
+    },
+    "table": {
+      "title": "Daily Summary",
+      "description": "Breakdown of API requests and cost by date",
+      "date": "Date",
+      "requests": "API Requests",
+      "cost": "Cost",
+      "total": "Total"
+    }
+  },
   "VoucherPage": {
     "title": "Voucher Management",
     "description": "Create and manage discount vouchers",
