@@ -364,7 +364,7 @@ export class PipelineManager {
 			// Tính cutoff date: N ngày trước (để giữ lại N ngày gần nhất)
 			const cutoffDate = new Date(now);
 			cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-			cutoffDate.setHours(0, 0, 0, 0);
+			cutoffDate.setHours(23, 59, 59, 999);
 			const cutoffTimestamp = Math.floor(cutoffDate.getTime());
 
 			console.log(`  Cutoff date (${retentionDays} days ago): ${cutoffDate.toISOString().split('T')[0]}`);
@@ -427,7 +427,7 @@ export class PipelineManager {
 				// Query batch tiếp theo nếu còn data và chưa đạt giới hạn concurrency
 				while (hasMore && processingQueue.length < concurrencyLimit) {
 					// Query batch từ D1 - quoted identifiers tương thích queue-worker
-					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? LIMIT ${batchSize} OFFSET ${offset}`;
+					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? ORDER BY "created_at" ASC LIMIT ${batchSize} OFFSET ${offset}`;
 					const result = await this.db.prepare(query).bind(startTimestamp, endTimestamp).all();
 
 					if (!result.results || result.results.length === 0) {
