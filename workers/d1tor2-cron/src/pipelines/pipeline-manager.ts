@@ -127,7 +127,7 @@ export class PipelineManager {
 
 		// Heuristic dựa trên Cloudflare Workers limits
 		// Mỗi pipeline/batch có thể tạo:
-		// - 1-3 D1 queries (query, delete)
+		// - 1-3 D1 queries (query, update flushedAt, delete flushed)
 		// - 1 HTTP request (send to pipeline endpoint)
 		// - Có thể có thêm subrequests trong quá trình xử lý
 		// Pipeline concurrency: mỗi pipeline có thể tạo ~3-5 subrequests
@@ -397,7 +397,7 @@ export class PipelineManager {
 	}
 
 	/**
-	 * Xử lý dữ liệu theo batch: query 10k từ D1 -> validate -> send vào R2 -> delete khỏi D1 -> lặp lại
+	 * Xử lý dữ liệu theo batch: query 10k từ D1 -> validate -> send vào R2 -> update flushedAt -> xoá bản ghi đã flushed -> lặp lại
 	 * Tối ưu memory bằng cách không lưu tất cả records vào memory
 	 * Xử lý song song nhiều batch để tăng hiệu suất
 	 */
@@ -409,15 +409,12 @@ export class PipelineManager {
 		let hasMore = true;
 
 		// Tính timestamp cho đầu và cuối ngày đích
-		const startOfDay = new Date(targetDate);
-		startOfDay.setHours(0, 0, 0, 0);
 		const endOfDay = new Date(targetDate);
 		endOfDay.setHours(23, 59, 59, 999);
 
-		const startTimestamp = Math.floor(startOfDay.getTime());
 		const endTimestamp = Math.floor(endOfDay.getTime());
 
-		console.log(`  Processing data from ${config.tableName} for date ${targetDate.toISOString().split('T')[0]} (${startTimestamp} - ${endTimestamp})...`);
+		console.log(`  Processing data from ${config.tableName} for date ${targetDate.toISOString().split('T')[0]} (<= ${endTimestamp})...`);
 
 		try {
 			// Queue để quản lý các batch đang được xử lý (map promise với batch info)
@@ -427,8 +424,9 @@ export class PipelineManager {
 				// Query batch tiếp theo nếu còn data và chưa đạt giới hạn concurrency
 				while (hasMore && processingQueue.length < concurrencyLimit) {
 					// Query batch từ D1 - quoted identifiers tương thích queue-worker
-					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" >= ? AND "created_at" <= ? ORDER BY "globalId" ASC LIMIT ${batchSize} OFFSET ${offset}`;
-					const result = await this.db.prepare(query).bind(startTimestamp, endTimestamp).all();
+					// Chỉ dùng endTimestamp (không dùng startTimestamp) để ngày T+1 vẫn xử lý được nếu ngày T chưa đẩy xong
+					const query = `SELECT * FROM "${config.tableName}" WHERE "created_at" <= ? ORDER BY "globalId" ASC LIMIT ${batchSize} OFFSET ${offset}`;
+					const result = await this.db.prepare(query).bind(endTimestamp).all();
 
 					if (!result.results || result.results.length === 0) {
 						hasMore = false;
@@ -489,6 +487,10 @@ export class PipelineManager {
 				}
 			}
 
+			// Xóa các bản ghi đã được update flushedAt (đã flush lên R2 thành công)
+			// Chỉ dùng endTimestamp (không dùng startTimestamp) để ngày T+1 vẫn xử lý được nếu ngày T chưa đẩy xong
+			await this.deleteFlushedRecordsFromD1(config.tableName, endTimestamp);
+
 			console.log(`  Total records processed: ${totalProcessed}`);
 			return totalProcessed;
 		} catch (error) {
@@ -502,7 +504,7 @@ export class PipelineManager {
 	}
 
 	/**
-	 * Xử lý một batch: validate -> send vào R2 -> delete khỏi D1
+	 * Xử lý một batch: validate -> send vào R2 -> update flushedAt trong D1 (đánh dấu xoá sau)
 	 */
 	private async processBatch(
 		config: PipelineConfig,
@@ -522,11 +524,11 @@ export class PipelineManager {
 		let recordIds: number[] = []; 
 	  
 		try {
-		  // 2. Lấy danh sách ID để xóa sau (chỉ lấy những record có id hợp lệ)
+		// 2. Lấy danh sách ID để update flushedAt sau (chỉ lấy những record có id hợp lệ)
 		  recordIds = batch
 			.map((record: any) => record.globalId);
 	  
-		  console.log(`Found ${recordIds.length} valid record IDs for potential deletion.`);
+		  console.log(`Found ${recordIds.length} valid record IDs for flushedAt update.`);
 	  
 		  // 3. Validate và transform dữ liệu theo Zod schema
 		  const validatedRecords = this.validateRecords(batch, config.schema);
@@ -542,17 +544,17 @@ export class PipelineManager {
 				throw new Error(`Failed to send data to pipeline ${config.schemaName}.`);
 			}
 			console.log('Successfully sent data to pipeline.');
-			await this.deleteBatchFromD1(config.tableName, recordIds);
-			console.log(`Deleted ${recordIds.length} records from D1.`);
+			await this.updateBatchFromD1(config.tableName, recordIds);
+			console.log(`Updated flushedAt for ${recordIds.length} records in D1.`);
 
 		  }
 	  
 		  return batchSize;
 		} catch (error: any) {
-		  // 6. Quan trọng: Nếu gửi pipeline thất bại → KHÔNG xóa data khỏi D1
+		// 6. Quan trọng: Nếu gửi pipeline thất bại → KHÔNG update flushedAt (data giữ nguyên)
 		  //     Để lần sync sau sẽ thử lại
 		  console.error(
-			`Failed to process batch at offset ${offset}. Data will NOT be deleted from D1 to allow retry.`,
+			`Failed to process batch at offset ${offset}. Data will NOT be updated in D1 to allow retry.`,
 			error
 		  );
 	  
@@ -562,23 +564,37 @@ export class PipelineManager {
 	}
 
 	/**
-	 * Xóa một batch records từ D1 database (sau khi đã đẩy lên R2 thành công)
+	 * Cập nhật flushedAt cho batch records trong D1 (đánh dấu đã flush lên R2, để xoá sau)
 	 */
-	private async deleteBatchFromD1(tableName: string, recordIds: number[]): Promise<void> {
+	private async updateBatchFromD1(tableName: string, recordIds: number[]): Promise<void> {
 		try {
-			// Xóa batch records - quoted identifiers tương thích queue-worker
+			const flushedAt = Math.floor(Date.now());
 			const placeholders = recordIds.map(() => '?').join(',');
-			const query = `DELETE FROM "${tableName}" WHERE "globalId" IN (${placeholders})`;
-			const params = [...recordIds];
-			
+			const query = `UPDATE "${tableName}" SET "flushedAt" = ? WHERE "globalId" IN (${placeholders})`;
+			const params = [flushedAt, ...recordIds];
+
 			await this.db.prepare(query).bind(...params).run();
-			console.log(`  Deleted ${recordIds.length} records from ${tableName}`);
+			console.log(`  Updated flushedAt for ${recordIds.length} records in ${tableName}`);
 		} catch (error) {
-			// Nếu bảng không tồn tại, chỉ log warning
-			if (error instanceof Error && error.message.includes('no such table')) {
-				console.warn(`Table ${tableName} does not exist, skipping deletion...`);
-				return;
+			console.error(`Failed to update batch in D1: ${error}, tableName: ${tableName}, recordIds: ${recordIds.join(',')}`);
+			throw error;
+		}
+	}
+
+	/**
+	 * Xóa các bản ghi đã được update flushedAt (đã flush lên R2 thành công)
+	 */
+	private async deleteFlushedRecordsFromD1(tableName: string, endTimestamp: number): Promise<number> {
+		try {
+			const query = `DELETE FROM "${tableName}" WHERE "created_at" <= ? AND "flushedAt" IS NOT NULL`;
+			const result = await this.db.prepare(query).bind(endTimestamp).run();
+			const deleted = result.meta?.changes ?? 0;
+			if (deleted > 0) {
+				console.log(`  Deleted ${deleted} flushed records from ${tableName}`);
 			}
+			return deleted;
+		} catch (error) {
+			console.error(`Failed to delete flushed records from D1: ${error}, tableName: ${tableName}`);
 			throw error;
 		}
 	}
