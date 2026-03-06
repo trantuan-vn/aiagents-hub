@@ -15,7 +15,6 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     Settings: t("settings"),
     Logs: t("logs"),
     Analytics: t("analytics"),
-    "Delivery & Quality": t("delivery_quality"),
     Default: t("default"),
     CRM: t("crm"),
     Finance: t("finance"),

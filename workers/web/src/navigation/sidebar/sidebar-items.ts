@@ -14,7 +14,6 @@ import {
   Key,
   LayoutDashboard,
   MessageSquare,
-  Package,
   RefreshCw,
   Scale,
   Settings,
@@ -71,7 +70,6 @@ export const sidebarItems: NavGroup[] = [
     items: [
       { title: "Logs", url: "/dashboard/monitor/logs", icon: FileText },
       { title: "Analytics", url: "/dashboard/monitor/analytics", icon: BarChart3 },
-      { title: "Delivery & Quality", url: "/dashboard/monitor/delivery-quality", icon: Package },
     ],
   },
   {
