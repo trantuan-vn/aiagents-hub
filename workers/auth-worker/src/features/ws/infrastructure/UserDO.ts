@@ -1080,8 +1080,10 @@ export class UserDO extends DurableObject {
       this.sessions.set(server, sessionId);
       // Persist sessionId với WebSocket để survive hibernation (khi DO hibernate, in-memory state bị mất)
       server.serializeAttachment({ sessionId });
+      // Chỉ registerUser khi đây là connection ĐẦU TIÊN (user chưa có WS nào) - reference counting cho multi-tab/device
+      const isFirstConnection = this.state.getWebSockets().length === 1;
       this.state.waitUntil(Promise.all([
-        this.registerUser(), 
+        isFirstConnection ? this.registerUser() : Promise.resolve(),
         this.sendPendingMessages(server),
         this.sendPendingFirstLoginNotificationIfAny()
       ]));
@@ -1154,7 +1156,11 @@ export class UserDO extends DurableObject {
         }
       }
       this.sessions.delete(ws);
-      await this.unregisterUser();
+      // Chỉ unregisterUser khi đây là connection CUỐI CÙNG đóng (getWebSockets đã loại WS vừa đóng)
+      const isLastConnectionClosed = this.state.getWebSockets().length === 0;
+      if (isLastConnectionClosed) {
+        await this.unregisterUser();
+      }
       await this.storage.deleteAlarm();
       await this.scheduleQueueAlarmIfNeeded();
     } catch (e) {

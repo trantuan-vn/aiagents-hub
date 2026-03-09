@@ -275,42 +275,44 @@ export class UserShardDO extends DurableObject {
   // =============================================
   // USER MANAGEMENT
   // =============================================
+  /** Chỉ lưu user đang online - delete khi unregister để DO storage = O(concurrent users), không phải O(total users) */
   async registerUser(userId: string) {
     const existingUser = await this.database.dynamicSelect('user_registrations', { field: 'userId', operator: '=', value: userId });
     if (existingUser.length > 0) {
       await this.database.dynamicUpdate('user_registrations', existingUser[0].id, { isActive: true });
-    } else {
-      const [userCount, activeCount, currentPerf] = await Promise.all([
-        this.getUserCount(),
-        this.getActiveUserCount(),
-        this.getPerformanceMetricsData(),
-      ]);
-      const performanceUpdate = {
-        ...currentPerf,
-        shardName: this.shardName,
-        totalUsers: userCount + 1,
-        activeUsers: activeCount + 1,
-        userGrowthRate: await this.calculateGrowthRate(),
-        timestamp: Math.floor(Date.now()),
-      };
-      await this.database.dynamicMultiTableTransaction([
-        {
-          table: 'user_registrations',
-          operation: 'insert',
-          data: { userId, shardName: this.shardName, tags: [], priority: 'normal', isActive: true },
-        },
-        {
-          table: 'shard_performances',
-          operation: 'upsert',
-          data: performanceUpdate,
-        },
-      ]);
+      return; // Idempotent: đã có (race/double register), không cần insert
     }
+    const [userCount, activeCount, currentPerf] = await Promise.all([
+      this.getUserCount(),
+      this.getActiveUserCount(),
+      this.getPerformanceMetricsData(),
+    ]);
+    const performanceUpdate = {
+      ...currentPerf,
+      shardName: this.shardName,
+      totalUsers: userCount + 1,
+      activeUsers: activeCount + 1,
+      userGrowthRate: await this.calculateGrowthRate(),
+      timestamp: Math.floor(Date.now()),
+    };
+    await this.database.dynamicMultiTableTransaction([
+      {
+        table: 'user_registrations',
+        operation: 'insert',
+        data: { userId, shardName: this.shardName, tags: [], priority: 'normal', isActive: true },
+      },
+      {
+        table: 'shard_performances',
+        operation: 'upsert',
+        data: performanceUpdate,
+      },
+    ]);
   }
 
+  /** Xoá user khỏi shard khi offline - giữ DO storage nhỏ (chỉ concurrent users) */
   async unregisterUser(userId: string) {
     const existingUser = await this.database.dynamicSelect('user_registrations', { field: 'userId', operator: '=', value: userId });
-    if (existingUser.length === 0) throw new Error('User not found');
+    if (existingUser.length === 0) return;
 
     const [userCount, activeCount, currentPerf] = await Promise.all([
       this.getUserCount(),
@@ -326,16 +328,8 @@ export class UserShardDO extends DurableObject {
       timestamp: Math.floor(Date.now()),
     };
     await this.database.dynamicMultiTableTransaction([
-      {
-        table: 'user_registrations',
-        operation: 'delete',
-        id: existingUser[0].id,
-      },
-      {
-        table: 'shard_performances',
-        operation: 'upsert',
-        data: performanceUpdate,
-      },
+      { table: 'user_registrations', operation: 'delete', id: existingUser[0].id },
+      { table: 'shard_performances', operation: 'upsert', data: performanceUpdate },
     ]);
   }
 
