@@ -793,10 +793,10 @@ export class UserDO extends DurableObject {
     const countToMark = countResult[0]?.count || 0;
     if (countToMark > 0) {
       await this.database.execTransaction([{
-        sql: `UPDATE ${tableName} SET queueStatus = 'processed'
+        sql: `UPDATE ${tableName} SET queueStatus = 'processed', processedAt = ?
               WHERE queueStatus = 'flushed' 
               AND queueId <= ?`,
-        params: [upToId]
+        params: [Date.now(), upToId]
       }]);
       
       console.log(`[UserDO ${this.userId}] Marked ${countToMark} flushed records to processed in ${tableName}, up to id ${upToId}`);
@@ -1148,10 +1148,10 @@ export class UserDO extends DurableObject {
       // Lấy sessionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
       const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
       if (sessionId) {
-        await this.database.execTransaction([{
-          sql: 'UPDATE connections SET connected = 0, queueStatus = ? WHERE sessionId = ?',
-          params: ['pending' as const, sessionId]
-        }]);
+        const connections = await this.database.dynamicSelect('connections', { field: 'sessionId', operator: '=', value: sessionId });
+        if (connections.length > 0) {
+          await this.database.dynamicUpdate('connections', connections[0].id, { connected: 0, queueStatus: 'pending' as const });
+        }
       }
       this.sessions.delete(ws);
       await this.unregisterUser();
@@ -1173,13 +1173,6 @@ export class UserDO extends DurableObject {
     console.log(`[UserDO] sendMessage: sending to ws=${ws} message=${JSON.stringify(message)}`);
     try {
       if (ws.readyState !== WebSocket.OPEN) {
-        const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
-        if (sessionId) {
-          await this.database.execTransaction([{
-            sql: 'UPDATE connections SET connected = 0, queueStatus = ? WHERE sessionId = ?',
-            params: ['pending' as const, sessionId]
-          }]);
-        }
         return false;
       }
       
@@ -1290,10 +1283,10 @@ export class UserDO extends DurableObject {
   }
 
   private async handleUnsubscribe(channel: string) {
-    await this.database.execTransaction([{
-      sql: 'UPDATE subscriptions SET isActive = false, queueStatus=? WHERE channel = ?',
-      params: ['pending' as const, channel]
-    }]);
+    const subscriptions = await this.database.dynamicSelect('subscriptions', { field: 'channel', operator: '=', value: channel });
+    if (subscriptions.length > 0) {
+      await this.database.dynamicUpdate('subscriptions', subscriptions[0].id, { isActive: false, queueStatus: 'pending' as const });
+    }
   }
 
   private async getSubscriptions(): Promise<Subscription[]> {
