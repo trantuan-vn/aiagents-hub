@@ -1145,7 +1145,8 @@ export class UserDO extends DurableObject {
 
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
     try {
-      console.log(`[UserDO ${this.userId}] webSocketClose: code=${code}, reason=${reason}, wasClean=${wasClean}`);
+      const remainingCount = this.state.getWebSockets().length;
+      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remainingSockets=${remainingCount}`);
       this.sendFailureCount.delete(ws);
       // Lấy sessionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
       const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
@@ -1157,8 +1158,10 @@ export class UserDO extends DurableObject {
       }
       this.sessions.delete(ws);
       // Chỉ unregisterUser khi đây là connection CUỐI CÙNG đóng (getWebSockets đã loại WS vừa đóng)
-      const isLastConnectionClosed = this.state.getWebSockets().length === 0;
+      const isLastConnectionClosed = remainingCount === 1;
+      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: isLastConnectionClosed=${isLastConnectionClosed} getWebSockets().length=${this.state.getWebSockets().length}`);
       if (isLastConnectionClosed) {
+        console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: calling unregisterUser`);
         await this.unregisterUser();
       }
       await this.storage.deleteAlarm();
@@ -1319,6 +1322,15 @@ export class UserDO extends DurableObject {
       const payload = message.message as { title: string; body?: string; data?: Record<string, unknown> };
       await this.storage.put('pending_first_login_notification', JSON.stringify(payload));
       console.log(`[UserDO] stored pending_first_login_notification for userId=${this.userId}`);
+    } else if (message.type === 'closeConnectionsForSession') {
+      const { sessionId } = message;
+      if (sessionId) {
+        await this.closeWebSocketsForSession(sessionId);
+        console.log(`[UserDO] closed connections for sessionId userId=${this.userId}`);
+      }
+    } else if (message.type === 'closeAllConnections') {
+      await this.closeAllWebSockets();
+      console.log(`[UserDO] closed all connections userId=${this.userId}`);
     }
 
     return this.jsonResponse({ success: true, status: 'processed' });
@@ -1338,6 +1350,32 @@ export class UserDO extends DurableObject {
                 
       default:
         return this.jsonResponse({ success: false, error: 'Not found' }, 404);
+    }
+  }
+
+  /** Đóng WebSocket connections để trigger webSocketClose → unregisterUser khi logout */
+  private async closeWebSocketsForSession(sessionId: string): Promise<void> {
+    const sockets = this.state.getWebSockets();
+    console.log('[UserDO closeWebSocketsForSession] DEBUG: userId=%s targetSessionId=%s socketCount=%d', this.userId, sessionId, sockets.length);
+    let closedCount = 0;
+    for (const ws of sockets) {
+      const att = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
+      const match = att === sessionId;
+      console.log('[UserDO closeWebSocketsForSession] DEBUG: ws att.sessionId=%s match=%s', att ?? '(null)', match);
+      if (match) {
+        try {
+          ws.close(1000, 'Session logged out');
+          closedCount++;
+        } catch (e) { handleErrorWithoutIp(e, 'Close WS for session'); }
+      }
+    }
+    console.log('[UserDO closeWebSocketsForSession] DEBUG: userId=%s closedCount=%d', this.userId, closedCount);
+  }
+
+  private async closeAllWebSockets(): Promise<void> {
+    const sockets = this.state.getWebSockets();
+    for (const ws of sockets) {
+      try { ws.close(1000, 'All sessions logged out'); } catch (e) { handleErrorWithoutIp(e, 'Close WS'); }
     }
   }
 

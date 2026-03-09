@@ -468,13 +468,38 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     // IV. Common
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
+      console.log('[logoutUseCase] DEBUG: identifier=%s sessionId=%s', identifier, sessionId);
       const repository = getRepository(identifier);
       await repository.sessions.update(sessionId, { isActive: false });
+      // Đóng WebSocket để trigger webSocketClose → unregisterUser trên BroadcastServiceDO
+      try {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        console.log('[logoutUseCase] DEBUG: calling UserDO closeConnectionsForSession sessionId=%s', sessionId);
+        const resp = await userDO.fetch('https://user.internal/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'closeConnectionsForSession', sessionId }),
+        });
+        console.log('[logoutUseCase] DEBUG: closeConnectionsForSession response status=%s ok=%s', resp.status, resp.ok);
+      } catch (e) {
+        console.warn('[logoutUseCase] closeConnectionsForSession failed:', e);
+      }
     },
 
     async logoutAllUseCase(identifier: string): Promise<void> {
       const repository = getRepository(identifier);
       await repository.sessions.deactivateAllUserSessions(identifier);
+      // Đóng tất cả WebSocket để trigger unregisterUser
+      try {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        await userDO.fetch('https://user.internal/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'closeAllConnections' }),
+        });
+      } catch (e) {
+        console.warn('[logoutAllUseCase] closeAllConnections failed:', e);
+      }
     },
 
     async listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }> {
@@ -496,6 +521,16 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async revokeSessionUseCase(identifier: string, sessionId: string): Promise<void> {
       const repository = getRepository(identifier);
       await repository.sessions.update(sessionId, { isActive: false });
+      try {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        await userDO.fetch('https://user.internal/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'closeConnectionsForSession', sessionId }),
+        });
+      } catch (e) {
+        console.warn('[revokeSessionUseCase] closeConnectionsForSession failed:', e);
+      }
     },
 
     async verifyTokenUseCase(sessionId: string, token: string, refreshToken: string): Promise<{ ok: boolean; user: any }> {

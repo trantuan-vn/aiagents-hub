@@ -18,7 +18,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
-import { disconnectWs } from "@/core/use-ws";
 import { User } from "@/data/users";
 import { useNotificationsWs } from "@/stores/notifications/use-notifications-ws";
 
@@ -38,9 +37,7 @@ export function AccountSwitcher({ user }: { readonly user: User | null }) {
     setIsLoggingOut(true);
 
     try {
-      // Ngắt kết nối WebSocket chủ động trước khi logout
-      disconnectWs();
-
+      // Server sẽ đóng WebSocket khi logout API trả về; client nhận onclose và không reconnect (use-ws xử lý)
       // Disconnect wallet
       disconnect();
 

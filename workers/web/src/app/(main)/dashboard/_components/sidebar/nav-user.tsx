@@ -19,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
-import { disconnectWs } from "@/core/use-ws";
 import { User } from "@/data/users";
 
 export function NavUser({ user }: { readonly user: User | null }) {
@@ -35,9 +34,7 @@ export function NavUser({ user }: { readonly user: User | null }) {
     setIsLoggingOut(true);
 
     try {
-      // Ngắt kết nối WebSocket chủ động trước khi logout
-      disconnectWs();
-
+      // Server sẽ đóng WebSocket khi logout API trả về; client nhận onclose và không reconnect (use-ws xử lý)
       // Disconnect wallet
       disconnect();
 
