@@ -37,6 +37,8 @@ export interface TableOptions {
     queue?: boolean;
   };
   conflictField?: string;
+  /** Bảng có tính chất queueTable() - dùng để tạo idx_[tableName]_user_created */
+  isQueueTable?: boolean;
 }
 
 export interface TableConfig {
@@ -566,7 +568,8 @@ export class D1DatabaseManager {
     }),
     queueTable: () => ({
       userScoped: true,
-      autoFields: { id: true, timestamps: true, user: true, queue: true }
+      autoFields: { id: true, timestamps: true, user: true, queue: true },
+      isQueueTable: true,
     }),
     /** Bảng danh mục: queue flow + unique index, tương thích với auth worker UserDO */
     queueTableWithUniqueIndex: (conflictField: string) => ({
@@ -1248,7 +1251,7 @@ export class D1DatabaseManager {
       }
     }
     
-    if (options.autoFields?.queue !== false) {
+    if (options.autoFields?.queue === true) {
       columns.push('"queueId" INTEGER');
       columns.push('"queueStatus" TEXT');
       columns.push('"flushedAt" INTEGER');
@@ -1507,19 +1510,25 @@ export class D1DatabaseManager {
       }
     }
 
-    // Custom composite indexes for service_usages (optimize logs query by user_id, serviceId, created_at)
-    if (tableName === 'service_usages') {
-      const serviceUsagesIndexes = [
-        `CREATE INDEX IF NOT EXISTS "idx_service_usages_user_created" ON "service_usages" ("user_id", "created_at" DESC)`,
-        `CREATE INDEX IF NOT EXISTS "idx_service_usages_user_service_created" ON "service_usages" ("user_id", "serviceId", "created_at" DESC)`,
-      ];
-      for (const indexSQL of serviceUsagesIndexes) {
-        try {
-          await this.db.prepare(indexSQL).run();
-        } catch (e) {
-          console.error(`Error creating service_usages index:`, e);
-          throw e;
-        }
+    // idx_[tableName]_user_created: các bảng có tính chất queueTable() (userScoped + timestamps + queue)
+    if (options.isQueueTable && options.userScoped && options.autoFields?.timestamps !== false) {
+      const userCreatedIndexSQL = `CREATE INDEX IF NOT EXISTS "idx_${tableName}_user_created" ON "${tableName}" ("user_id", "created_at" DESC)`;
+      try {
+        await this.db.prepare(userCreatedIndexSQL).run();
+      } catch (e) {
+        console.error(`Error creating idx_${tableName}_user_created:`, e);
+        throw e;
+      }
+    }
+
+    // Index bổ sung cho service_usages: (user_id, serviceId, created_at) - tối ưu query filter theo serviceId
+    if (tableName === "service_usages") {
+      const indexSQL = `CREATE INDEX IF NOT EXISTS "idx_${tableName}_user_service_created" ON "${tableName}" ("user_id", "serviceId", "created_at" DESC)`;
+      try {
+        await this.db.prepare(indexSQL).run();
+      } catch (e) {
+        console.error(`Error creating service_usages index:`, e);
+        throw e;
       }
     }
   }

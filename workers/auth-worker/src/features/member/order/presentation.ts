@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { createOrderApplicationService } from './application';
 import { CreateOrderSchema, UpdateOrderStatusSchema, ORDER_DEFAULT_PAGE, ORDER_DEFAULT_LIMIT } from './domain';
+import { getOrderHistoryFromD1, type OrderHistoryFilters } from './order-history-infrastructure';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 
@@ -31,6 +32,24 @@ export function createOrderRoutes(bindingName: string) {
     const result = await orderApp.createOrder(user, request);
     return c.json(result);
   }, 'Failed to create order'));
+
+  // Lấy order history từ D1 (đã sync từ UserDO)
+  app.get('/history', createRouteHandler(async (c: any, user: any) => {
+    const db = c.env.D1DB;
+    if (!db) {
+      throw new Error('D1 database binding not configured');
+    }
+    const userId = (c.env[bindingName] as DurableObjectNamespace).idFromName(user.identifier).toString();
+    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+    const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
+    const fromDate = c.req.query('fromDate') as string | undefined;
+    const toDate = c.req.query('toDate') as string | undefined;
+    const filters: OrderHistoryFilters = { limit, offset };
+    if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) filters.fromDate = fromDate;
+    if (toDate && /^\d{4}-\d{2}-\d{2}$/.test(toDate)) filters.toDate = toDate;
+    const result = await getOrderHistoryFromD1(db, userId, filters);
+    return c.json(result);
+  }, 'Failed to get order history'));
 
   // Lấy danh sách đơn hàng
   app.get('/orders', createRouteHandler(async (c: any, user: any) => {

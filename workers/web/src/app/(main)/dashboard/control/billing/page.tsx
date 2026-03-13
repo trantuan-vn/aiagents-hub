@@ -4,18 +4,40 @@ import { useEffect, useState } from "react";
 
 import { useSearchParams, useRouter } from "next/navigation";
 
-import { AlertCircle, CreditCard, Package, Receipt } from "lucide-react";
+import { AlertCircle, History, Package } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
+import { BillingStatsCards } from "./_components/billing-stats-cards";
 import { CreateOrderDialog } from "./_components/create-order-dialog";
+import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
 import { OrderList } from "./_components/order-list";
 import type { CreateOrder, Order } from "./_components/schema";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+
+async function loadHistoryFromApi(
+  limit: number,
+  offset: number,
+  dateParams?: { fromDate: string; toDate: string },
+): Promise<{ orders: Order[]; hasMore: boolean }> {
+  const params = new URLSearchParams();
+  params.append("limit", limit.toString());
+  params.append("offset", offset.toString());
+  if (dateParams?.fromDate) params.append("fromDate", dateParams.fromDate);
+  if (dateParams?.toDate) params.append("toDate", dateParams.toDate);
+  const response = await fetch(`${API_BASE_URL}/dashboard/order/history?${params}`, {
+    method: "GET",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
 
 export default function BillingPage() {
   const t = useTranslations("BillingPage");
@@ -29,6 +51,34 @@ export default function BillingPage() {
   const [targetType] = useState<"SERVICE" | "USER" | undefined>(undefined);
   const [page] = useState(1);
   const [limit] = useState(20);
+
+  const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const historyLimit = 50;
+
+  const [datePreset, setDatePreset] = useState<"all" | "7d" | "30d" | "month" | "custom">("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
+  const fetchHistory = async (
+    offset = 0,
+    append = false,
+    dateParams?: { fromDate: string; toDate: string },
+  ): Promise<void> => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const data = await loadHistoryFromApi(historyLimit, offset, dateParams);
+      setHistoryOrders(append ? (prev) => [...prev, ...data.orders] : data.orders);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : t("fetch_error");
+      setHistoryError(errorMessage);
+      toast({ title: t("error"), description: errorMessage, variant: "destructive" });
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const fetchOrders = async (): Promise<void> => {
     setIsLoading(true);
@@ -202,46 +252,7 @@ export default function BillingPage() {
         <CreateOrderDialog onCreate={handleCreateOrder} />
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("stats.total_orders")}</CardTitle>
-            <Package className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{orders.length}</div>
-            <p className="text-muted-foreground text-xs">{t("stats.total_orders_description")}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("stats.pending_orders")}</CardTitle>
-            <Receipt className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{pendingOrders.length}</div>
-            <p className="text-muted-foreground text-xs">{t("stats.pending_orders_description")}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("stats.total_amount")}</CardTitle>
-            <CreditCard className="text-muted-foreground h-4 w-4" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat("vi-VN", {
-                style: "currency",
-                currency: "VND",
-              }).format(totalAmount)}
-            </div>
-            <p className="text-muted-foreground text-xs">{t("stats.total_amount_description")}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <BillingStatsCards totalOrders={orders.length} pendingOrders={pendingOrders.length} totalAmount={totalAmount} />
 
       {/* Error Alert */}
       {error && (
@@ -252,16 +263,58 @@ export default function BillingPage() {
         </Alert>
       )}
 
-      {/* Order List */}
-      {isLoading ? (
-        <Card>
-          <CardContent className="flex items-center justify-center py-12">
-            <p className="text-muted-foreground">{t("loading")}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <OrderList orders={orders} onCancel={handleCancelOrder} onPayment={handlePayment} />
-      )}
+      {/* Order List với Tabs: Orders | History */}
+      <Tabs
+        defaultValue="orders"
+        className="space-y-4"
+        onValueChange={(v) => {
+          if (v !== "history" || historyLoading) return;
+          let dateParams: { fromDate: string; toDate: string } | undefined;
+          if (datePreset === "all") dateParams = undefined;
+          else if (datePreset === "custom" && fromDate && toDate) dateParams = { fromDate, toDate };
+          else if (datePreset !== "custom") dateParams = getPresetDateRange(datePreset);
+          void fetchHistory(0, false, dateParams);
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="orders" className="gap-1.5">
+            <Package className="h-4 w-4" />
+            {t("tab_orders")}
+          </TabsTrigger>
+          <TabsTrigger value="history" className="gap-1.5">
+            <History className="h-4 w-4" />
+            {t("tab_history")}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="orders">
+          {isLoading ? (
+            <Card>
+              <CardContent className="flex items-center justify-center py-12">
+                <p className="text-muted-foreground">{t("loading")}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <OrderList orders={orders} onCancel={handleCancelOrder} onPayment={handlePayment} />
+          )}
+        </TabsContent>
+        <TabsContent value="history">
+          <OrderHistoryTab
+            preset={datePreset}
+            fromDate={fromDate}
+            toDate={toDate}
+            onPresetChange={setDatePreset}
+            onFromDateChange={setFromDate}
+            onToDateChange={setToDate}
+            onApply={(p) => void fetchHistory(0, false, p)}
+            orders={historyOrders}
+            loading={historyLoading}
+            error={historyError}
+            onCancel={handleCancelOrder}
+            onPayment={handlePayment}
+            t={t}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

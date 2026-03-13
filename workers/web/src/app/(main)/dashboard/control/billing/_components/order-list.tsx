@@ -28,9 +28,11 @@ interface OrderListProps {
   orders: Order[];
   onCancel: (orderId: number) => Promise<void>;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
+  /** Read-only mode: không hiển thị nút thanh toán và hủy (dùng cho tab History) */
+  readOnly?: boolean;
 }
 
-export function OrderList({ orders, onCancel, onPayment }: OrderListProps) {
+export function OrderList({ orders, onCancel, onPayment, readOnly = false }: OrderListProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -168,13 +170,13 @@ export function OrderList({ orders, onCancel, onPayment }: OrderListProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canPay(order.status) && (
+                  {!readOnly && canPay(order.status) && (
                     <Button size="sm" onClick={() => setSelectedOrder(order)} className="flex items-center gap-1">
                       <CreditCard className="h-4 w-4" />
                       {t("pay_now")}
                     </Button>
                   )}
-                  {canCancel(order.status) && (
+                  {!readOnly && canCancel(order.status) && (
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" size="sm" disabled={cancellingOrderId === order.id}>
