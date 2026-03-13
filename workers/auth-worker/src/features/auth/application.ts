@@ -21,6 +21,7 @@ import { normalizeBackupCodeInput } from '../account/backup-codes';
 import { verifyTotpCode } from '../account/totp';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
+import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
 
 interface IApplicationService {
@@ -74,13 +75,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     if (!jwtSecret) {
       throw new Error("JWT_SECRET is not defined in environment variables");
     }
-    const token = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret);
-    const refreshToken = await jwtUtils.generateRefreshToken(user.id, user.identifier, jwtSecret);
+    const expiry = await getAuthExpiryFromConfig(c.env);
+    const token = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret, expiry.tokenExpiry);
+    const refreshToken = await jwtUtils.generateRefreshToken(user.id, user.identifier, jwtSecret, expiry.refreshTokenExpiry);
 
     const sessionData: Session = {
       hashSessionId: sessionId,
       type,
-      expiresAt: new Date(Date.now() + AUTH_CONSTANTS.SESSION_EXPIRY * 1000).toISOString(),
+      expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString(),
       token,
       refreshToken,
       ipAddress,
@@ -590,13 +592,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const session = await repository.sessions.findById(sessionId);
       validationUtils.validateSession(session, undefined, refreshToken);
 
-      const newToken = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret);
-      const newRefreshToken = await jwtUtils.generateRefreshToken(user.id, user.identifier, jwtSecret);
+      const expiry = await getAuthExpiryFromConfig(c.env);
+      const newToken = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret, expiry.tokenExpiry);
+      const newRefreshToken = await jwtUtils.generateRefreshToken(user.id, user.identifier, jwtSecret, expiry.refreshTokenExpiry);
       
       await repository.sessions.update(sessionId, { 
         token: newToken, 
         refreshToken: newRefreshToken, 
-        expiresAt: new Date(Date.now() + AUTH_CONSTANTS.SESSION_EXPIRY * 1000).toISOString() 
+        expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString() 
       });
 
       return { 

@@ -5,6 +5,7 @@ import { createVersionApplicationService } from '../admin/version/application';
 import { cookieUtils } from './utils';
 import { handleError, getClientIp, handleErrorWithoutIp } from '../../shared/utils';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 
 // Main authentication middleware factory
 export function createAuthMiddleware(bindingName: string) {
@@ -100,8 +101,9 @@ async function handleTokenRefresh(
 
   const result = await applicationService.refreshTokenUseCase(sessionId, refreshToken);
   if (result.ok) {
-    cookieUtils.setCookieWithOption(c, 'token', result.token, AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY);
-    cookieUtils.setCookieWithOption(c, 'refreshToken', result.refreshToken, AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY);
+    const expiry = await getAuthExpiryFromConfig(c.env);
+    cookieUtils.setCookieWithOption(c, 'token', result.token, expiry.tokenExpiry);
+    cookieUtils.setCookieWithOption(c, 'refreshToken', result.refreshToken, expiry.refreshTokenExpiry);
     c.set('user', result.user);
   } else {
     throw new Error(ERROR_MESSAGES.AUTH.INVALID_REFRESH_TOKEN);

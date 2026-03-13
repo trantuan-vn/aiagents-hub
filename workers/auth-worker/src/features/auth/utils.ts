@@ -16,6 +16,7 @@ import {
   JwtPayload 
 } from './domain'
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 
 
 // I. JWT Utilities
@@ -229,10 +230,34 @@ export const cookieUtils = {
     deleteCookie(c, 'sessionId', cookieOptions);
   },
 
-  setAuthCookies(c: Context, sessionId: string, token: string, refreshToken: string) {
-    this.setCookieWithOption(c, 'token', token, AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY);
-    this.setCookieWithOption(c, 'refreshToken', refreshToken, AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY);
-    this.setCookieWithOption(c, 'sessionId', sessionId, AUTH_CONSTANTS.SESSION_EXPIRY);
+  setAuthCookies(
+    c: Context,
+    sessionId: string,
+    token: string,
+    refreshToken: string,
+    expires?: { token: number; refreshToken: number; session: number }
+  ) {
+    const tokenExp = expires?.token ?? AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY;
+    const refreshExp = expires?.refreshToken ?? AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY;
+    const sessionExp = expires?.session ?? AUTH_CONSTANTS.SESSION_EXPIRY;
+    this.setCookieWithOption(c, 'token', token, tokenExp);
+    this.setCookieWithOption(c, 'refreshToken', refreshToken, refreshExp);
+    this.setCookieWithOption(c, 'sessionId', sessionId, sessionExp);
+  },
+
+  /** Lấy expiry từ system config và set auth cookies. Dùng khi cần cấu hình từ KV. */
+  async setAuthCookiesWithConfig(
+    c: Context,
+    sessionId: string,
+    token: string,
+    refreshToken: string
+  ) {
+    const cfg = await getAuthExpiryFromConfig(c.env);
+    this.setAuthCookies(c, sessionId, token, refreshToken, {
+      token: cfg.tokenExpiry,
+      refreshToken: cfg.refreshTokenExpiry,
+      session: cfg.sessionExpiry,
+    });
   }
 };
 

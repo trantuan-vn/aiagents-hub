@@ -1,12 +1,18 @@
 import { z } from 'zod';
 
-/** Cấu hình Auth Worker - Queue parameters cho UserDO */
+/** Cấu hình Auth Worker - Queue parameters cho UserDO + thời gian hết hạn token/session */
 export const AuthWorkerConfigSchema = z.object({
 	QUEUE_BATCH_SIZE: z.number().int().min(1).max(1000).optional(),
 	QUEUE_FLUSH_THRESHOLD: z.number().int().min(1).max(2000).optional(),
 	QUEUE_FLUSH_INTERVAL: z.number().int().min(1000).max(120000).optional(),
 	MAX_SEND_FAILURE_COUNT: z.number().int().min(1).max(10).optional(),
 	RETRY_ALARM_INTERVAL: z.number().int().min(10000).max(300000).optional(),
+	/** Thời gian hết hạn Access Token (giây) */
+	TOKEN_EXPIRY: z.number().int().min(60).max(3600).optional(),
+	/** Thời gian hết hạn Refresh Token (giây) */
+	REFRESH_TOKEN_EXPIRY: z.number().int().min(300).max(2592000).optional(),
+	/** Thời gian hết hạn Session (giây) */
+	SESSION_EXPIRY: z.number().int().min(300).max(2592000).optional(),
 });
 export type AuthWorkerConfig = z.infer<typeof AuthWorkerConfigSchema>;
 
@@ -35,13 +41,16 @@ export const SystemConfigSchema = z.object({
 });
 export type SystemConfig = z.infer<typeof SystemConfigSchema>;
 
-/** Default values từ wrangler vars */
+/** Default values từ wrangler vars - TOKEN/REFRESH/SESSION align với AUTH_CONSTANTS */
 export const DEFAULT_AUTH_CONFIG: AuthWorkerConfig = {
 	QUEUE_BATCH_SIZE: 100,
 	QUEUE_FLUSH_THRESHOLD: 200,
 	QUEUE_FLUSH_INTERVAL: 5000,
 	MAX_SEND_FAILURE_COUNT: 3,
 	RETRY_ALARM_INTERVAL: 60000,
+	TOKEN_EXPIRY: 15 * 60,
+	REFRESH_TOKEN_EXPIRY: 4 * 60 * 60,
+	SESSION_EXPIRY: 4 * 60 * 60,
 };
 
 export const DEFAULT_QUEUE_CONFIG: QueueWorkerConfig = {

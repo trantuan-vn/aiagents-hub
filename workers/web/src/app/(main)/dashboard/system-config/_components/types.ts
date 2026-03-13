@@ -4,6 +4,12 @@ export interface AuthWorkerConfig {
   QUEUE_FLUSH_INTERVAL?: number;
   MAX_SEND_FAILURE_COUNT?: number;
   RETRY_ALARM_INTERVAL?: number;
+  /** Thời gian hết hạn Access Token (giây) */
+  TOKEN_EXPIRY?: number;
+  /** Thời gian hết hạn Refresh Token (giây) */
+  REFRESH_TOKEN_EXPIRY?: number;
+  /** Thời gian hết hạn Session (giây) */
+  SESSION_EXPIRY?: number;
 }
 
 export interface QueueWorkerConfig {

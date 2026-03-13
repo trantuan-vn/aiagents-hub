@@ -126,7 +126,7 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const { token, refreshToken } = result as { token: string; refreshToken: string };
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 
@@ -156,7 +156,7 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const { token, refreshToken } = result as { token: string; refreshToken: string };
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "OTP verification failed"));
 
@@ -166,7 +166,7 @@ export function createAuthRoutes(bindingName: string) {
     const { token, refreshToken } = await applicationService.verifyTotpLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "TOTP verification failed"));
 
@@ -176,7 +176,7 @@ export function createAuthRoutes(bindingName: string) {
     const { token, refreshToken } = await applicationService.verifySmsLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "SMS verification failed"));
 
@@ -186,7 +186,7 @@ export function createAuthRoutes(bindingName: string) {
     const { token, refreshToken } = await applicationService.verifyBackupCodeLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "Backup code verification failed"));
 
@@ -196,7 +196,7 @@ export function createAuthRoutes(bindingName: string) {
     const { token, refreshToken } = await applicationService.recoverWithBackupCodeUseCase(
       identifier, code, sessionId, ipAddress, userAgent
     );
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "Backup code recovery failed"));
 
@@ -243,7 +243,7 @@ export function createAuthRoutes(bindingName: string) {
     const { token, refreshToken } = await applicationService.connectPasskeyUseCase(
       sessionId, identifier, ipAddress, userAgent
     );
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "Passkey auth verify failed", true));
 
@@ -274,7 +274,7 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const { token, refreshToken } = result as { token: string; refreshToken: string };
-    cookieUtils.setAuthCookies(c, sessionId, token, refreshToken);
+    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
     return c.json({ ok: true });
   }, "Wallet connection failed"));
 

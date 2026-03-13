@@ -46,6 +46,27 @@ export function getAuthFields(config: SystemConfigData): FieldDef[] {
       min: 10000,
       max: 300000,
     },
+    {
+      key: "TOKEN_EXPIRY",
+      label: "Token Expiry (seconds)",
+      value: auth.TOKEN_EXPIRY ?? 15 * 60,
+      min: 60,
+      max: 3600,
+    },
+    {
+      key: "REFRESH_TOKEN_EXPIRY",
+      label: "Refresh Token Expiry (seconds)",
+      value: auth.REFRESH_TOKEN_EXPIRY ?? 4 * 60 * 60,
+      min: 300,
+      max: 2592000,
+    },
+    {
+      key: "SESSION_EXPIRY",
+      label: "Session Expiry (seconds)",
+      value: auth.SESSION_EXPIRY ?? 4 * 60 * 60,
+      min: 300,
+      max: 2592000,
+    },
   ];
 }
 
