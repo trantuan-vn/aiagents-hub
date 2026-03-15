@@ -538,6 +538,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async verifyTokenUseCase(sessionId: string, token: string, refreshToken: string): Promise<{ ok: boolean; user: any }> {
       const jwtSecret= await c.env.JWT_SECRET.get();
       if (!jwtSecret) {
+        console.error('[verifyTokenUseCase] JWT_SECRET is not defined in environment variables');
         throw new Error("JWT_SECRET is not defined in environment variables");
       }
       const result = await jwtUtils.verifyJWT(token, jwtSecret);
@@ -547,19 +548,23 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       
       const identifier = result.payload?.identifier;
       if (!identifier) {
+        console.error('[verifyTokenUseCase] Identifier not found in token');
         throw new Error("identifier not found in token");
       }
       
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) {
+        console.error('[verifyTokenUseCase] User not found for identifier:', identifier);
         throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       }
       const session = await repository.sessions.findById(sessionId);
       if (!session) {
+        console.error('[verifyTokenUseCase] Session not found for sessionId:', sessionId);
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
-      validationUtils.validateSession(session, token, refreshToken);
+      // Chỉ check isActive và expiresAt - không check token/refreshToken match để hỗ trợ multi-tab
+      validationUtils.validateSession(session);
 
       return { ok: true, user };
     },
@@ -567,11 +572,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async refreshTokenUseCase(sessionId: string, refreshToken: string): Promise<{ ok: boolean; user: any; token: string; refreshToken: string }> {
       const jwtSecret= await c.env.JWT_SECRET.get();
       if (!jwtSecret) {
+        console.error('[refreshTokenUseCase] JWT_SECRET is not defined in environment variables');
         throw new Error("JWT_SECRET is not defined in environment variables");
       }
 
       const result = await jwtUtils.verifyJWT(refreshToken, jwtSecret);
       if (!result.ok) {
+        console.error('[refreshTokenUseCase] Refresh token verification failed:', result.error);
         const errorMessage = result.error
           ?.replace('token', 'refreshToken')
           ?.replace('Token', 'RefreshToken') ?? ERROR_MESSAGES.AUTH.INVALID_REFRESH_TOKEN;
@@ -580,12 +587,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       const identifier = result.payload?.identifier;
       if (!identifier) {
+        console.error('[refreshTokenUseCase] Identifier not found in refresh token');
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_REFRESH_TOKEN);
       }
 
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) {
+        console.error('[refreshTokenUseCase] User not found for identifier:', identifier);
         throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       }
 
@@ -594,19 +603,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       const expiry = await getAuthExpiryFromConfig(c.env);
       const newToken = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret, expiry.tokenExpiry);
-      const newRefreshToken = await jwtUtils.generateRefreshToken(user.id, user.identifier, jwtSecret, expiry.refreshTokenExpiry);
-      
-      await repository.sessions.update(sessionId, { 
-        token: newToken, 
-        refreshToken: newRefreshToken, 
-        expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString() 
+      // Không rotate refreshToken - giữ nguyên để hỗ trợ multi-tab (nhiều tab dùng chung refreshToken)
+      await repository.sessions.update(sessionId, {
+        token: newToken,
+        expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString(),
       });
 
-      return { 
-        ok: true, 
-        user, 
-        token: newToken, 
-        refreshToken: newRefreshToken 
+      return {
+        ok: true,
+        user,
+        token: newToken,
+        refreshToken, // Trả về refreshToken cũ, không tạo mới
       };
     },
 
