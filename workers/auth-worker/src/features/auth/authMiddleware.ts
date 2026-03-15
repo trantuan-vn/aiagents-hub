@@ -20,15 +20,12 @@ export function createAuthMiddleware(bindingName: string) {
         throw new Error("sessionId not found");
       }
       const token = getCookie(c, 'token');
-      if (!token) {
-        throw new Error("token not found");
-      }
       const refreshToken = getCookie(c, 'refreshToken');
-      // If no refresh token, clear cookies and continue
+      // Cần sessionId + refreshToken để có thể refresh khi token hết hạn
       if (!refreshToken) {
         throw new Error("refreshToken not found");
       }
-      
+
       await processAuthentication(c, bindingName, sessionId, token, refreshToken);
     } catch (error) {
       handleErrorWithoutIp(error, "Auth middleware error");

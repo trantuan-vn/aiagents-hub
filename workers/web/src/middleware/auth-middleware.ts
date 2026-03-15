@@ -31,8 +31,8 @@ async function validateUserAuthentication(req: NextRequest) {
   const refreshToken = cookies.get("refreshToken")?.value;
   const sessionId = cookies.get("sessionId")?.value;
 
-  const user = await getUserFromToken(token, refreshToken, sessionId);
-  return { user, isLoggedIn: !!user };
+  const { user, setCookies } = await getUserFromToken(token, refreshToken, sessionId);
+  return { user, isLoggedIn: !!user, setCookies };
 }
 
 function handleDashboardAccess(
@@ -54,7 +54,7 @@ function handleDashboardAccess(
 
 export async function authMiddleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  const { user, isLoggedIn } = await validateUserAuthentication(req);
+  const { user, isLoggedIn, setCookies } = await validateUserAuthentication(req);
 
   // Handle dashboard access
   const dashboardResult = handleDashboardAccess(req, pathname, isLoggedIn, user);
@@ -65,6 +65,11 @@ export async function authMiddleware(req: NextRequest) {
     return handleAuthenticatedLogin(req);
   }
 
-  console.log(`Auth middleware: Request to ${pathname} is ${isLoggedIn ? "" : "not"} authenticated.`);
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (setCookies?.length) {
+    for (const cookie of setCookies) {
+      response.headers.append("Set-Cookie", cookie);
+    }
+  }
+  return response;
 }

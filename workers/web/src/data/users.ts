@@ -34,14 +34,21 @@ function parseUserProfile(data: UserProfileResponse): User | null {
   return null;
 }
 
+export interface GetUserResult {
+  user: User | null;
+  /** Cookie chuỗi Set-Cookie từ API (khi refresh token thành công) - dùng để forward về client */
+  setCookies?: string[];
+}
+
 export async function getUserFromToken(
   token: string | undefined,
   refreshToken: string | undefined,
   sessionId: string | undefined,
-): Promise<User | null> {
+): Promise<GetUserResult> {
   try {
-    if (!token) {
-      return null;
+    // Cần sessionId + refreshToken để server có thể refresh khi token hết hạn
+    if (!refreshToken || !sessionId) {
+      return { user: null };
     }
 
     const cookieHeader = buildCookieHeader(token, refreshToken, sessionId);
@@ -57,16 +64,23 @@ export async function getUserFromToken(
 
     if (!response.ok) {
       if (response.status === 401) {
-        return null;
+        return { user: null };
       }
       console.error(`Failed to get user profile: ${response.status} ${response.statusText}`);
-      return null;
+      return { user: null };
     }
 
     const data: UserProfileResponse = await response.json();
-    return parseUserProfile(data);
+    const user = parseUserProfile(data);
+
+    // Forward Set-Cookie từ API khi refresh token thành công (token mới cần được gửi về client)
+    const setCookies = typeof response.headers.getSetCookie === "function"
+      ? response.headers.getSetCookie()
+      : undefined;
+
+    return { user, setCookies };
   } catch (error) {
     console.error("Error getting user from token:", error);
-    return null;
+    return { user: null };
   }
 }

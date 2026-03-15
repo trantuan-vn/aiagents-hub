@@ -25,7 +25,7 @@ import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 // export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
 export default async function Layout({ children }: LayoutProps<"/dashboard">) {
   const cookieStore = await cookies();
-  const user = await getUserFromToken(
+  const { user } = await getUserFromToken(
     cookieStore.get("token")?.value,
     cookieStore.get("refreshToken")?.value,
     cookieStore.get("sessionId")?.value,

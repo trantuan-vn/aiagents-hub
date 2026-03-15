@@ -605,8 +605,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const newToken = await jwtUtils.generateAccessToken(user.id, user.identifier, jwtSecret, expiry.tokenExpiry);
       // Không rotate refreshToken - giữ nguyên để hỗ trợ multi-tab (nhiều tab dùng chung refreshToken)
       await repository.sessions.update(sessionId, {
-        token: newToken,
-        expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString(),
+        token: newToken,        
       });
 
       return {
