@@ -2,7 +2,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 
 import { UserDODatabase, TableOptions } from '../../../shared/database/index.js';
-import { getIPAndUserAgent, getSessionIdHash, handleErrorWithoutIp } from '../../../shared/utils.js';
+import { getIPAndUserAgent, handleErrorWithoutIp } from '../../../shared/utils.js';
 
 import { 
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
@@ -1055,21 +1055,25 @@ export class UserDO extends DurableObject {
   }
 
   // ========== WEBSOCKET HANDLERS (giữ nguyên, nhưng đơn giản hóa) ==========
+  /** Parse sessionId from Cookie header (httpOnly session-based auth). */
+  private getSessionIdFromCookie(request: Request): string | null {
+    const cookieHeader = request.headers.get('Cookie');
+    if (!cookieHeader) return null;
+    const match = cookieHeader.match(/\bsessionId=([^;]+)/);
+    return match ? decodeURIComponent(match[1].trim()) : null;
+  }
+
   private async handleWebSocketUpgrade(request: Request): Promise<Response> {
     try {
-      const { ipAddress, userAgent } = getIPAndUserAgent(request);
-      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
+      const sessionId = this.getSessionIdFromCookie(request);
+      if (!sessionId) throw new Error('Missing sessionId cookie');
+      // const { ipAddress, userAgent } = getIPAndUserAgent(request);
+      // if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
       
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
       
       this.state.acceptWebSocket(server);
-      const encryptSecret= await this.env.ENCRYPTION_SECRET.get();
-      if (!encryptSecret) {
-        throw new Error("ENCRYPTION_SECRET is not defined in environment variables");
-      }
-
-      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
       await this.database.dynamicUpsert("connections", {
         connected: true, 
         lastConnected: Date.now(), 

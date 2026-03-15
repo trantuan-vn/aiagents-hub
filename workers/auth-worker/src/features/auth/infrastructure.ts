@@ -24,6 +24,25 @@ import { oauthUtils, otpUtils } from './utils';
 
 import { executeUtils } from '../../shared/utils';
 
+/** OAuth state: encode sessionId + nonce để callback không phụ thuộc cookie */
+function encodeOAuthState(sessionId: string, nonce: string): string {
+  const payload = JSON.stringify({ s: sessionId, n: nonce });
+  return btoa(payload).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeOAuthState(state: string): { sessionId: string; nonce: string } | null {
+  try {
+    const base64 = state.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+    const json = atob(padded);
+    const p = JSON.parse(json) as { s?: string; n?: string };
+    if (p?.s && p?.n) return { sessionId: p.s, nonce: p.n };
+  } catch {
+    /* invalid format */
+  }
+  return null;
+}
+
 // User Repository Implementation
 const createUserRepository = (userDO: DurableObjectStub<UserDO>): IUserRepository => ({
   async get(): Promise<any> {
@@ -469,19 +488,24 @@ export function createOAuthService(env: Env): IOAuthService {
 
   return {
     async generateState(sessionId: string): Promise<string> {
-      const state = generateNonce();
-      await kvService.saveNonce(sessionId, state);
-      return state;
+      const nonce = generateNonce();
+      await kvService.saveNonce(sessionId, nonce);
+      return encodeOAuthState(sessionId, nonce);
     },
 
-    async exchangeOAuthCode(provider: string, sessionId: string, state: string, code: string): Promise<OAuthTokenResponse> {
-      const isValidNonce = await kvService.validateNonce(sessionId, state);
+    async exchangeOAuthCode(provider: string, state: string, code: string): Promise<{ tokenData: OAuthTokenResponse; sessionId: string }> {
+      const parsed = decodeOAuthState(state);
+      if (!parsed) {
+        throw new Error(ERROR_MESSAGES.AUTH.OAUTH_STATE_INVALID);
+      }
+      const isValidNonce = await kvService.validateNonce(parsed.sessionId, parsed.nonce);
       if (!isValidNonce) {
-        throw new Error('Invalid OAuth state');
+        throw new Error(ERROR_MESSAGES.AUTH.OAUTH_STATE_INVALID);
       }
 
       const config = await oauthUtils.getOAuthConfig(provider, env);
-      return await exchangeCodeForToken(code, config);
+      const tokenData = await exchangeCodeForToken(code, config);
+      return { tokenData, sessionId: parsed.sessionId };
     },
 
     async getUserInfoFromProvider(provider: string, accessToken: string): Promise<any> {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // User Domain Object Schemas
-// sessionId is a SHA256 hash from getSessionIdHash(), not a UUID
+// sessionId: pre-auth = generateSecureSessionId (64-char hex); auth session = same
 export const ConnectionSchema = z.object({
   connected: z.boolean(),
   lastConnected: z.number(),

@@ -5,7 +5,6 @@ import { createVersionApplicationService } from '../admin/version/application';
 import { cookieUtils } from './utils';
 import { handleError, getClientIp, handleErrorWithoutIp } from '../../shared/utils';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
-import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 
 // Main authentication middleware factory
 export function createAuthMiddleware(bindingName: string) {
@@ -19,94 +18,22 @@ export function createAuthMiddleware(bindingName: string) {
       if (!sessionId) {
         throw new Error("sessionId not found");
       }
-      const token = getCookie(c, 'token');
-      const refreshToken = getCookie(c, 'refreshToken');
-      // Cần sessionId + refreshToken để có thể refresh khi token hết hạn
-      if (!refreshToken) {
-        throw new Error("refreshToken not found");
-      }
 
-      await processAuthentication(c, bindingName, sessionId, token, refreshToken);
+      const applicationService = createApplicationService(c, bindingName);
+      const result = await applicationService.verifySessionUseCase(sessionId);
+      if (result.ok) {
+        c.set('user', result.user);
+      } else {
+        throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
+      }
     } catch (error) {
       handleErrorWithoutIp(error, "Auth middleware error");
-      const sessionId = getCookie(c, 'sessionId');
-      const refreshToken = getCookie(c, 'refreshToken');
-      const token = getCookie(c, 'token');
-      if (sessionId && (refreshToken || token)) {
-        try {
-          const applicationService = createApplicationService(c, bindingName);
-          await applicationService.deactivateSessionOnAuthFailureUseCase(sessionId, refreshToken ?? '', token);
-        } catch {
-          // Ignore - auth already failed
-        }
-      }
       cookieUtils.clearAuthCookies(c);
     }
     
     await next();
   };
 }
-
-// Authentication processing logic
-async function processAuthentication(
-  c: Context,
-  bindingName: string,
-  sessionId: string | undefined,
-  token: string | undefined,
-  refreshToken: string
-): Promise<void> {
-  const applicationService = createApplicationService(c, bindingName);
-  
-  if (!token) {
-    // Token missing, try to refresh
-    await handleTokenRefresh(c, applicationService, sessionId, refreshToken);
-  } else {
-    // Token exists, verify it
-    await handleTokenVerification(c, applicationService, sessionId, token, refreshToken);
-  }
-}
-
-// Handle token verification flow
-async function handleTokenVerification(
-  c: Context,
-  applicationService: any,
-  sessionId: string | undefined,
-  token: string,
-  refreshToken: string
-): Promise<void> {
-  try {
-    const result = await applicationService.verifyTokenUseCase(sessionId, token, refreshToken);
-    if (result.ok) {
-      c.set('user', result.user);
-    } else {
-      // Token verification failed, try refresh
-      await handleTokenRefresh(c, applicationService, sessionId, refreshToken);
-    }
-  } catch (error) {
-    handleErrorWithoutIp(error, "Token verification error");
-    await handleTokenRefresh(c, applicationService, sessionId, refreshToken);
-  }
-}
-
-// Handle token refresh flow
-async function handleTokenRefresh(
-  c: Context,
-  applicationService: any,
-  sessionId: string | undefined,
-  refreshToken: string
-): Promise<void> {
-
-  const result = await applicationService.refreshTokenUseCase(sessionId, refreshToken);
-  if (result.ok) {
-    const expiry = await getAuthExpiryFromConfig(c.env);
-    cookieUtils.setCookieWithOption(c, 'token', result.token, expiry.tokenExpiry);
-    cookieUtils.setCookieWithOption(c, 'refreshToken', result.refreshToken, expiry.refreshTokenExpiry);
-    c.set('user', result.user);
-  } else {
-    throw new Error(ERROR_MESSAGES.AUTH.INVALID_REFRESH_TOKEN);
-  }
-}
-
 
 // Require authentication middleware
 export function requireAuth(c: Context) {

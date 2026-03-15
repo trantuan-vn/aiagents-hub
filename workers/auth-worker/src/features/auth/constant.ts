@@ -2,7 +2,10 @@
 export const ERROR_MESSAGES = {
   AUTH: {
     INVALID_CREDENTIALS: 'Invalid credentials',
-    INVALID_OTP: 'Invalid or expired OTP',
+    INVALID_OTP: 'Invalid or expired OTP. Please ensure your device time is correct and try again.',
+    TOTP_SESSION_EXPIRED: 'TOTP verification session expired. Please log in again.',
+    SMS_SESSION_EXPIRED: 'SMS verification session expired. Please log in again.',
+    TWO_FA_SESSION_EXPIRED: 'Verification session expired. Please log in again.',
     INVALID_TOKEN: 'Invalid token',
     INVALID_REFRESH_TOKEN: 'Invalid refresh token',
     SESSION_EXPIRED: 'Session expired',
@@ -11,6 +14,7 @@ export const ERROR_MESSAGES = {
     RATE_LIMIT_EXCEEDED: 'Too many requests',
     USER_NOT_FOUND: 'User not found',
     OAUTH_FAILED: 'OAuth authentication failed',
+    OAUTH_STATE_INVALID: 'OAuth session expired or invalid. Please try again.',
     WALLET_CONNECTION_FAILED: 'Wallet connection failed',
     SESSION_NOT_FOUND: 'Session not found'
   }

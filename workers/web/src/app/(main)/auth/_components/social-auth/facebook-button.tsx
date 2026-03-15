@@ -18,7 +18,9 @@ export function FacebookButton({ className, ...props }: React.ComponentProps<typ
 
   const handleFacebookLogin = async () => {
     try {
-      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/facebook/url");
+      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/facebook/url", {
+        credentials: "include",
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

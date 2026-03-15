@@ -18,7 +18,9 @@ export function GithubButton({ className, ...props }: React.ComponentProps<typeo
 
   const handleGithubLogin = async () => {
     try {
-      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/github/url");
+      const response = await fetch("https://api.unitoken.trade/dashboard/auth/oauth/github/url", {
+        credentials: "include",
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -29,7 +31,7 @@ export function GithubButton({ className, ...props }: React.ComponentProps<typeo
 
       router.push(validatedData.url);
     } catch (error) {
-      console.error("Failed to get Facebook OAuth URL:", error);
+      console.error("Failed to get Github OAuth URL:", error);
     }
   };
 

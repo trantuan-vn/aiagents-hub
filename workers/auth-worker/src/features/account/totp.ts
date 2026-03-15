@@ -93,14 +93,20 @@ export async function getTotpCode(secretBase32: string, timeStep?: number): Prom
   return otp.toString().padStart(TOTP_DIGITS, '0');
 }
 
+/** Time step window for verification: ±4 = 4 minutes total to handle clock skew. */
+const TOTP_VERIFY_WINDOW = 4;
+
 /**
- * Verify a 6-digit code against the secret, allowing one step before/after (30s window).
+ * Verify a 6-digit code against the secret.
+ * Allows ±4 time steps (270s window) to tolerate clock skew between server and Authenticator app.
  */
 export async function verifyTotpCode(secretBase32: string, code: string): Promise<boolean> {
+  const trimmedCode = code.replace(/\D/g, '').slice(0, 6);
+  if (trimmedCode.length !== 6) return false;
   const baseStep = Math.floor(Math.floor(Date.now() / 1000) / TOTP_STEP_SECONDS);
-  for (let delta = -1; delta <= 1; delta++) {
+  for (let delta = -TOTP_VERIFY_WINDOW; delta <= TOTP_VERIFY_WINDOW; delta++) {
     const expected = await getTotpCode(secretBase32, baseStep + delta);
-    if (expected === code) return true;
+    if (expected === trimmedCode) return true;
   }
   return false;
 }

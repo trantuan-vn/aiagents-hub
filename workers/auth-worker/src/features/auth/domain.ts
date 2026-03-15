@@ -22,7 +22,11 @@ export const OTPVerificationSchema = z.object({
 });
 
 export const TotpVerifySchema = z.object({
-  code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/, 'Code must be 6 digits'),
+  code: z
+    .string()
+    .min(1, 'Code is required')
+    .transform((s) => s.replace(/\D/g, '').slice(0, 6))
+    .refine((s) => s.length === 6, 'Code must be 6 digits'),
 });
 
 export const SmsVerifyLoginSchema = z.object({
@@ -164,8 +168,6 @@ export type User = z.infer<typeof UserSchema>;
 export const SessionSchema = z.object({
   hashSessionId: z.string(),
   type: z.enum(['otp', 'siwe', 'oauth', 'passkey']),
-  token: z.string().optional(),
-  refreshToken: z.string().optional(),
   expiresAt: z.string().datetime(),
   ipAddress: z.string().ip().optional(),
   userAgent: z.string().optional(),
@@ -214,7 +216,7 @@ export interface IWalletService {
 
 export interface IOAuthService {
   generateState(sessionId: string): Promise<string>;
-  exchangeOAuthCode(provider: string, sessionId: string, state: string, code: string): Promise<OAuthTokenResponse>;
+  exchangeOAuthCode(provider: string, state: string, code: string): Promise<{ tokenData: OAuthTokenResponse; sessionId: string }>;
   getUserInfoFromProvider(provider: string, accessToken: string): Promise<any>;
 }
 

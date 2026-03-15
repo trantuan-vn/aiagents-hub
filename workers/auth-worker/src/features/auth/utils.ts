@@ -2,8 +2,8 @@ import jwt from '@tsndr/cloudflare-worker-jwt';
 import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts'; 
 import CryptoJS from 'crypto-js';
 import { Context } from 'hono'
-import { setCookie, deleteCookie } from 'hono/cookie'
-
+import { setCookie, deleteCookie, getCookie } from 'hono/cookie'
+import { generateSecureSessionId } from '../../shared/utils';
 
 import { 
   OAuthConfig, 
@@ -17,7 +17,6 @@ import {
 } from './domain'
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
-
 
 // I. JWT Utilities
 export const jwtUtils = {
@@ -134,23 +133,15 @@ export const validationUtils = {
     return identifier.toLowerCase();
   },
 
-  validateSession(session: any, token?: string, refreshToken?: string): void {
+  validateSession(session: any): void {
     if (!session?.isActive) {
       throw new Error(`session is not active: ${JSON.stringify(!session?.isActive)}`);
     }
-    
+
     if (new Date(session.expiresAt) < new Date()) {
       throw new Error(ERROR_MESSAGES.AUTH.SESSION_EXPIRED);
     }
-    
-    if (token && session.token !== token) {
-      throw new Error(`token is not same as session in DB: ${token} !== ${session.token}`);
-    }
-    
-    if (refreshToken && session.refreshToken !== refreshToken) {
-      throw new Error(`refreshToken is not same as session in DB: ${refreshToken} !== ${session.refreshToken}`);
-    }
-  }
+  },
 };
 
 // III. Wallet Utilities
@@ -224,40 +215,49 @@ export const cookieUtils = {
       sameSite: 'lax' as const,
       httpOnly: true,
     };
-    
+    deleteCookie(c, 'sessionId', cookieOptions);
+    deleteCookie(c, 'preAuthSessionId', cookieOptions);
+    // Clear legacy cookies if present (backward compat)
     deleteCookie(c, 'token', cookieOptions);
     deleteCookie(c, 'refreshToken', cookieOptions);
-    deleteCookie(c, 'sessionId', cookieOptions);
   },
 
-  setAuthCookies(
-    c: Context,
-    sessionId: string,
-    token: string,
-    refreshToken: string,
-    expires?: { token: number; refreshToken: number; session: number }
-  ) {
-    const tokenExp = expires?.token ?? AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY;
-    const refreshExp = expires?.refreshToken ?? AUTH_CONSTANTS.REFRESH_TOKEN_EXPIRY;
-    const sessionExp = expires?.session ?? AUTH_CONSTANTS.SESSION_EXPIRY;
-    this.setCookieWithOption(c, 'token', token, tokenExp);
-    this.setCookieWithOption(c, 'refreshToken', refreshToken, refreshExp);
-    this.setCookieWithOption(c, 'sessionId', sessionId, sessionExp);
-  },
-
-  /** Lấy expiry từ system config và set auth cookies. Dùng khi cần cấu hình từ KV. */
-  async setAuthCookiesWithConfig(
-    c: Context,
-    sessionId: string,
-    token: string,
-    refreshToken: string
-  ) {
+  /** Chỉ set cookie sessionId (httpOnly, secure). Lấy expiry từ system config. */
+  async setSessionCookieWithConfig(c: Context, sessionId: string) {
     const cfg = await getAuthExpiryFromConfig(c.env);
-    this.setAuthCookies(c, sessionId, token, refreshToken, {
-      token: cfg.tokenExpiry,
-      refreshToken: cfg.refreshTokenExpiry,
-      session: cfg.sessionExpiry,
-    });
+    this.setCookieWithOption(c, 'sessionId', sessionId, cfg.sessionExpiry);
+    this.clearPreAuthSessionId(c);
+  },
+
+  /** TTL cho pre-auth session (10 phút) - đủ cho OTP, OAuth redirect, wallet connect */
+  PRE_AUTH_SESSION_TTL: 600,
+
+  /** Lấy hoặc tạo pre-auth sessionId từ cookie. Dùng generateSecureSessionId thay vì hash - bảo mật hơn, không lộ pattern IP+UA. */
+  getOrCreatePreAuthSessionId(c: Context): string {
+    const existing = getCookie(c, 'preAuthSessionId');
+    if (existing && existing.length >= 32) return existing;
+    const sessionId = generateSecureSessionId();
+    this.setCookieWithOption(c, 'preAuthSessionId', sessionId, this.PRE_AUTH_SESSION_TTL);
+    return sessionId;
+  },
+
+  clearPreAuthSessionId(c: Context) {
+    const opts = { path: '/', domain: '.unitoken.trade', secure: true, sameSite: 'lax' as const, httpOnly: true };
+    deleteCookie(c, 'preAuthSessionId', opts);
+  },
+
+  /** DID challenge: set khi lấy nonce, get khi link/unlink. */
+  setDidChallengeId(c: Context, id: string) {
+    this.setCookieWithOption(c, 'didChallengeId', id, 300); // 5 phút
+  },
+
+  getDidChallengeId(c: Context): string | undefined {
+    return getCookie(c, 'didChallengeId');
+  },
+
+  clearDidChallengeId(c: Context) {
+    const opts = { path: '/', domain: '.unitoken.trade', secure: true, sameSite: 'lax' as const, httpOnly: true };
+    deleteCookie(c, 'didChallengeId', opts);
   }
 };
 

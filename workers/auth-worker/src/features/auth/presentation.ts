@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';  
-import { handleError, parseBody, getIPAndUserAgent, getSessionIdHash } from '../../shared/utils';
+import { handleError, parseBody, getIPAndUserAgent, generateSecureSessionId } from '../../shared/utils';
 import { requireAuth } from './authMiddleware';
 import { createApplicationService } from './application';
 import { 
@@ -55,13 +55,7 @@ export function createAuthRoutes(bindingName: string) {
         if (!ipAddress || !userAgent) {
           throw new Error('Missing IP address or user agent');
         }
-        const encryptSecret= await c.env.ENCRYPTION_SECRET.get();
-        if (!encryptSecret) {
-          throw new Error("ENCRYPTION_SECRET is not defined in environment variables");
-        }
-
-        const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
-
+        const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c);
         return await handler(c, sessionId, ipAddress, userAgent);
       } catch (e) {
         const { errorResponse, status } = await handleError(c, e, errorMessage);
@@ -110,23 +104,27 @@ export function createAuthRoutes(bindingName: string) {
 
     const applicationService = createApplicationService(c, bindingName);
 
-    // Exchange code for tokens and connect user
-    const validatedUserInfo = await applicationService.exchangeOAuthCodeUseCase(provider, sessionId, state, code);
+    // Exchange code for tokens and connect user (sessionId lấy từ state, không dùng cookie)
+    const { userInfo: validatedUserInfo, sessionId: oauthSessionId } = await applicationService.exchangeOAuthCodeUseCase(provider, state, code);
     const identifier = oauthUtils.normalizeOAuthIdentifier(provider, validatedUserInfo);
 
     const result = await applicationService.connectOAuthUseCase(
-      sessionId, identifier, ipAddress, userAgent
+      oauthSessionId, identifier, ipAddress, userAgent
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
+      // Đồng bộ cookie với sessionId từ state - redirect từ Google có thể không gửi cookie,
+      // nên getOrCreatePreAuthSessionId đã tạo sessionId mới; PendingTotp dùng oauthSessionId.
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', oauthSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresTotp=1`);
     }
     if ('requiresSms' in result && result.requiresSms) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', oauthSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresSms=1`);
     }
 
-    const { token, refreshToken } = result as { token: string; refreshToken: string };
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    const { sessionId: newSessionId } = result as { sessionId: string };
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 
@@ -149,54 +147,56 @@ export function createAuthRoutes(bindingName: string) {
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresTotp: true });
     }
     if ('requiresSms' in result && result.requiresSms) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresSms: true });
     }
 
-    const { token, refreshToken } = result as { token: string; refreshToken: string };
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    const { sessionId: newSessionId } = result as { sessionId: string };
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "OTP verification failed"));
 
   app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const { code } = await parseBody(c, TotpVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
-    const { token, refreshToken } = await applicationService.verifyTotpLoginUseCase(
+    const { sessionId: newSessionId } = await applicationService.verifyTotpLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "TOTP verification failed"));
 
   app.post('/sms/verify-login', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const { code } = await parseBody(c, SmsVerifyLoginSchema);
     const applicationService = createApplicationService(c, bindingName);
-    const { token, refreshToken } = await applicationService.verifySmsLoginUseCase(
+    const { sessionId: newSessionId } = await applicationService.verifySmsLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "SMS verification failed"));
 
   app.post('/backup-code/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const { code } = await parseBody(c, BackupCodeVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
-    const { token, refreshToken } = await applicationService.verifyBackupCodeLoginUseCase(
+    const { sessionId: newSessionId } = await applicationService.verifyBackupCodeLoginUseCase(
       sessionId, code, ipAddress, userAgent
     );
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Backup code verification failed"));
 
   app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
     const applicationService = createApplicationService(c, bindingName);
-    const { token, refreshToken } = await applicationService.recoverWithBackupCodeUseCase(
+    const { sessionId: newSessionId } = await applicationService.recoverWithBackupCodeUseCase(
       identifier, code, sessionId, ipAddress, userAgent
     );
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Backup code recovery failed"));
 
@@ -240,10 +240,10 @@ export function createAuthRoutes(bindingName: string) {
       body.challengeKey,
       origin
     );
-    const { token, refreshToken } = await applicationService.connectPasskeyUseCase(
+    const { sessionId: newSessionId } = await applicationService.connectPasskeyUseCase(
       sessionId, identifier, ipAddress, userAgent
     );
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Passkey auth verify failed", true));
 
@@ -267,14 +267,17 @@ export function createAuthRoutes(bindingName: string) {
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
+      // Đồng bộ cookie để totp/verify dùng đúng sessionId (phòng popup/iframe có cookie khác)
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresTotp: true });
     }
     if ('requiresSms' in result && result.requiresSms) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresSms: true });
     }
 
-    const { token, refreshToken } = result as { token: string; refreshToken: string };
-    await cookieUtils.setAuthCookiesWithConfig(c, sessionId, token, refreshToken);
+    const { sessionId: newSessionId } = result as { sessionId: string };
+    await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Wallet connection failed"));
 
@@ -868,11 +871,8 @@ export function createAuthRoutes(bindingName: string) {
   app.get('/did/nonce', async (c) => {
     try {
       const user = requireAuth(c);
-      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
-      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
-      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
-      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const sessionId = generateSecureSessionId();
+      cookieUtils.setDidChallengeId(c, sessionId);
       const appService = getDidApp(c);
       const nonce = await appService.getDidNonceUseCase(sessionId);
       return c.json({ nonce });
@@ -885,14 +885,12 @@ export function createAuthRoutes(bindingName: string) {
   app.post('/did/link', async (c) => {
     try {
       const user = requireAuth(c);
-      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
-      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
-      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
-      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const sessionId = cookieUtils.getDidChallengeId(c);
+      if (!sessionId) throw new Error('DID challenge not found. Call /did/nonce first.');
       const { message, signature } = await parseBody(c, SIWEAuthSchema);
       const appService = getDidApp(c);
       const result = await appService.linkDidUseCase(user.identifier, sessionId, message, signature);
+      cookieUtils.clearDidChallengeId(c);
       return c.json(result);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to link DID');
@@ -903,11 +901,8 @@ export function createAuthRoutes(bindingName: string) {
   app.get('/did/unlink/nonce', async (c) => {
     try {
       const user = requireAuth(c);
-      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
-      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
-      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
-      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const sessionId = generateSecureSessionId();
+      cookieUtils.setDidChallengeId(c, sessionId);
       const appService = getDidApp(c);
       const nonce = await appService.getDidUnlinkNonceUseCase(sessionId);
       return c.json({ nonce });
@@ -920,14 +915,12 @@ export function createAuthRoutes(bindingName: string) {
   app.post('/did/unlink', async (c) => {
     try {
       const user = requireAuth(c);
-      const { ipAddress, userAgent } = getIPAndUserAgent(c.req.raw);
-      if (!ipAddress || !userAgent) throw new Error('Missing IP or user agent');
-      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-      if (!encryptSecret) throw new Error('ENCRYPTION_SECRET not configured');
-      const sessionId = getSessionIdHash(ipAddress, userAgent, encryptSecret);
+      const sessionId = cookieUtils.getDidChallengeId(c);
+      if (!sessionId) throw new Error('DID challenge not found. Call /did/unlink/nonce first.');
       const { message, signature } = await parseBody(c, SIWEAuthSchema);
       const appService = getDidApp(c);
       await appService.unlinkDidUseCase(user.identifier, sessionId, message, signature);
+      cookieUtils.clearDidChallengeId(c);
       return c.json({ ok: true });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to unlink DID');

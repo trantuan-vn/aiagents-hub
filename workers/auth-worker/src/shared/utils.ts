@@ -150,9 +150,18 @@ export function getIPAndUserAgent(request: Request) {
   return { ipAddress, userAgent };
 }
 
+/** Hash từ IP+UA+secret - dùng cho pre-login flow (OTP, OAuth state, wallet nonce) */
+/** Deterministic sessionId for pre-login flows (OTP, OAuth state, wallet nonce). */
 export const getSessionIdHash = (ipAddress: string, userAgent: string, secret: string) => {
   const data = `${ipAddress}|${userAgent}|${secret}`;
   return CryptoJS.SHA256(data).toString(CryptoJS.enc.Hex);
+};
+
+/** Cryptographically secure random sessionId (256-bit) for authenticated sessions. */
+export function generateSecureSessionId(): string {
+  const buf = new Uint8Array(32);
+  crypto.getRandomValues(buf);
+  return Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export const getClientIp = (c: any): string => {

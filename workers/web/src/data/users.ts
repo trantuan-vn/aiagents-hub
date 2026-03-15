@@ -46,8 +46,8 @@ export async function getUserFromToken(
   sessionId: string | undefined,
 ): Promise<GetUserResult> {
   try {
-    // Cần sessionId + refreshToken để server có thể refresh khi token hết hạn
-    if (!refreshToken || !sessionId) {
+    // Session-based auth: chỉ cần sessionId (API hiện dùng session cookie, không dùng token/refreshToken)
+    if (!sessionId) {
       return { user: null };
     }
 
