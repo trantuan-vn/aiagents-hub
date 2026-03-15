@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 // User Domain Object Schemas
 // sessionId: pre-auth = generateSecureSessionId (64-char hex); auth session = same
+// connectionId: unique per WebSocket connection (allows multiple tabs/devices per session)
 export const ConnectionSchema = z.object({
+  connectionId: z.string().min(1),
   connected: z.boolean(),
   lastConnected: z.number(),
   sessionId: z.string().min(1),

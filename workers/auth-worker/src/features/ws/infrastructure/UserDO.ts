@@ -108,7 +108,7 @@ export class UserDO extends DurableObject {
       
       this.table('users', extendWithQueue(UserSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
       this.table('sessions', extendWithQueue(SessionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
-      this.table('connections', extendWithQueue(ConnectionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('sessionId'));
+      this.table('connections', extendWithQueue(ConnectionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
       this.table('subscriptions', extendWithQueue(SubscriptionSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
       
       // Queue tables (xoá khi cleanup để tiết kiệm storage)
@@ -1072,18 +1072,21 @@ export class UserDO extends DurableObject {
       
       const webSocketPair = new WebSocketPair();
       const [client, server] = Object.values(webSocketPair);
+      const connectionId = crypto.randomUUID();
       
       this.state.acceptWebSocket(server);
-      await this.database.dynamicUpsert("connections", {
-        connected: true, 
-        lastConnected: Date.now(), 
+      await this.database.dynamicInsert("connections", this.ensureCatalogQueueStatus("connections", {
+        connectionId,
+        connected: true,
+        lastConnected: Date.now(),
         sessionId,
         queueStatus: 'pending' as const
-      });      
-      
+      }));
+      await this.updateTablePendingCount('connections');
+
       this.sessions.set(server, sessionId);
-      // Persist sessionId với WebSocket để survive hibernation (khi DO hibernate, in-memory state bị mất)
-      server.serializeAttachment({ sessionId });
+      // Persist sessionId + connectionId với WebSocket để survive hibernation (khi DO hibernate, in-memory state bị mất)
+      server.serializeAttachment({ sessionId, connectionId });
       // Chỉ registerUser khi đây là connection ĐẦU TIÊN (user chưa có WS nào) - reference counting cho multi-tab/device
       const isFirstConnection = this.state.getWebSockets().length === 1;
       this.state.waitUntil(Promise.all([
@@ -1152,12 +1155,16 @@ export class UserDO extends DurableObject {
       const remainingCount = this.state.getWebSockets().length;
       console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remainingSockets=${remainingCount}`);
       this.sendFailureCount.delete(ws);
-      // Lấy sessionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
-      const sessionId = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
-      if (sessionId) {
-        const connections = await this.database.dynamicSelect('connections', { field: 'sessionId', operator: '=', value: sessionId });
+      // Lấy sessionId, connectionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
+      const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
+      const sessionId = att.sessionId ?? this.sessions.get(ws);
+      const connectionId = att.connectionId;
+      // Xoá connection record tương ứng với WebSocket này (1 sessionId có thể có nhiều connections = nhiều tab)
+      if (connectionId) {
+        const connections = await this.database.dynamicSelect('connections', { field: 'connectionId', operator: '=', value: connectionId });
         if (connections.length > 0) {
-          await this.database.dynamicUpdate('connections', connections[0].id, { connected: 0, queueStatus: 'pending' as const });
+          await this.database.dynamicDelete('connections', connections[0].id);
+          await this.updateTablePendingCount('connections');
         }
       }
       this.sessions.delete(ws);
