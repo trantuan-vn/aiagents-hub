@@ -40,45 +40,71 @@ export interface GetUserResult {
   setCookies?: string[];
 }
 
+/** Lấy IP từ headers (CF-Connecting-IP, X-Real-IP, X-Forwarded-For) */
+export function getClientIPFromHeaders(headers: Headers): string | undefined {
+  const cf = headers.get("cf-connecting-ip");
+  if (cf) return cf;
+  const real = headers.get("x-real-ip");
+  if (real) return real;
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim();
+  return undefined;
+}
+
+/** Lấy User-Agent từ headers */
+export function getClientUAFromHeaders(headers: Headers): string | undefined {
+  return headers.get("user-agent") ?? undefined;
+}
+
+function buildProfileRequestHeaders(cookieHeader: string, opts?: { ip?: string; ua?: string }): Record<string, string> {
+  const headers: Record<string, string> = {
+    Cookie: cookieHeader,
+    "Content-Type": "application/json",
+  };
+  if (opts?.ip) headers["X-Client-IP"] = opts.ip;
+  if (opts?.ua) headers["X-Client-UA"] = opts.ua;
+  return headers;
+}
+
+function getSetCookiesFromResponse(response: Response): string[] | undefined {
+  if (typeof response.headers.getSetCookie === "function") {
+    return response.headers.getSetCookie();
+  }
+  return undefined;
+}
+
+async function fetchUserProfile(apiUrl: string, headers: Record<string, string>): Promise<GetUserResult> {
+  const response = await fetch(`${apiUrl}/profile/me`, {
+    method: "GET",
+    headers,
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) return { user: null };
+    console.error(`Failed to get user profile: ${response.status} ${response.statusText}`);
+    return { user: null };
+  }
+
+  const data: UserProfileResponse = await response.json();
+  const user = parseUserProfile(data);
+  const setCookies = getSetCookiesFromResponse(response);
+  return { user, setCookies };
+}
+
 export async function getUserFromToken(
   token: string | undefined,
   refreshToken: string | undefined,
   sessionId: string | undefined,
+  opts?: { ip?: string; ua?: string },
 ): Promise<GetUserResult> {
   try {
-    // Session-based auth: chỉ cần sessionId (API hiện dùng session cookie, không dùng token/refreshToken)
-    if (!sessionId) {
-      return { user: null };
-    }
+    if (!sessionId) return { user: null };
 
     const cookieHeader = buildCookieHeader(token, refreshToken, sessionId);
     const apiUrl = process.env.AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
-    const response = await fetch(`${apiUrl}/profile/me`, {
-      method: "GET",
-      headers: {
-        Cookie: cookieHeader,
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      if (response.status === 401) {
-        return { user: null };
-      }
-      console.error(`Failed to get user profile: ${response.status} ${response.statusText}`);
-      return { user: null };
-    }
-
-    const data: UserProfileResponse = await response.json();
-    const user = parseUserProfile(data);
-
-    // Forward Set-Cookie từ API khi refresh token thành công (token mới cần được gửi về client)
-    const setCookies = typeof response.headers.getSetCookie === "function"
-      ? response.headers.getSetCookie()
-      : undefined;
-
-    return { user, setCookies };
+    const headers = buildProfileRequestHeaders(cookieHeader, opts);
+    return fetchUserProfile(apiUrl, headers);
   } catch (error) {
     console.error("Error getting user from token:", error);
     return { user: null };

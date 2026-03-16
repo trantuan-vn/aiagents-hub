@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getUserFromToken, type User } from "@/data/users";
+import { getUserFromToken, getClientIPFromHeaders, getClientUAFromHeaders, type User } from "@/data/users";
 
 function requiresAdminAccess(pathname: string): boolean {
   return (
@@ -31,7 +31,13 @@ async function validateUserAuthentication(req: NextRequest) {
   const refreshToken = cookies.get("refreshToken")?.value;
   const sessionId = cookies.get("sessionId")?.value;
 
-  const { user, setCookies } = await getUserFromToken(token, refreshToken, sessionId);
+  const clientIp = getClientIPFromHeaders(req.headers);
+  const clientUserAgent = getClientUAFromHeaders(req.headers);
+
+  const { user, setCookies } = await getUserFromToken(token, refreshToken, sessionId, {
+    ip: clientIp,
+    ua: clientUserAgent,
+  });
   return { user, isLoggedIn: !!user, setCookies };
 }
 

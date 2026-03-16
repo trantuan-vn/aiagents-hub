@@ -50,7 +50,7 @@ interface IApplicationService {
   logoutAllUseCase(identifier: string): Promise<void>;
   listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
-  verifySessionUseCase(sessionId: string): Promise<{ ok: boolean; user: any }>;
+  verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }>;
 }
 
 export function createApplicationService(c: Context, bindingName: string): IApplicationService {
@@ -573,7 +573,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifySessionUseCase(sessionId: string): Promise<{ ok: boolean; user: any }> {
+    async verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }> {
       const identifier = await c.env.NONCE_KV.get(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
       if (!identifier) {
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
@@ -588,6 +588,22 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
       validationUtils.validateSession(session);
+
+      // So sánh IP/UA với session trong DO - nếu khác thì bắt đăng nhập lại
+      const sessionIp = session.ipAddress;
+      const sessionUa = session.userAgent;
+      if (sessionIp != null && sessionIp !== '' && clientIp != null && clientIp !== '') {
+        const norm = (s: string) => s.split(',')[0]?.trim() ?? '';
+        if (norm(sessionIp) !== norm(clientIp)) {
+          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
+        }
+      }
+      if (sessionUa != null && sessionUa !== '' && clientUserAgent != null && clientUserAgent !== '') {
+        if (sessionUa !== clientUserAgent) {
+          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
+        }
+      }
+
       return { ok: true, user };
     }
   };
