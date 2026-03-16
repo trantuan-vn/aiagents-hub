@@ -89,6 +89,14 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
     return session[0] || null;
   },
 
+  async existsByHashSessionId(sessionId: string): Promise<boolean> {
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: [{ field: 'hashSessionId', operator: '=', value: sessionId }],
+      limit: 1,
+    }, 'sessions');
+    return Array.isArray(rows) && rows.length > 0;
+  },
+
   async listAll(limit = 50): Promise<Session[]> {
     const sessions = await executeUtils.executeDynamicAction(userDO, 'select', {
       where: [{ field: 'isActive', operator: '=', value: 1 }],
@@ -215,6 +223,43 @@ export function createOTPService(env: Env): IOTPService {
     }
   };
 
+  // Template Brevo: session mới - VI: 5, EN: 6. Params: IP_ADDRESS, USER_AGENT, LOGIN_TIME
+  const sendNewSessionEmail = async (
+    email: string,
+    ipAddress: string,
+    userAgent: string,
+    language?: 'vi' | 'en'
+  ): Promise<void> => {
+    const brevoApiKey = await env.BREVO_API_KEY.get();
+    if (!brevoApiKey) return; // Không block login nếu thiếu config
+
+    const templateId = language === 'en' ? 4 : 3;
+    const loginTime = new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN');
+
+    const emailData = {
+      templateId,
+      to: [{ email }],
+      params: {
+        ipAddress: ipAddress || '-',
+        userAgent: userAgent || '-',
+        loginTime: loginTime,
+      },
+    };
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': brevoApiKey,
+      },
+      body: JSON.stringify(emailData),
+    });
+
+    if (!response.ok) {
+      console.warn('[Auth] Failed to send new session notification:', await response.text());
+    }
+  };
+
   const sendSMS = async (phone: string, otp: string): Promise<void> => {    
     // const apiKey= await env.VONAGE_API_KEY.get();
     // const apiSecret= await env.VONAGE_API_SECRET.get();
@@ -302,7 +347,16 @@ export function createOTPService(env: Env): IOTPService {
 
     async sendSmsOTP(phone: string, otp: string): Promise<void> {
       await sendSMS(phone, otp);
-    }
+    },
+
+    async sendNewSessionNotification(
+      email: string,
+      ipAddress: string,
+      userAgent: string,
+      language?: 'vi' | 'en'
+    ): Promise<void> {
+      await sendNewSessionEmail(email, ipAddress, userAgent, language);
+    },
   };
 }
 

@@ -195,6 +195,7 @@ export interface IUserRepository {
 export interface ISessionRepository {
   create(sessionData: Session): Promise<any>;
   findById(sessionId: string): Promise<any>;
+  existsByHashSessionId(sessionId: string): Promise<boolean>;
   listAll(limit?: number): Promise<Session[]>;
   update(sessionId: string, sessionData: Partial<Session>): Promise<void>;
   delete(sessionId: string): Promise<void>;
@@ -207,6 +208,7 @@ export interface IOTPService {
   verifyOTP(otp: string, sessionId: string): Promise<boolean>;
   sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void>;
   sendSmsOTP(phone: string, otp: string): Promise<void>;
+  sendNewSessionNotification(email: string, ipAddress: string, userAgent: string, language?: 'vi' | 'en'): Promise<void>;
 }
 
 export interface IWalletService {

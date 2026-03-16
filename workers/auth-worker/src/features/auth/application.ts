@@ -76,6 +76,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const expiry = await getAuthExpiryFromConfig(c.env);
     const sessionId = getSessionIdHash(ipAddress, userAgent, `${encryptSecret}|${user.identifier}`);
 
+    const sessionExisted = await repository.sessions.existsByHashSessionId(sessionId);
+
     const sessionData: Session = {
       hashSessionId: sessionId,
       type,
@@ -95,6 +97,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     const versionApp = createVersionApplicationService(c, bindingName);
     await versionApp.upgradeVersion(user.identifier);
+
+    // Gửi email thông báo chỉ khi sessionId chưa có trong bảng (thiết bị/địa điểm đăng nhập mới)
+    if (!sessionExisted) {
+      const userEmail = user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
+      if (userEmail) {
+        try {
+          await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
+        } catch (e) {
+          console.warn('[Auth] sendNewSessionNotification failed:', e);
+        }
+      }
+    }
 
     return { sessionId };
   };
