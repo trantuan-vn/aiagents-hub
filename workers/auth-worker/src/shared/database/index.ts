@@ -1025,7 +1025,34 @@ export class UserDODatabase {
       console.error(`Error in ensureTableExists, sql: ${createSQL}`);
       throw err;
     }
+    // Migration: thêm cột connectionId vào bảng connections nếu bảng đã tồn tại trước khi schema có connectionId
+    if (name === 'connections' && options.conflictField === 'connectionId') {
+      this.ensureConnectionsConnectionIdColumn();
+    }
+
     this.createIndexes(name, options);
+
+  }
+
+  /**
+   * Migration: Thêm cột connectionId vào bảng connections nếu chưa có.
+   * Bảng connections có thể đã được tạo trước khi schema có connectionId.
+   */
+  private ensureConnectionsConnectionIdColumn(): void {
+    try {
+      const cursor = this.storage.sql.exec<{ name: string }>(`SELECT name FROM pragma_table_info('connections')`);
+      const rows = cursor.toArray();
+      const columnNames = rows.map((row) => row.name);
+      const hasConnectionId = columnNames.includes('connectionId');
+
+      if (!hasConnectionId) {
+        this.storage.sql.exec(`ALTER TABLE "connections" ADD COLUMN "connectionId" TEXT`);
+        this.storage.sql.exec(`CREATE UNIQUE INDEX IF NOT EXISTS "uidx_connections_connectionId" ON "connections" ("connectionId")`);
+      }
+    } catch (err) {
+      console.error('[UserDODatabase] Error ensuring connectionId column:', err);
+      throw err;
+    }
   }
   
   private extractSchemaShape(schema: z.ZodSchema): Record<string, z.ZodTypeAny> {
