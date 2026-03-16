@@ -1,5 +1,5 @@
 import { Context } from 'hono';
-import { getIdFromName, isAdmin, generateSecureSessionId } from '../../shared/utils';
+import { getIdFromName, isAdmin, getSessionIdHash } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
 
@@ -64,14 +64,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
   const createUserSession = async (
     repository: any,
-    _preLoginSessionId: string, // Dùng cho OTP/OAuth flow, không lưu vào session
     user: any,
     type: 'otp' | 'siwe' | 'oauth' | 'passkey',
     ipAddress: string,
     userAgent: string
   ) => {
+    const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+    if (!encryptSecret) {
+      throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+    }
     const expiry = await getAuthExpiryFromConfig(c.env);
-    const sessionId = generateSecureSessionId();
+    const sessionId = getSessionIdHash(ipAddress, userAgent, `${encryptSecret}|${user.identifier}`);
 
     const sessionData: Session = {
       hashSessionId: sessionId,
@@ -220,7 +223,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, sessionId, user, 'oauth', ipAddress, userAgent);
+      const result = await createUserSession(repository, user, 'oauth', ipAddress, userAgent);
       console.log('[Auth] OAuth login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       // Notification gửi khi WS connect (đúng flow: login → token → client connect WS → gửi notification)
       if (isNewUser) {
@@ -316,7 +319,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      const result = await createUserSession(repository, user, 'otp', ipAddress, userAgent);
       console.log('[Auth] OTP login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       if (isNewUser) {
         console.log('[Auth] Storing pending 2FA notification for new user (OTP):', identifier);
@@ -357,7 +360,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       console.log('[Auth] verifyTotpLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
-      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent);
     },
 
     async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ sessionId: string }> {
@@ -376,7 +379,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       console.log('[Auth] verifySmsLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
-      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent);
     },
 
     async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string): Promise<{ sessionId: string }> {
@@ -403,7 +406,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent);
     },
 
     async recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string): Promise<{ sessionId: string }> {
@@ -418,7 +421,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const consumed = await backupRepo.consumeCode(normalized);
       if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
 
-      return await createUserSession(repository, sessionId, user, 'otp', ipAddress, userAgent);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent);
     },
 
     // III. WALLET
@@ -484,7 +487,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, sessionId, user, 'siwe', ipAddress, userAgent);
+      const result = await createUserSession(repository, user, 'siwe', ipAddress, userAgent);
       console.log('[Auth] SIWE login: isNewUser=', isNewUser, 'address=', address, 'flow=normal');
       if (isNewUser) {
         console.log('[Auth] Storing pending 2FA notification for new user (SIWE):', address);
@@ -498,7 +501,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      return await createUserSession(repository, sessionId, user, 'passkey', ipAddress, userAgent);
+      return await createUserSession(repository, user, 'passkey', ipAddress, userAgent);
     },
 
     // IV. Common
