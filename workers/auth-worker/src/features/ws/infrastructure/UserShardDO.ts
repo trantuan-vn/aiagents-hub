@@ -131,7 +131,6 @@ export class UserShardDO extends DurableObject {
 
     const actions: Record<string, Function> = {
       broadcast: () => this.handleFastBroadcast(data),
-      user_delivery_report: () => this.handleUserDeliveryReport(data),
       registerUser: () => this.registerUser(data.userId),
       unregisterUser: () => this.unregisterUser(data.userId)
     };
@@ -160,29 +159,25 @@ export class UserShardDO extends DurableObject {
   }
 
   // =============================================
-  // BROADCAST MANAGEMENT
+  // BROADCAST MANAGEMENT (fire-and-forget)
   // =============================================
   private async handleFastBroadcast(data: any) {
-    const { broadcastId, message, targetUsers } = data;
-    console.log(`[UserShardDO] handleFastBroadcast: received shardName=${this.shardName} broadcastId=${broadcastId} targetUsersCount=${targetUsers?.length ?? 'all'}`);
-    this.ctx.waitUntil(this.processFastBroadcast(broadcastId, message, targetUsers));
+    const { message, targetUsers } = data;
+    this.ctx.waitUntil(this.processFastBroadcast(message, targetUsers));
     return { status: 'accepted' };
   }
 
-  private async processFastBroadcast(broadcastId: number, message: any, targetUsers?: string[]) {
+  private async processFastBroadcast(message: any, targetUsers?: string[]) {
     const users = targetUsers
       ? await this.getSpecificUsers(targetUsers)
       : await this.getActiveUsers();
 
-    if (users.length === 0) {
-      console.log(`[UserShardDO] processFastBroadcast: no users shardName=${this.shardName} broadcastId=${broadcastId}`);
-      return;
-    }
+    if (users.length === 0) return;
 
-    const batches = this.createOptimizedBatches(users, broadcastId);
-    console.log(`[UserShardDO] processFastBroadcast: dispatching shardName=${this.shardName} broadcastId=${broadcastId} usersCount=${users.length} batchesCount=${batches.length}`);
-    await this.sendBatchesWithMessage(batches, broadcastId, message);
-    this.ctx.waitUntil(this.reportEstimatedDelivery(broadcastId, users.length));
+    const batches = this.createOptimizedBatches(users);
+    for (const batch of batches) {
+      this.ctx.waitUntil(this.sendBatchToUsers(batch, message));
+    }
   }
 
   private async getSpecificUsers(userIds: string[]): Promise<string[]> {
@@ -202,74 +197,33 @@ export class UserShardDO extends DurableObject {
     return users.map((user: any) => user.userId);
   }
 
-  private createOptimizedBatches(userIds: string[], broadcastId: number): UserBatch[] {
+  private createOptimizedBatches(userIds: string[]): UserBatch[] {
     const chunks = this.chunkArray(userIds, this.shardConfig.BATCH_SIZE);
     return chunks.map((userIdsChunk, index) => ({
-      batchId: `${broadcastId}_batch_${index}`,
+      batchId: `batch_${Date.now()}_${index}`,
       userIds: userIdsChunk,
       shardName: this.shardName,
       createdAt: Date.now(),
-      broadcastId,
       size: userIdsChunk.length,
       processingOrder: index,
       priority: 'normal',
     }));
   }
 
-  private async sendBatchesWithMessage(batches: UserBatch[], broadcastId: number, message: any) {
-    const sendPromises = batches.map(batch => 
-      this.sendBatchToUsersWithMessage(batch, broadcastId, message)
-    );
-    this.ctx.waitUntil(Promise.allSettled(sendPromises));
-  }
-
-  private async sendBatchToUsersWithMessage(batch: UserBatch, broadcastId: number, message: any) {
-    console.log(`[UserShardDO] sendBatchToUsersWithMessage: batch shardName=${this.shardName} broadcastId=${broadcastId} batchId=${batch.batchId} size=${batch.userIds.length}`);
-    const userPromises = batch.userIds.map(userId =>
-      this.sendToUserDirect(userId, { type: 'broadcast', broadcastId, message, timestamp: Date.now() })
-    );
-
-    const results = await Promise.allSettled(userPromises);
-    const successfulSends = results.filter(r => r.status === 'fulfilled').length;
-    console.log(`[UserShardDO] sendBatchToUsersWithMessage: done shardName=${this.shardName} broadcastId=${broadcastId} batchId=${batch.batchId} successfulSends=${successfulSends} total=${batch.userIds.length}`);
-    await this.updateLocalMetrics(broadcastId, successfulSends);
-  }
-
-  private async sendToUserDirect(userId: string, message: any) {
-    console.log(`[UserShardDO] sendToUserDirect: sending to userId=${userId} message=${JSON.stringify(message)}`);
-    const userDO = this.env.USER_DO.get(this.env.USER_DO.idFromString(userId));
-    const response = await userDO.fetch('https://user.internal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(message)
-    });
-    if (!response.ok) throw new Error(`Failed to send message to user ${userId}: ${response.statusText}`);
-    return { success: true, userId };
-  }
-
-  private async updateLocalMetrics(broadcastId: number, deliveredCount: number) {
-    const current = await this.storage.get<number>(`delivery_${broadcastId}`) || 0;
-    await this.storage.put(`delivery_${broadcastId}`, current + deliveredCount);
-  }
-
-  private async reportEstimatedDelivery(broadcastId: number, estimatedTotal: number) {
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    const deliveredCount = await this.storage.get<number>(`delivery_${broadcastId}`) || 0;
-    
-    if (deliveredCount > 0) {
-      const broadcastService = this.env.BROADCAST_SERVICE_DO.get(this.env.BROADCAST_SERVICE_DO.idFromName("global"));
-      await broadcastService.fetch('https://broadcast.internal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delivery_report', broadcastId, deliveredCount, shardName: this.shardName, timestamp: Date.now() })
-      });
-      await this.storage.delete(`delivery_${broadcastId}`);
+  private async sendBatchToUsers(batch: UserBatch, message: any) {
+    const payload = { type: 'broadcast', message, timestamp: Date.now() };
+    for (const userId of batch.userIds) {
+      this.ctx.waitUntil(this.sendToUser(userId, payload));
     }
   }
 
-  private async handleUserDeliveryReport(data: any) {
-    const { broadcastId, deliveredCount } = data;
-    if (broadcastId && deliveredCount) await this.updateLocalMetrics(broadcastId, deliveredCount);
+  private async sendToUser(userId: string, payload: any) {
+    const userDO = this.env.USER_DO.get(this.env.USER_DO.idFromString(userId));
+    await userDO.fetch('https://user.internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
   }
 
   // =============================================

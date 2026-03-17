@@ -1327,7 +1327,6 @@ export class UserDO extends DurableObject {
 
     const message = await request.json() as { type: string; [key: string]: any };
     if (message.type === 'broadcast') {
-      console.log(`[UserDO] internal message: broadcast received userId=${this.userId} broadcastId=${message.broadcastId}`);
       await this.handleDirectBroadcast(message);
     } else if (message.type === 'storePendingFirstLoginNotification') {
       const payload = message.message as { title: string; body?: string; data?: Record<string, unknown> };
@@ -1390,54 +1389,8 @@ export class UserDO extends DurableObject {
     }
   }
 
-  private async handleDirectBroadcast(message: any) {    
-    console.log(`[UserDO] handleDirectBroadcast: delivering userId=${this.userId} broadcastId=${message.broadcastId} message=${message.message}`);
+  private async handleDirectBroadcast(message: any) {
     await this.broadcast("broadcast", message.message);
-    this.state.waitUntil(this.recordLocalDelivery(message.broadcastId));
-  }
-
-  private async recordLocalDelivery(broadcastId: string) {
-    const current = await this.storage.get<number>(`user_delivery_${broadcastId}`) || 0;
-    const newCount = current + 1;
-    await this.storage.put(`user_delivery_${broadcastId}`, newCount);
-
-    if (newCount % 10 === 0) {
-      this.state.waitUntil(this.reportDeliveryToShard(broadcastId, newCount));
-    }
-  }
-
-  private async reportDeliveryToShard(broadcastId: string, deliveredCount: number) {
-    const shardName = this.getShardForUser(this.userId);
-    console.log(`[UserDO] reportDeliveryToShard: reporting userId=${this.userId} broadcastId=${broadcastId} deliveredCount=${deliveredCount} shardName=${shardName}`);
-    const shardDO = this.env.USER_SHARD_DO.get(this.env.USER_SHARD_DO.idFromName(shardName));
-
-    await shardDO.fetch('https://shard.internal', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'user_delivery_report',
-        broadcastId,
-        deliveredCount,
-        userId: this.userId,
-        timestamp: Date.now()
-      })
-    });
-    
-    await this.storage.delete(`user_delivery_${broadcastId}`);    
-  }
-
-  private getShardForUser(userId: string): string {
-    const hash = this.consistentHash(userId, this.scaleConfig.SHARD_COUNT);
-    return `shard-${hash}`;
-  }
-
-  private consistentHash(str: string, buckets: number): number {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      hash = ((hash << 5) - hash) + str.charCodeAt(i);
-      hash |= 0;
-    }
-    return Math.abs(hash) % buckets;
   }
 
   // ========== USER REGISTRATION ==========

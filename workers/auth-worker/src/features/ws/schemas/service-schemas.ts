@@ -52,11 +52,9 @@ export const ShardHealthSchema = z.object({
 
 // Request/Response Schemas
 export const BroadcastResponseSchema = z.object({
-  broadcastId: z.number().int(),
   status: z.string(),
   config: ScaleConfigSchema,
   estimatedUsers: z.number().int().nonnegative().optional(),
-  queuePosition: z.number().int().nonnegative().optional()
 });
 
 export const ScaleConfigResponseSchema = z.object({

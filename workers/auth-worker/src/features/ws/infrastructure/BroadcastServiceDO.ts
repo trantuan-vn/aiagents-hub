@@ -3,9 +3,8 @@ import { z } from 'zod';
 import { handleErrorWithoutIp } from '../../../shared/utils.js';
 import { UserDODatabase, TableOptions } from '../../../shared/database/index.js';
 import { 
-  ScaleConfig, ServiceConfigSchema, ScaleConfigName, BroadcastData, 
-  BroadcastDataSchema, CreateBroadcast, DeliveryRecordSchema, BroadcastAnalytics, 
-  DeliveryStats, BroadcastResponse, ScaleConfigResponse, DEFAULT_SCALE_CONFIGS, 
+  ScaleConfig, ServiceConfigSchema, ScaleConfigName, CreateBroadcast, 
+  BroadcastResponse, ScaleConfigResponse, DEFAULT_SCALE_CONFIGS, 
   DEFAULT_SERVICE_CONFIG, BroadcastValidator, UserShardSchema, GlobalCounterSchema
 } from '../domain';
 
@@ -40,13 +39,6 @@ export class BroadcastServiceDO extends DurableObject {
   private async initializeTables(): Promise<void> {
     console.log("[BroadcastServiceDO] initializeTables: entering blockConcurrencyWhile");
     await this.state.blockConcurrencyWhile(async () => {
-      // Phase 1: tạo hết các bảng trước (ensureTableExists sync)
-      this.table('broadcasts', BroadcastDataSchema, {
-        autoFields: { id: true, timestamps: true, user: true },
-      });
-      this.table('delivery_records', DeliveryRecordSchema, {
-        autoFields: { id: true, timestamps: true, user: true },
-      });
       this.table('service_configs', ServiceConfigSchema, {
         autoFields: { id: true, timestamps: true, user: true },
       });
@@ -120,7 +112,6 @@ export class BroadcastServiceDO extends DurableObject {
 
       const routes: { [key: string]: Function } = {
         '/dashboard/ws/broadcast': () => request.method === 'POST' && createBroadcastBody !== null ? this.handleCreateBroadcast(createBroadcastBody) : null,
-        '/dashboard/ws/analytics': () => request.method === 'GET' ? this.getBroadcastAnalytics(parseInt(url.searchParams.get('broadcastId') || '0')) : null,
         '/dashboard/ws/scale': () => request.method === 'POST' && updateScaleBody !== null ? this.handleUpdateScaleConfig(updateScaleBody) : null,
         '/dashboard/ws/health': () => this.getHealthStatus(),
         '/dashboard/ws/stats': () => this.getServiceStats()
@@ -150,7 +141,6 @@ export class BroadcastServiceDO extends DurableObject {
     const { action, ...data } = body;
     
     const actions: { [key: string]: Function } = {
-      delivery_report: () => this.handleDeliveryReport(data),
       registerUser: () => this.registerUser(data.userId),
       unregisterUser: () => this.unregisterUser(data.userId)
     };
@@ -178,110 +168,54 @@ export class BroadcastServiceDO extends DurableObject {
     return new Response('Not found', { status: 404 });
   }
 
-  private async handleDeliveryReport(data: any) {
-    const { broadcastId, deliveredCount } = data;
-    if (broadcastId && deliveredCount) {
-      await this.updateDeliveryCount(broadcastId, deliveredCount);
-    }
-  }
-
   // =============================================
-  // BROADCAST MANAGEMENT
+  // BROADCAST MANAGEMENT (fire-and-forget)
   // =============================================
   private async handleCreateBroadcast(body: unknown): Promise<Response> {
     const createData: CreateBroadcast = BroadcastValidator.validateCreateBroadcast(body);
-    console.log(`[BroadcastServiceDO] handleCreateBroadcast: received targetUsersCount=${createData.targetUsers?.length ?? 'all'} targetUsers=${JSON.stringify(createData.targetUsers)} priority=${createData.priority} expiresIn=${createData.expiresIn}`);
-    const broadcastId = await this.createBroadcast(createData);
-    console.log(`[BroadcastServiceDO] handleCreateBroadcast: created broadcastId=${broadcastId}`);
+    console.log(`[BroadcastServiceDO] handleCreateBroadcast: targetUsersCount=${createData.targetUsers?.length ?? 'all'} priority=${createData.priority}`);
+    
+    let userShards: string[];
+    if (createData.targetUsers?.length) {
+      const shardMap = new Map<string, string[]>();
+      for (const userId of createData.targetUsers) {
+        const shardName = this.getShardForUser(userId);
+        if (!shardMap.has(shardName)) shardMap.set(shardName, []);
+        shardMap.get(shardName)!.push(userId);
+      }
+      userShards = Array.from(shardMap.keys());
+    } else {
+      userShards = await this.getAllShards();
+    }
+
+    const payload = {
+      message: createData.message,
+      timestamp: Date.now(),
+      targetUsers: createData.targetUsers ?? null,
+      expiresAt: createData.expiresIn ? Date.now() + createData.expiresIn : undefined,
+      priority: createData.priority || 'normal',
+    };
+    
+    // Fire-and-forget: gửi xong quên, không await
+    for (const shardName of userShards) {
+      this.ctx.waitUntil(this.sendToShard(shardName, 'broadcast', payload));
+    }
 
     const response: BroadcastResponse = {
-      broadcastId,
-      status: 'started',
+      status: 'dispatched',
       config: this.scaleConfig,
       estimatedUsers: await this.getTotalUsers(),
-      queuePosition: 0
     };
-
     return new Response(JSON.stringify(response), { headers: { 'Content-Type': 'application/json' } });
   }
 
-  async createBroadcast(createData: CreateBroadcast): Promise<number> {
-    const broadcastData: BroadcastData = {
-      message: createData.message,
-      timestamp: Date.now(),
-      status: 'pending',
-      delivered: 0,
-      total: createData.targetUsers?.length || 0,
-      targetUsers: createData.targetUsers || null,
-      priority: createData.priority || 'normal',
-      expiresAt: createData.expiresIn ? Date.now() + createData.expiresIn : undefined,
-      retryCount: 0
-    };
-    const broadcast = await this.database.dynamicInsert('broadcasts', broadcastData);
-    console.log(`[BroadcastServiceDO] createBroadcast: inserted broadcastId=${broadcast.id}`);
-    this.ctx.waitUntil(this.processBroadcastWithMessage(broadcast.id, broadcast.message, createData.targetUsers));
-
-    return broadcast.id;
-  }
-
-  private async processBroadcastWithMessage(broadcastId: number, message: any, targetUsers?: string[]) {
-    console.log(`[BroadcastServiceDO] processBroadcastWithMessage: start broadcastId=${broadcastId} targetUsersCount=${targetUsers?.length ?? 'all'}`);
-    try {
-      let broadcastDataArr = await this.database.dynamicSelect('broadcasts', { field: 'id', operator: '=', value: broadcastId });
-      if (broadcastDataArr.length === 0) throw new Error(`Broadcast ${broadcastId} not found`);
-      if (broadcastDataArr[0].status === 'completed') return;
-      let broadcastData = broadcastDataArr[0]
-      broadcastData.status = 'processing';
-      broadcastData.startedAt = Date.now();
-      await this.database.dynamicUpdate('broadcasts', broadcastId, broadcastData);
-
-      let userShards: string[];
-      let totalUsers = 0;
-
-      if (targetUsers) {
-        const shardMap = new Map<string, string[]>();
-        for (const userId of targetUsers) {
-          const shardName = this.getShardForUser(userId);
-          if (!shardMap.has(shardName)) shardMap.set(shardName, []);
-          shardMap.get(shardName)!.push(userId);
-        }
-        userShards = Array.from(shardMap.keys());
-        totalUsers = targetUsers.length;        
-      } else {
-        userShards = await this.getAllShards();
-        totalUsers = await this.getTotalUsers();
-      }
-
-      broadcastData.total = totalUsers;
-      await this.database.dynamicUpdate('broadcasts', broadcastId, broadcastData);
-      console.log(`[BroadcastServiceDO] processBroadcastWithMessage: totalUsers=${totalUsers} shards=${userShards.length} shardNames=${JSON.stringify(userShards)}`);
-
-      const broadcastPayload = { broadcastId, message, timestamp: Date.now(), targetUsers, expiresAt: broadcastData.expiresAt, priority: broadcastData.priority };
-      await this.broadcastToShards(userShards, broadcastPayload);
-      console.log(`[BroadcastServiceDO] processBroadcastWithMessage: broadcastToShards dispatched broadcastId=${broadcastId}`);
-
-    } catch (error) {
-      await this.markBroadcastFailed(broadcastId, error);
-    }
-  }
-
-  private async broadcastToShards(shards: string[], payload: any) {
-    console.log(`[BroadcastServiceDO] broadcastToShards: sending to shards broadcastId=${payload.broadcastId} shardCount=${shards.length} shards=${JSON.stringify(shards)}`);
-    const shardPromises = shards.map(shardName =>
-      this.sendToShard(shardName, 'broadcast', payload)
-    );
-    this.ctx.waitUntil(Promise.allSettled(shardPromises));
-  }
-
   private async sendToShard(shardName: string, action: string, data: any) {
-    console.log(`[BroadcastServiceDO] sendToShard: calling shard shardName=${shardName} action=${action} broadcastId=${data.broadcastId}`);
     const shardDO = this.env.USER_SHARD_DO.get(this.env.USER_SHARD_DO.idFromName(shardName));
-    const response = await shardDO.fetch('https://shard.internal', {
+    await shardDO.fetch('https://shard.internal', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...data, shardName })
-    });    
-    if (!response.ok) throw new Error(`Failed to send broadcast to shard ${shardName}: ${response.statusText}`);
+    });
   }
 
   // =============================================
@@ -384,118 +318,6 @@ export class BroadcastServiceDO extends DurableObject {
   }
 
   // =============================================
-  // DELIVERY TRACKING & ANALYTICS
-  // =============================================
-  private async updateDeliveryCount(broadcastId: number, deliveredCount: number) {
-    const broadcastDataArr= await this.database.dynamicSelect('broadcasts', { field: 'id', operator: '=', value: broadcastId });
-    if (broadcastDataArr.length === 0) throw new Error(`Broadcast ${broadcastId} not found`); 
-    const broadcastData = broadcastDataArr[0];
-    if (broadcastData?.status === 'processing') {
-      const newDelivered = (broadcastData.delivered || 0) + deliveredCount;
-      const updates: any = {
-        delivered: newDelivered,
-        lastDeliveryTime: Date.now()
-      };
-
-      if (broadcastData.total > 0 && newDelivered >= broadcastData.total) {
-        updates.status = 'completed';
-        updates.completedAt = Date.now();
-      }
-      await this.database.dynamicUpdate('broadcasts', broadcastId, updates);
-    }
-  }
-
-  async getBroadcastAnalytics(broadcastId: number): Promise<Response> {
-    if (!BroadcastValidator.validateBroadcastId(broadcastId)) {
-      throw new Error('Invalid broadcast ID');
-    }
-
-    const stats = await this.getDeliveryStats(broadcastId);
-    if (!stats) throw new Error('Broadcast not found');
-
-    const estimatedCompletionSeconds = stats.deliveryRate > 0 ? stats.pending / stats.deliveryRate : Infinity;
-    const analytics: BroadcastAnalytics = {
-      ...stats,
-      estimatedCompletionSeconds,
-      estimatedCompletionTime: isFinite(estimatedCompletionSeconds) ? new Date(Date.now() + estimatedCompletionSeconds * 1000).toISOString() : null,
-      status: stats.completionPercentage === 100 ? 'completed' : stats.deliveryRate > 0 ? 'in_progress' : 'stalled',
-      shardProgress: await this.getShardProgress(broadcastId),
-      failed: 0,
-      elapsedSeconds: (Date.now() - stats.startTime) / 1000        
-    };
-
-    return new Response(JSON.stringify(analytics), { headers: { 'Content-Type': 'application/json' } });
-  }
-
-  private async getDeliveryStats(broadcastId: number): Promise<DeliveryStats | null> {
-    const dataArr = await this.database.dynamicSelect('broadcasts', { field: 'id', operator: '=', value: broadcastId });
-    if (dataArr.length === 0) return null;
-    const data = dataArr[0];
-    
-    const startTime = data.startedAt || data.timestamp;
-    const elapsed = (Date.now() - startTime) / 1000;
-    const rate = elapsed > 0 ? data.delivered / elapsed : 0;
-    
-    const deliveries = await this.database.execSelectSQL(
-      `SELECT userId, deliveredAt FROM delivery_records WHERE broadcastId = ? LIMIT 10`,
-      [broadcastId],
-      'delivery_records'
-    )
-
-    return {
-      broadcastId,
-      totalUsers: data.total,
-      delivered: data.delivered,
-      pending: Math.max(0, data.total - data.delivered),
-      deliveryRate: Math.round(rate * 100) / 100,
-      completionPercentage: data.total > 0 ? Math.round((data.delivered / data.total) * 100) : 0,
-      startTime,
-      currentTime: Date.now(),
-      sampleDeliveries: deliveries.map((record: any) => ({
-        userId: record.userId,
-        deliveredAt: new Date(record.deliveredAt).toISOString()
-      }))
-    };
-  }
-
-  private async getShardProgress(broadcastId: number) {
-    const [deliveries, allShards] = await Promise.all([
-      this.database.execSelectSQL(
-            `SELECT userId, deliveredAt FROM delivery_records WHERE broadcastId = ? LIMIT 1000`,
-            [broadcastId],
-            'delivery_records'
-          ),
-      this.database.dynamicSelect('user_shards')
-    ]);
-
-    const shardCounts = new Map<string, { delivered: number, total: number }>();
-    
-    for (const record of deliveries) {
-      const shardName = record.shardName;
-      const current = shardCounts.get(shardName) || { delivered: 0, total: 0 };
-      current.delivered++;
-      shardCounts.set(shardName, current);
-    }
-
-    for (const shard of allShards) {
-      const counts = shardCounts.get(shard.shardName) || { delivered: 0, total: 0 };
-      counts.total = shard.userCount;
-      shardCounts.set(shard.shardName, counts);
-    }
-
-    const result: Record<string, { delivered: number, total: number, percentage: number }> = {};
-    for (const [shardName, counts] of shardCounts.entries()) {
-      result[shardName] = {
-        delivered: counts.delivered,
-        total: counts.total,
-        percentage: counts.total > 0 ? Math.round((counts.delivered / counts.total) * 100) : 0
-      };
-    }
-
-    return result;
-  }
-
-  // =============================================
   // SCALING & HEALTH
   // =============================================
   private async handleUpdateScaleConfig(body: unknown): Promise<Response> {
@@ -554,28 +376,12 @@ export class BroadcastServiceDO extends DurableObject {
   }
 
   async getServiceStats(): Promise<Response> {
-    const [totalUsers, activeShards, recentBroadcasts] = await Promise.all([
+    const [totalUsers, activeShards] = await Promise.all([
       this.getTotalUsers(),
       this.getAllShards(),
-      this.getRecentBroadcasts(10)
     ]);
-
-    const stats = { totalUsers, activeShards: activeShards.length, scaleConfig: this.scaleConfigName, recentBroadcasts, timestamp: Date.now() };
+    const stats = { totalUsers, activeShards: activeShards.length, scaleConfig: this.scaleConfigName, timestamp: Date.now() };
     return new Response(JSON.stringify(stats), { headers: { 'Content-Type': 'application/json' } });
-  }
-
-  private async getRecentBroadcasts(limit: number) {
-    const broadcasts = await this.database.dynamicSelect('broadcasts');
-    return broadcasts
-      .sort((a: any, b: any) => b.timestamp - a.timestamp)
-      .slice(0, limit)
-      .map((broadcast: any) => ({
-        broadcastId: broadcast.id,
-        status: broadcast.status,
-        delivered: broadcast.delivered,
-        total: broadcast.total,
-        timestamp: broadcast.timestamp
-      }));
   }
 
   // =============================================
@@ -603,9 +409,5 @@ export class BroadcastServiceDO extends DurableObject {
   private async getTotalUsers(): Promise<number> {
     const counter = await this.database.dynamicSelect("global_counters", { field: 'key', operator: '=', value: 'totalUsers' });
     return counter.length > 0 ? (Number(counter[0].value ?? 0) || 0) : 0;
-  }
-
-  private async markBroadcastFailed(broadcastId: number, error: any) {
-    await this.database.dynamicUpdate("broadcasts", broadcastId, { status: 'failed', error: error.message });
   }
 }
