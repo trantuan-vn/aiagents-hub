@@ -603,19 +603,21 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
       validationUtils.validateSession(session);
 
-      // So sánh IP/UA với session trong DO - nếu khác thì bắt đăng nhập lại
+      // So sánh IP/UA với session trong DO - nếu khác thì sessionId có thể bị lộ, revoke để đảm bảo an toàn
       const sessionIp = session.ipAddress;
       const sessionUa = session.userAgent;
+      let ipMismatch = false;
+      let uaMismatch = false;
       if (sessionIp != null && sessionIp !== '' && clientIp != null && clientIp !== '') {
         const norm = (s: string) => s.split(',')[0]?.trim() ?? '';
-        if (norm(sessionIp) !== norm(clientIp)) {
-          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
-        }
+        if (norm(sessionIp) !== norm(clientIp)) ipMismatch = true;
       }
       if (sessionUa != null && sessionUa !== '' && clientUserAgent != null && clientUserAgent !== '') {
-        if (sessionUa !== clientUserAgent) {
-          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
-        }
+        if (sessionUa !== clientUserAgent) uaMismatch = true;
+      }
+      if (ipMismatch || uaMismatch) {
+        await this.revokeSessionUseCase(identifier, sessionId);
+        throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
 
       return { ok: true, user };
