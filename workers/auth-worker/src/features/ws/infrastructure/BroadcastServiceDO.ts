@@ -185,7 +185,13 @@ export class BroadcastServiceDO extends DurableObject {
       }
       userShards = Array.from(shardMap.keys());
     } else {
+      // Broadcast to all: lấy shards từ user_shards (đã có user đăng ký).
+      // Fallback: nếu bảng trống (chưa có registerUser nào), iterate qua tất cả shards để đảm bảo không bỏ sót client.
       userShards = await this.getAllShards();
+      if (userShards.length === 0) {
+        console.log('[BroadcastServiceDO] handleCreateBroadcast: getAllShards returned empty, falling back to all shards');
+        userShards = this.getAllShardNames();
+      }
     }
 
     const payload = {
@@ -197,6 +203,7 @@ export class BroadcastServiceDO extends DurableObject {
     };
     
     // Fire-and-forget: gửi xong quên, không await
+    console.log(`[BroadcastServiceDO] handleCreateBroadcast: dispatching to ${userShards.length} shards`);
     for (const shardName of userShards) {
       this.ctx.waitUntil(this.sendToShard(shardName, 'broadcast', payload));
     }
@@ -403,7 +410,15 @@ export class BroadcastServiceDO extends DurableObject {
 
   private async getAllShards(): Promise<string[]> {
     const shards = await this.database.dynamicSelect('user_shards');
-    return shards.map((shard: any) => shard.shardName);
+    return shards
+      .filter((shard: any) => (shard.userCount ?? 0) > 0)
+      .map((shard: any) => shard.shardName);
+  }
+
+  /** Trả về tất cả shard names theo scale config (dùng khi broadcast all nhưng user_shards trống). */
+  private getAllShardNames(): string[] {
+    const count = this.scaleConfig.SHARD_COUNT;
+    return Array.from({ length: count }, (_, i) => `shard-${i}`);
   }
 
   private async getTotalUsers(): Promise<number> {
