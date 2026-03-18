@@ -1157,7 +1157,6 @@ export class UserDO extends DurableObject {
       this.sendFailureCount.delete(ws);
       // Lấy sessionId, connectionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
       const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
-      const sessionId = att.sessionId ?? this.sessions.get(ws);
       const connectionId = att.connectionId;
       // Xoá connection record tương ứng với WebSocket này (1 sessionId có thể có nhiều connections = nhiều tab)
       if (connectionId) {
@@ -1366,12 +1365,18 @@ export class UserDO extends DurableObject {
   /** Đóng WebSocket connections để trigger webSocketClose → unregisterUser khi logout */
   private async closeWebSocketsForSession(sessionId: string): Promise<void> {
     const sockets = this.state.getWebSockets();
-    console.log('[UserDO closeWebSocketsForSession] DEBUG: userId=%s targetSessionId=%s socketCount=%d', this.userId, sessionId, sockets.length);
+    // Lấy connectionIds từ bảng connections (persisted) - đáng tin cậy hơn attachment sau hibernation
+    const connections = await this.database.dynamicSelect('connections', { field: 'sessionId', operator: '=', value: sessionId });
+    const targetConnectionIds = new Set(connections.map((c: { connectionId?: string }) => c.connectionId).filter(Boolean));
+    console.log('[UserDO closeWebSocketsForSession] userId=%s targetSessionId=%s socketCount=%d connectionIds=%d', this.userId, sessionId, sockets.length, targetConnectionIds.size);
     let closedCount = 0;
     for (const ws of sockets) {
-      const att = (ws.deserializeAttachment() as { sessionId?: string } | null)?.sessionId ?? this.sessions.get(ws);
-      const match = att === sessionId;
-      console.log('[UserDO closeWebSocketsForSession] DEBUG: ws att.sessionId=%s match=%s', att ?? '(null)', match);
+      const att = ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null;
+      const wsSessionId = att?.sessionId ?? this.sessions.get(ws);
+      const wsConnectionId = att?.connectionId;
+      const matchBySession = wsSessionId === sessionId;
+      const matchByConnection = wsConnectionId && targetConnectionIds.has(wsConnectionId);
+      const match = matchBySession || matchByConnection;
       if (match) {
         try {
           ws.close(1000, 'Session logged out');
@@ -1379,7 +1384,7 @@ export class UserDO extends DurableObject {
         } catch (e) { handleErrorWithoutIp(e, 'Close WS for session'); }
       }
     }
-    console.log('[UserDO closeWebSocketsForSession] DEBUG: userId=%s closedCount=%d', this.userId, closedCount);
+    console.log('[UserDO closeWebSocketsForSession] userId=%s closedCount=%d', this.userId, closedCount);
   }
 
   private async closeAllWebSockets(): Promise<void> {
