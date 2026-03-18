@@ -81,11 +81,9 @@ export function createDashboardWebSocketRoutes(bindingName: string) {
       }
 
       await queue.send({
-        body: JSON.stringify({
-          type: type ?? 'broadcast',
-          targetUsers,
-          message: message ?? body,
-        }),
+        type: type ?? 'broadcast',
+        targetUsers,
+        message: message ?? body,
       });
 
       return c.json({ success: true, queued: true, targetCount: targetUsers.length });
@@ -159,11 +157,9 @@ export function createApiWebSocketRoutes(bindingName: string) {
       }
 
       await queue.send({
-        body: JSON.stringify({
-          type: type ?? 'broadcast',
-          targetUsers,
-          message: message ?? body,
-        }),
+        type: type ?? 'broadcast',
+        targetUsers,
+        message: message ?? body,
       });
 
       return c.json({ success: true, queued: true, targetCount: targetUsers.length });

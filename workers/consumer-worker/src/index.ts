@@ -33,17 +33,25 @@ interface WsBroadcastMessage {
 
 function parseMessage(body: unknown): WsBroadcastMessage | null {
   try {
-    const raw = typeof body === 'string' ? JSON.parse(body) : body;
+    let raw: Record<string, unknown>;
+    if (typeof body === 'string') {
+      raw = JSON.parse(body) as Record<string, unknown>;
+    } else if (body && typeof body === 'object' && 'body' in body && typeof (body as { body: unknown }).body === 'string') {
+      // Legacy: producer used queue.send({ body: JSON.stringify(...) }), unwrap
+      raw = JSON.parse((body as { body: string }).body) as Record<string, unknown>;
+    } else {
+      raw = (body ?? {}) as Record<string, unknown>;
+    }
     if (!raw || !Array.isArray(raw.targetUsers)) {
       console.warn('[ConsumerWorker] Invalid message: targetUsers required', body);
       return null;
     }
     return {
-      type: raw.type ?? 'broadcast',
-      targetUsers: raw.targetUsers,
+      type: (raw.type as WsBroadcastType) ?? 'broadcast',
+      targetUsers: raw.targetUsers as string[],
       message: raw.message ?? raw,
-      priority: raw.priority,
-      expiresIn: raw.expiresIn,
+      priority: raw.priority as WsBroadcastMessage['priority'],
+      expiresIn: raw.expiresIn as number | undefined,
     };
   } catch (e) {
     console.error('[ConsumerWorker] Failed to parse message:', e);
