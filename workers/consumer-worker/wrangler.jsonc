@@ -1,0 +1,46 @@
+/**
+ * Consumer worker: consumes ws-broadcast-queue, routes messages to UserShardDO
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "consumer-worker",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-04-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"workers_dev": false,
+	"preview_urls": false,
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"SHARD_COUNT": "1000"
+	},
+	"queues": {
+		"consumers": [
+			{
+				"queue": "ws-broadcast-queue",
+				"max_batch_size": 50,
+				"max_batch_timeout": 10,
+				"max_retries": 3,
+				"dead_letter_queue": "ws-broadcast-dlq",
+				"retry_delay": 5
+			},
+			{
+				"queue": "ws-broadcast-dlq",
+				"max_batch_size": 20,
+				"max_batch_timeout": 30,
+				"max_retries": 1,
+				"retry_delay": 10
+			}
+		]
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "USER_SHARD_DO",
+				"class_name": "UserShardDO",
+				"script_name": "auth-worker"
+			}
+		]
+	}
+}

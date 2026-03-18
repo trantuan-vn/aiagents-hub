@@ -1,5 +1,6 @@
 export const WEBSOCKET_PERMISSIONS = [
   'websocket:connect',
+  'websocket:broadcast',
 ];
 
 // Re-export endpoints để tra cứu thông tin

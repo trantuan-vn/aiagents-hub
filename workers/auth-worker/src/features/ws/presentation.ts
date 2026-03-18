@@ -84,5 +84,36 @@ export function createApiWebSocketRoutes(bindingName: string) {
     }
   });
 
+  // Push message to ws-broadcast-queue (consumer-worker sẽ xử lý và gọi UserShardDO)
+  app.post('/queue/push', async (c) => {
+    try {
+      requirePermissions(c, ['websocket:broadcast']);
+      const body = await c.req.json<{ type?: string; targetUsers: string[]; message: unknown }>();
+      const { type = 'broadcast', targetUsers, message } = body;
+
+      if (!Array.isArray(targetUsers) || targetUsers.length === 0) {
+        return c.json({ success: false, error: 'targetUsers is required and must be non-empty' }, 400);
+      }
+
+      const queue = c.env.WS_BROADCAST_QUEUE;
+      if (!queue) {
+        return c.json({ success: false, error: 'WS_BROADCAST_QUEUE not configured' }, 503);
+      }
+
+      await queue.send({
+        body: JSON.stringify({
+          type: type ?? 'broadcast',
+          targetUsers,
+          message: message ?? body,
+        }),
+      });
+
+      return c.json({ success: true, queued: true, targetCount: targetUsers.length });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to push message to queue');
+      return c.json(errorResponse, status);
+    }
+  });
+
   return app;
 }

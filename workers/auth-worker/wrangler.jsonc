@@ -70,6 +70,10 @@
 		{
 			"binding": "ERROR_QUEUE",
 			"queue": "error-queue-dlq"
+		},
+		{
+			"binding": "WS_BROADCAST_QUEUE",
+			"queue": "ws-broadcast-queue"
 		}
 		]
 	},
