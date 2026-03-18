@@ -48,6 +48,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     "API Service": t("api_service"),
     "Discount Vouchers": t("discount_vouchers"),
     "Version Updates": t("version_updates"),
+    "WebSocket Notify": t("websocket_notify"),
   };
   return (title: string) =>
     // eslint-disable-next-line security/detect-object-injection -- title is validated via Object.hasOwn

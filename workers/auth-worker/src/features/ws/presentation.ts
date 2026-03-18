@@ -27,12 +27,70 @@ export function createDashboardWebSocketRoutes(bindingName: string) {
       if (user.role !== 'admin') {
         throw new Error('Unauthorized');
       }
-      const request = c.req.raw;
+      const body = (await c.req.json()) as Record<string, unknown>;
+      let finalBody = body;
+      // Resolve targetIdentifiers (emails) to targetUsers (DO ids) for BroadcastServiceDO
+      const targetIdentifiers = body.targetIdentifiers as string[] | undefined;
+      if (Array.isArray(targetIdentifiers) && targetIdentifiers.length > 0) {
+        const userDOBinding = (c.env as unknown as Record<string, DurableObjectNamespace>)[bindingName];
+        const targetUsers = targetIdentifiers
+          .map((id) => String(id).trim())
+          .filter(Boolean)
+          .map((identifier) => userDOBinding.idFromName(identifier).toString());
+        finalBody = { ...body, targetUsers, targetIdentifiers: undefined };
+      }
+      const request = new Request(c.req.raw.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalBody),
+      });
       const wsApplicationService = createWebsocketApplicationService(c, bindingName);
       return wsApplicationService.broadcastMessageUseCase(request);
-
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, "Broadcast failed");
+      return c.json(errorResponse, status);
+    }
+  });
+
+  // Push message to ws-broadcast-queue (admin only, same as API but with session auth)
+  app.post('/queue/push', async (c) => {
+    try {
+      const user = requireAuth(c);
+      if (user.role !== 'admin') {
+        throw new Error('Unauthorized');
+      }
+      const body = await c.req.json<{ type?: string; targetUsers?: string[]; targetIdentifiers?: string[]; message: unknown }>();
+      const { type = 'broadcast', targetUsers: rawTargetUsers, targetIdentifiers, message } = body;
+
+      let targetUsers: string[];
+      if (Array.isArray(targetIdentifiers) && targetIdentifiers.length > 0) {
+        const userDOBinding = (c.env as unknown as Record<string, DurableObjectNamespace>)[bindingName];
+        targetUsers = targetIdentifiers
+          .map((id) => String(id).trim())
+          .filter(Boolean)
+          .map((identifier) => userDOBinding.idFromName(identifier).toString());
+      } else if (Array.isArray(rawTargetUsers) && rawTargetUsers.length > 0) {
+        targetUsers = rawTargetUsers;
+      } else {
+        return c.json({ success: false, error: 'targetUsers or targetIdentifiers is required and must be non-empty' }, 400);
+      }
+
+      const queue = c.env.WS_BROADCAST_QUEUE;
+      if (!queue) {
+        return c.json({ success: false, error: 'WS_BROADCAST_QUEUE not configured' }, 503);
+      }
+
+      await queue.send({
+        body: JSON.stringify({
+          type: type ?? 'broadcast',
+          targetUsers,
+          message: message ?? body,
+        }),
+      });
+
+      return c.json({ success: true, queued: true, targetCount: targetUsers.length });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to push message to queue');
       return c.json(errorResponse, status);
     }
   });
