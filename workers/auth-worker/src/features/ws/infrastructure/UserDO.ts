@@ -1150,29 +1150,32 @@ export class UserDO extends DurableObject {
     if (handler) await handler();
   }
 
+  /** Lý do đóng từ logout - khi gặp các reason này thì connection + unregister đã xử lý ở closeWebSocketsForSession/closeAllWebSockets */
+  private static readonly LOGOUT_CLOSE_REASONS = ['Session logged out', 'All sessions logged out'] as const;
+
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
     try {
+      const closedByLogout = (UserDO.LOGOUT_CLOSE_REASONS as readonly string[]).includes(reason);
       const remainingCount = this.state.getWebSockets().length;
-      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remainingSockets=${remainingCount}`);
+      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remaining=${remainingCount} closedByLogout=${closedByLogout}`);
       this.sendFailureCount.delete(ws);
-      // Lấy sessionId, connectionId từ attachment (survive hibernation) hoặc từ memory (khi DO chưa hibernate)
-      const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
-      const connectionId = att.connectionId;
-      // Xoá connection record tương ứng với WebSocket này (1 sessionId có thể có nhiều connections = nhiều tab)
-      if (connectionId) {
-        const connections = await this.database.dynamicSelect('connections', { field: 'connectionId', operator: '=', value: connectionId });
-        if (connections.length > 0) {
-          await this.database.dynamicDelete('connections', connections[0].id);
-          await this.updateTablePendingCount('connections');
-        }
-      }
       this.sessions.delete(ws);
-      // Chỉ unregisterUser khi đây là connection CUỐI CÙNG đóng (getWebSockets đã loại WS vừa đóng)
-      const isLastConnectionClosed = remainingCount === 1;
-      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: isLastConnectionClosed=${isLastConnectionClosed} getWebSockets().length=${this.state.getWebSockets().length}`);
-      if (isLastConnectionClosed) {
-        console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: calling unregisterUser`);
-        await this.unregisterUser();
+
+      // Connection delete + unregister: đã xử lý ở closeWebSocketsForSession/closeAllWebSockets khi logout → bỏ qua tránh trùng
+      if (!closedByLogout) {
+        const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
+        const connectionId = att.connectionId;
+        if (connectionId) {
+          const connections = await this.database.dynamicSelect('connections', { field: 'connectionId', operator: '=', value: connectionId });
+          if (connections.length > 0) {
+            await this.database.dynamicDelete('connections', connections[0].id);
+            await this.updateTablePendingCount('connections');
+          }
+        }
+        if (remainingCount === 0) {
+          console.log(`[UserDO ${this.userId}] webSocketClose: calling unregisterUser`);
+          await this.unregisterUser();
+        }
       }
       await this.storage.deleteAlarm();
       await this.scheduleQueueAlarmIfNeeded();
@@ -1369,6 +1372,20 @@ export class UserDO extends DurableObject {
     const connections = await this.database.dynamicSelect('connections', { field: 'sessionId', operator: '=', value: sessionId });
     const targetConnectionIds = new Set(connections.map((c: { connectionId?: string }) => c.connectionId).filter(Boolean));
     console.log('[UserDO closeWebSocketsForSession] userId=%s targetSessionId=%s socketCount=%d connectionIds=%d', this.userId, sessionId, sockets.length, targetConnectionIds.size);
+
+    // Xoá connection records NGAY TẠI ĐÂY trước khi đóng WS (tránh race: webSocketClose có thể không có connectionId từ attachment sau hibernation)
+    // Không phụ thuộc webSocketClose để xoá - giúp luôn xoá được dù queueStatus đang pending/flushed/processed
+    for (const conn of connections) {
+      if (conn.id != null) {
+        try {
+          await this.database.dynamicDelete('connections', conn.id);
+        } catch (e) {
+          handleErrorWithoutIp(e, `Delete connection id=${conn.id} for session ${sessionId}`);
+        }
+      }
+    }
+    if (connections.length > 0) await this.updateTablePendingCount('connections');
+
     let closedCount = 0;
     for (const ws of sockets) {
       const att = ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null;
@@ -1384,13 +1401,37 @@ export class UserDO extends DurableObject {
         } catch (e) { handleErrorWithoutIp(e, 'Close WS for session'); }
       }
     }
-    console.log('[UserDO closeWebSocketsForSession] userId=%s closedCount=%d', this.userId, closedCount);
+    // Đã đóng hết WS của user (chỉ có 1 session) → gọi unregisterUser ngay, không chờ webSocketClose
+    if (closedCount > 0 && closedCount === sockets.length) {
+      console.log('[UserDO closeWebSocketsForSession] all sockets closed, calling unregisterUser');
+      await this.unregisterUser();
+    }
+    console.log('[UserDO closeWebSocketsForSession] userId=%s closedCount=%d deletedConnections=%d', this.userId, closedCount, connections.length);
   }
 
   private async closeAllWebSockets(): Promise<void> {
+    // Xoá tất cả connection records trước khi đóng WS (tránh phụ thuộc webSocketClose + attachment)
+    const connections = await this.database.dynamicSelect('connections');
+    for (const conn of connections) {
+      if (conn.id != null) {
+        try {
+          await this.database.dynamicDelete('connections', conn.id);
+        } catch (e) {
+          handleErrorWithoutIp(e, `Delete connection id=${conn.id}`);
+        }
+      }
+    }
+    if (connections.length > 0) await this.updateTablePendingCount('connections');
+    console.log('[UserDO closeAllWebSockets] userId=%s deletedConnections=%d', this.userId, connections.length);
+
     const sockets = this.state.getWebSockets();
     for (const ws of sockets) {
       try { ws.close(1000, 'All sessions logged out'); } catch (e) { handleErrorWithoutIp(e, 'Close WS'); }
+    }
+    // Đóng hết WS → gọi unregisterUser ngay, không chờ từng webSocketClose
+    if (sockets.length > 0) {
+      console.log('[UserDO closeAllWebSockets] all sockets closed, calling unregisterUser');
+      await this.unregisterUser();
     }
   }
 
