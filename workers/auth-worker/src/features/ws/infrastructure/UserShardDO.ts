@@ -163,8 +163,26 @@ export class UserShardDO extends DurableObject {
   // =============================================
   private async handleFastBroadcast(data: any) {
     const { message, targetUsers } = data;
-    this.ctx.waitUntil(this.processFastBroadcast(message, targetUsers));
+    const actualMessage = this.extractMessageContent(message);
+    this.ctx.waitUntil(this.processFastBroadcast(actualMessage, targetUsers));
     return { status: 'accepted' };
+  }
+
+  /**
+   * Chuẩn hóa message: Consumer gửi { type, message, timestamp }, BroadcastServiceDO gửi raw message.
+   * Trích message content để UserDO nhận đúng format và WebSocket client parse được.
+   */
+  private extractMessageContent(message: any): any {
+    if (
+      message &&
+      typeof message === 'object' &&
+      'message' in message &&
+      'type' in message &&
+      'timestamp' in message
+    ) {
+      return message.message;
+    }
+    return message;
   }
 
   private async processFastBroadcast(message: any, targetUsers?: string[]) {

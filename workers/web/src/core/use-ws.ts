@@ -40,23 +40,31 @@ function createConnectionManager(options: UseWsOptions = {}) {
   let reconnectAttempts = 0;
   let currentIdentifier: string | null = null;
 
-  /** Mỗi event -> Set các handler (dùng Set để cùng 1 handler không bị gọi 2 lần khi nhiều component subscribe chung) */
-  const handlerSetsByEvent = new Map<string, Set<WsMessageHandler>>();
+  /**
+   * event -> (handler -> refCount).
+   * Nhiều component có thể subscribe cùng handler; chỉ remove khi refCount về 0.
+   * Tránh bug: component A unmount xóa handler khi component B vẫn cần.
+   */
+  const handlerRefCountByEvent = new Map<string, Map<WsMessageHandler, number>>();
   const subscriptionEntries: Array<{ handlers: WsMessageHandlers }> = [];
+
+  function getHandlersForEvent(eventName: string): WsMessageHandler[] {
+    const refCountMap = handlerRefCountByEvent.get(eventName);
+    if (!refCountMap) return [];
+    return Array.from(refCountMap.keys());
+  }
 
   function dispatchMessage(raw: RawMessage): void {
     const eventName = raw.event ?? raw.type;
     if (eventName === "heartbeat") return;
 
     const data = raw.data;
-    const set = handlerSetsByEvent.get(eventName ?? "");
-    if (set) {
-      for (const handler of set) {
-        try {
-          handler(data);
-        } catch (err) {
-          console.error(`[useWs] handler for event "${eventName}" threw:`, err);
-        }
+    const handlers = getHandlersForEvent(eventName ?? "");
+    for (const handler of handlers) {
+      try {
+        handler(data);
+      } catch (err) {
+        console.error(`[useWs] handler for event "${eventName}" threw:`, err);
       }
     }
   }
@@ -153,12 +161,13 @@ function createConnectionManager(options: UseWsOptions = {}) {
     const entry = { handlers };
     for (const [event, fn] of Object.entries(handlers)) {
       if (fn) {
-        let set = handlerSetsByEvent.get(event);
-        if (!set) {
-          set = new Set();
-          handlerSetsByEvent.set(event, set);
+        let refCountMap = handlerRefCountByEvent.get(event);
+        if (!refCountMap) {
+          refCountMap = new Map();
+          handlerRefCountByEvent.set(event, refCountMap);
         }
-        set.add(fn);
+        const count = (refCountMap.get(fn) ?? 0) + 1;
+        refCountMap.set(fn, count);
       }
     }
     subscriptionEntries.push(entry);
@@ -171,7 +180,14 @@ function createConnectionManager(options: UseWsOptions = {}) {
     return () => {
       subscriberCount -= 1;
       for (const [event, fn] of Object.entries(entry.handlers)) {
-        if (fn) handlerSetsByEvent.get(event)?.delete(fn);
+        if (fn) {
+          const refCountMap = handlerRefCountByEvent.get(event);
+          if (refCountMap) {
+            const count = (refCountMap.get(fn) ?? 1) - 1;
+            if (count <= 0) refCountMap.delete(fn);
+            else refCountMap.set(fn, count);
+          }
+        }
       }
       const idx = subscriptionEntries.indexOf(entry);
       if (idx !== -1) subscriptionEntries.splice(idx, 1);
