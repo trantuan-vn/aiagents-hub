@@ -1157,7 +1157,7 @@ export class UserDO extends DurableObject {
     try {
       const closedByLogout = (UserDO.LOGOUT_CLOSE_REASONS as readonly string[]).includes(reason);
       const remainingCount = this.state.getWebSockets().length;
-      const isLastConnection = remainingCount === 0; // Socket đã remove khỏi list trước khi handler chạy
+      const isLastConnection = remainingCount <= 1;
       console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remaining=${remainingCount} isLastConnection=${isLastConnection} closedByLogout=${closedByLogout}`);
       this.sendFailureCount.delete(ws);
       this.sessions.delete(ws);
@@ -1193,7 +1193,8 @@ export class UserDO extends DurableObject {
 
   // ========== MESSAGE & BROADCAST MANAGEMENT ==========
   private async sendMessage(ws: WebSocket, message: any): Promise<boolean> {
-    console.log(`[UserDO] sendMessage: sending to ws=${ws} message=${JSON.stringify(message)}`);
+    const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
+    console.log(`[UserDO ${this.userId}] sendMessage: sessionId=${att.sessionId ?? '?'} connectionId=${att.connectionId ?? '?'} message=${JSON.stringify(message)}`);
     try {
       if (ws.readyState !== WebSocket.OPEN) {
         return false;
