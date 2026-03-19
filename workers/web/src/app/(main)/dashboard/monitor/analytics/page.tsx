@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Line, LineChart, XAxis, YAxis, CartesianGrid } from "recharts";
+import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,8 @@ type Duration = "week" | "month" | "quarter" | "year";
 interface DailyUsage {
   date: string;
   requestCount: number;
+  successCount: number;
+  errorCount: number;
   cost: number;
 }
 
@@ -39,9 +41,13 @@ const DURATIONS: { value: Duration; labelKey: string }[] = [
 ];
 
 const chartConfig = {
-  requestCount: {
-    label: "API Requests",
-    color: "var(--chart-1)",
+  successCount: {
+    label: "Successful",
+    color: "#22c55e",
+  },
+  errorCount: {
+    label: "Errors",
+    color: "#ef4444",
   },
 } satisfies ChartConfig;
 
@@ -89,7 +95,7 @@ function renderChartContent(
     );
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
-      <LineChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 0 }}>
+      <BarChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 0 }} barCategoryGap="15%">
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
@@ -107,15 +113,9 @@ function renderChartContent(
           tickFormatter={(value) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value)))}
         />
         <ChartTooltip content={<ChartTooltipContent labelFormatter={(value) => formatDate(value)} />} />
-        <Line
-          type="monotone"
-          dataKey="requestCount"
-          stroke="var(--color-requestCount)"
-          strokeWidth={2}
-          dot={{ r: 3 }}
-          activeDot={{ r: 5 }}
-        />
-      </LineChart>
+        <Bar dataKey="successCount" stackId="a" fill="var(--color-successCount)" radius={[0, 0, 0, 0]} />
+        <Bar dataKey="errorCount" stackId="a" fill="var(--color-errorCount)" radius={[0, 0, 0, 0]} />
+      </BarChart>
     </ChartContainer>
   );
 }
@@ -155,13 +155,18 @@ function renderTableContent(
         <p className="text-muted-foreground mt-1 text-sm">{t("empty_hint")}</p>
       </div>
     );
+  const totalSuccess = chartData.reduce((s, d) => s + d.successCount, 0);
+  const totalErrors = chartData.reduce((s, d) => s + d.errorCount, 0);
+
   return (
     <div className="overflow-hidden rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[180px]">{t("table.date")}</TableHead>
-            <TableHead className="text-right">{t("table.requests")}</TableHead>
+            <TableHead className="text-right">{t("table.total_requests")}</TableHead>
+            <TableHead className="text-right">{t("table.success_requests")}</TableHead>
+            <TableHead className="text-right">{t("table.error_requests")}</TableHead>
             <TableHead className="text-right">{t("table.cost")}</TableHead>
           </TableRow>
         </TableHeader>
@@ -170,7 +175,11 @@ function renderTableContent(
             <TableRow key={row.date}>
               <TableCell className="font-medium">{formatDate(row.date)}</TableCell>
               <TableCell className="text-right font-mono tabular-nums">{row.requestCount.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{formatEstimatedCost(row.requestCount)}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">{row.successCount.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">{row.errorCount.toLocaleString()}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">
+                {formatEstimatedCost(row.requestCount)}
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -179,6 +188,12 @@ function renderTableContent(
             <TableCell className="font-semibold">{t("table.total")}</TableCell>
             <TableCell className="text-right font-mono font-semibold tabular-nums">
               {data!.totalRequests.toLocaleString()}
+            </TableCell>
+            <TableCell className="text-right font-mono font-semibold tabular-nums">
+              {totalSuccess.toLocaleString()}
+            </TableCell>
+            <TableCell className="text-right font-mono font-semibold tabular-nums">
+              {totalErrors.toLocaleString()}
             </TableCell>
             <TableCell className="text-right font-mono font-semibold tabular-nums">
               {formatEstimatedCost(data!.totalRequests)}

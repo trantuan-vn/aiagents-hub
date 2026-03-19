@@ -913,7 +913,7 @@
     "empty_hint": "API usage will appear here when you make requests through your services.",
     "chart": {
       "title": "API Requests Over Time",
-      "description": "Daily API request count for the selected period",
+      "description": "Stacked column chart: successful requests (green) and failed requests (red) per day",
       "requests": "Requests"
     },
     "table": {
@@ -921,6 +921,9 @@
       "description": "Breakdown of API requests and cost by date",
       "date": "Date",
       "requests": "API Requests",
+      "total_requests": "Total API Requests",
+      "success_requests": "Successful API Requests",
+      "error_requests": "Failed API Requests",
       "cost": "Cost",
       "total": "Total"
     }

@@ -8,6 +8,8 @@ export type AnalyticsDuration = "week" | "month" | "quarter" | "year";
 export interface DailyUsage {
   date: string; // YYYY-MM-DD
   requestCount: number;
+  successCount: number;
+  errorCount: number;
   cost: number;
 }
 
@@ -56,19 +58,28 @@ export async function getServiceUsageAnalytics(
   const sql = `
     SELECT 
       date(created_at/1000, 'unixepoch') as date,
-      COUNT(*) as request_count
+      COUNT(*) as request_count,
+      SUM(CASE WHEN isError = 0 OR isError IS NULL THEN 1 ELSE 0 END) as success_count,
+      SUM(CASE WHEN isError = 1 THEN 1 ELSE 0 END) as error_count
     FROM service_usages 
     WHERE user_id = ? AND created_at >= ? AND created_at <= ?
     GROUP BY date
     ORDER BY date ASC
   `;
 
-  const result = await db.prepare(sql).bind(userId, from, to).all<{ date: string; request_count: number }>();
+  const result = await db.prepare(sql).bind(userId, from, to).all<{
+    date: string;
+    request_count: number;
+    success_count: number;
+    error_count: number;
+  }>();
 
   const rows = result.results ?? [];
   const daily: DailyUsage[] = rows.map((r) => ({
     date: r.date,
     requestCount: r.request_count ?? 0,
+    successCount: r.success_count ?? 0,
+    errorCount: r.error_count ?? 0,
     cost: 0, // Cost tracking to be implemented when pricing model is integrated
   }));
 

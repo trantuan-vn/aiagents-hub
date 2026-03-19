@@ -913,7 +913,7 @@
     "empty_hint": "Dữ liệu sử dụng API sẽ hiển thị tại đây khi bạn thực hiện request qua dịch vụ.",
     "chart": {
       "title": "Request API theo thời gian",
-      "description": "Số lượng request API mỗi ngày trong khoảng thời gian đã chọn",
+      "description": "Biểu đồ cột xếp chồng: request thành công (xanh) và request lỗi (đỏ) mỗi ngày",
       "requests": "Requests"
     },
     "table": {
@@ -921,6 +921,9 @@
       "description": "Chi tiết số request API và chi phí theo ngày",
       "date": "Ngày",
       "requests": "Request API",
+      "total_requests": "Tổng số request API",
+      "success_requests": "Số request API thành công",
+      "error_requests": "Số request API lỗi",
       "cost": "Chi phí",
       "total": "Tổng cộng"
     }
