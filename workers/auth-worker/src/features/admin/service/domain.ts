@@ -38,6 +38,8 @@ export const ServiceUsageSchema = z.object({
   endpoint: z.string(),
   userAgent: z.string().optional(),
   ipAddress: z.string().optional(),
+  /** true = API call failed (no deduct from quota), false/undefined = success */
+  isError: z.boolean().optional().default(false),
 });
 
 export const ServiceIdSchema = z.string().uuid();

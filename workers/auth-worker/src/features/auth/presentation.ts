@@ -55,8 +55,9 @@ export function createAuthRoutes(bindingName: string) {
         if (!ipAddress || !userAgent) {
           throw new Error('Missing IP address or user agent');
         }
+        const country = (request as Request & { cf?: { country?: string } }).cf?.country ?? 'XX';
         const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c);
-        return await handler(c, sessionId, ipAddress, userAgent);
+        return await handler(c, sessionId, ipAddress, userAgent, country);
       } catch (e) {
         const { errorResponse, status } = await handleError(c, e, errorMessage);
         cookieUtils.clearAuthCookies(c);
@@ -79,7 +80,7 @@ export function createAuthRoutes(bindingName: string) {
     return c.json({ url: authUrl });
   }, "Failed to get OAuth URL"));
 
-  app.get('/oauth/:provider/callback', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.get('/oauth/:provider/callback', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const provider = c.req.param('provider') as any;
     
     if (!['google', 'apple', 'facebook', 'github', 'twitter'].includes(provider)) {
@@ -109,7 +110,7 @@ export function createAuthRoutes(bindingName: string) {
     const identifier = oauthUtils.normalizeOAuthIdentifier(provider, validatedUserInfo);
 
     const result = await applicationService.connectOAuthUseCase(
-      oauthSessionId, identifier, ipAddress, userAgent
+      oauthSessionId, identifier, ipAddress, userAgent, country
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -138,12 +139,12 @@ export function createAuthRoutes(bindingName: string) {
     return c.json({ ok: true });
   }, "OTP request failed"));
 
-  app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { identifier, otp } = await parseBody(c, OTPVerificationSchema);
     
     const applicationService = createApplicationService(c, bindingName);
     const result = await applicationService.verifyOtpUseCase(
-      identifier, sessionId, otp, ipAddress, userAgent
+      identifier, sessionId, otp, ipAddress, userAgent, country
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -160,41 +161,41 @@ export function createAuthRoutes(bindingName: string) {
     return c.json({ ok: true });
   }, "OTP verification failed"));
 
-  app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, TotpVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifyTotpLoginUseCase(
-      sessionId, code, ipAddress, userAgent
+      sessionId, code, ipAddress, userAgent, country
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "TOTP verification failed"));
 
-  app.post('/sms/verify-login', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/sms/verify-login', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, SmsVerifyLoginSchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifySmsLoginUseCase(
-      sessionId, code, ipAddress, userAgent
+      sessionId, code, ipAddress, userAgent, country
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "SMS verification failed"));
 
-  app.post('/backup-code/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/backup-code/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, BackupCodeVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifyBackupCodeLoginUseCase(
-      sessionId, code, ipAddress, userAgent
+      sessionId, code, ipAddress, userAgent, country
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Backup code verification failed"));
 
-  app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.recoverWithBackupCodeUseCase(
-      identifier, code, sessionId, ipAddress, userAgent
+      identifier, code, sessionId, ipAddress, userAgent, country
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -227,7 +228,7 @@ export function createAuthRoutes(bindingName: string) {
     return c.json(result);
   }, "Passkey auth options failed", true));
 
-  app.post('/passkey/auth/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/passkey/auth/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const origin = c.req.header('origin') || c.env.FRONTEND_URL;
     if (!origin) throw new Error('Origin required');
     const body = (await c.req.json()) as { response: unknown; identifier?: string; challengeKey?: string };
@@ -241,7 +242,7 @@ export function createAuthRoutes(bindingName: string) {
       origin
     );
     const { sessionId: newSessionId } = await applicationService.connectPasskeyUseCase(
-      sessionId, identifier, ipAddress, userAgent
+      sessionId, identifier, ipAddress, userAgent, country
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -255,7 +256,7 @@ export function createAuthRoutes(bindingName: string) {
     return c.json({ nonce });
   }, "Nonce request failed"));
 
-  app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+  app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { message, signature } = await parseBody(c, SIWEAuthSchema);
 
     const applicationService = createApplicationService(c, bindingName);
@@ -263,7 +264,7 @@ export function createAuthRoutes(bindingName: string) {
     const address = fields.address.toLowerCase();
 
     const result = await applicationService.connectWalletUseCase(
-      sessionId, address, ipAddress, userAgent
+      sessionId, address, ipAddress, userAgent, country
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {

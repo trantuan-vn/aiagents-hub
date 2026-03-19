@@ -17,6 +17,7 @@ import { createSystemConfigRoutes } from './features/admin/system-config/present
 import { createOverviewRoutes } from './features/dashboard/overview/presentation';
 import { createMonitorLogsRoutes } from './features/dashboard/monitor/logs/presentation';
 import { createMonitorAnalyticsRoutes } from './features/dashboard/monitor/analytics/presentation';
+import { createAdminDefaultRoutes } from './features/dashboard/admin-default/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
@@ -64,6 +65,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/overview', createOverviewRoutes(bindingName));
   routes.route('/dashboard/monitor/logs', createMonitorLogsRoutes(bindingName));
   routes.route('/dashboard/monitor/analytics', createMonitorAnalyticsRoutes(bindingName));
+  routes.route('/dashboard/admin/default-stats', createAdminDefaultRoutes());
 
   // II. API
   // Security middleware

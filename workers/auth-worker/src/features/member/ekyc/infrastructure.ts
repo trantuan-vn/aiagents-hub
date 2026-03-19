@@ -37,8 +37,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     return service;
   };
   const updateServiceUsage = async (
-    service: any, 
-    endpoint: string, 
+    service: any,
+    endpoint: string,
     request: any
   ): Promise<void> => {
     await executeUtils.executeDynamicAction(userDO, 'multi-table', {
@@ -59,11 +59,40 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
             endpoint: endpoint,
             userAgent: request.userAgent,
             ipAddress: request.ipAddress,
+            isError: false,
             queueStatus: 'pending'
           }
         }
       ]
     });
+  };
+
+  /** Record API error (no deduct from quota) - for stats/error rate tracking */
+  const recordApiError = async (
+    service: any,
+    endpoint: string,
+    request: any
+  ): Promise<void> => {
+    try {
+      await executeUtils.executeDynamicAction(userDO, 'multi-table', {
+        operations: [
+          {
+            table: 'service_usages',
+            operation: 'insert',
+            data: {
+              serviceId: service.id,
+              endpoint: endpoint,
+              userAgent: request?.userAgent,
+              ipAddress: request?.ipAddress,
+              isError: true,
+              queueStatus: 'pending'
+            }
+          }
+        ]
+      });
+    } catch (e) {
+      console.warn('[Ekyc] recordApiError failed:', e);
+    }
   };
 
   const LLAMA_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
@@ -78,20 +107,18 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     return /5016|agree|Prior to using this model/i.test(msg);
   };
 
-  const executeAIModel = async ( 
+  const executeAIModel = async (
     endpoint: string,
     request: any,
     prompt: string,
     images: File[],
     processResult: (response: any, service: any) => Promise<any>
   ): Promise<any> => {
-    // Validate and update service usage
     const service = await validateServiceUsage(endpoint);
     if (!service) {
       throw new Error('Service not found');
     }
 
-    // Chuẩn hóa ảnh (giới hạn size) rồi mới gửi AI để tối ưu chi phí, vẫn đủ chi tiết
     const imageB64s = await Promise.all(
       images.map(async (img) => {
         const { buffer, mimeType } = await prepareImageForAI(img);
@@ -99,7 +126,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       })
     );
 
-    // Cloudflare Workers AI expects image_url.url (data URI), not type:'image'+image
     const messages = [{
       role: 'user',
       content: [
@@ -115,22 +141,23 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         max_tokens: maxTokens,
       }, { gateway: { id: "unitoken" } });
 
-    let response: any;
     try {
-      response = await runModel();
-    } catch (e) {
-      if (isLlamaLicenseError(e)) {
-        // Agree to license and retry
-        await agreeToLlamaLicense();
+      let response: any;
+      try {
         response = await runModel();
-      } else {
-        throw e;
+      } catch (e) {
+        if (isLlamaLicenseError(e)) {
+          await agreeToLlamaLicense();
+          response = await runModel();
+        } else {
+          throw e;
+        }
       }
+      return await processResult(response, service);
+    } catch (e) {
+      await recordApiError(service, endpoint, request);
+      throw e;
     }
-
-
-    // Process result and update service usage
-    return await processResult(response, service);
   };
 
   /** Lấy dữ liệu JSON từ response AI: ưu tiên response.response, fallback response; string → parse, object → dùng luôn. */

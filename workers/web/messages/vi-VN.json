@@ -237,6 +237,7 @@
     "strong_user_retention": "Giữ chân người dùng tốt",
     "engagement_exceed_targets": "Tương tác vượt mục tiêu",
     "growth_rate": "Tỷ lệ tăng trưởng",
+    "api_error_rate": "Tỷ lệ lỗi API",
     "steady_performance_increase": "Hiệu suất tăng ổn định",
     "meets_growth_projections": "Đáp ứng dự báo tăng trưởng",
     "view": "Chế độ xem",
@@ -248,6 +249,8 @@
     "add_section": "Thêm phần"
   },
   "DataTable": {
+    "country": "Quốc gia",
+    "total_visitors": "Tổng lượt truy cập",
     "view": "Xem",
     "toggle_columns": "Bật/tắt cột",
     "header": "Tiêu đề",

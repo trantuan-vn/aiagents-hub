@@ -237,6 +237,7 @@
     "strong_user_retention": "Strong user retention",
     "engagement_exceed_targets": "Engagement exceed targets",
     "growth_rate": "Growth Rate",
+    "api_error_rate": "API Error Rate",
     "steady_performance_increase": "Steady performance increase",
     "meets_growth_projections": "Meets growth projections",
     "view": "View",
@@ -248,6 +249,8 @@
     "add_section": "Add Section"
   },
   "DataTable": {
+    "country": "Country",
+    "total_visitors": "Total Visitors",
     "view": "View",
     "toggle_columns": "Toggle columns",
     "header": "Header",

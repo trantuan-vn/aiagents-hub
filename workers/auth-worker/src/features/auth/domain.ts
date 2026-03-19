@@ -171,6 +171,8 @@ export const SessionSchema = z.object({
   expiresAt: z.string().datetime(),
   ipAddress: z.string().ip().optional(),
   userAgent: z.string().optional(),
+  /** ISO 3166-1 Alpha 2 country code from Cloudflare cf.country */
+  country: z.string().max(2).optional(),
   isActive: z.preprocess(
     (val) => {
       // Chuyển đổi các giá trị thành boolean

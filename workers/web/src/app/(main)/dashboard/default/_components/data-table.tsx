@@ -2,82 +2,42 @@
 
 import * as React from "react";
 
-import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { z } from "zod";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDataTableInstance } from "@/hooks/use-data-table-instance";
 
 import { DataTable as DataTableNew } from "../../../../../components/data-table/data-table";
 import { DataTablePagination } from "../../../../../components/data-table/data-table-pagination";
 import { DataTableViewOptions } from "../../../../../components/data-table/data-table-view-options";
-import { withDndColumn } from "../../../../../components/data-table/table-utils";
 
-import { getDashboardColumns } from "./columns";
-import { sectionSchema } from "./schema";
+import { getVisitorsByCountryColumns, type VisitorByCountry, type VisitorByCountryRow } from "./columns-visitors";
 
-export function DataTable({ data: initialData }: { data: z.infer<typeof sectionSchema>[] }) {
-  const t = useTranslations("Default");
+export function DataTable({ visitorsByCountry }: { visitorsByCountry: VisitorByCountry[] }) {
   const tTable = useTranslations("DataTable");
-  const [data, setData] = React.useState(() => initialData);
-  const columns = withDndColumn(getDashboardColumns(tTable));
-  const table = useDataTableInstance({ data, columns, getRowId: (row) => row.id.toString() });
+  const data = React.useMemo<VisitorByCountryRow[]>(
+    () =>
+      visitorsByCountry.map((row, i) => ({
+        ...row,
+        id: `${row.country}-${i}`,
+      })),
+    [visitorsByCountry],
+  );
+  const columns = getVisitorsByCountryColumns(tTable);
+  const table = useDataTableInstance<VisitorByCountryRow, unknown>({
+    data,
+    columns,
+    getRowId: (row) => row.id,
+  });
 
   return (
-    <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6">
-      <div className="flex items-center justify-between">
-        <Label htmlFor="view-selector" className="sr-only">
-          {t("view")}
-        </Label>
-        <Select defaultValue="outline">
-          <SelectTrigger className="flex w-fit @4xl/main:hidden" size="sm" id="view-selector">
-            <SelectValue placeholder={t("select_view")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="outline">{t("outline")}</SelectItem>
-            <SelectItem value="past-performance">{t("past_performance")}</SelectItem>
-            <SelectItem value="key-personnel">{t("key_personnel")}</SelectItem>
-            <SelectItem value="focus-documents">{t("focus_documents")}</SelectItem>
-          </SelectContent>
-        </Select>
-        <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-          <TabsTrigger value="outline">{t("outline")}</TabsTrigger>
-          <TabsTrigger value="past-performance">
-            {t("past_performance")} <Badge variant="secondary">3</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="key-personnel">
-            {t("key_personnel")} <Badge variant="secondary">2</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="focus-documents">{t("focus_documents")}</TabsTrigger>
-        </TabsList>
-        <div className="flex items-center gap-2">
-          <DataTableViewOptions table={table} />
-          <Button variant="outline" size="sm">
-            <Plus />
-            <span className="hidden lg:inline">{t("add_section")}</span>
-          </Button>
-        </div>
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex items-center justify-end">
+        <DataTableViewOptions table={table} />
       </div>
-      <TabsContent value="outline" className="relative flex flex-col gap-4 overflow-auto">
-        <div className="overflow-hidden rounded-lg border">
-          <DataTableNew dndEnabled table={table} columns={columns} onReorder={setData} />
-        </div>
-        <DataTablePagination table={table} />
-      </TabsContent>
-      <TabsContent value="past-performance" className="flex flex-col">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="key-personnel" className="flex flex-col">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-      <TabsContent value="focus-documents" className="flex flex-col">
-        <div className="aspect-video w-full flex-1 rounded-lg border border-dashed"></div>
-      </TabsContent>
-    </Tabs>
+      <div className="overflow-hidden rounded-lg border">
+        <DataTableNew table={table} columns={columns} />
+      </div>
+      <DataTablePagination table={table} />
+    </div>
   );
 }
