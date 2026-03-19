@@ -863,7 +863,10 @@
       "active_services": "active services",
       "status": "Status",
       "live": "Live",
-      "realtime": "Real-time data"
+      "realtime": "Real-time data",
+      "error_rate": "Error Rate",
+      "error_rate_desc": "{errors} errors of {total} requests",
+      "error_rate_na": "No data"
     },
     "filters": {
       "title": "Search & Filter",
@@ -879,6 +882,9 @@
       "time": "Time",
       "service": "Service",
       "endpoint": "Endpoint",
+      "status": "Status",
+      "status_success": "Success",
+      "status_error": "Error",
       "ip": "IP Address",
       "user_agent": "User Agent"
     },

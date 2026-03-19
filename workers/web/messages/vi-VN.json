@@ -863,7 +863,10 @@
       "active_services": "dịch vụ đang hoạt động",
       "status": "Trạng thái",
       "live": "Trực tiếp",
-      "realtime": "Dữ liệu theo thời gian thực"
+      "realtime": "Dữ liệu theo thời gian thực",
+      "error_rate": "Tỉ lệ lỗi",
+      "error_rate_desc": "{errors} lỗi trên {total} request",
+      "error_rate_na": "Chưa có dữ liệu"
     },
     "filters": {
       "title": "Tìm kiếm & Lọc",
@@ -879,6 +882,9 @@
       "time": "Thời gian",
       "service": "Dịch vụ",
       "endpoint": "Endpoint",
+      "status": "Trạng thái",
+      "status_success": "Thành công",
+      "status_error": "Lỗi",
       "ip": "Địa chỉ IP",
       "user_agent": "User Agent"
     },

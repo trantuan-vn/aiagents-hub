@@ -20,13 +20,21 @@ export interface ServiceUsageLog {
   userAgent?: string;
   ipAddress?: string;
   user_id?: string;
+  isError?: boolean | number;
   created_at?: number;
   updated_at?: number;
+}
+
+export interface ErrorRateStats {
+  total: number;
+  errors: number;
+  errorRatePercent: number;
 }
 
 export interface LogsResult {
   logs: ServiceUsageLog[];
   hasMore: boolean;
+  errorRate?: ErrorRateStats;
 }
 
 export async function getServiceUsageLogs(
@@ -66,5 +74,46 @@ export async function getServiceUsageLogs(
   const hasMore = rows.length > limit;
   const logs = rows.slice(0, limit);
 
-  return { logs, hasMore };
+  const errorRate = await getErrorRateStats(db, userId, { serviceId, endpoint, dateFrom, dateTo });
+
+  return { logs, hasMore, errorRate };
+}
+
+export async function getErrorRateStats(
+  db: D1Database,
+  userId: string,
+  filters: Pick<LogsFilters, 'serviceId' | 'endpoint' | 'dateFrom' | 'dateTo'>
+): Promise<ErrorRateStats> {
+  const conditions: string[] = ['"user_id" = ?'];
+  const params: (string | number)[] = [userId];
+
+  if (filters.serviceId != null) {
+    conditions.push('"serviceId" = ?');
+    params.push(filters.serviceId);
+  }
+  if (filters.endpoint && filters.endpoint.trim()) {
+    conditions.push('"endpoint" LIKE ?');
+    params.push(`%${filters.endpoint.trim()}%`);
+  }
+  if (filters.dateFrom != null) {
+    conditions.push('"created_at" >= ?');
+    params.push(filters.dateFrom);
+  }
+  if (filters.dateTo != null) {
+    conditions.push('"created_at" <= ?');
+    params.push(filters.dateTo);
+  }
+
+  const whereClause = conditions.join(' AND ');
+  const sql = `SELECT
+    COUNT(*) as total,
+    SUM(CASE WHEN isError = 1 THEN 1 ELSE 0 END) as errors
+  FROM service_usages WHERE ${whereClause}`;
+
+  const row = await db.prepare(sql).bind(...params).first<{ total: number; errors: number }>();
+  const total = row?.total ?? 0;
+  const errors = row?.errors ?? 0;
+  const errorRatePercent = total > 0 ? Math.round((errors / total) * 100 * 10) / 10 : 0;
+
+  return { total, errors, errorRatePercent };
 }

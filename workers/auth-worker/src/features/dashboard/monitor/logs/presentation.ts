@@ -43,11 +43,12 @@ export function createMonitorLogsRoutes(bindingName: string) {
         if (!isNaN(ts)) filters.dateTo = ts;
       }
 
-      const { logs, hasMore } = await getServiceUsageLogs(db, userId, filters);
+      const { logs, hasMore, errorRate } = await getServiceUsageLogs(db, userId, filters);
 
       return c.json({
         logs,
         hasMore,
+        errorRate,
         limit,
         offset,
       });

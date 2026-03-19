@@ -16,6 +16,7 @@ interface ServiceUsageLog {
   ipAddress?: string;
   created_at?: number;
   createdAt?: number;
+  isError?: boolean | number;
 }
 
 interface Service {
@@ -71,6 +72,7 @@ export function LogsTableCard({
   };
 
   const displayValue = (v: string | undefined) => (v && v.length > 0 ? v : "—");
+  const getIsError = (log: ServiceUsageLog) => log.isError === true || log.isError === 1;
 
   if (isLoading) {
     return (
@@ -119,6 +121,7 @@ export function LogsTableCard({
                     <TableHead className="w-[160px]">{t("table.time")}</TableHead>
                     <TableHead>{t("table.service")}</TableHead>
                     <TableHead>{t("table.endpoint")}</TableHead>
+                    <TableHead className="w-[100px]">{t("table.status")}</TableHead>
                     <TableHead className="hidden md:table-cell">{t("table.ip")}</TableHead>
                     <TableHead className="hidden max-w-[200px] truncate lg:table-cell">
                       {t("table.user_agent")}
@@ -138,6 +141,11 @@ export function LogsTableCard({
                       </TableCell>
                       <TableCell className="max-w-[280px] truncate font-mono text-xs" title={log.endpoint}>
                         {displayValue(log.endpoint)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getIsError(log) ? "destructive" : "secondary"} className="text-xs font-normal">
+                          {getIsError(log) ? t("table.status_error") : t("table.status_success")}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground hidden font-mono text-xs md:table-cell">
                         {displayValue(log.ipAddress)}

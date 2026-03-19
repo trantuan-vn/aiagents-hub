@@ -23,6 +23,13 @@ interface ServiceUsageLog {
   ipAddress?: string;
   created_at?: number;
   createdAt?: number;
+  isError?: boolean | number;
+}
+
+interface ErrorRateStats {
+  total: number;
+  errors: number;
+  errorRatePercent: number;
 }
 
 interface Service {
@@ -42,6 +49,7 @@ export default function MonitorLogsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
 
+  const [errorRate, setErrorRate] = useState<ErrorRateStats | null>(null);
   const [searchEndpoint, setSearchEndpoint] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [serviceIdFilter, setServiceIdFilter] = useState<string>("all");
@@ -83,14 +91,16 @@ export default function MonitorLogsPage() {
         throw new Error(errorText ? errorText : t("fetch_error"));
       }
 
-      const result: { logs?: ServiceUsageLog[]; hasMore?: boolean } = await response.json();
+      const result: { logs?: ServiceUsageLog[]; hasMore?: boolean; errorRate?: ErrorRateStats } = await response.json();
       setLogs(result.logs ?? []);
       setHasMore(result.hasMore ?? false);
+      setErrorRate(result.errorRate ?? null);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t("fetch_error");
       setError(errorMessage);
       setLogs([]);
+      setErrorRate(null);
       toast({
         title: t("error"),
         description: errorMessage,
@@ -165,7 +175,7 @@ export default function MonitorLogsPage() {
         </Button>
       </div>
 
-      <LogsStatsCards logsCount={logs.length} servicesCount={services.length} t={t} />
+      <LogsStatsCards logsCount={logs.length} servicesCount={services.length} errorRate={errorRate} />
 
       <LogsFiltersCard
         searchEndpoint={searchEndpoint}
