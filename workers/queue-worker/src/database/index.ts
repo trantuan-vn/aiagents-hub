@@ -595,7 +595,7 @@ export class D1DatabaseManager {
     this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
     this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
     this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
-    this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('sessionId'));
+    this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
     this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
 
     // Queue tables (xoá khi cleanup): queue flow, không unique index
