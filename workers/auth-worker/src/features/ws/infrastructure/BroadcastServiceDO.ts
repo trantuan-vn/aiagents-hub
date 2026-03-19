@@ -228,18 +228,31 @@ export class BroadcastServiceDO extends DurableObject {
   // =============================================
   // USER MANAGEMENT
   // =============================================
+  /** Idempotent: chỉ tăng userCount khi UserShardDO xác nhận đây là đăng ký MỚI (user chưa có trong user_registrations).
+   * UserShardDO đã idempotent - gọi register nhiều lần cho cùng user chỉ insert 1 lần. BroadcastServiceDO phải đồng bộ:
+   * mỗi lần registerUser được gọi, nếu UserShardDO báo "đã có sẵn" thì không tăng counter. */
   async registerUser(userId: string) {
     const shardName = this.getShardForUser(userId);
+    const shardDO = this.env.USER_SHARD_DO.get(this.env.USER_SHARD_DO.idFromName(shardName));
+    const response = await shardDO.fetch('https://shard.internal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'registerUser', userId, shardName })
+    });
+    if (!response.ok) throw new Error(`Failed to register user: ${response.statusText}`);
+
+    const body = (await response.json()) as { status?: string; newlyRegistered?: boolean };
+    if (body.newlyRegistered !== true) return; // Idempotent: user đã có trong shard, không tăng counter
+
     const [existingShardArr, totalUsersCounterArr] = await Promise.all([
       this.database.dynamicSelect('user_shards', { field: 'shardName', operator: '=', value: shardName }),
       this.database.dynamicSelect('global_counters', { field: 'key', operator: '=', value: 'totalUsers' })
     ]);
-    if (totalUsersCounterArr.length===0) throw new Error('Total users counter not found');
+    if (totalUsersCounterArr.length === 0) throw new Error('Total users counter not found');
     let existingShard: any;
-    if (existingShardArr.length===0) {
+    if (existingShardArr.length === 0) {
       existingShard = await this.database.dynamicInsert('user_shards', { shardName, userCount: 0 });
-    }
-    else existingShard = existingShardArr[0];    
+    } else existingShard = existingShardArr[0];
     const totalUsersCounter = totalUsersCounterArr[0];
     const currentTotalUsers = Number(totalUsersCounter.value ?? 0) || 0;
 
@@ -253,13 +266,9 @@ export class BroadcastServiceDO extends DurableObject {
         table: 'global_counters',
         operation: 'update',
         id: totalUsersCounter.id,
-        // NOTE: `global_counters.value` is currently modeled as `z.any()` => column type TEXT,
-        // so Cloudflare SQLite may return strings like "0.01". Always coerce to number before incrementing.
         data: { value: currentTotalUsers + 1 }
       }
     ]);
-
-    await this.executeShardOperation('registerUser', userId, shardName, existingShard, totalUsersCounter);
   }
 
   async unregisterUser(userId: string) {

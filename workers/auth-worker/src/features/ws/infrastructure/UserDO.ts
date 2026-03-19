@@ -1157,7 +1157,8 @@ export class UserDO extends DurableObject {
     try {
       const closedByLogout = (UserDO.LOGOUT_CLOSE_REASONS as readonly string[]).includes(reason);
       const remainingCount = this.state.getWebSockets().length;
-      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remaining=${remainingCount} closedByLogout=${closedByLogout}`);
+      const isLastConnection = remainingCount === 0; // Socket đã remove khỏi list trước khi handler chạy
+      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remaining=${remainingCount} isLastConnection=${isLastConnection} closedByLogout=${closedByLogout}`);
       this.sendFailureCount.delete(ws);
       this.sessions.delete(ws);
 
@@ -1172,7 +1173,7 @@ export class UserDO extends DurableObject {
             await this.updateTablePendingCount('connections');
           }
         }
-        if (remainingCount === 0) {
+        if (isLastConnection) {
           console.log(`[UserDO ${this.userId}] webSocketClose: calling unregisterUser`);
           await this.unregisterUser();
         }

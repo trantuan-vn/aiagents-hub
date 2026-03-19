@@ -131,12 +131,18 @@ export class UserShardDO extends DurableObject {
 
     const actions: Record<string, Function> = {
       broadcast: () => this.handleFastBroadcast(data),
-      registerUser: () => this.registerUser(data.userId),
+      registerUser: async () => {
+        const newlyRegistered = await this.registerUser(data.userId);
+        return { status: 'processed', newlyRegistered };
+      },
       unregisterUser: () => this.unregisterUser(data.userId)
     };
 
-    if (actions[action]) await actions[action]();
-    return new Response(JSON.stringify({ status: 'processed' }));
+    const result = actions[action] ? await actions[action]() : undefined;
+    const responseBody = result && typeof result === 'object' && 'newlyRegistered' in result
+      ? result
+      : { status: 'processed' };
+    return new Response(JSON.stringify(responseBody));
   }
 
   private async handleRepositoryOperations(request: Request, path: string): Promise<Response> {
@@ -249,11 +255,11 @@ export class UserShardDO extends DurableObject {
   // USER MANAGEMENT
   // =============================================
   /** Chỉ lưu user đang online - delete khi unregister để DO storage = O(concurrent users), không phải O(total users) */
-  async registerUser(userId: string) {
+  async registerUser(userId: string): Promise<boolean> {
     const existingUser = await this.database.dynamicSelect('user_registrations', { field: 'userId', operator: '=', value: userId });
     if (existingUser.length > 0) {
       await this.database.dynamicUpdate('user_registrations', existingUser[0].id, { isActive: true });
-      return; // Idempotent: đã có (race/double register), không cần insert
+      return false; // Idempotent: đã có (race/double register), không cần insert
     }
     const [userCount, activeCount, currentPerf] = await Promise.all([
       this.getUserCount(),
@@ -280,6 +286,7 @@ export class UserShardDO extends DurableObject {
         data: performanceUpdate,
       },
     ]);
+    return true; // Newly registered
   }
 
   /** Xoá user khỏi shard khi offline - giữ DO storage nhỏ (chỉ concurrent users) */
