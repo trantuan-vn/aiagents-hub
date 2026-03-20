@@ -163,24 +163,6 @@ const processChunk = async (
     // Batch insert all records into D1 (preserves id from message)
     await database.batchInsertOrUpsertRecords(table, dataArray);
 
-    // Khi cập nhật sessions: nếu session có isActive = false (hết hiệu lực) thì xoá connections liên quan
-    if (table === 'sessions') {
-      const inactiveSessionIds = dataArray
-        .filter((r: any) => {
-          const v = r.isActive;
-          return v === false || v === 0 || v === '0' || v === 'false';
-        })
-        .map((r: any) => r.hashSessionId)
-        .filter((id: string) => id);
-      if (inactiveSessionIds.length > 0) {
-        try {
-          await database.deleteConnectionsBySessionIds(userId, inactiveSessionIds);
-        } catch (err) {
-          console.error(`[QueueWorker] Failed to delete connections for inactive sessions:`, err);
-        }
-      }
-    }
-
     // After successful insert, cleanup records from UserDO
     if (maxId > 0) {
       try {
