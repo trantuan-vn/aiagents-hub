@@ -9,12 +9,12 @@ import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 // Main authentication middleware factory
 export function createAuthMiddleware(bindingName: string) {
   return async (c: Context, next: Next) => {
-    
+    let sessionId: string | undefined;
     try {
       // Reset user context
       c.set('user', undefined);
       
-      const sessionId = getCookie(c, 'sessionId');
+      sessionId = getCookie(c, 'sessionId');
       if (!sessionId) {
         throw new Error("sessionId not found");
       }
@@ -35,6 +35,15 @@ export function createAuthMiddleware(bindingName: string) {
       }
     } catch (error) {
       handleErrorWithoutIp(error, "Auth middleware error");
+      // Logout session trên server trước khi xoá cookie (invalid session, revoke sessionId nếu còn)
+      if (sessionId) {
+        try {
+          const applicationService = createApplicationService(c, bindingName);
+          await applicationService.revokeSessionBySessionIdUseCase(sessionId);
+        } catch (revokeErr) {
+          console.warn('[Auth] revokeSessionBySessionIdUseCase failed:', revokeErr);
+        }
+      }
       cookieUtils.clearAuthCookies(c);
     }
     

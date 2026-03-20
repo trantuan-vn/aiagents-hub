@@ -47,6 +47,8 @@ interface IApplicationService {
   
   // IV. Common
   logoutUseCase(identifier: string, sessionId: string): Promise<void>;
+  /** Revoke session by sessionId only (dùng khi middleware catch lỗi, chưa có identifier). Lấy identifier từ KV nếu còn. */
+  revokeSessionBySessionIdUseCase(sessionId: string): Promise<void>;
   logoutAllUseCase(identifier: string): Promise<void>;
   listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
@@ -521,6 +523,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     // IV. Common
+    async revokeSessionBySessionIdUseCase(sessionId: string): Promise<void> {
+      const identifier = await c.env.NONCE_KV.get(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
+      if (identifier) {
+        await this.logoutUseCase(identifier, sessionId);
+      }
+    },
+
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
       console.log('[logoutUseCase] DEBUG: identifier=%s sessionId=%s', identifier, sessionId);
       const repository = getRepository(identifier);
