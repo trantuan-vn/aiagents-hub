@@ -131,7 +131,12 @@ export function createAuthRoutes(bindingName: string) {
 
   // II. OTP Routes
   app.post('/otp/request', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
-    const { identifier, language } = await parseBody(c, OTPRequestSchema);
+    const { identifier, language, ref } = await parseBody(c, OTPRequestSchema);
+
+    if (ref && c.env.NONCE_KV) {
+      const { storePendingRef } = await import('../referral/utils');
+      await storePendingRef(c.env.NONCE_KV, sessionId, ref);
+    }
 
     const applicationService = createApplicationService(c, bindingName);
     await applicationService.getRequestOtpUseCase(identifier, sessionId, language);
@@ -140,11 +145,17 @@ export function createAuthRoutes(bindingName: string) {
   }, "OTP request failed"));
 
   app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
-    const { identifier, otp } = await parseBody(c, OTPVerificationSchema);
-    
+    const body = await parseBody(c, OTPVerificationSchema);
+    const { identifier, otp } = body;
+    let ref = body.ref;
+    if (!ref && c.env.NONCE_KV) {
+      const { getPendingRef } = await import('../referral/utils');
+      ref = await getPendingRef(c.env.NONCE_KV, sessionId) ?? undefined;
+    }
+
     const applicationService = createApplicationService(c, bindingName);
     const result = await applicationService.verifyOtpUseCase(
-      identifier, sessionId, otp, ipAddress, userAgent, country
+      identifier, sessionId, otp, ipAddress, userAgent, country, ref
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {

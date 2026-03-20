@@ -11,7 +11,8 @@ import {
   PricePolicySchema, ServiceSchema, ServiceUsageSchema, VoucherSchema,
   OrderSchema, OrderItemSchema, OrderItemDiscountSchema, ApiTokenSchema,
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
-  UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema
+  UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
+  CommissionPolicySchema, CommissionSchema
 } from '../domain.js';
 
 const MAX_SEND_FAILURE_COUNT = 3;
@@ -55,7 +56,8 @@ export class UserDO extends DurableObject {
     "users", "sessions", "connections", "subscriptions",
     "api_tokens", "pending_messages",
     "user_mfa", "user_ekyc", "user_did",
-    "passkey_credentials", "backup_codes"
+    "passkey_credentials", "backup_codes",
+    "commission_policies", "commissions"
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -118,7 +120,8 @@ export class UserDO extends DurableObject {
         { name: 'order_items', schema: OrderItemSchema },
         { name: 'order_discounts', schema: OrderItemDiscountSchema },
         { name: 'payments', schema: PaymentSchema },
-        { name: 'refunds', schema: RefundSchema }
+        { name: 'refunds', schema: RefundSchema },
+        { name: 'commissions', schema: CommissionSchema }
       ];
       
       queueSchemas.forEach(({ name, schema }) => {
@@ -134,6 +137,7 @@ export class UserDO extends DurableObject {
       this.table('user_did', extendWithQueue(UserDidSchema), this.TABLE_CONFIGS.queueTable());
       this.table('passkey_credentials', extendWithQueue(PasskeyCredentialSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
       this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
+      this.table('commission_policies', extendWithQueue(CommissionPolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();

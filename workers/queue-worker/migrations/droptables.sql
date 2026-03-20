@@ -19,6 +19,8 @@ drop table passkey_credentials;
 drop table user_ekyc;
 drop table user_mfa;
 drop table user_did;
+drop table commission_policies;
+drop table commissions;
 
 
 drop table user_shards;

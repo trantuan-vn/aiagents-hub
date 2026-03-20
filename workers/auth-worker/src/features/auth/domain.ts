@@ -14,11 +14,15 @@ export interface JwtPayload {
 export const OTPRequestSchema = z.object({
   identifier: z.string().min(1, 'Identifier is required'),
   language: z.enum(['vi', 'en']).optional(),
+  /** Referral code from ref= param - links new user to referrer */
+  ref: z.string().min(1).max(64).optional(),
 });
 
 export const OTPVerificationSchema = z.object({
   identifier: z.string().min(1, 'Identifier is required'),
   otp: z.string().length(6, 'OTP must be 6 digits'),
+  /** Referral code - must match ref from OTP request if provided */
+  ref: z.string().min(1).max(64).optional(),
 });
 
 export const TotpVerifySchema = z.object({
@@ -159,6 +163,10 @@ export const UserSchema = BaseUserSchema.extend({
   phone: z.string().optional(),
   privateKey: z.string().optional(),
   mnemonicPhrase: z.string().optional(),
+  /** Identifier of the referrer (user who owns the referral link) */
+  referrerId: z.string().optional(),
+  /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */
+  referralCode: z.string().min(6).max(32).optional(),
 });
 
 export type BaseUser = z.infer<typeof BaseUserSchema>;

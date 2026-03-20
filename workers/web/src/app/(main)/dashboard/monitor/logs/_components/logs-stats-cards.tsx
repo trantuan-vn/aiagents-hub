@@ -63,9 +63,7 @@ export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStat
           <div className="text-2xl font-bold">{errorRate ? `${errorRate.errorRatePercent}%` : "—"}</div>
           <p className="text-muted-foreground text-xs">
             {errorRate
-              ? (
-                  t as (key: string, values?: Record<string, string | number>) => string
-                )("stats.error_rate_desc", {
+              ? (t as (key: string, values?: Record<string, string | number>) => string)("stats.error_rate_desc", {
                   errors: errorRate.errors,
                   total: errorRate.total,
                 })

@@ -3,9 +3,10 @@ import { D1DatabaseManager } from "./database";
 // Cache database manager instance to avoid recreating it on every queue processing
 let databaseManager: D1DatabaseManager | null = null;
 
-const getDatabaseManager = (db: D1Database): D1DatabaseManager => {
+const getDatabaseManager = async (db: D1Database): Promise<D1DatabaseManager> => {
   if (!databaseManager) {
     databaseManager = new D1DatabaseManager(db);
+    await databaseManager.ensureReady();
   }
   return databaseManager;
 };
@@ -38,7 +39,7 @@ interface CleanupResult {
 /** Bảng cần xoá khi cleanup (tiết kiệm storage) */
 const QUEUE_TABLE_NAMES = [
   "service_usages", "orders", "order_items",
-  "order_discounts", "payments", "refunds"
+  "order_discounts", "payments", "refunds", "commissions"
 ];
 
 /** Tất cả bảng sync (queue + catalog). Bảng catalog không xoá khi cleanup. */
@@ -48,7 +49,8 @@ const SYNC_TABLE_NAMES = [
   "users", "sessions", "connections", "subscriptions",
   "api_tokens", "pending_messages",
   "user_mfa", "user_ekyc", "user_did",
-  "passkey_credentials", "backup_codes"
+  "passkey_credentials", "backup_codes",
+  "commission_policies", "commissions"
 ];
 
 
@@ -262,7 +264,7 @@ const parseMessage = (message: Message): {
 const processInputQueue = async (batch: MessageBatch, env: Env): Promise<void> => {
   const config = await getQueueWorkerConfig(env);
   const BATCH_SIZE = config.BATCH_SIZE;
-  const database = getDatabaseManager(env.D1DB);
+  const database = await getDatabaseManager(env.D1DB);
   const userTableGroups = new Map<string, Map<string, ProcessedItem[]>>();
 
   // Group messages by userId and table

@@ -14,6 +14,8 @@ import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
 import { createSystemConfigRoutes } from './features/admin/system-config/presentation';
+import { createReferralRoutes } from './features/referral/presentation';
+import { createCommissionPolicyRoutes } from './features/referral/commission-policy-presentation';
 import { createOverviewRoutes } from './features/dashboard/overview/presentation';
 import { createMonitorLogsRoutes } from './features/dashboard/monitor/logs/presentation';
 import { createMonitorAnalyticsRoutes } from './features/dashboard/monitor/analytics/presentation';
@@ -62,6 +64,8 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));
   routes.route('/dashboard/admin/system-config', createSystemConfigRoutes(bindingName));
+  routes.route('/dashboard/referral', createReferralRoutes(bindingName));
+  routes.route('/dashboard/admin/commission-policy', createCommissionPolicyRoutes(bindingName));
   routes.route('/dashboard/overview', createOverviewRoutes(bindingName));
   routes.route('/dashboard/monitor/logs', createMonitorLogsRoutes(bindingName));
   routes.route('/dashboard/monitor/analytics', createMonitorAnalyticsRoutes(bindingName));

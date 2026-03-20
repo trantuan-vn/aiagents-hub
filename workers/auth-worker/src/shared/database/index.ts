@@ -1025,34 +1025,77 @@ export class UserDODatabase {
       console.error(`Error in ensureTableExists, sql: ${createSQL}`);
       throw err;
     }
-    // Migration: thêm cột connectionId vào bảng connections nếu bảng đã tồn tại trước khi schema có connectionId
-    if (name === 'connections' && options.conflictField === 'connectionId') {
-      this.ensureConnectionsConnectionIdColumn();
-    }
+
+    // Migration: thêm các cột thiếu vào bảng đã tồn tại (cho User DO cũ khi schema thay đổi)
+    this.ensureSchemaColumns(name, schema, options);
 
     this.createIndexes(name, options);
 
   }
 
   /**
-   * Migration: Thêm cột connectionId vào bảng connections nếu chưa có.
-   * Bảng connections có thể đã được tạo trước khi schema có connectionId.
+   * Migration: So sánh schema hiện tại với cột trong bảng, thêm các cột thiếu.
+   * Có hiệu lực với DO của user đã tồn tại khi schema thay đổi (thêm cột mới).
    */
-  private ensureConnectionsConnectionIdColumn(): void {
+  private ensureSchemaColumns(name: string, schema: z.ZodSchema, options: TableOptions): void {
     try {
-      const cursor = this.storage.sql.exec<{ name: string }>(`SELECT name FROM pragma_table_info('connections')`);
+      const expectedColumns = this.getExpectedColumnsForMigration(schema, options);
+      const cursor = this.storage.sql.exec<{ name: string }>(`SELECT name FROM pragma_table_info('${name}')`);
       const rows = cursor.toArray();
-      const columnNames = rows.map((row) => row.name);
-      const hasConnectionId = columnNames.includes('connectionId');
+      const existingColumns = new Set(rows.map((row) => row.name));
 
-      if (!hasConnectionId) {
-        this.storage.sql.exec(`ALTER TABLE "connections" ADD COLUMN "connectionId" TEXT`);
-        this.storage.sql.exec(`CREATE UNIQUE INDEX IF NOT EXISTS "uidx_connections_connectionId" ON "connections" ("connectionId")`);
+      for (const [colName, sqlType] of Object.entries(expectedColumns)) {
+        if (!existingColumns.has(colName)) {
+          this.storage.sql.exec(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`);
+          console.log(`[UserDODatabase] Migration: added column "${colName}" to table "${name}"`);
+        }
+      }
+
+      // Thêm unique index cho conflictField nếu cột vừa được thêm (trường hợp connectionId)
+      if (options.conflictField && options.uniqueIndexes?.includes(options.conflictField)) {
+        const idxName = `uidx_${name}_${options.conflictField}`;
+        try {
+          this.storage.sql.exec(`CREATE UNIQUE INDEX IF NOT EXISTS "${idxName}" ON "${name}" ("${options.conflictField}")`);
+        } catch {
+          // Index có thể đã tồn tại, bỏ qua
+        }
       }
     } catch (err) {
-      console.error('[UserDODatabase] Error ensuring connectionId column:', err);
+      console.error(`[UserDODatabase] Error ensuring schema columns for ${name}:`, err);
       throw err;
     }
+  }
+
+  /** Trả về map columnName -> sqlType cho migration (chỉ cột từ schema + auto fields, không bao gồm PRIMARY KEY/UNIQUE) */
+  private getExpectedColumnsForMigration(schema: z.ZodSchema, options: TableOptions): Record<string, string> {
+    const schemaShape = this.extractSchemaShape(schema);
+    const result: Record<string, string> = {};
+
+    if (options.autoFields?.id !== false) {
+      result.id = 'INTEGER';
+    }
+    if (options.autoFields?.timestamps !== false) {
+      result.created_at = 'INTEGER NOT NULL';
+      result.updated_at = 'INTEGER NOT NULL';
+    }
+    if (options.autoFields?.user !== false) {
+      result.user_id = 'TEXT';
+    }
+    if (options.autoFields?.organization !== false) {
+      result.organization_id = 'TEXT';
+    }
+    if (options.autoFields?.queue === true) {
+      result.queueId = 'INTEGER';
+      result.queueStatus = 'TEXT';
+      result.flushedAt = 'INTEGER';
+      result.processedAt = 'INTEGER';
+    }
+
+    for (const [key, value] of Object.entries(schemaShape)) {
+      result[key] = this.getColumnType(value as z.ZodTypeAny);
+    }
+
+    return result;
   }
   
   private extractSchemaShape(schema: z.ZodSchema): Record<string, z.ZodTypeAny> {

@@ -102,6 +102,12 @@ export const sidebarItems: NavGroup[] = [
         adminOnly: true,
       },
       {
+        title: "Commission Policy",
+        url: "/dashboard/commission-policy",
+        icon: Banknote,
+        adminOnly: true,
+      },
+      {
         title: "API Service",
         url: "/dashboard/service",
         icon: Code,

@@ -1,0 +1,91 @@
+import { Hono } from 'hono';
+import { requireAuth } from '../auth/authMiddleware';
+import { handleError } from '../../shared/utils';
+import { getIdFromName } from '../../shared/utils';
+import { UserDO } from '../ws/infrastructure/UserDO';
+import { executeUtils } from '../../shared/utils';
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://unitoken.trade';
+
+export function createReferralRoutes(bindingName: string) {
+  const app = new Hono<{ Bindings: Env }>();
+
+  const createRouteHandler = (handler: Function, errorMessage: string) => {
+    return async (c: any) => {
+      try {
+        const user = requireAuth(c);
+        return await handler(c, user);
+      } catch (e) {
+        const { errorResponse, status } = await handleError(c, e, errorMessage);
+        return c.json(errorResponse, status);
+      }
+    };
+  };
+
+  // Get referral link and code
+  app.get('/link', createRouteHandler(async (c: any, user: any) => {
+    const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+    const users = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: 'identifier', operator: '=', value: user.identifier }
+    }, 'users');
+    const u = Array.isArray(users) ? users[0] : users;
+    let referralCode = u?.referralCode;
+    if (!referralCode && u) {
+      const { generateReferralCode, storeReferralCode } = await import('./utils');
+      referralCode = generateReferralCode();
+      await executeUtils.executeDynamicAction(userDO, 'update', { id: u.id, referralCode }, 'users');
+      if (c.env.NONCE_KV) await storeReferralCode(c.env.NONCE_KV, referralCode, user.identifier);
+    }
+    if (!referralCode) {
+      throw new Error('Failed to get or generate referral code');
+    }
+    const baseUrl = c.env.FRONTEND_URL || FRONTEND_URL;
+    const referralLink = `${baseUrl}/auth/v3/login?ref=${encodeURIComponent(referralCode)}`;
+    return c.json({ referralLink, referralCode });
+  }, 'Failed to get referral link'));
+
+  // Get commission stats (for chart) - filter: 7d, 30d, 90d. Commissions are in referrer's UserDO.
+  app.get('/commissions/stats', createRouteHandler(async (c: any, user: any) => {
+    const period = c.req.query('period') || '30'; // 7, 30, 90
+    const days = Math.min(90, Math.max(7, parseInt(period, 10) || 30));
+    const fromTs = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: 'created_at', operator: '>=', value: fromTs },
+      orderBy: { field: 'created_at', direction: 'ASC' }
+    }, 'commissions').catch(() => []);
+
+    const byDate = new Map<string, number>();
+    for (const r of rows || []) {
+      const ts = r.created_at ?? r.createdAt ?? 0;
+      const dateKey = new Date(ts).toISOString().slice(0, 10);
+      byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.commissionAmount || 0));
+    }
+    const byDay = Array.from(byDate.entries()).map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date));
+    const totalAmount = byDay.reduce((sum, d) => sum + d.total, 0);
+
+    return c.json({ byDay, totalAmount, period: days });
+  }, 'Failed to get commission stats'));
+
+  // Get commission list (table)
+  app.get('/commissions', createRouteHandler(async (c: any, user: any) => {
+    const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
+    const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
+    const period = c.req.query('period') || '30';
+    const days = Math.min(365, Math.max(1, parseInt(period, 10) || 30));
+    const fromTs = Date.now() - days * 24 * 60 * 60 * 1000;
+
+    const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+      where: { field: 'created_at', operator: '>=', value: fromTs },
+      orderBy: { field: 'created_at', direction: 'DESC' },
+      limit,
+      offset
+    }, 'commissions').catch(() => []);
+
+    return c.json({ commissions: rows || [], limit, offset });
+  }, 'Failed to get commissions'));
+
+  return app;
+}

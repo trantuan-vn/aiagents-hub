@@ -22,6 +22,7 @@ import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
+import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../referral/utils';
 
 interface IApplicationService {
   // I. OAUTH
@@ -31,7 +32,7 @@ interface IApplicationService {
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
-  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
   verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
   verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
@@ -117,7 +118,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     return { sessionId };
   };
 
-  const getOrCreateUser = async (repository: any, identifier: string, additionalData: any = {}): Promise<{ user: any; isNewUser: boolean }> => {
+  const getOrCreateUser = async (repository: any, identifier: string, additionalData: any = {}, refCode?: string): Promise<{ user: any; isNewUser: boolean }> => {
     const encryptSecret= await c.env.ENCRYPTION_SECRET.get();
     if (!encryptSecret) {
       throw new Error("ENCRYPTION_SECRET is not defined in environment variables");
@@ -126,11 +127,31 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const existingUser = await repository.users.get();
     console.log('[Auth] getOrCreateUser: identifier=', identifier, 'existingUser=', !!existingUser, 'isNewUser=', !existingUser);
 
-    if (existingUser) return { user: existingUser, isNewUser: false };
+    if (existingUser) {
+      // Ensure existing users have referralCode (backfill)
+      if (!existingUser.referralCode && c.env.NONCE_KV) {
+        const code = generateReferralCode();
+        await repository.users.save({ ...existingUser, referralCode: code });
+        await storeReferralCode(c.env.NONCE_KV, code, existingUser.identifier);
+        existingUser.referralCode = code;
+      }
+      return { user: existingUser, isNewUser: false };
+    }
+
+    // Resolve referrer from ref code (only for new users)
+    let referrerId: string | undefined;
+    if (refCode && c.env.NONCE_KV) {
+      referrerId = await resolveReferrerByCode(c.env.NONCE_KV, refCode) ?? undefined;
+      if (referrerId) console.log('[Auth] getOrCreateUser: linking to referrer', referrerId);
+    }
+
+    const referralCode = generateReferralCode();
 
     const baseUser = {
       identifier: validationUtils.normalizeIdentifier(identifier),
       role: isAdmin(identifier) ? 'admin' : 'member',
+      referralCode,
+      ...(referrerId && { referrerId }),
       ...additionalData
     };
 
@@ -152,6 +173,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     }
 
     const user = await repository.users.save(baseUser);
+
+    // Index referral code in KV for lookup
+    if (c.env.NONCE_KV) {
+      await storeReferralCode(c.env.NONCE_KV, referralCode, user.identifier);
+    }
+
     return { user, isNewUser: true };
   };
 
@@ -265,7 +292,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const otpService = createOTPService(c.env);
       const isValid = await otpService.verifyOTP(otp, sessionId);
       if (!isValid) {
@@ -273,7 +300,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       const repository = getRepository(identifier);
-      const { user, isNewUser } = await getOrCreateUser(repository, identifier);
+      const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);

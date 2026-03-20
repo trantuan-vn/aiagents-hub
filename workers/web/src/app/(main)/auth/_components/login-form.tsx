@@ -90,15 +90,15 @@ function OtpDialog({
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               {t("cancel")}
             </Button>
-            <Button type="button" className="flex-1" onClick={() => onVerify(otp)} disabled={isLoading || otp.length !== 6}>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => onVerify(otp)}
+              disabled={isLoading || otp.length !== 6}
+            >
               {isLoading ? t("verifying") : t("verify_otp")}
             </Button>
           </div>
@@ -154,15 +154,15 @@ function TotpDialog({
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               {t("cancel")}
             </Button>
-            <Button type="button" className="flex-1" onClick={() => onVerify(totpCode)} disabled={isLoading || totpCode.length !== 6}>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => onVerify(totpCode)}
+              disabled={isLoading || totpCode.length !== 6}
+            >
               {isLoading ? t("verifying") : t("verify_totp")}
             </Button>
           </div>
@@ -288,15 +288,15 @@ function SmsDialogWithBackup({
             />
           </div>
           <div className="flex gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => onOpenChange(false)}
-            >
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
               {t("cancel")}
             </Button>
-            <Button type="button" className="flex-1" onClick={() => onVerify(smsCode)} disabled={isLoading || smsCode.length !== 6}>
+            <Button
+              type="button"
+              className="flex-1"
+              onClick={() => onVerify(smsCode)}
+              disabled={isLoading || smsCode.length !== 6}
+            >
               {isLoading ? t("verifying") : t("verify_sms")}
             </Button>
           </div>
@@ -318,6 +318,7 @@ export function LoginForm() {
   const locale = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const refFromUrl = searchParams.get("ref");
   const [showOtpPopup, setShowOtpPopup] = useState(false);
   const [showTotpPopup, setShowTotpPopup] = useState(false);
   const [showSmsPopup, setShowSmsPopup] = useState(false);
@@ -641,10 +642,15 @@ export function LoginForm() {
       if (!isMounted.current) return;
       setIsLoading(true);
       try {
+        const body: { identifier: string; language?: string; ref?: string } = {
+          identifier: data.email.trim(),
+          language,
+        };
+        if (refFromUrl) body.ref = refFromUrl;
         const res = await fetch(`${AUTH_API_URL}/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier: data.email.trim(), language }),
+          body: JSON.stringify(body),
           credentials: "include",
         });
         if (!res.ok) {
@@ -663,7 +669,7 @@ export function LoginForm() {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [language, t],
+    [language, refFromUrl, t],
   );
 
   const handleBackupCodeChange = useCallback((value: string) => {

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { AccountSecurityCard } from "./_components/account-security-card";
 import { DidCard } from "./_components/did-card";
 import { EkycCard } from "./_components/ekyc-card";
+import { ReferralCard } from "./_components/referral-card";
 import { SessionsDevicesCard } from "./_components/sessions-devices-card";
 
 export default function AccountPage() {
@@ -17,6 +18,7 @@ export default function AccountPage() {
         <p className="text-muted-foreground">{t("description")}</p>
       </div>
 
+      <ReferralCard />
       <AccountSecurityCard />
       <SessionsDevicesCard />
       <EkycCard />

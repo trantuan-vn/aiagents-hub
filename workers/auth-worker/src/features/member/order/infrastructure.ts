@@ -1,6 +1,7 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createPriceApplicationService } from '../../admin/policy/application';
 import { createVoucherApplicationService } from '../../admin/voucher/application';
+import { processCommissionOnOrder } from '../../referral/commission-service';
 import {
   CreateOrder,
   UpdateOrderStatus,
@@ -260,6 +261,18 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
         if (item.discounts) {
           await createOrderDiscounts(orderItem.id, item.discounts);
         }
+      }
+
+      // Process commission for referrer if user has one
+      try {
+        await processCommissionOnOrder(context, bindingName, user, {
+          id: orderRecord.id,
+          orderCode: orderData.orderCode,
+          finalAmount,
+          currency: request.currency ?? 'VND',
+        });
+      } catch (e) {
+        console.warn('[Order] Commission processing failed:', e);
       }
 
       return { id: orderRecord.id, items: calculationResult };

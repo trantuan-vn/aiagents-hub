@@ -22,6 +22,8 @@ import {
 	UserDidSchema,
 	PasskeyCredentialSchema,
 	BackupCodeSchema,
+	CommissionPolicySchema,
+	CommissionSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -581,22 +583,29 @@ export class D1DatabaseManager {
   };
 
 
+  private initPromise: Promise<void>;
+
   constructor(
     private db: D1Database,
   ) {
-    this.initializeTables();
+    this.initPromise = this.initializeTables();
   }
 
+  /** Đảm bảo migration schema đã chạy xong trước khi dùng DB */
+  async ensureReady(): Promise<void> {
+    await this.initPromise;
+  }
 
   private async initializeTables(): Promise<void> {
     // Bảng danh mục (catalog): queue flow + unique index - tương thích với auth worker UserDO
-    this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
-    this.registerTable('services', ServiceSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
-    this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
-    this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
-    this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
-    this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
-    this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
+    await this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+    await this.registerTable('services', ServiceSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
+    await this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+    await this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
+    await this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));
+    await this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
+    await this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
+    await this.registerTable('commission_policies', CommissionPolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
 
     // Queue tables (xoá khi cleanup): queue flow, không unique index
     const queueSchemas = [
@@ -605,26 +614,27 @@ export class D1DatabaseManager {
       { name: 'order_items', schema: OrderItemSchema },
       { name: 'order_discounts', schema: OrderItemDiscountSchema },
       { name: 'payments', schema: PaymentSchema },
-      { name: 'refunds', schema: RefundSchema }
+      { name: 'refunds', schema: RefundSchema },
+      { name: 'commissions', schema: CommissionSchema }
     ];
-    queueSchemas.forEach(({ name, schema }) => {
-      this.registerTable(name, schema, this.TABLE_CONFIGS.queueTable());
-    });
+    for (const { name, schema } of queueSchemas) {
+      await this.registerTable(name, schema, this.TABLE_CONFIGS.queueTable());
+    }
 
     // Bảng danh mục: queue flow, không xoá khi cleanup
-    this.registerTable('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('versions', VersionInfoSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('user_mfa', UserMfaSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('user_ekyc', UserEkycSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('user_did', UserDidSchema, this.TABLE_CONFIGS.queueTable());
-    this.registerTable('passkey_credentials', PasskeyCredentialSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
-    this.registerTable('backup_codes', BackupCodeSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
+    await this.registerTable('api_tokens', ApiTokenSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('versions', VersionInfoSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('pending_messages', PendingMessageSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('user_mfa', UserMfaSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('user_ekyc', UserEkycSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('user_did', UserDidSchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('passkey_credentials', PasskeyCredentialSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
+    await this.registerTable('backup_codes', BackupCodeSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
   }
 
-  registerTable(name: string, schema: z.ZodSchema, options: TableOptions = {}): void {
+  private async registerTable(name: string, schema: z.ZodSchema, options: TableOptions = {}): Promise<void> {
     this.tableConfigs.set(name, { schema, options });
-    this.ensureTableExists(name, schema, options);
+    await this.ensureTableExists(name, schema, options);
   }
 
   createExtendedSchema(
@@ -1163,7 +1173,75 @@ export class D1DatabaseManager {
       throw err;
     }
 
+    // Migration: thêm các cột thiếu vào bảng đã tồn tại (cho D1 khi schema thay đổi)
+    await this.ensureSchemaColumns(name, schema, options);
+
     await this.createIndexes(name, options);
+  }
+
+  /**
+   * Migration: So sánh schema hiện tại với cột trong bảng D1, thêm các cột thiếu.
+   * Có hiệu lực với D1 khi schema thay đổi (thêm cột mới).
+   */
+  private async ensureSchemaColumns(name: string, schema: z.ZodSchema, options: TableOptions): Promise<void> {
+    try {
+      const expectedColumns = this.getExpectedColumnsForMigration(schema, options);
+      const result = await this.db.prepare(`SELECT name FROM pragma_table_info(?)`).bind(name).all<{ name: string }>();
+      const existingColumns = new Set((result.results || []).map((r) => r.name));
+
+      for (const [colName, sqlType] of Object.entries(expectedColumns)) {
+        if (!existingColumns.has(colName)) {
+          await this.db.prepare(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`).run();
+          console.log(`[D1DatabaseManager] Migration: added column "${colName}" to table "${name}"`);
+        }
+      }
+
+      // Thêm unique index cho conflictField nếu cột vừa được thêm
+      if (options.conflictField && options.uniqueIndexes?.includes(options.conflictField)) {
+        const idxName = `uidx_${name}_${options.conflictField}`;
+        try {
+          await this.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS "${idxName}" ON "${name}" ("${options.conflictField}")`).run();
+        } catch {
+          // Index có thể đã tồn tại, bỏ qua
+        }
+      }
+    } catch (err) {
+      console.error(`[D1DatabaseManager] Error ensuring schema columns for ${name}:`, err);
+      throw err;
+    }
+  }
+
+  /** Trả về map columnName -> sqlType cho migration (D1 dùng globalId, id) */
+  private getExpectedColumnsForMigration(schema: z.ZodSchema, options: TableOptions): Record<string, string> {
+    const schemaShape = this.extractSchemaShape(schema);
+    const result: Record<string, string> = {};
+
+    if (options.autoFields?.id !== false) {
+      result.globalId = 'INTEGER';
+      result.id = 'INTEGER';
+    }
+    if (options.autoFields?.timestamps !== false) {
+      result.created_at = 'INTEGER NOT NULL';
+      result.updated_at = 'INTEGER NOT NULL';
+    }
+    if (options.autoFields?.user !== false) {
+      result.user_id = 'TEXT';
+    }
+    if (options.autoFields?.organization !== false) {
+      result.organization_id = 'TEXT';
+    }
+    if (options.autoFields?.queue === true) {
+      result.queueId = 'INTEGER';
+      result.queueStatus = 'TEXT';
+      result.flushedAt = 'INTEGER';
+      result.processedAt = 'INTEGER';
+    }
+
+    for (const [key, value] of Object.entries(schemaShape)) {
+      result[key] = this.getColumnType(value as z.ZodTypeAny);
+    }
+
+    return result;
   }
 
   private extractSchemaShape(schema: z.ZodSchema): Record<string, z.ZodTypeAny> {

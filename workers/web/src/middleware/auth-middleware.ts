@@ -6,7 +6,8 @@ function requiresAdminAccess(pathname: string): boolean {
   return (
     pathname.startsWith("/dashboard/crm") ||
     pathname.startsWith("/dashboard/finance") ||
-    pathname.startsWith("/dashboard/system-config")
+    pathname.startsWith("/dashboard/system-config") ||
+    pathname.startsWith("/dashboard/commission-policy")
   );
 }
 
