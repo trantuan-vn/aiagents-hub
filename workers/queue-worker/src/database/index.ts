@@ -877,6 +877,29 @@ export class D1DatabaseManager {
     }
   }
 
+  /**
+   * Cập nhật trạng thái connections liên quan tới các session đã hết hiệu lực (isActive = false).
+   * Đặt connected = false để đánh dấu connection hết hiệu lực.
+   * Gọi sau khi cập nhật sessions trên D1.
+   */
+  async updateConnectionsBySessionIds(userId: string, sessionIds: string[]): Promise<number> {
+    if (sessionIds.length === 0) return 0;
+
+    const placeholders = sessionIds.map(() => '?').join(', ');
+    const sql = `UPDATE "connections" SET "connected" = 0 WHERE "user_id" = ? AND "sessionId" IN (${placeholders})`;
+    const params = [userId, ...sessionIds];
+
+    const result = await this.db.prepare(sql).bind(...params).run();
+    if (!result.success) {
+      throw new Error('Failed to update connections for inactive sessions');
+    }
+    const updatedCount = result.meta?.changes ?? 0;
+    if (updatedCount > 0) {
+      console.log(`[D1] Updated ${updatedCount} connection(s) to inactive for ${sessionIds.length} inactive session(s) in user ${userId}`);
+    }
+    return updatedCount;
+  }
+
   async dynamicSelect(
     tableName: string,
     where?: { field: string; operator: string; value: any } | { field: string; operator: string; value: any }[],
