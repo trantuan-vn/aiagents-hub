@@ -127,18 +127,21 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
     await executeUtils.executeDynamicAction(userDO, 'delete', { id: session.id }, 'sessions');
   },
 
-  async deactivateAllUserSessions(identifier: string): Promise<void> {
+  async deactivateAllUserSessions(identifier: string): Promise<string[]> {
     const sessions = await executeUtils.executeDynamicAction(userDO, 'select', {
       where: [{ field: 'isActive', operator: '=', value: 1 }],
       limit: 500
     }, 'sessions');
     const list = Array.isArray(sessions) ? sessions : [];
+    const hashSessionIds: string[] = [];
     for (const session of list) {
+      if (session.hashSessionId) hashSessionIds.push(session.hashSessionId);
       await executeUtils.executeDynamicAction(userDO, 'update', {
         id: session.id,
         isActive: false
       }, 'sessions');
     }
+    return hashSessionIds;
   },
 });
 

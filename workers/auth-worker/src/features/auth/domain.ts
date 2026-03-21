@@ -209,7 +209,7 @@ export interface ISessionRepository {
   listAll(limit?: number): Promise<Session[]>;
   update(sessionId: string, sessionData: Partial<Session>): Promise<void>;
   delete(sessionId: string): Promise<void>;
-  deactivateAllUserSessions(identifier: string): Promise<void>;
+  deactivateAllUserSessions(identifier: string): Promise<string[]>;
 }
 
 // VIII. Service Interfaces

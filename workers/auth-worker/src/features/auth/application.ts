@@ -579,7 +579,10 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async logoutAllUseCase(identifier: string): Promise<void> {
       const repository = getRepository(identifier);
-      await repository.sessions.deactivateAllUserSessions(identifier);
+      const hashSessionIds = await repository.sessions.deactivateAllUserSessions(identifier);
+      for (const sid of hashSessionIds) {
+        await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sid}`);
+      }
       // Đóng tất cả WebSocket để trigger unregisterUser
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
@@ -641,7 +644,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
       validationUtils.validateSession(session);
 
-      // So sánh IP/UA với session trong DO - nếu khác thì sessionId có thể bị lộ, revoke để đảm bảo an toàn
+      // So sánh IP/UA với session trong DO - nếu khác thì sessionId có thể bị lộ (đánh cắp)
+      // Revoke TẤT CẢ sessions (logoutAll) để đảm bảo: đóng hết WS, gọi unregisterUser đúng 1 lần
+      // Tránh bug: revoke 1 session trong khi có 2 sessionIds→2 connectionIds → chỉ xoá 1 nhưng unregister sai
       const sessionIp = session.ipAddress;
       const sessionUa = session.userAgent;
       let ipMismatch = false;
@@ -654,7 +659,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         if (sessionUa !== clientUserAgent) uaMismatch = true;
       }
       if (ipMismatch || uaMismatch) {
-        await this.revokeSessionUseCase(identifier, sessionId);
+        await this.logoutAllUseCase(identifier);
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
 
