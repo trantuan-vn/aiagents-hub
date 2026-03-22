@@ -161,9 +161,7 @@ export default function CommissionsPage() {
                   {commissions.map((c, i) => (
                     <TableRow key={c.id ?? i}>
                       <TableCell>{c.created_at ? new Date(c.created_at).toLocaleString() : "-"}</TableCell>
-                      <TableCell className="font-mono text-sm whitespace-nowrap">
-                        {c.referredUserId ?? "-"}
-                      </TableCell>
+                      <TableCell className="font-mono text-sm whitespace-nowrap">{c.referredUserId ?? "-"}</TableCell>
                       <TableCell>
                         {c.orderAmount.toLocaleString()} {c.currency}
                       </TableCell>

@@ -925,9 +925,18 @@
       "status": "Trạng thái",
       "live": "Trực tiếp",
       "realtime": "Dữ liệu theo thời gian thực",
+      "all_systems_ok": "Hệ thống hoạt động bình thường",
       "error_rate": "Tỉ lệ lỗi",
       "error_rate_desc": "{errors} lỗi trên {total} request",
-      "error_rate_na": "Chưa có dữ liệu"
+      "error_rate_na": "Chưa có dữ liệu",
+      "success_rate": "tỉ lệ thành công",
+      "quality_excellent": "Xuất sắc",
+      "quality_good": "Tốt",
+      "quality_attention": "Cần chú ý"
+    },
+    "chart": {
+      "title": "Phân bố Request",
+      "description": "Thành công vs lỗi theo giờ (trang hiện tại)"
     },
     "filters": {
       "title": "Tìm kiếm & Lọc",
@@ -935,7 +944,12 @@
       "search_placeholder": "Tìm kiếm endpoint...",
       "service_placeholder": "Chọn dịch vụ",
       "all_services": "Tất cả dịch vụ",
-      "apply": "Áp dụng"
+      "date_7_days": "7 ngày",
+      "date_30_days": "30 ngày",
+      "date_90_days": "90 ngày",
+      "date_custom": "Tùy chỉnh",
+      "apply": "Áp dụng",
+      "clear": "Xóa bộ lọc"
     },
     "table": {
       "title": "Lịch sử Sử dụng",

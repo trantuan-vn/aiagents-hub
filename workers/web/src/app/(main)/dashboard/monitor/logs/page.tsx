@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 import { LogsFiltersCard } from "./_components/logs-filters-card";
+import { LogsOverviewChart } from "./_components/logs-overview-chart";
 import { LogsStatsCards } from "./_components/logs-stats-cards";
 import { LogsTableCard } from "./_components/logs-table-card";
 
@@ -38,6 +39,14 @@ interface Service {
   endpoint?: string;
 }
 
+function parseServicesResponse(raw: unknown): Array<Service | Record<string, unknown>> {
+  if (Array.isArray(raw)) return raw;
+  const obj = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  if (obj?.data != null && Array.isArray(obj.data)) return obj.data;
+  if (obj?.services != null && Array.isArray(obj.services)) return obj.services;
+  return [];
+}
+
 export default function MonitorLogsPage() {
   const t = useTranslations("MonitorLogsPage");
   const { toast } = useToast();
@@ -53,64 +62,78 @@ export default function MonitorLogsPage() {
   const [searchEndpoint, setSearchEndpoint] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [serviceIdFilter, setServiceIdFilter] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const from = new Date();
+    from.setDate(from.getDate() - 7);
+    return from.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
 
-  const buildQueryParams = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set("limit", String(PAGE_SIZE));
-    params.set("offset", String(offset));
-    if (serviceIdFilter && serviceIdFilter !== "all") {
-      params.set("serviceId", serviceIdFilter);
-    }
-    if (searchDebounced.trim()) {
-      params.set("endpoint", searchDebounced.trim());
-    }
-    if (dateFrom) {
-      params.set("dateFrom", String(new Date(dateFrom).getTime()));
-    }
-    if (dateTo) {
-      const endOfDay = new Date(dateTo);
-      endOfDay.setHours(23, 59, 59, 999);
-      params.set("dateTo", String(endOfDay.getTime()));
-    }
-    return params.toString();
-  }, [offset, serviceIdFilter, searchDebounced, dateFrom, dateTo]);
-
-  const fetchLogs = useCallback(async () => {
-    try {
-      const qs = buildQueryParams();
-      const response = await fetch(`${API_BASE_URL}/dashboard/monitor/logs?${qs}`, {
-        method: "GET",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText ? errorText : t("fetch_error"));
+  const buildLogsQueryParams = useCallback(
+    (overrideOffset?: number) => {
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(overrideOffset ?? offset));
+      if (serviceIdFilter && serviceIdFilter !== "all") {
+        params.set("serviceId", serviceIdFilter);
       }
+      if (searchDebounced.trim()) {
+        params.set("endpoint", searchDebounced.trim());
+      }
+      if (dateFrom) {
+        params.set("dateFrom", String(new Date(dateFrom).getTime()));
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        params.set("dateTo", String(endOfDay.getTime()));
+      }
+      return params.toString();
+    },
+    [offset, serviceIdFilter, searchDebounced, dateFrom, dateTo],
+  );
 
-      const result: { logs?: ServiceUsageLog[]; hasMore?: boolean; errorRate?: ErrorRateStats } = await response.json();
-      setLogs(result.logs ?? []);
-      setHasMore(result.hasMore ?? false);
-      setErrorRate(result.errorRate ?? null);
-      setError(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : t("fetch_error");
-      setError(errorMessage);
-      setLogs([]);
-      setErrorRate(null);
-      toast({
-        title: t("error"),
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [buildQueryParams, t, toast]);
+  const fetchLogs = useCallback(
+    async (overrideOffset?: number) => {
+      try {
+        const qs = buildLogsQueryParams(overrideOffset);
+        const response = await fetch(`${API_BASE_URL}/dashboard/monitor/logs?${qs}`, {
+          method: "GET",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText ? errorText : t("fetch_error"));
+        }
+
+        const result: {
+          logs?: ServiceUsageLog[];
+          hasMore?: boolean;
+          errorRate?: ErrorRateStats;
+        } = await response.json();
+        setLogs(result.logs ?? []);
+        setHasMore(result.hasMore ?? false);
+        setErrorRate(result.errorRate ?? null);
+        setError(null);
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : t("fetch_error");
+        setError(errorMessage);
+        setLogs([]);
+        setErrorRate(null);
+        toast({
+          title: t("error"),
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [buildLogsQueryParams, t, toast],
+  );
 
   const fetchServices = useCallback(async () => {
     try {
@@ -121,8 +144,9 @@ export default function MonitorLogsPage() {
       });
 
       if (response.ok) {
-        const data: Service[] = await response.json();
-        setServices(Array.isArray(data) ? data : []);
+        const raw: unknown = await response.json();
+        const data = parseServicesResponse(raw);
+        setServices(data.filter((s): s is Service => "id" in s && typeof (s as { id: unknown }).id === "number"));
       }
     } catch {
       setServices([]);
@@ -146,7 +170,11 @@ export default function MonitorLogsPage() {
     void fetchLogs();
   }, [fetchLogs]);
 
-  const handleApplyFilters = () => setOffset(0);
+  const handleApplyFilters = () => {
+    setOffset(0);
+    setIsLoading(true);
+    void fetchLogs(0);
+  };
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -163,13 +191,19 @@ export default function MonitorLogsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
-          <p className="text-muted-foreground text-sm">{t("description")}</p>
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
+          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{t("description")}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading || isRefreshing}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isLoading || isRefreshing}
+          className="shrink-0"
+        >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
           <span className="ml-2">{t("refresh")}</span>
         </Button>
@@ -190,6 +224,8 @@ export default function MonitorLogsPage() {
         services={services}
         t={t}
       />
+
+      <LogsOverviewChart logs={logs} t={t} />
 
       <LogsTableCard
         isLoading={isLoading}

@@ -925,9 +925,18 @@
       "status": "Status",
       "live": "Live",
       "realtime": "Real-time data",
+      "all_systems_ok": "All systems operational",
       "error_rate": "Error Rate",
       "error_rate_desc": "{errors} errors of {total} requests",
-      "error_rate_na": "No data"
+      "error_rate_na": "No data",
+      "success_rate": "success rate",
+      "quality_excellent": "Excellent",
+      "quality_good": "Good",
+      "quality_attention": "Needs Attention"
+    },
+    "chart": {
+      "title": "Request Distribution",
+      "description": "Success vs error by hour (current page)"
     },
     "filters": {
       "title": "Search & Filter",
@@ -935,7 +944,12 @@
       "search_placeholder": "Search endpoint...",
       "service_placeholder": "Select service",
       "all_services": "All services",
-      "apply": "Apply"
+      "date_7_days": "7 days",
+      "date_30_days": "30 days",
+      "date_90_days": "90 days",
+      "date_custom": "Custom",
+      "apply": "Apply",
+      "clear": "Clear filters"
     },
     "table": {
       "title": "Usage History",
