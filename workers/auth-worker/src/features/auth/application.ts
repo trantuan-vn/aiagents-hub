@@ -28,7 +28,7 @@ interface IApplicationService {
   // I. OAUTH
   getAuthUrlUseCase(provider: OAuthProvider, sessionId: string): Promise<string>;
   exchangeOAuthCodeUseCase(provider: string, state: string, code: string): Promise<{ userInfo: any; sessionId: string }>;
-  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
@@ -41,7 +41,7 @@ interface IApplicationService {
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
   verifySignatureUseCase(sessionId: string, message: string, signature: string): Promise<SiweMessage>;
-  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
 
   // IIIb. PASSKEY (login)
   connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
@@ -140,9 +140,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     // Resolve referrer from ref code (only for new users)
     let referrerId: string | undefined;
-    if (refCode && c.env.NONCE_KV) {
+    if (refCode && refCode.trim() && c.env.NONCE_KV) {
       referrerId = await resolveReferrerByCode(c.env.NONCE_KV, refCode) ?? undefined;
-      if (referrerId) console.log('[Auth] getOrCreateUser: linking to referrer', referrerId);
+      if (referrerId) {
+        console.log('[Auth] getOrCreateUser: linking to referrer', referrerId);
+      } else {
+        console.warn('[Auth] getOrCreateUser: ref code not found in KV, referrerId not set', { refCode: refCode.trim().toUpperCase() });
+      }
     }
 
     const referralCode = generateReferralCode();
@@ -171,7 +175,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     } else if (validationUtils.isValidPhone(identifier)) {
       Object.assign(baseUser, { phone: identifier });
     }
-
+    console.log(`[Auth] getOrCreateUser: baseUser=${JSON.stringify(baseUser)}`);
     const user = await repository.users.save(baseUser);
 
     // Index referral code in KV for lookup
@@ -215,9 +219,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return { userInfo, sessionId };
     },
 
-    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(identifier);
-      const { user, isNewUser } = await getOrCreateUser(repository, identifier);
+      const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -480,9 +484,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return await walletService.verifySignature(sessionId, message, signature, c.env.SIWE_DOMAIN, c.env.FRONTEND_URL);
     },
 
-    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(address);
-      const { user, isNewUser } = await getOrCreateUser(repository, address, { address });
+      const { user, isNewUser } = await getOrCreateUser(repository, address, { address }, ref);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);

@@ -14,8 +14,15 @@ export async function storeReferralCode(kv: KVNamespace, code: string, identifie
   await kv.put(`${KV_PREFIX_REFERRAL}${code}`, identifier, { expirationTtl: 86400 * 365 }); // 1 year
 }
 
+/** Normalize referral code for lookup (trim + uppercase to match generateReferralCode output) */
+export function normalizeRefCode(code: string): string {
+  return code?.trim().toUpperCase() || '';
+}
+
 export async function resolveReferrerByCode(kv: KVNamespace, code: string): Promise<string | null> {
-  return await kv.get(`${KV_PREFIX_REFERRAL}${code}`);
+  const normalized = normalizeRefCode(code);
+  if (!normalized) return null;
+  return await kv.get(`${KV_PREFIX_REFERRAL}${normalized}`);
 }
 
 export async function storePendingRef(kv: KVNamespace, sessionId: string, ref: string): Promise<void> {

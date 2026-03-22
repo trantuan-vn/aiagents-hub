@@ -466,10 +466,15 @@ export function LoginForm() {
       }
       setIsLoading(true);
       try {
+        const body: { identifier: string; otp: string; ref?: string } = {
+          identifier: identifier.trim(),
+          otp: code,
+        };
+        if (refFromUrl) body.ref = refFromUrl;
         const response = await fetch(`${AUTH_API_URL}/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier: identifier.trim(), otp: code }),
+          body: JSON.stringify(body),
           credentials: "include",
         });
         const data = (await response.json().catch(() => ({}))) as {
@@ -500,7 +505,7 @@ export function LoginForm() {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [identifier, form, router, t],
+    [identifier, form, refFromUrl, router, t],
   );
 
   const handleSmsVerify = useCallback(

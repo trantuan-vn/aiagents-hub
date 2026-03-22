@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { useTranslations } from "next-intl";
 import { SiweMessage } from "siwe";
@@ -14,9 +14,13 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
+
 export function WalletConnectButton({ className, ...props }: React.ComponentProps<typeof Button>) {
   const t = useTranslations("WalletConnect");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ref = searchParams.get("ref");
   const { address, isConnected } = useAccount();
   const { connect, connectors, isPending: isConnecting } = useConnect();
   const { signMessageAsync } = useSignMessage();
@@ -37,7 +41,9 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   const fetchNonce = useCallback(async () => {
     toast.info(t("preparing_auth"));
 
-    const nonceResponse = await fetch("https://api.unitoken.trade/dashboard/auth/wallet/nonce", {
+    const url = new URL(`${AUTH_API_URL}/wallet/nonce`);
+    if (ref) url.searchParams.set("ref", ref);
+    const nonceResponse = await fetch(url.toString(), {
       method: "GET",
       credentials: "include",
     });
@@ -51,7 +57,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     const result = NonceSchema.parse(data);
 
     return result.nonce;
-  }, [t, NonceSchema]);
+  }, [t, NonceSchema, ref]);
 
   const createAndSignMessage = useCallback(
     async (nonce: string) => {

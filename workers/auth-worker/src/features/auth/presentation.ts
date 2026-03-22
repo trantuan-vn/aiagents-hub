@@ -74,6 +74,13 @@ export function createAuthRoutes(bindingName: string) {
       throw new Error(`Unsupported OAuth provider: ${provider}`);
     }
 
+    // Store referral code from URL so it's available when user returns from OAuth
+    const ref = c.req.query('ref');
+    if (ref && c.env.NONCE_KV) {
+      const { storePendingRef } = await import('../referral/utils');
+      await storePendingRef(c.env.NONCE_KV, sessionId, ref);
+    }
+
     const applicationService = createApplicationService(c, bindingName);
     const authUrl = await applicationService.getAuthUrlUseCase(provider, sessionId);
 
@@ -109,8 +116,15 @@ export function createAuthRoutes(bindingName: string) {
     const { userInfo: validatedUserInfo, sessionId: oauthSessionId } = await applicationService.exchangeOAuthCodeUseCase(provider, state, code);
     const identifier = oauthUtils.normalizeOAuthIdentifier(provider, validatedUserInfo);
 
+    // Get referral code stored when user clicked OAuth (from link with ref=)
+    let ref: string | undefined;
+    if (c.env.NONCE_KV) {
+      const { getPendingRef } = await import('../referral/utils');
+      ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
+    }
+
     const result = await applicationService.connectOAuthUseCase(
-      oauthSessionId, identifier, ipAddress, userAgent, country
+      oauthSessionId, identifier, ipAddress, userAgent, country, ref
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -261,6 +275,13 @@ export function createAuthRoutes(bindingName: string) {
 
   // III. Wallet Routes
   app.get('/wallet/nonce', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
+    // Store referral code from URL so it's available when user completes wallet sign
+    const ref = c.req.query('ref');
+    if (ref && c.env.NONCE_KV) {
+      const { storePendingRef } = await import('../referral/utils');
+      await storePendingRef(c.env.NONCE_KV, sessionId, ref);
+    }
+
     const applicationService = createApplicationService(c, bindingName);
     const nonce = await applicationService.generateNonceUseCase(sessionId);
 
@@ -274,8 +295,15 @@ export function createAuthRoutes(bindingName: string) {
     const fields = await applicationService.verifySignatureUseCase(sessionId, message, signature);
     const address = fields.address.toLowerCase();
 
+    // Get referral code stored when user requested nonce (from link with ref=)
+    let ref: string | undefined;
+    if (c.env.NONCE_KV) {
+      const { getPendingRef } = await import('../referral/utils');
+      ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
+    }
+
     const result = await applicationService.connectWalletUseCase(
-      sessionId, address, ipAddress, userAgent, country
+      sessionId, address, ipAddress, userAgent, country, ref
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
