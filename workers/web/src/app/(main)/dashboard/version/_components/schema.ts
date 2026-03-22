@@ -9,6 +9,7 @@ export const versionInfoSchema = z.object({
       price_policies: z.number(),
       services: z.number(),
       vouchers: z.number(),
+      commission_policies: z.number().optional(),
     })
     .optional(),
 });
@@ -22,6 +23,7 @@ export const versionSaveResponseSchema = z.object({
       price_policies: z.number(),
       services: z.number(),
       vouchers: z.number(),
+      commission_policies: z.number().optional(),
     })
     .optional(),
 });
@@ -34,6 +36,7 @@ export const versionDataSchema = z.object({
     price_policies: z.array(z.any()),
     services: z.array(z.any()),
     vouchers: z.array(z.any()),
+    commission_policies: z.array(z.any()).optional(),
   }),
 });
 

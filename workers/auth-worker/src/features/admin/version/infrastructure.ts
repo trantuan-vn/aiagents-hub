@@ -14,7 +14,7 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
 
   // Helper để lấy tất cả dữ liệu từ các bảng
   const fetchAllTableData = async () => {
-    const [pricePolicies, services, vouchers] = await Promise.all([
+    const [pricePolicies, services, vouchers, commissionPolicies] = await Promise.all([
       executeUtils.executeDynamicAction(userDO, 'select', {
         orderBy: { field: 'createdAt', direction: 'DESC' }
       }, 'price_policies'),
@@ -22,11 +22,14 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
         orderBy: { field: 'createdAt', direction: 'DESC' }
       }, 'services'),
       executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'createdAt', direction: 'DESC' }    
-      }, 'vouchers')
+        orderBy: { field: 'createdAt', direction: 'DESC' }
+      }, 'vouchers'),
+      executeUtils.executeDynamicAction(userDO, 'select', {
+        orderBy: { field: 'createdAt', direction: 'DESC' }
+      }, 'commission_policies')
     ]);
 
-    return { pricePolicies, services, vouchers };
+    return { pricePolicies, services, vouchers, commissionPolicies };
   };
 
   // Helper để quản lý version trong KV
@@ -57,12 +60,13 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
       const newVersion = await incrementVersionNumber(currentVersion);
       
       // Lấy toàn bộ dữ liệu từ các bảng
-      const { pricePolicies, services, vouchers } = await fetchAllTableData();
+      const { pricePolicies, services, vouchers, commissionPolicies } = await fetchAllTableData();
       
       const recordCounts = {
         price_policies: pricePolicies.length,
         services: services.length,
         vouchers: vouchers.length,
+        commission_policies: commissionPolicies.length,
       };
 
       // Tạo data object để lưu
@@ -70,6 +74,7 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
         price_policies: pricePolicies,
         services: services,
         vouchers: vouchers,
+        commission_policies: commissionPolicies,
         timestamp: new Date().toISOString(),
         version: newVersion
       };
@@ -110,6 +115,9 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           || !(versionData.vouchers && Array.isArray(versionData.vouchers))) {
             throw new Error(`Version ${version} in R2 bucket has invalid data`);
           }
+          const commissionPolicies = Array.isArray(versionData.commission_policies)
+            ? versionData.commission_policies
+            : [];
           // Tạo operations cho multi-table
           const operations = [];
           
@@ -165,11 +173,25 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
               data: voucher
             });
           });
+          // Xử lý commission_policies (tương thích phiên bản cũ không có dữ liệu)
+          operations.push({
+            table: 'commission_policies',
+            operation: 'delete'
+          });
+          commissionPolicies.forEach((policy: any) => {
+            operations.push({
+              table: 'commission_policies',
+              operation: 'insert',
+              data: policy
+            });
+          });
+
           // xử lý versions
           const recordCounts = {
             price_policies: versionData.price_policies.length,
             services: versionData.services.length,
             vouchers: versionData.vouchers.length,
+            commission_policies: commissionPolicies.length,
           };          
           operations.push({
             table: 'versions',
@@ -215,6 +237,7 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           price_policies: versionData.price_policies,
           services: versionData.services,
           vouchers: versionData.vouchers,
+          commission_policies: versionData.commission_policies ?? [],
         }
       };
     },

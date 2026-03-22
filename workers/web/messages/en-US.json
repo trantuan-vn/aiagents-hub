@@ -1015,7 +1015,7 @@
     "version_upgraded_description": "Version has been upgraded successfully",
     "save_version": "Save Version",
     "save_version_description": "Save a new version snapshot of the current system state",
-    "save_version_warning": "This will create a snapshot of all current data (price policies, services, and vouchers).",
+    "save_version_warning": "This will create a snapshot of all current data (price policies, services, vouchers, and commission policies).",
     "saving": "Saving...",
     "save": "Save",
     "cancel": "Cancel",
@@ -1045,12 +1045,14 @@
       "price_policies": "{count} policies",
       "services": "{count} services",
       "vouchers": "{count} vouchers",
+      "commission_policies": "{count} commission policies",
       "total": "{count} total"
     },
     "data": {
       "price_policies": "Price Policies",
       "services": "Services",
-      "vouchers": "Vouchers"
+      "vouchers": "Vouchers",
+      "commission_policies": "Commission Policies"
     }
   },
   "SystemConfigPage": {

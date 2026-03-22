@@ -1015,7 +1015,7 @@
     "version_upgraded_description": "Phiên bản đã được nâng cấp thành công",
     "save_version": "Lưu Phiên bản",
     "save_version_description": "Lưu một bản snapshot mới của trạng thái hệ thống hiện tại",
-    "save_version_warning": "Hành động này sẽ tạo một snapshot của tất cả dữ liệu hiện tại (chính sách giá, dịch vụ và voucher).",
+    "save_version_warning": "Hành động này sẽ tạo một snapshot của tất cả dữ liệu hiện tại (chính sách giá, dịch vụ, voucher và chính sách hoa hồng).",
     "saving": "Đang lưu...",
     "save": "Lưu",
     "cancel": "Hủy",
@@ -1045,12 +1045,14 @@
       "price_policies": "{count} chính sách",
       "services": "{count} dịch vụ",
       "vouchers": "{count} voucher",
+      "commission_policies": "{count} chính sách hoa hồng",
       "total": "{count} tổng cộng"
     },
     "data": {
       "price_policies": "Chính sách Giá",
       "services": "Dịch vụ",
-      "vouchers": "Voucher"
+      "vouchers": "Voucher",
+      "commission_policies": "Chính sách Hoa hồng"
     }
   },
   "SystemConfigPage": {

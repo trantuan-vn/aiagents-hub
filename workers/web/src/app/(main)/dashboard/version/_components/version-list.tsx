@@ -49,7 +49,10 @@ function VersionItemContent({
   t: (key: string, params?: Record<string, string>) => string;
 }) {
   const totalRecords = version.recordCounts
-    ? version.recordCounts.price_policies + version.recordCounts.services + version.recordCounts.vouchers
+    ? version.recordCounts.price_policies +
+      version.recordCounts.services +
+      version.recordCounts.vouchers +
+      (version.recordCounts.commission_policies ?? 0)
     : 0;
 
   return (
@@ -81,6 +84,13 @@ function VersionItemContent({
               </div>
               <div className="flex items-center gap-1">
                 <span>{t("records.vouchers", { count: String(version.recordCounts.vouchers) })}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>
+                  {t("records.commission_policies", {
+                    count: String(version.recordCounts.commission_policies ?? 0),
+                  })}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <span className="font-medium">{t("records.total", { count: String(totalRecords) })}</span>
@@ -179,6 +189,12 @@ function VersionItemActions({
                 <h4 className="mb-2 font-semibold">{t("data.vouchers")}</h4>
                 <pre className="bg-muted rounded-lg p-4 text-xs">
                   {JSON.stringify(versionData.data.vouchers, null, 2)}
+                </pre>
+              </div>
+              <div>
+                <h4 className="mb-2 font-semibold">{t("data.commission_policies")}</h4>
+                <pre className="bg-muted rounded-lg p-4 text-xs">
+                  {JSON.stringify(versionData.data.commission_policies ?? [], null, 2)}
                 </pre>
               </div>
             </div>
