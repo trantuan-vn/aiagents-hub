@@ -2,36 +2,23 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { RefreshCw } from "lucide-react";
+import { Activity, BarChart3, PieChart as PieChartIcon, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+
+import { AnalyticsAreaChart, AnalyticsPieChart, AnalyticsStackedBarChart } from "./_components/analytics-charts";
+import { AnalyticsOverviewCards } from "./_components/analytics-overview-cards";
+import { AnalyticsTable } from "./_components/analytics-table";
+import type { AnalyticsData } from "./_components/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
 
 type Duration = "week" | "month" | "quarter" | "year";
-
-interface DailyUsage {
-  date: string;
-  requestCount: number;
-  successCount: number;
-  errorCount: number;
-  cost: number;
-}
-
-interface AnalyticsData {
-  daily: DailyUsage[];
-  totalRequests: number;
-  totalCost: number;
-  duration: string;
-}
 
 const DURATIONS: { value: Duration; labelKey: string }[] = [
   { value: "week", labelKey: "duration.week" },
@@ -39,171 +26,6 @@ const DURATIONS: { value: Duration; labelKey: string }[] = [
   { value: "quarter", labelKey: "duration.quarter" },
   { value: "year", labelKey: "duration.year" },
 ];
-
-const chartConfig = {
-  successCount: {
-    label: "Successful",
-    color: "#22c55e",
-  },
-  errorCount: {
-    label: "Errors",
-    color: "#ef4444",
-  },
-} satisfies ChartConfig;
-
-const UNIT_PRICE = 1000;
-
-function formatDate(dateStr: string, locale?: string): string {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString(locale ?? "en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function formatEstimatedCost(requestCount: number): string {
-  const cost = requestCount * UNIT_PRICE;
-  if (cost === 0) return "—";
-  return new Intl.NumberFormat("vi-VN").format(cost);
-}
-
-function renderChartContent(
-  isLoading: boolean,
-  error: string | null,
-  isEmpty: boolean,
-  chartData: DailyUsage[],
-  t: (key: string) => string,
-  onRetry: () => void,
-) {
-  if (isLoading) return <Skeleton className="h-[280px] w-full" />;
-  if (error)
-    return (
-      <div className="flex h-[280px] items-center justify-center">
-        <p className="text-muted-foreground">{error}</p>
-        <Button variant="outline" className="ml-4" onClick={onRetry}>
-          {t("retry")}
-        </Button>
-      </div>
-    );
-  if (isEmpty)
-    return (
-      <div className="flex h-[280px] flex-col items-center justify-center text-center">
-        <p className="text-muted-foreground">{t("empty_chart")}</p>
-        <p className="text-muted-foreground mt-1 text-sm">{t("empty_hint")}</p>
-      </div>
-    );
-  return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-[280px] w-full">
-      <BarChart data={chartData} margin={{ left: 0, right: 16, top: 8, bottom: 0 }} barCategoryGap="15%">
-        <CartesianGrid vertical={false} />
-        <XAxis
-          dataKey="date"
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          minTickGap={40}
-          tickFormatter={(value) => formatDate(value)}
-        />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          tickMargin={8}
-          allowDecimals={false}
-          tickFormatter={(value) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value)))}
-        />
-        <ChartTooltip content={<ChartTooltipContent labelFormatter={(value) => formatDate(value)} />} />
-        <Bar dataKey="successCount" stackId="a" fill="var(--color-successCount)" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="errorCount" stackId="a" fill="var(--color-errorCount)" radius={[0, 0, 0, 0]} />
-      </BarChart>
-    </ChartContainer>
-  );
-}
-
-function renderTableContent(
-  isLoading: boolean,
-  error: string | null,
-  isEmpty: boolean,
-  chartData: DailyUsage[],
-  data: AnalyticsData | null,
-  t: (key: string) => string,
-  onRetry: () => void,
-) {
-  if (isLoading)
-    return (
-      <div className="space-y-3">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-10 w-full" />
-      </div>
-    );
-  if (error)
-    return (
-      <div className="py-12 text-center">
-        <p className="text-muted-foreground">{error}</p>
-        <Button variant="outline" className="mt-4" onClick={onRetry}>
-          {t("retry")}
-        </Button>
-      </div>
-    );
-  if (isEmpty)
-    return (
-      <div className="py-12 text-center">
-        <p className="text-muted-foreground">{t("empty_table")}</p>
-        <p className="text-muted-foreground mt-1 text-sm">{t("empty_hint")}</p>
-      </div>
-    );
-  const totalSuccess = chartData.reduce((s, d) => s + d.successCount, 0);
-  const totalErrors = chartData.reduce((s, d) => s + d.errorCount, 0);
-
-  return (
-    <div className="overflow-hidden rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[180px]">{t("table.date")}</TableHead>
-            <TableHead className="text-right">{t("table.total_requests")}</TableHead>
-            <TableHead className="text-right">{t("table.success_requests")}</TableHead>
-            <TableHead className="text-right">{t("table.error_requests")}</TableHead>
-            <TableHead className="text-right">{t("table.cost")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {chartData.map((row) => (
-            <TableRow key={row.date}>
-              <TableCell className="font-medium">{formatDate(row.date)}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{row.requestCount.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{row.successCount.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{row.errorCount.toLocaleString()}</TableCell>
-              <TableCell className="text-right font-mono tabular-nums">
-                {formatEstimatedCost(row.requestCount)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-        <TableFooter>
-          <TableRow>
-            <TableCell className="font-semibold">{t("table.total")}</TableCell>
-            <TableCell className="text-right font-mono font-semibold tabular-nums">
-              {data!.totalRequests.toLocaleString()}
-            </TableCell>
-            <TableCell className="text-right font-mono font-semibold tabular-nums">
-              {totalSuccess.toLocaleString()}
-            </TableCell>
-            <TableCell className="text-right font-mono font-semibold tabular-nums">
-              {totalErrors.toLocaleString()}
-            </TableCell>
-            <TableCell className="text-right font-mono font-semibold tabular-nums">
-              {formatEstimatedCost(data!.totalRequests)}
-            </TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
-    </div>
-  );
-}
 
 export default function MonitorAnalyticsPage() {
   const t = useTranslations("MonitorAnalyticsPage");
@@ -264,15 +86,15 @@ export default function MonitorAnalyticsPage() {
   const onRetry = () => void fetchAnalytics();
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
-          <p className="text-muted-foreground text-sm">{t("description")}</p>
+          <h1 className="mb-1 text-3xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{t("description")}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <Select value={duration} onValueChange={handleDurationChange}>
-            <SelectTrigger className="w-[140px]" aria-label={t("duration_label")}>
+            <SelectTrigger className="w-[160px]" aria-label={t("duration_label")}>
               <SelectValue placeholder={t("duration.month")} />
             </SelectTrigger>
             <SelectContent>
@@ -283,27 +105,94 @@ export default function MonitorAnalyticsPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading || isRefreshing}>
-            <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-            <span className="ml-2">{t("refresh")}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading || isRefreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />
+            {t("refresh")}
           </Button>
         </div>
       </div>
 
-      <Card>
+      <AnalyticsOverviewCards data={data} t={t} isLoading={isLoading} />
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="overflow-hidden border-0 shadow-lg lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="size-5 text-blue-500" />
+              {t("chart.volume_title")}
+            </CardTitle>
+            <CardDescription>{t("chart.volume_description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AnalyticsAreaChart
+              isLoading={isLoading}
+              error={error}
+              isEmpty={isEmpty}
+              chartData={chartData}
+              data={data}
+              t={t}
+              onRetry={onRetry}
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <PieChartIcon className="size-5 text-violet-500" />
+              {t("chart.ratio_title")}
+            </CardTitle>
+            <CardDescription>{t("chart.ratio_description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AnalyticsPieChart isLoading={isLoading} error={error} data={data} t={t} onRetry={onRetry} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="overflow-hidden border-0 shadow-lg">
         <CardHeader>
-          <CardTitle>{t("chart.title")}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <BarChart3 className="size-5 text-emerald-500" />
+            {t("chart.title")}
+          </CardTitle>
           <CardDescription>{t("chart.description")}</CardDescription>
         </CardHeader>
-        <CardContent>{renderChartContent(isLoading, error, isEmpty, chartData, t, onRetry)}</CardContent>
+        <CardContent>
+          <AnalyticsStackedBarChart
+            isLoading={isLoading}
+            error={error}
+            isEmpty={isEmpty}
+            chartData={chartData}
+            data={data}
+            t={t}
+            onRetry={onRetry}
+          />
+        </CardContent>
       </Card>
 
-      <Card>
+      <Card className="overflow-hidden border-0 shadow-lg">
         <CardHeader>
           <CardTitle>{t("table.title")}</CardTitle>
           <CardDescription>{t("table.description")}</CardDescription>
         </CardHeader>
-        <CardContent>{renderTableContent(isLoading, error, isEmpty, chartData, data, t, onRetry)}</CardContent>
+        <CardContent>
+          <AnalyticsTable
+            isLoading={isLoading}
+            error={error}
+            isEmpty={isEmpty}
+            chartData={chartData}
+            data={data}
+            t={t}
+            onRetry={onRetry}
+          />
+        </CardContent>
       </Card>
     </div>
   );
