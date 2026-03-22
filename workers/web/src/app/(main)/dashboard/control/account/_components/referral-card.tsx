@@ -18,7 +18,6 @@ export function ReferralCard() {
   const t = useTranslations("AccountPage.referral");
   const { toast } = useToast();
   const [referralLink, setReferralLink] = useState<string>("");
-  const [referralCode, setReferralCode] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchReferralLink = useCallback(async () => {
@@ -31,11 +30,9 @@ export function ReferralCard() {
       if (res.ok) {
         const data: { referralLink?: string; referralCode?: string } = await res.json();
         setReferralLink(data.referralLink ?? "");
-        setReferralCode(data.referralCode ?? "");
       }
     } catch {
       setReferralLink("");
-      setReferralCode("");
     } finally {
       setIsLoading(false);
     }

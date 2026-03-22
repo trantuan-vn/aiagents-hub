@@ -1,6 +1,8 @@
 "use client";
 
-import { ExternalLink } from "lucide-react";
+import Link from "next/link";
+
+import { BookOpen, CreditCard, ExternalLink, HelpCircle, Radio } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -9,31 +11,34 @@ interface QuickLinksCardProps {
 }
 
 const LINKS = [
-  { nameKey: "quick_links.api_documentation", path: "/docs" },
-  { nameKey: "quick_links.support_center", path: "/support" },
-  { nameKey: "quick_links.status_page", path: "/status" },
-  { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing" },
+  { nameKey: "quick_links.api_documentation", path: "/docs", icon: BookOpen },
+  { nameKey: "quick_links.support_center", path: "/support", icon: HelpCircle },
+  { nameKey: "quick_links.status_page", path: "/status", icon: Radio },
+  { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing", icon: CreditCard },
 ] as const;
 
 export function QuickLinksCard({ t }: QuickLinksCardProps) {
   return (
-    <Card>
+    <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardHeader>
         <CardTitle>{t("quick_links.title")}</CardTitle>
+        <p className="text-muted-foreground text-sm">{t("quick_links.description")}</p>
       </CardHeader>
-      <CardContent className="space-y-2">
-        {LINKS.map(({ nameKey, path }) => (
-          <button
+      <CardContent className="space-y-1">
+        {LINKS.map(({ nameKey, path, icon: Icon }) => (
+          <Link
             key={nameKey}
-            type="button"
-            onClick={() => {
-              window.location.href = path;
-            }}
-            className="hover:bg-muted flex w-full items-center justify-between rounded-lg p-3 text-left transition-colors"
+            href={path}
+            className="hover:bg-muted/80 flex w-full items-center justify-between gap-3 rounded-lg p-3 transition-colors"
           >
-            <span className="text-sm">{t(nameKey)}</span>
-            <ExternalLink className="text-muted-foreground h-4 w-4" />
-          </button>
+            <div className="flex items-center gap-3">
+              <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-lg">
+                <Icon className="text-muted-foreground h-4 w-4" />
+              </div>
+              <span className="text-sm font-medium">{t(nameKey)}</span>
+            </div>
+            <ExternalLink className="text-muted-foreground h-4 w-4 shrink-0" />
+          </Link>
         ))}
       </CardContent>
     </Card>

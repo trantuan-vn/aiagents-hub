@@ -650,6 +650,31 @@
     "fetch_error": "Không thể tải dữ liệu bảng điều khiển",
     "no_subscriptions": "Chưa có gói đăng ký",
     "no_api_keys": "Chưa có khóa API",
+    "guest": "bạn",
+    "notifications": "Thông báo",
+    "explore_packages": "Khám phá gói dịch vụ",
+    "welcome": {
+      "subtitle": "Nền tảng API chuyên nghiệp",
+      "greeting_morning": "Chào buổi sáng",
+      "greeting_afternoon": "Chào buổi chiều",
+      "greeting_evening": "Chào buổi tối",
+      "morning": "Bắt đầu ngày mới với API mạnh mẽ. Xử lý hàng triệu request với độ tin cậy cấp doanh nghiệp.",
+      "afternoon": "Tiếp tục xây dựng! API của bạn đang hoạt động ổn định với độ trễ thấp và tính khả dụng cao.",
+      "evening": "Làm tốt lắm. Dịch vụ của bạn an toàn và sẵn sàng cho lưu lượng ngày mai."
+    },
+    "trust": {
+      "subtitle": "Hàng nghìn doanh nghiệp tin tưởng APIHub để xây dựng giải pháp",
+      "lightning_fast": "Cực kỳ nhanh",
+      "lightning_fast_desc": "Hàng triệu request mỗi giây với độ trễ thấp nhất",
+      "enterprise_security": "Bảo mật doanh nghiệp",
+      "enterprise_security_desc": "Mã hóa end-to-end và xác thực đa yếu tố",
+      "flexible_scaling": "Mở rộng linh hoạt",
+      "flexible_scaling_desc": "Tự động mở rộng tài nguyên theo nhu cầu",
+      "easy_integration": "Tích hợp dễ dàng",
+      "easy_integration_desc": "SDK và tài liệu cho mọi ngôn ngữ lập trình phổ biến",
+      "global_reach": "Phủ sóng toàn cầu",
+      "global_reach_desc": "Điểm kết nối toàn thế giới cho hiệu suất tối ưu"
+    },
     "stats": {
       "total_api_calls": "Tổng lượt gọi API",
       "active_subscriptions": "Gói đăng ký đang hoạt động",
@@ -663,6 +688,7 @@
       "title": "Gói đăng ký đang hoạt động",
       "description": "Các gói API và mức sử dụng hiện tại của bạn",
       "view_all": "Xem tất cả",
+      "explore": "Khám phá gói dịch vụ",
       "renews": "Gia hạn",
       "api_calls": "Lượt gọi API",
       "plan": "Gói"
@@ -671,6 +697,9 @@
       "title": "Khóa API",
       "description": "Quản lý khóa xác thực API của bạn",
       "new_key": "Khóa mới",
+      "create_first": "Tạo khóa đầu tiên",
+      "copied": "Đã sao chép",
+      "copied_desc": "Đã sao chép tiền tố token vào clipboard",
       "active": "đang hoạt động",
       "inactive": "không hoạt động"
     },
@@ -679,8 +708,18 @@
       "description": "Các lượt gọi API và sự kiện mới nhất",
       "no_activity": "Chưa có hoạt động"
     },
+    "referral": {
+      "title": "Chương trình giới thiệu",
+      "description": "Chia sẻ link và nhận thưởng",
+      "earned": "Đã kiếm được (30 ngày)",
+      "copy_link": "Sao chép link",
+      "manage": "Quản lý",
+      "setup": "Thiết lập giới thiệu",
+      "copied": "Đã sao chép link giới thiệu"
+    },
     "quick_links": {
       "title": "Liên kết nhanh",
+      "description": "Tài nguyên hỗ trợ bạn thành công",
       "api_documentation": "Tài liệu API",
       "support_center": "Trung tâm hỗ trợ",
       "status_page": "Trang trạng thái",

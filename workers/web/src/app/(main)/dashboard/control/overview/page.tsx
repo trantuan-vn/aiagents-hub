@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-import { Bell, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,11 @@ import { useToast } from "@/hooks/use-toast";
 import { ActivityCard } from "./_components/activity-card";
 import { ApiKeysCard } from "./_components/api-keys-card";
 import { QuickLinksCard } from "./_components/quick-links-card";
+import { ReferralSummary } from "./_components/referral-summary";
 import { StatsCards } from "./_components/stats-cards";
 import { SubscriptionsCard } from "./_components/subscriptions-card";
+import { TrustHighlights } from "./_components/trust-highlights";
+import { WelcomeHero } from "./_components/welcome-hero";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
 
@@ -119,30 +122,23 @@ export default function OverviewPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="flex flex-col gap-6 md:gap-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
+          <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Bell className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => {
-              window.location.href = "/packages";
-            }}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            {t("add_api")}
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => (window.location.href = "/packages")} className="shrink-0 gap-1.5">
+          <Plus className="h-4 w-4" />
+          {t("add_api")}
+        </Button>
       </div>
 
+      <WelcomeHero t={t} />
+
       <StatsCards stats={data.stats} t={t} />
+
+      <TrustHighlights t={t} />
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -151,6 +147,7 @@ export default function OverviewPage() {
         </div>
         <div className="space-y-6">
           <ActivityCard activities={data.recentActivity} t={t} />
+          <ReferralSummary t={t} />
           <QuickLinksCard t={t} />
         </div>
       </div>

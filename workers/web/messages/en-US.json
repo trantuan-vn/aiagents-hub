@@ -650,6 +650,31 @@
     "fetch_error": "Failed to load dashboard data",
     "no_subscriptions": "No active subscriptions",
     "no_api_keys": "No API keys yet",
+    "guest": "there",
+    "notifications": "Notifications",
+    "explore_packages": "Explore Packages",
+    "welcome": {
+      "subtitle": "Professional API Platform",
+      "greeting_morning": "Good morning",
+      "greeting_afternoon": "Good afternoon",
+      "greeting_evening": "Good evening",
+      "morning": "Start your day with powerful APIs. Process millions of requests with enterprise-grade reliability.",
+      "afternoon": "Keep building! Your APIs are running smoothly with low latency and high availability.",
+      "evening": "Great work today. Your services are secure and ready for tomorrow's traffic."
+    },
+    "trust": {
+      "subtitle": "Thousands of businesses trust APIHub to build their solutions",
+      "lightning_fast": "Lightning Fast",
+      "lightning_fast_desc": "Millions of requests per second with the lowest latency",
+      "enterprise_security": "Enterprise Security",
+      "enterprise_security_desc": "End-to-end encryption and multi-factor authentication",
+      "flexible_scaling": "Flexible Scaling",
+      "flexible_scaling_desc": "Auto-scale resources on demand to meet traffic needs",
+      "easy_integration": "Easy Integration",
+      "easy_integration_desc": "SDK and docs for all popular programming languages",
+      "global_reach": "Global Reach",
+      "global_reach_desc": "Connection points worldwide for optimal performance"
+    },
     "stats": {
       "total_api_calls": "Total API Calls",
       "active_subscriptions": "Active Subscriptions",
@@ -663,6 +688,7 @@
       "title": "Active Subscriptions",
       "description": "Your current API packages and usage",
       "view_all": "View all",
+      "explore": "Explore Packages",
       "renews": "Renews",
       "api_calls": "API Calls",
       "plan": "Plan"
@@ -671,6 +697,9 @@
       "title": "API Keys",
       "description": "Manage your API authentication keys",
       "new_key": "New Key",
+      "create_first": "Create First Key",
+      "copied": "Copied",
+      "copied_desc": "Token prefix copied to clipboard",
       "active": "active",
       "inactive": "inactive"
     },
@@ -679,8 +708,18 @@
       "description": "Latest API calls and events",
       "no_activity": "No recent activity"
     },
+    "referral": {
+      "title": "Referral Program",
+      "description": "Share your link and earn rewards",
+      "earned": "Earned (30 days)",
+      "copy_link": "Copy Link",
+      "manage": "Manage",
+      "setup": "Setup Referral",
+      "copied": "Referral link copied"
+    },
     "quick_links": {
       "title": "Quick Links",
+      "description": "Resources to help you succeed",
       "api_documentation": "API Documentation",
       "support_center": "Support Center",
       "status_page": "Status Page",
