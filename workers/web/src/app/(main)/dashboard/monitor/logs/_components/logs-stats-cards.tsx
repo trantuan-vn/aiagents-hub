@@ -47,7 +47,7 @@ export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStat
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card className="overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl">
-        <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5" />
+        <div className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-br from-blue-500/5 via-transparent to-indigo-500/5" />
         <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t("stats.total_logs")}</CardTitle>
           <div className="rounded-lg bg-blue-500/10 p-2">
@@ -61,7 +61,7 @@ export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStat
       </Card>
 
       <Card className="overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl">
-        <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5" />
+        <div className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5" />
         <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t("stats.services")}</CardTitle>
           <div className="rounded-lg bg-violet-500/10 p-2">
@@ -75,7 +75,7 @@ export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStat
       </Card>
 
       <Card className="overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl">
-        <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5" />
+        <div className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5" />
         <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">{t("stats.status")}</CardTitle>
           <div className="flex items-center gap-1.5">
