@@ -110,7 +110,6 @@ export const sidebarItems: NavGroup[] = [
         title: "API Service",
         url: "/dashboard/service",
         icon: Code,
-        adminOnly: true,
       },
       {
         title: "Discount Vouchers",

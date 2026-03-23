@@ -19,6 +19,7 @@ import { AccountSwitcher } from "./_components/sidebar/account-switcher";
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { DashboardUserProvider } from "./_context/dashboard-user-context";
 
 export default async function Layout({ children }: LayoutProps<"/dashboard">) {
   const [cookieStore, headersList] = await Promise.all([cookies(), headers()]);
@@ -70,7 +71,9 @@ export default async function Layout({ children }: LayoutProps<"/dashboard">) {
             </div>
           </div>
         </header>
-        <div className="h-full p-4 md:p-6">{children}</div>
+        <DashboardUserProvider user={user}>
+          <div className="h-full p-4 md:p-6">{children}</div>
+        </DashboardUserProvider>
       </SidebarInset>
     </SidebarProvider>
   );

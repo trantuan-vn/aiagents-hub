@@ -9,6 +9,8 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
+import { useDashboardUser } from "../_context/dashboard-user-context";
+
 import { CreateServiceDialog } from "./_components/create-service-dialog";
 import { type CreateService, type Service } from "./_components/schema";
 import { ServiceList } from "./_components/service-list";
@@ -18,6 +20,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.tr
 export default function ServicePage() {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
+  const user = useDashboardUser();
+  const isAdmin = user?.role === "admin";
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -107,7 +111,7 @@ export default function ServicePage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <CreateServiceDialog onCreate={handleCreateService} />
+        {isAdmin && <CreateServiceDialog onCreate={handleCreateService} />}
       </div>
 
       {/* Stats Cards */}
@@ -163,7 +167,7 @@ export default function ServicePage() {
           </CardContent>
         </Card>
       ) : (
-        <ServiceList services={services} onDelete={handleCancelService} />
+        <ServiceList services={services} onDelete={handleCancelService} canDelete={isAdmin} />
       )}
     </div>
   );

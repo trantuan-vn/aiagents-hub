@@ -29,6 +29,7 @@ interface ServiceItemProps {
   onDelete: (serviceId: string | number) => Promise<void>;
   formatDate: (dateString: string | undefined) => string;
   t: (key: string, params?: Record<string, string>) => string;
+  canDelete?: boolean;
 }
 
 function ServiceItemContent({
@@ -87,14 +88,16 @@ function ServiceItemActions({
   deletingServiceId,
   onDelete,
   t,
+  canDelete,
 }: {
   service: Service;
   deletingServiceId: string | number | null;
   onDelete: (serviceId: string | number) => Promise<void>;
   t: (key: string, params?: Record<string, string>) => string;
+  canDelete?: boolean;
 }) {
   const serviceId = service.id;
-  if (!serviceId) return null;
+  if (!serviceId || !canDelete) return null;
 
   return (
     <div className="flex items-center gap-1">
@@ -126,11 +129,24 @@ function ServiceItemActions({
   );
 }
 
-function ServiceItem({ service, deletingServiceId, onDelete, formatDate, t }: ServiceItemProps) {
+function ServiceItem({
+  service,
+  deletingServiceId,
+  onDelete,
+  formatDate,
+  t,
+  canDelete,
+}: ServiceItemProps) {
   return (
     <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
       <ServiceItemContent service={service} formatDate={formatDate} t={t} />
-      <ServiceItemActions service={service} deletingServiceId={deletingServiceId} onDelete={onDelete} t={t} />
+      <ServiceItemActions
+        service={service}
+        deletingServiceId={deletingServiceId}
+        onDelete={onDelete}
+        t={t}
+        canDelete={canDelete}
+      />
     </div>
   );
 }
@@ -138,9 +154,10 @@ function ServiceItem({ service, deletingServiceId, onDelete, formatDate, t }: Se
 interface ServiceListProps {
   services: Service[];
   onDelete: (serviceId: string | number) => Promise<void>;
+  canDelete?: boolean;
 }
 
-export function ServiceList({ services, onDelete }: ServiceListProps) {
+export function ServiceList({ services, onDelete, canDelete = false }: ServiceListProps) {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
   const [deletingServiceId, setDeletingServiceId] = useState<string | number | null>(null);
@@ -204,6 +221,7 @@ export function ServiceList({ services, onDelete }: ServiceListProps) {
               onDelete={handleDelete}
               formatDate={formatDate}
               t={t}
+              canDelete={canDelete}
             />
           ))}
         </div>
