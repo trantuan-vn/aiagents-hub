@@ -1585,5 +1585,34 @@
       "completed": "Completed",
       "cancelled": "Cancelled"
     }
+  },
+  "BuildEkycPage": {
+    "hero_title": "eKYC API Integration",
+    "hero_description": "Integrate identity verification (document OCR, face detection, liveness) into your applications with our REST API. Supports CCCD, Passport, and face matching.",
+    "quick_start_title": "Quick Start",
+    "quick_start_description": "Get up and running in minutes with API key authentication.",
+    "step1_title": "Get your API key",
+    "step1_desc": "Create an API token in Control > API Keys and ensure eKYC permissions are enabled.",
+    "step2_title": "Call the API",
+    "step2_desc": "Use the examples below in your preferred language. All endpoints accept multipart/form-data.",
+    "get_api_key": "Get API Key",
+    "integration_title": "Integration Examples",
+    "integration_description": "Copy and adapt these examples for your application. Replace the API key with your own.",
+    "api_reference_title": "API Reference",
+    "api_reference_description": "Available eKYC endpoints. All require Bearer token authentication.",
+    "endpoint_recognize_title": "Document Recognition (OCR)",
+    "endpoint_recognize_desc": "Extract text from identity documents (CCCD front/back, Passport). Returns structured data with confidence scores.",
+    "endpoint_face_search_title": "Face Detection",
+    "endpoint_face_search_desc": "Detect faces in an image. Returns bounding boxes, landmarks, and attributes.",
+    "endpoint_face_verify_title": "Face Verification",
+    "endpoint_face_verify_desc": "Compare two faces (e.g. document photo vs selfie). Returns similarity score and match result.",
+    "endpoint_liveness_title": "Liveness Detection",
+    "endpoint_liveness_desc": "Verify the subject is a live person, not a photo or video replay. Supports image or video input.",
+    "base_url_title": "Base URL & Authentication",
+    "base_url_label": "Base URL",
+    "auth_header": "Authorization header",
+    "auth_note": "Include the eKYC permission when creating your API token. Image formats: JPEG or PNG, max 2MB.",
+    "response_title": "Response Format",
+    "response_description": "All endpoints return JSON. Document recognition returns extracted fields; face endpoints return confidence and match results."
   }
 }

@@ -1585,5 +1585,34 @@
       "completed": "Hoàn thành",
       "cancelled": "Đã hủy"
     }
+  },
+  "BuildEkycPage": {
+    "hero_title": "Tích hợp API eKYC",
+    "hero_description": "Tích hợp xác minh danh tính (OCR giấy tờ, nhận diện khuôn mặt, phát hiện người thật) vào ứng dụng của bạn qua REST API. Hỗ trợ CCCD, Hộ chiếu và so khớp khuôn mặt.",
+    "quick_start_title": "Bắt đầu nhanh",
+    "quick_start_description": "Tích hợp trong vài phút với xác thực API key.",
+    "step1_title": "Lấy API key",
+    "step1_desc": "Tạo token API tại Điều khiển > API Keys và bật quyền eKYC.",
+    "step2_title": "Gọi API",
+    "step2_desc": "Sử dụng ví dụ bên dưới với ngôn ngữ bạn chọn. Tất cả endpoint dùng multipart/form-data.",
+    "get_api_key": "Lấy API Key",
+    "integration_title": "Ví dụ tích hợp",
+    "integration_description": "Sao chép và chỉnh sửa các ví dụ cho ứng dụng của bạn. Thay API key bằng key của bạn.",
+    "api_reference_title": "Tham chiếu API",
+    "api_reference_description": "Các endpoint eKYC. Tất cả yêu cầu xác thực Bearer token.",
+    "endpoint_recognize_title": "Nhận dạng giấy tờ (OCR)",
+    "endpoint_recognize_desc": "Trích xuất văn bản từ giấy tờ (CCCD trước/sau, Hộ chiếu). Trả về dữ liệu có cấu trúc và điểm tin cậy.",
+    "endpoint_face_search_title": "Phát hiện khuôn mặt",
+    "endpoint_face_search_desc": "Phát hiện khuôn mặt trong ảnh. Trả về khung giới hạn, các điểm mốc và thuộc tính.",
+    "endpoint_face_verify_title": "Xác minh khuôn mặt",
+    "endpoint_face_verify_desc": "So sánh hai khuôn mặt (vd: ảnh giấy tờ với selfie). Trả về điểm tương đồng và kết quả khớp.",
+    "endpoint_liveness_title": "Phát hiện người thật",
+    "endpoint_liveness_desc": "Xác minh đối tượng là người thật, không phải ảnh hay video phát lại. Hỗ trợ ảnh hoặc video.",
+    "base_url_title": "Base URL & Xác thực",
+    "base_url_label": "Base URL",
+    "auth_header": "Header Authorization",
+    "auth_note": "Bật quyền eKYC khi tạo API token. Định dạng ảnh: JPEG hoặc PNG, tối đa 2MB.",
+    "response_title": "Định dạng phản hồi",
+    "response_description": "Tất cả endpoint trả về JSON. Nhận dạng giấy tờ trả về các trường đã trích xuất; endpoint khuôn mặt trả về độ tin cậy và kết quả khớp."
   }
 }
