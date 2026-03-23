@@ -198,7 +198,7 @@ export function NavMain({ items, user }: NavMainProps) {
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
                     tooltip={t("quick_create")}
-                    className="group bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear data-[state=open]:bg-primary/90"
+                    className="group bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground data-[state=open]:bg-primary/90 min-w-8 duration-200 ease-linear"
                   >
                     <PlusCircleIcon />
                     <span>{t("quick_create")}</span>

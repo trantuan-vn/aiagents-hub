@@ -129,14 +129,7 @@ function ServiceItemActions({
   );
 }
 
-function ServiceItem({
-  service,
-  deletingServiceId,
-  onDelete,
-  formatDate,
-  t,
-  canDelete,
-}: ServiceItemProps) {
+function ServiceItem({ service, deletingServiceId, onDelete, formatDate, t, canDelete }: ServiceItemProps) {
   return (
     <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
       <ServiceItemContent service={service} formatDate={formatDate} t={t} />

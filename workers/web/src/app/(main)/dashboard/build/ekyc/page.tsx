@@ -13,11 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CodeBlock } from "./_components/code-block";
-import {
-  ENDPOINT_CODE_EXAMPLES,
-  ENDPOINTS,
-  RESPONSE_EXAMPLES,
-} from "./_data/code-examples";
+import { ENDPOINT_CODE_EXAMPLES, ENDPOINTS, RESPONSE_EXAMPLES } from "./_data/code-examples";
 
 const LANG_TABS = ["curl", "javascript", "python", "go", "php", "java", "csharp"] as const;
 
@@ -93,7 +89,7 @@ export default function BuildEkycPage() {
               return (
                 <div
                   key={ep.path}
-                  className="group relative rounded-xl border bg-card transition-colors hover:bg-muted/20"
+                  className="group bg-card hover:bg-muted/20 relative rounded-xl border transition-colors"
                 >
                   {/* Endpoint header */}
                   <div className="flex flex-col gap-3 p-4 sm:p-5">
@@ -104,7 +100,7 @@ export default function BuildEkycPage() {
                       >
                         {ep.method}
                       </Badge>
-                      <code className="font-mono text-sm text-muted-foreground">{ep.path}</code>
+                      <code className="text-muted-foreground font-mono text-sm">{ep.path}</code>
                       <span className="text-muted-foreground hidden text-xs sm:inline">
                         #{String(idx + 1).padStart(2, "0")}
                       </span>
@@ -124,8 +120,8 @@ export default function BuildEkycPage() {
 
                   {/* Code examples per endpoint */}
                   {examples && (
-                    <div className="border-t bg-muted/30 px-4 pb-4 pt-3 sm:px-5">
-                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
+                    <div className="bg-muted/30 border-t px-4 pt-3 pb-4 sm:px-5">
+                      <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
                         {t("example_code")}
                       </p>
                       <Tabs defaultValue="curl" className="w-full">
@@ -152,7 +148,7 @@ export default function BuildEkycPage() {
                   {/* Response format per endpoint */}
                   {RESPONSE_EXAMPLES[ep.id] && (
                     <div className="border-t px-4 pt-3 pb-4 sm:px-5">
-                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
+                      <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
                         {t("response_title")}
                       </p>
                       <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 dark:bg-zinc-900">

@@ -120,7 +120,8 @@ function createConnectionManager(options: UseWsOptions = {}) {
       socket.onclose = (event: CloseEvent) => {
         ws = null;
         // Server đóng WS khi logout (code 1000, reason "Session logged out" hoặc "All sessions logged out") → không reconnect
-        const isServerLogout = event.code === 1000 && (event.reason?.includes("logged out") ?? false);
+        const reason = event.reason;
+        const isServerLogout = event.code === 1000 && (reason ? reason.includes("logged out") : false);
         if (isServerLogout) {
           currentIdentifier = null;
           reconnectAttempts = 0;

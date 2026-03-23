@@ -30,10 +30,11 @@ function groupLogsByHour(logs: ServiceUsageLog[]): { hour: string; success: numb
     if (!ts) continue;
     const d = new Date(typeof ts === "number" && ts < 1e12 ? ts * 1000 : ts);
     const key = d.toISOString().slice(0, 13);
-    if (!buckets[key]) buckets[key] = { success: 0, error: 0 };
+    if (!(key in buckets)) buckets[key] = { success: 0, error: 0 };
+    const bucket = buckets[key]!;
     const isError = log.isError === true || log.isError === 1;
-    if (isError) buckets[key].error++;
-    else buckets[key].success++;
+    if (isError) bucket.error++;
+    else bucket.success++;
   }
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))

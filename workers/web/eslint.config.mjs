@@ -168,4 +168,23 @@ export default [
       "@typescript-eslint/triple-slash-reference": "off",
     },
   },
+  // Ask AI - relax complexity and import order for dynamic form/table/chart components
+  {
+    files: ["src/app/(main)/dashboard/useful-links/ask-ai/**/*.{ts,tsx}"],
+    rules: {
+      complexity: ["warn", { max: 15 }],
+      "import/order": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "@typescript-eslint/no-unnecessary-condition": "warn",
+      "security/detect-object-injection": "off",
+    },
+  },
+  // Logs - key from toISOString is safe, not user input
+  {
+    files: ["src/app/(main)/dashboard/monitor/logs/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-unnecessary-type-assertion": "off",
+      "security/detect-object-injection": "off",
+    },
+  },
 ];

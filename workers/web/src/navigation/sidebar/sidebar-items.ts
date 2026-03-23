@@ -140,9 +140,7 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 4,
     label: "Build",
-    items: [
-      { title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck },
-    ],
+    items: [{ title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck }],
   },
   {
     id: 5,
