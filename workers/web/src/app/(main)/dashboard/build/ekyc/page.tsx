@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import Link from "next/link";
 
-import { ChevronRight, Code2, FileText, Globe, Key, ShieldCheck, Terminal, Zap } from "lucide-react";
+import { ChevronRight, Code2, FileText, Key, ShieldCheck, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CodeBlock } from "./_components/code-block";
-import { API_BASE_URL, CODE_EXAMPLES, ENDPOINTS } from "./_data/code-examples";
+import {
+  ENDPOINT_CODE_EXAMPLES,
+  ENDPOINTS,
+  RESPONSE_EXAMPLES,
+} from "./_data/code-examples";
 
 const LANG_TABS = ["curl", "javascript", "python", "go", "php", "java", "csharp"] as const;
 
@@ -73,40 +77,7 @@ export default function BuildEkycPage() {
         </CardContent>
       </Card>
 
-      {/* Code examples by language */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Globe className="text-primary h-5 w-5" />
-            <CardTitle>{t("integration_title")}</CardTitle>
-          </div>
-          <CardDescription>{t("integration_description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="curl" className="w-full">
-            <TabsList className="mb-4 flex h-auto flex-wrap gap-1 p-1">
-              {LANG_TABS.map((lang) => (
-                <TabsTrigger key={lang} value={lang}>
-                  {lang === "csharp" ? "C#" : lang.charAt(0).toUpperCase() + lang.slice(1)}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            {LANG_TABS.map((lang) => (
-              <TabsContent key={lang} value={lang} className="mt-0">
-                <CodeBlock
-                  code={
-                    // eslint-disable-next-line security/detect-object-injection -- lang from LANG_TABS
-                    CODE_EXAMPLES[lang](apiKeyPlaceholder)
-                  }
-                  language={lang}
-                />
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
-
-      {/* API Reference */}
+      {/* API Reference – each endpoint with its code examples */}
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -116,80 +87,84 @@ export default function BuildEkycPage() {
           <CardDescription>{t("api_reference_description")}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {ENDPOINTS.map((ep) => (
-              <div key={ep.path} className="bg-card hover:bg-muted/30 rounded-lg border p-4 transition-colors">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs text-emerald-600 dark:text-emerald-400"
-                  >
-                    {ep.method}
-                  </Badge>
-                  <code className="text-muted-foreground font-mono text-sm">{ep.path}</code>
+          <div className="space-y-8">
+            {ENDPOINTS.map((ep, idx) => {
+              const examples = ENDPOINT_CODE_EXAMPLES[ep.id];
+              return (
+                <div
+                  key={ep.path}
+                  className="group relative rounded-xl border bg-card transition-colors hover:bg-muted/20"
+                >
+                  {/* Endpoint header */}
+                  <div className="flex flex-col gap-3 p-4 sm:p-5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-500/30 bg-emerald-500/10 font-mono text-xs text-emerald-600 dark:text-emerald-400"
+                      >
+                        {ep.method}
+                      </Badge>
+                      <code className="font-mono text-sm text-muted-foreground">{ep.path}</code>
+                      <span className="text-muted-foreground hidden text-xs sm:inline">
+                        #{String(idx + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{t(ep.titleKey)}</h3>
+                      <p className="text-muted-foreground mt-1 text-sm">{t(ep.descKey)}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {ep.params.map((p) => (
+                        <Badge key={p} variant="secondary" className="font-mono text-xs">
+                          {p}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Code examples per endpoint */}
+                  {examples && (
+                    <div className="border-t bg-muted/30 px-4 pb-4 pt-3 sm:px-5">
+                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
+                        {t("example_code")}
+                      </p>
+                      <Tabs defaultValue="curl" className="w-full">
+                        <TabsList className="mb-3 flex h-auto flex-wrap gap-1 p-1">
+                          {LANG_TABS.map((lang) => (
+                            <TabsTrigger key={lang} value={lang} className="text-xs">
+                              {lang === "csharp" ? "C#" : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                        {LANG_TABS.map((lang) => {
+                          const fn = examples[lang];
+                          if (!fn) return null;
+                          return (
+                            <TabsContent key={lang} value={lang} className="mt-0">
+                              <CodeBlock code={fn(apiKeyPlaceholder)} language={lang} />
+                            </TabsContent>
+                          );
+                        })}
+                      </Tabs>
+                    </div>
+                  )}
+
+                  {/* Response format per endpoint */}
+                  {RESPONSE_EXAMPLES[ep.id] && (
+                    <div className="border-t px-4 pt-3 pb-4 sm:px-5">
+                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
+                        {t("response_title")}
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 dark:bg-zinc-900">
+                        <pre className="font-mono text-sm text-zinc-100">
+                          <code>{RESPONSE_EXAMPLES[ep.id]}</code>
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <h3 className="mb-1 font-semibold">{t(ep.titleKey)}</h3>
-                <p className="text-muted-foreground mb-3 text-sm">{t(ep.descKey)}</p>
-                <div className="flex flex-wrap gap-1">
-                  {ep.params.map((p) => (
-                    <Badge key={p} variant="secondary" className="font-mono text-xs">
-                      {p}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Base URL & Auth */}
-      <Card className="bg-muted/30 border-dashed">
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Terminal className="text-muted-foreground h-5 w-5" />
-            <CardTitle className="text-base">{t("base_url_title")}</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="mb-1 text-sm font-medium">{t("base_url_label")}</p>
-            <code className="bg-background rounded border px-2 py-1 text-sm">{API_BASE_URL}</code>
-          </div>
-          <div>
-            <p className="mb-1 text-sm font-medium">{t("auth_header")}</p>
-            <code className="bg-background rounded border px-2 py-1 text-sm">Authorization: Bearer YOUR_API_KEY</code>
-          </div>
-          <p className="text-muted-foreground text-sm">{t("auth_note")}</p>
-        </CardContent>
-      </Card>
-
-      {/* Response format */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("response_title")}</CardTitle>
-          <CardDescription>{t("response_description")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 dark:bg-zinc-900">
-            <pre className="font-mono text-sm text-zinc-100">
-              <code>{`// recognize-document
-{
-  "documentType": "cccd_front",
-  "extractedData": { "no": "...", "full_name": "...", ... },
-  "confidence": 0.92,
-  "processingTime": 1234
-}
-
-// face-search
-{ "faces": [...], "confidence": 0.95, "faceCount": 1 }
-
-// face-verify
-{ "similarity": 0.89, "isMatch": true, "confidence": 0.92 }
-
-// face-liveness
-{ "isLive": true, "confidence": 0.88, "riskScore": 0.1 }`}</code>
-            </pre>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

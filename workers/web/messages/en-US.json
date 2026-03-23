@@ -1613,6 +1613,7 @@
     "auth_header": "Authorization header",
     "auth_note": "Include the eKYC permission when creating your API token. Image formats: JPEG or PNG, max 2MB.",
     "response_title": "Response Format",
-    "response_description": "All endpoints return JSON. Document recognition returns extracted fields; face endpoints return confidence and match results."
+    "response_description": "All endpoints return JSON. Document recognition returns extracted fields; face endpoints return confidence and match results.",
+    "example_code": "Example code"
   }
 }

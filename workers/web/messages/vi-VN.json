@@ -1613,6 +1613,7 @@
     "auth_header": "Header Authorization",
     "auth_note": "Bật quyền eKYC khi tạo API token. Định dạng ảnh: JPEG hoặc PNG, tối đa 2MB.",
     "response_title": "Định dạng phản hồi",
-    "response_description": "Tất cả endpoint trả về JSON. Nhận dạng giấy tờ trả về các trường đã trích xuất; endpoint khuôn mặt trả về độ tin cậy và kết quả khớp."
+    "response_description": "Tất cả endpoint trả về JSON. Nhận dạng giấy tờ trả về các trường đã trích xuất; endpoint khuôn mặt trả về độ tin cậy và kết quả khớp.",
+    "example_code": "Ví dụ code"
   }
 }
