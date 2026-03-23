@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+import Link from "next/link";
+
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -128,9 +130,11 @@ export default function OverviewPage() {
           <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <Button size="sm" onClick={() => (window.location.href = "/packages")} className="shrink-0 gap-1.5">
-          <Plus className="h-4 w-4" />
-          {t("add_api")}
+        <Button size="sm" asChild>
+          <Link href="/dashboard/control/billing" className="inline-flex shrink-0 items-center gap-1.5">
+            <Plus className="h-4 w-4" />
+            {t("add_api")}
+          </Link>
         </Button>
       </div>
 
