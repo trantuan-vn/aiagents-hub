@@ -180,6 +180,7 @@
     "no_results": "No results found.",
     "system_config": "System Configuration",
     "price_policy": "Price Policy",
+    "commission_policy": "Commission Policy",
     "api_service": "API Service",
     "discount_vouchers": "Discount Vouchers",
     "version_updates": "Version Updates",

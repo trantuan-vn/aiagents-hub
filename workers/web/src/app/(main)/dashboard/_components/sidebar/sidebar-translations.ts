@@ -44,6 +44,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     Others: t("others"),
     "System Configuration": t("system_config"),
     "Price Policy": t("price_policy"),
+    "Commission Policy": t("commission_policy"),
     "API Service": t("api_service"),
     "Discount Vouchers": t("discount_vouchers"),
     "Version Updates": t("version_updates"),
