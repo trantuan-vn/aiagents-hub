@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-
 import { ChevronRight, Package, TrendingUp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -41,10 +39,12 @@ export function SubscriptionsCard({ subscriptions, t }: SubscriptionsCardProps) 
             <CardDescription>{t("subscriptions.description")}</CardDescription>
           </div>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/packages" className="gap-1">
+            {/* eslint-disable @next/next/no-html-link-for-pages -- Full page load: client-side nav to React Router causes white screen */}
+            <a href="/packages" className="gap-1">
               {t("subscriptions.view_all")}
               <ChevronRight className="h-4 w-4" />
-            </Link>
+            </a>
+            {/* eslint-enable @next/next/no-html-link-for-pages */}
           </Button>
         </div>
       </CardHeader>
@@ -56,10 +56,12 @@ export function SubscriptionsCard({ subscriptions, t }: SubscriptionsCardProps) 
             </div>
             <p className="text-muted-foreground mb-2 font-medium">{t("no_subscriptions")}</p>
             <Button asChild>
-              <Link href="/packages">
+              {/* eslint-disable @next/next/no-html-link-for-pages -- Full page load: client-side nav to React Router causes white screen */}
+              <a href="/packages">
                 <TrendingUp className="mr-2 h-4 w-4" />
                 {t("subscriptions.explore")}
-              </Link>
+              </a>
+              {/* eslint-enable @next/next/no-html-link-for-pages */}
             </Button>
           </div>
         ) : (

@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import Link from "next/link";
-
 import { Bell, ChevronRight, Sparkles, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -104,10 +102,11 @@ export function WelcomeHero({ t }: WelcomeHeroProps) {
             {t("notifications")}
           </Button>
           <Button size="sm" asChild className="gap-1.5">
-            <Link href="/packages">
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Full page load required: client-side nav from Next.js to React Router causes white screen */}
+            <a href="/packages">
               {t("explore_packages")}
               <ChevronRight className="h-4 w-4" />
-            </Link>
+            </a>
           </Button>
         </div>
       </div>
