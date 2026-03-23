@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 
 import Link from "next/link";
 
-import { Plus } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -131,8 +131,8 @@ export default function OverviewPage() {
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
         <Button size="sm" asChild>
-          <Link href="/dashboard/control/billing" className="inline-flex shrink-0 items-center gap-1.5">
-            <Plus className="h-4 w-4" />
+          <Link href="/dashboard/useful-links/ask-ai" className="inline-flex shrink-0 items-center gap-1.5">
+            <Sparkles className="h-4 w-4" />
             {t("add_api")}
           </Link>
         </Button>

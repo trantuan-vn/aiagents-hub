@@ -653,7 +653,7 @@
   "OverviewPage": {
     "title": "Bảng điều khiển",
     "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",
-    "add_api": "Thêm API",
+    "add_api": "Hỏi AI",
     "loading": "Đang tải bảng điều khiển...",
     "fetch_error": "Không thể tải dữ liệu bảng điều khiển",
     "no_subscriptions": "Chưa có gói đăng ký",

@@ -653,7 +653,7 @@
   "OverviewPage": {
     "title": "Dashboard",
     "description": "Welcome back! Here's your API overview.",
-    "add_api": "Add API",
+    "add_api": "Ask AI",
     "loading": "Loading dashboard...",
     "fetch_error": "Failed to load dashboard data",
     "no_subscriptions": "No active subscriptions",
