@@ -728,8 +728,7 @@
     "quick_links": {
       "title": "Liên kết nhanh",
       "description": "Tài nguyên hỗ trợ bạn thành công",
-      "api_documentation": "Tài liệu API",
-      "support_center": "Trung tâm hỗ trợ",
+      "ask_ai": "Hỏi AI",
       "status_page": "Trang trạng thái",
       "billing_history": "Lịch sử thanh toán"
     }

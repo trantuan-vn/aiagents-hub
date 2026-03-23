@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { BookOpen, CreditCard, ExternalLink, HelpCircle } from "lucide-react";
+import { CreditCard, ExternalLink, Sparkles } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -11,8 +11,7 @@ interface QuickLinksCardProps {
 }
 
 const LINKS = [
-  { nameKey: "quick_links.api_documentation", path: "/docs", icon: BookOpen },
-  { nameKey: "quick_links.support_center", path: "/support", icon: HelpCircle },
+  { nameKey: "quick_links.ask_ai", path: "/dashboard/useful-links/ask-ai", icon: Sparkles },
   { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing", icon: CreditCard },
 ] as const;
 

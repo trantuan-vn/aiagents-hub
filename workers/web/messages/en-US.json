@@ -728,8 +728,7 @@
     "quick_links": {
       "title": "Quick Links",
       "description": "Resources to help you succeed",
-      "api_documentation": "API Documentation",
-      "support_center": "Support Center",
+      "ask_ai": "Ask AI",
       "status_page": "Status Page",
       "billing_history": "Billing History"
     }
