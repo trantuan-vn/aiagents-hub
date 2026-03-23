@@ -2,19 +2,14 @@ import {
   Banknote,
   BarChart3,
   Bell,
-  BookOpen,
   Bot,
   ChartBar,
   Code,
-  Cookie,
   CreditCard,
-  Eye,
   FileText,
-  HelpCircle,
   Key,
   LayoutDashboard,
   RefreshCw,
-  Scale,
   Send,
   Settings,
   ShieldCheck,
@@ -145,21 +140,7 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 5,
     label: "Useful Links",
-    items: [
-      { title: "Ask AI", url: "/dashboard/useful-links/ask-ai", icon: Bot },
-      { title: "Documentation", url: "/dashboard/useful-links/documentation", icon: BookOpen },
-      { title: "Support", url: "/dashboard/useful-links/support", icon: HelpCircle },
-      {
-        title: "Legal & Privacy",
-        url: "/dashboard/useful-links/legal-privacy",
-        icon: Scale,
-        subItems: [
-          { title: "Privacy Policy", url: "/dashboard/useful-links/legal-privacy/privacy-policy", icon: ShieldCheck },
-          { title: "Cookie Settings", url: "/dashboard/useful-links/legal-privacy/cookie-settings", icon: Cookie },
-          { title: "Your privacy choices", url: "/dashboard/useful-links/legal-privacy/privacy-choices", icon: Eye },
-        ],
-      },
-    ],
+    items: [{ title: "Ask AI", url: "/dashboard/useful-links/ask-ai", icon: Bot }],
   },
 ];
 
