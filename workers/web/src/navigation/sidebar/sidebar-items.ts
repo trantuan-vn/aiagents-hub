@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Key,
   LayoutDashboard,
-  MessageSquare,
   RefreshCw,
   Scale,
   Send,
@@ -144,7 +143,6 @@ export const sidebarItems: NavGroup[] = [
     label: "Build",
     items: [
       { title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck },
-      { title: "Messaging", url: "/dashboard/build/messaging", icon: MessageSquare },
     ],
   },
   {

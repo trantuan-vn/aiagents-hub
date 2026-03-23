@@ -19,7 +19,6 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     CRM: t("crm"),
     Finance: t("finance"),
     eKyc: t("ekyc"),
-    Messaging: t("messaging"),
     "Ask AI": t("ask_ai"),
     Documentation: t("documentation"),
     Support: t("support"),
