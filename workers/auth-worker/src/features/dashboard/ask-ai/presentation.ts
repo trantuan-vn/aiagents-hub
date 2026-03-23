@@ -98,7 +98,7 @@ export function createAskAiRoutes(bindingName: string) {
           { role: 'user', content: userPrompt },
         ],
         max_tokens: 2048,
-      });
+      }, { gateway: { id: "unitoken" } });
 
       const raw = (response as { response?: string })?.response ?? (response as { result?: { response?: string } })?.result?.response ?? String(response);
       let parsed: { type: string; content: string; payload?: unknown } = { type: 'text', content: raw, payload: null };
