@@ -41,7 +41,7 @@ const QUICK_CREATE_ITEMS: {
 }[] = [
   { url: "/dashboard/control/token", translationKey: "quick_create_api_token", icon: Key },
   { url: "/dashboard/policy", translationKey: "quick_create_policy", icon: Tag, adminOnly: true },
-  { url: "/dashboard/service", translationKey: "quick_create_service", icon: Code },
+  { url: "/dashboard/service", translationKey: "quick_create_service", icon: Code, adminOnly: true },
   { url: "/dashboard/voucher", translationKey: "quick_create_voucher", icon: Ticket, adminOnly: true },
   { url: "/dashboard/control/billing", translationKey: "quick_create_order", icon: CreditCard },
   { url: "/dashboard/commission-policy", translationKey: "quick_create_commission", icon: Banknote, adminOnly: true },
