@@ -521,11 +521,13 @@
     "category": "Category",
     "all_categories": "All Categories",
     "ai_ml": "AI & ML",
+    "claw": "CLAW",
     "data_processing": "Data Processing",
     "utilities": "Utilities",
     "security": "Security",
     "compare_plans": "Compare plans:",
     "popular": "Popular",
+    "coming_soon": "Coming soon",
     "learn_more": "Learn More",
     "subscribe": "Subscribe",
     "per_month": "/month",
@@ -533,16 +535,6 @@
     "more_features": "+{count} more features",
     "no_packages_found": "No packages found matching your criteria.",
     "packages": {
-      "data_processing": {
-        "name": "Data Processing API",
-        "description": "High-performance data transformation and processing pipeline for structured and unstructured data.",
-        "features": {
-          "0": "JSON/XML parsing",
-          "1": "Batch processing",
-          "2": "Real-time streaming",
-          "3": "Custom transformations"
-        }
-      },
       "ai_vision": {
         "name": "AI Vision API",
         "description": "Advanced image recognition, object detection, and visual content analysis powered by machine learning.",
@@ -553,44 +545,14 @@
           "3": "Content moderation"
         }
       },
-      "geolocation": {
-        "name": "Geolocation API",
-        "description": "Accurate IP geolocation, address validation, and distance calculation services.",
+      "claw_api": {
+        "name": "CLAW APIs",
+        "description": "Integrate once across CLAW variants—OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible stacks—for agents, automation, and system connectivity.",
         "features": {
-          "0": "IP to location",
-          "1": "Address validation",
-          "2": "Distance matrix",
-          "3": "Timezone detection"
-        }
-      },
-      "authentication": {
-        "name": "Authentication API",
-        "description": "Secure user authentication, SSO, and identity verification for your applications.",
-        "features": {
-          "0": "OAuth 2.0",
-          "1": "SAML SSO",
-          "2": "MFA support",
-          "3": "Session management"
-        }
-      },
-      "natural_language": {
-        "name": "Natural Language API",
-        "description": "Text analysis, sentiment detection, entity extraction, and language translation services.",
-        "features": {
-          "0": "Sentiment analysis",
-          "1": "Entity extraction",
-          "2": "Translation",
-          "3": "Summarization"
-        }
-      },
-      "realtime_events": {
-        "name": "Real-time Events API",
-        "description": "WebSocket-based real-time event streaming and pub/sub messaging infrastructure.",
-        "features": {
-          "0": "WebSocket support",
-          "1": "Pub/Sub messaging",
-          "2": "Event history",
-          "3": "Custom channels"
+          "0": "OpenClaw, NanoClaw, NemoClaw, BizClaw, and more",
+          "1": "Routing and configuration per CLAW type",
+          "2": "Webhooks and real-time event streams",
+          "3": "Extensible for custom CLAW implementations"
         }
       }
     }
@@ -644,7 +606,7 @@
     },
     "ai_responses": {
       "welcome": "Hello! I'm your AI support assistant. I can help you with API recommendations, troubleshooting, and answer questions about your usage. How can I assist you today?",
-      "recommend": "Based on your question, I'd recommend our **AI Vision API** for image processing tasks, or our **Data Processing API** for data transformation needs. What specific use case are you working on?",
+      "recommend": "Based on your question, I'd recommend our **AI Vision API** for image work, or our **CLAW APIs** (OpenClaw, NanoClaw, NemoClaw, BizClaw, …) for agents and automation. What specific use case are you working on?",
       "calls": "You currently have **15,000 API calls** remaining this month across all your subscriptions. Your quota resets on the 1st of each month.",
       "rate_limit": "Rate limiting protects our infrastructure. Your current limits are:\n- **Free tier**: 10 requests/second\n- **Pro tier**: 100 requests/second\n\nConsider implementing exponential backoff in your code.",
       "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Check, Search, Sparkles, Zap, Database, Brain, Globe, Shield } from "lucide-react";
+import { type LucideIcon, Bot, Brain, Check, Search, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
@@ -13,6 +13,114 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import Layout from "../components/layout/main-layout";
 
+type Tier = "free" | "basic" | "pro";
+
+type PackageEntry = {
+  id: number;
+  name: string;
+  description: string;
+  icon: LucideIcon;
+  category: string;
+  pricing: {
+    free: { calls: number; price: number };
+    basic: { calls: number; price: number };
+    pro: { calls: number; price: number };
+  };
+  features: string[];
+  popular: boolean;
+  comingSoon?: boolean;
+};
+
+function tierPricing(tier: Tier, pricing: PackageEntry["pricing"]) {
+  if (tier === "free") return pricing.free;
+  if (tier === "basic") return pricing.basic;
+  return pricing.pro;
+}
+
+function PackageCard({
+  pkg,
+  selectedTier,
+  categories,
+  t,
+}: {
+  pkg: PackageEntry;
+  selectedTier: Tier;
+  categories: { value: string; label: string }[];
+  t: ReturnType<typeof useTranslations<"PackagesPage">>;
+}) {
+  const tier = tierPricing(selectedTier, pkg.pricing);
+
+  return (
+    <div
+      className={`bg-card card-hover relative rounded-2xl border p-6 transition-all duration-300 ${
+        pkg.popular ? "border-primary shadow-lg" : "border-border hover:border-primary/50"
+      }`}
+    >
+      {pkg.popular && (
+        <Badge className="from-primary to-accent absolute -top-3 right-4 bg-gradient-to-r text-white">
+          {t("popular")}
+        </Badge>
+      )}
+      {pkg.comingSoon && (
+        <Badge
+          className="absolute -top-3 right-4 border border-cyan-400/40 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-violet-950 text-[11px] font-semibold tracking-wide text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.35)]"
+          variant="outline"
+        >
+          <Sparkles className="h-3 w-3 text-cyan-300" aria-hidden />
+          {t("coming_soon")}
+        </Badge>
+      )}
+
+      <div className="mb-4 flex items-start gap-4">
+        <div className="from-primary/20 to-accent/20 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br">
+          <pkg.icon className="text-primary h-6 w-6" />
+        </div>
+        <div className="flex-1">
+          <h3 className="mb-1 text-lg font-semibold">{pkg.name}</h3>
+          <Badge variant="outline" className="text-xs capitalize">
+            {categories.find((cat) => cat.value === pkg.category)?.label ?? pkg.category}
+          </Badge>
+        </div>
+      </div>
+
+      <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{pkg.description}</p>
+
+      <div className="bg-muted/50 mb-4 rounded-xl p-4">
+        <div className="mb-1 flex items-baseline gap-1">
+          <span className="text-2xl font-bold">${tier.price}</span>
+          <span className="text-muted-foreground text-sm">{t("per_month")}</span>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          {tier.calls.toLocaleString()} {t("api_calls")}
+        </p>
+      </div>
+
+      <ul className="mb-6 space-y-2">
+        {pkg.features.slice(0, 3).map((feature) => (
+          <li key={feature} className="flex items-center gap-2 text-sm">
+            <Check className="text-accent h-4 w-4" />
+            {feature}
+          </li>
+        ))}
+        {pkg.features.length > 3 && (
+          <li className="text-muted-foreground text-xs">{t("more_features", { count: pkg.features.length - 3 })}</li>
+        )}
+      </ul>
+
+      <div className="flex gap-2">
+        <Link to={`/packages/${pkg.id}`} className="flex-1">
+          <Button variant="outline" className="w-full">
+            {t("learn_more")}
+          </Button>
+        </Link>
+        <Link to="/auth?mode=signup">
+          <Button variant="default">{t("subscribe")}</Button>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 const Packages = () => {
   const t = useTranslations("PackagesPage");
   const [searchQuery, setSearchQuery] = useState("");
@@ -22,33 +130,12 @@ const Packages = () => {
   const categories = [
     { value: "all", label: t("all_categories") },
     { value: "ai", label: t("ai_ml") },
-    { value: "data", label: t("data_processing") },
-    { value: "utility", label: t("utilities") },
-    { value: "security", label: t("security") },
+    { value: "claw", label: t("claw") },
   ];
 
-  const apiPackages = [
+  const apiPackages: PackageEntry[] = [
     {
       id: 1,
-      name: t("packages.data_processing.name"),
-      description: t("packages.data_processing.description"),
-      icon: Database,
-      category: "data",
-      pricing: {
-        free: { calls: 1000, price: 0 },
-        basic: { calls: 50000, price: 29 },
-        pro: { calls: 500000, price: 99 },
-      },
-      features: [
-        t("packages.data_processing.features.0"),
-        t("packages.data_processing.features.1"),
-        t("packages.data_processing.features.2"),
-        t("packages.data_processing.features.3"),
-      ],
-      popular: false,
-    },
-    {
-      id: 2,
       name: t("packages.ai_vision.name"),
       description: t("packages.ai_vision.description"),
       icon: Brain,
@@ -67,80 +154,24 @@ const Packages = () => {
       popular: true,
     },
     {
-      id: 3,
-      name: t("packages.geolocation.name"),
-      description: t("packages.geolocation.description"),
-      icon: Globe,
-      category: "utility",
-      pricing: {
-        free: { calls: 2000, price: 0 },
-        basic: { calls: 100000, price: 19 },
-        pro: { calls: 1000000, price: 79 },
-      },
-      features: [
-        t("packages.geolocation.features.0"),
-        t("packages.geolocation.features.1"),
-        t("packages.geolocation.features.2"),
-        t("packages.geolocation.features.3"),
-      ],
-      popular: false,
-    },
-    {
-      id: 4,
-      name: t("packages.authentication.name"),
-      description: t("packages.authentication.description"),
-      icon: Shield,
-      category: "security",
+      id: 2,
+      name: t("packages.claw_api.name"),
+      description: t("packages.claw_api.description"),
+      icon: Bot,
+      category: "claw",
       pricing: {
         free: { calls: 1000, price: 0 },
-        basic: { calls: 50000, price: 39 },
-        pro: { calls: 500000, price: 129 },
+        basic: { calls: 40000, price: 39 },
+        pro: { calls: 400000, price: 119 },
       },
       features: [
-        t("packages.authentication.features.0"),
-        t("packages.authentication.features.1"),
-        t("packages.authentication.features.2"),
-        t("packages.authentication.features.3"),
-      ],
-      popular: true,
-    },
-    {
-      id: 5,
-      name: t("packages.natural_language.name"),
-      description: t("packages.natural_language.description"),
-      icon: Brain,
-      category: "ai",
-      pricing: {
-        free: { calls: 500, price: 0 },
-        basic: { calls: 30000, price: 59 },
-        pro: { calls: 300000, price: 179 },
-      },
-      features: [
-        t("packages.natural_language.features.0"),
-        t("packages.natural_language.features.1"),
-        t("packages.natural_language.features.2"),
-        t("packages.natural_language.features.3"),
+        t("packages.claw_api.features.0"),
+        t("packages.claw_api.features.1"),
+        t("packages.claw_api.features.2"),
+        t("packages.claw_api.features.3"),
       ],
       popular: false,
-    },
-    {
-      id: 6,
-      name: t("packages.realtime_events.name"),
-      description: t("packages.realtime_events.description"),
-      icon: Zap,
-      category: "utility",
-      pricing: {
-        free: { calls: 5000, price: 0 },
-        basic: { calls: 100000, price: 35 },
-        pro: { calls: 1000000, price: 99 },
-      },
-      features: [
-        t("packages.realtime_events.features.0"),
-        t("packages.realtime_events.features.1"),
-        t("packages.realtime_events.features.2"),
-        t("packages.realtime_events.features.3"),
-      ],
-      popular: false,
+      comingSoon: true,
     },
   ];
 
@@ -216,80 +247,7 @@ const Packages = () => {
           {/* Packages Grid */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredPackages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className={`bg-card card-hover relative rounded-2xl border p-6 transition-all duration-300 ${
-                  pkg.popular ? "border-primary shadow-lg" : "border-border hover:border-primary/50"
-                }`}
-              >
-                {pkg.popular && (
-                  <Badge className="from-primary to-accent absolute -top-3 right-4 bg-gradient-to-r text-white">
-                    {t("popular")}
-                  </Badge>
-                )}
-
-                <div className="mb-4 flex items-start gap-4">
-                  <div className="from-primary/20 to-accent/20 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br">
-                    <pkg.icon className="text-primary h-6 w-6" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="mb-1 text-lg font-semibold">{pkg.name}</h3>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {categories.find((cat) => cat.value === pkg.category)?.label ?? pkg.category}
-                    </Badge>
-                  </div>
-                </div>
-
-                <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">{pkg.description}</p>
-
-                <div className="bg-muted/50 mb-4 rounded-xl p-4">
-                  <div className="mb-1 flex items-baseline gap-1">
-                    <span className="text-2xl font-bold">
-                      $
-                      {selectedTier === "free"
-                        ? pkg.pricing.free.price
-                        : selectedTier === "basic"
-                          ? pkg.pricing.basic.price
-                          : pkg.pricing.pro.price}
-                    </span>
-                    <span className="text-muted-foreground text-sm">{t("per_month")}</span>
-                  </div>
-                  <p className="text-muted-foreground text-xs">
-                    {(selectedTier === "free"
-                      ? pkg.pricing.free.calls
-                      : selectedTier === "basic"
-                        ? pkg.pricing.basic.calls
-                        : pkg.pricing.pro.calls
-                    ).toLocaleString()}{" "}
-                    {t("api_calls")}
-                  </p>
-                </div>
-
-                <ul className="mb-6 space-y-2">
-                  {pkg.features.slice(0, 3).map((feature) => (
-                    <li key={feature} className="flex items-center gap-2 text-sm">
-                      <Check className="text-accent h-4 w-4" />
-                      {feature}
-                    </li>
-                  ))}
-                  {pkg.features.length > 3 && (
-                    <li className="text-muted-foreground text-xs">
-                      {t("more_features", { count: pkg.features.length - 3 })}
-                    </li>
-                  )}
-                </ul>
-
-                <div className="flex gap-2">
-                  <Link to={`/packages/${pkg.id}`} className="flex-1">
-                    <Button variant="outline" className="w-full">
-                      {t("learn_more")}
-                    </Button>
-                  </Link>
-                  <Link to="/auth?mode=signup">
-                    <Button variant="default">{t("subscribe")}</Button>
-                  </Link>
-                </div>
-              </div>
+              <PackageCard key={pkg.id} pkg={pkg} selectedTier={selectedTier} categories={categories} t={t} />
             ))}
           </div>
 

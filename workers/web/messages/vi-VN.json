@@ -521,11 +521,13 @@
     "category": "Danh mục",
     "all_categories": "Tất cả danh mục",
     "ai_ml": "AI & ML",
+    "claw": "CLAW",
     "data_processing": "Xử lý dữ liệu",
     "utilities": "Tiện ích",
     "security": "Bảo mật",
     "compare_plans": "So sánh gói:",
     "popular": "Phổ biến",
+    "coming_soon": "Sắp có",
     "learn_more": "Tìm hiểu thêm",
     "subscribe": "Đăng ký",
     "per_month": "/tháng",
@@ -533,16 +535,6 @@
     "more_features": "+{count} tính năng khác",
     "no_packages_found": "Không tìm thấy gói nào phù hợp với tiêu chí của bạn.",
     "packages": {
-      "data_processing": {
-        "name": "API Xử lý Dữ liệu",
-        "description": "Pipeline xử lý và chuyển đổi dữ liệu hiệu suất cao cho dữ liệu có cấu trúc và không cấu trúc.",
-        "features": {
-          "0": "Phân tích cú pháp JSON/XML",
-          "1": "Xử lý hàng loạt",
-          "2": "Streaming thời gian thực",
-          "3": "Chuyển đổi tùy chỉnh"
-        }
-      },
       "ai_vision": {
         "name": "API Thị giác AI",
         "description": "Nhận dạng hình ảnh tiên tiến, phát hiện đối tượng và phân tích nội dung trực quan được hỗ trợ bởi machine learning.",
@@ -553,44 +545,14 @@
           "3": "Kiểm duyệt nội dung"
         }
       },
-      "geolocation": {
-        "name": "API Định vị Địa lý",
-        "description": "Dịch vụ định vị IP chính xác, xác thực địa chỉ và tính toán khoảng cách.",
+      "claw_api": {
+        "name": "API cho các CLAW",
+        "description": "Tích hợp một lần với nhiều biến thể CLAW: OpenClaw, NanoClaw, NemoClaw, BizClaw và các dòng tương thích khác — phù hợp agent, tác vụ tự động và kết nối hệ thống.",
         "features": {
-          "0": "IP đến vị trí",
-          "1": "Xác thực địa chỉ",
-          "2": "Ma trận khoảng cách",
-          "3": "Phát hiện múi giờ"
-        }
-      },
-      "authentication": {
-        "name": "API Xác thực",
-        "description": "Xác thực người dùng an toàn, SSO và xác minh danh tính cho ứng dụng của bạn.",
-        "features": {
-          "0": "OAuth 2.0",
-          "1": "SAML SSO",
-          "2": "Hỗ trợ MFA",
-          "3": "Quản lý phiên"
-        }
-      },
-      "natural_language": {
-        "name": "API Ngôn ngữ Tự nhiên",
-        "description": "Dịch vụ phân tích văn bản, phát hiện cảm xúc, trích xuất thực thể và dịch ngôn ngữ.",
-        "features": {
-          "0": "Phân tích cảm xúc",
-          "1": "Trích xuất thực thể",
-          "2": "Dịch thuật",
-          "3": "Tóm tắt"
-        }
-      },
-      "realtime_events": {
-        "name": "API Sự kiện Thời gian thực",
-        "description": "Cơ sở hạ tầng streaming sự kiện thời gian thực và nhắn tin pub/sub dựa trên WebSocket.",
-        "features": {
-          "0": "Hỗ trợ WebSocket",
-          "1": "Nhắn tin Pub/Sub",
-          "2": "Lịch sử sự kiện",
-          "3": "Kênh tùy chỉnh"
+          "0": "Hỗ trợ OpenClaw, NanoClaw, NemoClaw, BizClaw, …",
+          "1": "Định tuyến và cấu hình theo loại CLAW",
+          "2": "Webhook và luồng sự kiện thời gian thực",
+          "3": "Mở rộng cho CLAW tùy chỉnh"
         }
       }
     }
@@ -644,7 +606,7 @@
     },
     "ai_responses": {
       "welcome": "Xin chào! Tôi là trợ lý hỗ trợ AI của bạn. Tôi có thể giúp bạn với đề xuất API, xử lý sự cố và trả lời câu hỏi về việc sử dụng của bạn. Tôi có thể hỗ trợ bạn như thế nào hôm nay?",
-      "recommend": "Dựa trên câu hỏi của bạn, tôi khuyên dùng **API Thị giác AI** của chúng tôi cho các tác vụ xử lý hình ảnh, hoặc **API Xử lý Dữ liệu** của chúng tôi cho nhu cầu chuyển đổi dữ liệu. Bạn đang làm việc với trường hợp sử dụng cụ thể nào?",
+      "recommend": "Dựa trên câu hỏi của bạn, tôi khuyên dùng **API Thị giác AI** cho xử lý hình ảnh, hoặc **API cho các CLAW** (OpenClaw, NanoClaw, NemoClaw, BizClaw, …) cho agent và tích hợp tự động. Bạn đang làm việc với trường hợp sử dụng cụ thể nào?",
       "calls": "Bạn hiện có **15.000 lượt gọi API** còn lại trong tháng này trên tất cả các gói đăng ký của bạn. Hạn mức của bạn được đặt lại vào ngày 1 mỗi tháng.",
       "rate_limit": "Giới hạn tốc độ bảo vệ cơ sở hạ tầng của chúng tôi. Giới hạn hiện tại của bạn là:\n- **Gói miễn phí**: 10 yêu cầu/giây\n- **Gói Pro**: 100 yêu cầu/giây\n\nHãy cân nhắc triển khai exponential backoff trong code của bạn.",
       "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
