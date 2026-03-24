@@ -42,12 +42,6 @@ export function DesktopNavigation({
           <DropdownMenuItem asChild>
             <Link to="/support">{t("support")}</Link>
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/blog">{t("blog")}</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/changelog">{t("changelog")}</Link>
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -167,28 +161,6 @@ export function MobileMenu({
             }`}
           >
             {t("support")}
-          </Link>
-          <Link
-            to="/blog"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 ${
-              isActive("/blog")
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            {t("blog")}
-          </Link>
-          <Link
-            to="/changelog"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`rounded-lg px-4 py-3 text-sm font-medium transition-all duration-200 ${
-              isActive("/changelog")
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            }`}
-          >
-            {t("changelog")}
           </Link>
         </div>
         <div className="border-border mt-4 flex flex-col gap-2 border-t pt-4">

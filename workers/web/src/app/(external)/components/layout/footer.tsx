@@ -22,7 +22,6 @@ const Footer = () => {
     ],
     [t("resources")]: [
       { name: t("support"), path: "/support" },
-      { name: t("changelog"), path: "/changelog" },
       { name: t("status"), path: "/status" },
       { name: t("terms"), path: "/terms" },
     ],

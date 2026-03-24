@@ -92,7 +92,6 @@ export default function Navbar() {
       { name: t("home"), path: "/" },
       { name: t("packages"), path: "/packages" },
       { name: t("documentation"), path: "/docs" },
-      { name: t("pricing"), path: "/pricing" },
     ],
     [t],
   );
