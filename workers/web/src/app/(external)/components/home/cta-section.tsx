@@ -2,9 +2,11 @@
 
 import { useEffect } from "react";
 
+import NextLink from "next/link";
+
 import { ArrowRight, MessageCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { updateThemeMode } from "@/lib/theme-utils";
@@ -36,18 +38,18 @@ const CTASection = () => {
           <p className="text-muted-foreground mx-auto mb-10 max-w-xl text-lg">{t("subtitle")}</p>
 
           <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link to="/auth?mode=signup">
-              <Button variant="default" size="default">
+            <Button variant="default" size="default" asChild>
+              <NextLink href="/auth/v3/login">
                 {t("get_started_free")}
                 <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
-            <Link to="/support">
+              </NextLink>
+            </Button>
+            <RouterLink to="/support">
               <Button variant="outline" size="lg">
                 <MessageCircle className="h-5 w-5" />
                 {t("talk_to_sales")}
               </Button>
-            </Link>
+            </RouterLink>
           </div>
 
           {/* Trust badges */}

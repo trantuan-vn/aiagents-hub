@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import NextLink from "next/link";
+
 import { type LucideIcon, Bot, Brain, Check, Search, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
@@ -113,9 +115,9 @@ function PackageCard({
             {t("learn_more")}
           </Button>
         </Link>
-        <Link to="/auth?mode=signup">
-          <Button variant="default">{t("subscribe")}</Button>
-        </Link>
+        <Button variant="default" asChild>
+          <NextLink href="/auth/v2/register">{t("subscribe")}</NextLink>
+        </Button>
       </div>
     </div>
   );

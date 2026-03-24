@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import NextLink from "next/link";
+
 import { Check, ArrowRight, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
@@ -35,12 +37,13 @@ const PackagesPreview = () => {
         t("features.standard_rate_limits"),
       ],
       cta: t("start_free"),
+      href: "/auth/v3/login",
       variant: "outline" as const,
       popular: false,
     },
     {
-      name: t("pro"),
-      description: t("pro_desc"),
+      name: t("basic"),
+      description: t("basic_desc"),
       price: "$49",
       period: t("per_month"),
       features: [
@@ -53,13 +56,14 @@ const PackagesPreview = () => {
         t("features.custom_domains"),
       ],
       cta: t("get_started"),
+      href: "/auth/v2/register",
       variant: "gradient" as const,
       popular: true,
     },
     {
       name: t("enterprise"),
       description: t("enterprise_desc"),
-      price: "$199",
+      price: "$149",
       period: t("per_month"),
       features: [
         t("features.unlimited_api_calls"),
@@ -72,6 +76,7 @@ const PackagesPreview = () => {
         t("features.custom_integrations"),
       ],
       cta: t("contact_sales"),
+      href: "/auth/v2/register",
       variant: "outline" as const,
       popular: false,
     },
@@ -128,11 +133,9 @@ const PackagesPreview = () => {
                 ))}
               </ul>
 
-              <Link to="/auth?mode=signup">
-                <Button variant={pkg.variant} className="w-full">
-                  {pkg.cta}
-                </Button>
-              </Link>
+              <Button variant={pkg.variant} className="w-full" asChild>
+                <NextLink href={pkg.href}>{pkg.cta}</NextLink>
+              </Button>
             </div>
           ))}
         </div>
