@@ -11,6 +11,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { updateThemeMode, updateThemePreset } from "@/lib/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import DocsApi from "./pages/docs/api";
+import DocsIndex from "./pages/docs/index";
+import DocsQuickstart from "./pages/docs/quickstart";
 import Index from "./pages/index";
 import Packages from "./pages/packages";
 import Support from "./pages/support";
@@ -55,6 +58,9 @@ const App = () => (
           {/* <Route path="/auth" element={<Auth />} /> */}
           {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
           <Route path="/support" element={<Support />} />
+          <Route path="/docs" element={<DocsIndex />} />
+          <Route path="/docs/quickstart" element={<DocsQuickstart />} />
+          <Route path="/docs/api" element={<DocsApi />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE
           <Route path="*" element={<NotFound />} /> */}
         </Routes>

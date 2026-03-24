@@ -97,7 +97,15 @@ export default function Navbar() {
     [t],
   );
 
-  const isActive = useMemo(() => (path: string) => location.pathname === path, [location.pathname]);
+  const isActive = useMemo(
+    () => (path: string) => {
+      if (path === "/docs") {
+        return location.pathname === "/docs" || location.pathname.startsWith("/docs/");
+      }
+      return location.pathname === path;
+    },
+    [location.pathname],
+  );
 
   return (
     <nav

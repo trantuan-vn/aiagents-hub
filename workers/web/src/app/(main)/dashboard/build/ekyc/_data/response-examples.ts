@@ -34,3 +34,19 @@ export const RESPONSE_EXAMPLES: Record<string, string> = {
   "riskScore": 0.1
 }`,
 };
+
+/** Safe lookup by endpoint id (explicit switch avoids dynamic property access warnings). */
+export function getResponseExample(endpointId: string): string | undefined {
+  switch (endpointId) {
+    case "recognize-document":
+      return RESPONSE_EXAMPLES["recognize-document"];
+    case "face-search":
+      return RESPONSE_EXAMPLES["face-search"];
+    case "face-verify":
+      return RESPONSE_EXAMPLES["face-verify"];
+    case "face-liveness":
+      return RESPONSE_EXAMPLES["face-liveness"];
+    default:
+      return undefined;
+  }
+}

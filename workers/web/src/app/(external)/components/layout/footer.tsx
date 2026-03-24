@@ -28,8 +28,6 @@ const Footer = () => {
     ],
     [t("developers")]: [
       { name: t("api_reference"), path: "/docs/api" },
-      { name: t("sdks"), path: "/docs/sdks" },
-      { name: t("examples"), path: "/docs/examples" },
       { name: t("community"), path: "/community" },
     ],
   };

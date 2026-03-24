@@ -13,9 +13,33 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { CodeBlock } from "./_components/code-block";
-import { ENDPOINT_CODE_EXAMPLES, ENDPOINTS, RESPONSE_EXAMPLES } from "./_data/code-examples";
+import { ENDPOINT_CODE_EXAMPLES, ENDPOINTS, getResponseExample } from "./_data/code-examples";
 
 const LANG_TABS = ["curl", "javascript", "python", "go", "php", "java", "csharp"] as const;
+
+type LangTab = (typeof LANG_TABS)[number];
+
+function pickExampleForLang(
+  examples: Record<string, (apiKey: string) => string>,
+  lang: LangTab,
+): (apiKey: string) => string {
+  switch (lang) {
+    case "curl":
+      return examples.curl;
+    case "javascript":
+      return examples.javascript;
+    case "python":
+      return examples.python;
+    case "go":
+      return examples.go;
+    case "php":
+      return examples.php;
+    case "java":
+      return examples.java;
+    case "csharp":
+      return examples.csharp;
+  }
+}
 
 export default function BuildEkycPage() {
   const t = useTranslations("BuildEkycPage");
@@ -86,6 +110,7 @@ export default function BuildEkycPage() {
           <div className="space-y-8">
             {ENDPOINTS.map((ep, idx) => {
               const examples = ENDPOINT_CODE_EXAMPLES[ep.id];
+              const responseExample = getResponseExample(ep.id);
               return (
                 <div
                   key={ep.path}
@@ -119,45 +144,42 @@ export default function BuildEkycPage() {
                   </div>
 
                   {/* Code examples per endpoint */}
-                  {examples && (
-                    <div className="bg-muted/30 border-t px-4 pt-3 pb-4 sm:px-5">
-                      <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
-                        {t("example_code")}
-                      </p>
-                      <Tabs defaultValue="curl" className="w-full">
-                        <TabsList className="mb-3 flex h-auto flex-wrap gap-1 p-1">
-                          {LANG_TABS.map((lang) => (
-                            <TabsTrigger key={lang} value={lang} className="text-xs">
-                              {lang === "csharp" ? "C#" : lang.charAt(0).toUpperCase() + lang.slice(1)}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                        {LANG_TABS.map((lang) => {
-                          const fn = examples[lang];
-                          if (!fn) return null;
-                          return (
-                            <TabsContent key={lang} value={lang} className="mt-0">
-                              <CodeBlock code={fn(apiKeyPlaceholder)} language={lang} />
-                            </TabsContent>
-                          );
-                        })}
-                      </Tabs>
-                    </div>
-                  )}
+                  <div className="bg-muted/30 border-t px-4 pt-3 pb-4 sm:px-5">
+                    <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
+                      {t("example_code")}
+                    </p>
+                    <Tabs defaultValue="curl" className="w-full">
+                      <TabsList className="mb-3 flex h-auto flex-wrap gap-1 p-1">
+                        {LANG_TABS.map((lang) => (
+                          <TabsTrigger key={lang} value={lang} className="text-xs">
+                            {lang === "csharp" ? "C#" : lang.charAt(0).toUpperCase() + lang.slice(1)}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      {LANG_TABS.map((lang) => {
+                        const fn = pickExampleForLang(examples, lang);
+                        return (
+                          <TabsContent key={lang} value={lang} className="mt-0">
+                            <CodeBlock code={fn(apiKeyPlaceholder)} language={lang} />
+                          </TabsContent>
+                        );
+                      })}
+                    </Tabs>
+                  </div>
 
                   {/* Response format per endpoint */}
-                  {RESPONSE_EXAMPLES[ep.id] && (
+                  {responseExample ? (
                     <div className="border-t px-4 pt-3 pb-4 sm:px-5">
                       <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wider uppercase">
                         {t("response_title")}
                       </p>
                       <div className="overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 dark:bg-zinc-900">
                         <pre className="font-mono text-sm text-zinc-100">
-                          <code>{RESPONSE_EXAMPLES[ep.id]}</code>
+                          <code>{responseExample}</code>
                         </pre>
                       </div>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               );
             })}

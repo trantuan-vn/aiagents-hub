@@ -334,4 +334,4 @@ export const ENDPOINTS = [
   },
 ] as const;
 
-export { RESPONSE_EXAMPLES } from "./response-examples";
+export { RESPONSE_EXAMPLES, getResponseExample } from "./response-examples";
