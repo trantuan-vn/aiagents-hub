@@ -20,6 +20,7 @@ import DocsQuickstart from "./pages/docs/quickstart";
 import Index from "./pages/index";
 import Packages from "./pages/packages";
 import Support from "./pages/support";
+import Terms from "./pages/terms";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
           {/* <Route path="/auth" element={<Auth />} /> */}
           {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
           <Route path="/support" element={<Support />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/docs" element={<DocsIndex />} />
           <Route path="/docs/quickstart" element={<DocsQuickstart />} />
           <Route path="/docs/api" element={<DocsApi />} />

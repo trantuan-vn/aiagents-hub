@@ -799,6 +799,148 @@
       "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"
     }
   },
+  "TermsPage": {
+    "badge": "Legal",
+    "title": "Terms of",
+    "title_gradient": "Service",
+    "subtitle": "These Terms govern your use of unitoken.trade and our managed API platform—including AI-assisted and blockchain-related capabilities—in line with common international practice for cloud and API services.",
+    "last_updated": "Last updated: March 25, 2025",
+    "toc_title": "On this page",
+    "toc_aria": "Terms of service sections",
+    "related_title": "Related",
+    "related_contact": "Contact & legal notices",
+    "cta_title": "Questions about these Terms?",
+    "cta_body": "Our team can help clarify billing, integration, compliance, or enterprise agreements.",
+    "cta_button": "Contact us",
+    "sections": {
+      "agreement": {
+        "title": "Agreement to these Terms",
+        "paragraphs": [
+          "These Terms of Service (\"Terms\") form a binding agreement between you (\"you\", \"your\", or \"Customer\") and the operator of unitoken.trade and api.unitoken.trade (collectively, the \"Platform\", \"we\", \"us\", or \"our\").",
+          "By accessing or using the Platform, creating an account, subscribing to an API product, generating API keys, connecting a wallet, or otherwise using our services, you agree to these Terms and to our Privacy Policy (where applicable). If you do not agree, do not use the Platform.",
+          "If you use the Platform on behalf of an organization, you represent that you have authority to bind that organization, and \"you\" includes that entity."
+        ]
+      },
+      "definitions": {
+        "title": "Definitions",
+        "paragraphs": [
+          "\"API\" means the application programming interfaces, endpoints, SDKs, webhooks, and related developer tools we make available at or through api.unitoken.trade (or successor URLs).",
+          "\"AI Features\" means machine-learning or generative capabilities we provide (for example assistants, classification, enrichment, or automation) whether labeled as AI or not.",
+          "\"Blockchain Features\" means functionality that interacts with public or permissioned distributed ledgers, smart contracts, wallet-based authentication, or on-chain attestations.",
+          "\"Content\" means data, prompts, files, payloads, metadata, or other materials that you or your end users submit to or retrieve from the Platform."
+        ]
+      },
+      "services": {
+        "title": "The services",
+        "paragraphs": [
+          "We provide a managed API business: gateways, metering, documentation, observability hooks, and account tooling intended to help developers and enterprises integrate reliably at scale. Specific capabilities, regions, uptime targets, and support levels depend on your plan and product documentation.",
+          "We may modify, deprecate, or replace features where reasonably necessary for security, compliance, or operations, in line with the change and notice practices described below and in product notices."
+        ]
+      },
+      "api_usage": {
+        "title": "API access, keys, and fair use",
+        "paragraphs": [
+          "You must use credentials (API keys, OAuth tokens, or other mechanisms we specify) responsibly and keep them confidential. You are responsible for all activity under your account unless you have notified us of a compromise in line with our security guidance.",
+          "We apply rate limits, quotas, concurrency controls, and abuse protections. Responses such as HTTP 429 or equivalent signals indicate that you should back off, optimize usage, or upgrade your plan. Unless expressly stated in a separate written agreement, we do not guarantee unlimited throughput or a particular latency percentile.",
+          "You must follow our documentation, versioning, and authentication requirements. We may require migration to newer API versions; continued use after a stated sunset date may be unsupported or disabled."
+        ]
+      },
+      "ai_features": {
+        "title": "AI features and outputs",
+        "paragraphs": [
+          "AI Features may produce probabilistic or incomplete results. Outputs may be inaccurate, outdated, or unsuitable for a given regulated use case. You are solely responsible for evaluating outputs before relying on them in production, safety-critical, financial, medical, legal, or other high-risk contexts.",
+          "You must not use AI Features to generate unlawful content, to infringe intellectual property or privacy rights, to deceive end users in material ways, or to bypass reasonable safeguards we implement. Where we describe restrictions for specific models or tools, those restrictions form part of these Terms.",
+          "Unless we expressly agree otherwise in writing, we do not use your Content to train foundation models in a way that identifies you or your end users; however, we may process Content to provide the service, secure the Platform, comply with law, and improve reliability (for example logging, debugging, and aggregated quality metrics)."
+        ]
+      },
+      "blockchain": {
+        "title": "Blockchain, wallets, and on-chain activity",
+        "paragraphs": [
+          "Blockchain Features depend on third-party networks that we do not control. Transaction finality, fees (including gas), reorganizations, smart-contract behavior, and token volatility are outside our responsibility. You acknowledge the inherent risks of interacting with blockchain systems.",
+          "Wallet connections and signatures are your responsibility. You must safeguard seed phrases, private keys, and devices. We are not a custodian of your digital assets unless a separate written agreement explicitly states otherwise.",
+          "When Blockchain Features involve reading or writing on-chain data, you represent that your use complies with applicable sanctions, securities, consumer-protection, and anti-money-laundering rules that apply to you. We may block, filter, or refuse interactions where required by law or to protect the Platform."
+        ]
+      },
+      "acceptable_use": {
+        "title": "Acceptable use",
+        "paragraphs": [
+          "You agree not to misuse the Platform. Without limitation, you must not probe, scan, or attack our systems; circumvent technical limits; distribute malware; send spam; harvest data in violation of applicable law; or use the APIs in a way that endangers minors, promotes violence, or violates export-control or sanctions rules.",
+          "You must not resell or sublicense API access in a manner that misrepresents origin, evades metering, or violates your plan. If you offer a product to your own customers powered by our APIs, you remain responsible for your product and for passing appropriate terms and disclosures to your users.",
+          "We may investigate suspected violations and suspend or terminate access where reasonably necessary to protect users, the Platform, or comply with legal obligations."
+        ]
+      },
+      "accounts": {
+        "title": "Accounts and security",
+        "paragraphs": [
+          "You must provide accurate registration information and keep it current. Multi-factor authentication and least-privilege API keys are strongly encouraged.",
+          "You must notify us promptly of unauthorized access or suspected key leakage. We may take protective actions such as rotating credentials, throttling traffic, or requiring additional verification."
+        ]
+      },
+      "fees": {
+        "title": "Fees, taxes, and billing",
+        "paragraphs": [
+          "Paid plans, usage-based charges, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Unless stated otherwise, fees are non-refundable except where mandatory law requires otherwise.",
+          "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any bank or blockchain network fees charged by third parties."
+        ]
+      },
+      "ip": {
+        "title": "Intellectual property",
+        "paragraphs": [
+          "We retain all rights in the Platform, documentation, trademarks, and our proprietary models and software, except for rights expressly granted to you.",
+          "We grant you a limited, non-exclusive, non-transferable license during your subscription to call the APIs and use our documentation solely as needed to exercise your rights under these Terms. You may not reverse engineer our services except where mandatory law permits interoperability.",
+          "You grant us a worldwide license to host, process, transmit, and display your Content as reasonably necessary to provide and secure the services. You represent that you have the rights needed to grant this license."
+        ]
+      },
+      "data": {
+        "title": "Data protection and privacy",
+        "paragraphs": [
+          "Our processing of personal data is described in our Privacy Policy and, where relevant, data processing terms offered to enterprise customers. You will not submit special categories of personal data to the APIs unless permitted by law and contract.",
+          "We may generate service logs and metrics (including request metadata and error traces) to operate, secure, and improve the Platform. Retention follows our policies and legal requirements."
+        ]
+      },
+      "warranties": {
+        "title": "Disclaimers",
+        "paragraphs": [
+          "EXCEPT WHERE PROHIBITED BY LAW, THE PLATFORM AND APIs ARE PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.",
+          "WE DO NOT WARRANT THAT THE SERVICES WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL COMPONENTS. AI AND BLOCKCHAIN SYSTEMS INVOLVE INHERENT UNCERTAINTY; YOU ASSUME ALL RISKS ASSOCIATED WITH YOUR USE."
+        ]
+      },
+      "liability": {
+        "title": "Limitation of liability",
+        "paragraphs": [
+          "TO THE MAXIMUM EXTENT PERMITTED BY LAW, NEITHER PARTY WILL BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOSS OF PROFITS, DATA, GOODWILL, OR BUSINESS OPPORTUNITY, EVEN IF ADVISED OF THE POSSIBILITY.",
+          "OUR AGGREGATE LIABILITY ARISING OUT OF OR RELATED TO THESE TERMS OR THE SERVICES WILL NOT EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID TO US FOR THE SERVICES IN THE TWELVE (12) MONTHS BEFORE THE EVENT GIVING RISE TO LIABILITY, OR (B) ONE HUNDRED U.S. DOLLARS (USD $100) IF YOU HAVE NOT HAD A PAYMENT OBLIGATION. MULTIPLE CLAIMS WILL NOT EXPAND THIS CAP. SOME JURISDICTIONS DO NOT ALLOW CERTAIN LIMITATIONS; IN THOSE CASES OUR LIABILITY IS LIMITED TO THE MAXIMUM EXTENT PERMITTED."
+        ]
+      },
+      "indemnity": {
+        "title": "Indemnity",
+        "paragraphs": [
+          "You will defend and indemnify us and our affiliates, officers, and employees against third-party claims, damages, and costs (including reasonable attorneys' fees) arising from your Content, your products, your misuse of the APIs, or your violation of these Terms or applicable law, except to the extent caused by our willful misconduct."
+        ]
+      },
+      "changes": {
+        "title": "Changes to these Terms",
+        "paragraphs": [
+          "We may update these Terms to reflect new features, legal requirements, or risk management needs. We will post the revised Terms on this page and update the \"Last updated\" date. Where changes are material, we will provide additional notice when reasonable (for example email or dashboard banner).",
+          "Continued use after the effective date of updated Terms constitutes acceptance. If you do not agree, you must stop using the Platform and cancel paid subscriptions according to our billing rules."
+        ]
+      },
+      "law": {
+        "title": "Governing law and disputes",
+        "paragraphs": [
+          "Unless mandatory consumer-protection rules in your jurisdiction require otherwise, these Terms are governed by the laws applicable to the operator of unitoken.trade, without regard to conflict-of-law principles that would require applying another jurisdiction's laws.",
+          "You agree to first contact us to seek an informal resolution of any dispute. If a dispute cannot be resolved informally, exclusive jurisdiction and venue for litigation will lie with the courts competent for the operator's registered seat, unless applicable law requires a different forum for consumers.",
+          "The United Nations Convention on Contracts for the International Sale of Goods does not apply."
+        ]
+      },
+      "contact": {
+        "title": "Contact",
+        "paragraphs": [
+          "For questions about these Terms, billing, or compliance, contact us at admin@unitoken.trade. Corporate name and registered address may be provided upon request for contractual or regulatory purposes."
+        ]
+      }
+    }
+  },
   "OverviewPage": {
     "title": "Dashboard",
     "description": "Welcome back! Here's your API overview.",

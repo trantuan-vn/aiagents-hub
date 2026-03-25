@@ -799,6 +799,148 @@
       "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
     }
   },
+  "TermsPage": {
+    "badge": "Pháp lý",
+    "title": "Điều khoản",
+    "title_gradient": "dịch vụ",
+    "subtitle": "Các Điều khoản này điều chỉnh việc bạn sử dụng unitoken.trade và nền tảng API được quản lý của chúng tôi—bao gồm khả năng hỗ trợ bởi AI và liên quan blockchain—phù hợp với thông lệ quốc tế phổ biến đối với dịch vụ đám mây và API.",
+    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "toc_title": "Mục lục",
+    "toc_aria": "Các mục điều khoản dịch vụ",
+    "related_title": "Liên quan",
+    "related_contact": "Liên hệ & thông báo pháp lý",
+    "cta_title": "Thắc mắc về Điều khoản?",
+    "cta_body": "Đội ngũ của chúng tôi có thể làm rõ thanh toán, tích hợp, tuân thủ hoặc hợp đồng doanh nghiệp.",
+    "cta_button": "Liên hệ",
+    "sections": {
+      "agreement": {
+        "title": "Chấp nhận Điều khoản",
+        "paragraphs": [
+          "Điều khoản dịch vụ này (\"Điều khoản\") là thỏa thuận ràng buộc giữa bạn (\"bạn\" hoặc \"Khách hàng\") và bên vận hành unitoken.trade và api.unitoken.trade (gọi chung là \"Nền tảng\", \"chúng tôi\").",
+          "Bằng việc truy cập hoặc sử dụng Nền tảng, tạo tài khoản, đăng ký sản phẩm API, tạo khóa API, kết nối ví hoặc sử dụng dịch vụ theo bất kỳ cách nào khác, bạn đồng ý với Điều khoản này và Chính sách quyền riêng tư (nếu có). Nếu không đồng ý, vui lòng không sử dụng Nền tảng.",
+          "Nếu bạn sử dụng Nền tảng thay mặt một tổ chức, bạn xác nhận có thẩm quyền ràng buộc tổ chức đó; khi đó \"bạn\" bao gồm cả tổ chức đó."
+        ]
+      },
+      "definitions": {
+        "title": "Định nghĩa",
+        "paragraphs": [
+          "\"API\" gồm các giao diện lập trình ứng dụng, endpoint, SDK, webhook và công cụ dành cho nhà phát triển mà chúng tôi cung cấp tại hoặc thông qua api.unitoken.trade (hoặc URL kế thừa).",
+          "\"Tính năng AI\" là các khả năng học máy hoặc tạo sinh mà chúng tôi cung cấp (ví dụ trợ lý, phân loại, làm giàu dữ liệu hoặc tự động hóa), dù có gắn nhãn AI hay không.",
+          "\"Tính năng blockchain\" là chức năng tương tác với sổ cái phân tán công khai hoặc được cấp phép, hợp đồng thông minh, xác thực qua ví hoặc chứng thực on-chain.",
+          "\"Nội dung\" là dữ liệu, prompt, tệp, payload, siêu dữ liệu hoặc tài liệu khác mà bạn hoặc người dùng cuối gửi tới hoặc nhận từ Nền tảng."
+        ]
+      },
+      "services": {
+        "title": "Phạm vi dịch vụ",
+        "paragraphs": [
+          "Chúng tôi cung cấp mô hình API được quản lý: gateway, đo lường, tài liệu, hook quan sát và công cụ tài khoản nhằm giúp nhà phát triển và doanh nghiệp tích hợp ổn định ở quy mô lớn. Khả năng cụ thể, vùng, mục tiêu thời gian hoạt động và mức hỗ trợ phụ thuộc gói dịch vụ và tài liệu sản phẩm của bạn.",
+          "Chúng tôi có thể sửa đổi, ngừng hỗ trợ hoặc thay thế tính năng khi cần thiết một cách hợp lý vì bảo mật, tuân thủ hoặc vận hành, theo cách thông báo thay đổi mô tả bên dưới và trong thông báo sản phẩm."
+        ]
+      },
+      "api_usage": {
+        "title": "Truy cập API, khóa và sử dụng công bằng",
+        "paragraphs": [
+          "Bạn phải dùng thông tin đăng nhập (khóa API, token OAuth hoặc cơ chế chúng tôi quy định) một cách có trách nhiệm và bảo mật. Bạn chịu trách nhiệm về mọi hoạt động dưới tài khoản trừ khi bạn đã thông báo sự cố theo hướng dẫn bảo mật của chúng tôi.",
+          "Chúng tôi áp dụng giới hạn tốc độ, hạn ngạch, kiểm soát đồng thời và biện pháp chống lạm dụng. Phản hồi như HTTP 429 hoặc tương đương có nghĩa bạn nên giảm tần suất, tối ưu sử dụng hoặc nâng cấp gói. Trừ khi được nêu rõ trong thỏa thuận riêng bằng văn bản, chúng tôi không đảm bảo thông lượng không giới hạn hay một phân vị độ trễ cụ thể.",
+          "Bạn phải tuân theo tài liệu, phiên bản và yêu cầu xác thực. Chúng tôi có thể yêu cầu chuyển sang phiên bản API mới; việc tiếp tục sử dụng sau ngày ngừng hỗ trợ đã thông báo có thể không được hỗ trợ hoặc bị vô hiệu hóa."
+        ]
+      },
+      "ai_features": {
+        "title": "Tính năng AI và đầu ra",
+        "paragraphs": [
+          "Tính năng AI có thể cho kết quả xác suất hoặc không đầy đủ. Đầu ra có thể sai, lỗi thời hoặc không phù hợp với ngữ cảnh chịu quy định đặc biệt. Bạn hoàn toàn chịu trách nhiệm đánh giá đầu ra trước khi dựa vào trong môi trường sản xuất, an toàn, tài chính, y tế, pháp lý hoặc bối cảnh rủi ro cao khác.",
+          "Bạn không được dùng Tính năng AI để tạo nội dung trái pháp luật, xâm phạm quyền sở hữu trí tuệ hoặc quyền riêng tư, lừa dối người dùng cuối theo cách trọng yếu, hoặc vượt qua biện pháp an toàn hợp lý mà chúng tôi triển khai. Hạn chế mô tả cho từng mô hình hoặc công cụ là một phần của Điều khoản này.",
+          "Trừ khi chúng tôi đồng ý khác bằng văn bản, chúng tôi không dùng Nội dung của bạn để huấn luyện mô hình nền theo cách nhận diện bạn hoặc người dùng cuối; tuy nhiên chúng tôi có thể xử lý Nội dung để cung cấp dịch vụ, bảo vệ Nền tảng, tuân thủ pháp luật và cải thiện độ tin cậy (ví dụ nhật ký, gỡ lỗi, chỉ số chất lượng tổng hợp)."
+        ]
+      },
+      "blockchain": {
+        "title": "Blockchain, ví và hoạt động on-chain",
+        "paragraphs": [
+          "Tính năng blockchain phụ thuộc mạng bên thứ ba mà chúng tôi không kiểm soát. Tính cuối cùng của giao dịch, phí (kể cả gas), tổ chức lại chuỗi, hành vi hợp đồng thông minh và biến động token nằm ngoài trách nhiệm của chúng tôi. Bạn thừa nhận rủi ro cố hữu khi tương tác với hệ thống blockchain.",
+          "Kết nối ví và chữ ký là trách nhiệm của bạn. Bạn phải bảo vệ cụm từ khôi phục, khóa riêng và thiết bị. Chúng tôi không giữ hộ tài sản số của bạn trừ khi thỏa thuận riêng bằng văn bản quy định rõ.",
+          "Khi Tính năng blockchain đọc hoặc ghi dữ liệu on-chain, bạn cam đoan việc sử dụng tuân thủ lệnh trừng phạt, chứng khoán, bảo vệ người tiêu dùng và chống rửa tiền áp dụng cho bạn. Chúng tôi có thể chặn, lọc hoặc từ chối tương tác khi pháp luật yêu cầu hoặc để bảo vệ Nền tảng."
+        ]
+      },
+      "acceptable_use": {
+        "title": "Sử dụng chấp nhận được",
+        "paragraphs": [
+          "Bạn đồng ý không lạm dụng Nền tảng. Không giới hạn ở đây, bạn không được dò quét hoặc tấn công hệ thống; vượt qua giới hạn kỹ thuật; phát tán phần mềm độc hại; gửi thư rác; thu thập dữ liệu trái pháp; hoặc dùng API theo cách gây nguy hiểm cho trẻ vị thành niên, cổ xúy bạo lực hoặc vi phạm kiểm soát xuất khẩu hoặc lệnh trừng phạt.",
+          "Bạn không được bán lại hoặc cấp phép lại quyền truy cập API theo cách che giấu nguồn, trốn đo lường hoặc vi phạm gói của bạn. Nếu bạn cung cấp sản phẩm cho khách hàng dựa trên API của chúng tôi, bạn vẫn chịu trách nhiệm về sản phẩm và phải chuyển tải điều khoản và thông tin phù hợp cho người dùng của bạn.",
+          "Chúng tôi có thể điều tra hành vi nghi ngờ vi phạm và tạm ngưng hoặc chấm dứt quyền truy cập khi cần thiết một cách hợp lý để bảo vệ người dùng, Nền tảng hoặc tuân thủ nghĩa vụ pháp lý."
+        ]
+      },
+      "accounts": {
+        "title": "Tài khoản và bảo mật",
+        "paragraphs": [
+          "Bạn phải cung cấp thông tin đăng ký chính xác và cập nhật. Xác thực đa yếu tố và khóa API theo nguyên tắc quyền tối thiểu được khuyến nghị mạnh.",
+          "Bạn phải thông báo kịp thời khi có truy cập trái phép hoặc nghi ngờ lộ khóa. Chúng tôi có thể thực hiện biện pháp bảo vệ như xoay khóa, giới hạn lưu lượng hoặc yêu cầu xác minh bổ sung."
+        ]
+      },
+      "fees": {
+        "title": "Phí, thuế và thanh toán",
+        "paragraphs": [
+          "Gói trả phí, phí theo mức dùng và thuế (nếu có) được mô tả khi thanh toán, trên bảng điều khiển hoặc trong đơn hàng. Trừ khi nêu khác, phí không hoàn trừ khi pháp luật bắt buộc.",
+          "Không thanh toán có thể dẫn đến tạm ngưng hoặc chấm dứt quyền truy cập. Bạn chịu trách nhiệm cung cấp phương thức thanh toán hợp lệ và mọi phí ngân hàng hoặc phí mạng blockchain do bên thứ ba tính."
+        ]
+      },
+      "ip": {
+        "title": "Sở hữu trí tuệ",
+        "paragraphs": [
+          "Chúng tôi giữ mọi quyền đối với Nền tảng, tài liệu, nhãn hiệu và phần mềm/mô hình độc quyền, trừ quyền được cấp rõ ràng cho bạn.",
+          "Chúng tôi cấp cho bạn giấy phép hạn chế, không độc quyền, không chuyển nhượng trong thời gian đăng ký để gọi API và dùng tài liệu chỉ trong phạm vi cần thiết theo Điều khoản này. Bạn không được dịch ngược dịch vụ trừ khi pháp luật bắt buộc cho phép tương thích.",
+          "Bạn cấp cho chúng tôi giấy phép toàn cầu để lưu trữ, xử lý, truyền và hiển thị Nội dung của bạn trong phạm vi hợp lý để cung cấp và bảo vệ dịch vụ. Bạn cam đoan có đủ quyền để cấp giấy phép này."
+        ]
+      },
+      "data": {
+        "title": "Bảo vệ dữ liệu và quyền riêng tư",
+        "paragraphs": [
+          "Việc xử lý dữ liệu cá nhân được mô tả trong Chính sách quyền riêng tư và, khi có, điều khoản xử lý dữ liệu dành cho khách hàng doanh nghiệp. Bạn không gửi các loại dữ liệu nhạy cảm đặc biệt tới API trừ khi pháp luật và hợp đồng cho phép.",
+          "Chúng tôi có thể tạo nhật ký dịch vụ và chỉ số (gồm siêu dữ liệu yêu cầu và dấu vết lỗi) để vận hành, bảo mật và cải thiện Nền tảng. Thời gian lưu giữ theo chính sách và yêu cầu pháp luật."
+        ]
+      },
+      "warranties": {
+        "title": "Tuyên bố từ chối",
+        "paragraphs": [
+          "TRỪ KHI PHÁP LUẬT CẤM, NỀN TẢNG VÀ API ĐƯỢC CUNG CẤP \"NGUYÊN TRẠNG\" VÀ \"SẴN CÓ\" KHÔNG KÈM BẤT KỲ BẢO ĐẢM NÀO, DÙ RÕ RÀNG, NGẦM ĐỊNH HAY THEO LUẬT ĐỊNH, GỒM KHẢ NĂNG THƯƠNG MẠI, PHÙ HỢP MỤC ĐÍCH CỤ THỂ, QUYỀN SỞ HỮU VÀ KHÔNG XÂM PHẠM.",
+          "CHÚNG TÔI KHÔNG BẢO ĐẢM DỊCH VỤ KHÔNG GIÁN ĐOẠN, KHÔNG LỖI HOẶC KHÔNG CÓ THÀNH PHẦN GÂY HẠI. HỆ THỐNG AI VÀ BLOCKCHAIN CÓ BẤT ĐỊNH CỐ HỮU; BẠN CHỊU MỌI RỦI RO LIÊN QUAN."
+        ]
+      },
+      "liability": {
+        "title": "Giới hạn trách nhiệm",
+        "paragraphs": [
+          "TRONG PHẠM VI PHÁP LUẬT CHO PHÉP, KHÔNG BÊN NÀO CHỊU TRÁCH NHIỆM VỀ THIỆT HẠI GIÁN TIẾP, NGẪU NHIÊN, ĐẶC BIỆT, HẬU QUẢ HOẶC TRỪNG PHẠT, HOẶC MẤT LỢI NHUẬN, DỮ LIỆU, UY TÍN HOẶC CƠ HỘI KINH DOANH, KỂ CẢ KHI ĐÃ ĐƯỢC CẢNH BÁO.",
+          "TỔNG TRÁCH NHIỆM CỦA CHÚNG TÔI PHÁT SINH TỪ HOẶC LIÊN QUAN ĐẾN ĐIỀU KHOẢN HOẶC DỊCH VỤ KHÔNG VƯỢT QUÁ (A) SỐ TIỀN BẠN ĐÃ TRẢ CHO CHÚNG TÔI TRONG MƯỜI HAI (12) THÁNG TRƯỚC SỰ KIỆN GÂY RA TRÁCH NHIỆM, HOẶC (B) MỘT TRĂM ĐÔ LA MỸ (100 USD) NẾU BẠN CHƯA CÓ NGHĨA VỤ THANH TOÁN. NHIỀU KHIẾU NẠI KHÔNG LÀM TĂNG MỨC TRẦN NÀY. MỘT SỐ PHÁP LỆNH KHÔNG CHO PHÉP GIỚI HẠN NHẤT ĐỊNH; TRONG TRƯỜNG HỢP ĐÓ TRÁCH NHIỆM CỦA CHÚNG TÔI ĐƯỢC GIỚI HẠN Ở MỨC TỐI ĐA PHÁP LUẬT CHO PHÉP."
+        ]
+      },
+      "indemnity": {
+        "title": "Bồi thường",
+        "paragraphs": [
+          "Bạn sẽ bảo vệ và bồi thường cho chúng tôi và các công ty liên kết, cán bộ và nhân viên trước khiếu nại, thiệt hại và chi phí của bên thứ ba (gồm phí luật sư hợp lý) phát sinh từ Nội dung của bạn, sản phẩm của bạn, lạm dụng API hoặc vi phạm Điều khoản hoặc pháp luật áp dụng, trừ phần do hành vi cố ý nghiêm trọng của chúng tôi gây ra."
+        ]
+      },
+      "changes": {
+        "title": "Thay đổi Điều khoản",
+        "paragraphs": [
+          "Chúng tôi có thể cập nhật Điều khoản để phản ánh tính năng mới, yêu cầu pháp lý hoặc quản lý rủi ro. Chúng tôi sẽ đăng bản sửa đổi trên trang này và cập nhật ngày \"Cập nhật lần cuối\". Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ email hoặc biểu ngữ trên bảng điều khiển).",
+          "Tiếp tục sử dụng sau ngày hiệu lực của Điều khoản đã sửa đổi đồng nghĩa chấp nhận. Nếu không đồng ý, bạn phải ngừng sử dụng Nền tảng và hủy gói trả phí theo quy tắc thanh toán."
+        ]
+      },
+      "law": {
+        "title": "Luật áp dụng và tranh chấp",
+        "paragraphs": [
+          "Trừ khi quy định bắt buộc về bảo vệ người tiêu dùng tại quốc gia của bạn yêu cầu khác, Điều khoản này chịu sự điều chỉnh của pháp luật áp dụng cho bên vận hành unitoken.trade, không tính các nguyên tắc xung đột pháp luật dẫn tới áp dụng pháp luật nước khác.",
+          "Bạn đồng ý liên hệ chúng tôi trước để giải quyết tranh chấp không chính thức. Nếu không đạt, thẩm quyền và địa điểm độc quyền cho tố tụng thuộc tòa án có thẩm quyền tại nơi đăng ký hoạt động của bên vận hành, trừ khi pháp luật bắt buộc quy định diễn đàn khác đối với người tiêu dùng.",
+          "Công ước Liên Hợp Quốc về Hợp đồng Mua bán Hàng hóa Quốc tế không áp dụng."
+        ]
+      },
+      "contact": {
+        "title": "Liên hệ",
+        "paragraphs": [
+          "Về Điều khoản, thanh toán hoặc tuân thủ, vui lòng liên hệ admin@unitoken.trade. Tên pháp nhân và địa chỉ đăng ký có thể được cung cấp theo yêu cầu cho mục đích hợp đồng hoặc quy định."
+        ]
+      }
+    }
+  },
   "OverviewPage": {
     "title": "Bảng điều khiển",
     "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",
