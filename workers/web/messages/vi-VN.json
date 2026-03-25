@@ -606,6 +606,90 @@
       "view_docs": "Đọc tài liệu"
     }
   },
+  "CareersPage": {
+    "badge": "Gia nhập đội nền tảng API",
+    "title": "Cùng xây xương sống cho",
+    "title_gradient": "các tích hợp hiện đại",
+    "subtitle": "Chúng tôi vận hành unitoken.trade theo mô hình dịch vụ API: gateway ổn định, đo lường rõ ràng và tài liệu lấy nhà phát triển làm trung tâm. Hãy cùng chúng tôi phát triển hạ tầng mà đội khách hàng tin cậy mỗi ngày.",
+    "why": {
+      "title": "Vì sao chọn",
+      "title_gradient": "APIHub",
+      "subtitle": "Đội nhỏ nhưng tác động lớn — đúng tinh thần startup giai đoạn đầu trong lĩnh vực API.",
+      "impact": {
+        "title": "Công việc gắn sản phẩm",
+        "description": "Code của bạn chạm tới xác thực, hạn mức, quan sát hệ thống và hợp đồng API đối ngoại — không chỉ công cụ nội bộ."
+      },
+      "ownership": {
+        "title": "Trách nhiệm trọn vẹn",
+        "description": "Thiết kế, triển khai và vận hành những gì bạn xây. On-call nhẹ nhưng thật; ưu tiên tự động hóa trước."
+      },
+      "stack": {
+        "title": "Stack hiện đại",
+        "description": "Dịch vụ cloud-native, type chặt, metric đầy đủ và tài liệu luôn đồng bộ với API thực tế."
+      }
+    },
+    "roles_section": {
+      "title": "Vị trí",
+      "title_gradient": "đang tuyển",
+      "subtitle": "Định biên phù hợp giai đoạn đầu startup: một core team gọn, có chỗ mở rộng khi lưu lượng tăng.",
+      "team_total": "Khoảng 4–5 người trên các vị trí này ở giai đoạn một"
+    },
+    "jobs": {
+      "api_engineer": {
+        "title": "Kỹ sư Backend / API",
+        "headcount": "2 vị trí",
+        "employment": "Toàn thời gian",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Thiết kế và triển khai API production: phiên bản, xác thực, rate limit, đo lường và mô hình lỗi nhất quán. Bạn phối hợp chặt về hành vi gateway và dữ liệu usage trên dashboard.",
+        "responsibilities": [
+          "Chịu trách nhiệm bề mặt REST/JSON (và mở rộng sau này) với quy tắc ngừng hỗ trợ và tương thích rõ ràng.",
+          "Triển khai luồng request bền bỉ, idempotency khi cần và quan sát (trace, metric, log có cấu trúc).",
+          "Phối hợp platform về rollout, feature flag và tiến hóa schema an toàn.",
+          "Rà soát tích hợp và tối ưu hiệu năng dưới tải thực tế của khách hàng."
+        ],
+        "apply_label": "Ứng tuyển vị trí này",
+        "apply_subject": "Ứng tuyển — Kỹ sư Backend / API"
+      },
+      "devops": {
+        "title": "Kỹ sư DevOps / Nền tảng",
+        "headcount": "1 vị trí",
+        "employment": "Toàn thời gian",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Giữ mặt API ổn định: CI/CD, môi trường, secret, dung lượng và công cụ xử lý sự cố. Bạn quan tâm SLO, không chỉ máy chủ.",
+        "responsibilities": [
+          "Xây và duy trì pipeline, infrastructure-as-code và quy trình triển khai an toàn.",
+          "Vận hành giám sát, cảnh báo và runbook on-call phù hợp mục tiêu độ trễ và sẵn sàng của API.",
+          "Củng cố mạng, TLS và mô hình truy cập giữa các dịch vụ và gateway công khai.",
+          "Cải thiện hiển thị chi phí và hiệu năng khi traffic tăng."
+        ],
+        "apply_label": "Ứng tuyển vị trí này",
+        "apply_subject": "Ứng tuyển — Kỹ sư DevOps / Nền tảng"
+      },
+      "dx": {
+        "title": "Kỹ sư Trải nghiệm nhà phát triển (DX)",
+        "headcount": "1 vị trí",
+        "employment": "Toàn thời gian",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Giúp tích hợp trở nên dễ dàng: tài liệu, ví dụ, luồng onboarding và truyền đạt kỹ thuật rõ ràng với đối tác. Bạn kết nối product, support và engineering.",
+        "responsibilities": [
+          "Chịu trách nhiệm tài liệu dev, quickstart và tham chiếu khớp với hành vi API thực tế.",
+          "Cung cấp mẫu code, Postman collection hoặc đoạn SDK để đội khách sao chép với độ tin cậy cao.",
+          "Thu thập phản hồi từ người tích hợp và chuyển thành cải tiến cụ thể.",
+          "Hỗ trợ hội thoại kỹ thuật với khách hàng đầu tiên và cộng đồng."
+        ],
+        "apply_label": "Ứng tuyển vị trí này",
+        "apply_subject": "Ứng tuyển — Kỹ sư Developer Experience"
+      }
+    },
+    "cta": {
+      "title": "Chưa thấy vị trí phù hợp?",
+      "title_gradient": "Vẫn cứ nhắn cho chúng tôi",
+      "subtitle": "Chúng tôi đọc từng tin. Hãy gửi chúng tôi, vài dòng về điều bạn muốn xây — chúng tôi sẽ liên hệ khi có cơ hội phù hợp.",
+      "apply_general": "Email tuyển dụng",
+      "apply_general_subject": "Ứng tuyển chung — APIHub / unitoken.trade",
+      "browse_docs": "Đọc tài liệu"
+    }
+  },
   "SupportPage": {
     "badge": "Hỗ trợ được hỗ trợ bởi AI",
     "title": "Chúng tôi có thể",

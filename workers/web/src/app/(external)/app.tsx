@@ -12,6 +12,7 @@ import { updateThemeMode, updateThemePreset } from "@/lib/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import About from "./pages/about";
+import Careers from "./pages/careers";
 import DocsApi from "./pages/docs/api";
 import DocsIndex from "./pages/docs/index";
 import DocsQuickstart from "./pages/docs/quickstart";
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/about" element={<About />} />
+          <Route path="/careers" element={<Careers />} />
           {/* <Route path="/auth" element={<Auth />} /> */}
           {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
           <Route path="/support" element={<Support />} />

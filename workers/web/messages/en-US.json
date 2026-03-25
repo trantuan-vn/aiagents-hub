@@ -606,6 +606,90 @@
       "view_docs": "Read the docs"
     }
   },
+  "CareersPage": {
+    "badge": "Join the API platform team",
+    "title": "Build the backbone of",
+    "title_gradient": "modern integrations",
+    "subtitle": "We operate unitoken.trade as a managed API business: reliable gateways, clear metering, and developer-first docs. Help us ship infrastructure other teams depend on every day.",
+    "why": {
+      "title": "Why",
+      "title_gradient": "APIHub",
+      "subtitle": "Small team, high leverage — typical of an early-stage API product company.",
+      "impact": {
+        "title": "Product-shaped work",
+        "description": "Your code touches authentication, quotas, observability, and customer-facing contracts — not internal-only tools."
+      },
+      "ownership": {
+        "title": "Ownership end-to-end",
+        "description": "Design, implement, and operate what you build. On-call is light but real; we automate first."
+      },
+      "stack": {
+        "title": "Modern stack",
+        "description": "Cloud-native services, strong typing, metrics everywhere, and docs that stay in sync with the API."
+      }
+    },
+    "roles_section": {
+      "title": "Open",
+      "title_gradient": "positions",
+      "subtitle": "Headcount sized for an early startup: a focused core team with room to grow as usage scales.",
+      "team_total": "~4–5 people across these roles in phase one"
+    },
+    "jobs": {
+      "api_engineer": {
+        "title": "Backend / API Engineer",
+        "headcount": "2 roles",
+        "employment": "Full-time",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Design and ship production APIs: versioning, auth, rate limits, metering, and consistent error models. You will collaborate closely on gateway behavior and dashboard-backed usage data.",
+        "responsibilities": [
+          "Own REST/JSON (and future) API surfaces with clear deprecation and compatibility rules.",
+          "Implement resilient request paths, idempotency where needed, and observability (traces, metrics, structured logs).",
+          "Partner with platform on rollout, feature flags, and safe schema evolution.",
+          "Review integrations and help tune performance under real customer load."
+        ],
+        "apply_label": "Apply for this role",
+        "apply_subject": "Application — Backend / API Engineer"
+      },
+      "devops": {
+        "title": "DevOps / Platform Engineer",
+        "headcount": "1 role",
+        "employment": "Full-time",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Keep our API edge reliable: CI/CD, environments, secrets, capacity, and incident tooling. You care about SLOs, not just servers.",
+        "responsibilities": [
+          "Build and maintain pipelines, infrastructure-as-code, and safe deployment practices.",
+          "Run monitoring, alerting, and on-call playbooks aligned with API latency and availability targets.",
+          "Harden networking, TLS, and access patterns between services and the public gateway.",
+          "Improve cost and performance visibility as traffic grows."
+        ],
+        "apply_label": "Apply for this role",
+        "apply_subject": "Application — DevOps / Platform Engineer"
+      },
+      "dx": {
+        "title": "Developer Experience (DX) Engineer",
+        "headcount": "1 role",
+        "employment": "Full-time",
+        "location": "Remote · Hybrid (GMT+7)",
+        "description": "Make integration effortless: documentation, examples, onboarding flows, and crisp communication with partners. You bridge product, support, and engineering.",
+        "responsibilities": [
+          "Own developer docs, quickstarts, and reference material that match real API behavior.",
+          "Produce code samples, Postman collections, or SDK snippets that teams can copy-paste with confidence.",
+          "Gather feedback from integrators and turn it into actionable improvements.",
+          "Support technical conversations with early customers and community channels."
+        ],
+        "apply_label": "Apply for this role",
+        "apply_subject": "Application — Developer Experience Engineer"
+      }
+    },
+    "cta": {
+      "title": "Don’t see a perfect fit?",
+      "title_gradient": "Say hello anyway",
+      "subtitle": "We read every message. Send us a few lines about what you want to build — we will reach out when there is a good fit.",
+      "apply_general": "Email admin",
+      "apply_general_subject": "General application — APIHub / unitoken.trade",
+      "browse_docs": "Read the docs"
+    }
+  },
   "SupportPage": {
     "badge": "AI-Powered Support",
     "title": "How Can We",
