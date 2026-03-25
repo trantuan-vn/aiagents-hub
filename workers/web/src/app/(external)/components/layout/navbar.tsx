@@ -90,6 +90,7 @@ export default function Navbar() {
   const navLinks = useMemo(
     () => [
       { name: t("home"), path: "/" },
+      { name: t("about"), path: "/about" },
       { name: t("packages"), path: "/packages" },
       { name: t("documentation"), path: "/docs" },
     ],

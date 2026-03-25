@@ -393,6 +393,7 @@
   },
   "Navbar": {
     "home": "Trang chủ",
+    "about": "Giới thiệu",
     "packages": "Gói dịch vụ",
     "documentation": "Tài liệu",
     "pricing": "Giá cả",
@@ -479,7 +480,7 @@
     "subtitle": "Chọn gói phù hợp với nhu cầu của bạn. Mở rộng hoặc thu nhỏ bất cứ lúc nào.",
     "free": "Miễn phí",
     "free_desc": "Hoàn hảo cho thử nghiệm và dự án nhỏ",
-    "basic": "Basic",
+    "basic": "Cơ bản",
     "basic_desc": "Dành cho doanh nghiệp và nhóm đang phát triển",
     "enterprise": "Chuyên nghiệp",
     "enterprise_desc": "Dành cho hoạt động quy mô lớn",
@@ -553,6 +554,56 @@
           "3": "Mở rộng cho CLAW tùy chỉnh"
         }
       }
+    }
+  },
+  "AboutPage": {
+    "badge": "Hạ tầng API",
+    "title": "Dành cho đội ngũ coi API là",
+    "title_gradient": "trọng tâm kinh doanh",
+    "subtitle": "APIHub vận hành unitoken.trade — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
+    "mission": {
+      "title": "Sứ mệnh của chúng tôi",
+      "lead": "Phần mềm hiện nay chạy trên API. Thanh toán, định danh, AI, tự động hóa — khi tầng API gặp sự cố, sản phẩm cũng vậy.",
+      "body": "Chúng tôi tập trung vào hiệu năng dự đoán được, mức sử dụng minh bạch và tài liệu bạn có thể tích hợp ngay từ ngày đầu. Dù bạn đang prototype hay vận hành lưu lượng production, nhiệm vụ của chúng tôi là vô hình ở những điểm quan trọng: thời gian hoạt động, độ trễ và niềm tin.",
+      "terminal": "GET /v1/health HTTP/1.1\nHost: api.unitoken.trade\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
+      "terminal_caption": "Phản hồi nhất quán trên nhiều khu vực — được giám sát 24/7"
+    },
+    "values_section": {
+      "title": "Điều chúng tôi tối ưu",
+      "title_gradient": "mỗi ngày",
+      "subtitle": "Các nguyên tắc định hình cách chúng tôi thiết kế endpoint, bảng điều khiển và hỗ trợ."
+    },
+    "values": {
+      "api_first": {
+        "title": "Ưu tiên API",
+        "description": "Sản phẩm và giá được xây quanh hợp đồng REST rõ ràng, phiên bản và chính sách ngừng hỗ trợ — không phải kế hoạch phụ."
+      },
+      "trust": {
+        "title": "Bảo mật & tuân thủ",
+        "description": "Mã hóa khi truyền, khóa theo nguyên tắc tối thiểu và kiểm soát thuận lợi cho kiểm toán để đáp ứng kỳ vọng nội bộ và quy định."
+      },
+      "developer": {
+        "title": "Trải nghiệm nhà phát triển",
+        "description": "Tài liệu kèm ví dụ chạy được, mã lỗi dự đoán được và công cụ rút ngắn đường từ lần gọi đầu tiên đến production."
+      },
+      "scale": {
+        "title": "Quy mô toàn cầu",
+        "description": "Định tuyến gần biên và quy hoạch dung lượng để đỉnh lưu lượng là biểu đồ đường, không phải câu chuyện sự cố."
+      }
+    },
+    "stats": {
+      "uptime": { "value": "99,9%", "label": "Mục tiêu SLA uptime" },
+      "latency": { "value": "<50ms", "label": "Độ trễ API điển hình" },
+      "regions": { "value": "50+", "label": "Điểm biên (edge)" },
+      "sla": { "value": "24/7", "label": "Giám sát & cảnh báo" }
+    },
+    "cta": {
+      "title": "Sẵn sàng tích hợp",
+      "title_gradient": "trong vài phút?",
+      "subtitle": "Tạo tài khoản, chọn gói và bắt đầu gọi endpoint production với mức sử dụng đo đếm được theo dõi trên bảng điều khiển.",
+      "get_started": "Bắt đầu",
+      "view_packages": "Xem gói dịch vụ",
+      "view_docs": "Đọc tài liệu"
     }
   },
   "SupportPage": {

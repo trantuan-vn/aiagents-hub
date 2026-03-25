@@ -9,8 +9,6 @@ const Footer = () => {
 
   const footerLinks = {
     [t("product")]: [
-      { name: t("features"), path: "/features" },
-      { name: t("pricing"), path: "/pricing" },
       { name: t("api_packages"), path: "/packages" },
       { name: t("documentation"), path: "/docs" },
     ],
@@ -22,7 +20,6 @@ const Footer = () => {
     ],
     [t("resources")]: [
       { name: t("support"), path: "/support" },
-      { name: t("status"), path: "/status" },
       { name: t("terms"), path: "/terms" },
     ],
     [t("developers")]: [

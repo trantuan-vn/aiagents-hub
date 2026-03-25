@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { updateThemeMode, updateThemePreset } from "@/lib/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import About from "./pages/about";
 import DocsApi from "./pages/docs/api";
 import DocsIndex from "./pages/docs/index";
 import DocsQuickstart from "./pages/docs/quickstart";
@@ -55,6 +56,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/packages" element={<Packages />} />
+          <Route path="/about" element={<About />} />
           {/* <Route path="/auth" element={<Auth />} /> */}
           {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
           <Route path="/support" element={<Support />} />

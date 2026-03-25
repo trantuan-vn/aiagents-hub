@@ -393,6 +393,7 @@
   },
   "Navbar": {
     "home": "Home",
+    "about": "About",
     "packages": "Packages",
     "documentation": "Documentation",
     "pricing": "Pricing",
@@ -553,6 +554,56 @@
           "3": "Extensible for custom CLAW implementations"
         }
       }
+    }
+  },
+  "AboutPage": {
+    "badge": "API infrastructure",
+    "title": "Built for teams who treat APIs as",
+    "title_gradient": "core business",
+    "subtitle": "APIHub powers unitoken.trade — a managed platform for reliable, metered API access. We help developers and enterprises ship faster with clear contracts, observability, and security baked in.",
+    "mission": {
+      "title": "Why we exist",
+      "lead": "Software today runs on APIs. Billing, identity, AI, automation — when the API layer fails, products fail.",
+      "body": "We focus on predictable performance, transparent usage, and documentation you can actually integrate from day one. Whether you are prototyping or running production traffic, our job is to stay invisible where it matters: uptime, latency, and trust.",
+      "terminal": "GET /v1/health HTTP/1.1\nHost: api.unitoken.trade\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
+      "terminal_caption": "Consistent responses across regions — monitored 24/7"
+    },
+    "values_section": {
+      "title": "What we optimize",
+      "title_gradient": "every day",
+      "subtitle": "Principles that shape how we design endpoints, dashboards, and support."
+    },
+    "values": {
+      "api_first": {
+        "title": "API-first delivery",
+        "description": "Products and pricing are built around clear REST contracts, versioning, and deprecation policies — not afterthoughts."
+      },
+      "trust": {
+        "title": "Security & compliance",
+        "description": "Encryption in transit, least-privilege keys, and audit-friendly controls so teams can meet internal and regulatory expectations."
+      },
+      "developer": {
+        "title": "Developer experience",
+        "description": "Docs with runnable examples, predictable error codes, and tooling that shortens the path from first call to production."
+      },
+      "scale": {
+        "title": "Global scale",
+        "description": "Edge-aware routing and capacity planning so spikes in traffic look like a line chart, not an outage story."
+      }
+    },
+    "stats": {
+      "uptime": { "value": "99.9%", "label": "Target uptime SLA" },
+      "latency": { "value": "<50ms", "label": "Typical API latency" },
+      "regions": { "value": "50+", "label": "Edge locations" },
+      "sla": { "value": "24/7", "label": "Monitoring & alerts" }
+    },
+    "cta": {
+      "title": "Ready to integrate",
+      "title_gradient": "in minutes?",
+      "subtitle": "Create an account, pick a package, and start calling production endpoints with metered usage you can track in the dashboard.",
+      "get_started": "Get started",
+      "view_packages": "View packages",
+      "view_docs": "Read the docs"
     }
   },
   "SupportPage": {
