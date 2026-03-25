@@ -619,6 +619,98 @@
       "view_docs": "Read the docs"
     }
   },
+  "CommunityPage": {
+    "badge": "Connect & build",
+    "title": "A community for teams shipping on",
+    "title_gradient": "unitoken.trade",
+    "subtitle": "Documentation, support, and clear paths into managed APIs, eKYC, and the dashboard—whether you are prototyping or running production traffic.",
+    "base_url_label": "Production base URL",
+    "steps": {
+      "title": "Start in",
+      "title_gradient": "three moves",
+      "subtitle": "The same flows our customers use—no guesswork.",
+      "1_title": "Create an account",
+      "1_desc": "Sign in to the dashboard to manage API keys, sessions, and wallet-linked identity.",
+      "2_title": "Choose a package",
+      "2_desc": "Pick metered access that matches your workloads—eKYC, CLAW, AI Vision, and more.",
+      "3_title": "Integrate & observe",
+      "3_desc": "Call api.unitoken.trade with Bearer tokens, track usage in the dashboard, and reach support when you need humans."
+    },
+    "paths": {
+      "title": "Where to go",
+      "title_gradient": "next",
+      "subtitle": "Jump straight to the resources you need.",
+      "docs": {
+        "title": "Documentation",
+        "description": "Platform overview, guides, and how the pieces fit together."
+      },
+      "quickstart": {
+        "title": "Quickstart",
+        "description": "Ship your first requests against the production API."
+      },
+      "api": {
+        "title": "eKYC API reference",
+        "description": "Endpoints, authentication, and runnable examples."
+      },
+      "packages": {
+        "title": "Packages",
+        "description": "Plans, features, and clear metering for every surface."
+      },
+      "support": {
+        "title": "Support",
+        "description": "Help center and structured paths for incidents."
+      },
+      "contact": {
+        "title": "Contact",
+        "description": "Partnerships, integrations, and billing questions."
+      },
+      "blog": {
+        "title": "Blog",
+        "description": "Notes on eKYC, CLAW, and platform updates."
+      },
+      "careers": {
+        "title": "Careers",
+        "description": "Join the team building the managed API platform."
+      }
+    },
+    "ecosystem": {
+      "title": "Aligned with",
+      "title_gradient": "live services",
+      "subtitle": "Every block below maps to something you can run on the platform today.",
+      "managed": {
+        "title": "Managed API gateway",
+        "description": "Stable endpoints, predictable errors, and metered usage across regions."
+      },
+      "ekyc": {
+        "title": "eKYC & identity",
+        "description": "Identity flows built for compliance with audit-friendly controls."
+      },
+      "auth": {
+        "title": "Auth & wallet",
+        "description": "Sessions, API keys, SIWE, and passkeys—secured for dashboard and APIs."
+      },
+      "billing": {
+        "title": "Billing & payments",
+        "description": "Transparent plans and payment flows tied to measured usage."
+      },
+      "claw": {
+        "title": "CLAW & AI APIs",
+        "description": "Automation-ready surfaces for agents, CLAW variants, and multimodal workloads."
+      },
+      "observability": {
+        "title": "Analytics & monitoring",
+        "description": "Usage visibility, alerts, and health checks so production traffic stays trustworthy."
+      }
+    },
+    "cta": {
+      "title": "Ready to build",
+      "title_gradient": "with us?",
+      "subtitle": "Open the dashboard, read the docs, or email us—we route every message to the right owners.",
+      "get_started": "Open dashboard",
+      "view_docs": "Read documentation",
+      "contact": "Contact the team"
+    }
+  },
   "CareersPage": {
     "badge": "Join the API platform team",
     "title": "Build the backbone of",

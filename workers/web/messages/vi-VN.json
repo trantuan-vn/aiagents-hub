@@ -619,6 +619,98 @@
       "view_docs": "Đọc tài liệu"
     }
   },
+  "CommunityPage": {
+    "badge": "Kết nối & xây dựng",
+    "title": "Cộng đồng cho đội ngũ triển khai trên",
+    "title_gradient": "unitoken.trade",
+    "subtitle": "Tài liệu, hỗ trợ và lộ trình rõ ràng tới API được quản lý, eKYC và bảng điều khiển — dù bạn đang prototype hay vận hành production.",
+    "base_url_label": "Base URL production",
+    "steps": {
+      "title": "Bắt đầu trong",
+      "title_gradient": "ba bước",
+      "subtitle": "Cùng luồng mà khách hàng của chúng tôi dùng — không mơ hồ.",
+      "1_title": "Tạo tài khoản",
+      "1_desc": "Đăng nhập bảng điều khiển để quản lý API key, phiên và định danh gắn ví.",
+      "2_title": "Chọn gói dịch vụ",
+      "2_desc": "Chọn mức truy cập đo đếm phù hợp khối lượng — eKYC, CLAW, AI Vision và hơn thế.",
+      "3_title": "Tích hợp & quan sát",
+      "3_desc": "Gọi api.unitoken.trade với Bearer token, theo dõi mức dùng trên dashboard và liên hệ hỗ trợ khi cần."
+    },
+    "paths": {
+      "title": "Đi tiếp",
+      "title_gradient": "ở đâu",
+      "subtitle": "Vào đúng tài nguyên bạn cần, không vòng vo.",
+      "docs": {
+        "title": "Tài liệu",
+        "description": "Tổng quan nền tảng, hướng dẫn và cách các phần kết nối."
+      },
+      "quickstart": {
+        "title": "Quickstart",
+        "description": "Gửi request đầu tiên lên API production."
+      },
+      "api": {
+        "title": "Tham chiếu eKYC API",
+        "description": "Endpoint, xác thực và ví dụ chạy được."
+      },
+      "packages": {
+        "title": "Gói dịch vụ",
+        "description": "Gói, tính năng và đo đếm rõ ràng cho từng bề mặt."
+      },
+      "support": {
+        "title": "Hỗ trợ",
+        "description": "Trung tâm trợ giúp và luồng xử lý sự cố có cấu trúc."
+      },
+      "contact": {
+        "title": "Liên hệ",
+        "description": "Hợp tác, tích hợp và câu hỏi thanh toán."
+      },
+      "blog": {
+        "title": "Blog",
+        "description": "Ghi chú về eKYC, CLAW và cập nhật nền tảng."
+      },
+      "careers": {
+        "title": "Tuyển dụng",
+        "description": "Gia nhập đội xây nền tảng API được quản lý."
+      }
+    },
+    "ecosystem": {
+      "title": "Bám sát",
+      "title_gradient": "dịch vụ thật",
+      "subtitle": "Mỗi khối dưới đây tương ứng điều bạn có thể chạy trên nền tảng hôm nay.",
+      "managed": {
+        "title": "API gateway được quản lý",
+        "description": "Endpoint ổn định, lỗi dự đoán được và mức dùng đo đếm trên nhiều khu vực."
+      },
+      "ekyc": {
+        "title": "eKYC & định danh",
+        "description": "Luồng định danh phục vụ tuân thủ với kiểm soát thuận lợi cho kiểm toán."
+      },
+      "auth": {
+        "title": "Xác thực & ví",
+        "description": "Phiên, API key, SIWE và passkey — bảo vệ cho dashboard và API."
+      },
+      "billing": {
+        "title": "Thanh toán & billing",
+        "description": "Gói minh bạch và luồng thanh toán gắn với mức sử dụng đo được."
+      },
+      "claw": {
+        "title": "CLAW & API AI",
+        "description": "Bề mặt sẵn sàng tự động hóa cho agent, các biến thể CLAW và tải đa phương thức."
+      },
+      "observability": {
+        "title": "Phân tích & giám sát",
+        "description": "Khả năng quan sát mức dùng, cảnh báo và sức khỏe dịch vụ để tin cậy production."
+      }
+    },
+    "cta": {
+      "title": "Sẵn sàng",
+      "title_gradient": "cùng chúng tôi?",
+      "subtitle": "Mở dashboard, đọc tài liệu hoặc gửi email — chúng tôi chuyển mỗi tin nhắn đến đúng chủ sở hữu.",
+      "get_started": "Mở bảng điều khiển",
+      "view_docs": "Đọc tài liệu",
+      "contact": "Liên hệ đội ngũ"
+    }
+  },
   "CareersPage": {
     "badge": "Gia nhập đội nền tảng API",
     "title": "Cùng xây xương sống cho",

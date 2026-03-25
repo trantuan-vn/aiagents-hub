@@ -15,6 +15,7 @@ import About from "./pages/about";
 import Blog from "./pages/blog";
 import BlogPost from "./pages/blog-post";
 import Careers from "./pages/careers";
+import Community from "./pages/community";
 import Contact from "./pages/contact";
 import Cookies from "./pages/cookies";
 import DocsApi from "./pages/docs/api";
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/community" element={<Community />} />
           {/* <Route path="/auth" element={<Auth />} /> */}
           {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
           <Route path="/support" element={<Support />} />
