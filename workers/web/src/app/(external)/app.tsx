@@ -14,6 +14,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import About from "./pages/about";
 import Careers from "./pages/careers";
 import Contact from "./pages/contact";
+import Cookies from "./pages/cookies";
 import DocsApi from "./pages/docs/api";
 import DocsIndex from "./pages/docs/index";
 import DocsQuickstart from "./pages/docs/quickstart";
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/support" element={<Support />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
+          <Route path="/cookies" element={<Cookies />} />
           <Route path="/docs" element={<DocsIndex />} />
           <Route path="/docs/quickstart" element={<DocsQuickstart />} />
           <Route path="/docs/api" element={<DocsApi />} />

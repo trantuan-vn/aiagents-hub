@@ -995,7 +995,7 @@
         "paragraphs": [
           "Chúng tôi dùng cookie, bộ nhớ cục bộ và công nghệ tương tự cho phiên làm việc, bảo mật (ví dụ chống CSRF), tùy chọn (ngôn ngữ hoặc giao diện), và phân tích góp phần hiểu cách Nền tảng được dùng ở mức tổng hợp.",
           "Bạn có thể kiểm soát cookie qua cài đặt trình duyệt. Chặn cookie thiết yếu có thể ảnh hưởng đăng nhập hoặc tính năng bảo mật. Khi pháp luật yêu cầu, chúng tôi sẽ xin đồng ý trước khi dùng cookie không thiết yếu; cho đến lúc đó chỉ cookie cần thiết có thể chạy.",
-          "Chính sách cookie (nếu có tại /cookies) có thể mô tả nhóm và thời gian lưu chi tiết hơn. Nếu chưa có trang riêng, cookie thiết yếu và chức năng được dùng theo nhu cầu vận hành dịch vụ."
+          "Chính sách cookie tại /cookies mô tả nhóm, mục đích và thời gian lưu chi tiết hơn."
         ]
       },
       "sharing": {
@@ -1059,6 +1059,124 @@
         "title": "Liên hệ",
         "paragraphs": [
           "Về quyền riêng tư, yêu cầu bảo vệ dữ liệu hoặc thắc mắc về Chính sách, liên hệ admin@unitoken.trade. Bạn cũng có thể liên hệ cơ quan bảo vệ dữ liệu địa phương nếu cho rằng pháp luật áp dụng bị vi phạm."
+        ]
+      }
+    }
+  },
+  "CookiesPage": {
+    "badge": "Minh bạch",
+    "title": "Chính sách",
+    "title_gradient": "Cookie",
+    "subtitle": "Cách unitoken.trade và api.unitoken.trade dùng cookie và công nghệ tương tự cho xác thực, bảo mật, tính năng ví và tùy chọn giao diện. Trang này bổ sung Chính sách bảo mật và phản ánh cách chúng tôi xây dựng dịch vụ hiện tại.",
+    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "toc_title": "Trên trang này",
+    "toc_aria": "Các mục chính sách cookie",
+    "related_title": "Liên quan",
+    "related_privacy": "Chính sách bảo mật",
+    "related_terms": "Điều khoản dịch vụ",
+    "related_contact": "Liên hệ",
+    "inventory_footnote": "Tên cookie, thời hạn và cờ bảo mật có thể thay đổi khi cập nhật hệ thống; chúng tôi sẽ cập nhật trang này khi thay đổi trọng yếu. Cookie HttpOnly không đọc được bởi script trên trang.",
+    "cta_title": "Thắc mắc về cookie hoặc theo dõi?",
+    "cta_body": "Liên hệ để được giải đáp về luồng đăng nhập, yêu cầu doanh nghiệp hoặc bảo vệ dữ liệu.",
+    "cta_button": "Liên hệ",
+    "sections": {
+      "intro": {
+        "title": "Giới thiệu",
+        "paragraphs": [
+          "Chính sách Cookie này giải thích cách bên vận hành unitoken.trade và api.unitoken.trade (\"Nền tảng\", \"chúng tôi\") sử dụng cookie HTTP và bộ nhớ tương tự trên thiết bị của bạn khi dùng trang web, bảng điều khiển và API.",
+          "Bạn nên đọc cùng Chính sách bảo mật, mô tả rộng hơn về xử lý dữ liệu cá nhân. Khi nhắc tới \"cookie\", chúng tôi gồm cả công nghệ tương đương như local storage khi có vai trò tương tự, trừ khi nêu khác.",
+          "Chúng tôi hạn chế thu thập và chủ yếu dùng cookie thiết yếu cho bảo mật và phiên đăng nhập. Cookie không thiết yếu hoặc phân tích chỉ chạy khi phù hợp cấu hình sản phẩm và pháp luật áp dụng."
+        ]
+      },
+      "what_are_cookies": {
+        "title": "Cookie là gì",
+        "paragraphs": [
+          "Cookie là tệp văn bản nhỏ do máy chủ web đặt trên thiết bị của bạn. Cookie first-party do miền chúng tôi kiểm soát đặt (ví dụ unitoken.trade hoặc api.unitoken.trade). Cookie bên thứ ba có thể do dịch vụ nhúng hoặc nhà cung cấp đặt khi bạn dùng một số tính năng.",
+          "Cookie có thể theo phiên (xóa khi đóng trình duyệt) hoặc lưu lâu dài (đến khi hết hạn hoặc bạn xóa). Thuộc tính như HttpOnly, Secure và SameSite giới hạn cách cookie được truy cập và gửi giữa các trang."
+        ]
+      },
+      "purposes": {
+        "title": "Mục đích sử dụng",
+        "paragraphs": [
+          "Chúng tôi dùng cookie để: duy trì đăng nhập an toàn; bảo vệ tài khoản khỏi lạm dụng; hoàn tất OAuth, OTP và bắt tay kết nối ví; ghi nhớ tùy chọn giao diện khi lưu trong cookie; và vận hành chẩn đoán giúp Nền tảng ổn định.",
+          "Chúng tôi phân loại cookie thành thiết yếu (bắt buộc cho bảo mật và vận hành cơ bản), chức năng (cải thiện trải nghiệm, ví dụ trạng thái ví), và khi bật, phân tích (thống kê tổng hợp). Chúng tôi không dùng cookie để \"bán\" thông tin cá nhân theo nghĩa mô tả trong Chính sách bảo mật."
+        ]
+      },
+      "inventory": {
+        "title": "Danh mục cookie (first-party)",
+        "paragraphs": [
+          "Bảng dưới đây liệt kê cookie first-party mà lớp xác thực và ứng dụng thường đặt cho miền thuộc .unitoken.trade. Chúng được gửi kèm Secure và SameSite=Lax trừ khi tương thích ngược cần khác, và dùng miền đăng ký chung để đăng nhập hoạt động trên các subdomain."
+        ],
+        "headers": {
+          "name": "Tên",
+          "purpose": "Mục đích",
+          "duration": "Thời hạn điển hình",
+          "type": "Phân loại"
+        },
+        "items": [
+          {
+            "name": "sessionId",
+            "purpose": "Duy trì phiên đã xác thực với API sau đăng nhập; HttpOnly, không đọc được từ script.",
+            "duration": "Theo cấu hình phiên (vài giờ đến vài ngày, tùy cài đặt hệ thống)",
+            "type": "Thiết yếu"
+          },
+          {
+            "name": "preAuthSessionId",
+            "purpose": "Phiên ngắn cho chuyển hướng OAuth, xác minh OTP và luồng kết nối ví trước khi xác thực đầy đủ.",
+            "duration": "Tối đa khoảng 10 phút",
+            "type": "Thiết yếu"
+          },
+          {
+            "name": "didChallengeId",
+            "purpose": "Lưu mã thử thách liên kết DID (định danh phi tập trung) trong luồng định danh qua ví.",
+            "duration": "Tối đa khoảng 5 phút",
+            "type": "Thiết yếu"
+          },
+          {
+            "name": "token, refreshToken",
+            "purpose": "Token truy cập và làm mới kiểu cũ nếu vẫn dùng; được xóa khi chuyển hoàn toàn sang cookie phiên.",
+            "duration": "Cho đến khi xóa hoặc luân chuyển",
+            "type": "Thiết yếu (kế thừa)"
+          },
+          {
+            "name": "Wagmi storage (tên có thể khác)",
+            "purpose": "Duy trì trạng thái kết nối Web3 cho tính năng bảng điều khiển qua bộ nhớ cookie của Wagmi (WalletConnect và luồng liên quan).",
+            "duration": "Theo phiên hoặc theo cấu hình Wagmi trên trình duyệt",
+            "type": "Chức năng"
+          }
+        ]
+      },
+      "web3_ui": {
+        "title": "Ví, bảng điều khiển và tùy chọn",
+        "paragraphs": [
+          "Khi bạn kết nối ví, WalletConnect và nhà cung cấp chuỗi có thể đặt hoặc đọc thêm cookie hoặc bộ nhớ thiết bị để hoàn tất ghép nối, hiển thị trạng thái chuỗi hoặc đáp ứng yêu cầu bảo mật của họ. Dữ liệu đó xử lý theo chính sách riêng của họ.",
+          "Giao diện, ngôn ngữ hoặc bố cục có thể lưu trong cookie hoặc local storage tùy bề mặt (trang marketing so với bảng điều khiển). Chặn bộ nhớ chức năng có thể khiến tùy chọn không thiết yếu bị đặt lại mỗi lần truy cập."
+        ]
+      },
+      "third_party": {
+        "title": "Bên thứ ba và hạ tầng",
+        "paragraphs": [
+          "Hạ tầng của chúng tôi (ví dụ mạng biên và quan sát) có thể phát cookie hoặc định danh kỹ thuật cần cho cân tải, chống bot hoặc khả năng chịu lỗi. Bên xử lý thanh toán có thể đặt cookie khi bạn thanh toán trên trang của họ.",
+          "Chúng tôi không cố ý tải trình theo dõi quảng cáo bên thứ ba trên các bề mặt API hoặc bảng điều khiển cốt lõi để lập hồ sơ hành vi. Nếu giới thiệu cookie phân tích hoặc tiếp thị tùy chọn cần đồng ý tại khu vực của bạn, chúng tôi sẽ mô tả tại đây và cung cấp điều khiển khi cần."
+        ]
+      },
+      "control": {
+        "title": "Lựa chọn của bạn và cài đặt trình duyệt",
+        "paragraphs": [
+          "Bạn có thể xóa hoặc chặn cookie trong cài đặt trình duyệt. Chặn cookie thiết yếu sẽ khiến không đăng nhập được hoặc làm hỏng luồng nhạy cảm về bảo mật.",
+          "Công cụ từ chối quảng cáo theo hành vi thường không trọng tâm của nền tảng API; nếu bạn bật \"Do Not Track\" hoặc Global Privacy Control, chúng tôi tôn trọng tín hiệu khi hạ tầng hỗ trợ, nhưng một số tính năng vẫn cần cookie thiết yếu."
+        ]
+      },
+      "changes": {
+        "title": "Thay đổi Chính sách Cookie",
+        "paragraphs": [
+          "Chúng tôi có thể cập nhật trang này khi có tính năng mới, tích hợp đối tác hoặc yêu cầu pháp lý. Ngày \"Cập nhật lần cuối\" sẽ đổi khi có bản sửa. Thay đổi trọng yếu có thể được thông báo thêm qua bảng điều khiển hoặc email khi thích hợp."
+        ]
+      },
+      "contact": {
+        "title": "Liên hệ",
+        "paragraphs": [
+          "Thắc mắc về Chính sách Cookie hoặc công nghệ tương tự: admin@unitoken.trade."
         ]
       }
     }

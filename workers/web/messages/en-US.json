@@ -995,7 +995,7 @@
         "paragraphs": [
           "We use cookies, local storage, and similar technologies for session management, security (for example CSRF protection), preferences (such as language or theme), and analytics that help us understand how the Platform is used in aggregate.",
           "You can control cookies through your browser settings. Blocking strictly necessary cookies may affect login or security features. Where required, we will obtain consent before using non-essential cookies; until then, only necessary cookies may run.",
-          "Our Cookie Policy (if linked at /cookies) may describe categories and retention in more detail. If no separate page is published, essential and functional cookies are used as needed to operate the service."
+          "Our Cookie Policy at /cookies describes categories, purposes, and retention in more detail."
         ]
       },
       "sharing": {
@@ -1059,6 +1059,124 @@
         "title": "Contact",
         "paragraphs": [
           "For privacy questions, data protection requests, or concerns about this Policy, contact admin@unitoken.trade. You may also contact your local data protection authority if you believe applicable law has been violated."
+        ]
+      }
+    }
+  },
+  "CookiesPage": {
+    "badge": "Transparency",
+    "title": "Cookie",
+    "title_gradient": "Policy",
+    "subtitle": "How unitoken.trade and api.unitoken.trade use cookies and similar technologies for authentication, security, wallet features, and preferences. This page complements our Privacy Policy and reflects how our services are built today.",
+    "last_updated": "Last updated: March 25, 2025",
+    "toc_title": "On this page",
+    "toc_aria": "Cookie policy sections",
+    "related_title": "Related",
+    "related_privacy": "Privacy Policy",
+    "related_terms": "Terms of Service",
+    "related_contact": "Contact",
+    "inventory_footnote": "Cookie names, lifetimes, and security flags may be adjusted as we ship updates; we will update this page when changes are material. HttpOnly cookies are not readable by page scripts in the browser.",
+    "cta_title": "Questions about cookies or tracking?",
+    "cta_body": "Contact us for clarification on authentication flows, enterprise requirements, or data protection requests.",
+    "cta_button": "Contact us",
+    "sections": {
+      "intro": {
+        "title": "Introduction",
+        "paragraphs": [
+          "This Cookie Policy explains how the operator of unitoken.trade and api.unitoken.trade (the \"Platform\", \"we\", \"us\") uses HTTP cookies and similar storage on your device when you use our websites, dashboards, and APIs.",
+          "It should be read together with our Privacy Policy, which describes personal data processing more broadly. Where this page refers to \"cookies\", we include comparable technologies such as local storage when they serve a similar role, unless noted otherwise.",
+          "We minimize data collection and rely on strictly necessary cookies for core security and session management. Non-essential cookies or analytics run only where compatible with our product configuration and applicable law."
+        ]
+      },
+      "what_are_cookies": {
+        "title": "What cookies are",
+        "paragraphs": [
+          "Cookies are small text files placed on your device by a web server. First-party cookies are set by domains we control (for example unitoken.trade or api.unitoken.trade). Third-party cookies may be set by embedded services or providers when you use certain features.",
+          "Cookies can be session cookies (removed when you close the browser) or persistent cookies (stored until they expire or you delete them). Attributes such as HttpOnly, Secure, and SameSite help limit how cookies are accessed and sent across sites."
+        ]
+      },
+      "purposes": {
+        "title": "Why we use cookies",
+        "paragraphs": [
+          "We use cookies to: keep you signed in securely; protect accounts against abuse; complete OAuth, OTP, and wallet handshakes; remember UI preferences where we store them in cookies; and operate diagnostics that keep the Platform reliable.",
+          "We classify cookies as strictly necessary (required for security and basic operation), functional (improving experience, such as wallet state), and, where enabled, analytics (aggregate insight). We do not use cookies to sell personal information in the conventional sense described in our Privacy Policy."
+        ]
+      },
+      "inventory": {
+        "title": "Cookie inventory (first-party)",
+        "paragraphs": [
+          "The table below lists first-party cookies our authentication and application layers commonly set for domains under .unitoken.trade. They are sent with Secure and SameSite=Lax unless legacy compatibility requires otherwise, and use the shared registrable domain so sign-in works across subdomains."
+        ],
+        "headers": {
+          "name": "Name",
+          "purpose": "Purpose",
+          "duration": "Typical duration",
+          "type": "Category"
+        },
+        "items": [
+          {
+            "name": "sessionId",
+            "purpose": "Maintains your authenticated session with the API after login; HttpOnly, not accessible to scripts.",
+            "duration": "Per session configuration (hours to days, per system settings)",
+            "type": "Strictly necessary"
+          },
+          {
+            "name": "preAuthSessionId",
+            "purpose": "Short-lived session for OAuth redirects, OTP verification, and wallet connect flows before full authentication.",
+            "duration": "Up to ~10 minutes",
+            "type": "Strictly necessary"
+          },
+          {
+            "name": "didChallengeId",
+            "purpose": "Stores a decentralized identity (DID) linking challenge identifier during wallet-based identity flows.",
+            "duration": "Up to ~5 minutes",
+            "type": "Strictly necessary"
+          },
+          {
+            "name": "token, refreshToken",
+            "purpose": "Legacy access and refresh tokens where still in use; cleared when migrating fully to session-based cookies.",
+            "duration": "Until cleared or rotated",
+            "type": "Strictly necessary (legacy)"
+          },
+          {
+            "name": "Wagmi storage (name may vary)",
+            "purpose": "Persists Web3 wallet connection state for dashboard features using Wagmi cookie storage (WalletConnect and related flows).",
+            "duration": "Session or as configured by Wagmi in the browser",
+            "type": "Functional"
+          }
+        ]
+      },
+      "web3_ui": {
+        "title": "Wallet, dashboard, and preferences",
+        "paragraphs": [
+          "When you connect a wallet, WalletConnect and chain providers may set or read additional cookies or device storage to complete pairing, display chain state, or meet their security requirements. Those providers process data under their own policies.",
+          "Theme, language, or layout preferences may be stored in cookies or local storage depending on the surface (marketing site vs dashboard). Blocking functional storage may reset non-essential preferences on each visit."
+        ]
+      },
+      "third_party": {
+        "title": "Third-party and infrastructure",
+        "paragraphs": [
+          "Our infrastructure (for example edge networks and observability) may emit technical cookies or identifiers needed for load balancing, bot management, or resilience. Payment processors may set cookies when you complete checkout on their pages.",
+          "We do not intentionally load third-party advertising trackers on core API or dashboard surfaces for behavioral profiling. If we introduce optional analytics or marketing cookies that require consent in your region, we will describe them here and provide controls where required."
+        ]
+      },
+      "control": {
+        "title": "Your choices and browser controls",
+        "paragraphs": [
+          "You can delete or block cookies through your browser settings. Blocking strictly necessary cookies will prevent sign-in or may break security-sensitive flows.",
+          "Industry opt-out tools for interest-based ads are generally not central to our API platform; if you enable \"Do Not Track\" or Global Privacy Control, we treat those signals where our stack supports them, but some features may still require necessary cookies to function."
+        ]
+      },
+      "changes": {
+        "title": "Changes to this Cookie Policy",
+        "paragraphs": [
+          "We may update this page to reflect new features, partner integrations, or legal requirements. The \"Last updated\" date will change when we publish edits. Material changes may also be communicated through the dashboard or email when appropriate."
+        ]
+      },
+      "contact": {
+        "title": "Contact",
+        "paragraphs": [
+          "Questions about this Cookie Policy or similar technologies: admin@unitoken.trade."
         ]
       }
     }
