@@ -396,6 +396,7 @@
     "about": "About",
     "packages": "Packages",
     "documentation": "Documentation",
+    "contact": "Contact",
     "pricing": "Pricing",
     "resources": "Resources",
     "support": "Support",
@@ -689,6 +690,59 @@
       "apply_general_subject": "General application — APIHub / unitoken.trade",
       "browse_docs": "Read the docs"
     }
+  },
+  "ContactPage": {
+    "badge": "We’re here to help",
+    "title": "Talk to the",
+    "title_gradient": "APIHub team",
+    "subtitle": "Questions about billing, integration, or partnerships? Reach out — we route every message to the right people at unitoken.trade.",
+    "response_hint": "We usually reply within one business day.",
+    "cards": {
+      "copy": {
+        "title": "Copy our email",
+        "description": "One tap to copy — paste into your mail app anytime."
+      },
+      "support": {
+        "title": "Self‑serve help",
+        "description": "AI answers and FAQs for keys, limits, and plans.",
+        "action": "Open Support"
+      },
+      "docs": {
+        "title": "Documentation",
+        "description": "Quickstart, reference, and examples for api.unitoken.trade.",
+        "action": "Browse docs"
+      }
+    },
+    "form": {
+      "kicker": "Direct line",
+      "title": "Send a",
+      "title_gradient": "message",
+      "subtitle": "Tell us what you need — we’ll open your email client with everything filled in.",
+      "name_label": "Name",
+      "name_placeholder": "Your name",
+      "email_label": "Work email",
+      "email_placeholder": "you@company.com",
+      "topic_label": "Topic",
+      "message_label": "Message",
+      "message_placeholder": "What should we know? Include links or account details if relevant.",
+      "submit": "Open in email app",
+      "mailto_note": "Submitting opens your default mail app with a draft to admin@unitoken.trade. You can edit before sending."
+    },
+    "topics": {
+      "general": "General",
+      "billing": "Billing & plans",
+      "technical": "Technical / API",
+      "partnership": "Partnership",
+      "other": "Other"
+    },
+    "mailto_subject": "[{topic}] {name} — unitoken.trade contact",
+    "mailto_body_header": "From: {name} <{email}>",
+    "toast_opened": "Your mail app should open with a draft.",
+    "toast_copy": "Email copied to clipboard.",
+    "toast_copy_fail": "Could not copy — select the address manually.",
+    "validation_name": "Please enter your name.",
+    "validation_email": "Please enter a valid email address.",
+    "validation_message": "Please add a bit more detail (at least 8 characters)."
   },
   "SupportPage": {
     "badge": "AI-Powered Support",

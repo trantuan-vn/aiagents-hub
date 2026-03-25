@@ -93,6 +93,7 @@ export default function Navbar() {
       { name: t("about"), path: "/about" },
       { name: t("packages"), path: "/packages" },
       { name: t("documentation"), path: "/docs" },
+      { name: t("contact"), path: "/contact" },
     ],
     [t],
   );

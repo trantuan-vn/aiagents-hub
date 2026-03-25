@@ -396,6 +396,7 @@
     "about": "Giới thiệu",
     "packages": "Gói dịch vụ",
     "documentation": "Tài liệu",
+    "contact": "Liên hệ",
     "pricing": "Giá cả",
     "resources": "Tài nguyên",
     "support": "Hỗ trợ",
@@ -689,6 +690,59 @@
       "apply_general_subject": "Ứng tuyển chung — APIHub / unitoken.trade",
       "browse_docs": "Đọc tài liệu"
     }
+  },
+  "ContactPage": {
+    "badge": "Luôn sẵn sàng hỗ trợ",
+    "title": "Trao đổi với",
+    "title_gradient": "đội APIHub",
+    "subtitle": "Thắc mắc về thanh toán, tích hợp hay hợp tác? Hãy liên hệ — chúng tôi chuyển mỗi tin nhắn đến đúng người tại unitoken.trade.",
+    "response_hint": "Thường phản hồi trong một ngày làm việc.",
+    "cards": {
+      "copy": {
+        "title": "Sao chép email",
+        "description": "Một chạm để sao chép — dán vào ứng dụng mail bất cứ lúc nào."
+      },
+      "support": {
+        "title": "Tự phục vụ",
+        "description": "Trợ lý AI và FAQ về khóa API, giới hạn và gói dịch vụ.",
+        "action": "Mở Hỗ trợ"
+      },
+      "docs": {
+        "title": "Tài liệu",
+        "description": "Quickstart, tham chiếu và ví dụ cho api.unitoken.trade.",
+        "action": "Xem tài liệu"
+      }
+    },
+    "form": {
+      "kicker": "Kênh trực tiếp",
+      "title": "Gửi",
+      "title_gradient": "tin nhắn",
+      "subtitle": "Cho chúng tôi biết bạn cần gì — chúng tôi mở sẵn ứng dụng email với nội dung đã điền.",
+      "name_label": "Họ tên",
+      "name_placeholder": "Tên của bạn",
+      "email_label": "Email công việc",
+      "email_placeholder": "ban@congty.com",
+      "topic_label": "Chủ đề",
+      "message_label": "Nội dung",
+      "message_placeholder": "Bạn cần hỗ trợ điều gì? Có thể kèm link hoặc thông tin tài khoản nếu cần.",
+      "submit": "Mở trong ứng dụng mail",
+      "mailto_note": "Khi gửi, trình mail mặc định sẽ mở với bản nháp tới admin@unitoken.trade. Bạn có thể chỉnh sửa trước khi gửi."
+    },
+    "topics": {
+      "general": "Chung",
+      "billing": "Thanh toán & gói",
+      "technical": "Kỹ thuật / API",
+      "partnership": "Hợp tác",
+      "other": "Khác"
+    },
+    "mailto_subject": "[{topic}] {name} — liên hệ unitoken.trade",
+    "mailto_body_header": "Từ: {name} <{email}>",
+    "toast_opened": "Ứng dụng mail sẽ mở với bản nháp.",
+    "toast_copy": "Đã sao chép email.",
+    "toast_copy_fail": "Không sao chép được — hãy chọn địa chỉ thủ công.",
+    "validation_name": "Vui lòng nhập họ tên.",
+    "validation_email": "Vui lòng nhập địa chỉ email hợp lệ.",
+    "validation_message": "Vui lòng nhập thêm chi tiết (ít nhất 8 ký tự)."
   },
   "SupportPage": {
     "badge": "Hỗ trợ được hỗ trợ bởi AI",
