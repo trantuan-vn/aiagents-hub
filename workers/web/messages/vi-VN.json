@@ -941,6 +941,128 @@
       }
     }
   },
+  "PrivacyPage": {
+    "badge": "Tin cậy & minh bạch",
+    "title": "Chính sách",
+    "title_gradient": "bảo mật",
+    "subtitle": "Cách chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin cá nhân khi bạn dùng unitoken.trade, api.unitoken.trade và dịch vụ liên quan. Thông báo này được soạn thảo phù hợp với các kỳ vọng quốc tế phổ biến, gồm nguyên tắc minh bạch trong GDPR và các khung pháp lý tương tự.",
+    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "toc_title": "Trên trang này",
+    "toc_aria": "Các mục chính sách bảo mật",
+    "related_title": "Liên quan",
+    "related_terms": "Điều khoản dịch vụ",
+    "related_contact": "Liên hệ",
+    "cta_title": "Thắc mắc về quyền riêng tư hoặc dữ liệu của bạn?",
+    "cta_body": "Liên hệ để được giải đáp về bảo vệ dữ liệu, hợp đồng doanh nghiệp hoặc thực hiện quyền riêng tư của bạn.",
+    "cta_button": "Liên hệ",
+    "sections": {
+      "intro": {
+        "title": "Giới thiệu và phạm vi",
+        "paragraphs": [
+          "Chính sách bảo mật này (\"Chính sách\") mô tả cách bên vận hành unitoken.trade và api.unitoken.trade (gọi chung là \"Nền tảng\", \"chúng tôi\") xử lý thông tin cá nhân.",
+          "Chính sách áp dụng khi bạn truy cập trang web, tạo hoặc sử dụng tài khoản, mua hoặc dùng sản phẩm API, tương tác với bảng điều khiển hoặc tài liệu, xác thực bằng ví hoặc passkey khi được cung cấp, hoặc sử dụng dịch vụ của chúng tôi theo cách khác. Bạn nên đọc cùng Điều khoản dịch vụ và mọi thông báo riêng theo từng sản phẩm.",
+          "Chúng tôi có thể cập nhật Chính sách theo thời gian. Bản sửa đổi sẽ được đăng trên trang này và ngày \"Cập nhật lần cuối\" sẽ thay đổi. Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ qua email hoặc biểu ngữ trong sản phẩm)."
+        ]
+      },
+      "controller": {
+        "title": "Bên kiểm soát dữ liệu và liên hệ",
+        "paragraphs": [
+          "Bên kiểm soát dữ liệu chịu trách nhiệm về thông tin cá nhân trong Chính sách này là pháp nhân vận hành Nền tảng (gọi gọn là \"APIHub\" / \"Unitoken\"). Tên pháp nhân đầy đủ, địa chỉ đăng ký và mã số đăng ký có thể được cung cấp theo yêu cầu cho hóa đơn, hợp đồng hoặc mục đích quy định.",
+          "Đối với câu hỏi chung về quyền riêng tư và để thực hiện quyền của bạn khi pháp luật cho phép, liên hệ admin@unitoken.trade. Đối với sự cố bảo mật liên quan đến thông tin đăng nhập hoặc truy cập trái phép nghi ngờ, hãy liên hệ kịp thời kèm chi tiết liên quan để chúng tôi xử lý hiệu quả."
+        ]
+      },
+      "collection": {
+        "title": "Các loại thông tin chúng tôi thu thập",
+        "paragraphs": [
+          "Dữ liệu tài khoản và định danh: ví dụ họ tên, email, tổ chức, tên người dùng hoặc mã người dùng, các yếu tố xác thực bạn bật (ví dụ TOTP, passkey hoặc định danh đăng nhập mạng xã hội đã liên kết), và tùy chọn trong hồ sơ.",
+          "Dữ liệu sử dụng và kỹ thuật: ví dụ địa chỉ IP, vị trí gần đúng suy ra từ IP, loại thiết bị và trình duyệt, mốc thời gian, trang hoặc endpoint truy cập, siêu dữ liệu yêu cầu API (ví dụ route, mã trạng thái, độ trễ, log lỗi), bản ghi đăng ký và đo lường, ticket hỗ trợ, và phân tích trong sản phẩm cần thiết để vận hành và cải thiện dịch vụ.",
+          "Dữ liệu thanh toán và hóa đơn: ví dụ thông tin liên hệ thanh toán, mã giao dịch, mã số thuế khi bắt buộc, và trạng thái thanh toán. Xử lý thẻ thanh toán có thể do đối tác thanh toán được chứng nhận thực hiện; chúng tôi thường chỉ nhận dữ liệu hóa đơn và xác nhận hạn chế thay vì số thẻ đầy đủ.",
+          "Thông tin liên lạc: nội dung bạn gửi (email, biểu mẫu liên hệ, hoặc bản ghi chat) và hồ sơ cần để trả lời và chứng minh tuân thủ.",
+          "Dữ liệu liên quan blockchain và ví: khi bạn kết nối ví hoặc dùng tính năng on-chain, chúng tôi có thể xử lý địa chỉ ví công khai, mã nhận dạng chuỗi, và tham chiếu giao dịch hoặc chứng thực cần cho tính năng. Dữ liệu on-chain công khai vốn hiển thị trên mạng mà chúng tôi không kiểm soát.",
+          "Cookie và công nghệ tương tự: được mô tả ở mục cookie bên dưới."
+        ]
+      },
+      "purposes": {
+        "title": "Mục đích và cơ sở pháp lý",
+        "paragraphs": [
+          "Chúng tôi xử lý thông tin cá nhân cho các mục đích như: cung cấp, bảo đảm an toàn và cải thiện Nền tảng; xác thực người dùng; đo lường và thanh toán; hỗ trợ khách hàng; phòng chống gian lận, phát hiện lạm dụng và giám sát bảo mật; tuân thủ nghĩa vụ pháp lý; và gửi thông báo liên quan dịch vụ.",
+          "Tùy ngữ cảnh và pháp luật áp dụng, chúng tôi dựa vào một hoặc nhiều cơ sở sau: thực hiện hợp đồng với bạn; lợi ích hợp pháp không bị quyền của bạn vượt trội (ví dụ bảo vệ hệ thống và hiểu dùng tổng hợp), khi được phép; tuân thủ nghĩa vụ pháp lý; và sự đồng ý khi bắt buộc (ví dụ cookie không thiết yếu hoặc tiếp thị, nếu được yêu cầu riêng).",
+          "Khi cơ sở là đồng ý, bạn có thể rút lại bất cứ lúc nào mà không ảnh hưởng tính hợp pháp của xử lý trước khi rút. Thông điệp tiếp thị, nếu có, sẽ có cách từ chối."
+        ]
+      },
+      "cookies": {
+        "title": "Cookie và công nghệ tương tự",
+        "paragraphs": [
+          "Chúng tôi dùng cookie, bộ nhớ cục bộ và công nghệ tương tự cho phiên làm việc, bảo mật (ví dụ chống CSRF), tùy chọn (ngôn ngữ hoặc giao diện), và phân tích góp phần hiểu cách Nền tảng được dùng ở mức tổng hợp.",
+          "Bạn có thể kiểm soát cookie qua cài đặt trình duyệt. Chặn cookie thiết yếu có thể ảnh hưởng đăng nhập hoặc tính năng bảo mật. Khi pháp luật yêu cầu, chúng tôi sẽ xin đồng ý trước khi dùng cookie không thiết yếu; cho đến lúc đó chỉ cookie cần thiết có thể chạy.",
+          "Chính sách cookie (nếu có tại /cookies) có thể mô tả nhóm và thời gian lưu chi tiết hơn. Nếu chưa có trang riêng, cookie thiết yếu và chức năng được dùng theo nhu cầu vận hành dịch vụ."
+        ]
+      },
+      "sharing": {
+        "title": "Tiết lộ và bên xử lý",
+        "paragraphs": [
+          "Chúng tôi không \"bán\" thông tin cá nhân của bạn theo nghĩa trao đổi lấy tiền truyền thống. Chúng tôi có thể chia sẻ với nhà cung cấp dịch vụ xử lý dữ liệu theo chỉ dẫn của chúng tôi (ví dụ lưu trữ đám mây, quan sát hệ thống, gửi email, thanh toán, công cụ hỗ trợ, và bảo mật).",
+          "Chúng tôi có thể tiết lộ khi pháp luật, quy định, tố tụng hoặc yêu cầu cơ quan nhà nước yêu cầu; để thực thi điều khoản hoặc bảo vệ quyền, an toàn và an ninh; hoặc trong sáp nhập, mua lại hoặc chuyển giao tài sản, kèm biện pháp bảo vệ và thông báo phù hợp khi cần.",
+          "Danh sách cập nhật các bên xử lý chính hoặc nhóm có thể được cung cấp trong bảng điều khiển, đơn đặt hàng, hoặc thỏa thuận xử lý dữ liệu doanh nghiệp khi áp dụng."
+        ]
+      },
+      "transfers": {
+        "title": "Chuyển giao quốc tế",
+        "paragraphs": [
+          "Chúng tôi có thể xử lý và lưu trữ thông tin tại quốc gia khác nơi bạn sinh sống, gồm nơi đặt hạ tầng và đối tác. Khi chuyển thông tin cá nhân từ Khu vực Kinh tế Châu Âu, Vương quốc Anh hoặc Thụy Sĩ sang quốc gia không có quyết định tương đương, chúng tôi áp dụng biện pháp bảo đảm thích hợp như Điều khoản hợp đồng chuẩn do Ủy ban Châu Âu phê duyệt (và tương đương UK/Thụy Sĩ khi liên quan) hoặc cơ chế chuyển giao hợp pháp khác.",
+          "Bạn có thể yêu cầu thêm thông tin về các biện pháp này bằng cách liên hệ admin@unitoken.trade."
+        ]
+      },
+      "retention": {
+        "title": "Lưu giữ",
+        "paragraphs": [
+          "Chúng tôi chỉ lưu thông tin cá nhân trong thời gian cần thiết cho các mục đích trong Chính sách, trừ khi pháp luật yêu cầu hoặc cho phép lâu hơn (ví dụ thuế, kế toán hoặc giải quyết tranh chấp).",
+          "Các yếu tố gồm bản chất dữ liệu, nhu cầu kinh doanh đang diễn ra (như gói đăng ký hoạt động), log bảo mật và xử lý sự cố với thời hạn giới hạn, và ẩn danh hoặc tổng hợp khi khả thi cho phân tích."
+        ]
+      },
+      "security": {
+        "title": "Bảo mật",
+        "paragraphs": [
+          "Chúng tôi áp dụng biện pháp kỹ thuật và tổ chức nhằm bảo vệ thông tin cá nhân khỏi truy cập trái phép, mất mát hoặc thay đổi. Các biện pháp có thể gồm mã hóa khi truyền, kiểm soát truy cập, nguyên tắc đặc quyền tối thiểu cho nhân sự và hệ thống, giám sát, và đánh giá nhà cung cấp.",
+          "Không phương thức truyền tải hay lưu trữ nào an toàn tuyệt đối. Bạn chịu trách nhiệm bảo vệ thông tin đăng nhập, khóa API và cụm từ khôi phục ví. Vui lòng báo sự cố nghi ngờ kịp thời."
+        ]
+      },
+      "rights": {
+        "title": "Quyền riêng tư của bạn",
+        "paragraphs": [
+          "Tùy nơi bạn cư trú, bạn có thể có quyền truy cập, chỉnh sửa, xóa hoặc xuất thông tin cá nhân; hạn chế hoặc phản đối một số xử lý; rút đồng ý khi xử lý dựa trên đồng ý; và khiếu nại với cơ quan giám sát bảo vệ dữ liệu.",
+          "Cư dân Khu vực Kinh tế Châu Âu, Vương quốc Anh và các khu vực tương tự có thể thực hiện các quyền này phù hợp ngoại lệ pháp luật. Chúng tôi phản hồi trong khung thời gian luật định, thường trong một tháng đối với yêu cầu GDPR (có thể gia hạn cho trường hợp phức tạp).",
+          "Nếu bạn cư trú tại California, bạn có thể có quyền theo CCPA/CPRA, gồm biết các loại thông tin thu thập, mục đích, nguồn, tiết lộ, và yêu cầu chỉnh sửa hoặc xóa phù hợp ngoại lệ. Chúng tôi không \"bán\" hoặc \"chia sẻ\" thông tin cá nhân theo định nghĩa CPRA về quảng cáo nhắm mục tiêu cho dịch vụ API cốt lõi mô tả tại đây; nếu thực hành thay đổi, chúng tôi sẽ cập nhật Chính sách và liên kết cần thiết.",
+          "Để gửi yêu cầu, email admin@unitoken.trade từ email tài khoản hoặc cung cấp thông tin để xác minh danh tính. Đại diện được ủy quyền có thể gửi yêu cầu khi pháp luật cho phép kèm chứng từ thích hợp."
+        ]
+      },
+      "children": {
+        "title": "Trẻ em",
+        "paragraphs": [
+          "Nền tảng không nhắm tới trẻ em dưới độ tuổi mà pháp luật địa phương yêu cầu đồng ý của cha mẹ đối với dịch vụ trực tuyến (thường là 13 hoặc 16). Chúng tôi không cố ý thu thập thông tin cá nhân của trẻ em. Nếu bạn cho rằng chúng tôi đã thu thập như vậy, hãy liên hệ để chúng tôi xóa phù hợp."
+        ]
+      },
+      "automated": {
+        "title": "Ra quyết định tự động",
+        "paragraphs": [
+          "Chúng tôi không đưa ra quyết định chỉ dựa trên xử lý tự động, gồm lập hồ sơ, gây hiệu lực pháp lý hoặc tương tự đáng kể đối với bạn, trừ khi pháp luật bắt buộc hoặc chúng tôi thông báo khác và cung cấp biện pháp bảo vệ thích hợp.",
+          "Một số hệ thống bảo mật, chống gian lật hoặc đo lường có thể dùng tín hiệu tự động (ví dụ giới hạn tốc độ hoặc điểm bất thường); đây thường là biện pháp vận hành thay vì quyết định hoàn toàn tự động về quyền pháp lý của bạn."
+        ]
+      },
+      "changes": {
+        "title": "Thay đổi Chính sách",
+        "paragraphs": [
+          "Chúng tôi có thể sửa đổi Chính sách để phản ánh thay đổi về thực tiễn, công nghệ hoặc yêu cầu pháp lý. Phiên bản cập nhật sẽ được đăng trên trang này với ngày \"Cập nhật lần cuối\" mới. Bạn nên xem lại định kỳ."
+        ]
+      },
+      "contact": {
+        "title": "Liên hệ",
+        "paragraphs": [
+          "Về quyền riêng tư, yêu cầu bảo vệ dữ liệu hoặc thắc mắc về Chính sách, liên hệ admin@unitoken.trade. Bạn cũng có thể liên hệ cơ quan bảo vệ dữ liệu địa phương nếu cho rằng pháp luật áp dụng bị vi phạm."
+        ]
+      }
+    }
+  },
   "OverviewPage": {
     "title": "Bảng điều khiển",
     "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",

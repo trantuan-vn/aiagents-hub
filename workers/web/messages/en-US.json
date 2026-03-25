@@ -941,6 +941,128 @@
       }
     }
   },
+  "PrivacyPage": {
+    "badge": "Trust & transparency",
+    "title": "Privacy",
+    "title_gradient": "Policy",
+    "subtitle": "How we collect, use, share, and protect personal information when you use unitoken.trade, api.unitoken.trade, and related services. This notice is designed to align with common international expectations, including transparency principles reflected in the GDPR and similar frameworks.",
+    "last_updated": "Last updated: March 25, 2025",
+    "toc_title": "On this page",
+    "toc_aria": "Privacy policy sections",
+    "related_title": "Related",
+    "related_terms": "Terms of Service",
+    "related_contact": "Contact",
+    "cta_title": "Questions about privacy or your data?",
+    "cta_body": "Reach out for data-protection questions, enterprise agreements, or to exercise your privacy rights.",
+    "cta_button": "Contact us",
+    "sections": {
+      "intro": {
+        "title": "Introduction and scope",
+        "paragraphs": [
+          "This Privacy Policy (\"Policy\") explains how the operator of unitoken.trade and api.unitoken.trade (collectively, the \"Platform\", \"we\", \"us\", or \"our\") handles personal information.",
+          "It applies when you visit our websites, create or use an account, purchase or use API products, interact with dashboards or documentation, authenticate with a wallet or passkey where offered, or otherwise engage with our services. It should be read together with our Terms of Service and any product-specific notices we provide.",
+          "We may update this Policy from time to time. We will post the revised version on this page and change the \"Last updated\" date. Where changes are material, we will provide additional notice when reasonable (for example by email or an in-product banner)."
+        ]
+      },
+      "controller": {
+        "title": "Data controller and contact",
+        "paragraphs": [
+          "The data controller responsible for personal information described in this Policy is the legal entity operating the Platform (referred to here as \"APIHub\" / \"Unitoken\" for convenience). Corporate name, registered address, and registration identifiers may be provided on request for contractual, invoicing, or regulatory purposes.",
+          "For general privacy inquiries and to exercise your rights where applicable, contact us at admin@unitoken.trade. For security incidents involving credentials or suspected unauthorized access, contact us promptly using the same channel and include relevant details so we can respond effectively."
+        ]
+      },
+      "collection": {
+        "title": "Categories of information we collect",
+        "paragraphs": [
+          "Account and identity data: such as name, email address, organization, username or user ID, authentication factors you enable (for example TOTP, passkeys, or linked social login identifiers), and preferences you set in your profile.",
+          "Usage and technical data: such as IP address, approximate location derived from IP, device and browser type, timestamps, pages or endpoints accessed, API request metadata (for example route, status codes, latency, error traces), subscription and metering records, support tickets, and in-product analytics needed to operate and improve the service.",
+          "Payment and billing data: such as billing contact details, transaction references, tax identifiers where required, and payment status. Payment card processing may be handled by certified payment partners; we typically receive limited billing and confirmation data rather than full card numbers.",
+          "Communications: content you send us (for example emails, contact forms, or chat transcripts) and records needed to respond and demonstrate compliance.",
+          "Blockchain- and wallet-related data: where you connect a wallet or use on-chain features, we may process public wallet addresses, chain identifiers, and transaction or attestation references as needed to provide those features. Public blockchain data is inherently visible on networks we do not control.",
+          "Cookies and similar technologies: described in the section on cookies below."
+        ]
+      },
+      "purposes": {
+        "title": "Purposes and legal bases",
+        "paragraphs": [
+          "We process personal information for purposes such as: providing, securing, and improving the Platform; authenticating users; metering and billing; customer support; fraud prevention, abuse detection, and security monitoring; complying with legal obligations; and communicating service-related notices.",
+          "Depending on the context and applicable law, we rely on one or more of the following legal bases: performance of a contract with you; legitimate interests that are not overridden by your rights (for example securing our systems and understanding aggregate usage), where permitted; compliance with legal obligations; and consent where required (for example certain non-essential cookies or marketing, where we ask for it separately).",
+          "Where consent is the basis, you may withdraw it at any time without affecting the lawfulness of processing before withdrawal. Marketing communications, if any, will include a way to opt out."
+        ]
+      },
+      "cookies": {
+        "title": "Cookies and similar technologies",
+        "paragraphs": [
+          "We use cookies, local storage, and similar technologies for session management, security (for example CSRF protection), preferences (such as language or theme), and analytics that help us understand how the Platform is used in aggregate.",
+          "You can control cookies through your browser settings. Blocking strictly necessary cookies may affect login or security features. Where required, we will obtain consent before using non-essential cookies; until then, only necessary cookies may run.",
+          "Our Cookie Policy (if linked at /cookies) may describe categories and retention in more detail. If no separate page is published, essential and functional cookies are used as needed to operate the service."
+        ]
+      },
+      "sharing": {
+        "title": "Disclosure and subprocessors",
+        "paragraphs": [
+          "We do not sell your personal information in the conventional sense of exchanging data for money. We may share information with service providers who process data on our instructions (for example cloud hosting, observability, email delivery, payment processing, customer support tooling, and security services).",
+          "We may disclose information if required by law, regulation, legal process, or governmental request; to enforce our terms or protect rights, safety, and security; or in connection with a merger, acquisition, or asset transfer, subject to appropriate safeguards and notice where required.",
+          "An up-to-date list of key subprocessors or categories may be provided in your dashboard, order form, or enterprise data processing agreement where applicable."
+        ]
+      },
+      "transfers": {
+        "title": "International transfers",
+        "paragraphs": [
+          "We may process and store information in countries other than where you live, including where our infrastructure and partners operate. When we transfer personal information from the European Economic Area, the United Kingdom, or Switzerland to countries not subject to an adequacy decision, we implement appropriate safeguards such as Standard Contractual Clauses approved by the European Commission (and UK/Swiss equivalents where relevant) or other lawful transfer mechanisms.",
+          "You may request more information about these safeguards by contacting us at admin@unitoken.trade."
+        ]
+      },
+      "retention": {
+        "title": "Retention",
+        "paragraphs": [
+          "We retain personal information only as long as necessary for the purposes described in this Policy, unless a longer period is required or permitted by law (for example tax, accounting, or dispute resolution).",
+          "Factors include the nature of the data, ongoing business needs (such as active subscriptions), security and troubleshooting logs with limited retention, and anonymization or aggregation where feasible for analytics."
+        ]
+      },
+      "security": {
+        "title": "Security",
+        "paragraphs": [
+          "We implement technical and organizational measures designed to protect personal information against unauthorized access, loss, or alteration. These may include encryption in transit, access controls, least-privilege practices for staff and systems, monitoring, and vendor assessments.",
+          "No method of transmission or storage is completely secure. You are responsible for safeguarding your credentials, API keys, and wallet seed phrases. Please report suspected incidents to us promptly."
+        ]
+      },
+      "rights": {
+        "title": "Your privacy rights",
+        "paragraphs": [
+          "Depending on your location, you may have rights to access, correct, delete, or export personal information; restrict or object to certain processing; withdraw consent where processing is consent-based; and lodge a complaint with a supervisory authority.",
+          "Residents of the European Economic Area, the United Kingdom, and similar jurisdictions can exercise these rights subject to applicable exceptions. We will respond within the timeframes required by law, typically within one month for GDPR requests (extensions may apply for complex requests).",
+          "If you are a California resident, you may have rights under the CCPA/CPRA, including to know categories of personal information collected, purposes, sources, disclosures, and to request correction or deletion subject to exceptions. We do not \"sell\" or \"share\" personal information as those terms are defined in the CPRA for targeted advertising in a way that requires opt-out of sale/sharing for the core API service described here; if our practices change, we will update this Policy and any required links.",
+          "To submit a request, email admin@unitoken.trade from your account email or provide information we can use to verify your identity. Authorized agents may submit requests where permitted by law with appropriate documentation."
+        ]
+      },
+      "children": {
+        "title": "Children",
+        "paragraphs": [
+          "The Platform is not directed at children under the age where parental consent is required for online services in their jurisdiction (often 13 or 16). We do not knowingly collect personal information from children. If you believe we have collected such information, contact us and we will take appropriate steps to delete it."
+        ]
+      },
+      "automated": {
+        "title": "Automated decision-making",
+        "paragraphs": [
+          "We do not make decisions based solely on automated processing, including profiling, that produce legal or similarly significant effects concerning you, unless we are required to do so by law or we notify you otherwise and offer suitable safeguards.",
+          "Some security, fraud-prevention, or metering systems may use automated signals (for example rate limits or anomaly scores); these are generally operational safeguards rather than solely automated decisions about your legal rights."
+        ]
+      },
+      "changes": {
+        "title": "Changes to this Policy",
+        "paragraphs": [
+          "We may revise this Policy to reflect changes in our practices, technologies, or legal requirements. The updated version will be posted on this page with a new \"Last updated\" date. We encourage you to review it periodically."
+        ]
+      },
+      "contact": {
+        "title": "Contact",
+        "paragraphs": [
+          "For privacy questions, data protection requests, or concerns about this Policy, contact admin@unitoken.trade. You may also contact your local data protection authority if you believe applicable law has been violated."
+        ]
+      }
+    }
+  },
   "OverviewPage": {
     "title": "Dashboard",
     "description": "Welcome back! Here's your API overview.",
