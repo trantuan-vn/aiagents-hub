@@ -593,10 +593,22 @@
       }
     },
     "stats": {
-      "uptime": { "value": "99,9%", "label": "Mục tiêu SLA uptime" },
-      "latency": { "value": "<50ms", "label": "Độ trễ API điển hình" },
-      "regions": { "value": "50+", "label": "Điểm biên (edge)" },
-      "sla": { "value": "24/7", "label": "Giám sát & cảnh báo" }
+      "uptime": {
+        "value": "99,9%",
+        "label": "Mục tiêu SLA uptime"
+      },
+      "latency": {
+        "value": "<50ms",
+        "label": "Độ trễ API điển hình"
+      },
+      "regions": {
+        "value": "50+",
+        "label": "Điểm biên (edge)"
+      },
+      "sla": {
+        "value": "24/7",
+        "label": "Giám sát & cảnh báo"
+      }
     },
     "cta": {
       "title": "Sẵn sàng tích hợp",
@@ -2065,8 +2077,6 @@
       "apply": "Áp dụng"
     },
     "orders": "Đơn hàng",
-    "tab_orders": "Đơn hàng",
-    "tab_history": "Lịch sử",
     "orders_description": "Danh sách tất cả đơn hàng của bạn",
     "no_orders": "Không tìm thấy đơn hàng. Tạo đơn hàng đầu tiên để bắt đầu.",
     "cancel_order_confirm_title": "Hủy đơn hàng?",
@@ -2186,5 +2196,87 @@
     "placeholder_api_key": "YOUR_API_KEY",
     "copy": "Sao chép",
     "copied": "Đã chép"
+  },
+  "BlogPage": {
+    "badge": "Sản phẩm & nền tảng",
+    "title": "Blog",
+    "title_gradient": "từ unitoken.trade",
+    "subtitle": "Ghi chú thực tiễn về triển khai eKYC qua API được quản lý hôm nay, và định hướng dịch vụ CLAW — dành cho đội kỹ thuật, sản phẩm và quản trị rủi ro.",
+    "author_display": "admin@unitoken.trade",
+    "byline": "Bài viết từ {author}",
+    "section_ekyc": "Dịch vụ eKYC",
+    "section_ekyc_sub": "Xác minh danh tính và luồng gắn với tuân thủ qua api.unitoken.trade — hợp đồng API, bảo mật và vận hành.",
+    "section_claw": "Dịch vụ CLAW",
+    "section_claw_sub": "Kết nối sắp tới cho OpenClaw, NanoClaw, NemoClaw, BizClaw và các stack tương thích — phục vụ agent và tự động hóa.",
+    "badge_upcoming": "Sắp ra mắt",
+    "min_read": "{count} phút đọc",
+    "read_more": "Đọc bài",
+    "back_to_blog": "Về danh sách blog",
+    "not_found_title": "Không tìm thấy bài viết",
+    "not_found_body": "URL này không khớp bài đã xuất bản. Hãy quay lại trang blog để xem các cập nhật eKYC và CLAW.",
+    "cta_lead": "Cần hỗ trợ tích hợp eKYC hoặc tham gia sớm CLAW? Chúng tôi chuyển mỗi tin nhắn đến đúng chủ sở hữu.",
+    "cta_contact": "Liên hệ",
+    "posts": {
+      "ekyc-how-we-deliver-identity-verification": {
+        "title": "Cách chúng tôi cung cấp eKYC như một dịch vụ được quản lý",
+        "excerpt": "Tóm tắt các giai đoạn xác minh, xử lý chứng cứ và cách giữ trải nghiệm ổn định cho bên tích hợp.",
+        "body": [
+          "eKYC (định danh điện tử) không còn là tùy chọn: đó là cổng vào cho onboarding chịu quy định, chi trả và các quy trình cần độ tin cậy cao. Tại unitoken.trade chúng tôi coi eKYC là một bề mặt sản phẩm với hợp đồng API rõ ràng, không phải dự án tích hợp một lần rồi bỏ.",
+          "Dịch vụ tách thu thập, xác minh và quyết định thành các bước được định nghĩa tốt. Ứng dụng của bạn có thể thu thập đồng ý và tài liệu một lần, trong khi pipeline áp dụng kiểm tra nhất quán, hỗ trợ rà soát có máy khi phù hợp, và kết quả có thể đối soát trong hệ thống của bạn.",
+          "Về vận hành, chúng tôi thiết kế để chịu lỗi: yêu cầu lũy đẳng (idempotent) khi cần, lỗi có cấu trúc ánh xạ tới bước khắc phục, và trạng thái hiển thị trên dashboard mà không bắt buộc ticket hỗ trợ. Mục tiêu là đội của bạn ra mắt nhanh hơn mà không đánh đổi sự rõ ràng với người dùng.",
+          "Khi đánh giá nhà cung cấp, hãy hỏi cách biểu diễn kết quả, giới hạn lưu giữ và cách phân quyền khóa. Chúng tôi công bố các kỳ vọng đó cùng endpoint để bộ phận tuân thủ và kỹ thuật xem cùng một bộ dữ kiện."
+        ]
+      },
+      "ekyc-api-contracts-for-international-rollouts": {
+        "title": "Hợp đồng API eKYC cho triển khai quốc tế",
+        "excerpt": "Phiên bản, scope và mô hình lỗi phù hợp cách các đội nghiêm túc triển khai xác minh danh tính xuyên khu vực.",
+        "body": [
+          "Triển khai quốc tế thất bại khi API mơ hồ. Chúng tôi phiên bản hóa tài nguyên có chủ đích, công bố thay đổi phá vỡ tương thích trước, và căn chỉnh xác thực với quyền tối thiểu để khóa sandbox không vô tình chạm dữ liệu production.",
+          "Payload ưu tiên trường rõ ràng hơn là enum quá tải. Khi quy tắc từng khu vực khác nhau, chúng tôi hiển thị cờ năng lực và loại giấy tờ được hỗ trợ để client phân nhánh mà không đoán hành vi máy chủ.",
+          "Lỗi ưu tiên đọc được bằng máy trước: mã ổn định, văn bản cho người sau. Đó là thông lệ phổ biến trên nền tảng đám mây — giữ mobile, web và server đồng bộ khi cần thử lại hoặc sửa phía người dùng.",
+          "Đối tác lộ trình theo giai đoạn nên bắt đầu với hồ sơ xác minh hẹp, đo chuyển đổi và độ trễ, rồi mở rộng phạm vi giấy tờ. Hợp đồng của chúng tôi được thiết kế để cùng bạn mở rộng mà không viết lại lõi tích hợp."
+        ]
+      },
+      "ekyc-data-minimization-retention-and-auditability": {
+        "title": "Tối thiểu hóa dữ liệu, lưu giữ và eKYC sẵn sàng kiểm toán",
+        "excerpt": "Vì sao chỉ thu thập phần cần cho xác minh, cách thông báo cửa sổ lưu giữ và điều kiểm toán thường xem xét.",
+        "body": [
+          "eKYC mạnh vừa là thứ bạn không lưu vừa là thứ bạn thu. Chúng tôi tối thiểu hóa dữ liệu theo mặc định: phần nhạy cảm được xử lý để xác minh, sau đó chỉ giữ khi chính sách hoặc quy định yêu cầu dấu vết kiểm toán giới hạn.",
+          "Lưu giữ không phải suy nghĩ sau. Khung thời gian được trình bày theo ngôn ngữ sản phẩm và phản ánh trong vận hành — bài đánh giá bảo mật của bạn phải thấy cùng câu chuyện mà kỹ sư triển khai. Khi khách hàng yêu cầu xóa, chúng tôi phối hợp theo thời hạn và bước xác minh áp dụng được.",
+          "Khả năng kiểm toán nghĩa là truy vết mà không lộ thừa. Truy cập chứng từ xác minh được ghi nhật ký, giới hạn theo vai trò và tương thích đánh giá định kỳ. Đó là nền tảng khi định danh chạm quy trình chịu quy định.",
+          "Nếu chương trình của bạn trải nhiều khu vực pháp lý, hãy kết hợp kiểm soát kỹ thuật của chúng tôi với đánh giá pháp lý của bạn. Chúng tôi cung cấp chi tiết vận hành; bên tư vấn ánh xạ tới luật địa phương — phân công phù hợp quy mô quốc tế."
+        ]
+      },
+      "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
+        "title": "CLAW trên unitoken.trade: lộ trình và khả năng sắp tới",
+        "excerpt": "Hướng phát triển — hỗ trợ đa biến thể, định tuyến và tích hợp hướng sự kiện cho hệ thống tự động nặng.",
+        "body": [
+          "CLAW là lớp kết nối sắp tới cho khối lượng agent và tự động hóa trên OpenClaw, NanoClaw, NemoClaw, BizClaw và các triển khai tương thích. Mục tiêu quen thuộc với đội nền tảng: tích hợp một lần, định tuyến thông minh và quan sát hành vi nhất quán.",
+          "Trên lộ trình sẽ có cấu hình riêng cho từng biến thể CLAW, phân tách rõ giữa gọi đồng bộ và tác vụ chạy lâu, cùng webhook phản ánh chuyển trạng thái đáng tin để điều phối phía sau.",
+          "Chúng tôi cũng siết trải nghiệm nhà phát triển: xác thực dự đoán được, thống nhất với phần còn lại của api.unitoken.trade, sandbox sát giới hạn production, và tài liệu đồng bộ với bề mặt API.",
+          "Không gì thay thế bài rà soát bảo mật của bạn — nội dung này bổ trợ. Khi gần phổ cập, chúng tôi sẽ công bố ghi chú migration, chính sách ngừng hỗ trợ và kênh hỗ trợ đối tác thiết kế."
+        ]
+      },
+      "claw-launch-what-partners-can-expect": {
+        "title": "Đối tác có thể kỳ vọng gì khi dịch vụ CLAW lên sóng",
+        "excerpt": "Mốc thời gian mức cao, ranh giới phạm vi và cách onboarding cho người dùng sớm.",
+        "body": [
+          "Đối tác nên kỳ vọng triển khai theo giai đoạn: xem trước riêng với SLA rõ ràng, rồi mở rộng khi chúng tôi xác nhận thông lượng, chế độ lỗi và quy trình vận hành. Ngày chuyển đổi sẽ được báo trước đủ để cập nhật runbook.",
+          "Phạm vi sẽ minh bạch. Mỗi cửa xem trước liệt kê biến thể CLAW được hỗ trợ, khu vực và rate limit. Tính năng thử nghiệm được gắn nhãn — chúng tôi không thăng cấp thầm hành vi mà tích hợp của bạn vẫn coi là tạm.",
+          "Onboarding sẽ giống cách chúng tôi đưa đối tác eKYC vào hệ thống hôm nay: liên hệ kỹ thuật, kênh chung cho sự cố, và tài liệu có ví dụ chạy được thay vì hứa hẹn trừu tượng.",
+          "Nếu bạn phụ thuộc CLAW cho tự động hóa đối mặt khách hàng, hãy vẽ miền lỗi ngay từ bây giờ — thử lại, khóa lũy đẳng và thông báo trễ cho người dùng. Nền tảng sẽ hỗ trợ quan sát; sản phẩm vẫn cần giải thích nhẹ nhàng khi chậm."
+        ]
+      },
+      "claw-integration-patterns-early-access": {
+        "title": "Mẫu tích hợp CLAW: lưu ý khi truy cập sớm",
+        "excerpt": "Worker xếp hàng, đăng ký sự kiện và chiến lược thử an toàn trước khi bật traffic production.",
+        "body": [
+          "Tích hợp CLAW giai đoạn đầu hưởng lợi từ cùng mẫu API trưởng thành: cách ly lệnh gọi ra sau hàng đợi nội bộ, giới hạn đồng thời, và ưu tiên đăng ký sự kiện thay vì poll khi có thể — giảm tải và đơn giản hóa phục hồi.",
+          "Trong bản xem trước, chúng tôi có thể bật header chẩn đoán hoặc trace id. Hãy dùng khi có, nhưng tránh phụ thuộc cứng cho đến khi được ghi trong tài liệu ổn định.",
+          "Kiểm thử nên phủ kịch bản sandbox có lỗi một phần. Tự động hóa chưa từng thấy timeout sẽ gây bất ngờ sau này. Chúng tôi sẽ công bố ma trận thử khuyến nghị cùng ví dụ tham chiếu.",
+          "Đội quan tâm có thể liên hệ qua admin@unitoken.trade kèm tóm tắt use case, quy mô dự kiến và khu vực. Chúng tôi ưu tiên đối tác có thể phản hồi có cấu trúc trong thời gian xem trước."
+        ]
+      }
+    }
   }
 }

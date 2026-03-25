@@ -593,10 +593,22 @@
       }
     },
     "stats": {
-      "uptime": { "value": "99.9%", "label": "Target uptime SLA" },
-      "latency": { "value": "<50ms", "label": "Typical API latency" },
-      "regions": { "value": "50+", "label": "Edge locations" },
-      "sla": { "value": "24/7", "label": "Monitoring & alerts" }
+      "uptime": {
+        "value": "99.9%",
+        "label": "Target uptime SLA"
+      },
+      "latency": {
+        "value": "<50ms",
+        "label": "Typical API latency"
+      },
+      "regions": {
+        "value": "50+",
+        "label": "Edge locations"
+      },
+      "sla": {
+        "value": "24/7",
+        "label": "Monitoring & alerts"
+      }
     },
     "cta": {
       "title": "Ready to integrate",
@@ -2065,8 +2077,6 @@
       "apply": "Apply"
     },
     "orders": "Orders",
-    "tab_orders": "Orders",
-    "tab_history": "History",
     "orders_description": "List of all your orders",
     "no_orders": "No orders found. Create your first order to get started.",
     "cancel_order_confirm_title": "Cancel Order?",
@@ -2186,5 +2196,87 @@
     "placeholder_api_key": "YOUR_API_KEY",
     "copy": "Copy",
     "copied": "Copied"
+  },
+  "BlogPage": {
+    "badge": "Product & platform",
+    "title": "Blog",
+    "title_gradient": "from unitoken.trade",
+    "subtitle": "Practical notes on delivering eKYC through our managed APIs today, and what is ahead for CLAW — written for engineering, product, and risk teams.",
+    "author_display": "admin@unitoken.trade",
+    "byline": "Editorial from {author}",
+    "section_ekyc": "eKYC services",
+    "section_ekyc_sub": "Identity verification and compliance-oriented flows served via api.unitoken.trade — contracts, security, and operations.",
+    "section_claw": "CLAW services",
+    "section_claw_sub": "Upcoming connectivity across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible stacks for agents and automation.",
+    "badge_upcoming": "Coming soon",
+    "min_read": "{count} min read",
+    "read_more": "Read article",
+    "back_to_blog": "Back to blog",
+    "not_found_title": "Article not found",
+    "not_found_body": "This URL does not match a published post. Use the blog index to browse eKYC and CLAW updates.",
+    "cta_lead": "Questions about eKYC integration or early CLAW access? Our team routes every message to the right owners.",
+    "cta_contact": "Contact us",
+    "posts": {
+      "ekyc-how-we-deliver-identity-verification": {
+        "title": "How we deliver eKYC as a managed service",
+        "excerpt": "A concise look at verification stages, evidence handling, and how we keep the experience predictable for integrators.",
+        "body": [
+          "Electronic Know Your Customer (eKYC) is no longer a nice-to-have: it is the front door for regulated onboarding, payouts, and high-trust workflows. At unitoken.trade we treat eKYC as a product surface with explicit API contracts, not a one-off integration project.",
+          "Our service separates capture, verification, and decisioning into well-defined steps. That means your application can collect user consent and documents once, while our pipeline applies consistent checks, machine-assisted review where appropriate, and auditable outcomes you can reconcile in your own systems.",
+          "Operationally, we design for resilience: idempotent requests where it matters, structured errors that map to remediation paths, and dashboards that reflect status without forcing support tickets. The goal is simple — your team ships faster without trading off clarity for customers.",
+          "If you are evaluating providers, ask how outcomes are represented, how retention is bounded, and how keys are scoped. We publish those expectations alongside our endpoints so compliance and engineering can review the same facts."
+        ]
+      },
+      "ekyc-api-contracts-for-international-rollouts": {
+        "title": "eKYC API contracts built for international rollouts",
+        "excerpt": "Versioning, scopes, and error models that match how serious teams ship identity checks across regions.",
+        "body": [
+          "International rollouts fail when APIs are ambiguous. We version resources deliberately, document breaking changes in advance, and align authentication with least-privilege scopes so a key used for sandbox cannot accidentally reach production data.",
+          "Payloads favor explicit fields over overloaded enums. Where regional rules differ, we expose capability flags and supported document types so your client can branch without guessing server behavior.",
+          "Errors are machine-readable first: stable codes, human text second. That pattern is standard among cloud platforms for a reason — it keeps mobile, web, and server clients aligned when something needs a retry or a user-facing correction.",
+          "For partners planning phased launches, we recommend starting with a narrow verification profile, measuring conversion and latency, then expanding document coverage. Our contracts are designed to grow with you without rewriting your core integration."
+        ]
+      },
+      "ekyc-data-minimization-retention-and-auditability": {
+        "title": "Data minimization, retention, and audit-ready eKYC",
+        "excerpt": "Why we collect only what verification requires, how retention windows are communicated, and what auditors typically review.",
+        "body": [
+          "Strong eKYC is as much about what you do not retain as what you collect. We apply data minimization by default: sensitive elements are processed for verification, then retained only where policy or regulation requires a limited audit trail.",
+          "Retention is not an afterthought. Windows are communicated in product terms and reflected operationally — your security reviews should see the same story our engineers implement. When customers request deletion workflows, we align responses with applicable timelines and verification steps.",
+          "Auditability means traceability without unnecessary exposure. Access to verification artifacts is logged, scoped to roles, and compatible with periodic reviews. That is the baseline teams expect when identity touches regulated flows.",
+          "If your program spans multiple jurisdictions, pair our technical controls with your legal assessment. We provide the operational detail; your counsel maps it to local rules — a division of labor that scales internationally."
+        ]
+      },
+      "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
+        "title": "CLAW on unitoken.trade: roadmap and upcoming capabilities",
+        "excerpt": "Where we are taking CLAW next — multi-variant support, routing, and event-driven integrations for automation-heavy stacks.",
+        "body": [
+          "CLAW is our upcoming connectivity layer for agent-style and automation workloads across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible implementations. The objective is familiar to platform teams: integrate once, route intelligently, and observe behavior consistently.",
+          "On the roadmap you will see first-class configuration per CLAW variant, clearer separation between synchronous calls and long-running tasks, and webhooks that reflect state transitions you can trust for downstream orchestration.",
+          "We are also tightening developer ergonomics: predictable authentication aligned with the rest of api.unitoken.trade, sandbox parity that mirrors production limits, and documentation that stays synchronized with the API surface.",
+          "Nothing here replaces your security review — it complements it. As we approach general availability, we will publish migration notes, deprecation policies, and support channels for design partners."
+        ]
+      },
+      "claw-launch-what-partners-can-expect": {
+        "title": "What partners can expect as CLAW services go live",
+        "excerpt": "Timelines at a high level, scope boundaries, and how onboarding will work for early adopters.",
+        "body": [
+          "Partners should expect a staged rollout: private previews with explicit SLAs, followed by broader access as we validate throughput, failure modes, and operational playbooks. We will communicate cutover dates with enough lead time for your runbooks.",
+          "Scope will be clear. Each preview window will list supported CLAW variants, regions, and rate limits. Features marked experimental will be labeled as such — we will not silently promote behavior that your integration depended on as provisional.",
+          "Onboarding will mirror how we onboard eKYC integrators today: technical contacts, a shared channel for incidents, and documentation that includes worked examples rather than abstract promises.",
+          "If you plan to depend on CLAW for customer-facing automation, start by mapping your failure domains now — retries, idempotency keys, and user-visible messaging. The platform will meet you with observability; your product must still explain delays kindly."
+        ]
+      },
+      "claw-integration-patterns-early-access": {
+        "title": "Integration patterns for CLAW: early access considerations",
+        "excerpt": "Queue-backed workers, event subscriptions, and safe testing strategies before you wire production traffic.",
+        "body": [
+          "Early CLAW integrations benefit from the same patterns that work for mature APIs: isolate outbound calls behind your own queue, cap concurrency, and subscribe to events instead of polling when possible — it reduces load and simplifies recovery.",
+          "In previews, we may expose additional diagnostic headers or trace identifiers. Use them while they exist, but avoid hard-coding reliance until those fields graduate to stable documentation.",
+          "Testing should span sandbox scenarios that include partial failures. Automation that never sees a timeout is automation that will surprise you later. We will publish recommended test matrices alongside reference implementations.",
+          "Interested teams can reach out via admin@unitoken.trade with a short summary of use case, expected volume, and regions. We prioritize partners who can share structured feedback during the preview window."
+        ]
+      }
+    }
   }
 }

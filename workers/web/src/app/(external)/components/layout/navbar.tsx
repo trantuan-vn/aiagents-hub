@@ -93,6 +93,7 @@ export default function Navbar() {
       { name: t("about"), path: "/about" },
       { name: t("packages"), path: "/packages" },
       { name: t("documentation"), path: "/docs" },
+      { name: t("blog"), path: "/blog" },
       { name: t("contact"), path: "/contact" },
     ],
     [t],
@@ -102,6 +103,9 @@ export default function Navbar() {
     () => (path: string) => {
       if (path === "/docs") {
         return location.pathname === "/docs" || location.pathname.startsWith("/docs/");
+      }
+      if (path === "/blog") {
+        return location.pathname === "/blog" || location.pathname.startsWith("/blog/");
       }
       return location.pathname === path;
     },

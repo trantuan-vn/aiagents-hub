@@ -12,6 +12,8 @@ import { updateThemeMode, updateThemePreset } from "@/lib/theme-utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import About from "./pages/about";
+import Blog from "./pages/blog";
+import BlogPost from "./pages/blog-post";
 import Careers from "./pages/careers";
 import Contact from "./pages/contact";
 import Cookies from "./pages/cookies";
@@ -62,6 +64,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/packages" element={<Packages />} />
           <Route path="/about" element={<About />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/careers" element={<Careers />} />
           <Route path="/contact" element={<Contact />} />
           {/* <Route path="/auth" element={<Auth />} /> */}
