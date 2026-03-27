@@ -8,7 +8,10 @@
   },
   "main": "dist/src/index.js",
   "dependencies": {
+    "@ai-sdk/provider": "^3.0.8",
+    "@simplewebauthn/server": "^10.0.0",
     "@tsndr/cloudflare-worker-jwt": "^3.1.7",
+    "ai": "^6.0.140",
     "crypto-js": "^4.2.0",
     "drizzle-orm": "^0.44.2",
     "hono": "^4.7.10",
@@ -16,8 +19,8 @@
     "reconnecting-websocket": "^4.4.0",
     "siwe": "^3.0.0",
     "viem": "^2.37.5",
-    "zod": "^3.25.32",
-    "@simplewebauthn/server": "^10.0.0"
+    "workers-ai-provider": "^3.1.8",
+    "zod": "^3.25.32"
   },
   "devDependencies": {
     "@types/crypto-js": "^4.2.2",

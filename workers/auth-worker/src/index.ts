@@ -26,6 +26,7 @@ import { createAskAiRoutes } from './features/dashboard/ask-ai/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
+export { AskAiMemoryDO } from './features/dashboard/ask-ai/AskAiMemoryDO';
 
 // I. CREATE ROUTES 
 function createRoutes(bindingName: string) {

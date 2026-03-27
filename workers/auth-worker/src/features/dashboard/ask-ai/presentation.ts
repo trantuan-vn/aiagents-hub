@@ -1,8 +1,15 @@
 import type { Context } from 'hono';
 import { Hono } from 'hono';
+import { generateText, stepCountIs } from 'ai';
+import { createWorkersAI } from 'workers-ai-provider';
+
 import { requireAuth } from '../../auth/authMiddleware';
 import { createWebsocketApplicationService } from '../../ws/application';
 import { handleError } from '../../../shared/utils';
+import { buildAskAiTools, type SuggestedNav } from './ask-ai-tools';
+import { loadEpisodic, persistEpisodic, summarizeLast10Messages } from './episodic-memory';
+import { scoreMessageImportance } from './importance';
+import { embedMessageText, querySemanticForPrompt, upsertSemanticIfWorthy } from './semantic-memory';
 
 async function notifyAskAiProgress(
   c: Context<{ Bindings: Env }>,
@@ -17,7 +24,7 @@ async function notifyAskAiProgress(
       title: '\u200b',
       body: undefined,
       data: {
-        channel: "ask-ai",
+        channel: 'ask-ai',
         requestId,
         stepId: step.id,
         label: step.label,
@@ -25,11 +32,11 @@ async function notifyAskAiProgress(
       },
     });
   } catch {
-    // Tiến trình là best-effort; không làm fail request chat
+    // best-effort
   }
 }
 
-/** Codebase context - đồng bộ với workers/web _data/codebase-context.ts */
+/** Codebase context — đồng bộ với workers/web _data/codebase-context.ts */
 const CODEBASE_CONTEXT = `## API Endpoints & Schemas
 
 ### Tạo đơn hàng: POST /dashboard/order/orders
@@ -64,6 +71,8 @@ Query: period?, limit?
 
 const SYSTEM_PROMPT = `Bạn là trợ lý AI của APIHub. Phản hồi NGẮN GỌN, ĐÚNG CẤU TRÚC. KHÔNG dừng giữa chừng.
 
+Bạn có thể gọi tools (search_semantic_memory, suggest_dashboard_navigation) khi cần. Sau khi xong mọi bước tool, phản hồi CUỐI CÙNG phải là ĐÚNG MỘT JSON thuần (không markdown), cùng format như dưới.
+
 Bối cảnh:
 ${CODEBASE_CONTEXT}
 
@@ -96,7 +105,43 @@ VÍ DỤ thống kê visitors:
 VÍ DỤ form logs:
 {"type":"form","content":"Lọc logs theo khoảng thời gian","payload":{"endpoint":"/dashboard/monitor/logs","method":"GET","schema":{"fields":[{"name":"dateFrom","type":"date","label":"Từ ngày","required":true},{"name":"dateTo","type":"date","label":"Đến ngày","required":true}]}}}
 
-Chỉ output JSON thuần, không \`\`\`json.`;
+Chỉ output JSON thuần cho bước cuối, không \\\`\\\`\\\`json.`;
+
+function extractJsonObject(raw: string): string | null {
+  const m = raw.match(/\{[\s\S]*\}/);
+  return m ? m[0] : null;
+}
+
+async function runLegacyChat(
+  ai: Ai,
+  userPrompt: string,
+): Promise<{ type: string; content: string; payload?: unknown }> {
+  const response = await ai.run(
+    '@cf/meta/llama-3.1-8b-instruct-fp8',
+    {
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: 2048,
+    },
+    { gateway: { id: 'unitoken' } },
+  );
+  const raw =
+    (response as { response?: string })?.response ??
+    (response as { result?: { response?: string } })?.result?.response ??
+    String(response);
+  let parsed: { type: string; content: string; payload?: unknown } = { type: 'text', content: raw, payload: null };
+  const j = extractJsonObject(raw);
+  if (j) {
+    try {
+      parsed = JSON.parse(j);
+    } catch {
+      parsed.content = raw;
+    }
+  }
+  return parsed;
+}
 
 export function createAskAiRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -122,9 +167,7 @@ export function createAskAiRoutes(bindingName: string) {
         return c.json({ error: 'AI not configured' }, 503);
       }
 
-      const userPrompt = history.length > 0
-        ? history.map((h: { role: string; content: string }) => `${h.role}: ${h.content}`).join('\n') + `\nuser: ${message}`
-        : message;
+      const userKey = user.identifier;
 
       await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
         id: 'receive',
@@ -132,18 +175,93 @@ export function createAskAiRoutes(bindingName: string) {
         status: 'done',
       });
       await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
-        id: 'infer',
-        label: 'Đang gọi mô hình AI…',
+        id: 'memory',
+        label: 'Đang tải bộ nhớ (episodic + semantic)…',
         status: 'running',
       });
 
-      const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        max_tokens: 2048,
-      }, { gateway: { id: "unitoken" } });
+      const episodic = await loadEpisodic(c.env, userKey);
+      let semanticBlock = '';
+      let userEmbedding: number[] | null = null;
+      try {
+        userEmbedding = await embedMessageText(ai, message);
+        semanticBlock = await querySemanticForPrompt(c.env, userKey, userEmbedding, Date.now());
+      } catch {
+        semanticBlock = '';
+      }
+
+      const importance = await scoreMessageImportance(ai, message).catch(() => 0.35);
+
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'memory',
+        label: 'Đã tải bộ nhớ',
+        status: 'done',
+      });
+
+      const memoryBlock = [
+        episodic.episodicSummary
+          ? `## Bộ nhớ sự kiện (tóm tắt tối đa 10 tin gần nhất)\n${episodic.episodicSummary}`
+          : '',
+        semanticBlock || '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const histMessages = (history ?? [])
+        .slice(-10)
+        .filter((h) => h.role === 'user' || h.role === 'assistant')
+        .map((h) => ({ role: h.role as 'user' | 'assistant', content: h.content }));
+
+      const suggestedNav: SuggestedNav[] = [];
+
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'infer',
+        label: 'Đang gọi mô hình AI (AI SDK + tools)…',
+        status: 'running',
+      });
+
+      const workersai = createWorkersAI({ binding: ai, gateway: { id: 'unitoken' } });
+      const model = workersai.chat('@cf/meta/llama-3.1-8b-instruct-fp8');
+      const tools = buildAskAiTools({ ai, env: c.env, userKey, suggestedNav });
+
+      let parsed: { type: string; content: string; payload?: unknown };
+      let rawOut: string;
+
+      try {
+        const result = await generateText({
+          model,
+          messages: [
+            {
+              role: 'system',
+              content: memoryBlock ? `${SYSTEM_PROMPT}\n\n${memoryBlock}` : SYSTEM_PROMPT,
+            },
+            ...histMessages,
+            { role: 'user', content: message },
+          ],
+          tools,
+          stopWhen: stepCountIs(10),
+          maxOutputTokens: 2048,
+        });
+        rawOut = result.text;
+        const j = extractJsonObject(rawOut);
+        if (j) {
+          try {
+            parsed = JSON.parse(j) as { type: string; content: string; payload?: unknown };
+          } catch {
+            parsed = { type: 'text', content: rawOut, payload: null };
+          }
+        } else {
+          parsed = { type: 'text', content: rawOut, payload: null };
+        }
+      } catch {
+        const userPrompt =
+          histMessages.length > 0
+            ? histMessages.map((h) => `${h.role}: ${h.content}`).join('\n') + `\nuser: ${message}`
+            : message;
+        const memPrefix = memoryBlock ? `${memoryBlock}\n\n` : '';
+        parsed = await runLegacyChat(ai, memPrefix + userPrompt);
+        rawOut = parsed.content;
+      }
 
       await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
         id: 'infer',
@@ -156,16 +274,28 @@ export function createAskAiRoutes(bindingName: string) {
         status: 'running',
       });
 
-      const raw = (response as { response?: string })?.response ?? (response as { result?: { response?: string } })?.result?.response ?? String(response);
-      let parsed: { type: string; content: string; payload?: unknown } = { type: 'text', content: raw, payload: null };
+      const now = Date.now();
+      const last10Lines = [...histMessages, { role: 'user' as const, content: message }, { role: 'assistant' as const, content: parsed.content ?? '' }]
+        .slice(-10)
+        .map((m, i) => ({
+          role: m.role,
+          content: m.content,
+          at: now - (10 - i) * 1000,
+        }));
+      const episodicSummary = await summarizeLast10Messages(ai, last10Lines.map(({ role, content }) => ({ role, content }))).catch(
+        () => episodic.episodicSummary,
+      );
+      await persistEpisodic(c.env, userKey, { episodicSummary, last10: last10Lines }).catch(() => {});
 
-      const jsonMatch = raw.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        try {
-          parsed = JSON.parse(jsonMatch[0]);
-        } catch {
-          parsed.content = raw;
-        }
+      if (userEmbedding) {
+        await upsertSemanticIfWorthy({
+          env: c.env,
+          ai,
+          userKey,
+          messageText: message,
+          importance,
+          embedding: userEmbedding,
+        }).catch(() => {});
       }
 
       await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
@@ -181,9 +311,10 @@ export function createAskAiRoutes(bindingName: string) {
 
       return c.json({
         type: parsed.type || 'text',
-        content: parsed.content || raw,
+        content: parsed.content || rawOut,
         payload: parsed.payload ?? null,
         requestId,
+        suggestedActions: suggestedNav.length > 0 ? suggestedNav : undefined,
       });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Ask AI failed');

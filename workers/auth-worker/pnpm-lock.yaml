@@ -8,18 +8,24 @@ importers:
 
   .:
     dependencies:
+      '@ai-sdk/provider':
+        specifier: ^3.0.8
+        version: 3.0.8
       '@simplewebauthn/server':
         specifier: ^10.0.0
         version: 10.0.1
       '@tsndr/cloudflare-worker-jwt':
         specifier: ^3.1.7
         version: 3.2.1
+      ai:
+        specifier: ^6.0.140
+        version: 6.0.140(zod@3.25.76)
       crypto-js:
         specifier: ^4.2.0
         version: 4.2.0
       drizzle-orm:
         specifier: ^0.44.2
-        version: 0.44.7
+        version: 0.44.7(@opentelemetry/api@1.9.0)
       hono:
         specifier: ^4.7.10
         version: 4.11.3
@@ -35,6 +41,9 @@ importers:
       viem:
         specifier: ^2.37.5
         version: 2.43.3(typescript@5.8.3)(zod@3.25.76)
+      workers-ai-provider:
+        specifier: ^3.1.8
+        version: 3.1.8(@ai-sdk/provider@3.0.8)(ai@6.0.140(zod@3.25.76))
       zod:
         specifier: ^3.25.32
         version: 3.25.76
@@ -59,6 +68,22 @@ packages:
 
   '@adraffy/ens-normalize@1.11.1':
     resolution: {integrity: sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==}
+
+  '@ai-sdk/gateway@3.0.82':
+    resolution: {integrity: sha512-ddB9FrkHZank1zyx13vypU0RrPjsXWj3NvlsrJ4yFQnrpR+xh48W4wO9ijndUueBsaADjlvMz2Ghv8yq5tZGCQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider-utils@4.0.21':
+    resolution: {integrity: sha512-MtFUYI1/8mgDvRmaBDjbLJPFFrMG777AvSgyIFQtZHIMzm88R/12vYBBpnk7pfiWLFE1DSZzY4WDYzGbKAcmiw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
+
+  '@ai-sdk/provider@3.0.8':
+    resolution: {integrity: sha512-oGMAgGoQdBXbZqNG0Ze56CHjDZ1IDYOwGYxYjO5KLSlz5HiNQ9udIXsPZ61VWaHGZ5XW/jyjmr6t2xz2jGVwbQ==}
+    engines: {node: '>=18'}
 
   '@cloudflare/kv-asset-handler@0.4.2':
     resolution: {integrity: sha512-SIOD2DxrRRwQ+jgzlXCqoEFiKOFqaPjhnNTGKXSRLvp1HiOvapLaFG2kEr9dYQTYe8rKrd9uvDUzmAITeNyaHQ==}
@@ -438,6 +463,10 @@ packages:
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
     engines: {node: ^14.21.3 || >=16}
 
+  '@opentelemetry/api@1.9.0':
+    resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
+    engines: {node: '>=8.0.0'}
+
   '@peculiar/asn1-android@2.6.0':
     resolution: {integrity: sha512-cBRCKtYPF7vJGN76/yG8VbxRcHLPF3HnkoHhKOZeHpoVtbMYfY9ROKtH3DtYUY9m8uI1Mh47PRhHf2hSK3xcSQ==}
 
@@ -501,6 +530,9 @@ packages:
   '@stablelib/wipe@1.0.1':
     resolution: {integrity: sha512-WfqfX/eXGiAd3RJe4VU2snh/ZPwtSjLG4ynQ/vYzvghTh7dHFcI1wl+nrkWG6lGhukOxOsUHfv8dUXr58D0ayg==}
 
+  '@standard-schema/spec@1.1.0':
+    resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
+
   '@tsndr/cloudflare-worker-jwt@3.2.1':
     resolution: {integrity: sha512-1AfDEgu7DTbU0sXDSOKh4D5t7+RJ0dIRRaDmoX3LFeW0AxQdunuqTQ7AVGwNJqOnxrbxiruyvX01cf9HHqEvXQ==}
 
@@ -512,6 +544,10 @@ packages:
 
   '@types/node@24.10.4':
     resolution: {integrity: sha512-vnDVpYPMzs4wunl27jHrfmwojOGKya0xyM3sH+UE5iv5uPS6vX7UIoh6m+vQc5LGBq52HBKPIn/zcSZVzeDEZg==}
+
+  '@vercel/oidc@3.1.0':
+    resolution: {integrity: sha512-Fw28YZpRnA3cAHHDlkt7xQHiJ0fcL+NRcIqsocZQUSmbzeIKRpwttJjik5ZGanXP+vlA4SbTg+AbA3bP363l+w==}
+    engines: {node: '>= 20'}
 
   abitype@1.2.3:
     resolution: {integrity: sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==}
@@ -526,6 +562,12 @@ packages:
 
   aes-js@4.0.0-beta.5:
     resolution: {integrity: sha512-G965FqalsNyrPqgEGON7nIx1e/OVENSgiEIzyC63haUMuvNnwIgIjMs52hlTCKhkBny7A2ORNlfY9Zu+jmGk1Q==}
+
+  ai@6.0.140:
+    resolution: {integrity: sha512-+jf6fQDPZe+gQlzPoP5mzy+DdfYOpE0cgUm99U8OxVTIPv19gCDuNzlKTZSntcQzLbo6LFXyNhJdV7XTWQ+5vA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   apg-js@4.4.0:
     resolution: {integrity: sha512-fefmXFknJmtgtNEXfPwZKYkMFX4Fyeyz+fNF6JWp87biGOPslJbCBVU158zvKRZfHBKnJDy8CMM40oLFGkXT8Q==}
@@ -682,6 +724,10 @@ packages:
   eventemitter3@5.0.1:
     resolution: {integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==}
 
+  eventsource-parser@3.0.6:
+    resolution: {integrity: sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg==}
+    engines: {node: '>=18.0.0'}
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -718,6 +764,9 @@ packages:
     resolution: {integrity: sha512-I1fSfDCZL5P0v33sVqeTDSpcstAg/N+wF5HS033mogOVIp4B+oHC7oOCsA3axAbBSGTJ8QubbNmnIRN/h8U7hg==}
     peerDependencies:
       ws: '*'
+
+  json-schema@0.4.0:
+    resolution: {integrity: sha512-es94M3nTIfsEPisRafak+HDLfHXnKBhV3vU5eqPcS3flIWqcxJWgXHXiey3YrpaNsanY5ei1VoYEbOzijuq9BA==}
 
   kleur@4.1.5:
     resolution: {integrity: sha512-o+NO+8WrRiQEE4/7nwRJhN1HWpVmJm511pBHUxPLtp0BUISzlBplORYSmTclCnJvQq2tKu/sgl3xVpkc7ZWuQQ==}
@@ -853,6 +902,12 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
+  workers-ai-provider@3.1.8:
+    resolution: {integrity: sha512-zVT4MeAKE+9XhrB2+jyhcsmCq/1klDcTr7uDkNnnz9RLOi7J86+RWXOuCdOPd/jOJmDFdbjj+n8PmQ7DyP/stA==}
+    peerDependencies:
+      '@ai-sdk/provider': ^3.0.0
+      ai: ^6.0.0
+
   wrangler@4.60.0:
     resolution: {integrity: sha512-n4kibm/xY0Qd5G2K/CbAQeVeOIlwPNVglmFjlDRCCYk3hZh8IggO/rg8AXt/vByK2Sxsugl5Z7yvgWxrUbmS6g==}
     engines: {node: '>=20.0.0'}
@@ -913,6 +968,24 @@ snapshots:
   '@adraffy/ens-normalize@1.10.1': {}
 
   '@adraffy/ens-normalize@1.11.1': {}
+
+  '@ai-sdk/gateway@3.0.82(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.21(zod@3.25.76)
+      '@vercel/oidc': 3.1.0
+      zod: 3.25.76
+
+  '@ai-sdk/provider-utils@4.0.21(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@standard-schema/spec': 1.1.0
+      eventsource-parser: 3.0.6
+      zod: 3.25.76
+
+  '@ai-sdk/provider@3.0.8':
+    dependencies:
+      json-schema: 0.4.0
 
   '@cloudflare/kv-asset-handler@0.4.2': {}
 
@@ -1147,6 +1220,8 @@ snapshots:
 
   '@noble/hashes@1.8.0': {}
 
+  '@opentelemetry/api@1.9.0': {}
+
   '@peculiar/asn1-android@2.6.0':
     dependencies:
       '@peculiar/asn1-schema': 2.6.0
@@ -1243,6 +1318,8 @@ snapshots:
 
   '@stablelib/wipe@1.0.1': {}
 
+  '@standard-schema/spec@1.1.0': {}
+
   '@tsndr/cloudflare-worker-jwt@3.2.1': {}
 
   '@types/crypto-js@4.2.2': {}
@@ -1255,12 +1332,22 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@vercel/oidc@3.1.0': {}
+
   abitype@1.2.3(typescript@5.8.3)(zod@3.25.76):
     optionalDependencies:
       typescript: 5.8.3
       zod: 3.25.76
 
   aes-js@4.0.0-beta.5: {}
+
+  ai@6.0.140(zod@3.25.76):
+    dependencies:
+      '@ai-sdk/gateway': 3.0.82(zod@3.25.76)
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.21(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      zod: 3.25.76
 
   apg-js@4.4.0: {}
 
@@ -1294,7 +1381,9 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
-  drizzle-orm@0.44.7: {}
+  drizzle-orm@0.44.7(@opentelemetry/api@1.9.0):
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
 
   dunder-proto@1.0.1:
     dependencies:
@@ -1356,6 +1445,8 @@ snapshots:
 
   eventemitter3@5.0.1: {}
 
+  eventsource-parser@3.0.6: {}
+
   fsevents@2.3.3:
     optional: true
 
@@ -1392,6 +1483,8 @@ snapshots:
   isows@1.0.7(ws@8.18.3):
     dependencies:
       ws: 8.18.3
+
+  json-schema@0.4.0: {}
 
   kleur@4.1.5: {}
 
@@ -1565,6 +1658,11 @@ snapshots:
       '@cloudflare/workerd-linux-64': 1.20260120.0
       '@cloudflare/workerd-linux-arm64': 1.20260120.0
       '@cloudflare/workerd-windows-64': 1.20260120.0
+
+  workers-ai-provider@3.1.8(@ai-sdk/provider@3.0.8)(ai@6.0.140(zod@3.25.76)):
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      ai: 6.0.140(zod@3.25.76)
 
   wrangler@4.60.0:
     dependencies:

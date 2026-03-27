@@ -6,6 +6,7 @@ import { Bot, Send, Sparkles } from "lucide-react";
 
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useWs } from "@/core/use-ws";
 
@@ -19,8 +20,23 @@ export interface ChatMessageData {
   content: string;
   type?: "text" | "form" | "table" | "chart" | "multidim";
   payload?: unknown;
+  /** Nút mở màn hình dashboard trong panel (từ tool AI + server). */
+  suggestedActions?: Array<{ label: string; path: string }>;
   timestamp: Date;
 }
+
+const QUICK_ACTIONS_MEMBER: Array<{ label: string; path: string }> = [
+  { label: "API Keys", path: "/dashboard/control/token" },
+  { label: "Đơn hàng", path: "/dashboard/control/billing" },
+  { label: "Logs", path: "/dashboard/monitor/logs" },
+  { label: "Analytics", path: "/dashboard/monitor/analytics" },
+];
+
+const QUICK_ACTIONS_ADMIN: Array<{ label: string; path: string }> = [
+  { label: "Default", path: "/dashboard/default" },
+  { label: "Finance", path: "/dashboard/finance" },
+  { label: "CRM", path: "/dashboard/crm" },
+];
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
 
@@ -28,6 +44,7 @@ export function AskAiChat() {
   const user = useDashboardUser();
   const [messages, setMessages] = React.useState<ChatMessageData[]>([]);
   const [input, setInput] = React.useState("");
+  const [panelPath, setPanelPath] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
   const [activitySteps, setActivitySteps] = React.useState<ActivityStep[]>([]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -111,6 +128,7 @@ export function AskAiChat() {
         content?: string;
         type?: string;
         payload?: unknown;
+        suggestedActions?: Array<{ label: string; path: string }>;
       };
       if (!res.ok) {
         throw new Error(data.error ?? "Request failed");
@@ -127,6 +145,7 @@ export function AskAiChat() {
         content: data.content ?? "Sorry, I couldn't process that.",
         type: msgType,
         payload: data.payload ?? null,
+        suggestedActions: Array.isArray(data.suggestedActions) ? data.suggestedActions : undefined,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMsg]);
@@ -156,6 +175,11 @@ export function AskAiChat() {
   };
 
   const wsReady = Boolean(user?.identifier);
+  const isAdmin = user?.role === "admin";
+  const quickActions = React.useMemo(
+    () => [...QUICK_ACTIONS_MEMBER, ...(isAdmin ? QUICK_ACTIONS_ADMIN : [])],
+    [isAdmin],
+  );
 
   return (
     <div className="from-background via-background to-muted/20 flex h-full min-h-0 w-full flex-col bg-gradient-to-b">
@@ -167,6 +191,20 @@ export function AskAiChat() {
           <div className="min-w-0">
             <h2 className="text-base font-semibold tracking-tight">Ask AI</h2>
             <p className="text-muted-foreground text-xs">Trợ lý tích hợp APIHub — đơn hàng, thống kê, logs, API keys</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {quickActions.map((a) => (
+                <Button
+                  key={a.path}
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full text-xs"
+                  onClick={() => setPanelPath(a.path)}
+                >
+                  {a.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -190,6 +228,7 @@ export function AskAiChat() {
                   key={msg.id}
                   message={msg}
                   onApiSuccess={(result) => setMessages((prev) => [...prev, result])}
+                  onOpenInPanel={(path) => setPanelPath(path)}
                 />
               ))}
               {isLoading && (
@@ -238,6 +277,27 @@ export function AskAiChat() {
           </div>
         </form>
       </div>
+
+      <Sheet open={Boolean(panelPath)} onOpenChange={(open) => !open && setPanelPath(null)}>
+        <SheetContent
+          side="right"
+          className="flex h-full max-h-screen w-full flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(100vw,720px)]"
+        >
+          <SheetHeader className="border-border shrink-0 border-b px-4 py-3">
+            <SheetTitle className="text-sm font-medium">Màn hình nhanh</SheetTitle>
+          </SheetHeader>
+          {panelPath ? (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <iframe
+                title="Dashboard panel"
+                src={panelPath}
+                className="border-border/60 h-full min-h-[min(70vh,800px)] w-full flex-1 border-0"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+              />
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
