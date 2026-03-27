@@ -137,7 +137,7 @@ export function createAskAiRoutes(bindingName: string) {
         status: 'running',
       });
 
-      const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fast', {
+      const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
