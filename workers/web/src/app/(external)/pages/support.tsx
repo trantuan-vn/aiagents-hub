@@ -228,13 +228,13 @@ const Support = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <a
-                    href="mailto:support@apihub.com"
+                    href="mailto:admin@unitoken.trade"
                     className="hover:bg-muted flex items-center gap-3 rounded-lg p-3 transition-colors"
                   >
                     <Mail className="text-primary h-5 w-5" />
                     <div>
                       <p className="text-sm font-medium">{t("need_help.email_support")}</p>
-                      <p className="text-muted-foreground text-xs">support@apihub.com</p>
+                      <p className="text-muted-foreground text-xs">admin@unitoken.trade</p>
                     </div>
                   </a>
                   <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">
@@ -259,7 +259,6 @@ const Support = () => {
                   {[
                     { name: t("resources.api_docs"), href: "/docs" },
                     { name: t("resources.getting_started"), href: "/docs/quickstart" },
-                    { name: t("resources.video_tutorials"), href: "/tutorials" },
                     { name: t("resources.developer_blog"), href: "/blog" },
                   ].map((resource) => (
                     <a
