@@ -21,7 +21,9 @@ function AssistantBlocks({ message, onApiSuccess }: ChatMessageProps) {
   return (
     <>
       {message.content && (
-        <p className="bg-muted rounded-lg px-3 py-2 text-sm whitespace-pre-wrap">{message.content}</p>
+        <p className="border-border/60 bg-card/90 text-foreground rounded-2xl border px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
+          {message.content}
+        </p>
       )}
       {message.type === "form" && message.payload && <MessageForm payload={message.payload} onSuccess={onApiSuccess} />}
       {message.type === "table" && message.payload && <MessageTable payload={message.payload} />}
@@ -35,18 +37,20 @@ export function ChatMessage({ message, onApiSuccess }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex items-start gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("group flex items-start gap-3", isUser && "flex-row-reverse")}>
       <div
         className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+          "flex size-9 shrink-0 items-center justify-center rounded-xl shadow-sm",
+          isUser ? "bg-primary text-primary-foreground" : "bg-primary/12 text-primary",
         )}
       >
         {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
       </div>
-      <div className={cn("flex max-w-[85%] min-w-0 flex-1 flex-col gap-2", isUser && "items-end")}>
+      <div className={cn("flex max-w-[min(85%,42rem)] min-w-0 flex-1 flex-col gap-2", isUser && "items-end")}>
         {isUser ? (
-          <p className="bg-muted rounded-lg px-3 py-2 text-sm">{message.content}</p>
+          <p className="bg-primary text-primary-foreground rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm">
+            {message.content}
+          </p>
         ) : (
           <AssistantBlocks message={message} onApiSuccess={onApiSuccess} />
         )}

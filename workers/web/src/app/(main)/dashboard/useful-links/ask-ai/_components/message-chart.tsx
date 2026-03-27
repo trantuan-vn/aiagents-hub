@@ -50,7 +50,9 @@ export function MessageChart({ payload }: { payload: ChartPayload }) {
           rawItems = (json.data ?? json.items ?? []) as unknown[];
         }
         const items: Array<Record<string, unknown>> = Array.isArray(rawItems)
-          ? rawItems.filter((r): r is Record<string, unknown> => r != null && typeof r === "object" && !Array.isArray(r))
+          ? rawItems.filter(
+              (r): r is Record<string, unknown> => r != null && typeof r === "object" && !Array.isArray(r),
+            )
           : [];
         setData(items);
       } catch (err) {

@@ -2,15 +2,16 @@
 
 import * as React from "react";
 
-import { Bot, Paperclip, Send } from "lucide-react";
+import { Bot, Send, Sparkles } from "lucide-react";
 
+import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useWs } from "@/core/use-ws";
 
-import { codebaseContext } from "../_data/codebase-context";
-
+import { AskAiInlineActivity } from "./ask-ai-inline-activity";
+import { mergeServerStep, type ActivityStep } from "./ask-ai-steps";
 import { ChatMessage } from "./chat-message";
-import { FeatureTree } from "./feature-tree";
 
 export interface ChatMessageData {
   id: string;
@@ -24,30 +25,73 @@ export interface ChatMessageData {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
 
 export function AskAiChat() {
+  const user = useDashboardUser();
   const [messages, setMessages] = React.useState<ChatMessageData[]>([]);
   const [input, setInput] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(false);
+  const [activitySteps, setActivitySteps] = React.useState<ActivityStep[]>([]);
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const inputRef = React.useRef<HTMLTextAreaElement>(null);
+  const wasLoadingRef = React.useRef(false);
+  const requestIdRef = React.useRef<string | null>(null);
+
+  const wsHandlers = React.useMemo(
+    () => ({
+      broadcast(data: unknown) {
+        if (typeof data !== "object" || data === null) return;
+        const o = data as {
+          data?: { channel?: string; requestId?: string; stepId?: string; label?: string; status?: string };
+        };
+        const d = o.data;
+        if (d?.channel !== "ask-ai" || d.requestId !== requestIdRef.current) return;
+        if (!d.stepId || !d.label) return;
+        setActivitySteps((prev) =>
+          mergeServerStep(prev, {
+            stepId: d.stepId!,
+            label: d.label!,
+            status: d.status ?? "running",
+          }),
+        );
+      },
+    }),
+    [],
+  );
+
+  useWs(user?.identifier ? { identifier: user.identifier } : null, wsHandlers);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages, activitySteps]);
 
-  const sendMessage = async (text: string, selectedFeatureId?: string) => {
+  React.useEffect(() => {
+    if (wasLoadingRef.current && !isLoading) {
+      window.requestAnimationFrame(() => {
+        inputRef.current?.focus({ preventScroll: true });
+      });
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  const sendMessage = async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || isLoading) return;
+
+    const requestId = crypto.randomUUID();
+    requestIdRef.current = requestId;
 
     const userMsg: ChatMessageData = {
       id: crypto.randomUUID(),
       role: "user",
-      content: selectedFeatureId
-        ? `[${codebaseContext.features.find((f) => f.id === selectedFeatureId)?.name}] ${trimmed}`
-        : trimmed,
+      content: trimmed,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsLoading(true);
+    setActivitySteps([
+      { id: "client", label: "Đã gửi tới máy chủ", status: "done", at: Date.now() },
+      { id: "receive", label: "Đang chờ xác nhận…", status: "running", at: Date.now() },
+    ]);
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }));
@@ -58,6 +102,7 @@ export function AskAiChat() {
         body: JSON.stringify({
           message: userMsg.content,
           history: history.slice(-10),
+          requestId,
         }),
       });
 
@@ -94,8 +139,14 @@ export function AskAiChat() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, errMsg]);
+      setActivitySteps((prev) =>
+        mergeServerStep(prev, { stepId: "error", label: "Có lỗi khi xử lý yêu cầu", status: "error" }),
+      );
     } finally {
       setIsLoading(false);
+      window.setTimeout(() => {
+        if (requestIdRef.current === requestId) requestIdRef.current = null;
+      }, 2500);
     }
   };
 
@@ -104,35 +155,36 @@ export function AskAiChat() {
     sendMessage(input);
   };
 
-  const handleFeatureSelect = (featureId: string) => {
-    const feature = codebaseContext.features.find((f) => f.id === featureId);
-    if (feature) {
-      setInput(feature.description);
-    }
-  };
+  const wsReady = Boolean(user?.identifier);
 
   return (
-    <div className="flex h-full w-full">
-      {/* Chat area - 70% */}
-      <div className="flex min-w-0 flex-[7] flex-col overflow-hidden">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+    <div className="from-background via-background to-muted/20 flex h-full min-h-0 w-full flex-col bg-gradient-to-b">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-start gap-3 border-b px-5 py-4">
+          <div className="bg-primary/15 flex size-9 shrink-0 items-center justify-center rounded-xl">
+            <Bot className="text-primary size-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold tracking-tight">Ask AI</h2>
+            <p className="text-muted-foreground text-xs">Trợ lý tích hợp APIHub — đơn hàng, thống kê, logs, API keys</p>
+          </div>
+        </header>
+
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-              <div className="bg-primary/10 rounded-full p-4">
-                <Bot className="text-primary size-10" />
+            <div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-4 py-12 text-center sm:py-20">
+              <div className="from-primary/20 to-primary/5 flex size-16 items-center justify-center rounded-2xl bg-gradient-to-br shadow-inner">
+                <Sparkles className="text-primary size-8" />
               </div>
-              <div>
-                <h2 className="text-lg font-semibold">Ask AI</h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Tôi có thể giúp bạn tạo đơn hàng, xem thống kê, logs, API keys và nhiều hơn nữa.
-                </p>
-                <p className="text-muted-foreground mt-2 text-xs">
-                  Thử: &quot;Tạo đơn hàng mới&quot; hoặc &quot;Xem thống kê doanh thu tháng này&quot;
+              <div className="space-y-2">
+                <p className="text-lg font-medium tracking-tight">Bắt đầu cuộc trò chuyện</p>
+                <p className="text-muted-foreground text-sm leading-relaxed">
+                  Mô tả ngắn gọn việc bạn cần — ví dụ tạo đơn, xem biểu đồ doanh thu, hoặc lọc logs theo ngày.
                 </p>
               </div>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="mx-auto flex max-w-3xl flex-col gap-6">
               {messages.map((msg) => (
                 <ChatMessage
                   key={msg.id}
@@ -142,13 +194,11 @@ export function AskAiChat() {
               ))}
               {isLoading && (
                 <div className="flex items-start gap-3">
-                  <div className="bg-primary/10 flex size-8 shrink-0 items-center justify-center rounded-full">
+                  <div className="bg-primary/12 flex size-9 shrink-0 items-center justify-center rounded-xl">
                     <Bot className="text-primary size-4" />
                   </div>
-                  <div className="flex gap-1 pt-1">
-                    <span className="bg-muted size-2 animate-bounce rounded-full" style={{ animationDelay: "0ms" }} />
-                    <span className="bg-muted size-2 animate-bounce rounded-full" style={{ animationDelay: "150ms" }} />
-                    <span className="bg-muted size-2 animate-bounce rounded-full" style={{ animationDelay: "300ms" }} />
+                  <div className="min-w-0 flex-1">
+                    <AskAiInlineActivity steps={activitySteps} wsConnected={wsReady} />
                   </div>
                 </div>
               )}
@@ -156,13 +206,17 @@ export function AskAiChat() {
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="border-t p-4">
-          <div className="flex gap-2">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-background/95 supports-[backdrop-filter]:bg-background/80 border-t p-4 backdrop-blur md:px-6"
+        >
+          <div className="mx-auto flex max-w-3xl gap-2">
             <Textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Nhập câu hỏi hoặc yêu cầu..."
-              className="max-h-32 min-h-[44px] resize-none"
+              placeholder="Nhập yêu cầu… (Enter gửi, Shift+Enter xuống dòng)"
+              className="border-border/50 bg-card/50 focus-visible:ring-primary/40 max-h-36 min-h-[48px] resize-none rounded-xl py-3 shadow-sm"
               rows={1}
               disabled={isLoading}
               onKeyDown={(e) => {
@@ -172,19 +226,17 @@ export function AskAiChat() {
                 }
               }}
             />
-            <Button type="button" variant="outline" size="icon" className="shrink-0" title="Đính kèm">
-              <Paperclip className="size-4" />
-            </Button>
-            <Button type="submit" size="icon" className="shrink-0" disabled={isLoading || !input.trim()}>
+            <Button
+              type="submit"
+              size="icon"
+              className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
+              disabled={isLoading || !input.trim()}
+              aria-label="Gửi"
+            >
               <Send className="size-4" />
             </Button>
           </div>
         </form>
-      </div>
-
-      {/* Sidebar - 30% */}
-      <div className="flex min-w-[200px] flex-[3] flex-col overflow-hidden border-l">
-        <FeatureTree features={codebaseContext.features} onSelect={handleFeatureSelect} />
       </div>
     </div>
   );

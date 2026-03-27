@@ -1,6 +1,33 @@
+import type { Context } from 'hono';
 import { Hono } from 'hono';
 import { requireAuth } from '../../auth/authMiddleware';
+import { createWebsocketApplicationService } from '../../ws/application';
 import { handleError } from '../../../shared/utils';
+
+async function notifyAskAiProgress(
+  c: Context<{ Bindings: Env }>,
+  bindingName: string,
+  identifier: string,
+  requestId: string,
+  step: { id: string; label: string; status: 'running' | 'done' | 'error' },
+): Promise<void> {
+  try {
+    const ws = createWebsocketApplicationService(c, bindingName);
+    await ws.sendNotificationToUserUseCase(identifier, {
+      title: '\u200b',
+      body: undefined,
+      data: {
+        channel: "ask-ai",
+        requestId,
+        stepId: step.id,
+        label: step.label,
+        status: step.status,
+      },
+    });
+  } catch {
+    // Tiến trình là best-effort; không làm fail request chat
+  }
+}
 
 /** Codebase context - đồng bộ với workers/web _data/codebase-context.ts */
 const CODEBASE_CONTEXT = `## API Endpoints & Schemas
@@ -74,14 +101,21 @@ Chỉ output JSON thuần, không \`\`\`json.`;
 export function createAskAiRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
 
-  app.post('/chat', async (c: any) => {
+  app.post('/chat', async (c) => {
     try {
-      requireAuth(c);
+      const user = requireAuth(c);
       const body = await c.req.json().catch(() => ({}));
-      const { message, history = [] } = body as { message: string; history?: Array<{ role: string; content: string }> };
+      const { message, history = [], requestId: clientRequestId } = body as {
+        message: string;
+        history?: Array<{ role: string; content: string }>;
+        requestId?: string;
+      };
       if (!message || typeof message !== 'string') {
         return c.json({ error: 'message is required' }, 400);
       }
+
+      const requestId =
+        typeof clientRequestId === 'string' && clientRequestId.length > 0 ? clientRequestId : crypto.randomUUID();
 
       const ai = c.env.AI;
       if (!ai) {
@@ -92,6 +126,17 @@ export function createAskAiRoutes(bindingName: string) {
         ? history.map((h: { role: string; content: string }) => `${h.role}: ${h.content}`).join('\n') + `\nuser: ${message}`
         : message;
 
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'receive',
+        label: 'Đã nhận yêu cầu',
+        status: 'done',
+      });
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'infer',
+        label: 'Đang gọi mô hình AI…',
+        status: 'running',
+      });
+
       const response = await ai.run('@cf/meta/llama-3.1-8b-instruct-fast', {
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -99,6 +144,17 @@ export function createAskAiRoutes(bindingName: string) {
         ],
         max_tokens: 2048,
       }, { gateway: { id: "unitoken" } });
+
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'infer',
+        label: 'Đã nhận phản hồi từ mô hình',
+        status: 'done',
+      });
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'parse',
+        label: 'Đang chuẩn hóa dữ liệu…',
+        status: 'running',
+      });
 
       const raw = (response as { response?: string })?.response ?? (response as { result?: { response?: string } })?.result?.response ?? String(response);
       let parsed: { type: string; content: string; payload?: unknown } = { type: 'text', content: raw, payload: null };
@@ -112,10 +168,22 @@ export function createAskAiRoutes(bindingName: string) {
         }
       }
 
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'parse',
+        label: 'Đã chuẩn hóa phản hồi',
+        status: 'done',
+      });
+      await notifyAskAiProgress(c, bindingName, user.identifier, requestId, {
+        id: 'complete',
+        label: 'Hoàn tất',
+        status: 'done',
+      });
+
       return c.json({
         type: parsed.type || 'text',
         content: parsed.content || raw,
         payload: parsed.payload ?? null,
+        requestId,
       });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Ask AI failed');

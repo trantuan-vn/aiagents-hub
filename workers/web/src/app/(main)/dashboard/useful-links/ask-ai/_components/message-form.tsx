@@ -85,11 +85,14 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
           const toTimestamp = (key: string) => {
             const v = finalValues[key];
             if (v && typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
-              const d = key === "dateTo" ? (() => {
-                const x = new Date(v);
-                x.setHours(23, 59, 59, 999);
-                return x;
-              })() : new Date(v);
+              const d =
+                key === "dateTo"
+                  ? (() => {
+                      const x = new Date(v);
+                      x.setHours(23, 59, 59, 999);
+                      return x;
+                    })()
+                  : new Date(v);
               finalValues[key] = String(d.getTime());
             }
           };
@@ -107,7 +110,10 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
         );
         const url = `${API_BASE_URL}${endpoint}${params.toString() ? `?${params}` : ""}`;
         const res = await fetch(url, { credentials: "include" });
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: string; message?: string };
+        const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
+          error?: string;
+          message?: string;
+        };
         if (!res.ok) throw new Error(data.error ?? data.message ?? "Request failed");
         setResult(data);
         setStatus("success");
@@ -177,12 +183,7 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
       );
     }
     if (f.type === "boolean") {
-      return (
-        <Switch
-          checked={!!field.value}
-          onCheckedChange={(v) => field.onChange(v)}
-        />
-      );
+      return <Switch checked={!!field.value} onCheckedChange={(v) => field.onChange(v)} />;
     }
     if (f.type === "select" && f.options && f.options.length > 0) {
       return (
@@ -205,7 +206,9 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
         type={f.type === "number" ? "number" : "text"}
         placeholder={f.placeholder ?? f.label ?? f.name}
         value={(field.value ?? "") as string}
-        onChange={(e) => field.onChange(f.type === "number" ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value)}
+        onChange={(e) =>
+          field.onChange(f.type === "number" ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value)
+        }
       />
     );
   };
