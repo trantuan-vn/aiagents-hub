@@ -7,31 +7,18 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 import type { ChatMessageData } from "./ask-ai-chat";
+import { MessageFormDynamicField, type DynamicFieldSchema } from "./message-form-field";
+import { submitMessageForm, type MessageFormPayload } from "./message-form-submit";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
 
-interface FormFieldSchema {
-  name: string;
-  type: string;
-  label?: string;
-  required?: boolean;
-  options?: Array<{ value: string; label: string }>;
-  placeholder?: string;
-}
-
-interface FormPayload {
-  endpoint?: string;
-  method?: string;
-  schema?: {
-    fields?: FormFieldSchema[];
-  };
-}
+export type FormPayload = MessageFormPayload & {
+  schema?: { fields?: DynamicFieldSchema[] };
+};
 
 function schemaFromPayload(payload: FormPayload): z.ZodObject<Record<string, z.ZodTypeAny>> {
   const fields = payload.schema?.fields ?? [];
@@ -54,6 +41,8 @@ interface MessageFormProps {
 }
 
 export function MessageForm({ payload, onSuccess }: MessageFormProps) {
+  const useModal = payload.displayMode === "modal";
+  const [modalOpen, setModalOpen] = React.useState(useModal);
   const [status, setStatus] = React.useState<"idle" | "loading" | "success" | "error">("idle");
   const [result, setResult] = React.useState<Record<string, unknown> | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -64,7 +53,9 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
     defaultValues:
       payload.schema?.fields?.reduce(
         (acc, f) => {
-          acc[f.name] = f.type === "boolean" ? false : "";
+          if (f.type === "boolean") acc[f.name] = false;
+          else if (f.type === "number") acc[f.name] = undefined;
+          else acc[f.name] = "";
           return acc;
         },
         {} as Record<string, unknown>,
@@ -75,79 +66,14 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
     setStatus("loading");
     setError(null);
     try {
-      const endpoint = payload.endpoint ?? "";
-      const isLogs = endpoint.includes("/dashboard/monitor/logs");
-      let finalValues = values;
-
-      if (payload.method === "GET") {
-        finalValues = { ...values };
-        if (isLogs) {
-          const toTimestamp = (key: string) => {
-            const v = finalValues[key];
-            if (v && typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) {
-              const d =
-                key === "dateTo"
-                  ? (() => {
-                      const x = new Date(v);
-                      x.setHours(23, 59, 59, 999);
-                      return x;
-                    })()
-                  : new Date(v);
-              finalValues[key] = String(d.getTime());
-            }
-          };
-          toTimestamp("dateFrom");
-          toTimestamp("dateTo");
-        }
-        const params = new URLSearchParams(
-          Object.entries(finalValues).reduce(
-            (acc, [k, v]) => {
-              if (v != null && v !== "") acc[k] = String(v);
-              return acc;
-            },
-            {} as Record<string, string>,
-          ),
-        );
-        const url = `${API_BASE_URL}${endpoint}${params.toString() ? `?${params}` : ""}`;
-        const res = await fetch(url, { credentials: "include" });
-        const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
-          error?: string;
-          message?: string;
-        };
-        if (!res.ok) throw new Error(data.error ?? data.message ?? "Request failed");
-        setResult(data);
-        setStatus("success");
-        onSuccess?.({
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "Thao tác thành công.",
-          type: "text",
-          payload: data,
-          timestamp: new Date(),
-        });
-        return;
-      }
-
-      const url = endpoint.startsWith("http") ? endpoint : `${API_BASE_URL}${endpoint}`;
-      const res = await fetch(url, {
-        method: (payload.method ?? "POST") as "GET" | "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(finalValues),
-      });
-      const data = (await res.json().catch(() => ({}))) as Record<string, unknown> & {
-        error?: string;
-        message?: string;
-      };
-      if (!res.ok) {
-        throw new Error(data.error ?? data.message ?? "Request failed");
-      }
+      const { data, successMessage } = await submitMessageForm(payload, values, API_BASE_URL);
       setResult(data);
       setStatus("success");
+      setModalOpen(false);
       onSuccess?.({
         id: crypto.randomUUID(),
         role: "assistant",
-        content: "Thao tác thành công.",
+        content: successMessage,
         type: "text",
         payload: data,
         timestamp: new Date(),
@@ -161,85 +87,48 @@ export function MessageForm({ payload, onSuccess }: MessageFormProps) {
   const fields = payload.schema?.fields ?? [];
   if (fields.length === 0) return null;
 
-  const renderField = (f: FormFieldSchema, field: { value: unknown; onChange: (v: unknown) => void }) => {
-    if (f.type === "date") {
-      return (
-        <Input
-          type="date"
-          value={(field.value as string) ?? ""}
-          onChange={(e) => field.onChange(e.target.value || undefined)}
-          placeholder={f.placeholder}
-        />
-      );
-    }
-    if (f.type === "datetime") {
-      return (
-        <Input
-          type="datetime-local"
-          value={(field.value as string) ?? ""}
-          onChange={(e) => field.onChange(e.target.value || undefined)}
-          placeholder={f.placeholder}
-        />
-      );
-    }
-    if (f.type === "boolean") {
-      return <Switch checked={!!field.value} onCheckedChange={(v) => field.onChange(v)} />;
-    }
-    if (f.type === "select" && f.options && f.options.length > 0) {
-      return (
-        <Select value={(field.value as string) ?? ""} onValueChange={(v) => field.onChange(v)}>
-          <SelectTrigger>
-            <SelectValue placeholder={f.placeholder ?? `Chọn ${f.label ?? f.name}`} />
-          </SelectTrigger>
-          <SelectContent>
-            {f.options.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label ?? opt.value}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      );
-    }
-    return (
-      <Input
-        type={f.type === "number" ? "number" : "text"}
-        placeholder={f.placeholder ?? f.label ?? f.name}
-        value={(field.value ?? "") as string}
-        onChange={(e) =>
-          field.onChange(f.type === "number" ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value)
-        }
-      />
-    );
-  };
-
-  return (
-    <div className="bg-card rounded-lg border p-4">
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          {fields.map((f) => (
-            <FormField
-              key={f.name}
-              control={form.control}
-              name={f.name}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{f.label ?? f.name}</FormLabel>
-                  <FormControl>{renderField(f, field)}</FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          ))}
-          {error && <p className="text-destructive text-sm">{error}</p>}
-          {status === "success" && result !== null && (
-            <pre className="bg-muted max-h-32 overflow-auto rounded p-2 text-xs">{JSON.stringify(result, null, 2)}</pre>
-          )}
-          <Button type="submit" disabled={status === "loading"}>
-            {status === "loading" ? "Đang xử lý..." : "Gửi"}
-          </Button>
-        </form>
-      </Form>
-    </div>
+  const formBody = (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {fields.map((f) => (
+          <FormField
+            key={f.name}
+            control={form.control}
+            name={f.name}
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{f.label ?? f.name}</FormLabel>
+                <FormControl>
+                  <MessageFormDynamicField f={f} field={field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        ))}
+        {error ? <p className="text-destructive text-sm">{error}</p> : null}
+        {status === "success" && result !== null ? (
+          <pre className="bg-muted max-h-32 overflow-auto rounded p-2 text-xs">{JSON.stringify(result, null, 2)}</pre>
+        ) : null}
+        <Button type="submit" disabled={status === "loading"}>
+          {status === "loading" ? "Đang xử lý..." : "Gửi"}
+        </Button>
+      </form>
+    </Form>
   );
+
+  if (useModal) {
+    return (
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="max-h-[min(90vh,640px)] overflow-y-auto sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{payload.formTitle ?? "Bổ sung thông tin"}</DialogTitle>
+          </DialogHeader>
+          {formBody}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  return <div className="bg-card rounded-lg border p-4">{formBody}</div>;
 }

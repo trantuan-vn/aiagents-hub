@@ -1,5 +1,3 @@
-const STEP_ORDER = ["receive", "infer", "parse", "complete"] as const;
-
 export type ActivityStep = {
   id: string;
   label: string;
@@ -7,14 +5,9 @@ export type ActivityStep = {
   at: number;
 };
 
+/** Sắp theo thời gian server/client gửi — đúng thứ tự thực (memory → infer → tool → lượt 2…). */
 function sortSteps(steps: ActivityStep[]): ActivityStep[] {
-  return [...steps].sort((a, b) => {
-    const ia = STEP_ORDER.indexOf(a.id as (typeof STEP_ORDER)[number]);
-    const ib = STEP_ORDER.indexOf(b.id as (typeof STEP_ORDER)[number]);
-    const sa = ia === -1 ? 99 : ia;
-    const sb = ib === -1 ? 99 : ib;
-    return sa - sb;
-  });
+  return [...steps].sort((a, b) => a.at - b.at);
 }
 
 export function mergeServerStep(

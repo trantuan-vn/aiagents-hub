@@ -10,6 +10,13 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"rules": [
+		{
+			"type": "Text",
+			"globs": ["**/*.md"],
+			"fallthrough": true
+		}
+	],
 	"migrations": [
 		{
 			"tag": "v1",
@@ -22,6 +29,10 @@
 		{
 			"tag": "v2",
 			"new_sqlite_classes": ["AskAiMemoryDO"]
+		},
+		{
+			"tag": "v3",
+			"deleted_classes": ["AskAiMemoryDO"]
 		}
 	],
 	"durable_objects": {
@@ -40,11 +51,6 @@
 				"name": "USER_DO",
 				"script_name": "auth-worker", 
 				"class_name": "UserDO"
-			},
-			{
-				"name": "ASK_AI_MEMORY_DO",
-				"script_name": "auth-worker",
-				"class_name": "AskAiMemoryDO"
 			}
 		]
 	},

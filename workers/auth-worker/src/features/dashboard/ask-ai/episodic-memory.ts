@@ -1,19 +1,23 @@
-import type { EpisodicSnapshot } from './AskAiMemoryDO';
+/** Episodic state: summary of last ≤10 messages + raw tail for debugging. */
+export type EpisodicSnapshot = {
+  episodicSummary: string;
+  last10: Array<{ role: string; content: string; at: number }>;
+};
 
 export async function loadEpisodic(env: Env, userId: string): Promise<EpisodicSnapshot> {
-  const ns = env.ASK_AI_MEMORY_DO;
+  const ns = env.USER_DO;
   if (!ns) return { episodicSummary: '', last10: [] };
   const stub = ns.get(ns.idFromName(userId));
-  const res = await stub.fetch('https://ask-ai-memory/load');
+  const res = await stub.fetch('https://user.internal/ask-ai/episodic/load');
   if (!res.ok) return { episodicSummary: '', last10: [] };
   return (await res.json()) as EpisodicSnapshot;
 }
 
 export async function persistEpisodic(env: Env, userId: string, snap: EpisodicSnapshot): Promise<void> {
-  const ns = env.ASK_AI_MEMORY_DO;
+  const ns = env.USER_DO;
   if (!ns) return;
   const stub = ns.get(ns.idFromName(userId));
-  await stub.fetch('https://ask-ai-memory/sync', {
+  await stub.fetch('https://user.internal/ask-ai/episodic/sync', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(snap),

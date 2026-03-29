@@ -21,8 +21,19 @@ interface ChatMessageProps {
 
 function AssistantBlocks({ message, onApiSuccess, onOpenInPanel }: ChatMessageProps) {
   const actions = message.suggestedActions;
+  const toolLines = message.toolProgressLines;
   return (
     <>
+      {toolLines && toolLines.length > 0 ? (
+        <ul className="border-border/50 bg-muted/30 text-muted-foreground mb-1 rounded-xl border px-3 py-2 text-xs leading-relaxed">
+          {toolLines.map((line, i) => (
+            <li key={`${line}-${i}`} className="flex gap-2">
+              <span className="text-primary shrink-0">→</span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {message.content && (
         <p className="border-border/60 bg-card/90 text-foreground rounded-2xl border px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm">
           {message.content}

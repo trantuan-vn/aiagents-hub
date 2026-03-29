@@ -13,6 +13,9 @@ export const SEMANTIC_STORE_MIN_SCORE = 0.14;
 /** Strong single-signal memories (preferences, IDs) — always eligible if above this importance. */
 export const SEMANTIC_STORE_IMPORTANCE_FLOOR = 0.72;
 
+/** Metadata `userKey` cho chunk tài liệu OpenAPI / code examples (vector dùng chung). */
+export const ASK_AI_GLOBAL_KB_USER_KEY = '__ask_ai_kb__';
+
 /** Similarity threshold to count “same topic” for frequency. */
 const SIMILARITY_FREQ_THRESHOLD = 0.82;
 
@@ -53,26 +56,50 @@ export async function querySemanticForPrompt(
   const index = env.ASK_AI_VECTOR;
   if (!index) return '';
 
-  const res = await index.query(embedding, {
-    topK: 12,
-    returnMetadata: true,
-    filter: { userKey: { $eq: userKey } },
-  });
+  const [userRes, kbRes] = await Promise.all([
+    index.query(embedding, {
+      topK: 8,
+      returnMetadata: true,
+      filter: { userKey: { $eq: userKey } },
+    }),
+    index.query(embedding, {
+      topK: 8,
+      returnMetadata: true,
+      filter: { userKey: { $eq: ASK_AI_GLOBAL_KB_USER_KEY } },
+    }),
+  ]);
 
-  const matches = res.matches ?? [];
-  const lines: string[] = [];
-  for (const m of matches) {
-    const meta = m.metadata as Record<string, string | number | boolean> | undefined;
-    if (!meta?.text) continue;
-    const storedAt = Number(meta.storedAt ?? nowMs);
-    const importance = Number(meta.importance ?? 0.5);
-    const frequency = Number(meta.frequency ?? 1);
-    const score = combinedRetrievalScore(importance, storedAt, frequency, nowMs);
-    if (score < 0.02) continue;
-    lines.push(`- (${score.toFixed(2)}) ${String(meta.text).slice(0, 500)}`);
-  }
+  type MatchLine = { score: number; line: string; kind: 'user' | 'kb' };
+  const out: MatchLine[] = [];
+
+  const pushMatches = (matches: typeof userRes.matches, kind: 'user' | 'kb') => {
+    for (const m of matches ?? []) {
+      const meta = m.metadata as Record<string, string | number | boolean> | undefined;
+      if (!meta?.text) continue;
+      const storedAt = Number(meta.storedAt ?? nowMs);
+      const importance = Number(meta.importance ?? 0.5);
+      const frequency = Number(meta.frequency ?? 1);
+      const score = combinedRetrievalScore(importance, storedAt, frequency, nowMs);
+      const vecScore = typeof m.score === 'number' ? m.score : 0;
+      const blended = score * (0.6 + 0.4 * vecScore);
+      if (blended < 0.015) continue;
+      const prefix = kind === 'kb' ? 'KB' : 'Mem';
+      const doc = meta.docSource != null ? ` [${String(meta.docSource)}]` : '';
+      out.push({
+        score: blended,
+        line: `- (${prefix}${doc}) (${blended.toFixed(2)}) ${String(meta.text).slice(0, 500)}`,
+        kind,
+      });
+    }
+  };
+
+  pushMatches(userRes.matches, 'user');
+  pushMatches(kbRes.matches, 'kb');
+
+  out.sort((a, b) => b.score - a.score);
+  const lines = out.slice(0, 14).map((x) => x.line);
   if (lines.length === 0) return '';
-  return ['## Bộ nhớ ngữ nghĩa (đã xếp hạng theo Importance×Recency×Frequency)', ...lines].join('\n');
+  return ['## Bộ nhớ ngữ nghĩa (cá nhân + tài liệu API)', ...lines].join('\n');
 }
 
 export async function countSimilarMessages(

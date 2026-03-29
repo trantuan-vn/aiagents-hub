@@ -4,7 +4,7 @@
 declare namespace Cloudflare {
 	interface GlobalProps {
 		mainModule: typeof import("./src/index");
-		durableNamespaces: "BroadcastServiceDO" | "UserShardDO" | "UserDO" | "AskAiMemoryDO";
+		durableNamespaces: "BroadcastServiceDO" | "UserShardDO" | "UserDO";
 	}
 	interface Env {
 		NONCE_KV: KVNamespace;
@@ -24,7 +24,6 @@ declare namespace Cloudflare {
 		BROADCAST_SERVICE_DO: DurableObjectNamespace /* BroadcastServiceDO from auth-worker */;
 		USER_SHARD_DO: DurableObjectNamespace /* UserShardDO from auth-worker */;
 		USER_DO: DurableObjectNamespace /* UserDO from auth-worker */;
-		ASK_AI_MEMORY_DO: DurableObjectNamespace /* AskAiMemoryDO from auth-worker */;
 		R2_VERSION_BUCKET: R2Bucket;
 		R2_EKYC_BUCKET: R2Bucket;
 		D1DB: D1Database;
