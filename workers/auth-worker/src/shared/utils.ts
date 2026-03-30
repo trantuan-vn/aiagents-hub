@@ -150,6 +150,24 @@ export function getIPAndUserAgent(request: Request) {
   return { ipAddress, userAgent };
 }
 
+/**
+ * IP/UA dùng khi tạo session (login) và khi verifySession — PHẢI cùng một quy tắc với authMiddleware.
+ * Nếu không, iOS / Next.js proxy có thể gửi X-Client-* ở request sau nhưng login chỉ dùng CF-Connecting-IP → mismatch → "Session not found".
+ * Chuỗi rỗng coi như không có (fallback về header gốc).
+ */
+export function getClientIpAndUserAgentForSession(request: Request): {
+  ipAddress: string | undefined;
+  userAgent: string | undefined;
+} {
+  const xIp = request.headers.get('X-Client-IP')?.trim();
+  const xUa = request.headers.get('X-Client-UA')?.trim();
+  const { ipAddress: reqIp, userAgent: reqUa } = getIPAndUserAgent(request);
+  return {
+    ipAddress: xIp || reqIp || undefined,
+    userAgent: xUa || reqUa || undefined,
+  };
+}
+
 /** Hash từ IP+UA+secret - dùng cho pre-login flow (OTP, OAuth state, wallet nonce) */
 /** Deterministic sessionId for pre-login flows (OTP, OAuth state, wallet nonce). */
 export const getSessionIdHash = (ipAddress: string, userAgent: string, secret: string) => {

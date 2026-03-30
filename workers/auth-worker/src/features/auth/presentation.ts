@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';  
-import { handleError, parseBody, getIPAndUserAgent, generateSecureSessionId } from '../../shared/utils';
+import { handleError, parseBody, getIPAndUserAgent, getClientIpAndUserAgentForSession, generateSecureSessionId } from '../../shared/utils';
 import { requireAuth } from './authMiddleware';
 import { createApplicationService } from './application';
 import { 
@@ -51,7 +51,7 @@ export function createAuthRoutes(bindingName: string) {
         }
 
         const request = c.req.raw;
-        const { ipAddress, userAgent } = getIPAndUserAgent(request);
+        const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(request);
         if (!ipAddress || !userAgent) {
           throw new Error('Missing IP address or user agent');
         }

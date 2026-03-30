@@ -3,7 +3,7 @@ import { getCookie } from 'hono/cookie';
 import { createApplicationService } from './application';
 import { createVersionApplicationService } from '../admin/version/application';
 import { cookieUtils } from './utils';
-import { getIPAndUserAgent, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
+import { getClientIpAndUserAgentForSession, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 
 // Main authentication middleware factory
@@ -19,12 +19,7 @@ export function createAuthMiddleware(bindingName: string) {
         throw new Error("sessionId not found");
       }
 
-      // IP/UA: ưu tiên X-Client-IP, X-Client-UA từ getUserFromToken (Next.js); nếu không có thì dùng request
-      const clientIp = c.req.header('X-Client-IP');
-      const clientUa = c.req.header('X-Client-UA');
-      const { ipAddress: reqIp, userAgent: reqUa } = getIPAndUserAgent(c.req.raw);
-      const ipAddress = clientIp ?? reqIp ?? undefined;
-      const userAgent = clientUa ?? reqUa ?? undefined;
+      const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(c.req.raw);
 
       const applicationService = createApplicationService(c, bindingName);
       const result = await applicationService.verifySessionUseCase(sessionId, ipAddress, userAgent);
