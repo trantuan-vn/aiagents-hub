@@ -31,6 +31,10 @@ type PackageEntry = {
   features: string[];
   popular: boolean;
   comingSoon?: boolean;
+  /** Nếu có — nút "Tìm hiểu thêm" mở URL này (thay vì /packages/:id) */
+  learnMoreHref?: string;
+  /** Nếu true — nút "Tìm hiểu thêm" không điều hướng */
+  learnMoreNoOp?: boolean;
 };
 
 function tierPricing(tier: Tier, pricing: PackageEntry["pricing"]) {
@@ -110,13 +114,30 @@ function PackageCard({
       </ul>
 
       <div className="flex gap-2">
-        <Link to={`/packages/${pkg.id}`} className="flex-1">
-          <Button variant="outline" className="w-full">
+        {pkg.learnMoreNoOp ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={(e) => {
+              e.preventDefault();
+            }}
+          >
             {t("learn_more")}
           </Button>
-        </Link>
+        ) : pkg.learnMoreHref ? (
+          <Button variant="outline" className="w-full flex-1" asChild>
+            <a href={pkg.learnMoreHref}>{t("learn_more")}</a>
+          </Button>
+        ) : (
+          <Link to={`/packages/${pkg.id}`} className="flex-1">
+            <Button variant="outline" className="w-full">
+              {t("learn_more")}
+            </Button>
+          </Link>
+        )}
         <Button variant="default" asChild>
-          <NextLink href="/auth/v2/register">{t("subscribe")}</NextLink>
+          <NextLink href="/auth/v3/login">{t("subscribe")}</NextLink>
         </Button>
       </div>
     </div>
@@ -154,6 +175,7 @@ const Packages = () => {
         t("packages.ai_vision.features.3"),
       ],
       popular: true,
+      learnMoreHref: "https://unitoken.trade/docs/api",
     },
     {
       id: 2,
@@ -174,6 +196,7 @@ const Packages = () => {
       ],
       popular: false,
       comingSoon: true,
+      learnMoreNoOp: true,
     },
   ];
 
