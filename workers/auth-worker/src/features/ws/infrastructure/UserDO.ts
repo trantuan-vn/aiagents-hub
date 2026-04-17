@@ -273,8 +273,6 @@ export class UserDO extends DurableObject {
       const routeHandlers: Record<string, (req: Request) => Promise<Response>> = {
         '/status': () => this.getWebsocketStatus(),
         '/subscriptions': () => this.getSubscriptionList(),
-        '/ask-ai/episodic/load': () => this.handleAskAiEpisodicLoad(),
-        '/ask-ai/episodic/sync': (req) => this.handleAskAiEpisodicSync(req),
         '/dynamic/insert': (req) => this.handleDynamicInsert(req),
         '/dynamic/update': (req) => this.handleDynamicUpdate(req),
         '/dynamic/upsert': (req) => this.handleDynamicUpsert(req),
@@ -301,38 +299,6 @@ export class UserDO extends DurableObject {
       handleErrorWithoutIp(error, `UserDO ${this.userId} fetch error`);
       return this.jsonResponse({ success: false, error: 'Internal Server Error' }, 500);
     }
-  }
-
-  private static readonly ASK_AI_EPISODIC_STORAGE_KEY = 'ask_ai_episodic_v1';
-
-  /** Ask AI: tóm tắt hội thoại ngắn (episodic) — cùng format với episodic-memory.ts */
-  private async handleAskAiEpisodicLoad(): Promise<Response> {
-    const raw = await this.storage.get<string>(UserDO.ASK_AI_EPISODIC_STORAGE_KEY);
-    const data = raw
-      ? (JSON.parse(raw) as { episodicSummary: string; last10: Array<{ role: string; content: string; at: number }> })
-      : { episodicSummary: '', last10: [] };
-    return Response.json(data);
-  }
-
-  private async handleAskAiEpisodicSync(request: Request): Promise<Response> {
-    const body = (await request.json()) as {
-      episodicSummary: string;
-      last10: Array<{ role: string; content: string; at: number }>;
-    };
-    if (!body || typeof body.episodicSummary !== 'string' || !Array.isArray(body.last10)) {
-      return Response.json({ error: 'invalid body' }, { status: 400 });
-    }
-    const trimmed = body.last10.slice(-10).map((m) => ({
-      role: m.role,
-      content: String(m.content ?? '').slice(0, 8000),
-      at: typeof m.at === 'number' ? m.at : Date.now(),
-    }));
-    const snapshot = {
-      episodicSummary: body.episodicSummary.slice(0, 12000),
-      last10: trimmed,
-    };
-    await this.storage.put(UserDO.ASK_AI_EPISODIC_STORAGE_KEY, JSON.stringify(snapshot));
-    return Response.json({ ok: true });
   }
 
   // ========== DYNAMIC OPERATIONS ==========

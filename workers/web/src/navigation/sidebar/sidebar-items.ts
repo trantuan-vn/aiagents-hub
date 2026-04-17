@@ -2,7 +2,6 @@ import {
   Banknote,
   BarChart3,
   Bell,
-  Bot,
   ChartBar,
   Code,
   CreditCard,
@@ -136,11 +135,6 @@ export const sidebarItems: NavGroup[] = [
     id: 4,
     label: "Build",
     items: [{ title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck }],
-  },
-  {
-    id: 5,
-    label: "Useful Links",
-    items: [{ title: "Ask AI", url: "/dashboard/useful-links/ask-ai", icon: Bot }],
   },
 ];
 

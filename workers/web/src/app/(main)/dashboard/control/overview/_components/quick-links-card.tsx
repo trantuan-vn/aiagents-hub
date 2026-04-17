@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { CreditCard, ExternalLink, Sparkles } from "lucide-react";
+import { CreditCard, ExternalLink } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -11,7 +11,6 @@ interface QuickLinksCardProps {
 }
 
 const LINKS = [
-  { nameKey: "quick_links.ask_ai", path: "/dashboard/useful-links/ask-ai", icon: Sparkles },
   { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing", icon: CreditCard },
 ] as const;
 

@@ -28,10 +28,6 @@ function parseNotificationPayload(data: unknown): NotificationPayload | null {
 const notificationsWsHandlers = {
   broadcast(data: unknown) {
     if (data === undefined || data === null) return;
-    if (typeof data === "object") {
-      const d = (data as { data?: { channel?: string } }).data;
-      if (d?.channel === "ask-ai") return;
-    }
     const payload = parseNotificationPayload(data);
     if (!payload) return;
     notificationsStore.getState().addNotification({

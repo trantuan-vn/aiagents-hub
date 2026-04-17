@@ -2,12 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-import Link from "next/link";
-
-import { Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 
 import { ActivityCard } from "./_components/activity-card";
@@ -125,17 +121,11 @@ export default function OverviewPage() {
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
         <div>
           <h1 className="mb-1 text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <Button size="sm" asChild>
-          <Link href="/dashboard/useful-links/ask-ai" className="inline-flex shrink-0 items-center gap-1.5">
-            <Sparkles className="h-4 w-4" />
-            {t("add_api")}
-          </Link>
-        </Button>
       </div>
 
       <WelcomeHero t={t} />

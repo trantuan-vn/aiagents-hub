@@ -28,11 +28,11 @@
 		},
 		{
 			"tag": "v2",
-			"new_sqlite_classes": ["AskAiMemoryDO"]
+			"new_sqlite_classes": []
 		},
 		{
 			"tag": "v3",
-			"deleted_classes": ["AskAiMemoryDO"]
+			"deleted_classes": []
 		}
 	],
 	"durable_objects": {
@@ -123,13 +123,6 @@
 	"ai": {
 		"binding": "AI"  
 	},
-	// Vectorize: wrangler vectorize create ask-ai-semantic --dimensions=768 --metric=cosine
-	"vectorize": [
-		{
-			"binding": "ASK_AI_VECTOR",
-			"index_name": "ask-ai-semantic"
-		}
-	],
 	"routes": [
 		{
 		"pattern": "api.unitoken.trade",

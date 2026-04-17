@@ -51,7 +51,6 @@ declare namespace Cloudflare {
 		INPUT_QUEUE: Queue;
 		ERROR_QUEUE: Queue;
 		WS_BROADCAST_QUEUE: Queue;
-		ASK_AI_VECTOR: VectorizeIndex;
 		AI: Ai;
 		IMAGES: ImagesBinding;
 	}

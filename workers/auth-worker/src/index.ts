@@ -22,7 +22,6 @@ import { createMonitorAnalyticsRoutes } from './features/dashboard/monitor/analy
 import { createAdminDefaultRoutes } from './features/dashboard/admin-default/presentation';
 import { createAdminCrmRoutes } from './features/dashboard/admin-crm/presentation';
 import { createAdminFinanceRoutes } from './features/dashboard/admin-finance/presentation';
-import { createAskAiRoutes } from './features/dashboard/ask-ai/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
@@ -74,8 +73,6 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/default-stats', createAdminDefaultRoutes());
   routes.route('/dashboard/admin/crm-stats', createAdminCrmRoutes());
   routes.route('/dashboard/admin/finance-stats', createAdminFinanceRoutes());
-  routes.route('/dashboard/ask-ai', createAskAiRoutes(bindingName));
-
   // II. API
   // Security middleware
   routes.use('/api/*', createTokenValidationMiddleware(bindingName));  
