@@ -9,6 +9,7 @@ import { createDashboardWebSocketRoutes, createApiWebSocketRoutes } from './feat
 import { createEkycRoutes } from './features/member/ekyc/presentation';
 import { createOrderRoutes } from './features/member/order/presentation';
 import { createPaymentRoutes } from './features/member/vnpay/presentation';
+import { createAssistantRoutes } from './features/member/assistant/presentation';
 import { createPriceRoutes } from './features/admin/policy/presentation';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
@@ -59,6 +60,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/ws', createDashboardWebSocketRoutes(bindingName));  
   routes.route('/dashboard/token', createTokenRoutes(bindingName)); 
   routes.route('/dashboard/order', createOrderRoutes(bindingName));  
+  routes.route('/dashboard/assistant', createAssistantRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/admin/policy', createPriceRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));

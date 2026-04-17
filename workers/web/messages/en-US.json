@@ -1364,6 +1364,7 @@
       "title": "Quick Links",
       "description": "Resources to help you succeed",
       "ask_ai": "Ask AI",
+      "assistant": "Assistant",
       "status_page": "Status Page",
       "billing_history": "Billing History"
     }
@@ -1423,6 +1424,15 @@
     },
     "token_created": "Token created",
     "token_created_description": "Your API token has been created successfully"
+  },
+  "AssistantPage": {
+    "title": "Assistant",
+    "description": "Chat with the dashboard assistant (OpenAI via assistant-worker). Tools can create API keys and orders through auth-worker.",
+    "empty": "Ask a question or request creating an API key or an order.",
+    "placeholder": "Type a message…",
+    "send": "Send",
+    "stop": "Stop",
+    "activity_idle": "Ready — messages go to assistant-worker; tools call auth-worker when needed."
   },
   "WalletConnect": {
     "nonce_validation_error": "Nonce must only contain letters and numbers",
