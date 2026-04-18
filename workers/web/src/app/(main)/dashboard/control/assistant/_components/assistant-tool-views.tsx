@@ -1,6 +1,6 @@
 "use client";
 
-import type { AssistantUIMessage, CreateApiKeyToolUI, CreateOrderToolUI } from "./assistant-types";
+import type { AssistantUIMessage } from "./assistant-types";
 
 type CreateApiKeyPart = Extract<AssistantUIMessage["parts"][number], { type: "tool-createApiKey" }>;
 type CreateOrderPart = Extract<AssistantUIMessage["parts"][number], { type: "tool-createOrder" }>;
@@ -26,10 +26,10 @@ export function CreateApiKeyToolView({ part }: { part: CreateApiKeyPart }) {
     case "input-streaming":
       return <JsonBlock value={part.input} />;
     case "input-available": {
-      const input = part.input as CreateApiKeyToolUI["input"];
+      const { input } = part;
       return (
         <p className="text-muted-foreground text-sm">
-          Chuẩn bị tạo API key: <span className="text-foreground font-medium">{input.name ?? "—"}</span>
+          Chuẩn bị tạo API key: <span className="text-foreground font-medium">{input.name}</span>
         </p>
       );
     }
@@ -61,12 +61,8 @@ export function CreateOrderToolView({ part }: { part: CreateOrderPart }) {
     case "input-streaming":
       return <JsonBlock value={part.input} />;
     case "input-available": {
-      const input = part.input as CreateOrderToolUI["input"];
-      return (
-        <p className="text-muted-foreground text-sm">
-          Chuẩn bị tạo đơn hàng với {input.items?.length ?? 0} dòng hàng…
-        </p>
-      );
+      const { input } = part;
+      return <p className="text-muted-foreground text-sm">Chuẩn bị tạo đơn hàng với {input.items.length} dòng hàng…</p>;
     }
     case "output-available": {
       const out = part.output as OrderOutput;
