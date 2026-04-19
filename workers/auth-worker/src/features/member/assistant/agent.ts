@@ -11,7 +11,8 @@ export function createAssistantAgent(c: any, bindingName: string, user: any) {
   });
 
   return new ToolLoopAgent({
-    model: workersAI('@cf/meta/llama-3.3-70b-instruct-fp8-fast'),
+    // model: workersAI('@cf/moonshotai/kimi-k2.5'),
+    model: workersAI('@cf/zai-org/glm-4.7-flash'),
     instructions: [
       'You are a concise assistant for the Unitoken dashboard.',
       'You can create API keys and create orders by calling the provided tools when the user asks.',
