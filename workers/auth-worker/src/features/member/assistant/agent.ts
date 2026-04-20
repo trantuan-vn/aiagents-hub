@@ -10,6 +10,9 @@ import { getOrderDetailTool } from './tools/get-order-detail-tool';
 import { getOrdersTool } from './tools/get-orders-tool';
 import { getPaymentMethodsTool } from './tools/get-payment-methods-tool';
 import { getServicesTool } from './tools/get-services-tool';
+import { getOverviewTool } from './tools/get-overview-tool';
+import { getMonitorLogsTool } from './tools/get-monitor-logs-tool';
+import { getMonitorAnalyticsTool } from './tools/get-monitor-analytics-tool';
 import { listApiKeysTool } from './tools/list-api-keys-tool';
 import { queryPaymentTransactionTool } from './tools/query-payment-transaction-tool';
 import { refundPaymentTool } from './tools/refund-payment-tool';
@@ -96,6 +99,21 @@ const TOOL_CONFIGS: AssistantToolConfig[] = [
     roles: ['member'],
     factory: refundPaymentTool,
   },
+  {
+    name: 'getOverview',
+    roles: ['member'],
+    factory: getOverviewTool,
+  },
+  {
+    name: 'getMonitorLogs',
+    roles: ['member'],
+    factory: getMonitorLogsTool,
+  },
+  {
+    name: 'getMonitorAnalytics',
+    roles: ['member'],
+    factory: getMonitorAnalyticsTool,
+  },
 ];
 
 function toUserRole(role: unknown): UserRole | undefined {
@@ -114,7 +132,13 @@ function collectUserScopes(user: any) {
 
 function canUseTool(config: AssistantToolConfig, user: any): boolean {
   const { role } = collectUserScopes(user);
-  if (!role || !config.roles.includes(role)) {
+  if (!role) {
+    return false;
+  }
+  if (role === 'admin' && config.roles.includes('member')) {
+    return true;
+  }
+  if (!config.roles.includes(role)) {
     return false;
   }
   return true;
@@ -141,7 +165,7 @@ export function createAssistantAgent(c: any, bindingName: string, user: any) {
     // model: workersAI('@cf/moonshotai/kimi-k2.5'),
     model: workersAI('@cf/zai-org/glm-4.7-flash'),
     instructions: [
-      'You are a concise assistant for the Unitoken dashboard.',
+      'You are a concise and comprehensive Unitoken User Feature Assistant for the full Unitoken user dashboard experience.',
       'Only use tools that are available in the current toolset and never call unavailable capabilities.',
       'The backend already scopes tool availability per user; if a capability is missing, explain that it is not enabled for this account.',
       enabledTools.length
