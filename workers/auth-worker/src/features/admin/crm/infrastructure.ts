@@ -207,7 +207,7 @@ export async function getAdminCrmStats(db: D1Database): Promise<AdminCrmStats> {
 
   const newUsersByDate = (newUsersByDateRows?.results ?? []).map((r) =>
     'referred' in r && 'direct' in r
-      ? { date: r.date, total: r.total, referred: r.referred, direct: r.direct }
+      ? { date: r.date, total: r.total, referred: Number(r.referred) || 0, direct: Number(r.direct) || 0 }
       : { date: r.date, total: r.total, referred: 0, direct: r.total }
   );
 
