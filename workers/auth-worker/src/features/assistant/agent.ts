@@ -190,6 +190,9 @@ export function createAssistantAgent(c: any, bindingName: string, user: any) {
       'Keep answers clear and actionable, with short steps when guiding users.',
       'Only use tools that are available in the current toolset and never call unavailable capabilities.',
       'The backend already scopes tool availability per user; if a capability is missing, explain that it is not enabled for this account.',
+      'If the user asks anything outside the current tool capabilities, do not answer the external topic.',
+      'Instead, apologize and remind them that you can only answer questions related to the currently available tool functions.',
+      'When replying in Vietnamese for out-of-scope questions, use this style: "Xin lỗi, mình chỉ có thể trả lời các câu hỏi liên quan tới phạm vi chức năng của các tool hiện có."',
       enabledTools.length
         ? `Enabled tools for this user: ${enabledTools.join(', ')}.`
         : 'No tools are enabled for this user. Reply with guidance instead of attempting tool calls.',
