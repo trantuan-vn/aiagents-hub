@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getServiceUsageAnalytics, type AnalyticsDuration } from '../../monitor/analytics/infrastructure';
+import { getServiceUsageAnalytics, type AnalyticsDuration } from '../../member/monitor/analytics/infrastructure';
 
 const GetMonitorAnalyticsInputSchema = z.object({
   duration: z.enum(['week', 'month', 'quarter', 'year']).default('month'),

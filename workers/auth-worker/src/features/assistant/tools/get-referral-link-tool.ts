@@ -1,9 +1,9 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { executeUtils, getIdFromName } from '../../../../shared/utils';
-import { UserDO } from '../../../ws/infrastructure/UserDO';
-import { generateReferralCode, storeReferralCode } from '../../referral/utils';
+import { executeUtils, getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
+import { generateReferralCode, storeReferralCode } from '../../member/referral/utils';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://unitoken.trade';
 

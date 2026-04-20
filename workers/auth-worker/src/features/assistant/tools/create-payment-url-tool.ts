@@ -1,9 +1,9 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getClientIp } from '../../../../shared/utils';
-import { createPaymentApplicationService } from '../../vnpay/application';
-import { CreatePaymentSchema } from '../../vnpay/domain';
+import { getClientIp } from '../../../shared/utils';
+import { createPaymentApplicationService } from '../../member/vnpay/application';
+import { CreatePaymentSchema } from '../../member/vnpay/domain';
 
 export function createPaymentUrlTool(c: any, bindingName: string, user: any) {
   return tool({

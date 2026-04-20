@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createOrderApplicationService } from '../../order/application';
+import { createOrderApplicationService } from '../../member/order/application';
 
 const GetOrdersInputSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']).optional(),

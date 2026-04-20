@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createOrderApplicationService } from '../../order/application';
+import { createOrderApplicationService } from '../../member/order/application';
 
 const CancelOrderInputSchema = z.object({
   orderId: z.number().int().positive(),

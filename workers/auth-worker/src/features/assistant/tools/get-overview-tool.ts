@@ -1,9 +1,9 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getIdFromName } from '../../../../shared/utils';
-import { UserDO } from '../../../ws/infrastructure/UserDO';
-import { getOverviewData } from '../../overview/infrastructure';
+import { getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
+import { getOverviewData } from '../../member/overview/infrastructure';
 
 export function getOverviewTool(c: any, bindingName: string, user: any) {
   return tool({

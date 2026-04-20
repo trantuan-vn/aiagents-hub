@@ -1,8 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createTokenApplicationService } from '../../token/application';
-import { CreateApiTokenSchema } from '../../token/domain';
+import { createTokenApplicationService } from '../../member/token/application';
+import { CreateApiTokenSchema } from '../../member/token/domain';
 
 export function createApiKeyTool(c: any, bindingName: string, user: any) {
   return tool({

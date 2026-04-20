@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createOrderApplicationService } from '../../order/application';
+import { createOrderApplicationService } from '../../member/order/application';
 
 const GetOrderDetailInputSchema = z.object({
   orderId: z.number().int().positive(),

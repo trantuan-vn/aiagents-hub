@@ -1,8 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createOrderApplicationService } from '../../order/application';
-import { CreateOrderSchema } from '../../order/domain';
+import { createOrderApplicationService } from '../../member/order/application';
+import { CreateOrderSchema } from '../../member/order/domain';
 
 export function createOrderTool(c: any, bindingName: string, user: any) {
   return tool({

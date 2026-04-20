@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createServiceApplicationService } from '../../../admin/service/application';
+import { createServiceApplicationService } from '../../admin/service/application';
 
 export function getServicesTool(c: any, bindingName: string, user: any) {
   return tool({

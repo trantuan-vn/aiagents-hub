@@ -9,7 +9,7 @@ import { createDashboardWebSocketRoutes, createApiWebSocketRoutes } from './feat
 import { createEkycRoutes } from './features/member/ekyc/presentation';
 import { createOrderRoutes } from './features/member/order/presentation';
 import { createPaymentRoutes } from './features/member/vnpay/presentation';
-import { createAssistantRoutes } from './features/member/assistant/presentation';
+import { createAssistantRoutes } from './features/assistant/presentation';
 import { createPriceRoutes } from './features/admin/policy/presentation';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';

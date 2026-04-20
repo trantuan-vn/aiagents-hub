@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createVoucherApplicationService } from '../../../admin/voucher/application';
+import { createVoucherApplicationService } from '../../admin/voucher/application';
 
 const GetAvailableVouchersSchema = z.object({
   targetType: z.enum(['SERVICE', 'USER']).default('SERVICE'),

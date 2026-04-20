@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { createTokenApplicationService } from '../../token/application';
+import { createTokenApplicationService } from '../../member/token/application';
 
 const RevokeApiKeyInputSchema = z.object({
   tokenId: z.number().int().positive(),

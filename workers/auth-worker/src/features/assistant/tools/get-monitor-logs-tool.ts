@@ -1,7 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getServiceUsageLogs, type LogsFilters } from '../../monitor/logs/infrastructure';
+import { getServiceUsageLogs, type LogsFilters } from '../../member/monitor/logs/infrastructure';
 
 const GetMonitorLogsInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50),

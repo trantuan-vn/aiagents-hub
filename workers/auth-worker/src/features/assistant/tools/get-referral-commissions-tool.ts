@@ -1,8 +1,8 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { executeUtils, getIdFromName } from '../../../../shared/utils';
-import { UserDO } from '../../../ws/infrastructure/UserDO';
+import { executeUtils, getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
 
 const GetReferralCommissionsInputSchema = z.object({
   limit: z.number().int().min(1).max(100).default(50),

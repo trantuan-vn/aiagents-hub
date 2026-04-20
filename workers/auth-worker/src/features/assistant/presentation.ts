@@ -1,8 +1,8 @@
 import { createAgentUIStreamResponse } from 'ai';
 import { Hono } from 'hono';
 
-import { requireAuth } from '../../auth/authMiddleware';
-import { handleError } from '../../../shared/utils';
+import { requireAuth } from '../auth/authMiddleware';
+import { handleError } from '../../shared/utils';
 import { createAssistantApplicationService } from './application';
 
 export function createAssistantRoutes(bindingName: string) {
