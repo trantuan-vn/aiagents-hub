@@ -13,6 +13,9 @@ import { getServicesTool } from './tools/get-services-tool';
 import { getOverviewTool } from './tools/get-overview-tool';
 import { getMonitorLogsTool } from './tools/get-monitor-logs-tool';
 import { getMonitorAnalyticsTool } from './tools/get-monitor-analytics-tool';
+import { getReferralCommissionsTool } from './tools/get-referral-commissions-tool';
+import { getReferralCommissionStatsTool } from './tools/get-referral-commission-stats-tool';
+import { getReferralLinkTool } from './tools/get-referral-link-tool';
 import { listApiKeysTool } from './tools/list-api-keys-tool';
 import { queryPaymentTransactionTool } from './tools/query-payment-transaction-tool';
 import { refundPaymentTool } from './tools/refund-payment-tool';
@@ -113,6 +116,21 @@ const TOOL_CONFIGS: AssistantToolConfig[] = [
     name: 'getMonitorAnalytics',
     roles: ['member'],
     factory: getMonitorAnalyticsTool,
+  },
+  {
+    name: 'getReferralLink',
+    roles: ['member'],
+    factory: getReferralLinkTool,
+  },
+  {
+    name: 'getReferralCommissionStats',
+    roles: ['member'],
+    factory: getReferralCommissionStatsTool,
+  },
+  {
+    name: 'getReferralCommissions',
+    roles: ['member'],
+    factory: getReferralCommissionsTool,
   },
 ];
 
