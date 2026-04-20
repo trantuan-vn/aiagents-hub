@@ -1,6 +1,6 @@
-import { UserDO } from '../ws/infrastructure/UserDO';
+import { UserDO } from '../../ws/infrastructure/UserDO';
 import { CommissionPolicy } from './domain';
-import { executeUtils } from '../../shared/utils';
+import { executeUtils } from '../../../shared/utils';
 
 export function createCommissionPolicyInfrastructure(userDO: DurableObjectStub<UserDO>) {
   return {

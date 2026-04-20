@@ -1,7 +1,7 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createPriceApplicationService } from '../../admin/policy/application';
 import { createVoucherApplicationService } from '../../admin/voucher/application';
-import { processCommissionOnOrder } from '../../referral/commission-service';
+import { processCommissionOnOrder } from '../referral/commission-service';
 import {
   CreateOrder,
   UpdateOrderStatus,

@@ -77,7 +77,7 @@ export function createAuthRoutes(bindingName: string) {
     // Store referral code from URL so it's available when user returns from OAuth
     const ref = c.req.query('ref');
     if (ref && c.env.NONCE_KV) {
-      const { storePendingRef } = await import('../referral/utils');
+      const { storePendingRef } = await import('../member/referral/utils');
       await storePendingRef(c.env.NONCE_KV, sessionId, ref);
     }
 
@@ -119,7 +119,7 @@ export function createAuthRoutes(bindingName: string) {
     // Get referral code stored when user clicked OAuth (from link with ref=)
     let ref: string | undefined;
     if (c.env.NONCE_KV) {
-      const { getPendingRef } = await import('../referral/utils');
+      const { getPendingRef } = await import('../member/referral/utils');
       ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
     }
 
@@ -148,7 +148,7 @@ export function createAuthRoutes(bindingName: string) {
     const { identifier, language, ref } = await parseBody(c, OTPRequestSchema);
 
     if (ref && c.env.NONCE_KV) {
-      const { storePendingRef } = await import('../referral/utils');
+      const { storePendingRef } = await import('../member/referral/utils');
       await storePendingRef(c.env.NONCE_KV, sessionId, ref);
     }
 
@@ -163,7 +163,7 @@ export function createAuthRoutes(bindingName: string) {
     const { identifier, otp } = body;
     let ref = body.ref;
     if (!ref && c.env.NONCE_KV) {
-      const { getPendingRef } = await import('../referral/utils');
+      const { getPendingRef } = await import('../member/referral/utils');
       ref = await getPendingRef(c.env.NONCE_KV, sessionId) ?? undefined;
     }
 
@@ -278,7 +278,7 @@ export function createAuthRoutes(bindingName: string) {
     // Store referral code from URL so it's available when user completes wallet sign
     const ref = c.req.query('ref');
     if (ref && c.env.NONCE_KV) {
-      const { storePendingRef } = await import('../referral/utils');
+      const { storePendingRef } = await import('../member/referral/utils');
       await storePendingRef(c.env.NONCE_KV, sessionId, ref);
     }
 
@@ -298,7 +298,7 @@ export function createAuthRoutes(bindingName: string) {
     // Get referral code stored when user requested nonce (from link with ref=)
     let ref: string | undefined;
     if (c.env.NONCE_KV) {
-      const { getPendingRef } = await import('../referral/utils');
+      const { getPendingRef } = await import('../member/referral/utils');
       ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
     }
 

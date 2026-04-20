@@ -19,5 +19,5 @@ export * from '../member/order/domain';
 export * from '../member/token/domain';
 export * from '../member/vnpay/domain';
 export * from '../account/domain';
-export * from '../referral/domain';
+export * from '../member/referral/domain';
 

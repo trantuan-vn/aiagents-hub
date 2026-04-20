@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { requireAuth } from '../auth/authMiddleware';
-import { handleError } from '../../shared/utils';
-import { getIdFromName } from '../../shared/utils';
-import { UserDO } from '../ws/infrastructure/UserDO';
+import { requireAuth } from '../../auth/authMiddleware';
+import { handleError } from '../../../shared/utils';
+import { getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
 import { CommissionPolicySchema } from './domain';
 

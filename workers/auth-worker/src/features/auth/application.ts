@@ -22,7 +22,7 @@ import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { createVersionApplicationService } from '../admin/version/application';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
-import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../referral/utils';
+import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../member/referral/utils';
 
 interface IApplicationService {
   // I. OAUTH
