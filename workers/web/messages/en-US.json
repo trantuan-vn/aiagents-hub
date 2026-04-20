@@ -1426,8 +1426,8 @@
     "token_created_description": "Your API token has been created successfully"
   },
   "AssistantPage": {
-    "title": "Assistant",
-    "description": "Chat with the dashboard assistant (OpenAI via assistant-worker). Tools can create API keys and orders through auth-worker.",
+    "title": "Your Support Assistant",
+    "description": "Chat with the assistant for quick guidance and help with common actions in your dashboard.",
     "empty": "Ask a question or request creating an API key or an order.",
     "placeholder": "Type a message…",
     "send": "Send",

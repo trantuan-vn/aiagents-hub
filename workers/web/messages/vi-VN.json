@@ -1426,13 +1426,13 @@
     "token_created_description": "Token API của bạn đã được tạo thành công"
   },
   "AssistantPage": {
-    "title": "Trợ lý",
-    "description": "Chat với trợ lý dashboard (OpenAI qua assistant-worker). Công cụ có thể tạo API key và đơn hàng qua auth-worker.",
-    "empty": "Hãy hỏi hoặc yêu cầu tạo API key / đơn hàng.",
+    "title": "Trợ lý hỗ trợ của bạn",
+    "description": "Chat với trợ lý để được hướng dẫn nhanh và hỗ trợ thao tác ngay trên trang quản lý.",
+    "empty": "Hãy hỏi hoặc yêu cầu chức năng thực hiện",
     "placeholder": "Nhập tin nhắn…",
     "send": "Gửi",
     "stop": "Dừng",
-    "activity_idle": "Sẵn sàng — tin nhắn gửi tới assistant-worker; công cụ gọi auth-worker khi cần."
+    "activity_idle": "Sẵn sàng hỗ trợ bạn. Hãy nhắn yêu cầu, mình sẽ xử lý từng bước khi cần."
   },
   "WalletConnect": {
     "nonce_validation_error": "Nonce chỉ được chứa chữ cái và số",
