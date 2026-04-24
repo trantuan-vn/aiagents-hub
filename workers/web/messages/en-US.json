@@ -132,6 +132,7 @@
     "overview": "Overview",
     "account": "Account",
     "api_keys": "API Keys",
+    "assistant": "Assistant",
     "billing": "Billing",
     "notifications": "Notifications",
     "settings": "Settings",
@@ -1432,7 +1433,25 @@
     "placeholder": "Type a message…",
     "send": "Send",
     "stop": "Stop",
-    "activity_idle": "Ready — messages go to assistant-worker; tools call auth-worker when needed."
+    "activity_idle": "Ready to help. Send your request and I will handle it step by step when needed.",
+    "activity": {
+      "backend_error": "There was an error calling auth-worker /dashboard/assistant/chat.",
+      "submitted": "Sending message to auth-worker /dashboard/assistant/chat…",
+      "streaming": "Auth-worker assistant is streaming a response (Workers AI + tools)…",
+      "create_api_key_input": "Model is preparing API key parameters → will call auth-worker /dashboard/token/create.",
+      "create_api_key_loading": "Backend: calling auth-worker POST /dashboard/token/create (create API key)…",
+      "create_order_input": "Model is preparing order parameters → will call auth-worker /dashboard/order/orders.",
+      "create_order_loading": "Backend: calling auth-worker POST /dashboard/order/orders (create order)…",
+      "create_payment_url_input": "Model is preparing payment URL parameters.",
+      "create_payment_url_loading": "Backend: creating payment URL for the order…"
+    },
+    "confirmation_actions": {
+      "prompt": "Confirm this action:",
+      "ok_label": "OK",
+      "cancel_label": "Cancel",
+      "ok_payload": "__assistant_confirm_ok__",
+      "cancel_payload": "__assistant_confirm_cancel__"
+    }
   },
   "WalletConnect": {
     "nonce_validation_error": "Nonce must only contain letters and numbers",

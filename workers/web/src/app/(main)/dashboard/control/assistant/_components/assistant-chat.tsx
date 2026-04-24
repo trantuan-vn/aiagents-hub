@@ -3,106 +3,48 @@
 import { useMemo, useState } from "react";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, type ChatStatus } from "ai";
+import { DefaultChatTransport } from "ai";
 import { Loader2, SendHorizontal, Square } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-import { CreateApiKeyToolView, CreateOrderToolView } from "./assistant-tool-views";
+import {
+  AssistantMessagesList,
+  CONFIRM_APPROVE_TOKEN,
+  CONFIRM_CANCEL_TOKEN,
+  CONFIRM_SEPARATOR,
+  describeBackendActivity,
+  getPendingConfirmationKey,
+  shouldShowConfirmationActions,
+} from "./assistant-chat-helpers";
 import type { AssistantUIMessage } from "./assistant-types";
 
-type AssistantMessagePart = NonNullable<AssistantUIMessage["parts"]>[number];
+type AssistantTranslations = ReturnType<typeof useTranslations<"AssistantPage">>;
 
-function isLoadingToolOutput(output: unknown): boolean {
-  if (!output || typeof output !== "object" || !("state" in output)) return false;
-  return (output as { state: unknown }).state === "loading";
-}
-
-function describeCreateApiKeyTool(part: Extract<AssistantMessagePart, { type: "tool-createApiKey" }>): string | null {
-  if (part.state === "input-streaming" || part.state === "input-available") {
-    return "Model đang chọn tham số tạo API key → sẽ gọi auth-worker /dashboard/token/create.";
-  }
-  if (part.state === "output-available" && isLoadingToolOutput(part.output)) {
-    return "Backend: đang gọi auth-worker POST /dashboard/token/create (tạo API key)…";
-  }
-  return null;
-}
-
-function describeCreateOrderTool(part: Extract<AssistantMessagePart, { type: "tool-createOrder" }>): string | null {
-  if (part.state === "input-streaming" || part.state === "input-available") {
-    return "Model đang chọn tham số đơn hàng → sẽ gọi auth-worker /dashboard/order/orders.";
-  }
-  if (part.state === "output-available" && isLoadingToolOutput(part.output)) {
-    return "Backend: đang gọi auth-worker POST /dashboard/order/orders (tạo đơn)…";
-  }
-  return null;
-}
-
-function describeToolPartActivity(part: AssistantMessagePart): string | null {
-  if (!isToolUIPart(part)) return null;
-  if (part.type === "tool-createApiKey") return describeCreateApiKeyTool(part);
-  if (part.type === "tool-createOrder") return describeCreateOrderTool(part);
-  return null;
-}
-
-function describeActivityFromLastAssistantMessage(messages: AssistantUIMessage[]): string | null {
-  const last = messages.at(-1);
-  if (!last || last.role !== "assistant" || last.parts.length === 0) return null;
-  const parts = last.parts;
-  for (let i = parts.length - 1; i >= 0; i--) {
-    const part = parts.at(i);
-    if (!part) continue;
-    const line = describeToolPartActivity(part);
-    if (line) return line;
-  }
-  return null;
-}
-
-function describeBackendActivity(status: ChatStatus, messages: AssistantUIMessage[]): string {
-  if (status === "error") return "Có lỗi khi gọi auth-worker /dashboard/assistant/chat.";
-  if (status === "submitted") return "Đang gửi tin nhắn tới auth-worker /dashboard/assistant/chat…";
-
-  // Remaining ChatStatus is only 'streaming' | 'ready'
-  const fromParts = describeActivityFromLastAssistantMessage(messages);
-  if (fromParts) return fromParts;
-
-  if (status === "streaming") return "Auth-worker assistant đang stream phản hồi (Workers AI + tools)…";
-  return "";
-}
-
-function AssistantMessagePartView({ index, part }: { index: number; part: AssistantMessagePart }) {
-  if (part.type === "text") {
-    return <p className="text-sm whitespace-pre-wrap">{part.text}</p>;
-  }
-  if (part.type === "step-start") {
-    return index > 0 ? <hr className="border-muted my-2" /> : null;
-  }
-  if (part.type === "tool-createApiKey") {
-    return <CreateApiKeyToolView part={part} />;
-  }
-  if (part.type === "tool-createOrder") {
-    return <CreateOrderToolView part={part} />;
-  }
-  return null;
-}
-
-function AssistantMessagesList({ emptyLabel, messages }: { emptyLabel: string; messages: AssistantUIMessage[] }) {
-  if (messages.length === 0) {
-    return <p className="text-muted-foreground text-sm">{emptyLabel}</p>;
-  }
-  return messages.map((message) => (
-    <div key={message.id} className="space-y-2">
-      <div className="text-muted-foreground text-xs font-medium uppercase">{message.role}</div>
-      <div className="space-y-2 pl-0">
-        {message.parts.map((part, index) => (
-          // eslint-disable-next-line react/no-array-index-key -- SDK parts are ordered; not all part kinds expose stable ids
-          <AssistantMessagePartView key={`${message.id}-${index}`} index={index} part={part} />
-        ))}
-      </div>
+function ConfirmationActions({
+  disabled,
+  onCancel,
+  onConfirm,
+  t,
+}: {
+  disabled: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  t: AssistantTranslations;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-muted-foreground text-sm">{t("confirmation_actions.prompt")}</span>
+      <Button type="button" onClick={onConfirm} disabled={disabled}>
+        {t("confirmation_actions.ok_label")}
+      </Button>
+      <Button type="button" variant="outline" onClick={onCancel} disabled={disabled}>
+        {t("confirmation_actions.cancel_label")}
+      </Button>
     </div>
-  ));
+  );
 }
 
 export function AssistantChat() {
@@ -121,22 +63,42 @@ export function AssistantChat() {
 
   const { messages, sendMessage, status, stop, error } = useChat<AssistantUIMessage>({ transport });
 
-  const activity = describeBackendActivity(status, messages);
+  const isBusy = status === "streaming" || status === "submitted";
+  const activity = describeBackendActivity(status, messages, t);
+  const pendingConfirmationKey = getPendingConfirmationKey(messages);
+  const showConfirmationActions = shouldShowConfirmationActions(status, messages);
+  const canSend = !isBusy && Boolean(text.trim());
+  const sendConfirmation = (value: "ok" | "cancel") => {
+    const payload =
+      value === "ok"
+        ? pendingConfirmationKey
+          ? `${CONFIRM_APPROVE_TOKEN}${CONFIRM_SEPARATOR}${pendingConfirmationKey}`
+          : CONFIRM_APPROVE_TOKEN
+        : CONFIRM_CANCEL_TOKEN;
+    void sendMessage({ text: payload });
+  };
 
   return (
     <div className="flex h-[min(720px,calc(100vh-12rem))] flex-col gap-4">
       <div className="bg-muted/40 text-muted-foreground flex min-h-9 items-center gap-2 rounded-md border px-3 py-2 text-sm">
-        <Loader2
-          className={`h-4 w-4 shrink-0 ${status === "streaming" || status === "submitted" ? "animate-spin" : "opacity-40"}`}
-        />
+        <Loader2 className={`h-4 w-4 shrink-0 ${isBusy ? "animate-spin" : "opacity-40"}`} />
         <span className="min-w-0 flex-1">{activity || t("activity_idle")}</span>
       </div>
 
       {error ? <p className="text-destructive text-sm">{error.message}</p> : null}
 
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-md border p-4">
-        <AssistantMessagesList emptyLabel={t("empty")} messages={messages} />
+        <AssistantMessagesList emptyLabel={t("empty")} messages={messages} t={t} />
       </div>
+
+      {showConfirmationActions ? (
+        <ConfirmationActions
+          t={t}
+          disabled={isBusy}
+          onConfirm={() => sendConfirmation("ok")}
+          onCancel={() => sendConfirmation("cancel")}
+        />
+      ) : null}
 
       <form
         className="flex flex-col gap-2 sm:flex-row sm:items-end"
@@ -154,13 +116,13 @@ export function AssistantChat() {
           onChange={(e) => setText(e.target.value)}
         />
         <div className="flex shrink-0 gap-2 sm:flex-col">
-          {(status === "streaming" || status === "submitted") && (
+          {isBusy && (
             <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => stop()}>
               <Square className="mr-2 h-4 w-4" />
               {t("stop")}
             </Button>
           )}
-          <Button type="submit" disabled={status === "streaming" || status === "submitted" || !text.trim()}>
+          <Button type="submit" disabled={!canSend}>
             <SendHorizontal className="mr-2 h-4 w-4" />
             {t("send")}
           </Button>

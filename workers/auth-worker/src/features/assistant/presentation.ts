@@ -5,6 +5,28 @@ import { requireAuth } from '../auth/authMiddleware';
 import { handleError } from '../../shared/utils';
 import { createAssistantApplicationService } from './application';
 
+function extractLatestUserMessageText(messages: unknown[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i] as { role?: unknown; parts?: unknown; content?: unknown } | undefined;
+    if (!message || message.role !== 'user') continue;
+
+    if (Array.isArray(message.parts)) {
+      const textParts = message.parts
+        .map((part) => {
+          if (!part || typeof part !== 'object') return '';
+          const candidate = part as { type?: unknown; text?: unknown };
+          return candidate.type === 'text' && typeof candidate.text === 'string' ? candidate.text : '';
+        })
+        .filter(Boolean);
+      if (textParts.length > 0) return textParts.join('\n').trim();
+    }
+
+    if (typeof message.content === 'string') return message.content.trim();
+  }
+
+  return '';
+}
+
 export function createAssistantRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
 
@@ -22,7 +44,8 @@ export function createAssistantRoutes(bindingName: string) {
         return c.json({ error: 'Expected { messages: UIMessage[] }' }, 400);
       }
 
-      const agent = createAssistantApplicationService(c, bindingName, user);
+      const latestUserMessageText = extractLatestUserMessageText(messages);
+      const agent = createAssistantApplicationService(c, bindingName, user, latestUserMessageText);
 
       return await createAgentUIStreamResponse({
         agent,

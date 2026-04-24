@@ -81,6 +81,7 @@ export function SearchDialog({ user }: SearchDialogProps) {
     (title: string): string => {
       const translationMap: Record<string, string> = {
         Dashboards: t("dashboards"),
+        Assistant: t("assistant"),
         Pages: t("pages"),
         Misc: t("misc"),
         Default: t("default"),

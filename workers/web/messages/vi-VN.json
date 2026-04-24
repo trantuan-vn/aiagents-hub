@@ -132,6 +132,7 @@
     "overview": "Tổng quan",
     "account": "Tài khoản",
     "api_keys": "Khóa API",
+    "assistant": "Trợ lý",
     "billing": "Thanh toán",
     "notifications": "Thông báo",
     "settings": "Cài đặt",
@@ -1432,7 +1433,25 @@
     "placeholder": "Nhập tin nhắn…",
     "send": "Gửi",
     "stop": "Dừng",
-    "activity_idle": "Sẵn sàng hỗ trợ bạn. Hãy nhắn yêu cầu, mình sẽ xử lý từng bước khi cần."
+    "activity_idle": "Sẵn sàng hỗ trợ bạn. Hãy nhắn yêu cầu, mình sẽ xử lý từng bước khi cần.",
+    "activity": {
+      "backend_error": "Có lỗi khi gọi auth-worker /dashboard/assistant/chat.",
+      "submitted": "Đang gửi tin nhắn tới auth-worker /dashboard/assistant/chat…",
+      "streaming": "Auth-worker assistant đang stream phản hồi (Workers AI + tools)…",
+      "create_api_key_input": "Model đang chọn tham số tạo API key → sẽ gọi auth-worker /dashboard/token/create.",
+      "create_api_key_loading": "Backend: đang gọi auth-worker POST /dashboard/token/create (tạo API key)…",
+      "create_order_input": "Model đang chọn tham số đơn hàng → sẽ gọi auth-worker /dashboard/order/orders.",
+      "create_order_loading": "Backend: đang gọi auth-worker POST /dashboard/order/orders (tạo đơn)…",
+      "create_payment_url_input": "Model đang chọn tham số tạo link thanh toán.",
+      "create_payment_url_loading": "Backend: đang tạo link thanh toán cho đơn hàng…"
+    },
+    "confirmation_actions": {
+      "prompt": "Xác nhận thao tác:",
+      "ok_label": "Đồng ý",
+      "cancel_label": "Hủy",
+      "ok_payload": "__assistant_confirm_ok__",
+      "cancel_payload": "__assistant_confirm_cancel__"
+    }
   },
   "WalletConnect": {
     "nonce_validation_error": "Nonce chỉ được chứa chữ cái và số",

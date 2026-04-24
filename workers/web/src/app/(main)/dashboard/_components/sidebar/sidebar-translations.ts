@@ -10,6 +10,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     Overview: t("overview"),
     Account: t("account"),
     "API Keys": t("api_keys"),
+    Assistant: t("assistant"),
     Billing: t("billing"),
     Notifications: t("notifications"),
     Settings: t("settings"),
