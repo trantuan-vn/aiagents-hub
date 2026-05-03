@@ -1,0 +1,1 @@
+Help me install fireant-stock using Clawhub. If Clawhub is not installed, install it first (npm i -g clawhub)
