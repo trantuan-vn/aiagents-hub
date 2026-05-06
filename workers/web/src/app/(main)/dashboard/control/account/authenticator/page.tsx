@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { type AuthenticatorStep, renderStepContent } from "./_components/authenticator-step-content";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function AuthenticatorPage() {
   const t = useTranslations("AccountPage.authenticator");

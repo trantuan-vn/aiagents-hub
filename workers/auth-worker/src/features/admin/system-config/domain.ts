@@ -66,4 +66,4 @@ export const DEFAULT_D1TOR2_CONFIG: D1tor2CronConfig = {
 	D1_RETENTION_DAYS: 96,
 };
 
-export const KV_KEY = 'system_config';
+export const KV_KEY = 'aiagents-hub-system-config';

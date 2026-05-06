@@ -102,7 +102,7 @@ export async function getUserFromToken(
     if (!sessionId) return { user: null };
 
     const cookieHeader = buildCookieHeader(token, refreshToken, sessionId);
-    const apiUrl = process.env.AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
+    const apiUrl = process.env.AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
     const headers = buildProfileRequestHeaders(cookieHeader, opts);
     return fetchUserProfile(apiUrl, headers);
   } catch (error) {

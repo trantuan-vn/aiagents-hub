@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { type SmsStep, renderSmsStepContent } from "./_components/sms-step-content";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function SmsPage() {
   const t = useTranslations("AccountPage.sms");

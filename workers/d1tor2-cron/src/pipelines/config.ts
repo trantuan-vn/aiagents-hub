@@ -419,7 +419,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(ServiceUsageSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(ServiceUsageSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 	{
 		schemaName: 'OrderSchema',
@@ -427,7 +427,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(OrderSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 	{
 		schemaName: 'OrderItemSchema',
@@ -435,7 +435,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(OrderItemSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 	{
 		schemaName: 'OrderItemDiscountSchema',
@@ -443,7 +443,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(OrderItemDiscountSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemDiscountSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 	{
 		schemaName: 'PaymentSchema',
@@ -451,7 +451,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(PaymentSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(PaymentSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 	{
 		schemaName: 'RefundSchema',
@@ -459,7 +459,7 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		schema: createExtendedSchema(RefundSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(RefundSchema)),
 		namespace: 'v011',
-		r2BucketName: 'lakehouse',
+		r2BucketName: 'aiagents-hub-lakehouse',
 	},
 ];
 

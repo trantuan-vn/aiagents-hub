@@ -87,7 +87,7 @@ const About = () => {
                       <span className="h-2.5 w-2.5 rounded-full bg-amber-500/90" />
                       <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/90" />
                     </div>
-                    <span className="text-muted-foreground ml-2 font-mono text-[11px]">api.unitoken.trade</span>
+                    <span className="text-muted-foreground ml-2 font-mono text-[11px]">api.aiagents-hub.vn</span>
                   </div>
                   <pre className="text-muted-foreground font-mono text-xs leading-relaxed whitespace-pre-wrap md:text-sm">
                     {t("mission.terminal")}

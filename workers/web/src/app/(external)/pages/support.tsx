@@ -228,13 +228,13 @@ const Support = () => {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <a
-                    href="mailto:admin@unitoken.trade"
+                    href="mailto:support@aiagents-hub.vn"
                     className="hover:bg-muted flex items-center gap-3 rounded-lg p-3 transition-colors"
                   >
                     <Mail className="text-primary h-5 w-5" />
                     <div>
                       <p className="text-sm font-medium">{t("need_help.email_support")}</p>
-                      <p className="text-muted-foreground text-xs">admin@unitoken.trade</p>
+                      <p className="text-muted-foreground text-xs">support@aiagents-hub.vn</p>
                     </div>
                   </a>
                   <div className="bg-muted/50 flex items-center gap-3 rounded-lg p-3">

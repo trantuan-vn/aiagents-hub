@@ -5,7 +5,7 @@ import { executeUtils, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { generateReferralCode, storeReferralCode } from '../../member/referral/utils';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://unitoken.trade';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
 
 export function getReferralLinkTool(c: any, bindingName: string, user: any) {
   return tool({

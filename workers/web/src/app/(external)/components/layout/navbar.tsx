@@ -56,7 +56,7 @@ export default function Navbar() {
   // Check authentication status using API (since token cookie is httpOnly)
   const checkAuth = useCallback(async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.unitoken.trade/dashboard/auth";
+      const apiUrl = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
       const response = await fetch(`${apiUrl}/profile/me`, {
         method: "GET",
         credentials: "include",

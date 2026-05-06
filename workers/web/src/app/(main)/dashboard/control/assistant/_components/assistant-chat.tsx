@@ -50,7 +50,7 @@ function ConfirmationActions({
 export function AssistantChat() {
   const t = useTranslations("AssistantPage");
   const [text, setText] = useState("");
-  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
   const transport = useMemo(
     () =>

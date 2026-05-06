@@ -13,7 +13,7 @@ import { CreateTokenDialog } from "./_components/create-token-dialog";
 import type { ApiToken, CreateApiToken } from "./_components/schema";
 import { TokenList } from "./_components/token-list";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface TokenListResponse {
   tokens: ApiToken[];

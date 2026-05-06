@@ -222,7 +222,7 @@ export function NavMain({ items, user }: NavMainProps) {
                 variant="outline"
                 asChild
               >
-                <a href="mailto:admin@unitoken.trade" title={t("email_admin")}>
+                <a href="mailto:support@aiagents-hub.vn" title={t("email_admin")}>
                   <MailIcon />
                   <span className="sr-only">{t("email_admin")}</span>
                 </a>

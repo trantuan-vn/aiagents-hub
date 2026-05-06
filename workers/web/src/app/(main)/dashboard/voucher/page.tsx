@@ -13,7 +13,7 @@ import { CreateVoucherDialog } from "./_components/create-voucher-dialog";
 import { type CreateVoucher, type Voucher } from "./_components/schema";
 import { VoucherList } from "./_components/voucher-list";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function VoucherPage() {
   const t = useTranslations("VoucherPage");

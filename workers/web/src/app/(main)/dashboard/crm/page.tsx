@@ -8,7 +8,7 @@ import { CrmDataTables } from "./_components/crm-data-tables";
 import { CrmInsightCharts } from "./_components/crm-insight-charts";
 import { CrmOverviewCards } from "./_components/crm-overview-cards";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export interface AdminCrmStats {
   totalUsers: { current: number; previous: number; changePercent: number };

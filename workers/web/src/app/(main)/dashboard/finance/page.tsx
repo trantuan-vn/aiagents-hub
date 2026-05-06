@@ -8,7 +8,7 @@ import { FinanceDataTables } from "./_components/finance-data-tables";
 import { FinanceInsightCharts } from "./_components/finance-insight-charts";
 import { FinanceOverviewCards } from "./_components/finance-overview-cards";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export interface AdminFinanceStats {
   totalRevenue: { current: number; previous: number; changePercent: number };

@@ -1,5 +1,5 @@
 main = ".open-next/worker.js"
-name = "trading-sto"
+name = "aiagents-hub-trading-sto"
 compatibility_date = "2025-03-25"
 compatibility_flags = ["nodejs_compat"]
 
@@ -16,5 +16,5 @@ cpu_ms = 300000
 directory = ".open-next/assets"
 binding = "ASSETS"
 [[routes]]
-pattern = "unitoken.trade"
+pattern = "aiagents-hub.vn"
 custom_domain = true

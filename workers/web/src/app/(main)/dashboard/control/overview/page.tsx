@@ -15,7 +15,7 @@ import { SubscriptionsCard } from "./_components/subscriptions-card";
 import { TrustHighlights } from "./_components/trust-highlights";
 import { WelcomeHero } from "./_components/welcome-hero";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface OverviewStats {
   totalApiCalls: number;

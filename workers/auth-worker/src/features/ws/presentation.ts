@@ -52,7 +52,7 @@ export function createDashboardWebSocketRoutes(bindingName: string) {
     }
   });
 
-  // Push message to ws-broadcast-queue (admin only, same as API but with session auth)
+  // Push message to aiagents-hub-ws-broadcast-queue (admin only, same as API but with session auth)
   app.post('/queue/push', async (c) => {
     try {
       const user = requireAuth(c);
@@ -140,7 +140,7 @@ export function createApiWebSocketRoutes(bindingName: string) {
     }
   });
 
-  // Push message to ws-broadcast-queue (consumer-worker sẽ xử lý và gọi UserShardDO)
+  // Push message to aiagents-hub-ws-broadcast-queue (consumer-worker sẽ xử lý và gọi UserShardDO)
   app.post('/queue/push', async (c) => {
     try {
       requirePermissions(c, ['websocket:broadcast']);

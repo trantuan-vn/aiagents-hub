@@ -13,7 +13,7 @@ import { LogsOverviewChart } from "./_components/logs-overview-chart";
 import { LogsStatsCards } from "./_components/logs-stats-cards";
 import { LogsTableCard } from "./_components/logs-table-card";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 const PAGE_SIZE = 25;
 
 interface ServiceUsageLog {

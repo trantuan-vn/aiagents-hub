@@ -60,7 +60,7 @@ export function AccountSwitcher({ user }: { readonly user: User | null }) {
       await checkDisconnected();
 
       // Call API logout
-      const response = await fetch("https://api.unitoken.trade/dashboard/auth/profile/logout", {
+      const response = await fetch("https://api.aiagents-hub.vn/dashboard/auth/profile/logout", {
         method: "POST",
         credentials: "include",
       });

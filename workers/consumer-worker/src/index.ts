@@ -1,6 +1,6 @@
 /// <reference path="../worker-configuration.d.ts" />
 /**
- * Consumer worker: consumes ws-broadcast-queue, parses by type (heartbeats, notifications, prices, etc.),
+ * Consumer worker: consumes aiagents-hub-ws-broadcast-queue, parses by type (heartbeats, notifications, prices, etc.),
  * computes shards from targetUsers, and calls UserShardDO.handleFastBroadcast
  */
 
@@ -167,8 +167,8 @@ export default {
     console.log(`[ConsumerWorker] Processing ${batch.queue} with ${batch.messages.length} messages`);
 
     const handlers: Record<string, (batch: MessageBatch, env: Env) => Promise<void>> = {
-      'ws-broadcast-queue': processWsBroadcastQueue,
-      'ws-broadcast-dlq': processDlq,
+      'aiagents-hub-ws-broadcast-queue': processWsBroadcastQueue,
+      'aiagents-hub-ws-broadcast-dlq': processDlq,
     };
 
     const handler = handlers[batch.queue];

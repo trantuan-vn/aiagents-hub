@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "auth-worker",
+	"name": "aiagents-hub-auth-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-04-01",
 	"compatibility_flags": [
@@ -39,17 +39,17 @@
 		"bindings": [
 			{
 				"name": "BROADCAST_SERVICE_DO",
-				"script_name": "auth-worker",
+				"script_name": "aiagents-hub-auth-worker",
 				"class_name": "BroadcastServiceDO"
 			},
 			{
 				"name": "USER_SHARD_DO", 
-				"script_name": "auth-worker",
+				"script_name": "aiagents-hub-auth-worker",
 				"class_name": "UserShardDO"
 			},
 			{
 				"name": "USER_DO",
-				"script_name": "auth-worker", 
+				"script_name": "aiagents-hub-auth-worker", 
 				"class_name": "UserDO"
 			}
 		]
@@ -58,15 +58,15 @@
 		"enabled": true
 	},
 	"images": {
-		"binding": "IMAGES", // i.e. available in your Worker on env.IMAGES
+		"binding": "IMAGES" // i.e. available in your Worker on env.IMAGES
 	},
 	// "placement": { "mode": "smart" }
 	"vars": {
 		"ACCOUNT_ID": "e76b7bb989f93985402e1a61e6cd5ff3",  
 		"SMS_FROM_NUMBER": "+84919358683",		
-		"SIWE_DOMAIN": "unitoken.trade",
-		"FRONTEND_URL": "https://unitoken.trade",
-		"BASE_URL": "https://api.unitoken.trade",
+		"SIWE_DOMAIN": "aiagents-hub.vn",
+		"FRONTEND_URL": "https://aiagents-hub.vn",
+		"BASE_URL": "https://api.aiagents-hub.vn",
 		"DEBUG": "false",
 		"ENVIRONMENT": "production",
 		"QUEUE_BATCH_SIZE": "100",
@@ -80,15 +80,15 @@
 		"producers": [
 		{
 			"binding": "INPUT_QUEUE",
-			"queue": "input-part-0"
+			"queue": "aiagents-hub-input-part-0"
 		},
 		{
 			"binding": "ERROR_QUEUE",
-			"queue": "error-queue-dlq"
+			"queue": "aiagents-hub-error-queue-dlq"
 		},
 		{
 			"binding": "WS_BROADCAST_QUEUE",
-			"queue": "ws-broadcast-queue"
+			"queue": "aiagents-hub-ws-broadcast-queue"
 		}
 		]
 	},
@@ -96,28 +96,28 @@
 	"d1_databases": [
 		{
 			"binding": "D1DB",
-			"database_name": "unitoken_db",
-			"database_id": "02704177-c811-4132-92e4-622f955a7ae8"
+			"database_name": "aiagents-hub-db",
+			"database_id": "1c4b5c9d-4125-44fc-b1c8-c47bd3898b54"
 		}
 	],
 	"r2_buckets": [
 		{
 		"binding": "R2_VERSION_BUCKET",
-		"bucket_name": "version-backup-bucket"
+		"bucket_name": "aiagents-hub-version-backup-bucket"
 		},
 		{
 		"binding": "R2_EKYC_BUCKET",
-		"bucket_name": "ekyc-storage-bucket"
+		"bucket_name": "aiagents-hub-ekyc-storage-bucket"
 		}
 	],	
 	"kv_namespaces": [
 		{
 			"binding": "NONCE_KV",
-			"id": "fbaaa47d74ba4fd4b2342d9abae94491"
+			"id": "dfbfc6ec8f75482bbf54854d86442e27"
 		},
 		{
 			"binding": "SYSTEM_CONFIG_KV",
-			"id": "529353fcfe7641c9bcbd5dda5d01d5da"
+			"id": "e80315e1a3fb47e2959d645a15ac534a"
 		}
 	],
 	"ai": {
@@ -125,7 +125,7 @@
 	},
 	"routes": [
 		{
-		"pattern": "api.unitoken.trade",
+		"pattern": "api.aiagents-hub.vn",
 		"custom_domain": true
 		}
 	],	
@@ -234,7 +234,7 @@
   	"services": [
 		{
 			"binding": "QUEUE_WORKER",        // Tên bạn sẽ dùng trong code: env.QUEUE_WORKER
-			"service": "queue-worker",        // Tên chính xác của Worker kia (phải khớp 100%)
+			"service": "aiagents-hub-queue-worker"        // Tên chính xác của Worker kia (phải khớp 100%)
 		}
 	]
 }

@@ -179,7 +179,7 @@
     "search": "Search",
     "search_placeholder": "Search dashboards, users, and more…",
     "no_results": "No results found.",
-    "system_config": "System Configuration",
+    "aiagents-hub-system-config": "System Configuration",
     "price_policy": "Price Policy",
     "commission_policy": "Commission Policy",
     "api_service": "API Service",
@@ -562,12 +562,12 @@
     "badge": "API infrastructure",
     "title": "Built for teams who treat APIs as",
     "title_gradient": "core business",
-    "subtitle": "APIHub powers unitoken.trade — a managed platform for reliable, metered API access. We help developers and enterprises ship faster with clear contracts, observability, and security baked in.",
+    "subtitle": "APIHub powers aiagents-hub.vn — a managed platform for reliable, metered API access. We help developers and enterprises ship faster with clear contracts, observability, and security baked in.",
     "mission": {
       "title": "Why we exist",
       "lead": "Software today runs on APIs. Billing, identity, AI, automation — when the API layer fails, products fail.",
       "body": "We focus on predictable performance, transparent usage, and documentation you can actually integrate from day one. Whether you are prototyping or running production traffic, our job is to stay invisible where it matters: uptime, latency, and trust.",
-      "terminal": "GET /v1/health HTTP/1.1\nHost: api.unitoken.trade\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
+      "terminal": "GET /v1/health HTTP/1.1\nHost: api.aiagents-hub.vn\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
       "terminal_caption": "Consistent responses across regions — monitored 24/7"
     },
     "values_section": {
@@ -623,7 +623,7 @@
   "CommunityPage": {
     "badge": "Connect & build",
     "title": "A community for teams shipping on",
-    "title_gradient": "unitoken.trade",
+    "title_gradient": "aiagents-hub.vn",
     "subtitle": "Documentation, support, and clear paths into managed APIs, eKYC, and the dashboard—whether you are prototyping or running production traffic.",
     "base_url_label": "Production base URL",
     "steps": {
@@ -635,7 +635,7 @@
       "2_title": "Choose a package",
       "2_desc": "Pick metered access that matches your workloads—eKYC, CLAW, AI Vision, and more.",
       "3_title": "Integrate & observe",
-      "3_desc": "Call api.unitoken.trade with Bearer tokens, track usage in the dashboard, and reach support when you need humans."
+      "3_desc": "Call api.aiagents-hub.vn with Bearer tokens, track usage in the dashboard, and reach support when you need humans."
     },
     "paths": {
       "title": "Where to go",
@@ -716,7 +716,7 @@
     "badge": "Join the API platform team",
     "title": "Build the backbone of",
     "title_gradient": "modern integrations",
-    "subtitle": "We operate unitoken.trade as a managed API business: reliable gateways, clear metering, and developer-first docs. Help us ship infrastructure other teams depend on every day.",
+    "subtitle": "We operate aiagents-hub.vn as a managed API business: reliable gateways, clear metering, and developer-first docs. Help us ship infrastructure other teams depend on every day.",
     "why": {
       "title": "Why",
       "title_gradient": "APIHub",
@@ -792,7 +792,7 @@
       "title_gradient": "Say hello anyway",
       "subtitle": "We read every message. Send us a few lines about what you want to build — we will reach out when there is a good fit.",
       "apply_general": "Email admin",
-      "apply_general_subject": "General application — APIHub / unitoken.trade",
+      "apply_general_subject": "General application — APIHub / aiagents-hub.vn",
       "browse_docs": "Read the docs"
     }
   },
@@ -800,7 +800,7 @@
     "badge": "We’re here to help",
     "title": "Talk to the",
     "title_gradient": "APIHub team",
-    "subtitle": "Questions about billing, integration, or partnerships? Reach out — we route every message to the right people at unitoken.trade.",
+    "subtitle": "Questions about billing, integration, or partnerships? Reach out — we route every message to the right people at aiagents-hub.vn.",
     "response_hint": "We usually reply within one business day.",
     "cards": {
       "copy": {
@@ -814,7 +814,7 @@
       },
       "docs": {
         "title": "Documentation",
-        "description": "Quickstart, reference, and examples for api.unitoken.trade.",
+        "description": "Quickstart, reference, and examples for api.aiagents-hub.vn.",
         "action": "Browse docs"
       }
     },
@@ -831,7 +831,7 @@
       "message_label": "Message",
       "message_placeholder": "What should we know? Include links or account details if relevant.",
       "submit": "Open in email app",
-      "mailto_note": "Submitting opens your default mail app with a draft to admin@unitoken.trade. You can edit before sending."
+      "mailto_note": "Submitting opens your default mail app with a draft to support@aiagents-hub.vn. You can edit before sending."
     },
     "topics": {
       "general": "General",
@@ -840,7 +840,7 @@
       "partnership": "Partnership",
       "other": "Other"
     },
-    "mailto_subject": "[{topic}] {name} — unitoken.trade contact",
+    "mailto_subject": "[{topic}] {name} — aiagents-hub.vn contact",
     "mailto_body_header": "From: {name} <{email}>",
     "toast_opened": "Your mail app should open with a draft.",
     "toast_copy": "Email copied to clipboard.",
@@ -908,7 +908,7 @@
     "badge": "Legal",
     "title": "Terms of",
     "title_gradient": "Service",
-    "subtitle": "These Terms govern your use of unitoken.trade and our managed API platform—including AI-assisted and blockchain-related capabilities—in line with common international practice for cloud and API services.",
+    "subtitle": "These Terms govern your use of aiagents-hub.vn and our managed API platform—including AI-assisted and blockchain-related capabilities—in line with common international practice for cloud and API services.",
     "last_updated": "Last updated: March 25, 2025",
     "toc_title": "On this page",
     "toc_aria": "Terms of service sections",
@@ -921,7 +921,7 @@
       "agreement": {
         "title": "Agreement to these Terms",
         "paragraphs": [
-          "These Terms of Service (\"Terms\") form a binding agreement between you (\"you\", \"your\", or \"Customer\") and the operator of unitoken.trade and api.unitoken.trade (collectively, the \"Platform\", \"we\", \"us\", or \"our\").",
+          "These Terms of Service (\"Terms\") form a binding agreement between you (\"you\", \"your\", or \"Customer\") and the operator of aiagents-hub.vn and api.aiagents-hub.vn (collectively, the \"Platform\", \"we\", \"us\", or \"our\").",
           "By accessing or using the Platform, creating an account, subscribing to an API product, generating API keys, connecting a wallet, or otherwise using our services, you agree to these Terms and to our Privacy Policy (where applicable). If you do not agree, do not use the Platform.",
           "If you use the Platform on behalf of an organization, you represent that you have authority to bind that organization, and \"you\" includes that entity."
         ]
@@ -929,7 +929,7 @@
       "definitions": {
         "title": "Definitions",
         "paragraphs": [
-          "\"API\" means the application programming interfaces, endpoints, SDKs, webhooks, and related developer tools we make available at or through api.unitoken.trade (or successor URLs).",
+          "\"API\" means the application programming interfaces, endpoints, SDKs, webhooks, and related developer tools we make available at or through api.aiagents-hub.vn (or successor URLs).",
           "\"AI Features\" means machine-learning or generative capabilities we provide (for example assistants, classification, enrichment, or automation) whether labeled as AI or not.",
           "\"Blockchain Features\" means functionality that interacts with public or permissioned distributed ledgers, smart contracts, wallet-based authentication, or on-chain attestations.",
           "\"Content\" means data, prompts, files, payloads, metadata, or other materials that you or your end users submit to or retrieve from the Platform."
@@ -1033,7 +1033,7 @@
       "law": {
         "title": "Governing law and disputes",
         "paragraphs": [
-          "Unless mandatory consumer-protection rules in your jurisdiction require otherwise, these Terms are governed by the laws applicable to the operator of unitoken.trade, without regard to conflict-of-law principles that would require applying another jurisdiction's laws.",
+          "Unless mandatory consumer-protection rules in your jurisdiction require otherwise, these Terms are governed by the laws applicable to the operator of aiagents-hub.vn, without regard to conflict-of-law principles that would require applying another jurisdiction's laws.",
           "You agree to first contact us to seek an informal resolution of any dispute. If a dispute cannot be resolved informally, exclusive jurisdiction and venue for litigation will lie with the courts competent for the operator's registered seat, unless applicable law requires a different forum for consumers.",
           "The United Nations Convention on Contracts for the International Sale of Goods does not apply."
         ]
@@ -1041,7 +1041,7 @@
       "contact": {
         "title": "Contact",
         "paragraphs": [
-          "For questions about these Terms, billing, or compliance, contact us at admin@unitoken.trade. Corporate name and registered address may be provided upon request for contractual or regulatory purposes."
+          "For questions about these Terms, billing, or compliance, contact us at support@aiagents-hub.vn. Corporate name and registered address may be provided upon request for contractual or regulatory purposes."
         ]
       }
     }
@@ -1050,7 +1050,7 @@
     "badge": "Trust & transparency",
     "title": "Privacy",
     "title_gradient": "Policy",
-    "subtitle": "How we collect, use, share, and protect personal information when you use unitoken.trade, api.unitoken.trade, and related services. This notice is designed to align with common international expectations, including transparency principles reflected in the GDPR and similar frameworks.",
+    "subtitle": "How we collect, use, share, and protect personal information when you use aiagents-hub.vn, api.aiagents-hub.vn, and related services. This notice is designed to align with common international expectations, including transparency principles reflected in the GDPR and similar frameworks.",
     "last_updated": "Last updated: March 25, 2025",
     "toc_title": "On this page",
     "toc_aria": "Privacy policy sections",
@@ -1064,7 +1064,7 @@
       "intro": {
         "title": "Introduction and scope",
         "paragraphs": [
-          "This Privacy Policy (\"Policy\") explains how the operator of unitoken.trade and api.unitoken.trade (collectively, the \"Platform\", \"we\", \"us\", or \"our\") handles personal information.",
+          "This Privacy Policy (\"Policy\") explains how the operator of aiagents-hub.vn and api.aiagents-hub.vn (collectively, the \"Platform\", \"we\", \"us\", or \"our\") handles personal information.",
           "It applies when you visit our websites, create or use an account, purchase or use API products, interact with dashboards or documentation, authenticate with a wallet or passkey where offered, or otherwise engage with our services. It should be read together with our Terms of Service and any product-specific notices we provide.",
           "We may update this Policy from time to time. We will post the revised version on this page and change the \"Last updated\" date. Where changes are material, we will provide additional notice when reasonable (for example by email or an in-product banner)."
         ]
@@ -1073,7 +1073,7 @@
         "title": "Data controller and contact",
         "paragraphs": [
           "The data controller responsible for personal information described in this Policy is the legal entity operating the Platform (referred to here as \"APIHub\" / \"Unitoken\" for convenience). Corporate name, registered address, and registration identifiers may be provided on request for contractual, invoicing, or regulatory purposes.",
-          "For general privacy inquiries and to exercise your rights where applicable, contact us at admin@unitoken.trade. For security incidents involving credentials or suspected unauthorized access, contact us promptly using the same channel and include relevant details so we can respond effectively."
+          "For general privacy inquiries and to exercise your rights where applicable, contact us at support@aiagents-hub.vn. For security incidents involving credentials or suspected unauthorized access, contact us promptly using the same channel and include relevant details so we can respond effectively."
         ]
       },
       "collection": {
@@ -1115,7 +1115,7 @@
         "title": "International transfers",
         "paragraphs": [
           "We may process and store information in countries other than where you live, including where our infrastructure and partners operate. When we transfer personal information from the European Economic Area, the United Kingdom, or Switzerland to countries not subject to an adequacy decision, we implement appropriate safeguards such as Standard Contractual Clauses approved by the European Commission (and UK/Swiss equivalents where relevant) or other lawful transfer mechanisms.",
-          "You may request more information about these safeguards by contacting us at admin@unitoken.trade."
+          "You may request more information about these safeguards by contacting us at support@aiagents-hub.vn."
         ]
       },
       "retention": {
@@ -1138,7 +1138,7 @@
           "Depending on your location, you may have rights to access, correct, delete, or export personal information; restrict or object to certain processing; withdraw consent where processing is consent-based; and lodge a complaint with a supervisory authority.",
           "Residents of the European Economic Area, the United Kingdom, and similar jurisdictions can exercise these rights subject to applicable exceptions. We will respond within the timeframes required by law, typically within one month for GDPR requests (extensions may apply for complex requests).",
           "If you are a California resident, you may have rights under the CCPA/CPRA, including to know categories of personal information collected, purposes, sources, disclosures, and to request correction or deletion subject to exceptions. We do not \"sell\" or \"share\" personal information as those terms are defined in the CPRA for targeted advertising in a way that requires opt-out of sale/sharing for the core API service described here; if our practices change, we will update this Policy and any required links.",
-          "To submit a request, email admin@unitoken.trade from your account email or provide information we can use to verify your identity. Authorized agents may submit requests where permitted by law with appropriate documentation."
+          "To submit a request, email support@aiagents-hub.vn from your account email or provide information we can use to verify your identity. Authorized agents may submit requests where permitted by law with appropriate documentation."
         ]
       },
       "children": {
@@ -1163,7 +1163,7 @@
       "contact": {
         "title": "Contact",
         "paragraphs": [
-          "For privacy questions, data protection requests, or concerns about this Policy, contact admin@unitoken.trade. You may also contact your local data protection authority if you believe applicable law has been violated."
+          "For privacy questions, data protection requests, or concerns about this Policy, contact support@aiagents-hub.vn. You may also contact your local data protection authority if you believe applicable law has been violated."
         ]
       }
     }
@@ -1172,7 +1172,7 @@
     "badge": "Transparency",
     "title": "Cookie",
     "title_gradient": "Policy",
-    "subtitle": "How unitoken.trade and api.unitoken.trade use cookies and similar technologies for authentication, security, wallet features, and preferences. This page complements our Privacy Policy and reflects how our services are built today.",
+    "subtitle": "How aiagents-hub.vn and api.aiagents-hub.vn use cookies and similar technologies for authentication, security, wallet features, and preferences. This page complements our Privacy Policy and reflects how our services are built today.",
     "last_updated": "Last updated: March 25, 2025",
     "toc_title": "On this page",
     "toc_aria": "Cookie policy sections",
@@ -1188,7 +1188,7 @@
       "intro": {
         "title": "Introduction",
         "paragraphs": [
-          "This Cookie Policy explains how the operator of unitoken.trade and api.unitoken.trade (the \"Platform\", \"we\", \"us\") uses HTTP cookies and similar storage on your device when you use our websites, dashboards, and APIs.",
+          "This Cookie Policy explains how the operator of aiagents-hub.vn and api.aiagents-hub.vn (the \"Platform\", \"we\", \"us\") uses HTTP cookies and similar storage on your device when you use our websites, dashboards, and APIs.",
           "It should be read together with our Privacy Policy, which describes personal data processing more broadly. Where this page refers to \"cookies\", we include comparable technologies such as local storage when they serve a similar role, unless noted otherwise.",
           "We minimize data collection and rely on strictly necessary cookies for core security and session management. Non-essential cookies or analytics run only where compatible with our product configuration and applicable law."
         ]
@@ -1196,7 +1196,7 @@
       "what_are_cookies": {
         "title": "What cookies are",
         "paragraphs": [
-          "Cookies are small text files placed on your device by a web server. First-party cookies are set by domains we control (for example unitoken.trade or api.unitoken.trade). Third-party cookies may be set by embedded services or providers when you use certain features.",
+          "Cookies are small text files placed on your device by a web server. First-party cookies are set by domains we control (for example aiagents-hub.vn or api.aiagents-hub.vn). Third-party cookies may be set by embedded services or providers when you use certain features.",
           "Cookies can be session cookies (removed when you close the browser) or persistent cookies (stored until they expire or you delete them). Attributes such as HttpOnly, Secure, and SameSite help limit how cookies are accessed and sent across sites."
         ]
       },
@@ -1210,7 +1210,7 @@
       "inventory": {
         "title": "Cookie inventory (first-party)",
         "paragraphs": [
-          "The table below lists first-party cookies our authentication and application layers commonly set for domains under .unitoken.trade. They are sent with Secure and SameSite=Lax unless legacy compatibility requires otherwise, and use the shared registrable domain so sign-in works across subdomains."
+          "The table below lists first-party cookies our authentication and application layers commonly set for domains under .aiagents-hub.vn. They are sent with Secure and SameSite=Lax unless legacy compatibility requires otherwise, and use the shared registrable domain so sign-in works across subdomains."
         ],
         "headers": {
           "name": "Name",
@@ -1281,7 +1281,7 @@
       "contact": {
         "title": "Contact",
         "paragraphs": [
-          "Questions about this Cookie Policy or similar technologies: admin@unitoken.trade."
+          "Questions about this Cookie Policy or similar technologies: support@aiagents-hub.vn."
         ]
       }
     }
@@ -2290,7 +2290,7 @@
     "hub_title": "UniToken API documentation",
     "hub_description": "Everything you need to integrate eKYC and identity APIs: quickstart and the eKYC API reference.",
     "hub_badge_1": "REST · multipart/form-data · Bearer tokens",
-    "hub_badge_2": "Base URL: api.unitoken.trade",
+    "hub_badge_2": "Base URL: api.aiagents-hub.vn",
     "card_quickstart_title": "Quickstart",
     "card_quickstart_desc": "Create an API key, send your first request, and verify responses in minutes.",
     "card_api_title": "eKyc API",
@@ -2303,7 +2303,7 @@
     "quickstart_try_body": "Below is a working multipart example. Swap in a real JPEG/PNG under 2MB.",
     "quickstart_more": "See every endpoint and parameter in",
     "api_page_title": "eKYC API",
-    "api_page_description": "eKYC HTTP API served at https://api.unitoken.trade. All calls require an Authorization Bearer token with the right scopes.",
+    "api_page_description": "eKYC HTTP API served at https://api.aiagents-hub.vn. All calls require an Authorization Bearer token with the right scopes.",
     "params_label": "Form fields",
     "section_start": "Start here",
     "section_guides": "Guide",
@@ -2321,12 +2321,12 @@
   "BlogPage": {
     "badge": "Product & platform",
     "title": "Blog",
-    "title_gradient": "from unitoken.trade",
+    "title_gradient": "from aiagents-hub.vn",
     "subtitle": "Practical notes on delivering eKYC through our managed APIs today, and what is ahead for CLAW — written for engineering, product, and risk teams.",
-    "author_display": "admin@unitoken.trade",
+    "author_display": "support@aiagents-hub.vn",
     "byline": "Editorial from {author}",
     "section_ekyc": "eKYC services",
-    "section_ekyc_sub": "Identity verification and compliance-oriented flows served via api.unitoken.trade — contracts, security, and operations.",
+    "section_ekyc_sub": "Identity verification and compliance-oriented flows served via api.aiagents-hub.vn — contracts, security, and operations.",
     "section_claw": "CLAW services",
     "section_claw_sub": "Upcoming connectivity across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible stacks for agents and automation.",
     "badge_upcoming": "Coming soon",
@@ -2342,7 +2342,7 @@
         "title": "How we deliver eKYC as a managed service",
         "excerpt": "A concise look at verification stages, evidence handling, and how we keep the experience predictable for integrators.",
         "body": [
-          "Electronic Know Your Customer (eKYC) is no longer a nice-to-have: it is the front door for regulated onboarding, payouts, and high-trust workflows. At unitoken.trade we treat eKYC as a product surface with explicit API contracts, not a one-off integration project.",
+          "Electronic Know Your Customer (eKYC) is no longer a nice-to-have: it is the front door for regulated onboarding, payouts, and high-trust workflows. At aiagents-hub.vn we treat eKYC as a product surface with explicit API contracts, not a one-off integration project.",
           "Our service separates capture, verification, and decisioning into well-defined steps. That means your application can collect user consent and documents once, while our pipeline applies consistent checks, machine-assisted review where appropriate, and auditable outcomes you can reconcile in your own systems.",
           "Operationally, we design for resilience: idempotent requests where it matters, structured errors that map to remediation paths, and dashboards that reflect status without forcing support tickets. The goal is simple — your team ships faster without trading off clarity for customers.",
           "If you are evaluating providers, ask how outcomes are represented, how retention is bounded, and how keys are scoped. We publish those expectations alongside our endpoints so compliance and engineering can review the same facts."
@@ -2369,12 +2369,12 @@
         ]
       },
       "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
-        "title": "CLAW on unitoken.trade: roadmap and upcoming capabilities",
+        "title": "CLAW on aiagents-hub.vn: roadmap and upcoming capabilities",
         "excerpt": "Where we are taking CLAW next — multi-variant support, routing, and event-driven integrations for automation-heavy stacks.",
         "body": [
           "CLAW is our upcoming connectivity layer for agent-style and automation workloads across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible implementations. The objective is familiar to platform teams: integrate once, route intelligently, and observe behavior consistently.",
           "On the roadmap you will see first-class configuration per CLAW variant, clearer separation between synchronous calls and long-running tasks, and webhooks that reflect state transitions you can trust for downstream orchestration.",
-          "We are also tightening developer ergonomics: predictable authentication aligned with the rest of api.unitoken.trade, sandbox parity that mirrors production limits, and documentation that stays synchronized with the API surface.",
+          "We are also tightening developer ergonomics: predictable authentication aligned with the rest of api.aiagents-hub.vn, sandbox parity that mirrors production limits, and documentation that stays synchronized with the API surface.",
           "Nothing here replaces your security review — it complements it. As we approach general availability, we will publish migration notes, deprecation policies, and support channels for design partners."
         ]
       },
@@ -2395,7 +2395,7 @@
           "Early CLAW integrations benefit from the same patterns that work for mature APIs: isolate outbound calls behind your own queue, cap concurrency, and subscribe to events instead of polling when possible — it reduces load and simplifies recovery.",
           "In previews, we may expose additional diagnostic headers or trace identifiers. Use them while they exist, but avoid hard-coding reliance until those fields graduate to stable documentation.",
           "Testing should span sandbox scenarios that include partial failures. Automation that never sees a timeout is automation that will surprise you later. We will publish recommended test matrices alongside reference implementations.",
-          "Interested teams can reach out via admin@unitoken.trade with a short summary of use case, expected volume, and regions. We prioritize partners who can share structured feedback during the preview window."
+          "Interested teams can reach out via support@aiagents-hub.vn with a short summary of use case, expected volume, and regions. We prioritize partners who can share structured feedback during the preview window."
         ]
       }
     }

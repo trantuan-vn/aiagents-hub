@@ -117,10 +117,10 @@ const Cookies = () => {
                         {t("related_contact")}
                       </Link>
                       <a
-                        href="mailto:admin@unitoken.trade"
+                        href="mailto:support@aiagents-hub.vn"
                         className="text-muted-foreground hover:text-foreground text-sm transition-colors"
                       >
-                        admin@unitoken.trade
+                        support@aiagents-hub.vn
                       </a>
                     </div>
                   </div>

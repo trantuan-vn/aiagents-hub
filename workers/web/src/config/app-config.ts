@@ -4,7 +4,7 @@ const currentYear = new Date().getFullYear();
 
 export const APP_CONFIG = {
   name: "APIHub - Unitoken",
-  homeUrl: "https://unitoken.trade/",
+  homeUrl: "https://aiagents-hub.vn/",
   version: packageJson.version,
   copyright: `© ${currentYear}, Unitoken.`,
   meta: {

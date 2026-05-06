@@ -64,7 +64,7 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
   return chunks;
 };
 
-const KV_KEY = 'system_config';
+const KV_KEY = 'aiagents-hub-system-config';
 
 /** Đọc cấu hình queue_worker từ KV. Có hiệu lực ngay khi admin thiết lập. */
 async function getQueueWorkerConfig(env: Env): Promise<{
@@ -365,7 +365,7 @@ const handleHttpRequest = async (req: Request, env: Env): Promise<Response> => {
     }),
 
     '/metrics': async () => new Response(JSON.stringify({
-      queues: { input: 'input-part-0', error: 'error-queue-dlq' },
+      queues: { input: 'aiagents-hub-input-part-0', error: 'aiagents-hub-error-queue-dlq' },
       settings: {
         batch_size: '100',
         max_retries: '3'
@@ -409,8 +409,8 @@ export default {
     console.log(`[QueueWorker] Processing ${batch.queue} with ${batch.messages.length} messages`);
 
     const queueHandlers: Record<string, (batch: MessageBatch, env: Env) => Promise<void>> = {
-      'input-part-0': processInputQueue,
-      'error-queue-dlq': processErrorQueue
+      'aiagents-hub-input-part-0': processInputQueue,
+      'aiagents-hub-error-queue-dlq': processErrorQueue
     };
 
     const handler = queueHandlers[batch.queue];

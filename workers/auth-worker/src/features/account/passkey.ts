@@ -28,7 +28,7 @@ function getRpId(origin: string): string {
     const u = new URL(origin);
     return u.hostname;
   } catch {
-    return 'unitoken.trade';
+    return 'aiagents-hub.vn';
   }
 }
 

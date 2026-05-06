@@ -25,7 +25,7 @@ import { OrderItemForm } from "./order-item-form";
 import { CreateOrderSchema, type CreateOrder } from "./schema";
 import { VoucherSelect } from "./voucher-select";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface Service {
   id: string | number;

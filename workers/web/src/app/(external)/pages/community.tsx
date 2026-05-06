@@ -134,7 +134,7 @@ const Community = () => {
                   {t("base_url_label")}
                 </span>
                 <code className="text-foreground bg-muted/80 rounded-lg px-3 py-1.5 font-mono text-sm">
-                  https://api.unitoken.trade
+                  https://api.aiagents-hub.vn
                 </code>
               </div>
             </div>

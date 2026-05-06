@@ -1,9 +1,9 @@
 /**
- * Consumer worker: consumes ws-broadcast-queue, routes messages to UserShardDO
+ * Consumer worker: consumes aiagents-hub-ws-broadcast-queue, routes messages to UserShardDO
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "consumer-worker",
+	"name": "aiagents-hub-consumer-worker",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-04-01",
 	"compatibility_flags": ["nodejs_compat"],
@@ -18,15 +18,15 @@
 	"queues": {
 		"consumers": [
 			{
-				"queue": "ws-broadcast-queue",
+				"queue": "aiagents-hub-ws-broadcast-queue",
 				"max_batch_size": 50,
 				"max_batch_timeout": 10,
 				"max_retries": 3,
-				"dead_letter_queue": "ws-broadcast-dlq",
+				"dead_letter_queue": "aiagents-hub-ws-broadcast-dlq",
 				"retry_delay": 5
 			},
 			{
-				"queue": "ws-broadcast-dlq",
+				"queue": "aiagents-hub-ws-broadcast-dlq",
 				"max_batch_size": 20,
 				"max_batch_timeout": 30,
 				"max_retries": 1,
@@ -39,7 +39,7 @@
 			{
 				"name": "USER_SHARD_DO",
 				"class_name": "UserShardDO",
-				"script_name": "auth-worker"
+				"script_name": "aiagents-hub-auth-worker"
 			}
 		]
 	}

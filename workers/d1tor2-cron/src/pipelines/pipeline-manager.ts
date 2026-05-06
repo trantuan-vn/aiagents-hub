@@ -25,7 +25,7 @@ export interface PipelineStats {
  * 
  * Reference: https://developers.cloudflare.com/pipelines/getting-started/
  */
-const KV_KEY = 'system_config';
+const KV_KEY = 'aiagents-hub-system-config';
 
 /** Cấu hình d1tor2 đọc từ KV (có hiệu lực ngay khi admin thiết lập) */
 interface D1tor2RuntimeConfig {

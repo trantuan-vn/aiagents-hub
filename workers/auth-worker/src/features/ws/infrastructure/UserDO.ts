@@ -20,7 +20,7 @@ const RETRY_ALARM_INTERVAL = 60000;
 const QUEUE_FLUSH_INTERVAL = 5000;
 const QUEUE_FLUSH_THRESHOLD = 200;
 
-const KV_KEY = 'system_config';
+const KV_KEY = 'aiagents-hub-system-config';
 
 const TableStateSchema = z.object({
   tableName: z.string(),

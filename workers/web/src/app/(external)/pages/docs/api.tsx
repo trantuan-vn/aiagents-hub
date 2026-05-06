@@ -28,7 +28,7 @@ const ApiReferencePage = () => {
                   {te("base_url_label")}
                 </p>
                 <code className="bg-background border-border block rounded-lg border px-3 py-2 break-all">
-                  https://api.unitoken.trade
+                  https://api.aiagents-hub.vn
                 </code>
               </div>
               <div>

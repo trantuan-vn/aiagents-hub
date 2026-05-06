@@ -201,7 +201,7 @@ export const cookieUtils = {
       httpOnly: true,
       secure: true,
       path: '/',
-      domain: '.unitoken.trade',
+      domain: '.aiagents-hub.vn',
       maxAge,
     };
     setCookie(c, name, value, cookieOptions);
@@ -210,7 +210,7 @@ export const cookieUtils = {
   clearAuthCookies(c: Context) {
     const cookieOptions = {
       path: '/',
-      domain: '.unitoken.trade',
+      domain: '.aiagents-hub.vn',
       secure: true,
       sameSite: 'lax' as const,
       httpOnly: true,
@@ -242,7 +242,7 @@ export const cookieUtils = {
   },
 
   clearPreAuthSessionId(c: Context) {
-    const opts = { path: '/', domain: '.unitoken.trade', secure: true, sameSite: 'lax' as const, httpOnly: true };
+    const opts = { path: '/', domain: '.aiagents-hub.vn', secure: true, sameSite: 'lax' as const, httpOnly: true };
     deleteCookie(c, 'preAuthSessionId', opts);
   },
 
@@ -256,7 +256,7 @@ export const cookieUtils = {
   },
 
   clearDidChallengeId(c: Context) {
-    const opts = { path: '/', domain: '.unitoken.trade', secure: true, sameSite: 'lax' as const, httpOnly: true };
+    const opts = { path: '/', domain: '.aiagents-hub.vn', secure: true, sameSite: 'lax' as const, httpOnly: true };
     deleteCookie(c, 'didChallengeId', opts);
   }
 };

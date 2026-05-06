@@ -5,7 +5,7 @@ import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://unitoken.trade';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
 
 export function createReferralRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();

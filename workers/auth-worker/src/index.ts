@@ -35,10 +35,10 @@ function createRoutes(bindingName: string) {
   // CORS middleware (must come before auth middleware)
   routes.use('/*', cors({
       origin: [
-        'https://beta.unitoken.trade',
-        'https://www.beta.unitoken.trade',
-        'https://unitoken.trade',
-        'https://www.unitoken.trade',
+        'https://beta.aiagents-hub.vn',
+        'https://www.beta.aiagents-hub.vn',
+        'https://aiagents-hub.vn',
+        'https://www.aiagents-hub.vn',
         'https://sandbox.vnpayment.vn',
         'https://vnpayment.vn'
       ], 

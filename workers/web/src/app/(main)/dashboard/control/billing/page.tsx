@@ -18,7 +18,7 @@ import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history
 import { OrderList } from "./_components/order-list";
 import type { CreateOrder, Order } from "./_components/schema";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 async function loadHistoryFromApi(
   limit: number,

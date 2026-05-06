@@ -8,7 +8,7 @@ export interface BlogPostMeta {
   readMinutes: number;
 }
 
-export const BLOG_AUTHOR_EMAIL = "admin@unitoken.trade";
+export const BLOG_AUTHOR_EMAIL = "support@aiagents-hub.vn";
 
 /** Ordered newest first for listing */
 export const BLOG_POST_METAS: BlogPostMeta[] = [

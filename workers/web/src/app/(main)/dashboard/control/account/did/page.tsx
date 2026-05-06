@@ -15,7 +15,7 @@ import { toast } from "@/hooks/use-toast";
 
 import { DidLinkedContent } from "./_components/did-linked-content";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 /** EIP-4361 requires statement to be ASCII only - use fixed strings, not translations */
 const SIWE_STATEMENT_LINK = "Link your decentralized identity (DID) to your Unitoken account.";
@@ -110,8 +110,8 @@ export default function DidPage() {
   const createAndSignMessage = useCallback(
     async (nonce: string, statement: string) => {
       if (!address) throw new Error(t("wallet_required"));
-      const domain = typeof window !== "undefined" ? window.location.host : "unitoken.trade";
-      const origin = typeof window !== "undefined" ? window.location.origin : "https://unitoken.trade";
+      const domain = typeof window !== "undefined" ? window.location.host : "aiagents-hub.vn";
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://aiagents-hub.vn";
 
       const siweMessage = new SiweMessage({
         domain,

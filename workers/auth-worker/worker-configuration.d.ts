@@ -11,9 +11,9 @@ declare namespace Cloudflare {
 		SYSTEM_CONFIG_KV: KVNamespace;
 		ACCOUNT_ID: "e76b7bb989f93985402e1a61e6cd5ff3";
 		SMS_FROM_NUMBER: "+84919358683";
-		SIWE_DOMAIN: "unitoken.trade";
-		FRONTEND_URL: "https://unitoken.trade";
-		BASE_URL: "https://api.unitoken.trade";
+		SIWE_DOMAIN: "aiagents-hub.vn";
+		FRONTEND_URL: "https://aiagents-hub.vn";
+		BASE_URL: "https://api.aiagents-hub.vn";
 		DEBUG: "false";
 		ENVIRONMENT: "production";
 		QUEUE_BATCH_SIZE: "100";

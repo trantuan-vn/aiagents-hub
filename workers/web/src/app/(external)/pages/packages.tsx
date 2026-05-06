@@ -175,7 +175,7 @@ const Packages = () => {
         t("packages.ai_vision.features.3"),
       ],
       popular: true,
-      learnMoreHref: "https://unitoken.trade/docs/api",
+      learnMoreHref: "https://aiagents-hub.vn/docs/api",
     },
     {
       id: 2,

@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { log } from "./_components/ekyc-debug";
 import { EkycStepContent, type EkycStep, type DocType } from "./_components/ekyc-step-content";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface EkycStatus {
   status: string;

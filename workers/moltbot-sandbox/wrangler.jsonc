@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "moltbot-sandbox",
+  "name": "aiagents-hub-moltbot-sandbox",
   "main": "src/index.ts",
   "compatibility_date": "2025-05-06",
   "compatibility_flags": ["nodejs_compat"],
@@ -69,8 +69,8 @@
   "r2_buckets": [
     {
       "binding": "BACKUP_BUCKET",
-      "bucket_name": "moltbot-data",
-      "preview_bucket_name": "moltbot-data"
+      "bucket_name": "aiagents-hub-moltbot-data",
+      "preview_bucket_name": "aiagents-hub-moltbot-data"
     }
   ],
 
@@ -115,5 +115,5 @@
   // - R2_ACCESS_KEY_ID: R2 access key ID (from R2 API tokens)
   // - R2_SECRET_ACCESS_KEY: R2 secret access key (from R2 API tokens)
   // - CLOUDFLARE_ACCOUNT_ID: Your Cloudflare account ID
-  // - BACKUP_BUCKET_NAME: R2 bucket name (default: moltbot-data)
+  // - BACKUP_BUCKET_NAME: R2 bucket name (default: aiagents-hub-moltbot-data)
 }

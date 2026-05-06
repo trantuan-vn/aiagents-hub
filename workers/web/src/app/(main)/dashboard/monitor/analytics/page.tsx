@@ -16,7 +16,7 @@ import { AnalyticsOverviewCards } from "./_components/analytics-overview-cards";
 import { AnalyticsTable } from "./_components/analytics-table";
 import type { AnalyticsData } from "./_components/utils";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 type Duration = "week" | "month" | "quarter" | "year";
 

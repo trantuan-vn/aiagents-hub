@@ -15,7 +15,7 @@ import { CreateServiceDialog } from "./_components/create-service-dialog";
 import { type CreateService, type Service } from "./_components/schema";
 import { ServiceList } from "./_components/service-list";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function ServicePage() {
   const t = useTranslations("ServicePage");

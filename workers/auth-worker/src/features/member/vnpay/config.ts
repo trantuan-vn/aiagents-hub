@@ -15,7 +15,7 @@ class Config {
       vnp_HashSecret: process.env.VNP_HASHSECRET || "E9MO6EJLUHNPLSJVE3OFFKK6J2V0VL5E",
       vnp_Url: process.env.VNP_URL || "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
       vnp_Api: process.env.VNP_API || "https://sandbox.vnpayment.vn/merchant_webapi/api/transaction",
-      vnp_ReturnUrl: process.env.VNP_RETURNURL || "https://api.unitoken.trade/dashboard/vnpay/vnpay_return"
+      vnp_ReturnUrl: process.env.VNP_RETURNURL || "https://api.aiagents-hub.vn/dashboard/vnpay/vnpay_return"
     };
   }
 

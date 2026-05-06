@@ -6,7 +6,7 @@ import { Bell, ChevronRight, Sparkles, Zap } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface UserProfile {
   id: string;

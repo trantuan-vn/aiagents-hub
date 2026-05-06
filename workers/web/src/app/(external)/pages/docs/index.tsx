@@ -66,7 +66,7 @@ const DocsIndex = () => {
             <h2 className="text-foreground mb-2 text-lg font-semibold">{t("hub_base_title")}</h2>
             <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{t("hub_base_body")}</p>
             <code className="bg-background border-border block rounded-lg border px-4 py-3 text-sm break-all">
-              https://api.unitoken.trade
+              https://api.aiagents-hub.vn
             </code>
           </div>
         </div>

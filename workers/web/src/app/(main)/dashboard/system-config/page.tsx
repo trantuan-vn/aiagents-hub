@@ -14,7 +14,7 @@ import { ConfigCard } from "./_components/config-card";
 import { getAuthFields, getD1tor2Fields, getQueueFields } from "./_components/field-definitions";
 import type { AuthWorkerConfig, D1tor2CronConfig, QueueWorkerConfig, SystemConfigData } from "./_components/types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 function parseErrorResponse(data: unknown, defaultMsg: string): string {
   if (data && typeof data === "object" && "error" in data) {

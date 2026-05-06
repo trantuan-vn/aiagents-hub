@@ -13,7 +13,7 @@ import { CreatePolicyDialog } from "./_components/create-policy-dialog";
 import { PolicyList } from "./_components/policy-list";
 import type { PricePolicy, UpdatePricePolicy } from "./_components/schema";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function PolicyPage() {
   const t = useTranslations("PolicyPage");

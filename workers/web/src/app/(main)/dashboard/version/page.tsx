@@ -13,7 +13,7 @@ import { SaveVersionDialog } from "./_components/save-version-dialog";
 import type { VersionData, VersionInfo, VersionListResponse, VersionSaveResponse } from "./_components/schema";
 import { VersionList } from "./_components/version-list";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.unitoken.trade";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function VersionPage() {
   const t = useTranslations("VersionPage");

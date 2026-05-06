@@ -49,7 +49,7 @@ echo "Generating e2e config: $E2E_CONFIG" >&2
 
 # Copy config, replace the worker name and R2 bucket name for this e2e run
 sed -e 's/"name": "moltbot-sandbox"/"name": "'"$WORKER_NAME"'"/' \
-    -e 's/"bucket_name": "moltbot-data"/"bucket_name": "'"$R2_BUCKET"'"/' \
+    -e 's/"bucket_name": "aiagents-hub-moltbot-data"/"bucket_name": "'"$R2_BUCKET"'"/' \
     "$PROJECT_DIR/wrangler.jsonc" > "$E2E_CONFIG"
 
 # Deploy using the e2e-specific config (retry on Docker Hub rate limits)

@@ -41,7 +41,7 @@ export function createPaymentRoutes(bindingName: string) {
 
   // VNPay return URL
   app.get('/vnpay_return', async (c: any) => {
-    const frontendUrl = process.env.FRONTEND_URL || 'https://unitoken.trade';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
     const redirectUrl = new URL(`${frontendUrl}/dashboard/control/billing`);
     
     try {

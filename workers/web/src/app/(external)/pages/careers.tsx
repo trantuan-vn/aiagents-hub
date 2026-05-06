@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 
 import Layout from "../components/layout/main-layout";
 
-const CAREERS_EMAIL = "admin@unitoken.trade";
+const CAREERS_EMAIL = "support@aiagents-hub.vn";
 
 function mailtoHref(subject: string) {
   const q = new URLSearchParams({ subject });

@@ -437,8 +437,8 @@ export function createWalletService(env: Env): IWalletService {
       sessionId: string, 
       message: string, 
       signature: string,
-      expectedDomain: string = 'unitoken.trade',
-      expectedOrigin: string = 'https://unitoken.trade'
+      expectedDomain: string = 'aiagents-hub.vn',
+      expectedOrigin: string = 'https://aiagents-hub.vn'
     ): Promise<SiweMessage> {
       // 1. Parse message
       let siweMessage: SiweMessage;

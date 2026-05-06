@@ -179,7 +179,7 @@
     "search": "Tìm kiếm",
     "search_placeholder": "Tìm kiếm bảng điều khiển, người dùng và nhiều hơn nữa…",
     "no_results": "Không tìm thấy kết quả.",
-    "system_config": "Cấu hình hệ thống",
+    "aiagents-hub-system-config": "Cấu hình hệ thống",
     "price_policy": "Chính sách giá",
     "commission_policy": "Chính sách hoa hồng",
     "api_service": "Dịch vụ API",
@@ -562,12 +562,12 @@
     "badge": "Hạ tầng API",
     "title": "Dành cho đội ngũ coi API là",
     "title_gradient": "trọng tâm kinh doanh",
-    "subtitle": "APIHub vận hành unitoken.trade — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
+    "subtitle": "APIHub vận hành aiagents-hub.vn — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
     "mission": {
       "title": "Sứ mệnh của chúng tôi",
       "lead": "Phần mềm hiện nay chạy trên API. Thanh toán, định danh, AI, tự động hóa — khi tầng API gặp sự cố, sản phẩm cũng vậy.",
       "body": "Chúng tôi tập trung vào hiệu năng dự đoán được, mức sử dụng minh bạch và tài liệu bạn có thể tích hợp ngay từ ngày đầu. Dù bạn đang prototype hay vận hành lưu lượng production, nhiệm vụ của chúng tôi là vô hình ở những điểm quan trọng: thời gian hoạt động, độ trễ và niềm tin.",
-      "terminal": "GET /v1/health HTTP/1.1\nHost: api.unitoken.trade\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
+      "terminal": "GET /v1/health HTTP/1.1\nHost: api.aiagents-hub.vn\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
       "terminal_caption": "Phản hồi nhất quán trên nhiều khu vực — được giám sát 24/7"
     },
     "values_section": {
@@ -623,7 +623,7 @@
   "CommunityPage": {
     "badge": "Kết nối & xây dựng",
     "title": "Cộng đồng cho đội ngũ triển khai trên",
-    "title_gradient": "unitoken.trade",
+    "title_gradient": "aiagents-hub.vn",
     "subtitle": "Tài liệu, hỗ trợ và lộ trình rõ ràng tới API được quản lý, eKYC và bảng điều khiển — dù bạn đang prototype hay vận hành production.",
     "base_url_label": "Base URL production",
     "steps": {
@@ -635,7 +635,7 @@
       "2_title": "Chọn gói dịch vụ",
       "2_desc": "Chọn mức truy cập đo đếm phù hợp khối lượng — eKYC, CLAW, AI Vision và hơn thế.",
       "3_title": "Tích hợp & quan sát",
-      "3_desc": "Gọi api.unitoken.trade với Bearer token, theo dõi mức dùng trên dashboard và liên hệ hỗ trợ khi cần."
+      "3_desc": "Gọi api.aiagents-hub.vn với Bearer token, theo dõi mức dùng trên dashboard và liên hệ hỗ trợ khi cần."
     },
     "paths": {
       "title": "Đi tiếp",
@@ -716,7 +716,7 @@
     "badge": "Gia nhập đội nền tảng API",
     "title": "Cùng xây xương sống cho",
     "title_gradient": "các tích hợp hiện đại",
-    "subtitle": "Chúng tôi vận hành unitoken.trade theo mô hình dịch vụ API: gateway ổn định, đo lường rõ ràng và tài liệu lấy nhà phát triển làm trung tâm. Hãy cùng chúng tôi phát triển hạ tầng mà đội khách hàng tin cậy mỗi ngày.",
+    "subtitle": "Chúng tôi vận hành aiagents-hub.vn theo mô hình dịch vụ API: gateway ổn định, đo lường rõ ràng và tài liệu lấy nhà phát triển làm trung tâm. Hãy cùng chúng tôi phát triển hạ tầng mà đội khách hàng tin cậy mỗi ngày.",
     "why": {
       "title": "Vì sao chọn",
       "title_gradient": "APIHub",
@@ -792,7 +792,7 @@
       "title_gradient": "Vẫn cứ nhắn cho chúng tôi",
       "subtitle": "Chúng tôi đọc từng tin. Hãy gửi chúng tôi, vài dòng về điều bạn muốn xây — chúng tôi sẽ liên hệ khi có cơ hội phù hợp.",
       "apply_general": "Email tuyển dụng",
-      "apply_general_subject": "Ứng tuyển chung — APIHub / unitoken.trade",
+      "apply_general_subject": "Ứng tuyển chung — APIHub / aiagents-hub.vn",
       "browse_docs": "Đọc tài liệu"
     }
   },
@@ -800,7 +800,7 @@
     "badge": "Luôn sẵn sàng hỗ trợ",
     "title": "Trao đổi với",
     "title_gradient": "đội APIHub",
-    "subtitle": "Thắc mắc về thanh toán, tích hợp hay hợp tác? Hãy liên hệ — chúng tôi chuyển mỗi tin nhắn đến đúng người tại unitoken.trade.",
+    "subtitle": "Thắc mắc về thanh toán, tích hợp hay hợp tác? Hãy liên hệ — chúng tôi chuyển mỗi tin nhắn đến đúng người tại aiagents-hub.vn.",
     "response_hint": "Thường phản hồi trong một ngày làm việc.",
     "cards": {
       "copy": {
@@ -814,7 +814,7 @@
       },
       "docs": {
         "title": "Tài liệu",
-        "description": "Quickstart, tham chiếu và ví dụ cho api.unitoken.trade.",
+        "description": "Quickstart, tham chiếu và ví dụ cho api.aiagents-hub.vn.",
         "action": "Xem tài liệu"
       }
     },
@@ -831,7 +831,7 @@
       "message_label": "Nội dung",
       "message_placeholder": "Bạn cần hỗ trợ điều gì? Có thể kèm link hoặc thông tin tài khoản nếu cần.",
       "submit": "Mở trong ứng dụng mail",
-      "mailto_note": "Khi gửi, trình mail mặc định sẽ mở với bản nháp tới admin@unitoken.trade. Bạn có thể chỉnh sửa trước khi gửi."
+      "mailto_note": "Khi gửi, trình mail mặc định sẽ mở với bản nháp tới support@aiagents-hub.vn. Bạn có thể chỉnh sửa trước khi gửi."
     },
     "topics": {
       "general": "Chung",
@@ -840,7 +840,7 @@
       "partnership": "Hợp tác",
       "other": "Khác"
     },
-    "mailto_subject": "[{topic}] {name} — liên hệ unitoken.trade",
+    "mailto_subject": "[{topic}] {name} — liên hệ aiagents-hub.vn",
     "mailto_body_header": "Từ: {name} <{email}>",
     "toast_opened": "Ứng dụng mail sẽ mở với bản nháp.",
     "toast_copy": "Đã sao chép email.",
@@ -908,7 +908,7 @@
     "badge": "Pháp lý",
     "title": "Điều khoản",
     "title_gradient": "dịch vụ",
-    "subtitle": "Các Điều khoản này điều chỉnh việc bạn sử dụng unitoken.trade và nền tảng API được quản lý của chúng tôi—bao gồm khả năng hỗ trợ bởi AI và liên quan blockchain—phù hợp với thông lệ quốc tế phổ biến đối với dịch vụ đám mây và API.",
+    "subtitle": "Các Điều khoản này điều chỉnh việc bạn sử dụng aiagents-hub.vn và nền tảng API được quản lý của chúng tôi—bao gồm khả năng hỗ trợ bởi AI và liên quan blockchain—phù hợp với thông lệ quốc tế phổ biến đối với dịch vụ đám mây và API.",
     "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
     "toc_title": "Mục lục",
     "toc_aria": "Các mục điều khoản dịch vụ",
@@ -921,7 +921,7 @@
       "agreement": {
         "title": "Chấp nhận Điều khoản",
         "paragraphs": [
-          "Điều khoản dịch vụ này (\"Điều khoản\") là thỏa thuận ràng buộc giữa bạn (\"bạn\" hoặc \"Khách hàng\") và bên vận hành unitoken.trade và api.unitoken.trade (gọi chung là \"Nền tảng\", \"chúng tôi\").",
+          "Điều khoản dịch vụ này (\"Điều khoản\") là thỏa thuận ràng buộc giữa bạn (\"bạn\" hoặc \"Khách hàng\") và bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (gọi chung là \"Nền tảng\", \"chúng tôi\").",
           "Bằng việc truy cập hoặc sử dụng Nền tảng, tạo tài khoản, đăng ký sản phẩm API, tạo khóa API, kết nối ví hoặc sử dụng dịch vụ theo bất kỳ cách nào khác, bạn đồng ý với Điều khoản này và Chính sách quyền riêng tư (nếu có). Nếu không đồng ý, vui lòng không sử dụng Nền tảng.",
           "Nếu bạn sử dụng Nền tảng thay mặt một tổ chức, bạn xác nhận có thẩm quyền ràng buộc tổ chức đó; khi đó \"bạn\" bao gồm cả tổ chức đó."
         ]
@@ -929,7 +929,7 @@
       "definitions": {
         "title": "Định nghĩa",
         "paragraphs": [
-          "\"API\" gồm các giao diện lập trình ứng dụng, endpoint, SDK, webhook và công cụ dành cho nhà phát triển mà chúng tôi cung cấp tại hoặc thông qua api.unitoken.trade (hoặc URL kế thừa).",
+          "\"API\" gồm các giao diện lập trình ứng dụng, endpoint, SDK, webhook và công cụ dành cho nhà phát triển mà chúng tôi cung cấp tại hoặc thông qua api.aiagents-hub.vn (hoặc URL kế thừa).",
           "\"Tính năng AI\" là các khả năng học máy hoặc tạo sinh mà chúng tôi cung cấp (ví dụ trợ lý, phân loại, làm giàu dữ liệu hoặc tự động hóa), dù có gắn nhãn AI hay không.",
           "\"Tính năng blockchain\" là chức năng tương tác với sổ cái phân tán công khai hoặc được cấp phép, hợp đồng thông minh, xác thực qua ví hoặc chứng thực on-chain.",
           "\"Nội dung\" là dữ liệu, prompt, tệp, payload, siêu dữ liệu hoặc tài liệu khác mà bạn hoặc người dùng cuối gửi tới hoặc nhận từ Nền tảng."
@@ -1033,7 +1033,7 @@
       "law": {
         "title": "Luật áp dụng và tranh chấp",
         "paragraphs": [
-          "Trừ khi quy định bắt buộc về bảo vệ người tiêu dùng tại quốc gia của bạn yêu cầu khác, Điều khoản này chịu sự điều chỉnh của pháp luật áp dụng cho bên vận hành unitoken.trade, không tính các nguyên tắc xung đột pháp luật dẫn tới áp dụng pháp luật nước khác.",
+          "Trừ khi quy định bắt buộc về bảo vệ người tiêu dùng tại quốc gia của bạn yêu cầu khác, Điều khoản này chịu sự điều chỉnh của pháp luật áp dụng cho bên vận hành aiagents-hub.vn, không tính các nguyên tắc xung đột pháp luật dẫn tới áp dụng pháp luật nước khác.",
           "Bạn đồng ý liên hệ chúng tôi trước để giải quyết tranh chấp không chính thức. Nếu không đạt, thẩm quyền và địa điểm độc quyền cho tố tụng thuộc tòa án có thẩm quyền tại nơi đăng ký hoạt động của bên vận hành, trừ khi pháp luật bắt buộc quy định diễn đàn khác đối với người tiêu dùng.",
           "Công ước Liên Hợp Quốc về Hợp đồng Mua bán Hàng hóa Quốc tế không áp dụng."
         ]
@@ -1041,7 +1041,7 @@
       "contact": {
         "title": "Liên hệ",
         "paragraphs": [
-          "Về Điều khoản, thanh toán hoặc tuân thủ, vui lòng liên hệ admin@unitoken.trade. Tên pháp nhân và địa chỉ đăng ký có thể được cung cấp theo yêu cầu cho mục đích hợp đồng hoặc quy định."
+          "Về Điều khoản, thanh toán hoặc tuân thủ, vui lòng liên hệ support@aiagents-hub.vn. Tên pháp nhân và địa chỉ đăng ký có thể được cung cấp theo yêu cầu cho mục đích hợp đồng hoặc quy định."
         ]
       }
     }
@@ -1050,7 +1050,7 @@
     "badge": "Tin cậy & minh bạch",
     "title": "Chính sách",
     "title_gradient": "bảo mật",
-    "subtitle": "Cách chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin cá nhân khi bạn dùng unitoken.trade, api.unitoken.trade và dịch vụ liên quan. Thông báo này được soạn thảo phù hợp với các kỳ vọng quốc tế phổ biến, gồm nguyên tắc minh bạch trong GDPR và các khung pháp lý tương tự.",
+    "subtitle": "Cách chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin cá nhân khi bạn dùng aiagents-hub.vn, api.aiagents-hub.vn và dịch vụ liên quan. Thông báo này được soạn thảo phù hợp với các kỳ vọng quốc tế phổ biến, gồm nguyên tắc minh bạch trong GDPR và các khung pháp lý tương tự.",
     "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
     "toc_title": "Trên trang này",
     "toc_aria": "Các mục chính sách bảo mật",
@@ -1064,7 +1064,7 @@
       "intro": {
         "title": "Giới thiệu và phạm vi",
         "paragraphs": [
-          "Chính sách bảo mật này (\"Chính sách\") mô tả cách bên vận hành unitoken.trade và api.unitoken.trade (gọi chung là \"Nền tảng\", \"chúng tôi\") xử lý thông tin cá nhân.",
+          "Chính sách bảo mật này (\"Chính sách\") mô tả cách bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (gọi chung là \"Nền tảng\", \"chúng tôi\") xử lý thông tin cá nhân.",
           "Chính sách áp dụng khi bạn truy cập trang web, tạo hoặc sử dụng tài khoản, mua hoặc dùng sản phẩm API, tương tác với bảng điều khiển hoặc tài liệu, xác thực bằng ví hoặc passkey khi được cung cấp, hoặc sử dụng dịch vụ của chúng tôi theo cách khác. Bạn nên đọc cùng Điều khoản dịch vụ và mọi thông báo riêng theo từng sản phẩm.",
           "Chúng tôi có thể cập nhật Chính sách theo thời gian. Bản sửa đổi sẽ được đăng trên trang này và ngày \"Cập nhật lần cuối\" sẽ thay đổi. Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ qua email hoặc biểu ngữ trong sản phẩm)."
         ]
@@ -1073,7 +1073,7 @@
         "title": "Bên kiểm soát dữ liệu và liên hệ",
         "paragraphs": [
           "Bên kiểm soát dữ liệu chịu trách nhiệm về thông tin cá nhân trong Chính sách này là pháp nhân vận hành Nền tảng (gọi gọn là \"APIHub\" / \"Unitoken\"). Tên pháp nhân đầy đủ, địa chỉ đăng ký và mã số đăng ký có thể được cung cấp theo yêu cầu cho hóa đơn, hợp đồng hoặc mục đích quy định.",
-          "Đối với câu hỏi chung về quyền riêng tư và để thực hiện quyền của bạn khi pháp luật cho phép, liên hệ admin@unitoken.trade. Đối với sự cố bảo mật liên quan đến thông tin đăng nhập hoặc truy cập trái phép nghi ngờ, hãy liên hệ kịp thời kèm chi tiết liên quan để chúng tôi xử lý hiệu quả."
+          "Đối với câu hỏi chung về quyền riêng tư và để thực hiện quyền của bạn khi pháp luật cho phép, liên hệ support@aiagents-hub.vn. Đối với sự cố bảo mật liên quan đến thông tin đăng nhập hoặc truy cập trái phép nghi ngờ, hãy liên hệ kịp thời kèm chi tiết liên quan để chúng tôi xử lý hiệu quả."
         ]
       },
       "collection": {
@@ -1115,7 +1115,7 @@
         "title": "Chuyển giao quốc tế",
         "paragraphs": [
           "Chúng tôi có thể xử lý và lưu trữ thông tin tại quốc gia khác nơi bạn sinh sống, gồm nơi đặt hạ tầng và đối tác. Khi chuyển thông tin cá nhân từ Khu vực Kinh tế Châu Âu, Vương quốc Anh hoặc Thụy Sĩ sang quốc gia không có quyết định tương đương, chúng tôi áp dụng biện pháp bảo đảm thích hợp như Điều khoản hợp đồng chuẩn do Ủy ban Châu Âu phê duyệt (và tương đương UK/Thụy Sĩ khi liên quan) hoặc cơ chế chuyển giao hợp pháp khác.",
-          "Bạn có thể yêu cầu thêm thông tin về các biện pháp này bằng cách liên hệ admin@unitoken.trade."
+          "Bạn có thể yêu cầu thêm thông tin về các biện pháp này bằng cách liên hệ support@aiagents-hub.vn."
         ]
       },
       "retention": {
@@ -1138,7 +1138,7 @@
           "Tùy nơi bạn cư trú, bạn có thể có quyền truy cập, chỉnh sửa, xóa hoặc xuất thông tin cá nhân; hạn chế hoặc phản đối một số xử lý; rút đồng ý khi xử lý dựa trên đồng ý; và khiếu nại với cơ quan giám sát bảo vệ dữ liệu.",
           "Cư dân Khu vực Kinh tế Châu Âu, Vương quốc Anh và các khu vực tương tự có thể thực hiện các quyền này phù hợp ngoại lệ pháp luật. Chúng tôi phản hồi trong khung thời gian luật định, thường trong một tháng đối với yêu cầu GDPR (có thể gia hạn cho trường hợp phức tạp).",
           "Nếu bạn cư trú tại California, bạn có thể có quyền theo CCPA/CPRA, gồm biết các loại thông tin thu thập, mục đích, nguồn, tiết lộ, và yêu cầu chỉnh sửa hoặc xóa phù hợp ngoại lệ. Chúng tôi không \"bán\" hoặc \"chia sẻ\" thông tin cá nhân theo định nghĩa CPRA về quảng cáo nhắm mục tiêu cho dịch vụ API cốt lõi mô tả tại đây; nếu thực hành thay đổi, chúng tôi sẽ cập nhật Chính sách và liên kết cần thiết.",
-          "Để gửi yêu cầu, email admin@unitoken.trade từ email tài khoản hoặc cung cấp thông tin để xác minh danh tính. Đại diện được ủy quyền có thể gửi yêu cầu khi pháp luật cho phép kèm chứng từ thích hợp."
+          "Để gửi yêu cầu, email support@aiagents-hub.vn từ email tài khoản hoặc cung cấp thông tin để xác minh danh tính. Đại diện được ủy quyền có thể gửi yêu cầu khi pháp luật cho phép kèm chứng từ thích hợp."
         ]
       },
       "children": {
@@ -1163,7 +1163,7 @@
       "contact": {
         "title": "Liên hệ",
         "paragraphs": [
-          "Về quyền riêng tư, yêu cầu bảo vệ dữ liệu hoặc thắc mắc về Chính sách, liên hệ admin@unitoken.trade. Bạn cũng có thể liên hệ cơ quan bảo vệ dữ liệu địa phương nếu cho rằng pháp luật áp dụng bị vi phạm."
+          "Về quyền riêng tư, yêu cầu bảo vệ dữ liệu hoặc thắc mắc về Chính sách, liên hệ support@aiagents-hub.vn. Bạn cũng có thể liên hệ cơ quan bảo vệ dữ liệu địa phương nếu cho rằng pháp luật áp dụng bị vi phạm."
         ]
       }
     }
@@ -1172,7 +1172,7 @@
     "badge": "Minh bạch",
     "title": "Chính sách",
     "title_gradient": "Cookie",
-    "subtitle": "Cách unitoken.trade và api.unitoken.trade dùng cookie và công nghệ tương tự cho xác thực, bảo mật, tính năng ví và tùy chọn giao diện. Trang này bổ sung Chính sách bảo mật và phản ánh cách chúng tôi xây dựng dịch vụ hiện tại.",
+    "subtitle": "Cách aiagents-hub.vn và api.aiagents-hub.vn dùng cookie và công nghệ tương tự cho xác thực, bảo mật, tính năng ví và tùy chọn giao diện. Trang này bổ sung Chính sách bảo mật và phản ánh cách chúng tôi xây dựng dịch vụ hiện tại.",
     "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
     "toc_title": "Trên trang này",
     "toc_aria": "Các mục chính sách cookie",
@@ -1188,7 +1188,7 @@
       "intro": {
         "title": "Giới thiệu",
         "paragraphs": [
-          "Chính sách Cookie này giải thích cách bên vận hành unitoken.trade và api.unitoken.trade (\"Nền tảng\", \"chúng tôi\") sử dụng cookie HTTP và bộ nhớ tương tự trên thiết bị của bạn khi dùng trang web, bảng điều khiển và API.",
+          "Chính sách Cookie này giải thích cách bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (\"Nền tảng\", \"chúng tôi\") sử dụng cookie HTTP và bộ nhớ tương tự trên thiết bị của bạn khi dùng trang web, bảng điều khiển và API.",
           "Bạn nên đọc cùng Chính sách bảo mật, mô tả rộng hơn về xử lý dữ liệu cá nhân. Khi nhắc tới \"cookie\", chúng tôi gồm cả công nghệ tương đương như local storage khi có vai trò tương tự, trừ khi nêu khác.",
           "Chúng tôi hạn chế thu thập và chủ yếu dùng cookie thiết yếu cho bảo mật và phiên đăng nhập. Cookie không thiết yếu hoặc phân tích chỉ chạy khi phù hợp cấu hình sản phẩm và pháp luật áp dụng."
         ]
@@ -1196,7 +1196,7 @@
       "what_are_cookies": {
         "title": "Cookie là gì",
         "paragraphs": [
-          "Cookie là tệp văn bản nhỏ do máy chủ web đặt trên thiết bị của bạn. Cookie first-party do miền chúng tôi kiểm soát đặt (ví dụ unitoken.trade hoặc api.unitoken.trade). Cookie bên thứ ba có thể do dịch vụ nhúng hoặc nhà cung cấp đặt khi bạn dùng một số tính năng.",
+          "Cookie là tệp văn bản nhỏ do máy chủ web đặt trên thiết bị của bạn. Cookie first-party do miền chúng tôi kiểm soát đặt (ví dụ aiagents-hub.vn hoặc api.aiagents-hub.vn). Cookie bên thứ ba có thể do dịch vụ nhúng hoặc nhà cung cấp đặt khi bạn dùng một số tính năng.",
           "Cookie có thể theo phiên (xóa khi đóng trình duyệt) hoặc lưu lâu dài (đến khi hết hạn hoặc bạn xóa). Thuộc tính như HttpOnly, Secure và SameSite giới hạn cách cookie được truy cập và gửi giữa các trang."
         ]
       },
@@ -1210,7 +1210,7 @@
       "inventory": {
         "title": "Danh mục cookie (first-party)",
         "paragraphs": [
-          "Bảng dưới đây liệt kê cookie first-party mà lớp xác thực và ứng dụng thường đặt cho miền thuộc .unitoken.trade. Chúng được gửi kèm Secure và SameSite=Lax trừ khi tương thích ngược cần khác, và dùng miền đăng ký chung để đăng nhập hoạt động trên các subdomain."
+          "Bảng dưới đây liệt kê cookie first-party mà lớp xác thực và ứng dụng thường đặt cho miền thuộc .aiagents-hub.vn. Chúng được gửi kèm Secure và SameSite=Lax trừ khi tương thích ngược cần khác, và dùng miền đăng ký chung để đăng nhập hoạt động trên các subdomain."
         ],
         "headers": {
           "name": "Tên",
@@ -1281,7 +1281,7 @@
       "contact": {
         "title": "Liên hệ",
         "paragraphs": [
-          "Thắc mắc về Chính sách Cookie hoặc công nghệ tương tự: admin@unitoken.trade."
+          "Thắc mắc về Chính sách Cookie hoặc công nghệ tương tự: support@aiagents-hub.vn."
         ]
       }
     }
@@ -2290,7 +2290,7 @@
     "hub_title": "Tài liệu API UniToken",
     "hub_description": "Mọi thứ bạn cần để tích hợp eKYC và API định danh: bắt đầu nhanh và tài liệu endpoint eKYC.",
     "hub_badge_1": "REST · multipart/form-data · Bearer token",
-    "hub_badge_2": "Base URL: api.unitoken.trade",
+    "hub_badge_2": "Base URL: api.aiagents-hub.vn",
     "card_quickstart_title": "Bắt đầu nhanh",
     "card_quickstart_desc": "Tạo API key, gửi request đầu tiên và xác minh phản hồi trong vài phút.",
     "card_api_title": "eKyc API",
@@ -2303,7 +2303,7 @@
     "quickstart_try_body": "Dưới đây là ví dụ multipart hoạt động được. Thay bằng ảnh JPEG/PNG thật dưới 2MB.",
     "quickstart_more": "Xem mọi endpoint và tham số tại",
     "api_page_title": "eKYC API",
-    "api_page_description": "HTTP API eKYC tại https://api.unitoken.trade. Mọi lệnh gọi cần header Authorization Bearer với quyền phù hợp.",
+    "api_page_description": "HTTP API eKYC tại https://api.aiagents-hub.vn. Mọi lệnh gọi cần header Authorization Bearer với quyền phù hợp.",
     "params_label": "Trường form",
     "section_start": "Bắt đầu",
     "section_guides": "Hướng dẫn",
@@ -2321,12 +2321,12 @@
   "BlogPage": {
     "badge": "Sản phẩm & nền tảng",
     "title": "Blog",
-    "title_gradient": "từ unitoken.trade",
+    "title_gradient": "từ aiagents-hub.vn",
     "subtitle": "Ghi chú thực tiễn về triển khai eKYC qua API được quản lý hôm nay, và định hướng dịch vụ CLAW — dành cho đội kỹ thuật, sản phẩm và quản trị rủi ro.",
-    "author_display": "admin@unitoken.trade",
+    "author_display": "support@aiagents-hub.vn",
     "byline": "Bài viết từ {author}",
     "section_ekyc": "Dịch vụ eKYC",
-    "section_ekyc_sub": "Xác minh danh tính và luồng gắn với tuân thủ qua api.unitoken.trade — hợp đồng API, bảo mật và vận hành.",
+    "section_ekyc_sub": "Xác minh danh tính và luồng gắn với tuân thủ qua api.aiagents-hub.vn — hợp đồng API, bảo mật và vận hành.",
     "section_claw": "Dịch vụ CLAW",
     "section_claw_sub": "Kết nối sắp tới cho OpenClaw, NanoClaw, NemoClaw, BizClaw và các stack tương thích — phục vụ agent và tự động hóa.",
     "badge_upcoming": "Sắp ra mắt",
@@ -2342,7 +2342,7 @@
         "title": "Cách chúng tôi cung cấp eKYC như một dịch vụ được quản lý",
         "excerpt": "Tóm tắt các giai đoạn xác minh, xử lý chứng cứ và cách giữ trải nghiệm ổn định cho bên tích hợp.",
         "body": [
-          "eKYC (định danh điện tử) không còn là tùy chọn: đó là cổng vào cho onboarding chịu quy định, chi trả và các quy trình cần độ tin cậy cao. Tại unitoken.trade chúng tôi coi eKYC là một bề mặt sản phẩm với hợp đồng API rõ ràng, không phải dự án tích hợp một lần rồi bỏ.",
+          "eKYC (định danh điện tử) không còn là tùy chọn: đó là cổng vào cho onboarding chịu quy định, chi trả và các quy trình cần độ tin cậy cao. Tại aiagents-hub.vn chúng tôi coi eKYC là một bề mặt sản phẩm với hợp đồng API rõ ràng, không phải dự án tích hợp một lần rồi bỏ.",
           "Dịch vụ tách thu thập, xác minh và quyết định thành các bước được định nghĩa tốt. Ứng dụng của bạn có thể thu thập đồng ý và tài liệu một lần, trong khi pipeline áp dụng kiểm tra nhất quán, hỗ trợ rà soát có máy khi phù hợp, và kết quả có thể đối soát trong hệ thống của bạn.",
           "Về vận hành, chúng tôi thiết kế để chịu lỗi: yêu cầu lũy đẳng (idempotent) khi cần, lỗi có cấu trúc ánh xạ tới bước khắc phục, và trạng thái hiển thị trên dashboard mà không bắt buộc ticket hỗ trợ. Mục tiêu là đội của bạn ra mắt nhanh hơn mà không đánh đổi sự rõ ràng với người dùng.",
           "Khi đánh giá nhà cung cấp, hãy hỏi cách biểu diễn kết quả, giới hạn lưu giữ và cách phân quyền khóa. Chúng tôi công bố các kỳ vọng đó cùng endpoint để bộ phận tuân thủ và kỹ thuật xem cùng một bộ dữ kiện."
@@ -2369,12 +2369,12 @@
         ]
       },
       "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
-        "title": "CLAW trên unitoken.trade: lộ trình và khả năng sắp tới",
+        "title": "CLAW trên aiagents-hub.vn: lộ trình và khả năng sắp tới",
         "excerpt": "Hướng phát triển — hỗ trợ đa biến thể, định tuyến và tích hợp hướng sự kiện cho hệ thống tự động nặng.",
         "body": [
           "CLAW là lớp kết nối sắp tới cho khối lượng agent và tự động hóa trên OpenClaw, NanoClaw, NemoClaw, BizClaw và các triển khai tương thích. Mục tiêu quen thuộc với đội nền tảng: tích hợp một lần, định tuyến thông minh và quan sát hành vi nhất quán.",
           "Trên lộ trình sẽ có cấu hình riêng cho từng biến thể CLAW, phân tách rõ giữa gọi đồng bộ và tác vụ chạy lâu, cùng webhook phản ánh chuyển trạng thái đáng tin để điều phối phía sau.",
-          "Chúng tôi cũng siết trải nghiệm nhà phát triển: xác thực dự đoán được, thống nhất với phần còn lại của api.unitoken.trade, sandbox sát giới hạn production, và tài liệu đồng bộ với bề mặt API.",
+          "Chúng tôi cũng siết trải nghiệm nhà phát triển: xác thực dự đoán được, thống nhất với phần còn lại của api.aiagents-hub.vn, sandbox sát giới hạn production, và tài liệu đồng bộ với bề mặt API.",
           "Không gì thay thế bài rà soát bảo mật của bạn — nội dung này bổ trợ. Khi gần phổ cập, chúng tôi sẽ công bố ghi chú migration, chính sách ngừng hỗ trợ và kênh hỗ trợ đối tác thiết kế."
         ]
       },
@@ -2395,7 +2395,7 @@
           "Tích hợp CLAW giai đoạn đầu hưởng lợi từ cùng mẫu API trưởng thành: cách ly lệnh gọi ra sau hàng đợi nội bộ, giới hạn đồng thời, và ưu tiên đăng ký sự kiện thay vì poll khi có thể — giảm tải và đơn giản hóa phục hồi.",
           "Trong bản xem trước, chúng tôi có thể bật header chẩn đoán hoặc trace id. Hãy dùng khi có, nhưng tránh phụ thuộc cứng cho đến khi được ghi trong tài liệu ổn định.",
           "Kiểm thử nên phủ kịch bản sandbox có lỗi một phần. Tự động hóa chưa từng thấy timeout sẽ gây bất ngờ sau này. Chúng tôi sẽ công bố ma trận thử khuyến nghị cùng ví dụ tham chiếu.",
-          "Đội quan tâm có thể liên hệ qua admin@unitoken.trade kèm tóm tắt use case, quy mô dự kiến và khu vực. Chúng tôi ưu tiên đối tác có thể phản hồi có cấu trúc trong thời gian xem trước."
+          "Đội quan tâm có thể liên hệ qua support@aiagents-hub.vn kèm tóm tắt use case, quy mô dự kiến và khu vực. Chúng tôi ưu tiên đối tác có thể phản hồi có cấu trúc trong thời gian xem trước."
         ]
       }
     }
