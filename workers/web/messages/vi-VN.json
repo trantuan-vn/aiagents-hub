@@ -32,7 +32,7 @@
     "language_label": "VIE"
   },
   "AuthLayout": {
-    "apihub_title": "APIHub",
+    "apihub_title": "AIAgentsHub",
     "apihub_tagline": "Nền tảng API chuyên nghiệp cho doanh nghiệp hiện đại",
     "feature_speed_title": "Tốc độ vượt trội",
     "feature_speed_description": "Xử lý hàng triệu request mỗi giây với độ trễ thấp nhất",
@@ -44,7 +44,7 @@
     "feature_integration_description": "SDK và tài liệu đầy đủ hỗ trợ mọi ngôn ngữ lập trình phổ biến",
     "feature_global_title": "Toàn cầu hóa",
     "feature_global_description": "Điểm kết nối đa dạng trên toàn thế giới, đảm bảo hiệu năng tối ưu",
-    "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng APIHub để xây dựng giải pháp của họ"
+    "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng AIAgentsHub để xây dựng giải pháp của họ"
   },
   "LoginForm": {
     "email_label": "Email",
@@ -426,7 +426,7 @@
     "api_reference": "eKYC API",
     "community": "Cộng đồng",
     "description": "Dịch vụ API mạnh mẽ cho nhà phát triển và doanh nghiệp. Xây dựng nhanh hơn với cơ sở hạ tầng đáng tin cậy của chúng tôi.",
-    "copyright": "© {year} APIHub. Tất cả quyền được bảo lưu.",
+    "copyright": "© {year} AIAgentsHub. Tất cả quyền được bảo lưu.",
     "privacy_policy": "Chính sách bảo mật",
     "terms_of_service": "Điều khoản dịch vụ",
     "cookies": "Cookies"
@@ -562,7 +562,7 @@
     "badge": "Hạ tầng API",
     "title": "Dành cho đội ngũ coi API là",
     "title_gradient": "trọng tâm kinh doanh",
-    "subtitle": "APIHub vận hành aiagents-hub.vn — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
+    "subtitle": "AIAgentsHub vận hành aiagents-hub.vn — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
     "mission": {
       "title": "Sứ mệnh của chúng tôi",
       "lead": "Phần mềm hiện nay chạy trên API. Thanh toán, định danh, AI, tự động hóa — khi tầng API gặp sự cố, sản phẩm cũng vậy.",
@@ -719,7 +719,7 @@
     "subtitle": "Chúng tôi vận hành aiagents-hub.vn theo mô hình dịch vụ API: gateway ổn định, đo lường rõ ràng và tài liệu lấy nhà phát triển làm trung tâm. Hãy cùng chúng tôi phát triển hạ tầng mà đội khách hàng tin cậy mỗi ngày.",
     "why": {
       "title": "Vì sao chọn",
-      "title_gradient": "APIHub",
+      "title_gradient": "AIAgentsHub",
       "subtitle": "Đội nhỏ nhưng tác động lớn — đúng tinh thần startup giai đoạn đầu trong lĩnh vực API.",
       "impact": {
         "title": "Công việc gắn sản phẩm",
@@ -792,14 +792,14 @@
       "title_gradient": "Vẫn cứ nhắn cho chúng tôi",
       "subtitle": "Chúng tôi đọc từng tin. Hãy gửi chúng tôi, vài dòng về điều bạn muốn xây — chúng tôi sẽ liên hệ khi có cơ hội phù hợp.",
       "apply_general": "Email tuyển dụng",
-      "apply_general_subject": "Ứng tuyển chung — APIHub / aiagents-hub.vn",
+      "apply_general_subject": "Ứng tuyển chung — AIAgentsHub / aiagents-hub.vn",
       "browse_docs": "Đọc tài liệu"
     }
   },
   "ContactPage": {
     "badge": "Luôn sẵn sàng hỗ trợ",
     "title": "Trao đổi với",
-    "title_gradient": "đội APIHub",
+    "title_gradient": "đội AIAgentsHub",
     "subtitle": "Thắc mắc về thanh toán, tích hợp hay hợp tác? Hãy liên hệ — chúng tôi chuyển mỗi tin nhắn đến đúng người tại aiagents-hub.vn.",
     "response_hint": "Thường phản hồi trong một ngày làm việc.",
     "cards": {
@@ -1072,7 +1072,7 @@
       "controller": {
         "title": "Bên kiểm soát dữ liệu và liên hệ",
         "paragraphs": [
-          "Bên kiểm soát dữ liệu chịu trách nhiệm về thông tin cá nhân trong Chính sách này là pháp nhân vận hành Nền tảng (gọi gọn là \"APIHub\" / \"Unitoken\"). Tên pháp nhân đầy đủ, địa chỉ đăng ký và mã số đăng ký có thể được cung cấp theo yêu cầu cho hóa đơn, hợp đồng hoặc mục đích quy định.",
+          "Bên kiểm soát dữ liệu chịu trách nhiệm về thông tin cá nhân trong Chính sách này là pháp nhân vận hành Nền tảng (gọi gọn là \"AIAgentsHub\" / \"Unitoken\"). Tên pháp nhân đầy đủ, địa chỉ đăng ký và mã số đăng ký có thể được cung cấp theo yêu cầu cho hóa đơn, hợp đồng hoặc mục đích quy định.",
           "Đối với câu hỏi chung về quyền riêng tư và để thực hiện quyền của bạn khi pháp luật cho phép, liên hệ support@aiagents-hub.vn. Đối với sự cố bảo mật liên quan đến thông tin đăng nhập hoặc truy cập trái phép nghi ngờ, hãy liên hệ kịp thời kèm chi tiết liên quan để chúng tôi xử lý hiệu quả."
         ]
       },
@@ -1307,7 +1307,7 @@
       "evening": "Làm tốt lắm. Dịch vụ của bạn an toàn và sẵn sàng cho lưu lượng ngày mai."
     },
     "trust": {
-      "subtitle": "Hàng nghìn doanh nghiệp tin tưởng APIHub để xây dựng giải pháp",
+      "subtitle": "Hàng nghìn doanh nghiệp tin tưởng AIAgentsHub để xây dựng giải pháp",
       "lightning_fast": "Cực kỳ nhanh",
       "lightning_fast_desc": "Hàng triệu request mỗi giây với độ trễ thấp nhất",
       "enterprise_security": "Bảo mật doanh nghiệp",
