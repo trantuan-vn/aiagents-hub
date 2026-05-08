@@ -98,7 +98,10 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
         'SELECT version FROM versions where version = (select max(version) from versions)'
       );
 
-      if ((versions.length > 0 && (versions[0].version !== version)) || versions.length === 0) {
+      const hasStoredVersion = versions.length > 0;
+      const needsUpgrade = !hasStoredVersion || versions[0].version !== version;
+
+      if (needsUpgrade) {
         const object = await env.R2_VERSION_BUCKET.get(`version-${version}.json`);
         
         if (object) {
@@ -211,7 +214,22 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
 
         }
         else {
-          throw new Error(`Version ${version} on R2_VERSION_BUCKET not found`);
+          // First-login bootstrap: no local version row and no snapshot file yet.
+          // Do not block authentication flow in this case.
+          if (!hasStoredVersion) {
+            await executeUtils.executeDynamicAction(userDO, 'insert', {
+              version,
+              timestamp: new Date().toISOString(),
+              recordCounts: {
+                price_policies: 0,
+                services: 0,
+                vouchers: 0,
+                commission_policies: 0,
+              }
+            }, 'versions');
+          } else {
+            throw new Error(`Version ${version} on R2_VERSION_BUCKET not found`);
+          }
         }
       }
             

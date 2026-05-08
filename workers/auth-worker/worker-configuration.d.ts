@@ -46,7 +46,6 @@ declare namespace Cloudflare {
 		GITHUB_CLIENT_SECRET: SecretsStoreSecret;
 		TWITTER_CLIENT_ID: SecretsStoreSecret;
 		TWITTER_CLIENT_SECRET: SecretsStoreSecret;
-		CF_AIG_TOKEN: SecretsStoreSecret;
 		QUEUE_WORKER: Fetcher /* queue-worker */;
 		INPUT_QUEUE: Queue;
 		ERROR_QUEUE: Queue;
