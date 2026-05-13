@@ -32,6 +32,7 @@ interface Service {
   name: string;
   endpoint: string;
   isActive: boolean;
+  fixedPrice?: number | null;
 }
 
 interface Voucher {

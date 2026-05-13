@@ -1589,6 +1589,8 @@
     "cancel_confirm_description": "Bạn có chắc chắn muốn hủy dịch vụ \"{name}\"? Hành động này không thể hoàn tác.",
     "never_expires": "Không bao giờ hết hạn",
     "calls": "{current} / {max} lượt gọi",
+    "pricing_fixed": "Giá cố định {amount}/lần",
+    "pricing_gateway": "Theo cost log AI Gateway",
     "stats": {
       "total_services": "Tổng số Dịch vụ",
       "total_services_description": "Tổng số dịch vụ đã đăng ký",
@@ -1615,7 +1617,10 @@
       "expires_at_placeholder": "Chọn ngày hết hạn",
       "expires_at_description": "Ngày hết hạn tùy chọn cho dịch vụ",
       "is_active": "Đang hoạt động",
-      "is_active_description": "Dịch vụ có đang hoạt động hay không"
+      "is_active_description": "Dịch vụ có đang hoạt động hay không",
+      "fixed_price": "Giá cố định mỗi lần gọi (tùy chọn)",
+      "fixed_price_placeholder": "Để trống để tính theo cost log AI Gateway",
+      "fixed_price_description": "Nếu nhập, mỗi lần gọi thành công ghi nhận đúng số đó. Để trống thì dùng cost từ log AI Gateway."
     }
   },
   "MonitorLogsPage": {
@@ -1701,12 +1706,12 @@
       "success_rate": "Tỷ lệ thành công",
       "errors": "Lỗi",
       "peak_day": "Ngày cao điểm",
-      "estimated_cost": "Chi phí ước tính",
+      "estimated_cost": "Chi phí sử dụng",
       "in_period": "trong khoảng thời gian chọn",
       "of_total": "trên tổng",
       "no_errors": "Không có lỗi",
       "no_data": "Không có dữ liệu",
-      "unit_per_request": "cho mỗi 1.000 requests",
+      "unit_per_request": "Tổng phí mỗi lần gọi (giá cố định hoặc AI Gateway)",
       "quality_excellent": "Xuất sắc",
       "quality_good": "Tốt",
       "quality_attention": "Cần chú ý"

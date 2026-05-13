@@ -1,5 +1,3 @@
-export const UNIT_PRICE = 1000;
-
 export interface DailyUsage {
   date: string;
   requestCount: number;
@@ -24,10 +22,10 @@ export function formatDate(dateStr: string, locale?: string): string {
   });
 }
 
-export function formatEstimatedCost(requestCount: number): string {
-  const cost = requestCount * UNIT_PRICE;
-  if (cost === 0) return "—";
-  return new Intl.NumberFormat("vi-VN").format(cost);
+/** Định dạng chi phí thực tế (giá cố định hoặc cost từ AI Gateway). */
+export function formatUsageCost(amount: number): string {
+  if (amount == null || amount === 0) return "—";
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(amount);
 }
 
 export function getQualityLevel(

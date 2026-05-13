@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { formatDate, formatEstimatedCost, type AnalyticsData, type DailyUsage } from "./utils";
+import { formatDate, formatUsageCost, type AnalyticsData, type DailyUsage } from "./utils";
 
 interface AnalyticsTableProps {
   isLoading: boolean;
@@ -71,7 +71,7 @@ export function AnalyticsTable({ isLoading, error, isEmpty, chartData, data, t, 
                 {row.errorCount.toLocaleString()}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatEstimatedCost(row.requestCount)}
+                {formatUsageCost(row.cost)}
               </TableCell>
             </TableRow>
           ))}
@@ -87,7 +87,7 @@ export function AnalyticsTable({ isLoading, error, isEmpty, chartData, data, t, 
               {totalErrors.toLocaleString()}
             </TableCell>
             <TableCell className="text-right font-mono tabular-nums">
-              {formatEstimatedCost(data!.totalRequests)}
+              {formatUsageCost(data!.totalCost)}
             </TableCell>
           </TableRow>
         </TableFooter>

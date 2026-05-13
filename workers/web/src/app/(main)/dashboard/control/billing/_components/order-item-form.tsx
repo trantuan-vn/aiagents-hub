@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Control } from "react-hook-form";
+import { Control, useFormContext } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -15,6 +15,7 @@ interface Service {
   name: string;
   endpoint: string;
   isActive: boolean;
+  fixedPrice?: number | null;
 }
 
 interface OrderItemFormProps {
@@ -35,6 +36,15 @@ export function OrderItemForm({
   canRemove,
 }: OrderItemFormProps) {
   const t = useTranslations("BillingPage");
+  const { setValue } = useFormContext<CreateOrder>();
+
+  const resolveServiceBasePrice = (serviceId: number): number => {
+    const svc = services.find((s) => Number(s.id) === serviceId);
+    const fp = svc?.fixedPrice;
+    if (fp == null) return 0;
+    const n = Number(fp);
+    return Number.isNaN(n) ? 0 : Math.max(0, n);
+  };
 
   return (
     <div className="bg-muted space-y-3 rounded-lg p-4">
@@ -56,7 +66,14 @@ export function OrderItemForm({
           <FormItem>
             <FormLabel>{t("service")}</FormLabel>
             <Select
-              onValueChange={(value) => field.onChange(parseInt(value, 10))}
+              onValueChange={(value) => {
+                const id = parseInt(value, 10);
+                field.onChange(id);
+                setValue(`items.${index}.basePrice`, resolveServiceBasePrice(id), {
+                  shouldValidate: true,
+                  shouldDirty: true,
+                });
+              }}
               value={field.value ? String(field.value) : ""}
               disabled={isLoadingServices}
             >
@@ -96,9 +113,11 @@ export function OrderItemForm({
                 <Input
                   type="number"
                   min={0}
+                  readOnly
+                  tabIndex={-1}
+                  className="bg-muted cursor-default"
                   placeholder="0"
                   {...field}
-                  onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
                 />
               </FormControl>
               <FormMessage />

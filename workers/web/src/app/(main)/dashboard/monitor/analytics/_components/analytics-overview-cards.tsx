@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { formatDate, formatEstimatedCost, getQualityLevel, type AnalyticsData } from "./utils";
+import { formatDate, formatUsageCost, getQualityLevel, type AnalyticsData } from "./utils";
 
 type StatRow = {
   totalRequests: number;
@@ -44,7 +44,12 @@ function computeStats(data: AnalyticsData): StatRow {
   };
 }
 
-function buildCards(stats: StatRow, quality: { label: string; badgeClass: string } | null, t: (k: string) => string) {
+function buildCards(
+  stats: StatRow,
+  quality: { label: string; badgeClass: string } | null,
+  t: (k: string) => string,
+  totalCost: number,
+) {
   return [
     {
       key: "total_requests",
@@ -93,7 +98,7 @@ function buildCards(stats: StatRow, quality: { label: string; badgeClass: string
     {
       key: "cost",
       title: t("stats.estimated_cost"),
-      value: formatEstimatedCost(stats.totalRequests),
+      value: formatUsageCost(totalCost),
       sub: t("stats.unit_per_request"),
       icon: BarChart3,
       iconBg: "bg-cyan-500/15",
@@ -123,9 +128,9 @@ export function AnalyticsOverviewCards({ data, t, isLoading }: AnalyticsOverview
       </div>
     );
   }
-  if (!stats || data?.daily.length === 0) return null;
+  if (!stats || !data || data.daily.length === 0) return null;
 
-  const cards = buildCards(stats, quality, t);
+  const cards = buildCards(stats, quality, t, data.totalCost);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">

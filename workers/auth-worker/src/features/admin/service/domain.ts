@@ -31,6 +31,8 @@ export const ServiceSchema = z.object({
     z.string().datetime().optional()
   ),
   isActive: z.boolean().default(true),
+  /** Khi có giá trị số: mỗi lần gọi thành công tính đúng số đó. Khi không gán: lấy `cost` từ log AI Gateway. */
+  fixedPrice: z.number().min(0).optional(),
 });
 
 export const ServiceUsageSchema = z.object({
@@ -38,6 +40,8 @@ export const ServiceUsageSchema = z.object({
   endpoint: z.string(),
   userAgent: z.string().optional(),
   ipAddress: z.string().optional(),
+  /** Chi phí ghi nhận cho lần gọi (giá cố định hoặc cost từ AI Gateway). */
+  cost: z.number().min(0).optional(),
   /** true = API call failed (no deduct from quota), false/undefined = success */
   isError: z.boolean().optional().default(false),
 });

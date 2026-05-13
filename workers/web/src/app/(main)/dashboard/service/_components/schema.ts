@@ -20,6 +20,18 @@ const endpointSchema = z
     },
   );
 
+/** Form/API có thể gửi number hoặc string rỗng; output luôn là số không âm hoặc undefined. */
+const optionalFixedPriceField = z
+  .union([z.number(), z.string(), z.null()])
+  .optional()
+  .transform((val): number | undefined => {
+    if (val === undefined || val === null) return undefined;
+    if (typeof val === "string" && val.trim() === "") return undefined;
+    const n = typeof val === "number" ? val : Number(val);
+    if (Number.isNaN(n)) return undefined;
+    return Math.max(0, n);
+  });
+
 // Service Schema
 export const serviceSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
@@ -53,6 +65,8 @@ export const serviceSchema = z.object({
     }, z.string().datetime().optional())
     .optional(),
   isActive: z.boolean().default(true),
+  /** Số tiền mỗi lần gọi thành công; để trống = lấy theo cost log AI Gateway */
+  fixedPrice: optionalFixedPriceField,
   createdAt: z.string().datetime().optional(),
 });
 
@@ -64,6 +78,7 @@ export const createServiceSchema = z.object({
   currentCalls: z.number().min(0),
   expiresAt: z.string().datetime().optional(),
   isActive: z.boolean(),
+  fixedPrice: optionalFixedPriceField,
 });
 
 // Update Service Schema
@@ -79,8 +94,9 @@ export const serviceUsageSchema = z.object({
   createdAt: z.string().datetime().optional(),
 });
 
-// Types
+// Types (infer = output sau transform; input = giá trị form trước khi parse)
 export type Service = z.infer<typeof serviceSchema>;
 export type CreateService = z.infer<typeof createServiceSchema>;
+export type CreateServiceFormInput = z.input<typeof createServiceSchema>;
 export type UpdateService = z.infer<typeof updateServiceSchema>;
 export type ServiceUsage = z.infer<typeof serviceUsageSchema>;

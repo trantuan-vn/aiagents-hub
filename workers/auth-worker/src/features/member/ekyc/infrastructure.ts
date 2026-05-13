@@ -15,6 +15,26 @@ import { getDocumentPrompt, getFaceSearchPrompt, getFaceComparisonPrompt, getLiv
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 
+const AI_GATEWAY_ID = 'unitoken';
+
+async function resolveRecordedUsageCost(env: Env, service: { fixedPrice?: number | null }): Promise<number> {
+  if (typeof service.fixedPrice === 'number' && !Number.isNaN(service.fixedPrice)) {
+    return Math.max(0, service.fixedPrice);
+  }
+  const logId = env.AI.aiGatewayLogId;
+  if (!logId) {
+    return 0;
+  }
+  try {
+    const log = await env.AI.gateway(AI_GATEWAY_ID).getLog(logId);
+    const c = log.cost;
+    return typeof c === 'number' && !Number.isNaN(c) ? Math.max(0, c) : 0;
+  } catch (e) {
+    console.warn('[Ekyc] AI Gateway getLog failed for usage cost:', e);
+    return 0;
+  }
+}
+
 export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IAIDocumentService {
 
   const validateServiceUsage = async (endpoint: string): Promise<any> => {
@@ -39,7 +59,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
   const updateServiceUsage = async (
     service: any,
     endpoint: string,
-    request: any
+    request: any,
+    usageCost: number
   ): Promise<void> => {
     await executeUtils.executeDynamicAction(userDO, 'multi-table', {
       operations: [
@@ -60,6 +81,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
             userAgent: request.userAgent,
             ipAddress: request.ipAddress,
             isError: false,
+            cost: usageCost,
             queueStatus: 'pending'
           }
         }
@@ -85,6 +107,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
               userAgent: request?.userAgent,
               ipAddress: request?.ipAddress,
               isError: true,
+              cost: 0,
               queueStatus: 'pending'
             }
           }
@@ -112,7 +135,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: any,
     prompt: string,
     images: File[],
-    processResult: (response: any, service: any) => Promise<any>
+    processResult: (response: any, service: any, usageCost: number) => Promise<any>
   ): Promise<any> => {
     const service = await validateServiceUsage(endpoint);
     if (!service) {
@@ -139,7 +162,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       env.AI.run(LLAMA_VISION_MODEL, {
         messages,
         max_tokens: maxTokens,
-      }, { gateway: { id: "unitoken" } });
+      }, { gateway: { id: AI_GATEWAY_ID, collectLog: true } });
 
     try {
       let response: any;
@@ -153,7 +176,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
           throw e;
         }
       }
-      return await processResult(response, service);
+      const usageCost = await resolveRecordedUsageCost(env, service);
+      return await processResult(response, service, usageCost);
     } catch (e) {
       await recordApiError(service, endpoint, request);
       throw e;
@@ -180,7 +204,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
   const processDocumentRecognition = async (
     response: any,
     service: any,
-    request: DocumentRecognition
+    request: DocumentRecognition,
+    usageCost: number
   ): Promise<DocumentExtractionResult> => {
     console.log('full response:', response);
 
@@ -202,7 +227,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         imageType: request.image.type
       }
     };
-    await updateServiceUsage(service, request.endpoint, request);
+    await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
   };
 
@@ -222,7 +247,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
   const processFaceSearch = async (
     response: any,
     service: any,
-    request: FaceSearch
+    request: FaceSearch,
+    usageCost: number
   ): Promise<FaceDetectionResult> => {
     console.log('response: ', response);
     const data = extractResponseData(response);
@@ -248,14 +274,15 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       faceCount,
       processingTime: Date.now()
     };
-    await updateServiceUsage(service, request.endpoint, request);
+    await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
   };
 
   const processFaceVerification = async (
     response: any,
     service: any,
-    request: FaceVerification
+    request: FaceVerification,
+    usageCost: number
   ): Promise<FaceVerificationResult> => {
     console.log('response: ', response);
     const result = extractResponseData(response);
@@ -278,14 +305,15 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       attributes: q != null ? { image1: { quality: q }, image2: { quality: q } } : {},
       processingTime: Date.now()
     };
-    await updateServiceUsage(service, request.endpoint, request);
+    await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
   };
 
   const processLivenessDetection = async (
     response: any,
     service: any,
-    request: LivenessDetection
+    request: LivenessDetection,
+    usageCost: number
   ): Promise<LivenessResult> => {
     console.log('response: ', response);
     const result = extractResponseData(response);
@@ -309,7 +337,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       processingTime: Date.now(),
       recommendations
     };
-    await updateServiceUsage(service, request.endpoint, request);
+    await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
   };
 
@@ -320,7 +348,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         getDocumentPrompt(request.docType),
         [request.image],
-        (response, service) => processDocumentRecognition(response, service, request)
+        (response, service, usageCost) => processDocumentRecognition(response, service, request, usageCost)
       );
     },
 
@@ -330,7 +358,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         getFaceSearchPrompt(),
         [request.image],
-        (response, service) => processFaceSearch(response, service, request)
+        (response, service, usageCost) => processFaceSearch(response, service, request, usageCost)
       );
     },
 
@@ -341,7 +369,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         getFaceComparisonPrompt(),
         [request.image],
-        (response, service) => processFaceVerification(response, service, request)
+        (response, service, usageCost) => processFaceVerification(response, service, request, usageCost)
       );
     },
 
@@ -353,7 +381,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         prompt,
         [request.image],
-        (response, service) => processLivenessDetection(response, service, request)
+        (response, service, usageCost) => processLivenessDetection(response, service, request, usageCost)
       );
     }
   };

@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 
-import { createServiceSchema, type CreateService, type Service } from "./schema";
+import { createServiceSchema, type CreateService, type CreateServiceFormInput, type Service } from "./schema";
 
 interface CreateServiceDialogProps {
   onCreate: (data: CreateService) => Promise<Service>;
@@ -34,7 +34,7 @@ export function CreateServiceDialog({ onCreate }: CreateServiceDialogProps) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<CreateService>({
+  const form = useForm<CreateServiceFormInput, unknown, CreateService>({
     resolver: zodResolver(createServiceSchema),
     defaultValues: {
       name: "",
@@ -155,6 +155,32 @@ export function CreateServiceDialog({ onCreate }: CreateServiceDialogProps) {
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="fixedPrice"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("form.fixed_price")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      placeholder={t("form.fixed_price_placeholder")}
+                      {...field}
+                      value={field.value ?? ""}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        field.onChange(v === "" ? undefined : parseFloat(v));
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>{t("form.fixed_price_description")}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

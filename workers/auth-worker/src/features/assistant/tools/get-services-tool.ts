@@ -27,6 +27,7 @@ export function getServicesTool(c: any, bindingName: string, user: any) {
           endpoint: service.endpoint,
           isActive: service.isActive,
           expiresAt: service.expiresAt,
+          fixedPrice: service.fixedPrice,
           usage: {
             currentCalls: service.currentCalls,
             maxCalls: service.maxCalls,

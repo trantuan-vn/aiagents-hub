@@ -60,7 +60,8 @@ export async function getServiceUsageAnalytics(
       date(created_at/1000, 'unixepoch') as date,
       COUNT(*) as request_count,
       SUM(CASE WHEN isError = 0 OR isError IS NULL THEN 1 ELSE 0 END) as success_count,
-      SUM(CASE WHEN isError = 1 THEN 1 ELSE 0 END) as error_count
+      SUM(CASE WHEN isError = 1 THEN 1 ELSE 0 END) as error_count,
+      SUM(CASE WHEN isError = 0 OR isError IS NULL THEN COALESCE("cost", 0) ELSE 0 END) as day_cost
     FROM service_usages 
     WHERE user_id = ? AND created_at >= ? AND created_at <= ?
     GROUP BY date
@@ -72,6 +73,7 @@ export async function getServiceUsageAnalytics(
     request_count: number;
     success_count: number;
     error_count: number;
+    day_cost: number;
   }>();
 
   const rows = result.results ?? [];
@@ -80,7 +82,7 @@ export async function getServiceUsageAnalytics(
     requestCount: r.request_count ?? 0,
     successCount: r.success_count ?? 0,
     errorCount: r.error_count ?? 0,
-    cost: 0, // Cost tracking to be implemented when pricing model is integrated
+    cost: Number(r.day_cost) || 0,
   }));
 
   const totalRequests = daily.reduce((sum, d) => sum + d.requestCount, 0);

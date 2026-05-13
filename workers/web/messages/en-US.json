@@ -1589,6 +1589,8 @@
     "cancel_confirm_description": "Are you sure you want to cancel the service \"{name}\"? This action cannot be undone.",
     "never_expires": "Never expires",
     "calls": "{current} / {max} calls",
+    "pricing_fixed": "Fixed {amount} per call",
+    "pricing_gateway": "Billed from AI Gateway log",
     "stats": {
       "total_services": "Total Services",
       "total_services_description": "Total number of registered services",
@@ -1615,7 +1617,10 @@
       "expires_at_placeholder": "Select expiration date",
       "expires_at_description": "Optional expiration date for the service",
       "is_active": "Active",
-      "is_active_description": "Whether the service is currently active"
+      "is_active_description": "Whether the service is currently active",
+      "fixed_price": "Fixed price per call (optional)",
+      "fixed_price_placeholder": "Leave empty to bill from AI Gateway log cost",
+      "fixed_price_description": "If set, each successful call records this amount. If empty, the cost from the AI Gateway log is used."
     }
   },
   "MonitorLogsPage": {
@@ -1701,12 +1706,12 @@
       "success_rate": "Success Rate",
       "errors": "Errors",
       "peak_day": "Peak Day",
-      "estimated_cost": "Est. Cost",
+      "estimated_cost": "Usage cost",
       "in_period": "in selected period",
       "of_total": "of total",
       "no_errors": "No errors",
       "no_data": "No data",
-      "unit_per_request": "per 1,000 requests",
+      "unit_per_request": "Sum of per-call charges (fixed price or AI Gateway)",
       "quality_excellent": "Excellent",
       "quality_good": "Good",
       "quality_attention": "Needs attention"

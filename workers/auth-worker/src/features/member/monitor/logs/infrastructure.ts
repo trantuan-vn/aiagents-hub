@@ -21,6 +21,8 @@ export interface ServiceUsageLog {
   ipAddress?: string;
   user_id?: string;
   isError?: boolean | number;
+  /** Chi phí theo giá cố định service hoặc cost AI Gateway */
+  cost?: number;
   created_at?: number;
   updated_at?: number;
 }

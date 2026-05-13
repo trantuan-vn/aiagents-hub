@@ -32,6 +32,26 @@ interface ServiceItemProps {
   canDelete?: boolean;
 }
 
+type TranslateFn = (key: string, params?: Record<string, string>) => string;
+
+function serviceVisualState(service: Service, t: TranslateFn) {
+  const isExpired = Boolean(service.expiresAt && new Date(service.expiresAt) < new Date());
+  if (!service.isActive) {
+    return { badgeVariant: "secondary" as const, statusLabel: t("status.inactive") };
+  }
+  if (isExpired) {
+    return { badgeVariant: "destructive" as const, statusLabel: t("status.expired") };
+  }
+  return { badgeVariant: "default" as const, statusLabel: t("status.active") };
+}
+
+function ServicePricingLabel({ service, t }: { service: Service; t: TranslateFn }) {
+  if (typeof service.fixedPrice === "number" && !Number.isNaN(service.fixedPrice)) {
+    return <span>{t("pricing_fixed", { amount: service.fixedPrice.toLocaleString() })}</span>;
+  }
+  return <span>{t("pricing_gateway")}</span>;
+}
+
 function ServiceItemContent({
   service,
   formatDate,
@@ -39,12 +59,9 @@ function ServiceItemContent({
 }: {
   service: Service;
   formatDate: (dateString: string | undefined) => string;
-  t: (key: string, params?: Record<string, string>) => string;
+  t: TranslateFn;
 }) {
-  const isActive = service.isActive;
-  const isExpired = service.expiresAt ? new Date(service.expiresAt) < new Date() : false;
-  const badgeVariant = !isActive ? "secondary" : isExpired ? "destructive" : "default";
-  const statusLabel = !isActive ? t("status.inactive") : isExpired ? t("status.expired") : t("status.active");
+  const { badgeVariant, statusLabel } = serviceVisualState(service, t);
 
   return (
     <div className="flex flex-1 items-center gap-3">
@@ -58,7 +75,7 @@ function ServiceItemContent({
             {statusLabel}
           </Badge>
         </div>
-        <div className="text-muted-foreground flex items-center gap-4 text-xs">
+        <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <div className="flex items-center gap-1">
             <ExternalLink className="h-3 w-3" />
             <span className="max-w-xs truncate">{service.endpoint}</span>
@@ -66,11 +83,12 @@ function ServiceItemContent({
           <div className="flex items-center gap-1">
             <span>
               {t("calls", {
-                current: String(service.currentCalls ?? 0),
-                max: String(service.maxCalls ?? 0),
+                current: String(service.currentCalls),
+                max: String(service.maxCalls),
               })}
             </span>
           </div>
+          <ServicePricingLabel service={service} t={t} />
           {service.expiresAt && (
             <div className="flex items-center gap-1">
               <Calendar className="h-3 w-3" />
