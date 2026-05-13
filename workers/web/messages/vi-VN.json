@@ -1588,16 +1588,14 @@
     "cancel_confirm_title": "Hủy dịch vụ?",
     "cancel_confirm_description": "Bạn có chắc chắn muốn hủy dịch vụ \"{name}\"? Hành động này không thể hoàn tác.",
     "never_expires": "Không bao giờ hết hạn",
-    "calls": "{current} / {max} lượt gọi",
-    "pricing_fixed": "Giá cố định {amount}/lần",
-    "pricing_gateway": "Theo cost log AI Gateway",
+    "pricing_fee_percent": "{percent}% × cost gateway",
     "stats": {
       "total_services": "Tổng số Dịch vụ",
       "total_services_description": "Tổng số dịch vụ đã đăng ký",
       "active_services": "Dịch vụ Đang hoạt động",
       "active_services_description": "Dịch vụ hiện đang hoạt động",
-      "total_calls": "Tổng lượt gọi",
-      "total_calls_description": "Tổng số lượt gọi API trên tất cả các dịch vụ"
+      "avg_fee_percent": "Phí TB %",
+      "avg_fee_percent_description": "Trung bình phần trăm so với cost AI Gateway"
     },
     "status": {
       "active": "Đang hoạt động",
@@ -1610,17 +1608,13 @@
       "endpoint": "URL Endpoint",
       "endpoint_placeholder": "https://api.example.com/v1/vision",
       "endpoint_description": "URL endpoint API cho dịch vụ này",
-      "max_calls": "Số lượt gọi tối đa",
-      "max_calls_placeholder": "0 cho không giới hạn",
-      "max_calls_description": "Số lượt gọi API tối đa được phép (0 = không giới hạn)",
+      "fee_percent": "Phí so với gateway (%)",
+      "fee_percent_description": "Phí mỗi lần gọi = phần trăm này × cost log AI Gateway (100 = bằng gateway).",
       "expires_at": "Ngày hết hạn",
       "expires_at_placeholder": "Chọn ngày hết hạn",
       "expires_at_description": "Ngày hết hạn tùy chọn cho dịch vụ",
       "is_active": "Đang hoạt động",
-      "is_active_description": "Dịch vụ có đang hoạt động hay không",
-      "fixed_price": "Giá cố định mỗi lần gọi (tùy chọn)",
-      "fixed_price_placeholder": "Để trống để tính theo cost log AI Gateway",
-      "fixed_price_description": "Nếu nhập, mỗi lần gọi thành công ghi nhận đúng số đó. Để trống thì dùng cost từ log AI Gateway."
+      "is_active_description": "Dịch vụ có đang hoạt động hay không"
     }
   },
   "MonitorLogsPage": {
@@ -1868,7 +1862,7 @@
   },
   "SystemConfigPage": {
     "title": "Cấu hình hệ thống",
-    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker và D1tor2-Cron. Thay đổi có hiệu lực ngay khi lưu.",
+    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker, D1tor2-Cron và thanh toán (tỉ giá USD/VND). Thay đổi có hiệu lực ngay khi lưu.",
     "loading": "Đang tải cấu hình...",
     "save_config": "Lưu cấu hình",
     "saving": "Đang lưu...",
@@ -1883,6 +1877,8 @@
     "queue_worker_desc": "Tham số xử lý batch và retry",
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline và retention D1 → R2",
+    "billing": "Thanh toán",
+    "billing_desc": "Nạp ví: số tiền tối thiểu mỗi lệnh và tỉ giá VND cho 1 USD (preset & hiển thị)",
     "fields": {
       "QUEUE_BATCH_SIZE": "Kích thước Batch Queue (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Ngưỡng Flush Queue",
@@ -1898,7 +1894,9 @@
       "QUEUE_PROCESSING_TIMEOUT": "Timeout xử lý Queue (ms)",
       "PIPELINE_CONCURRENCY_LIMIT": "Giới hạn Pipeline đồng thời",
       "BATCH_CONCURRENCY_LIMIT": "Giới hạn Batch đồng thời",
-      "D1_RETENTION_DAYS": "Số ngày lưu D1"
+      "D1_RETENTION_DAYS": "Số ngày lưu D1",
+      "USD_VND_RATE": "Tỉ giá USD/VND (VND cho 1 USD)",
+      "MIN_TOP_UP_VND": "Số tiền nạp tối thiểu (VND mỗi lệnh)"
     }
   },
   "CommissionPolicyPage": {
@@ -2163,8 +2161,8 @@
     }
   },
   "BillingPage": {
-    "title": "Thanh toán & Đơn hàng",
-    "description": "Quản lý đơn hàng và thanh toán của bạn",
+    "title": "Thanh toán & ví",
+    "description": "Nạp tiền (mức USD gợi ý), thanh toán VNPay bằng VND; mỗi lần gọi API trừ phí = % × cost AI Gateway.",
     "fetch_error": "Không thể tải danh sách đơn hàng",
     "error": "Lỗi",
     "create_error": "Không thể tạo đơn hàng",
@@ -2180,9 +2178,16 @@
     "order_created_description": "Đơn hàng đã được tạo thành công",
     "order_cancelled": "Đã hủy đơn hàng",
     "order_cancelled_description": "Đơn hàng đã được hủy thành công",
-    "create_order": "Tạo Đơn hàng",
-    "create_order_title": "Tạo Đơn hàng Mới",
-    "create_order_description": "Tạo đơn hàng mới với các sản phẩm và thông tin thanh toán",
+    "top_up": "Nạp tiền",
+    "top_up_title": "Nạp vào ví",
+    "top_up_description": "Chọn mức (hiển thị USD để tham khảo). Thanh toán VNPay quyết toán bằng VND.",
+    "preset_usd_label": "Mức nhanh (USD)",
+    "exchange_rate_label": "Tỉ giá USD/VND",
+    "exchange_rate_hint": "Do quản trị viên cấu hình trong Cấu hình hệ thống. Chỉ dùng cho mức gợi ý và quy đổi USD ≈.",
+    "min_top_up_hint": "Số tiền nạp tối thiểu mỗi lệnh: {amount} VND (cấu hình trong Cấu hình hệ thống).",
+    "amount_vnd_label": "Số tiền (VND)",
+    "approx_usd": "≈ ${amount} USD theo tỷ giá tham chiếu",
+    "create_top_up": "Tạo lệnh nạp",
     "tab_orders": "Đơn hàng",
     "tab_history": "Lịch sử",
     "filter_by_date": "Lọc theo ngày",
@@ -2245,12 +2250,12 @@
     "create": "Tạo",
     "processing": "Đang xử lý...",
     "stats": {
-      "total_orders": "Tổng số Đơn hàng",
-      "total_orders_description": "Tổng số đơn hàng",
-      "pending_orders": "Đơn hàng Chờ thanh toán",
-      "pending_orders_description": "Đơn hàng đang chờ thanh toán",
-      "total_amount": "Tổng số tiền",
-      "total_amount_description": "Tổng số tiền trên tất cả đơn hàng"
+      "wallet_balance": "Số dư ví",
+      "wallet_balance_usd_hint": "≈ ${amount} USD (tham chiếu)",
+      "pending_topups": "Lệnh nạp chờ thanh toán",
+      "pending_topups_description": "Chưa hoàn tất thanh toán ngân hàng",
+      "completed_volume": "Đã nạp (trang hiện tại)",
+      "completed_volume_description": "Tổng các đơn hoàn thành trong danh sách đang xem"
     },
     "status": {
       "pending": "Chờ thanh toán",

@@ -46,10 +46,11 @@ function serviceVisualState(service: Service, t: TranslateFn) {
 }
 
 function ServicePricingLabel({ service, t }: { service: Service; t: TranslateFn }) {
-  if (typeof service.fixedPrice === "number" && !Number.isNaN(service.fixedPrice)) {
-    return <span>{t("pricing_fixed", { amount: service.fixedPrice.toLocaleString() })}</span>;
-  }
-  return <span>{t("pricing_gateway")}</span>;
+  const pct =
+    typeof service.feePercent === "number" && !Number.isNaN(service.feePercent)
+      ? service.feePercent
+      : 100;
+  return <span>{t("pricing_fee_percent", { percent: String(pct) })}</span>;
 }
 
 function ServiceItemContent({
@@ -79,14 +80,6 @@ function ServiceItemContent({
           <div className="flex items-center gap-1">
             <ExternalLink className="h-3 w-3" />
             <span className="max-w-xs truncate">{service.endpoint}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span>
-              {t("calls", {
-                current: String(service.currentCalls),
-                max: String(service.maxCalls),
-              })}
-            </span>
           </div>
           <ServicePricingLabel service={service} t={t} />
           {service.expiresAt && (

@@ -11,8 +11,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
 import { ConfigCard } from "./_components/config-card";
-import { getAuthFields, getD1tor2Fields, getQueueFields } from "./_components/field-definitions";
-import type { AuthWorkerConfig, D1tor2CronConfig, QueueWorkerConfig, SystemConfigData } from "./_components/types";
+import { getAuthFields, getBillingFields, getD1tor2Fields, getQueueFields } from "./_components/field-definitions";
+import type {
+  AuthWorkerConfig,
+  BillingConfig,
+  D1tor2CronConfig,
+  QueueWorkerConfig,
+  SystemConfigData,
+} from "./_components/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -52,6 +58,7 @@ export default function SystemConfigPage() {
           auth_worker?: AuthWorkerConfig;
           queue_worker?: QueueWorkerConfig;
           d1tor2_cron?: D1tor2CronConfig;
+          billing?: BillingConfig;
         };
       }
       const result: ApiResponse = await response.json();
@@ -60,6 +67,7 @@ export default function SystemConfigPage() {
         auth_worker: { ...data.auth_worker },
         queue_worker: { ...data.queue_worker },
         d1tor2_cron: { ...data.d1tor2_cron },
+        billing: { ...data.billing },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("fetch_error");
@@ -115,6 +123,10 @@ export default function SystemConfigPage() {
     setConfig((prev) => (prev ? { ...prev, d1tor2_cron: { ...prev.d1tor2_cron, [key]: value } } : prev));
   }, []);
 
+  const updateBilling = useCallback((key: keyof BillingConfig, value: number) => {
+    setConfig((prev) => (prev ? { ...prev, billing: { ...prev.billing, [key]: value } } : prev));
+  }, []);
+
   if (isLoading || !config) {
     return (
       <div className="flex flex-col gap-4">
@@ -131,10 +143,12 @@ export default function SystemConfigPage() {
   const handleAuthChange = (key: string, value: number) => updateAuth(key as keyof AuthWorkerConfig, value);
   const handleQueueChange = (key: string, value: number) => updateQueue(key as keyof QueueWorkerConfig, value);
   const handleD1tor2Change = (key: string, value: number) => updateD1tor2(key as keyof D1tor2CronConfig, value);
+  const handleBillingChange = (key: string, value: number) => updateBilling(key as keyof BillingConfig, value);
 
   const authFields = getAuthFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
   const queueFields = getQueueFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
   const d1tor2Fields = getD1tor2Fields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
+  const billingFields = getBillingFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -157,7 +171,7 @@ export default function SystemConfigPage() {
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-4">
         <ConfigCard
           title={t("auth_worker")}
           description={t("auth_worker_desc")}
@@ -175,6 +189,12 @@ export default function SystemConfigPage() {
           description={t("d1tor2_worker_desc")}
           fields={d1tor2Fields}
           onFieldChange={handleD1tor2Change}
+        />
+        <ConfigCard
+          title={t("billing")}
+          description={t("billing_desc")}
+          fields={billingFields}
+          onFieldChange={handleBillingChange}
         />
       </div>
     </div>

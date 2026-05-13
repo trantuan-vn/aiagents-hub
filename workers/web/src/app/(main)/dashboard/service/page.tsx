@@ -101,7 +101,15 @@ export default function ServicePage() {
   };
 
   const activeServices = services.filter((s) => s.isActive);
-  const totalCalls = services.reduce((sum, s) => sum + s.currentCalls, 0);
+  const avgFeePercent =
+    services.length === 0
+      ? "—"
+      : String(
+          Math.round(
+            services.reduce((sum, s) => sum + (typeof s.feePercent === "number" ? s.feePercent : 100), 0) /
+              services.length,
+          ),
+        );
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -140,12 +148,12 @@ export default function ServicePage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t("stats.total_calls")}</CardTitle>
+            <CardTitle className="text-sm font-medium">{t("stats.avg_fee_percent")}</CardTitle>
             <AlertCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCalls.toLocaleString()}</div>
-            <p className="text-muted-foreground text-xs">{t("stats.total_calls_description")}</p>
+            <div className="text-2xl font-bold">{avgFeePercent}</div>
+            <p className="text-muted-foreground text-xs">{t("stats.avg_fee_percent_description")}</p>
           </CardContent>
         </Card>
       </div>

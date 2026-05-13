@@ -19,44 +19,6 @@ import { VNPAY_CONSTANTS, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_ERROR_MESSAGES }
 
 import { executeUtils } from '../../../shared/utils';
 export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPayService {
-  
-  // Helper methods
-  const getServiceUpdates = async (orderId: number, operation: 'add' | 'subtract'): Promise<Array<any>> => {
-    const orderItems = await executeUtils.executeDynamicAction(userDO, 'select', {
-      where: { field: "orderId", operator: '=', value: orderId }
-    }, 'order_items');
-    
-    let operations: Array<any> = [];
-
-    for (const item of orderItems) {
-      const services = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "id", operator: '=', value: item.serviceId },
-          { field: "isActive", operator: '=', value: 1 }
-        ]
-      }, 'services');
-      
-      if (services.length === 0) {
-        throw new Error(PAYMENT_ERROR_MESSAGES.SERVICE_NOT_FOUND.replace('${item.serviceId}', item.serviceId));
-      }
-
-      const service = services[0];
-      const newMaxCalls = operation === 'add' 
-        ? service.maxCalls + item.quantity
-        : Math.max(0, service.maxCalls - item.quantity); // Đảm bảo không bao giờ < 0
-      
-      operations.push({
-        table: 'services',
-        operation: 'update',
-        id: service.id,
-        data: { 
-          maxCalls: newMaxCalls 
-        }
-      });
-    }
-    return operations;
-  };
-
   const validatePayment = async (paymentId: number, expectedAmount: number): Promise<number> => {
     const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
       where: { field: "id", operator: '=', value: paymentId }
@@ -109,21 +71,34 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     });
     
     if (newPaymentStatus === PAYMENT_STATUS.COMPLETED) {
-      // Update order status
+      const orderRows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'id', operator: '=', value: orderId },
+      }, 'orders');
+      const orderRow = orderRows[0];
+      const userRows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+      const dbUser = userRows[0];
+      if (!dbUser?.id || !orderRow) {
+        throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
+      }
+      const credit = Number(orderRow.finalAmount ?? 0) || 0;
+      const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
+
       operations.push({
         table: 'orders',
-        operation: 'update',        
+        operation: 'update',
         id: orderId,
-        data: { 
-          
-          status: ORDER_STATUS.COMPLETED, 
-          queueStatus: 'pending' 
-        }
+        data: {
+          status: ORDER_STATUS.COMPLETED,
+          queueStatus: 'pending',
+        },
       });
-      
-      // Get service updates (multi-table operations for updating services)
-      const serviceUpdates = await getServiceUpdates(orderId, 'add');
-      operations.push(...serviceUpdates);
+
+      operations.push({
+        table: 'users',
+        operation: 'update',
+        id: dbUser.id,
+        data: { walletBalance: prevBal + credit },
+      });
       
       // Get all order_items for this order
       const orderItems = await executeUtils.executeDynamicAction(userDO, 'select', {
@@ -203,15 +178,31 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     operations.push({
       table: 'orders',
       operation: 'update',
-      id: orderId, 
-      data: { status: ORDER_STATUS.CANCELLED }
+      id: orderId,
+      data: { status: ORDER_STATUS.CANCELLED },
     });
-    
-    // Get service updates (multi-table operations for updating services)
-    const serviceUpdates = await getServiceUpdates(orderId, 'subtract');
-    operations.push(...serviceUpdates);
 
-    const results = await executeUtils.executeDynamicAction(userDO, 'multi-table', {operations: operations});
+    const orderRows = await executeUtils.executeDynamicAction(
+      userDO,
+      'select',
+      { where: { field: 'id', operator: '=', value: orderId } },
+      'orders',
+    );
+    const orderRow = orderRows[0];
+    const userRows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+    const dbUser = userRows[0];
+    if (dbUser?.id && orderRow) {
+      const bal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
+      const debit = Math.min(bal, Number(orderRow.finalAmount ?? 0) || 0);
+      operations.push({
+        table: 'users',
+        operation: 'update',
+        id: dbUser.id,
+        data: { walletBalance: bal - debit },
+      });
+    }
+
+    const results = await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations: operations });
     
     return results[0].id;
   };

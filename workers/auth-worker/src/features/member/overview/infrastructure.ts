@@ -4,14 +4,16 @@ import type { OverviewResponse, OverviewSubscription, OverviewApiKey, OverviewAc
 
 export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promise<OverviewResponse> {
   const [services, tokens, serviceUsages] = await Promise.all([
-    executeUtils.executeDynamicAction(userDO, 'select', {
-      where: [
-        { field: 'isActive', operator: '=', value: 1 },
-        { field: 'maxCalls', operator: '>', value: { $column: 'currentCalls' } },
-      ],
-      orderBy: { field: 'createdAt', direction: 'DESC' },
-      limit: 20,
-    }, 'services'),
+    executeUtils.executeDynamicAction(
+      userDO,
+      'select',
+      {
+        where: { field: 'isActive', operator: '=', value: 1 },
+        orderBy: { field: 'createdAt', direction: 'DESC' },
+        limit: 20,
+      },
+      'services',
+    ),
     getApiTokens(userDO),
     getRecentServiceUsages(userDO),
   ]);
@@ -31,8 +33,10 @@ export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promis
         endpoint: s.endpoint,
         plan: s.name,
         calls: Number(s.currentCalls ?? s.current_calls) || 0,
-        limit: Number(s.maxCalls ?? s.max_calls) || 0,
-        nextBilling: (s.expiresAt ?? s.expires_at) ? new Date(s.expiresAt ?? s.expires_at).toLocaleDateString('en-US') : null,
+        limit: 0,
+        nextBilling: s.expiresAt ?? s.expires_at
+          ? new Date(s.expiresAt ?? s.expires_at).toLocaleDateString('en-US')
+          : null,
       }))
     : [];
 

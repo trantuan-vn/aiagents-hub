@@ -4,8 +4,6 @@ import { z } from 'zod';
 export const ServiceSchema = z.object({
   name: z.string().min(1).max(100),
   endpoint: z.string(),
-  maxCalls: z.number().min(0).default(0),
-  currentCalls: z.number().min(0).default(0),
   expiresAt: z.preprocess(
     (val) => {
       // Xử lý cả string số và number
@@ -31,8 +29,8 @@ export const ServiceSchema = z.object({
     z.string().datetime().optional()
   ),
   isActive: z.boolean().default(true),
-  /** Khi có giá trị số: mỗi lần gọi thành công tính đúng số đó. Khi không gán: lấy `cost` từ log AI Gateway. */
-  fixedPrice: z.number().min(0).optional(),
+  /** User charge per call = (feePercent / 100) × AI Gateway log cost. Default 100 = same as gateway cost. */
+  feePercent: z.number().min(0).max(100000).default(100),
 });
 
 export const ServiceUsageSchema = z.object({
@@ -40,9 +38,9 @@ export const ServiceUsageSchema = z.object({
   endpoint: z.string(),
   userAgent: z.string().optional(),
   ipAddress: z.string().optional(),
-  /** Chi phí ghi nhận cho lần gọi (giá cố định hoặc cost từ AI Gateway). */
+  /** Số tiền trừ ví user cho lần gọi (= feePercent × gateway cost). */
   cost: z.number().min(0).optional(),
-  /** true = API call failed (no deduct from quota), false/undefined = success */
+  /** true = API call failed (không trừ ví), false/undefined = success */
   isError: z.boolean().optional().default(false),
 });
 

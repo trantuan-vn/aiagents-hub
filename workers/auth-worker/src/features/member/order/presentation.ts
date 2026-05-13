@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { createOrderApplicationService } from './application';
-import { CreateOrderSchema, UpdateOrderStatusSchema, ORDER_DEFAULT_PAGE, ORDER_DEFAULT_LIMIT } from './domain';
+import { parseCreateOrderRequest, UpdateOrderStatusSchema, ORDER_DEFAULT_PAGE, ORDER_DEFAULT_LIMIT } from './domain';
 import { getOrderHistoryFromD1, type OrderHistoryFilters } from './order-history-infrastructure';
+import { getMemberBillingParamsFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 
@@ -24,10 +25,17 @@ export function createOrderRoutes(bindingName: string) {
     };
   };
 
+  /** Tỉ giá + số tiền nạp tối thiểu từ system config (member đọc được). */
+  app.get('/exchange-rate', createRouteHandler(async (c: any) => {
+    const { usdVndRate, minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env);
+    return c.json({ usdVndRate, minTopUpVnd });
+  }, 'Failed to get exchange rate'));
+
   // Tạo đơn hàng mới
   app.post('/orders', createRouteHandler(async (c: any, user: any) => {
     const body = await c.req.json();
-    const request = CreateOrderSchema.parse(body);
+    const { minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env);
+    const request = parseCreateOrderRequest(body, minTopUpVnd);
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.createOrder(user, request);
     return c.json(result);

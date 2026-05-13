@@ -12,32 +12,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
+import {
+  API_BASE_URL,
+  FALLBACK_MIN_TOP_UP_VND,
+  FALLBACK_USD_VND,
+  fetchMemberBillingParams,
+  fetchWalletBalance,
+  loadHistoryFromApi,
+} from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
-import { CreateOrderDialog } from "./_components/create-order-dialog";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
 import { OrderList } from "./_components/order-list";
 import type { CreateOrder, Order } from "./_components/schema";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
-
-async function loadHistoryFromApi(
-  limit: number,
-  offset: number,
-  dateParams?: { fromDate: string; toDate: string },
-): Promise<{ orders: Order[]; hasMore: boolean }> {
-  const params = new URLSearchParams();
-  params.append("limit", limit.toString());
-  params.append("offset", offset.toString());
-  if (dateParams?.fromDate) params.append("fromDate", dateParams.fromDate);
-  if (dateParams?.toDate) params.append("toDate", dateParams.toDate);
-  const response = await fetch(`${API_BASE_URL}/dashboard/order/history?${params}`, {
-    method: "GET",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-  });
-  if (!response.ok) throw new Error(await response.text());
-  return response.json();
-}
+import { WalletTopUpDialog } from "./_components/wallet-top-up-dialog";
 
 export default function BillingPage() {
   const t = useTranslations("BillingPage");
@@ -45,6 +32,9 @@ export default function BillingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [walletBalanceVnd, setWalletBalanceVnd] = useState(0);
+  const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
+  const [minTopUpVnd, setMinTopUpVnd] = useState(FALLBACK_MIN_TOP_UP_VND);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status] = useState<string | undefined>(undefined);
@@ -78,6 +68,13 @@ export default function BillingPage() {
     } finally {
       setHistoryLoading(false);
     }
+  };
+
+  const refreshBillingParams = (): void => {
+    void fetchMemberBillingParams().then((p) => {
+      setUsdVndRate(p.usdVndRate);
+      setMinTopUpVnd(p.minTopUpVnd);
+    });
   };
 
   const fetchOrders = async (): Promise<void> => {
@@ -121,6 +118,8 @@ export default function BillingPage() {
 
   useEffect(() => {
     void fetchOrders();
+    void fetchWalletBalance().then(setWalletBalanceVnd);
+    refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, targetType, page, limit]);
 
@@ -146,6 +145,8 @@ export default function BillingPage() {
 
       // Refresh danh sách orders
       void fetchOrders();
+      void fetchWalletBalance().then(setWalletBalanceVnd);
+      refreshBillingParams();
 
       // Xóa query params sau khi xử lý
       const newSearchParams = new URLSearchParams(searchParams.toString());
@@ -179,7 +180,9 @@ export default function BillingPage() {
     }
 
     const result = await response.json();
-    void fetchOrders(); // Refresh the list
+    void fetchOrders();
+    void fetchWalletBalance().then(setWalletBalanceVnd);
+    refreshBillingParams();
     return result;
   };
 
@@ -239,7 +242,6 @@ export default function BillingPage() {
   };
 
   const pendingOrders = orders.filter((o) => o.status === "PENDING");
-  const totalAmount = orders.reduce((sum, o) => sum + o.finalAmount, 0);
 
   return (
     <div className="flex flex-col gap-4 md:gap-6">
@@ -249,10 +251,15 @@ export default function BillingPage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <CreateOrderDialog onCreate={handleCreateOrder} />
+        <WalletTopUpDialog onCreate={handleCreateOrder} usdVndRate={usdVndRate} minTopUpVnd={minTopUpVnd} />
       </div>
 
-      <BillingStatsCards totalOrders={orders.length} pendingOrders={pendingOrders.length} totalAmount={totalAmount} />
+      <BillingStatsCards
+        walletBalanceVnd={walletBalanceVnd}
+        pendingTopUps={pendingOrders.length}
+        completedVolumeVnd={orders.filter((o) => o.status === "COMPLETED").reduce((s, o) => s + o.finalAmount, 0)}
+        usdVndRate={usdVndRate}
+      />
 
       {/* Error Alert */}
       {error && (

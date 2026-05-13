@@ -359,11 +359,14 @@ export function createAuthRoutes(bindingName: string) {
   app.get('/profile/me', async (c) => {
     try {
       const user = requireAuth(c);
-      return c.json({ 
-        id: user.id, 
-        identifier: user.identifier, 
+      const wb = user.walletBalance ?? user.wallet_balance;
+      const walletBalance = typeof wb === "number" && !Number.isNaN(wb) ? wb : Number(wb) || 0;
+      return c.json({
+        id: user.id,
+        identifier: user.identifier,
         address: user.address,
-        role: user.role || 'member'
+        role: user.role || "member",
+        walletBalance: Math.max(0, walletBalance),
       });
     } catch (e) {
       const { errorResponse } = await handleError(c, e, "Get user info failed");

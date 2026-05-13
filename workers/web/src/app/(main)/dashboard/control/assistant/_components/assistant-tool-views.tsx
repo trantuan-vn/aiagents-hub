@@ -37,6 +37,25 @@ function JsonBlock({ value }: { value: unknown }) {
   );
 }
 
+function renderCreateOrderOutput(out: OrderOutput) {
+  if (out.state === "loading") {
+    return (
+      <p className="text-muted-foreground text-sm">
+        Đang gọi auth-worker <code className="text-xs">POST /dashboard/order/orders</code>…
+      </p>
+    );
+  }
+  if (out.state === "confirmation-required") {
+    return <p className="text-muted-foreground text-sm">Đang chờ bạn xác nhận để tạo đơn hàng.</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">{out.ok ? "Đã tạo đơn hàng" : "Tạo đơn hàng thất bại"}</p>
+      <JsonBlock value={out.body ?? out.error} />
+    </div>
+  );
+}
+
 export function CreateApiKeyToolView({ part }: { part: CreateApiKeyPart }) {
   switch (part.state) {
     case "input-streaming":
@@ -81,27 +100,11 @@ export function CreateOrderToolView({ part }: { part: CreateOrderPart }) {
       return <JsonBlock value={part.input} />;
     case "input-available": {
       const { input } = part;
-      return <p className="text-muted-foreground text-sm">Chuẩn bị tạo đơn hàng với {input.items.length} dòng hàng…</p>;
+      const amt = "amount" in input && typeof input.amount === "number" ? input.amount : 0;
+      return <p className="text-muted-foreground text-sm">Chuẩn bị nạp ví với số tiền {amt.toLocaleString("vi-VN")} VND…</p>;
     }
-    case "output-available": {
-      const out = part.output as OrderOutput;
-      if (out.state === "loading") {
-        return (
-          <p className="text-muted-foreground text-sm">
-            Đang gọi auth-worker <code className="text-xs">POST /dashboard/order/orders</code>…
-          </p>
-        );
-      }
-      if (out.state === "confirmation-required") {
-        return <p className="text-muted-foreground text-sm">Đang chờ bạn xác nhận để tạo đơn hàng.</p>;
-      }
-      return (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">{out.ok ? "Đã tạo đơn hàng" : "Tạo đơn hàng thất bại"}</p>
-          <JsonBlock value={out.body ?? out.error} />
-        </div>
-      );
-    }
+    case "output-available":
+      return renderCreateOrderOutput(part.output as OrderOutput);
     case "output-error":
       return <p className="text-destructive text-sm">Lỗi: {part.errorText}</p>;
     default:

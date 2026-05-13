@@ -1,26 +1,33 @@
-import { 
-  DocumentRecognition, 
-  FaceSearch, 
-  FaceVerification, 
+import {
+  DocumentRecognition,
+  FaceSearch,
+  FaceVerification,
   LivenessDetection,
   DocumentExtractionResult,
   FaceDetectionResult,
   FaceVerificationResult,
   LivenessResult,
-  IAIDocumentService
+  IAIDocumentService,
 } from './domain';
-import { prepareImageForAI, dataUriFromBuffer, calculateConfidence, 
-  calculateFaceDetectionConfidence, calculateFaceVerificationConfidence } from './utils';
-import { getDocumentPrompt, getFaceSearchPrompt, getFaceComparisonPrompt, getLivenessDetectionPrompt } from './utils';
+import {
+  prepareImageForAI,
+  dataUriFromBuffer,
+  calculateConfidence,
+  calculateFaceDetectionConfidence,
+  calculateFaceVerificationConfidence,
+} from './utils';
+import {
+  getDocumentPrompt,
+  getFaceSearchPrompt,
+  getFaceComparisonPrompt,
+  getLivenessDetectionPrompt,
+} from './utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 
 const AI_GATEWAY_ID = 'unitoken';
 
-async function resolveRecordedUsageCost(env: Env, service: { fixedPrice?: number | null }): Promise<number> {
-  if (typeof service.fixedPrice === 'number' && !Number.isNaN(service.fixedPrice)) {
-    return Math.max(0, service.fixedPrice);
-  }
+async function resolveGatewayCost(env: Env): Promise<number> {
   const logId = env.AI.aiGatewayLogId;
   if (!logId) {
     return 0;
@@ -35,42 +42,72 @@ async function resolveRecordedUsageCost(env: Env, service: { fixedPrice?: number
   }
 }
 
-export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IAIDocumentService {
+function feePercentOf(service: { feePercent?: number | null; fee_percent?: number | null }): number {
+  const raw = service.feePercent ?? service.fee_percent;
+  if (typeof raw === 'number' && !Number.isNaN(raw) && raw >= 0) {
+    return raw;
+  }
+  return 100;
+}
 
+function userChargeFromGateway(service: any, gatewayCost: number): number {
+  return Math.max(0, (feePercentOf(service) / 100) * gatewayCost);
+}
+
+export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IAIDocumentService {
   const validateServiceUsage = async (endpoint: string): Promise<any> => {
-     
-    const service = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "endpoint", operator: '=', value: endpoint },
-          { field: "isActive", operator: '=', value: 1 }
-        ]
-      }, 'services').then(results => results[0]);
+    const service = await executeUtils
+      .executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [
+            { field: 'endpoint', operator: '=', value: endpoint },
+            { field: 'isActive', operator: '=', value: 1 },
+          ],
+        },
+        'services',
+      )
+      .then((results) => results[0]);
 
     if (!service) {
       throw new Error('Service not found');
     }
 
-    if (service.currentCalls >= service.maxCalls) {
-      throw new Error('Service quota exceeded');
+    const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+    const u = users[0];
+    const balance = Number(u?.walletBalance ?? u?.wallet_balance ?? 0) || 0;
+    if (balance <= 0) {
+      throw new Error('Insufficient wallet balance');
     }
 
     return service;
   };
+
   const updateServiceUsage = async (
     service: any,
     endpoint: string,
     request: any,
-    usageCost: number
+    charge: number,
   ): Promise<void> => {
+    const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+    const u = users[0];
+    if (!u?.id) {
+      throw new Error('User profile not found');
+    }
+    const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
+    if (charge > balance) {
+      throw new Error('Insufficient wallet balance');
+    }
+    const newBal = balance - charge;
+
     await executeUtils.executeDynamicAction(userDO, 'multi-table', {
       operations: [
         {
-          table: 'services',
+          table: 'users',
           operation: 'update',
-          id: service.id,
-          data: {
-            currentCalls: service.currentCalls + 1,
-          }
+          id: u.id,
+          data: { walletBalance: newBal },
         },
         {
           table: 'service_usages',
@@ -81,20 +118,16 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
             userAgent: request.userAgent,
             ipAddress: request.ipAddress,
             isError: false,
-            cost: usageCost,
-            queueStatus: 'pending'
-          }
-        }
-      ]
+            cost: charge,
+            queueStatus: 'pending',
+          },
+        },
+      ],
     });
   };
 
-  /** Record API error (no deduct from quota) - for stats/error rate tracking */
-  const recordApiError = async (
-    service: any,
-    endpoint: string,
-    request: any
-  ): Promise<void> => {
+  /** Record API error (no wallet debit) */
+  const recordApiError = async (service: any, endpoint: string, request: any): Promise<void> => {
     try {
       await executeUtils.executeDynamicAction(userDO, 'multi-table', {
         operations: [
@@ -108,10 +141,10 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
               ipAddress: request?.ipAddress,
               isError: true,
               cost: 0,
-              queueStatus: 'pending'
-            }
-          }
-        ]
+              queueStatus: 'pending',
+            },
+          },
+        ],
       });
     } catch (e) {
       console.warn('[Ekyc] recordApiError failed:', e);
@@ -135,7 +168,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: any,
     prompt: string,
     images: File[],
-    processResult: (response: any, service: any, usageCost: number) => Promise<any>
+    processResult: (response: any, service: any, usageCost: number) => Promise<any>,
   ): Promise<any> => {
     const service = await validateServiceUsage(endpoint);
     if (!service) {
@@ -146,23 +179,29 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       images.map(async (img) => {
         const { buffer, mimeType } = await prepareImageForAI(img);
         return dataUriFromBuffer(buffer, mimeType);
-      })
+      }),
     );
 
-    const messages = [{
-      role: 'user',
-      content: [
-        { type: 'text', text: prompt },
-        ...imageB64s.map((dataUri) => ({ type: 'image_url', image_url: { url: dataUri } }))
-      ]
-    }];
+    const messages = [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          ...imageB64s.map((dataUri) => ({ type: 'image_url', image_url: { url: dataUri } })),
+        ],
+      },
+    ];
 
     const maxTokens = request.options?.maxTokens ?? 500;
     const runModel = () =>
-      env.AI.run(LLAMA_VISION_MODEL, {
-        messages,
-        max_tokens: maxTokens,
-      }, { gateway: { id: AI_GATEWAY_ID, collectLog: true } });
+      env.AI.run(
+        LLAMA_VISION_MODEL,
+        {
+          messages,
+          max_tokens: maxTokens,
+        },
+        { gateway: { id: AI_GATEWAY_ID, collectLog: true } },
+      );
 
     try {
       let response: any;
@@ -176,7 +215,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
           throw e;
         }
       }
-      const usageCost = await resolveRecordedUsageCost(env, service);
+      const gatewayCost = await resolveGatewayCost(env);
+      const usageCost = userChargeFromGateway(service, gatewayCost);
       return await processResult(response, service, usageCost);
     } catch (e) {
       await recordApiError(service, endpoint, request);
@@ -205,7 +245,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     response: any,
     service: any,
     request: DocumentRecognition,
-    usageCost: number
+    usageCost: number,
   ): Promise<DocumentExtractionResult> => {
     console.log('full response:', response);
 
@@ -224,8 +264,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       processingTime: Date.now(),
       metadata: {
         imageSize: request.image.size,
-        imageType: request.image.type
-      }
+        imageType: request.image.type,
+      },
     };
     await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
@@ -236,11 +276,16 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     if (!lm || typeof lm !== 'object') return [];
     const entries = Object.entries(lm as Record<string, { x?: number; y?: number }>);
     return entries
-      .filter(([, v]) => v && typeof v === 'object' && (typeof (v as any).x === 'number' || typeof (v as any).y === 'number'))
+      .filter(
+        ([, v]) =>
+          v &&
+          typeof v === 'object' &&
+          (typeof (v as any).x === 'number' || typeof (v as any).y === 'number'),
+      )
       .map(([type, v]) => ({
         x: Number((v as any).x) || 0,
         y: Number((v as any).y) || 0,
-        type
+        type,
       }));
   };
 
@@ -248,7 +293,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     response: any,
     service: any,
     request: FaceSearch,
-    usageCost: number
+    usageCost: number,
   ): Promise<FaceDetectionResult> => {
     console.log('response: ', response);
     const data = extractResponseData(response);
@@ -260,11 +305,11 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
           x: Number(box.x) || 0,
           y: Number(box.y) || 0,
           width: Number(box.width) || 0,
-          height: Number(box.height) || 0
+          height: Number(box.height) || 0,
         },
         confidence: Math.min(1, Math.max(0, Number(f?.confidence) ?? request.options?.detectionThreshold ?? 0.7)),
         landmarks: Array.isArray(f?.landmarks) ? f.landmarks : landmarksToArray(f?.landmarks),
-        attributes: (f?.attributes && typeof f.attributes === 'object') ? f.attributes : {}
+        attributes: f?.attributes && typeof f.attributes === 'object' ? f.attributes : {},
       };
     });
     const faceCount = typeof data?.face_count === 'number' ? data.face_count : faces.length;
@@ -272,7 +317,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       faces,
       confidence: calculateFaceDetectionConfidence(faces),
       faceCount,
-      processingTime: Date.now()
+      processingTime: Date.now(),
     };
     await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
@@ -282,28 +327,31 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     response: any,
     service: any,
     request: FaceVerification,
-    usageCost: number
+    usageCost: number,
   ): Promise<FaceVerificationResult> => {
     console.log('response: ', response);
     const result = extractResponseData(response);
     const similarity = Math.min(1, Math.max(0, Number(result?.similarity) ?? 0));
     const threshold = request.options?.similarityThreshold ?? 0.75;
-    const isMatch = result?.isMatch === true || (typeof result?.isMatch !== 'boolean' && similarity >= threshold);
+    const isMatch =
+      result?.isMatch === true ||
+      (typeof result?.isMatch !== 'boolean' && similarity >= threshold);
     const conf =
       typeof result?.confidence === 'number' && result.confidence >= 0 && result.confidence <= 1
         ? result.confidence
         : calculateFaceVerificationConfidence(similarity);
     const fc = result?.features_compared;
-    const q = typeof fc === 'object' && fc !== null && typeof (fc as any).face_shape === 'number'
-      ? (fc as any).face_shape
-      : undefined;
+    const q =
+      typeof fc === 'object' && fc !== null && typeof (fc as any).face_shape === 'number'
+        ? (fc as any).face_shape
+        : undefined;
     const returnData: FaceVerificationResult = {
       similarity,
       isMatch,
       details: (result?.description ?? result?.details ?? 'No description provided').toString(),
       confidence: conf,
       attributes: q != null ? { image1: { quality: q }, image2: { quality: q } } : {},
-      processingTime: Date.now()
+      processingTime: Date.now(),
     };
     await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
@@ -313,7 +361,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     response: any,
     service: any,
     request: LivenessDetection,
-    usageCost: number
+    usageCost: number,
   ): Promise<LivenessResult> => {
     console.log('response: ', response);
     const result = extractResponseData(response);
@@ -335,7 +383,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       spoofType: result?.spoofType != null ? String(result.spoofType) : undefined,
       riskScore: risk,
       processingTime: Date.now(),
-      recommendations
+      recommendations,
     };
     await updateServiceUsage(service, request.endpoint, request, usageCost);
     return returnData;
@@ -348,7 +396,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         getDocumentPrompt(request.docType),
         [request.image],
-        (response, service, usageCost) => processDocumentRecognition(response, service, request, usageCost)
+        (response, service, usageCost) =>
+          processDocumentRecognition(response, service, request, usageCost),
       );
     },
 
@@ -358,31 +407,32 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         request,
         getFaceSearchPrompt(),
         [request.image],
-        (response, service, usageCost) => processFaceSearch(response, service, request, usageCost)
+        (response, service, usageCost) => processFaceSearch(response, service, request, usageCost),
       );
     },
 
     async faceVerify(request: FaceVerification): Promise<FaceVerificationResult> {
-
       return executeAIModel(
         request.endpoint,
         request,
         getFaceComparisonPrompt(),
         [request.image],
-        (response, service, usageCost) => processFaceVerification(response, service, request, usageCost)
+        (response, service, usageCost) =>
+          processFaceVerification(response, service, request, usageCost),
       );
     },
 
     async livenessDetection(request: LivenessDetection): Promise<LivenessResult> {
-      const prompt = getLivenessDetectionPrompt(request.isVideo);        
+      const prompt = getLivenessDetectionPrompt(request.isVideo);
       console.log('prompt: ', prompt);
       return executeAIModel(
         request.endpoint,
         request,
         prompt,
         [request.image],
-        (response, service, usageCost) => processLivenessDetection(response, service, request, usageCost)
+        (response, service, usageCost) =>
+          processLivenessDetection(response, service, request, usageCost),
       );
-    }
+    },
   };
 }

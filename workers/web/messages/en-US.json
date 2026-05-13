@@ -1588,16 +1588,14 @@
     "cancel_confirm_title": "Cancel Service?",
     "cancel_confirm_description": "Are you sure you want to cancel the service \"{name}\"? This action cannot be undone.",
     "never_expires": "Never expires",
-    "calls": "{current} / {max} calls",
-    "pricing_fixed": "Fixed {amount} per call",
-    "pricing_gateway": "Billed from AI Gateway log",
+    "pricing_fee_percent": "{percent}% × gateway cost",
     "stats": {
       "total_services": "Total Services",
       "total_services_description": "Total number of registered services",
       "active_services": "Active Services",
       "active_services_description": "Currently active services",
-      "total_calls": "Total Calls",
-      "total_calls_description": "Total API calls across all services"
+      "avg_fee_percent": "Avg. fee %",
+      "avg_fee_percent_description": "Average markup vs AI Gateway cost across services"
     },
     "status": {
       "active": "Active",
@@ -1610,17 +1608,13 @@
       "endpoint": "Endpoint URL",
       "endpoint_placeholder": "https://api.example.com/v1/vision",
       "endpoint_description": "The API endpoint URL for this service",
-      "max_calls": "Max Calls",
-      "max_calls_placeholder": "0 for unlimited",
-      "max_calls_description": "Maximum number of API calls allowed (0 = unlimited)",
+      "fee_percent": "Fee vs gateway (%)",
+      "fee_percent_description": "User charge per call = this percent × AI Gateway log cost (100 = same as gateway).",
       "expires_at": "Expires At",
       "expires_at_placeholder": "Select expiration date",
       "expires_at_description": "Optional expiration date for the service",
       "is_active": "Active",
-      "is_active_description": "Whether the service is currently active",
-      "fixed_price": "Fixed price per call (optional)",
-      "fixed_price_placeholder": "Leave empty to bill from AI Gateway log cost",
-      "fixed_price_description": "If set, each successful call records this amount. If empty, the cost from the AI Gateway log is used."
+      "is_active_description": "Whether the service is currently active"
     }
   },
   "MonitorLogsPage": {
@@ -1868,7 +1862,7 @@
   },
   "SystemConfigPage": {
     "title": "System Configuration",
-    "description": "Configure parameters for Auth Worker, Queue Worker and D1tor2-Cron. Changes take effect immediately when saved.",
+    "description": "Configure parameters for Auth Worker, Queue Worker, D1tor2-Cron, and billing (USD/VND rate). Changes take effect immediately when saved.",
     "loading": "Loading configuration...",
     "save_config": "Save Configuration",
     "saving": "Saving...",
@@ -1883,6 +1877,8 @@
     "queue_worker_desc": "Batch processing and retry parameters",
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline and D1 → R2 retention",
+    "billing": "Billing",
+    "billing_desc": "Wallet top-up: minimum VND per order, and VND per 1 USD for presets and display",
     "fields": {
       "QUEUE_BATCH_SIZE": "Queue Batch Size (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Queue Flush Threshold",
@@ -1898,7 +1894,9 @@
       "QUEUE_PROCESSING_TIMEOUT": "Queue Processing Timeout (ms)",
       "PIPELINE_CONCURRENCY_LIMIT": "Pipeline Concurrency Limit",
       "BATCH_CONCURRENCY_LIMIT": "Batch Concurrency Limit",
-      "D1_RETENTION_DAYS": "D1 Retention Days"
+      "D1_RETENTION_DAYS": "D1 Retention Days",
+      "USD_VND_RATE": "USD/VND rate (VND per 1 USD)",
+      "MIN_TOP_UP_VND": "Minimum top-up amount (VND per order)"
     }
   },
   "CommissionPolicyPage": {
@@ -2163,8 +2161,8 @@
     }
   },
   "BillingPage": {
-    "title": "Billing & Orders",
-    "description": "Manage your orders and payments",
+    "title": "Billing & wallet",
+    "description": "Top up your balance (USD presets), pay via VNPay, then usage deducts fee % × AI Gateway cost.",
     "fetch_error": "Failed to fetch orders",
     "error": "Error",
     "create_error": "Failed to create order",
@@ -2180,9 +2178,16 @@
     "order_created_description": "Order has been created successfully",
     "order_cancelled": "Order cancelled",
     "order_cancelled_description": "Order has been cancelled successfully",
-    "create_order": "Create Order",
-    "create_order_title": "Create New Order",
-    "create_order_description": "Create a new order with items and payment details",
+    "top_up": "Top up",
+    "top_up_title": "Add balance",
+    "top_up_description": "Choose an amount (shown in USD for convenience). Checkout via VNPay is settled in VND.",
+    "preset_usd_label": "Quick amounts (USD)",
+    "exchange_rate_label": "USD/VND rate",
+    "exchange_rate_hint": "Set by administrators in System Configuration. Used for presets and USD hints only.",
+    "min_top_up_hint": "Minimum amount for this top-up: {amount} VND (set in System Configuration).",
+    "amount_vnd_label": "Amount (VND)",
+    "approx_usd": "≈ ${amount} USD at current rate",
+    "create_top_up": "Create top-up",
     "tab_orders": "Orders",
     "tab_history": "History",
     "filter_by_date": "Filter by date",
@@ -2245,12 +2250,12 @@
     "create": "Create",
     "processing": "Processing...",
     "stats": {
-      "total_orders": "Total Orders",
-      "total_orders_description": "Total number of orders",
-      "pending_orders": "Pending Orders",
-      "pending_orders_description": "Orders waiting for payment",
-      "total_amount": "Total Amount",
-      "total_amount_description": "Total amount across all orders"
+      "wallet_balance": "Wallet balance",
+      "wallet_balance_usd_hint": "≈ ${amount} USD (reference)",
+      "pending_topups": "Pending top-ups",
+      "pending_topups_description": "Awaiting bank payment",
+      "completed_volume": "Paid top-ups (this page)",
+      "completed_volume_description": "Sum of completed orders in the current list"
     },
     "status": {
       "pending": "Pending",

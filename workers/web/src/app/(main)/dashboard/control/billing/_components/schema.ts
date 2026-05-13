@@ -3,19 +3,28 @@ import { z } from "zod";
 // Order Schemas
 export const OrderStatusSchema = z.enum(["PENDING", "CONFIRMED", "PROCESSING", "COMPLETED", "CANCELLED"]);
 
-export const CreateOrderItemSchema = z.object({
-  serviceId: z.number().int().min(1, "Service ID is required"),
-  basePrice: z.number().min(0, "Base price must be positive"),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
-});
+export function createCreateOrderSchema(minTopUpVnd: number) {
+  const m = Math.max(1, Math.floor(minTopUpVnd));
+  return z.object({
+    /** VND amount to credit after successful payment (before gateway discounts = policies + vouchers). */
+    amount: z
+      .number()
+      .int("Amount must be a whole number")
+      .min(m, `Amount must be at least ${m.toLocaleString("vi-VN")} VND`),
+    currency: z.string().default("VND"),
+    voucherCode: z.string().optional(),
+    notes: z.string().optional(),
+    paymentMethod: z.string().optional(),
+  });
+}
 
-export const CreateOrderSchema = z.object({
-  items: z.array(CreateOrderItemSchema).min(1, "At least one item is required"),
-  currency: z.string().default("VND"),
-  voucherCode: z.string().optional(),
-  notes: z.string().optional(),
-  paymentMethod: z.string().optional(),
-});
+export type CreateOrder = {
+  amount: number;
+  currency: string;
+  voucherCode?: string;
+  notes?: string;
+  paymentMethod?: string;
+};
 
 export const OrderItemSchema = z.object({
   id: z.number().int(),
@@ -67,8 +76,6 @@ export const PaymentResultSchema = z.object({
 
 // Types
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
-export type CreateOrderItem = z.infer<typeof CreateOrderItemSchema>;
-export type CreateOrder = z.infer<typeof CreateOrderSchema>;
 export type Order = z.infer<typeof OrderSchema>;
 export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderDetail = z.infer<typeof OrderDetailSchema>;

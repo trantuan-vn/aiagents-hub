@@ -19,7 +19,8 @@ export const OrderSchema = z.object({
 
 export const OrderItemSchema = z.object({
   orderId: z.number().int(),
-  serviceId: z.number().int(),
+  /** 0 = wallet top-up line */
+  serviceId: z.number().int().min(0),
   basePrice: z.number().min(0),
   discountAmount: z.number().min(0).default(0),
   finalAmount: z.number().min(0),
@@ -40,20 +41,21 @@ export const OrderItemDiscountSchema = z.object({
   description: z.string().optional(),
 });
 
-// Request Schemas
-export const CreateOrderItemSchema = z.object({
-  serviceId: z.number().int().min(1, "Service ID is required"),
-  basePrice: z.number().min(0, "Base price must be positive"),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
-});
-
+/** Wallet top-up: amount is VND credited after payment (policies / vouchers apply to payable amount). */
 export const CreateOrderSchema = z.object({
-  items: z.array(CreateOrderItemSchema).min(1, "At least one item is required"),
+  amount: z.number().int().positive(),
   currency: z.string().default('VND'),
   voucherCode: z.string().optional(),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
 });
+
+/** Validates create-order JSON; `minTopUpVnd` from system config `billing.MIN_TOP_UP_VND`. */
+export function parseCreateOrderRequest(body: unknown, minTopUpVnd: number): CreateOrder {
+  return CreateOrderSchema.extend({
+    amount: z.number().int().min(minTopUpVnd, `Amount must be at least ${minTopUpVnd} VND`),
+  }).parse(body);
+}
 
 export const UpdateOrderStatusSchema = z.object({
   status: OrderStatusSchema,
@@ -65,7 +67,7 @@ export const ApplyVoucherToOrderSchema = z.object({
 });
 
 export const CalculateOrderRequestSchema = z.object({
-  items: z.array(CreateOrderItemSchema).min(1, "At least one item is required"),
+  amount: z.number().int().min(1),
   voucherCode: z.string().optional(),
   currency: z.string().default('VND'),
 });
@@ -122,7 +124,7 @@ export const DiscountDetailSchema = z.object({
 });
 
 export const OrderCalculationItemSchema = z.object({
-  serviceId: z.number().int(),
+  serviceId: z.number().int().min(0),
   basePrice: z.number().min(0),
   quantity: z.number().min(1),
   servicePrice: PriceCalculationResultSchema,

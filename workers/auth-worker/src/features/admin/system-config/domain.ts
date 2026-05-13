@@ -33,11 +33,21 @@ export const D1tor2CronConfigSchema = z.object({
 });
 export type D1tor2CronConfig = z.infer<typeof D1tor2CronConfigSchema>;
 
+/** Billing / ví (tỉ giá hiển thị USD ↔ VND khi tạo lệnh nạp) */
+export const BillingConfigSchema = z.object({
+	/** Số VND tương đương 1 USD (dùng UI preset & quy đổi, VNPay vẫn VND) */
+	USD_VND_RATE: z.number().min(1).max(10000000).optional(),
+	/** Số tiền nạp tối thiểu mỗi lệnh (VND, số nguyên ≥ 1) */
+	MIN_TOP_UP_VND: z.number().int().min(1).max(100000000).optional(),
+});
+export type BillingConfig = z.infer<typeof BillingConfigSchema>;
+
 /** Toàn bộ cấu hình hệ thống */
 export const SystemConfigSchema = z.object({
 	auth_worker: AuthWorkerConfigSchema.optional(),
 	queue_worker: QueueWorkerConfigSchema.optional(),
 	d1tor2_cron: D1tor2CronConfigSchema.optional(),
+	billing: BillingConfigSchema.optional(),
 });
 export type SystemConfig = z.infer<typeof SystemConfigSchema>;
 
@@ -64,6 +74,11 @@ export const DEFAULT_D1TOR2_CONFIG: D1tor2CronConfig = {
 	PIPELINE_CONCURRENCY_LIMIT: 5,
 	BATCH_CONCURRENCY_LIMIT: 3,
 	D1_RETENTION_DAYS: 96,
+};
+
+export const DEFAULT_BILLING_CONFIG: BillingConfig = {
+	USD_VND_RATE: 26000,
+	MIN_TOP_UP_VND: 1000,
 };
 
 export const KV_KEY = 'aiagents-hub-system-config';

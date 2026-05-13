@@ -2,18 +2,20 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 import { createOrderApplicationService } from '../../member/order/application';
-import { CreateOrderSchema } from '../../member/order/domain';
+import { CreateOrderSchema, parseCreateOrderRequest } from '../../member/order/domain';
+import { getMemberBillingParamsFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 
 export function createOrderTool(c: any, bindingName: string, user: any) {
   return tool({
     description:
-      'Tao don hang (order) cho user da dang nhap. Can it nhat mot item voi serviceId, basePrice, quantity.',
+      'Tao lenh nap tien vao vi (amount VND, voucherCode tuy chon). Sau thanh toan thanh cong vi duoc cong tien.',
     inputSchema: CreateOrderSchema,
     async *execute(input: z.infer<typeof CreateOrderSchema>) {
       yield { state: 'loading' as const };
 
       try {
-        const request = CreateOrderSchema.parse(input);
+        const { minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env);
+        const request = parseCreateOrderRequest(input, minTopUpVnd);
         const orderService = createOrderApplicationService(c, bindingName);
         const result = await orderService.createOrder(user, request);
         yield { state: 'ready' as const, ok: true, body: result };

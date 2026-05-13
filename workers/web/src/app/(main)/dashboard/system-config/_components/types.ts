@@ -25,8 +25,15 @@ export interface D1tor2CronConfig {
   D1_RETENTION_DAYS?: number;
 }
 
+/** Billing UI — tỉ giá USD/VND cho màn nạp tiền */
+export interface BillingConfig {
+  USD_VND_RATE?: number;
+  MIN_TOP_UP_VND?: number;
+}
+
 export interface SystemConfigData {
   auth_worker?: AuthWorkerConfig;
   queue_worker?: QueueWorkerConfig;
   d1tor2_cron?: D1tor2CronConfig;
+  billing?: BillingConfig;
 }

@@ -66,7 +66,8 @@ export function SubscriptionsCard({ subscriptions, t }: SubscriptionsCardProps) 
           </div>
         ) : (
           subscriptions.map((sub) => {
-            const percent = sub.limit > 0 ? Math.min(100, (sub.calls / sub.limit) * 100) : 0;
+            const showQuota = sub.limit > 0;
+            const percent = showQuota ? Math.min(100, (sub.calls / sub.limit) * 100) : 0;
             return (
               <div key={sub.id} className="group bg-muted/30 hover:bg-muted/50 rounded-xl border p-4 transition-all">
                 <div className="mb-3 flex items-start justify-between gap-2">
@@ -95,15 +96,18 @@ export function SubscriptionsCard({ subscriptions, t }: SubscriptionsCardProps) 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">{t("subscriptions.api_calls")}</span>
                     <span className="font-medium tabular-nums">
-                      {sub.calls.toLocaleString()} / {sub.limit > 0 ? sub.limit.toLocaleString() : "∞"}
+                      {sub.calls.toLocaleString()}
+                      {showQuota ? ` / ${sub.limit.toLocaleString()}` : ""}
                     </span>
                   </div>
-                  <div className="bg-muted overflow-hidden rounded-full">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(percent)}`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
+                  {showQuota ? (
+                    <div className="bg-muted overflow-hidden rounded-full">
+                      <div
+                        className={`h-2 rounded-full transition-all duration-500 ${getUsageColor(percent)}`}
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             );

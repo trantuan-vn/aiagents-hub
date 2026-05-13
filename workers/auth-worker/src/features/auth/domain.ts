@@ -163,6 +163,11 @@ export const UserSchema = BaseUserSchema.extend({
   phone: z.string().optional(),
   privateKey: z.string().optional(),
   mnemonicPhrase: z.string().optional(),
+  /** VND balance after successful top-ups; usage deducts by fee% × AI Gateway cost */
+  walletBalance: z.preprocess(
+    (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
+    z.number().min(0),
+  ).optional(),
   /** Identifier of the referrer (user who owns the referral link) */
   referrerId: z.string().optional(),
   /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */

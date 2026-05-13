@@ -6,6 +6,7 @@ import {
 	DEFAULT_AUTH_CONFIG,
 	DEFAULT_QUEUE_CONFIG,
 	DEFAULT_D1TOR2_CONFIG,
+	DEFAULT_BILLING_CONFIG,
 	KV_KEY,
 	type SystemConfig,
 } from './domain';
@@ -39,6 +40,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 					auth_worker: DEFAULT_AUTH_CONFIG,
 					queue_worker: DEFAULT_QUEUE_CONFIG,
 					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
+					billing: DEFAULT_BILLING_CONFIG,
 				},
 			});
 		}
@@ -50,6 +52,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 					auth_worker: DEFAULT_AUTH_CONFIG,
 					queue_worker: DEFAULT_QUEUE_CONFIG,
 					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
+					billing: DEFAULT_BILLING_CONFIG,
 				},
 			});
 		}
@@ -59,6 +62,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 				auth_worker: { ...DEFAULT_AUTH_CONFIG, ...(parsed.auth_worker || {}) },
 				queue_worker: { ...DEFAULT_QUEUE_CONFIG, ...(parsed.queue_worker || {}) },
 				d1tor2_cron: { ...DEFAULT_D1TOR2_CONFIG, ...(parsed.d1tor2_cron || {}) },
+				billing: { ...DEFAULT_BILLING_CONFIG, ...(parsed.billing || {}) },
 			};
 			return c.json({ success: true, data: merged });
 		} catch {
@@ -68,6 +72,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 					auth_worker: DEFAULT_AUTH_CONFIG,
 					queue_worker: DEFAULT_QUEUE_CONFIG,
 					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
+					billing: DEFAULT_BILLING_CONFIG,
 				},
 			});
 		}

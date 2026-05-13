@@ -5,127 +5,101 @@ import { processCommissionOnOrder } from '../referral/commission-service';
 import {
   CreateOrder,
   UpdateOrderStatus,
-  CalculateOrderRequest,
   IOrderInfrastructureService,
 } from './domain';
 import { executeUtils } from '../../../shared/utils';
+
+const WALLET_LINE_SERVICE_ID = 0;
+
 export function createOrderInfrastructureService(userDO: DurableObjectStub<UserDO>, context: any, bindingName: string): IOrderInfrastructureService {
-  
-  // Helper methods
-  const calculateOrderTotal = async (user: any, request: CalculateOrderRequest): Promise<any[]> => {
+  /** Top-up order: one synthetic line (serviceId 0) with policies + vouchers applied to `amount`. */
+  const calculateWalletTopUp = async (user: any, request: CreateOrder): Promise<any[]> => {
     const priceApp = createPriceApplicationService(context, bindingName);
     const voucherApp = createVoucherApplicationService(context, bindingName);
-    const orderAmount = request.items.reduce((acc, item) => acc + item.basePrice * item.quantity, 0);
-    
-    const results = await Promise.all(
-      request.items.map(async (item) => {
-        const service = await executeUtils.executeDynamicAction(userDO,
-          'select', { where : { field: 'id', operator: '=', value: item.serviceId } }, 'services'
-        ).then(rows => rows[0]);
 
-        if (!service) {
-          throw new Error('Service not found');
-        }
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+    const dbUser = rows[0];
+    if (!dbUser?.id) {
+      throw new Error('User profile not found');
+    }
 
-        if (!service.isActive) {
-          throw new Error('Service is not active');
-        }
-        
-        if (new Date(service.expiresAt) < new Date()) {
-          throw new Error('Service expired');
-        }
+    const amount = request.amount;
+    const orderAmount = amount;
 
-        // Chuẩn bị các promise cho price calculation (luôn thực hiện)
-        const priceData = {
-            basePrice: item.basePrice,
-            userId: user.id,
-            serviceId: item.serviceId,
-            quantity: item.quantity,
-            currency: request.currency,
-            userRole: user.role,
-            serviceName: service.name,
-            currentCalls: service.current_calls,
-            maxCalls: service.max_calls
-        }
-        const pricePromises = [
-          priceApp.calculateServicePrice(user.identifier, priceData),
-          priceApp.calculateUserPrice(user.identifier, priceData)
+    const priceData = {
+      basePrice: amount,
+      userId: dbUser.id,
+      userRole: user.role ?? dbUser.role ?? 'member',
+      serviceId: WALLET_LINE_SERVICE_ID,
+      serviceName: 'Wallet top-up',
+      quantity: 1,
+      currency: request.currency ?? 'VND',
+      currentCalls: Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0,
+      maxCalls: 0,
+    };
+
+    const pricePromises = [
+      priceApp.calculateServicePrice(user.identifier, priceData),
+      priceApp.calculateUserPrice(user.identifier, priceData),
+    ];
+
+    const voucherPromises = request.voucherCode
+      ? [
+          voucherApp.applyServiceVoucher(user.identifier, {
+            voucherCode: request.voucherCode,
+            basePrice: amount,
+            orderAmount,
+            serviceId: WALLET_LINE_SERVICE_ID,
+            currentCalls: priceData.currentCalls,
+            userId: dbUser.id,
+            userRole: user.role ?? dbUser.role ?? 'member',
+          }),
+          voucherApp.applyUserVoucher(user.identifier, {
+            voucherCode: request.voucherCode,
+            basePrice: amount,
+            orderAmount,
+            serviceId: WALLET_LINE_SERVICE_ID,
+            currentCalls: priceData.currentCalls,
+            userId: dbUser.id,
+            userRole: user.role ?? dbUser.role ?? 'member',
+          }),
+        ]
+      : [
+          Promise.resolve({ finalAmount: amount, discountAmount: 0, voucher: null }),
+          Promise.resolve({ finalAmount: amount, discountAmount: 0, voucher: null }),
         ];
 
-        // Chuẩn bị các promise cho voucher calculation (chỉ khi có voucherCode)
-        const voucherPromises = [];
-        
-        if (request.voucherCode) {
-          voucherPromises.push(
-            voucherApp.applyServiceVoucher(user.identifier, {            
-              voucherCode: request.voucherCode,
-              basePrice: item.basePrice,
-              orderAmount: orderAmount,
-              serviceId: item.serviceId,
-              currentCalls: service.current_calls,
-              userId: user.id,
-              userRole: user.role
-            }),
-            voucherApp.applyUserVoucher(user.identifier, {
-              voucherCode: request.voucherCode,
-              basePrice: item.basePrice,
-              orderAmount: orderAmount,
-              serviceId: item.serviceId,
-              currentCalls: service.current_calls,
-              userId: user.id,
-              userRole: user.role
-            })
-          );
-        } else {
-          // Nếu không có voucher, trả về kết quả mặc định
-          voucherPromises.push(
-            Promise.resolve({
-              finalAmount: item.basePrice * item.quantity,
-              discountAmount: 0,
-              voucher: null
-            }),
-            Promise.resolve({
-              finalAmount: item.basePrice * item.quantity,
-              discountAmount: 0,
-              voucher: null
-            })
-          );
-        }
+    const [servicePriceResult, userPriceResult, serviceVoucherResult, userVoucherResult] = await Promise.all([
+      ...pricePromises,
+      ...voucherPromises,
+    ]);
 
-        // Thực thi tất cả promises
-        const [servicePriceResult, userPriceResult, serviceVoucherResult, userVoucherResult] = await Promise.all([
-          ...pricePromises,
-          ...voucherPromises
-        ]);
+    const discounts = createDiscountsObject(servicePriceResult, userPriceResult, serviceVoucherResult, userVoucherResult);
 
-        const discounts = createDiscountsObject(servicePriceResult, userPriceResult, serviceVoucherResult, userVoucherResult);
-
-        return {
-          serviceId: item.serviceId,
-          basePrice: item.basePrice,
-          quantity: item.quantity,
-          servicePrice: {
-            finalPrice: servicePriceResult.finalPrice,
-            totalDiscount: servicePriceResult.totalDiscount
-          },
-          userPrice: {
-            finalPrice: userPriceResult.finalPrice,
-            totalDiscount: userPriceResult.totalDiscount
-          },
-          serviceVoucher: {
-            finalAmount: serviceVoucherResult.finalAmount,
-            discountAmount: serviceVoucherResult.discountAmount
-          },
-          userVoucher: {
-            finalAmount: userVoucherResult.finalAmount,
-            discountAmount: userVoucherResult.discountAmount
-          },
-          discounts: Object.keys(discounts).length > 0 ? discounts : undefined
-        };
-      })
-    );
-
-    return results;
+    return [
+      {
+        serviceId: WALLET_LINE_SERVICE_ID,
+        basePrice: amount,
+        quantity: 1,
+        servicePrice: {
+          finalPrice: servicePriceResult.finalPrice,
+          totalDiscount: servicePriceResult.totalDiscount,
+        },
+        userPrice: {
+          finalPrice: userPriceResult.finalPrice,
+          totalDiscount: userPriceResult.totalDiscount,
+        },
+        serviceVoucher: {
+          finalAmount: serviceVoucherResult.finalAmount,
+          discountAmount: serviceVoucherResult.discountAmount,
+        },
+        userVoucher: {
+          finalAmount: userVoucherResult.finalAmount,
+          discountAmount: userVoucherResult.discountAmount,
+        },
+        discounts: Object.keys(discounts).length > 0 ? discounts : undefined,
+      },
+    ];
   };
 
   const createDiscountsObject = (servicePrice: any, userPrice: any, serviceVoucher: any, userVoucher: any) => {
@@ -147,19 +121,25 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
       };
     }
     
-    if (serviceVoucher.discountAmount > 0) {
+    if (serviceVoucher.discountAmount > 0 && serviceVoucher.voucher) {
+      const code = typeof serviceVoucher.voucher === 'object' && serviceVoucher.voucher.code != null
+        ? serviceVoucher.voucher.code
+        : String(serviceVoucher.voucher);
       discounts.serviceVoucherDiscount = {
         amount: serviceVoucher.discountAmount,
         type: 'SERVICE_VOUCHER',
-        voucher: serviceVoucher.voucher.code
+        voucher: code
       };
     }
-    
-    if (userVoucher.discountAmount > 0) {
+
+    if (userVoucher.discountAmount > 0 && userVoucher.voucher) {
+      const code = typeof userVoucher.voucher === 'object' && userVoucher.voucher.code != null
+        ? userVoucher.voucher.code
+        : String(userVoucher.voucher);
       discounts.userVoucherDiscount = {
         amount: userVoucher.discountAmount,
         type: 'USER_VOUCHER',
-        voucher: userVoucher.voucher.code
+        voucher: code
       };
     }
 
@@ -224,13 +204,13 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
 
   return {
     async createOrder(user: any, request: CreateOrder): Promise<any> {
-      const calculationResult = await calculateOrderTotal(user, request);
+      const calculationResult = await calculateWalletTopUp(user, request);
 
       const subtotalAmount = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
       const discountAmount = calculationResult.reduce((total, item) => 
         total + (item.servicePrice.totalDiscount + item.userPrice.totalDiscount + 
                item.serviceVoucher.discountAmount + item.userVoucher.discountAmount)* item.quantity, 0);
-      const finalAmount = subtotalAmount - discountAmount;
+      const finalAmount = Math.max(0, subtotalAmount - discountAmount);
 
       const orderData = {
         orderCode: generateOrderCode(),

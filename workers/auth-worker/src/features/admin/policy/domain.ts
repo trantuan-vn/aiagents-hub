@@ -53,7 +53,8 @@ export const PriceCalculationRequestSchema = z.object({
   basePrice: z.number().min(0),
   userId: z.number().int(),
   userRole: z.enum(['member', 'admin']).optional(),
-  serviceId: z.number().int(),
+  /** 0 = wallet top-up (no concrete service). */
+  serviceId: z.number().int().min(0),
   serviceName: z.string().optional(),
   currentCalls: z.number().min(0).optional(),
   maxCalls: z.number().min(0).optional(),

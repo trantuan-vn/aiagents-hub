@@ -39,8 +39,7 @@ export function CreateServiceDialog({ onCreate }: CreateServiceDialogProps) {
     defaultValues: {
       name: "",
       endpoint: "",
-      maxCalls: 0,
-      currentCalls: 0,
+      feePercent: 100,
       isActive: true,
     },
   });
@@ -110,22 +109,28 @@ export function CreateServiceDialog({ onCreate }: CreateServiceDialogProps) {
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
-                name="maxCalls"
+                name="feePercent"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("form.max_calls")}</FormLabel>
+                    <FormLabel>{t("form.fee_percent")}</FormLabel>
                     <FormControl>
                       <Input
                         type="number"
-                        placeholder={t("form.max_calls_placeholder")}
+                        min={0}
+                        step="any"
+                        placeholder="100"
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        value={field.value ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          field.onChange(v === "" ? undefined : parseFloat(v));
+                        }}
                       />
                     </FormControl>
-                    <FormDescription>{t("form.max_calls_description")}</FormDescription>
+                    <FormDescription>{t("form.fee_percent_description")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -155,32 +160,6 @@ export function CreateServiceDialog({ onCreate }: CreateServiceDialogProps) {
                 )}
               />
             </div>
-
-            <FormField
-              control={form.control}
-              name="fixedPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("form.fixed_price")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="any"
-                      placeholder={t("form.fixed_price_placeholder")}
-                      {...field}
-                      value={field.value ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        field.onChange(v === "" ? undefined : parseFloat(v));
-                      }}
-                    />
-                  </FormControl>
-                  <FormDescription>{t("form.fixed_price_description")}</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}
