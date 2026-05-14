@@ -5,49 +5,36 @@ import {
   IPriceInfrastructureService,
 } from './domain';
 import { executeUtils } from '../../../shared/utils';
+
 export function createPriceInfrastructureService(userDO: DurableObjectStub<UserDO>): IPriceInfrastructureService {
-  // Helper methods
   const isPolicyApplicable = (policy: any, request: PriceCalculationRequest): boolean => {
     const conditions = policy.conditions || {};
-    
-    // Note: Status and expiration are already filtered before calling this function
-    // But we keep these checks as safety measures
+
     if (policy.status !== 'ACTIVE') {
       return false;
     }
-    
+
     if (policy.expiresAt && new Date(policy.expiresAt) < new Date()) {
       return false;
     }
 
-    // Check target specific conditions
-    if (policy.targetType === 'SERVICE') {
-      if (policy.targetIds && policy.targetIds.length > 0 && !policy.targetIds.includes(request.serviceId)) {
+    if (policy.applicableTo === 'SPECIFIC') {
+      const ids: number[] = policy.targetIds || [];
+      if (ids.length === 0 || !ids.includes(request.userId)) {
         return false;
       }
     }
 
-    if (policy.targetType === 'USER') {
-      if (policy.targetIds && policy.targetIds.length > 0 && !policy.targetIds.includes(request.userId)) {
-        return false;
-      }
+    if (conditions.userRoles?.length && request.userRole && !conditions.userRoles.includes(request.userRole)) {
+      return false;
     }
 
-    // Check user role
-    if (policy.targetType === 'USER' && conditions.userRoles) {
-      if (conditions.userRoles.length > 0 && !conditions.userRoles.includes(request.userRole)) {
-        return false;
-      }
-    }
-
-    // Check usage conditions
-    if (policy.type === 'USAGE_BASED' && conditions.maxCalls) {
+    if (policy.type === 'USAGE_BASED' && conditions.maxCalls != null) {
       if ((request.currentCalls ?? 0) >= conditions.maxCalls) {
         return false;
       }
     }
 
-    // Check minimum quantity
     if (conditions.minQuantity && request.quantity) {
       if (request.quantity < conditions.minQuantity) {
         return false;
@@ -72,77 +59,74 @@ export function createPriceInfrastructureService(userDO: DurableObjectStub<UserD
     }
   };
 
-  const calculateTieredDiscount = (policy: any, currentPrice: number, request: any): number => {
-    const tiers = [...(policy.conditions?.tiers || [])].sort((a, b) => 
-      (a.minAmount || a.minUsage || 0) - (b.minAmount || b.minUsage || 0)
+  const calculateTieredDiscount = (policy: any, currentPrice: number, request: PriceCalculationRequest): number => {
+    const tiers = [...(policy.conditions?.tiers || [])].sort(
+      (a, b) => (a.minAmount || a.minUsage || 0) - (b.minAmount || b.minUsage || 0),
     );
-    
-    // Tìm tier phù hợp (tier cao nhất mà điều kiện thỏa mãn)
-    let applicableTier = null;
+
+    let applicableTier: (typeof tiers)[0] | null = null;
     for (const tier of tiers) {
       if (tier.minAmount && currentPrice >= tier.minAmount) {
         applicableTier = tier;
-      } else if (tier.minUsage && 'currentCalls' in request && (request.currentCalls ?? 0) >= tier.minUsage) {
+      } else if (tier.minUsage != null && (request.currentCalls ?? 0) >= tier.minUsage) {
         applicableTier = tier;
       }
     }
-    
+
     if (!applicableTier) return 0;
-    
-    return applicableTier.type === 'PERCENTAGE' 
-      ? currentPrice * (applicableTier.value / 100) 
+
+    return applicableTier.type === 'PERCENTAGE'
+      ? currentPrice * (applicableTier.value / 100)
       : applicableTier.value;
   };
 
   const calculateUsageBasedDiscount = (policy: any, request: PriceCalculationRequest): number => {
-    if (!('currentCalls' in request)) return 0;
-    
     const conditions = policy.conditions || {};
     const currentCalls = request.currentCalls || 0;
     const maxCalls = conditions.maxCalls || 1;
-    
-    if (conditions.usagePercentage && (currentCalls / maxCalls) >= conditions.usagePercentage) {
-      return policy.value;
+
+    if (conditions.usagePercentage != null && maxCalls > 0) {
+      const pctUsed = (currentCalls / maxCalls) * 100;
+      if (pctUsed >= conditions.usagePercentage) {
+        return policy.value;
+      }
     }
-    
+
     return 0;
   };
 
-  const calculatePrice = async (request: PriceCalculationRequest, targetType: 'SERVICE' | 'USER') => {
-    const allPolicies = await executeUtils.executeDynamicAction(userDO,
-      'select', { 
-        where: { field: 'targetType', operator: '=', value: targetType },
-        orderBy: { field: 'priority', direction: 'DESC' } 
-      }, 'price_policies'
+  const calculatePrice = async (request: PriceCalculationRequest) => {
+    const allPolicies = await executeUtils.executeDynamicAction(
+      userDO,
+      'select',
+      {
+        orderBy: { field: 'priority', direction: 'DESC' },
+      },
+      'price_policies',
     );
 
-    // Filter only active and non-expired policies
     const now = new Date();
     const activePolicies = allPolicies.filter((policy: any) => {
-      if (policy.status !== 'ACTIVE') {
-        return false;
-      }
-      if (policy.expiresAt && new Date(policy.expiresAt) < now) {
-        return false;
-      }
+      if (policy.status !== 'ACTIVE') return false;
+      if (policy.expiresAt && new Date(policy.expiresAt) < now) return false;
       return true;
     });
 
     let finalPrice = request.basePrice;
     let totalDiscount = 0;
-    const appliedPolicies = [];
+    const appliedPolicies: Array<{ policyId: number; policyName: string; discount: number; type: string }> = [];
 
     for (const policy of activePolicies) {
       if (isPolicyApplicable(policy, request)) {
         const discount = calculateDiscount(policy, finalPrice, request);
         finalPrice = Math.max(0, finalPrice - discount);
         totalDiscount += discount;
-        
+
         appliedPolicies.push({
           policyId: policy.id,
           policyName: policy.name,
           discount,
-          type: policy.type
+          type: policy.type,
         });
       }
     }
@@ -153,42 +137,46 @@ export function createPriceInfrastructureService(userDO: DurableObjectStub<UserD
       totalDiscount,
       appliedPolicies,
       currency: request.currency || 'VND',
-      [targetType === 'SERVICE' ? 'serviceId' : 'userId']: targetType === 'SERVICE' 
-        ? request.serviceId 
-        : request.userId
+      userId: request.userId,
     };
   };
 
   return {
-    createPricePolicy: (request: Partial<PricePolicy>) => 
+    createPricePolicy: (request: Partial<PricePolicy>) =>
       executeUtils.executeDynamicAction(userDO, 'insert', request, 'price_policies'),
 
-    updatePricePolicy: (policyId: number, request: Partial<PricePolicy>) => 
+    updatePricePolicy: (policyId: number, request: Partial<PricePolicy>) =>
       executeUtils.executeDynamicAction(userDO, 'update', { id: policyId, ...request }, 'price_policies'),
 
-    getPricePolicies: (limit: number, offset: number, status?: string) => 
-      executeUtils.executeDynamicAction(userDO, 'select', {
-        ...(status ? { where: { field: "status", operator: '=', value: status } } : {}),
-        orderBy: { field: 'priority', direction: 'DESC' },
-        limit,
-        offset
-      }, 'price_policies'),
+    getPricePolicies: (limit: number, offset: number, status?: string) =>
+      executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          ...(status ? { where: { field: 'status', operator: '=', value: status } } : {}),
+          orderBy: { field: 'priority', direction: 'DESC' },
+          limit,
+          offset,
+        },
+        'price_policies',
+      ),
 
-    getPricePolicy: (policyId: number) => 
-      executeUtils.executeDynamicAction(userDO, 'select', {
-        where: { field: "id", operator: '=', value: policyId }
-      }, 'price_policies'),
+    getPricePolicy: (policyId: number) =>
+      executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: { field: 'id', operator: '=', value: policyId },
+        },
+        'price_policies',
+      ),
 
-    deletePricePolicy: (policyId: number) => 
+    deletePricePolicy: (policyId: number) =>
       executeUtils.executeDynamicAction(userDO, 'delete', { id: policyId }, 'price_policies'),
 
-    updatePolicyStatus: (policyId: number, status: string) => 
-      executeUtils.executeDynamicAction(userDO, 'update', { id: policyId, status: status}, 'price_policies'),
+    updatePolicyStatus: (policyId: number, status: string) =>
+      executeUtils.executeDynamicAction(userDO, 'update', { id: policyId, status: status }, 'price_policies'),
 
-    calculateServicePrice: (request: PriceCalculationRequest) => 
-      calculatePrice(request, 'SERVICE'),
-
-    calculateUserPrice: (request: PriceCalculationRequest) => 
-      calculatePrice(request, 'USER'),
+    calculatePrice: (request: PriceCalculationRequest) => calculatePrice(request),
   };
 }

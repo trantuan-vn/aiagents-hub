@@ -1481,7 +1481,7 @@
   },
   "PolicyPage": {
     "title": "Price Policy Management",
-    "description": "Create and manage price policies for your API services",
+    "description": "Create and manage price policies for wallet top-up (user-based discounts)",
     "fetch_error": "Failed to fetch policies",
     "error": "Error",
     "create_error": "Failed to create policy",
@@ -1498,7 +1498,7 @@
     "status_updated": "Status updated",
     "status_updated_description": "Policy status has been updated to {status}",
     "create_policy": "Create Policy",
-    "create_policy_description": "Create a new price policy for API services",
+    "create_policy_description": "Create a new price policy applied to users when they top up the wallet",
     "edit_policy": "Edit Policy",
     "edit_policy_description": "Update the price policy details",
     "creating": "Creating...",
@@ -1539,6 +1539,11 @@
       "service": "Service",
       "user": "User"
     },
+    "scope": {
+      "all_users": "All users",
+      "specific_users": "Users: {ids}",
+      "specific_users_empty": "Specific users (add ids)"
+    },
     "form": {
       "name": "Policy Name",
       "name_placeholder": "e.g., 10% discount for members",
@@ -1561,7 +1566,10 @@
       "status": "Status",
       "status_placeholder": "Select status",
       "expires_at": "Expires At",
-      "expires_at_description": "Optional expiration date for the policy"
+      "expires_at_description": "Optional expiration date for the policy",
+      "eligible_user_ids": "Eligible user IDs",
+      "eligible_user_ids_placeholder": "e.g., 12, 34, 56 (database user ids)",
+      "eligible_user_ids_description": "When scope is Specific, list internal user ids separated by commas."
     }
   },
   "ServicePage": {
@@ -1802,7 +1810,10 @@
       "expires_at_placeholder": "Select expiration date",
       "expires_at_description": "Optional expiration date for the voucher",
       "status": "Status",
-      "status_placeholder": "Select status"
+      "status_placeholder": "Select status",
+      "eligible_user_ids": "Eligible user IDs (optional)",
+      "eligible_user_ids_placeholder": "e.g., 12, 34 — leave empty for any user",
+      "eligible_user_ids_description": "If set, only these database user ids can use the voucher (still subject to roles below)."
     }
   },
   "VersionPage": {

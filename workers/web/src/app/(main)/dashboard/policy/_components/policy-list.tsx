@@ -34,7 +34,7 @@ interface PolicyItemProps {
   onEdit: (policy: PricePolicy) => void;
   formatDate: (dateString: string | undefined) => string;
   getPolicyTypeLabel: (type: string) => string;
-  getTargetTypeLabel: (type: string) => string;
+  getScopeLabel: (policy: PricePolicy) => string;
   t: (key: string, params?: Record<string, string>) => string;
 }
 
@@ -42,13 +42,13 @@ function PolicyItemContent({
   policy,
   formatDate,
   getPolicyTypeLabel,
-  getTargetTypeLabel,
+  getScopeLabel,
   t,
 }: {
   policy: PricePolicy;
   formatDate: (dateString: string | undefined) => string;
   getPolicyTypeLabel: (type: string) => string;
-  getTargetTypeLabel: (type: string) => string;
+  getScopeLabel: (policy: PricePolicy) => string;
   t: (key: string, params?: Record<string, string>) => string;
 }) {
   const isActive = policy.status === "ACTIVE";
@@ -72,7 +72,7 @@ function PolicyItemContent({
             {getPolicyTypeLabel(policy.type)}
           </Badge>
           <Badge variant="outline" className="text-xs">
-            {getTargetTypeLabel(policy.targetType)}
+            {getScopeLabel(policy)}
           </Badge>
         </div>
         <div className="text-muted-foreground flex items-center gap-4 text-xs">
@@ -166,7 +166,7 @@ function PolicyItem({
   onEdit,
   formatDate,
   getPolicyTypeLabel,
-  getTargetTypeLabel,
+  getScopeLabel,
   t,
 }: PolicyItemProps) {
   return (
@@ -175,7 +175,7 @@ function PolicyItem({
         policy={policy}
         formatDate={formatDate}
         getPolicyTypeLabel={getPolicyTypeLabel}
-        getTargetTypeLabel={getTargetTypeLabel}
+        getScopeLabel={getScopeLabel}
         t={t}
       />
       <PolicyItemActions
@@ -279,15 +279,10 @@ export function PolicyList({ policies, onDelete, onUpdate, onUpdateStatus }: Pol
     }
   };
 
-  const getTargetTypeLabel = (type: string): string => {
-    switch (type) {
-      case "SERVICE":
-        return t("target.service");
-      case "USER":
-        return t("target.user");
-      default:
-        return type;
-    }
+  const getScopeLabel = (policy: PricePolicy): string => {
+    if (policy.applicableTo === "ALL") return t("scope.all_users");
+    const ids = policy.targetIds?.length ? policy.targetIds.join(", ") : "";
+    return ids ? t("scope.specific_users", { ids }) : t("scope.specific_users_empty");
   };
 
   if (policies.length === 0) {
@@ -323,7 +318,7 @@ export function PolicyList({ policies, onDelete, onUpdate, onUpdateStatus }: Pol
                 onEdit={handleEdit}
                 formatDate={formatDate}
                 getPolicyTypeLabel={getPolicyTypeLabel}
-                getTargetTypeLabel={getTargetTypeLabel}
+                getScopeLabel={getScopeLabel}
                 t={t}
               />
             ))}

@@ -1,82 +1,46 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
-import {
-  Voucher,
-  ApplyVoucher,
-  ValidateVoucherRequest,
-  IVoucherInfrastructureService,
-} from './domain';
+import { ApplyVoucher, ValidateVoucherRequest, IVoucherInfrastructureService, Voucher } from './domain';
 import { executeUtils } from '../../../shared/utils';
-export function createVoucherInfrastructureService(userDO: DurableObjectStub<UserDO>): IVoucherInfrastructureService {  
 
-  // Helper methods
-  const isVoucherApplicable = (voucher: any, request: any, targetType: 'SERVICE' | 'USER' ): boolean => {
-
-    // Check target type
-    if (targetType === 'SERVICE' && voucher.targetType !== 'SERVICE' && voucher.targetType !== 'BOTH') {
-      throw new Error(`TargetType must be SERVICE or BOTH. ${voucher.targetType} for voucher ${voucher.code} is not applicable for this service`);
-    }
-
-    if (targetType === 'USER' && voucher.targetType !== 'USER' && voucher.targetType !== 'BOTH') {
-      throw new Error(`TargetType must be USER or BOTH. ${voucher.targetType} for voucher ${voucher.code} is not applicable for this user`);
-    }
-
-    // Check status
+export function createVoucherInfrastructureService(userDO: DurableObjectStub<UserDO>): IVoucherInfrastructureService {
+  const assertVoucherApplicable = (voucher: any, request: { orderAmount: number; currentCalls?: number; userId: number; userRole?: string }) => {
     if (voucher.status !== 'ACTIVE') {
       throw new Error(`Voucher for ${voucher.code} is not active.`);
     }
 
-    // Check date validity
-    if (new Date(voucher.expiresAt) < new Date()) {
+    if (voucher.expiresAt && new Date(voucher.expiresAt) < new Date()) {
       throw new Error(`Voucher for ${voucher.code} has expired.`);
     }
 
-    // Check usage limit
     if (voucher.usageLimit && voucher.usedCount >= voucher.usageLimit) {
       throw new Error(`Voucher for ${voucher.code} has reached its usage limit.`);
     }
 
-    // Check minimum order amount
     if (voucher.minOrderAmount && request.orderAmount < voucher.minOrderAmount) {
       throw new Error(`Voucher for ${voucher.code} requires a minimum order amount of ${voucher.minOrderAmount}.`);
     }
 
-    // Service-specific checks
-    if (targetType === 'SERVICE' && request.serviceId) {
-      if (voucher.applicableServices && voucher.applicableServices.length > 0 && !voucher.applicableServices.includes(request.serviceId)) {
-        throw new Error(`Voucher for ${voucher.code} is not applicable for service ${request.serviceId}.`);
-      }
+    const uid = request.userId;
+    if (voucher.applicableUsers?.length && !voucher.applicableUsers.includes(uid)) {
+      throw new Error(`Voucher for ${voucher.code} is not applicable for user ${uid}.`);
     }
 
-    // User-specific checks
-    if (targetType === 'USER') {
-      if (voucher.applicableUsers && 
-          voucher.applicableUsers.length > 0 && 
-          request.userId && 
-          !voucher.applicableUsers.includes(request.userId)) {
-        //throw new Error(`Voucher for ${voucher.code} is not applicable for user ${request.userId}.`);
-        throw new Error(`Voucher for ${voucher.code} is not applicable for user ${request.userId}. voucher.applicableUsers?.length is ${voucher.applicableUsers.length}, request.userId is ${request.userId}, voucher.applicableUsers.includes(request.userId) is ${voucher.applicableUsers.includes(request.userId)}, voucher.applicableUsers is ${Array.isArray(voucher.applicableUsers)}, `);
-      }
-
-      if (voucher.userRoles && voucher.userRoles.length>0 && request.userRole && !voucher.userRoles.includes(request.userRole)) {
-        throw new Error(`Voucher for ${voucher.code} is not applicable for user role ${request.userRole}.`);
-      }
+    if (voucher.userRoles?.length && request.userRole && !voucher.userRoles.includes(request.userRole)) {
+      throw new Error(`Voucher for ${voucher.code} is not applicable for user role ${request.userRole}.`);
     }
 
-    // Usage-based conditions
     if (voucher.conditions && voucher.type === 'USAGE_BASED') {
       const { minUsage, maxCalls } = voucher.conditions;
       const currentCalls = request.currentCalls || 0;
-      
+
       if (minUsage !== undefined && currentCalls < minUsage) {
         throw new Error(`Voucher for ${voucher.code} requires a minimum usage of ${minUsage}. Current usage is ${currentCalls}.`);
       }
-      
+
       if (maxCalls !== undefined && currentCalls > maxCalls) {
         throw new Error(`Voucher for ${voucher.code} requires a maximum usage of ${maxCalls}. Current usage is ${currentCalls}.`);
       }
     }
-
-    return true;
   };
 
   const calculateDiscount = (voucher: any, basePrice: number, currentCalls: number): number => {
@@ -107,80 +71,86 @@ export function createVoucherInfrastructureService(userDO: DurableObjectStub<Use
   };
 
   const calculateUsageBasedDiscount = (voucher: any, basePrice: number, currentCalls: number): number => {
-    if (voucher.conditions?.minUsage && voucher.conditions?.maxCalls) {
+    if (voucher.conditions?.minUsage != null && voucher.conditions?.maxCalls != null) {
       const { minUsage, maxCalls } = voucher.conditions;
-      
+
       if (currentCalls >= minUsage && currentCalls <= maxCalls) {
         const usageRange = maxCalls - minUsage;
         const currentPosition = currentCalls - minUsage;
-        const discountMultiplier = currentPosition / usageRange;
-        
+        const discountMultiplier = usageRange > 0 ? currentPosition / usageRange : 0;
+
         return (basePrice * (voucher.discountValue * discountMultiplier)) / 100;
       }
     }
-    
+
     return voucher.discountValue;
   };
 
   const calculateTieredDiscount = (voucher: any, basePrice: number): number => {
-    const tiers = voucher.conditions?.tiers || [];
-    for (const tier of tiers.reverse()) {
+    const tiers = [...(voucher.conditions?.tiers || [])].sort((a, b) => a.minAmount - b.minAmount);
+    let best = 0;
+    for (const tier of tiers) {
       if (basePrice >= tier.minAmount) {
-        return tier.type === 'PERCENTAGE' 
-          ? basePrice * (tier.value / 100) 
-          : tier.value;
+        best = tier.type === 'PERCENTAGE' ? basePrice * (tier.value / 100) : tier.value;
       }
     }
-    return 0;
+    return best;
   };
 
   return {
     async createVoucher(request: Partial<Voucher>): Promise<any> {
-      // Check if code already exists
-      const existingVouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "code", operator: '=', value: request.code },
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')      
-      
+      const existingVouchers = await executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [
+            { field: 'code', operator: '=', value: request.code },
+            { field: 'status', operator: '=', value: 'ACTIVE' },
+          ],
+        },
+        'vouchers',
+      );
+
       if (existingVouchers.length > 0) {
         throw new Error('Voucher code already exists');
       }
       return await executeUtils.executeDynamicAction(userDO, 'insert', request, 'vouchers');
     },
 
-    async applyServiceVoucher(request: ApplyVoucher): Promise<any> {
-      const { voucherCode, basePrice, serviceId } = request;
-      
-      // Find voucher by code
-      const vouchers = await executeUtils.executeDynamicAction(userDO,
-        'select', 
-        { 
-          where: { field: 'code', operator: '=', value: voucherCode.toUpperCase() } 
-        }, 
-        'vouchers'
+    async applyVoucher(request: ApplyVoucher): Promise<any> {
+      const { voucherCode, basePrice, userId } = request;
+
+      const vouchers = await executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [
+            { field: 'code', operator: '=', value: voucherCode.toUpperCase() },
+            { field: 'status', operator: '=', value: 'ACTIVE' },
+          ],
+        },
+        'vouchers',
       );
 
       if (vouchers.length === 0) {
         throw new Error('Voucher not found');
       }
-      
+
       const voucher = vouchers[0];
 
-      // Validate voucher
-      if (!isVoucherApplicable(voucher, request, 'SERVICE')) {
-        throw new Error('Voucher is not applicable for this service');
-      }
+      assertVoucherApplicable(voucher, request);
 
-      // Calculate discount
       const discountAmount = calculateDiscount(voucher, basePrice, request.currentCalls || 0);
 
-      // Update voucher usage count
-      await executeUtils.executeDynamicAction(userDO, 'update', {
-        id: voucher.id,
-        data: { usedCount: voucher.usedCount + 1 }
-      }, 'vouchers');
+      await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        {
+          id: voucher.id,
+          data: { usedCount: voucher.usedCount + 1 },
+        },
+        'vouchers',
+      );
 
       return {
         voucher: {
@@ -189,222 +159,127 @@ export function createVoucherInfrastructureService(userDO: DurableObjectStub<Use
           name: voucher.name,
           type: voucher.type,
         },
-        serviceId: serviceId,
+        userId,
         originalAmount: basePrice,
-        discountAmount: discountAmount,
+        discountAmount,
         finalAmount: basePrice - discountAmount,
       };
     },
 
-    async applyUserVoucher(request: ApplyVoucher): Promise<any> {
-      const { voucherCode, basePrice, userId } = request;
-      const vouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "code", operator: '=', value: voucherCode.toUpperCase() },
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')      
-      
-      if (vouchers.length === 0) {
-        throw new Error('Voucher not found');
-      }
-
-      const voucher = vouchers[0];
-
-      // Validate voucher
-      if (!isVoucherApplicable(voucher, request, 'USER')) {
-        throw new Error('Voucher is not applicable for this user');
-      }
-
-      // Calculate discount
-      const discountAmount = calculateDiscount(voucher, basePrice, request.currentCalls || 0);
-
-      // Update voucher usage count
-      await executeUtils.executeDynamicAction(userDO, 'update', {
-        id: voucher.id,
-        data: { usedCount: voucher.usedCount + 1 }
-      }, 'vouchers');
-
-      return {
-        voucher: {
-          id: voucher.id,
-          code: voucher.code,
-          name: voucher.name,
-          type: voucher.type,
-        },
-        userId: userId,
-        originalAmount: basePrice,
-        discountAmount: discountAmount,
-        finalAmount: basePrice - discountAmount,
-      };
-    },
-
-    async getVouchers(status?: string, targetType?: string): Promise<any[]> {
-      const where: Array<{ field: string; operator: string; value: any }> = [];
-      
-      if (status !== undefined) {
-        where.push({ field: "status", operator: '=', value: status });
-      }
-      
-      if (targetType !== undefined) {
-        where.push({ field: "targetType", operator: '=', value: targetType });
-      }
-      
+    async getVouchers(status?: string): Promise<any[]> {
       const query: any = {
-        orderBy: { field: 'createdAt', direction: 'DESC' }
+        orderBy: { field: 'createdAt', direction: 'DESC' },
       };
-      
-      if (where.length > 0) {
-        query.where = where;
+
+      if (status !== undefined) {
+        query.where = { field: 'status', operator: '=', value: status };
       }
-      
-      return await executeUtils.executeDynamicAction(userDO, 'select', query, 'vouchers')      
+
+      return await executeUtils.executeDynamicAction(userDO, 'select', query, 'vouchers');
     },
 
     async getVoucherByCode(voucherCode: string): Promise<any> {
-      const vouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "code", operator: '=', value: voucherCode.toUpperCase() },
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')             
-      
+      const vouchers = await executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [
+            { field: 'code', operator: '=', value: voucherCode.toUpperCase() },
+            { field: 'status', operator: '=', value: 'ACTIVE' },
+          ],
+        },
+        'vouchers',
+      );
+
       if (vouchers.length === 0) {
         throw new Error('Voucher not found');
       }
-      
+
       return vouchers[0];
     },
 
-    async validateServiceVoucher(request: ValidateVoucherRequest): Promise<any> {
+    async validateVoucher(request: ValidateVoucherRequest): Promise<any> {
       const { voucherCode } = request;
-      const vouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "code", operator: '=', value: voucherCode.toUpperCase() },
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')       
-      
-      
+      const vouchers = await executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [
+            { field: 'code', operator: '=', value: voucherCode.toUpperCase() },
+            { field: 'status', operator: '=', value: 'ACTIVE' },
+          ],
+        },
+        'vouchers',
+      );
+
       if (vouchers.length === 0) {
         return { isValid: false, errorMessage: 'Voucher not found' };
       }
 
       const voucher = vouchers[0];
-      const isValid = isVoucherApplicable(voucher, request, 'SERVICE');
+
+      try {
+        assertVoucherApplicable(voucher, request);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Voucher is not applicable';
+        return { isValid: false, errorMessage: message };
+      }
 
       return {
-        isValid,
-        errorMessage: isValid ? undefined : 'Voucher is not applicable for this service',
-        voucher: isValid ? {
+        isValid: true,
+        voucher: {
           id: voucher.id,
           code: voucher.code,
           name: voucher.name,
           type: voucher.type,
           discountValue: voucher.discountValue,
           maxDiscountAmount: voucher.maxDiscountAmount,
-        } : undefined
-      };
-    },
-
-    async validateUserVoucher(request: ValidateVoucherRequest): Promise<any> {
-      const { voucherCode } = request;
-      const vouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "code", operator: '=', value: voucherCode.toUpperCase() },
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')       
-      
-      if (vouchers.length === 0) {
-        return { isValid: false, errorMessage: 'Voucher not found' };
-      }
-
-      const voucher = vouchers[0];
-      const isValid = isVoucherApplicable(voucher, request, 'USER');
-
-      return {
-        isValid,
-        errorMessage: isValid ? undefined : 'Voucher is not applicable for this user',
-        voucher: isValid ? {
-          id: voucher.id,
-          code: voucher.code,
-          name: voucher.name,
-          type: voucher.type,
-          discountValue: voucher.discountValue,
-          maxDiscountAmount: voucher.maxDiscountAmount,
-        } : undefined
+        },
       };
     },
 
     async updateVoucherStatus(voucherId: number, status: string): Promise<any> {
-      // Update voucher
-      return await executeUtils.executeDynamicAction(userDO, 'update', {
-        id: voucherId,
-        status: status
-      }, 'vouchers');
+      return await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        {
+          id: voucherId,
+          status: status,
+        },
+        'vouchers',
+      );
     },
 
-    async getAvailableServiceVouchers(serviceId?: string, basePrice?: number): Promise<any[]> {
-      let sql = `
-        select * from vouchers 
-        where status = 'ACTIVE' 
-        and (usageLimit is null or usedCount < usageLimit)
-        and targetType in ('SERVICE', 'BOTH')
-      `;
-      const params: any[] = [];
+    async getAvailableVouchers(userId: number, userRole?: string, basePrice?: number): Promise<any[]> {
+      const vouchers = await executeUtils.executeDynamicAction(
+        userDO,
+        'select',
+        {
+          where: [{ field: 'status', operator: '=', value: 'ACTIVE' }],
+        },
+        'vouchers',
+      );
 
-      if (serviceId) {
-        sql += ` and (applicableServices = '[]' or EXISTS (
-                                                  SELECT 1 
-                                                  FROM json_each(applicableServices) 
-                                                  WHERE value = ?
-                                              )
-                      )`;
-        params.push(`"${serviceId}"`);
-      }
+      const now = new Date();
 
-      const vouchers = await executeUtils.executeRepositorySelect(userDO, sql, params, 'vouchers');
-      
-      // Filter by base price if provided
-      if (basePrice !== undefined) {
-        return vouchers.filter(voucher => 
-          !voucher.minOrderAmount || basePrice >= voucher.minOrderAmount
-        );
-      }
-
-      return vouchers;
-    },
-
-    async getAvailableUserVouchers(userId?: string, userRole?: string, basePrice?: number): Promise<any[]> {
-      const vouchers = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: [
-          { field: "status", operator: '=', value: 'ACTIVE' }
-        ]
-      }, 'vouchers')
-            
-      // Filter by user-specific conditions
-      return vouchers
-        .filter((voucher: any) => 
-            ((!voucher.usageLimit || voucher.usedCount < voucher.usageLimit) 
-              && voucher.targetType in ['SERVICE', 'BOTH']))
-        .filter( (voucher: any) => {
-          if (voucher.applicableUsers?.length 
-              && userId 
-              && !voucher.applicableUsers.includes(userId)) {
-            return false;
-          }
-
-          if (voucher.userRoles?.length && userRole && !voucher.userRoles.includes(userRole)) {
-            return false;
-          }
-
-          if (basePrice !== undefined && voucher.minOrderAmount && basePrice < voucher.minOrderAmount) {
-            return false;
-          }
-
-          return true;
-        });
+      return vouchers.filter((voucher: any) => {
+        if (voucher.usageLimit && voucher.usedCount >= voucher.usageLimit) {
+          return false;
+        }
+        if (voucher.expiresAt && new Date(voucher.expiresAt) < now) {
+          return false;
+        }
+        if (voucher.applicableUsers?.length && !voucher.applicableUsers.includes(userId)) {
+          return false;
+        }
+        if (voucher.userRoles?.length && userRole && !voucher.userRoles.includes(userRole)) {
+          return false;
+        }
+        if (basePrice !== undefined && voucher.minOrderAmount && basePrice < voucher.minOrderAmount) {
+          return false;
+        }
+        return true;
+      });
     },
   };
 }

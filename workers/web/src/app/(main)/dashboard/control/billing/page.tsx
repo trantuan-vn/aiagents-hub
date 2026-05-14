@@ -38,7 +38,6 @@ export default function BillingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status] = useState<string | undefined>(undefined);
-  const [targetType] = useState<"SERVICE" | "USER" | undefined>(undefined);
   const [page] = useState(1);
   const [limit] = useState(20);
 
@@ -83,7 +82,6 @@ export default function BillingPage() {
     try {
       const params = new URLSearchParams();
       if (status) params.append("status", status);
-      if (targetType) params.append("targetType", targetType);
       params.append("page", page.toString());
       params.append("limit", limit.toString());
 
@@ -121,7 +119,7 @@ export default function BillingPage() {
     void fetchWalletBalance().then(setWalletBalanceVnd);
     refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, targetType, page, limit]);
+  }, [status, page, limit]);
 
   // Xử lý kết quả thanh toán từ VNPay return
   useEffect(() => {

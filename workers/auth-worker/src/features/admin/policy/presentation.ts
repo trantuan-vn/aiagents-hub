@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
 import { createPriceApplicationService } from './application';
-import { PricePolicySchema, PolicyIdSchema, StatusSchema } from './domain';
+import { PricePolicySchema, PolicyIdSchema, StatusSchema, PriceCalculationRequestSchema, PricePolicy } from './domain';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
+
+const assertSpecificPolicyHasUserIds = (data: PricePolicy) => {
+  if (data.applicableTo === 'SPECIFIC' && (!data.targetIds || data.targetIds.length === 0)) {
+    throw new Error('SPECIFIC policies require at least one user id in targetIds');
+  }
+};
 
 export function createPriceRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -31,6 +37,7 @@ export function createPriceRoutes(bindingName: string) {
   app.post('/new', createRouteHandler(async (c: any, user: any) => {
     const body = await c.req.json();
     const request = PricePolicySchema.parse(body);
+    assertSpecificPolicyHasUserIds(request);
     const priceApp = createPriceApplicationService(c, bindingName);
     const result = await priceApp.createPricePolicy(user.identifier, request);
     return c.json(result);
@@ -51,6 +58,7 @@ export function createPriceRoutes(bindingName: string) {
 
     const body = await c.req.json();
     const request = PricePolicySchema.parse(body);
+    assertSpecificPolicyHasUserIds(request);
     const priceApp = createPriceApplicationService(c, bindingName);
     const result = await priceApp.updatePricePolicy(user.identifier, policyId, request);
     return c.json(result);
@@ -119,19 +127,16 @@ export function createPriceRoutes(bindingName: string) {
     return c.json(result);
   }, 'Failed to update policy status'));
 
-  // Tính toán giá không yêu cầu admin
-  const createCalculateHandler = (type: 'service' | 'user') => 
+  app.post(
+    '/calculate',
     createRouteHandler(async (c: any, user: any) => {
       const body = await c.req.json();
+      const request = PriceCalculationRequestSchema.parse(body);
       const priceApp = createPriceApplicationService(c, bindingName);
-      const result = type === 'service' 
-        ? await priceApp.calculateServicePrice(user.identifier, body)
-        : await priceApp.calculateUserPrice(user.identifier, body);
+      const result = await priceApp.calculatePrice(user.identifier, request);
       return c.json(result);
-    }, `Failed to calculate ${type} price`, false);
-
-  app.post('/calculate/service', createCalculateHandler('service'));
-  app.post('/calculate/user', createCalculateHandler('user'));
+    }, 'Failed to calculate price', false),
+  );
 
 
   return app;

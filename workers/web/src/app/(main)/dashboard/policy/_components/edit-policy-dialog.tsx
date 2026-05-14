@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,13 +42,14 @@ export function EditPolicyDialog({ policy, open, onOpenChange, onUpdate }: EditP
       type: policy.type,
       value: policy.value,
       applicableTo: policy.applicableTo,
-      targetType: policy.targetType,
       targetIds: policy.targetIds ?? [],
       priority: policy.priority,
       status: policy.status,
       expiresAt: policy.expiresAt,
     },
   });
+
+  const applicableTo = useWatch({ control: form.control, name: "applicableTo" });
 
   // Reset form when policy changes
   useEffect(() => {
@@ -59,7 +60,6 @@ export function EditPolicyDialog({ policy, open, onOpenChange, onUpdate }: EditP
         type: policy.type,
         value: policy.value,
         applicableTo: policy.applicableTo,
-        targetType: policy.targetType,
         targetIds: policy.targetIds ?? [],
         priority: policy.priority,
         status: policy.status,
@@ -196,29 +196,34 @@ export function EditPolicyDialog({ policy, open, onOpenChange, onUpdate }: EditP
                   </FormItem>
                 )}
               />
+            </div>
 
+            {applicableTo === "SPECIFIC" ? (
               <FormField
                 control={form.control}
-                name="targetType"
+                name="targetIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("form.target_type")}</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("form.target_type_placeholder")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="SERVICE">{t("target.service")}</SelectItem>
-                        <SelectItem value="USER">{t("target.user")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>{t("form.eligible_user_ids")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t("form.eligible_user_ids_placeholder")}
+                        value={(field.value ?? []).join(", ")}
+                        onChange={(e) => {
+                          const nums = e.target.value
+                            .split(",")
+                            .map((s) => parseInt(s.trim(), 10))
+                            .filter((n) => !Number.isNaN(n));
+                          field.onChange(nums.length > 0 ? nums : []);
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>{t("form.eligible_user_ids_description")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+            ) : null}
 
             <FormField
               control={form.control}

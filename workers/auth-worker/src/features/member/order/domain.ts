@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 // Common Schemas
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
-export const DiscountTypeSchema = z.enum(['SERVICE_PRICE', 'USER_PRICE', 'SERVICE_VOUCHER', 'USER_VOUCHER']);
+export const DiscountTypeSchema = z.enum([
+  'POLICY',
+  'VOUCHER',
+  'USER_PRICE',
+  'USER_VOUCHER',
+  'SERVICE_PRICE',
+  'SERVICE_VOUCHER',
+]);
 
 // Main Schemas
 export const OrderSchema = z.object({
@@ -91,46 +98,35 @@ export const VoucherCalculationResultSchema = z.object({
 });
 
 export const DiscountDetailSchema = z.object({
-  servicePriceDiscount: z.object({
-    amount: z.number().min(0),
-    type: z.literal('service_price'),
-    appliedPolicies: z.array(z.object({
-      policyId: z.number().int(),
-      policyName: z.string(),
-      discount: z.number(),
-      type: z.string(),
-    })),
-  }).optional(),
-  userPriceDiscount: z.object({
-    amount: z.number().min(0),
-    type: z.literal('user_price'),
-    appliedPolicies: z.array(z.object({
-      policyId: z.number().int(),
-      policyName: z.string(),
-      discount: z.number(),
-      type: z.string(),
-    })),
-  }).optional(),
-  serviceVoucherDiscount: z.object({
-    amount: z.number().min(0),
-    type: z.literal('service_voucher'),
-    voucher: z.any(),
-  }).optional(),
-  userVoucherDiscount: z.object({
-    amount: z.number().min(0),
-    type: z.literal('user_voucher'),
-    voucher: z.any(),
-  }).optional(),
+  policyDiscount: z
+    .object({
+      amount: z.number().min(0),
+      type: z.literal('POLICY'),
+      appliedPolicies: z.array(
+        z.object({
+          policyId: z.number().int(),
+          policyName: z.string(),
+          discount: z.number(),
+          type: z.string(),
+        }),
+      ),
+    })
+    .optional(),
+  voucherDiscount: z
+    .object({
+      amount: z.number().min(0),
+      type: z.literal('VOUCHER'),
+      voucher: z.any(),
+    })
+    .optional(),
 });
 
 export const OrderCalculationItemSchema = z.object({
   serviceId: z.number().int().min(0),
   basePrice: z.number().min(0),
   quantity: z.number().min(1),
-  servicePrice: PriceCalculationResultSchema,
-  userPrice: PriceCalculationResultSchema,
-  serviceVoucher: VoucherCalculationResultSchema,
-  userVoucher: VoucherCalculationResultSchema,
+  policy: PriceCalculationResultSchema,
+  voucher: VoucherCalculationResultSchema,
   discounts: DiscountDetailSchema.optional(),
 });
 
@@ -186,7 +182,6 @@ export interface OrderDetail extends Order {
 // Filter Types
 export interface OrderFilters {
   status?: OrderStatus;
-  targetType?: 'SERVICE' | 'USER';
   page?: number;
   limit?: number;
 }
@@ -202,13 +197,11 @@ export interface IOrderInfrastructureService {
 
 // Service Interfaces cho external services
 export interface IPriceApplicationService {
-  calculateServicePrice(identifier: string, request: any): Promise<PriceCalculationResult>;
-  calculateUserPrice(identifier: string, request: any): Promise<PriceCalculationResult>;
+  calculatePrice(identifier: string, request: any): Promise<PriceCalculationResult>;
 }
 
 export interface IVoucherApplicationService {
-  applyServiceVoucher(identifier: string, request: any): Promise<VoucherCalculationResult>;
-  applyUserVoucher(identifier: string, request: any): Promise<VoucherCalculationResult>;
+  applyVoucher(identifier: string, request: any): Promise<VoucherCalculationResult>;
 }
 
 // Error Types
@@ -220,7 +213,6 @@ export const OrderErrorSchema = z.object({
 
 export type OrderError = z.infer<typeof OrderErrorSchema>;
 
-// Constants
 export const ORDER_DEFAULT_LIMIT = 20;
 export const ORDER_DEFAULT_PAGE = 1;
 export const ORDER_CURRENCY = 'VND';
@@ -233,66 +225,3 @@ export const validateOrderAmounts = (order: Order): boolean => {
 export const canCancelOrder = (status: OrderStatus): boolean => {
   return !['COMPLETED', 'CANCELLED'].includes(status);
 };
-
-// VÍ DỤ SỬ DỤNG:
-
-// 1. Tạo order cho Service (customer mua service)
-// POST /api/v1/orders/orders
-// {
-//   "targetType": "SERVICE",
-//   "customerId": "comp_techcorp",
-//   "customerName": "Công ty TechCorp",
-//   "userId": "user_admin01",
-//   "items": [
-//     {
-//       "serviceId": "api_premium",
-//       "serviceName": "API Premium Plan", 
-//       "basePrice": 5000000,
-//       "quantity": 1,
-//       "currentCalls": 1500,
-//       "maxCalls": 10000
-//     }
-//   ],
-//   "voucherCode": "APISALE20",
-//   "notes": "Nâng cấp gói API"
-// }
-
-// 2. Tạo order cho User (user cá nhân mua service)
-// {
-//   "targetType": "USER", 
-//   "userId": "user_john_doe",
-//   "userRole": "member",
-//   "customerId": "comp_abc", // optional: user có thể thuộc customer
-//   "customerName": "Công ty ABC",
-//   "items": [
-//     {
-//       "serviceId": "basic_plan",
-//       "serviceName": "Basic Plan",
-//       "basePrice": 300000,
-//       "quantity": 1,
-//       "currentCalls": 100,
-//       "maxCalls": 1000
-//     }
-//   ],
-//   "voucherCode": "WELCOME10",
-//   "notes": "Đăng ký gói basic"
-// }
-
-// 3. Tính toán giá order
-// POST /api/v1/orders/calculate
-// {
-//   "targetType": "SERVICE",
-//   "customerId": "comp_techcorp",
-//   "userId": "user_admin01",
-//   "items": [
-//     {
-//       "serviceId": "api_premium",
-//       "serviceName": "API Premium Plan",
-//       "basePrice": 5000000,
-//       "quantity": 1,
-//       "currentCalls": 1500,
-//       "maxCalls": 10000
-//     }
-//   ],
-//   "voucherCode": "APISALE20"
-// }

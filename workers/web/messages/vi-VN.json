@@ -1481,7 +1481,7 @@
   },
   "PolicyPage": {
     "title": "Quản lý Chính sách Giá",
-    "description": "Tạo và quản lý các chính sách giá cho dịch vụ API của bạn",
+    "description": "Tạo và quản lý chính sách giá khi nạp ví (ưu đãi theo người dùng)",
     "fetch_error": "Không thể tải danh sách chính sách",
     "error": "Lỗi",
     "create_error": "Không thể tạo chính sách",
@@ -1498,7 +1498,7 @@
     "status_updated": "Đã cập nhật trạng thái",
     "status_updated_description": "Trạng thái chính sách đã được cập nhật thành {status}",
     "create_policy": "Tạo Chính sách",
-    "create_policy_description": "Tạo một chính sách giá mới cho dịch vụ API",
+    "create_policy_description": "Tạo chính sách giá áp dụng cho người dùng khi nạp tiền vào ví",
     "edit_policy": "Chỉnh sửa Chính sách",
     "edit_policy_description": "Cập nhật thông tin chính sách giá",
     "creating": "Đang tạo...",
@@ -1539,6 +1539,11 @@
       "service": "Dịch vụ",
       "user": "Người dùng"
     },
+    "scope": {
+      "all_users": "Mọi người dùng",
+      "specific_users": "Người dùng: {ids}",
+      "specific_users_empty": "Người cụ thể (cần nhập id)"
+    },
     "form": {
       "name": "Tên chính sách",
       "name_placeholder": "ví dụ: Giảm giá 10% cho thành viên",
@@ -1561,7 +1566,10 @@
       "status": "Trạng thái",
       "status_placeholder": "Chọn trạng thái",
       "expires_at": "Ngày hết hạn",
-      "expires_at_description": "Ngày hết hạn tùy chọn cho chính sách"
+      "expires_at_description": "Ngày hết hạn tùy chọn cho chính sách",
+      "eligible_user_ids": "ID người dùng được hưởng",
+      "eligible_user_ids_placeholder": "ví dụ: 12, 34, 56 (id user trong CSDL)",
+      "eligible_user_ids_description": "Bắt buộc khi chọn phạm vi Cụ thể. Để trống chỉ khi chọn Tất cả."
     }
   },
   "ServicePage": {
@@ -1802,7 +1810,10 @@
       "expires_at_placeholder": "Chọn ngày hết hạn",
       "expires_at_description": "Ngày hết hạn tùy chọn cho voucher",
       "status": "Trạng thái",
-      "status_placeholder": "Chọn trạng thái"
+      "status_placeholder": "Chọn trạng thái",
+      "eligible_user_ids": "ID người dùng được hưởng (tùy chọn)",
+      "eligible_user_ids_placeholder": "ví dụ: 12, 34 — để trống = mọi user (vẫn theo vai trò)",
+      "eligible_user_ids_description": "Nếu điền, chỉ các user có id trong CSDL mới dùng được voucher (vẫn kiểm tra vai trò nếu cấu hình)."
     }
   },
   "VersionPage": {

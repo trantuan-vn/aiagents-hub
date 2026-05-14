@@ -5,7 +5,6 @@ import { createOrderApplicationService } from '../../member/order/application';
 
 const GetOrdersInputSchema = z.object({
   status: z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']).optional(),
-  targetType: z.enum(['SERVICE', 'USER']).optional(),
   page: z.number().int().min(1).default(1),
   limit: z.number().int().min(1).max(100).default(20),
 });

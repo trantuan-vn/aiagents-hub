@@ -5,7 +5,7 @@ import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,12 +42,13 @@ export function CreatePolicyDialog({ onCreate }: CreatePolicyDialogProps) {
       type: "PERCENTAGE",
       value: 0,
       applicableTo: "ALL",
-      targetType: "SERVICE",
       targetIds: [],
       priority: 0,
       status: "ACTIVE",
     },
   });
+
+  const applicableTo = useWatch({ control: form.control, name: "applicableTo" });
 
   const onSubmit = async (data: CreatePricePolicy): Promise<void> => {
     setIsSubmitting(true);
@@ -181,29 +182,34 @@ export function CreatePolicyDialog({ onCreate }: CreatePolicyDialogProps) {
                   </FormItem>
                 )}
               />
+            </div>
 
+            {applicableTo === "SPECIFIC" ? (
               <FormField
                 control={form.control}
-                name="targetType"
+                name="targetIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t("form.target_type")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("form.target_type_placeholder")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="SERVICE">{t("target.service")}</SelectItem>
-                        <SelectItem value="USER">{t("target.user")}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>{t("form.eligible_user_ids")}</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder={t("form.eligible_user_ids_placeholder")}
+                        value={(field.value ?? []).join(", ")}
+                        onChange={(e) => {
+                          const nums = e.target.value
+                            .split(",")
+                            .map((s) => parseInt(s.trim(), 10))
+                            .filter((n) => !Number.isNaN(n));
+                          field.onChange(nums.length > 0 ? nums : []);
+                        }}
+                      />
+                    </FormControl>
+                    <FormDescription>{t("form.eligible_user_ids_description")}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+            ) : null}
 
             <FormField
               control={form.control}

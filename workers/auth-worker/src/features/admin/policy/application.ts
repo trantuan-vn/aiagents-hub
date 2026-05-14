@@ -13,8 +13,7 @@ interface IPriceApplicationService {
   getPricePolicies(identifier: string, limit: number, offset: number, status?: string): Promise<PricePolicy[]>;
   getPricePolicy(identifier: string, policyId: number): Promise<PricePolicy>;
   deletePricePolicy(identifier: string, policyId: number): Promise<void>;
-  calculateServicePrice(identifier: string, request: PriceCalculationRequest): Promise<any>;
-  calculateUserPrice(identifier: string, request: PriceCalculationRequest): Promise<any>;
+  calculatePrice(identifier: string, request: PriceCalculationRequest): Promise<any>;
   updatePolicyStatus(identifier: string, policyId: number, status: string): Promise<PricePolicy>;
 }
 export function createPriceApplicationService(c: Context, bindingName: string): IPriceApplicationService {
@@ -50,14 +49,9 @@ export function createPriceApplicationService(c: Context, bindingName: string): 
       await priceInfra.deletePricePolicy(policyId);
     },
 
-    async calculateServicePrice(identifier: string, request: PriceCalculationRequest): Promise<any> {
+    async calculatePrice(identifier: string, request: PriceCalculationRequest): Promise<any> {
       const priceInfra = getPriceInfrastructure(identifier);
-      return await priceInfra.calculateServicePrice(request);
-    },
-
-    async calculateUserPrice(identifier: string, request: PriceCalculationRequest): Promise<any> {
-      const priceInfra = getPriceInfrastructure(identifier);
-      return await priceInfra.calculateUserPrice(request);
+      return await priceInfra.calculatePrice(request);
     },
 
     async updatePolicyStatus(identifier: string, policyId: number, status: string): Promise<any> {

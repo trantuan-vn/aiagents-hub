@@ -1,13 +1,12 @@
 import { z } from 'zod';
 
-// Schemas
+// Schemas — price policies apply to users only (e.g. wallet top-up). `targetIds` = user DB ids when `applicableTo` is SPECIFIC.
 export const PricePolicySchema = z.object({
   name: z.string().min(1).max(300),
   code: z.string().min(3).max(50),
   type: z.enum(['PERCENTAGE', 'FIXED_AMOUNT', 'TIERED', 'USAGE_BASED']),
   value: z.number().min(0),
   applicableTo: z.enum(['ALL', 'SPECIFIC']),
-  targetType: z.enum(['SERVICE', 'USER']),
   targetIds: z.array(z.number()).optional(),
   conditions: z.object({
     userRoles: z.array(z.enum(['member', 'admin'])).optional(),
@@ -53,9 +52,6 @@ export const PriceCalculationRequestSchema = z.object({
   basePrice: z.number().min(0),
   userId: z.number().int(),
   userRole: z.enum(['member', 'admin']).optional(),
-  /** 0 = wallet top-up (no concrete service). */
-  serviceId: z.number().int().min(0),
-  serviceName: z.string().optional(),
   currentCalls: z.number().min(0).optional(),
   maxCalls: z.number().min(0).optional(),
   quantity: z.number().min(1).optional().default(1),
@@ -74,44 +70,6 @@ export interface IPriceInfrastructureService {
   getPricePolicies(limit: number, offset: number, status?: string): Promise<any[]>;
   getPricePolicy(policyId: number): Promise<any>;
   deletePricePolicy(policyId: number): Promise<void>;
-  calculateServicePrice(request: Partial<PriceCalculationRequest>): Promise<any>;
-  calculateUserPrice(request: Partial<PriceCalculationRequest>): Promise<any>;
+  calculatePrice(request: PriceCalculationRequest): Promise<any>;
   updatePolicyStatus(policyId: number, status: string): Promise<any>;
 }
-
-// Ví dụ sử dụng:
-// {
-//   "name": "Giảm 10% cho Service API",
-//   "type": "PERCENTAGE", 
-//   "value": 10,
-//   "applicableTo": "SPECIFIC",
-//   "targetType": "SERVICE",
-//   "targetIds": [1],
-//   "conditions": {
-//     "maxCalls": 1000
-//   }
-// }
-
-// {
-//   "name": "Giảm giá cho thành viên",
-//   "type": "FIXED_AMOUNT",
-//   "value": 50000,
-//   "applicableTo": "ALL",
-//   "targetType": "USER",
-//   "conditions": {
-//     "userRoles": ["member"]
-//   }
-// }
-
-// {
-//   "name": "Giảm giá theo usage",
-//   "type": "USAGE_BASED", 
-//   "value": 100000,
-//   "applicableTo": "SPECIFIC",
-//   "targetType": "SERVICE",
-//   "targetIds": [1],
-//   "conditions": {
-//     "usagePercentage": 80,
-//     "maxCalls": 1000
-//   }
-// }

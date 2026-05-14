@@ -62,11 +62,10 @@ export function createOrderRoutes(bindingName: string) {
   // Lấy danh sách đơn hàng
   app.get('/orders', createRouteHandler(async (c: any, user: any) => {
     const status = c.req.query('status');
-    const targetType = c.req.query('targetType') as 'SERVICE' | 'USER' | undefined;
     const page = parseInt(c.req.query('page') || ORDER_DEFAULT_PAGE);
     const limit = parseInt(c.req.query('limit') || ORDER_DEFAULT_LIMIT);
     const orderApp = createOrderApplicationService(c, bindingName);
-    const result = await orderApp.getOrders(user.identifier, { status, targetType, page, limit });
+    const result = await orderApp.getOrders(user.identifier, { status, page, limit });
     return c.json(result);
   }, 'Failed to get orders'));
 

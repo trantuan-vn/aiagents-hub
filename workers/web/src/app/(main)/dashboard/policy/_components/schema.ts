@@ -3,7 +3,6 @@ import { z } from "zod";
 // Policy Type Schema
 export const policyTypeSchema = z.enum(["PERCENTAGE", "FIXED_AMOUNT", "TIERED", "USAGE_BASED"]);
 export const applicableToSchema = z.enum(["ALL", "SPECIFIC"]);
-export const targetTypeSchema = z.enum(["SERVICE", "USER"]);
 export const statusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 export const userRoleSchema = z.enum(["member", "admin"]);
 
@@ -24,7 +23,7 @@ export const conditionsSchema = z.object({
   tiers: z.array(tierSchema).optional(),
 });
 
-// Price Policy Schema
+// Price Policy Schema — user scope only; `targetIds` = DB user ids when `applicableTo` is SPECIFIC
 export const pricePolicySchema = z.object({
   id: z.number().optional(),
   name: z.string().min(1).max(300),
@@ -32,7 +31,6 @@ export const pricePolicySchema = z.object({
   type: policyTypeSchema,
   value: z.number().min(0),
   applicableTo: applicableToSchema,
-  targetType: targetTypeSchema,
   targetIds: z.array(z.number()).optional(),
   conditions: conditionsSchema.optional(),
   priority: z.number().min(0),
@@ -49,7 +47,6 @@ export const updatePricePolicySchema = pricePolicySchema.partial();
 // Types
 export type PolicyType = z.infer<typeof policyTypeSchema>;
 export type ApplicableTo = z.infer<typeof applicableToSchema>;
-export type TargetType = z.infer<typeof targetTypeSchema>;
 export type Status = z.infer<typeof statusSchema>;
 export type UserRole = z.infer<typeof userRoleSchema>;
 export type Tier = z.infer<typeof tierSchema>;

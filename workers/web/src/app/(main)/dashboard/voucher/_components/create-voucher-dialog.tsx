@@ -41,7 +41,7 @@ export function CreateVoucherDialog({ onCreate }: CreateVoucherDialogProps) {
       name: "",
       type: "PERCENTAGE",
       discountValue: 0,
-      targetType: "BOTH",
+      applicableUsers: [],
       status: "ACTIVE",
       userRoles: [],
     },
@@ -137,30 +137,32 @@ export function CreateVoucherDialog({ onCreate }: CreateVoucherDialogProps) {
                   </FormItem>
                 )}
               />
-
-              <FormField
-                control={form.control}
-                name="targetType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{t("form.target_type")}</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("form.target_type_placeholder")} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="SERVICE">{t("form.target_service")}</SelectItem>
-                        <SelectItem value="USER">{t("form.target_user")}</SelectItem>
-                        <SelectItem value="BOTH">{t("form.target_both")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
+
+            <FormField
+              control={form.control}
+              name="applicableUsers"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("form.eligible_user_ids")}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t("form.eligible_user_ids_placeholder")}
+                      value={(field.value ?? []).join(", ")}
+                      onChange={(e) => {
+                        const nums = e.target.value
+                          .split(",")
+                          .map((s) => parseInt(s.trim(), 10))
+                          .filter((n) => !Number.isNaN(n));
+                        field.onChange(nums.length > 0 ? nums : undefined);
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>{t("form.eligible_user_ids_description")}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-3 gap-4">
               <FormField

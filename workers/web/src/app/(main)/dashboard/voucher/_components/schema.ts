@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Voucher Schema
+// Voucher Schema — user targeting only; empty `applicableUsers` = any user (subject to `userRoles`)
 export const voucherSchema = z.object({
   id: z.union([z.string(), z.number()]).optional(),
   code: z.string().min(3).max(50),
@@ -11,28 +11,21 @@ export const voucherSchema = z.object({
   maxDiscountAmount: z.number().min(0).optional(),
   usageLimit: z.number().min(1).optional(),
   usedCount: z.number().min(0).default(0),
-  targetType: z.enum(["SERVICE", "USER", "BOTH"]).default("BOTH"),
-  applicableServices: z.array(z.number()).optional(),
   applicableUsers: z.array(z.number()).optional(),
-  userRoles: z.array(z.enum(["member", "admin"])).default([]),
+  userRoles: z.array(z.enum(["member", "admin"])).optional(),
   expiresAt: z
     .preprocess((val) => {
       if (val === null || val === undefined || val === "") return undefined;
-      // Xử lý cả string số và number
       const num = Number(val);
 
       if (!isNaN(num)) {
         const date = new Date();
 
-        // Phân biệt: số nhỏ là ngày, số lớn là timestamp
         if (num < 10000) {
-          // Giả sử < 10000 là số ngày
-          // Giới hạn tối đa 360 ngày nếu cần
           const daysToAdd = num > 360 ? 360 : num;
           date.setDate(date.getDate() + daysToAdd);
           return date.toISOString();
         } else {
-          // Số lớn: coi như timestamp
           return new Date(num).toISOString();
         }
       }
@@ -68,10 +61,8 @@ export const createVoucherSchema = z.object({
   minOrderAmount: z.number().min(0).optional(),
   maxDiscountAmount: z.number().min(0).optional(),
   usageLimit: z.number().min(1).optional(),
-  targetType: z.enum(["SERVICE", "USER", "BOTH"]),
-  applicableServices: z.array(z.number()).optional(),
   applicableUsers: z.array(z.number()).optional(),
-  userRoles: z.array(z.enum(["member", "admin"])),
+  userRoles: z.array(z.enum(["member", "admin"])).optional(),
   expiresAt: z.string().datetime().optional(),
   status: z.enum(["ACTIVE", "INACTIVE", "EXPIRED"]),
   conditions: z
@@ -99,9 +90,8 @@ export const applyVoucherSchema = z.object({
   voucherCode: z.string().min(3).max(20),
   basePrice: z.number().min(0),
   orderAmount: z.number().min(0),
-  serviceId: z.number().int().optional(),
   currentCalls: z.number().min(0).optional(),
-  userId: z.number().int().optional(),
+  userId: z.number().int(),
   userRole: z.enum(["member", "admin"]).optional(),
 });
 
