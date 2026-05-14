@@ -1,4 +1,4 @@
-import type { Order } from "./schema";
+import type { CreateOrder, Order } from "./schema";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -82,4 +82,95 @@ export async function loadHistoryFromApi(
   });
   if (!response.ok) throw new Error(await response.text());
   return response.json();
+}
+
+export async function requestVnpayPaymentUrl(
+  orderId: number,
+  amount: number,
+  bankCode: string,
+  language: string,
+  paymentErrorFallback: string,
+  invalidUrlFallback: string,
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/vnpay/create_payment_url`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, amount, bankCode, language }),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || paymentErrorFallback);
+  }
+  const result: unknown = await response.json();
+  if (
+    result &&
+    typeof result === "object" &&
+    "paymentUrl" in result &&
+    typeof (result as { paymentUrl: unknown }).paymentUrl === "string"
+  ) {
+    return (result as { paymentUrl: string }).paymentUrl;
+  }
+  throw new Error(invalidUrlFallback);
+}
+
+export async function requestCassoQr(
+  orderId: number,
+  amount: number,
+  paymentErrorFallback: string,
+  invalidQrFallback: string,
+): Promise<{ qr: string }> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/vnpay/casso_qr`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, amount }),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || paymentErrorFallback);
+  }
+  const result: unknown = await response.json();
+  if (result && typeof result === "object" && "qr" in result && typeof (result as { qr: unknown }).qr === "string") {
+    return { qr: (result as { qr: string }).qr };
+  }
+  throw new Error(invalidQrFallback);
+}
+
+export async function fetchOrdersList(query: {
+  status?: string;
+  page: number;
+  limit: number;
+  fetchErrorFallback: string;
+}): Promise<Order[]> {
+  const params = new URLSearchParams();
+  if (query.status) params.append("status", query.status);
+  params.append("page", query.page.toString());
+  params.append("limit", query.limit.toString());
+  const qs = params.toString();
+  const response = await fetch(`${API_BASE_URL}/dashboard/order/orders${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error((await response.text()) || query.fetchErrorFallback);
+  return response.json();
+}
+
+export async function postCreateOrder(data: CreateOrder, createErrorFallback: string): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/order/orders`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error((await response.text()) || createErrorFallback);
+  return response.json();
+}
+
+export async function postCancelOrder(orderId: number, cancelErrorFallback: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/order/orders/${orderId}/cancel`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) throw new Error((await response.text()) || cancelErrorFallback);
 }

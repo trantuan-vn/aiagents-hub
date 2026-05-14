@@ -57,6 +57,8 @@ interface OrderHistoryTabProps {
   error: string | null;
   onCancel: (orderId: number) => Promise<void>;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
+  onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
+  onPaidDone?: () => void;
   t: (key: string) => string;
 }
 
@@ -73,6 +75,8 @@ export function OrderHistoryTab({
   error,
   onCancel,
   onPayment,
+  onCassoQr,
+  onPaidDone,
   t,
 }: OrderHistoryTabProps) {
   const handlePresetChange = (v: DatePreset) => {
@@ -167,7 +171,14 @@ export function OrderHistoryTab({
           </CardContent>
         </Card>
       ) : (
-        <OrderList orders={orders} onCancel={onCancel} onPayment={onPayment} readOnly />
+        <OrderList
+          orders={orders}
+          onCancel={onCancel}
+          onPayment={onPayment}
+          onCassoQr={onCassoQr}
+          onPaidDone={onPaidDone}
+          readOnly
+        />
       )}
     </>
   );

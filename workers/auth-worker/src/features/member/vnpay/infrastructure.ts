@@ -3,6 +3,7 @@ import {
   IVNPayService, 
   ICryptoService,
   CreatePayment,
+  CassoQrRequest,
   PaymentQuery,
   CreateRefund,
   QueryDRResult,
@@ -369,6 +370,183 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     };
   };
 
+  const randomCassoTransferCode = (): string => {
+    const buf = new Uint8Array(8);
+    crypto.getRandomValues(buf);
+    return `C${Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+  };
+
+  const createCassoQr = async (
+    request: CassoQrRequest,
+    identifier: string,
+    kv: KVNamespace,
+    vietqr: { accountNo: string; accountName: string; acqId: string },
+  ): Promise<{ qr: string }> => {
+    paymentUtils.validateAmount(request.amount);
+
+    const orders = await executeUtils.executeDynamicAction(
+      userDO,
+      "select",
+      { where: { field: "id", operator: "=", value: request.orderId } },
+      "orders",
+    );
+
+    if (orders.length === 0) {
+      throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
+    }
+
+    const transferCode = randomCassoTransferCode();
+    const paymentData = PaymentSchema.parse({
+      orderId: request.orderId,
+      paymentMethod: "bank_transfer",
+      gateway: "casso",
+      status: PAYMENT_STATUS.PENDING,
+      paymentDetails: {},
+    });
+
+    const paymentRecord = await executeUtils.executeDynamicAction(userDO, "insert", paymentData, "payments");
+    const paymentId = paymentRecord.id as number;
+
+    await kv.put(`casso_ref:${transferCode}`, JSON.stringify({ identifier, paymentId }), {
+      expirationTtl: 60 * 60 * 24 * 7,
+    });
+
+    const vietQrBody = {
+      accountNo: vietqr.accountNo,
+      accountName: vietqr.accountName,
+      acqId: vietqr.acqId,
+      amount: request.amount,
+      addInfo: transferCode,
+      format: "text",
+      template: "compact",
+    };
+
+    let qrPayload: string | undefined;
+    try {
+      const res = await fetch("https://api.vietqr.io/v2/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(vietQrBody),
+      });
+      if (!res.ok) {
+        throw new Error(`VietQR HTTP ${res.status}`);
+      }
+      const jr = (await res.json()) as { data?: { qrDataURL?: string } };
+      qrPayload = jr.data?.qrDataURL;
+    } catch {
+      await kv.delete(`casso_ref:${transferCode}`);
+      throw new Error(PAYMENT_ERROR_MESSAGES.VIETQR_FAILED);
+    }
+
+    if (!qrPayload) {
+      await kv.delete(`casso_ref:${transferCode}`);
+      throw new Error(PAYMENT_ERROR_MESSAGES.VIETQR_FAILED);
+    }
+
+    await executeUtils.executeDynamicAction(
+      userDO,
+      "update",
+      {
+        id: paymentId,
+        paymentDetails: {
+          vnp_Amount: request.amount * 100,
+          casso_transferCode: transferCode,
+          vietqr_addInfo: transferCode,
+        },
+      },
+      "payments",
+    );
+
+    return { qr: qrPayload };
+  };
+
+  const processCassoIPN = async (
+    paymentId: number,
+    creditedAmount: number,
+    externalRef: string,
+  ): Promise<PaymentResult> => {
+    const payments = await executeUtils.executeDynamicAction(
+      userDO,
+      "select",
+      {
+        where: { field: "id", operator: "=", value: paymentId },
+      },
+      "payments",
+    );
+
+    if (payments.length === 0) {
+      return {
+        success: false,
+        code: "01",
+        message: PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND,
+      };
+    }
+
+    const payment = payments[0] as { status: string; orderId: number; gateway?: string; paymentDetails?: { vnp_Amount?: number } };
+
+    if (payment.gateway !== "casso") {
+      return {
+        success: false,
+        code: "01",
+        message: PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND,
+      };
+    }
+
+    if (payment.status !== PAYMENT_STATUS.PENDING) {
+      return {
+        success: false,
+        code: "02",
+        message: PAYMENT_ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED,
+      };
+    }
+
+    const expectedAmount = (payment.paymentDetails?.vnp_Amount ?? 0) / 100;
+
+    const orders = await executeUtils.executeDynamicAction(userDO, "select", {
+      where: { field: "id", operator: "=", value: payment.orderId },
+    }, "orders");
+
+    if (orders.length === 0) {
+      return {
+        success: false,
+        code: "01",
+        message: PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND,
+      };
+    }
+
+    const order = orders[0] as { id: number; finalAmount: number };
+    if (order.finalAmount !== expectedAmount || creditedAmount !== order.finalAmount) {
+      return {
+        success: false,
+        code: "04",
+        message: PAYMENT_ERROR_MESSAGES.INVALID_AMOUNT,
+      };
+    }
+
+    const synthetic: VNPayReturn = {
+      vnp_TmnCode: "CASSO",
+      vnp_Amount: String(creditedAmount * 100),
+      vnp_BankCode: "CASSO",
+      vnp_BankTranNo: externalRef,
+      vnp_CardType: undefined,
+      vnp_PayDate: formatDateVNPay(new Date()),
+      vnp_OrderInfo: "Casso bank transfer",
+      vnp_TransactionNo: externalRef,
+      vnp_ResponseCode: "00",
+      vnp_TransactionStatus: "00",
+      vnp_TxnRef: `${paymentId}`,
+      vnp_SecureHash: "",
+    };
+
+    await processPaymentTransaction(paymentId, order.id, synthetic);
+
+    return {
+      success: true,
+      code: "00",
+      message: "Success",
+    };
+  };
+
   const queryTransaction = async (request: PaymentQuery, ipAddr: string): Promise<QueryDRResult> => {
     // Lấy payment trước để lấy orderId
     const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
@@ -533,6 +711,8 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     createPaymentUrl,
     processReturn,
     processIPN,
+    createCassoQr,
+    processCassoIPN,
     queryTransaction,
     refundTransaction
   };

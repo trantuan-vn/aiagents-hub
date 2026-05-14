@@ -11,7 +11,10 @@ export const PAYMENT_ERROR_MESSAGES = {
   TRANSACTION_EXPIRED: 'Transaction expired',
   BANK_MAINTENANCE: 'Bank is under maintenance',
   REFUND_FAILED: 'Refund failed',
-  QUERY_FAILED: 'Transaction query failed'
+  QUERY_FAILED: 'Transaction query failed',
+  CASSO_TRANSFER_NOT_FOUND: 'Casso transfer reference not found',
+  VIETQR_FAILED: 'Failed to generate VietQR',
+  INVALID_CASSO_PAYLOAD: 'Invalid Casso webhook payload'
 } as const;
 
 // VNPay Configuration Constants

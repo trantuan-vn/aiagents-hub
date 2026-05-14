@@ -13,12 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 import {
-  API_BASE_URL,
   FALLBACK_MIN_TOP_UP_VND,
   FALLBACK_USD_VND,
   fetchMemberBillingParams,
+  fetchOrdersList,
   fetchWalletBalance,
   loadHistoryFromApi,
+  postCancelOrder,
+  postCreateOrder,
+  requestCassoQr,
+  requestVnpayPaymentUrl,
 } from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
@@ -80,35 +84,12 @@ export default function BillingPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
-      if (status) params.append("status", status);
-      params.append("page", page.toString());
-      params.append("limit", limit.toString());
-
-      const url = `${API_BASE_URL}/dashboard/order/orders${params.toString() ? `?${params.toString()}` : ""}`;
-      const response = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
-      }
-
-      const data: Order[] = await response.json();
+      const data = await fetchOrdersList({ status, page, limit, fetchErrorFallback: t("fetch_error") });
       setOrders(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t("fetch_error");
       setError(errorMessage);
-      toast({
-        title: t("error"),
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast({ title: t("error"), description: errorMessage, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -163,21 +144,7 @@ export default function BillingPage() {
   }, [searchParams, router]);
 
   const handleCreateOrder = async (data: CreateOrder): Promise<unknown> => {
-    const response = await fetch(`${API_BASE_URL}/dashboard/order/orders`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("create_error"));
-    }
-
-    const result = await response.json();
+    const result = await postCreateOrder(data, t("create_error"));
     void fetchOrders();
     void fetchWalletBalance().then(setWalletBalanceVnd);
     refreshBillingParams();
@@ -185,58 +152,34 @@ export default function BillingPage() {
   };
 
   const handleCancelOrder = async (orderId: number): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/dashboard/order/orders/${orderId}/cancel`, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("cancel_error"));
-    }
-
-    void fetchOrders(); // Refresh the list
+    await postCancelOrder(orderId, t("cancel_error"));
+    void fetchOrders();
   };
 
   const handlePayment = async (orderId: number, amount: number, bankCode: string, language: string): Promise<void> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/dashboard/vnpay/create_payment_url`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          orderId,
-          amount,
-          bankCode,
-          language,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("payment_error"));
-      }
-
-      const result: unknown = await response.json();
-      if (result && typeof result === "object" && "paymentUrl" in result && typeof result.paymentUrl === "string") {
-        window.location.href = result.paymentUrl;
-      } else {
-        throw new Error(t("payment_url_error"));
-      }
+      window.location.href = await requestVnpayPaymentUrl(
+        orderId,
+        amount,
+        bankCode,
+        language,
+        t("payment_error"),
+        t("payment_url_error"),
+      );
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t("payment_error");
-      toast({
-        title: t("error"),
-        description: errorMessage,
-        variant: "destructive",
-      });
+      toast({ title: t("error"), description: errorMessage, variant: "destructive" });
       throw err;
     }
+  };
+
+  const handleCassoQr = (orderId: number, amount: number): Promise<{ qr: string }> =>
+    requestCassoQr(orderId, amount, t("payment_error"), t("casso_qr_error"));
+
+  const handleBillingRefresh = (): void => {
+    void fetchOrders();
+    void fetchWalletBalance().then(setWalletBalanceVnd);
+    refreshBillingParams();
   };
 
   const pendingOrders = orders.filter((o) => o.status === "PENDING");
@@ -299,7 +242,13 @@ export default function BillingPage() {
               </CardContent>
             </Card>
           ) : (
-            <OrderList orders={orders} onCancel={handleCancelOrder} onPayment={handlePayment} />
+            <OrderList
+              orders={orders}
+              onCancel={handleCancelOrder}
+              onPayment={handlePayment}
+              onCassoQr={handleCassoQr}
+              onPaidDone={handleBillingRefresh}
+            />
           )}
         </TabsContent>
         <TabsContent value="history">
@@ -316,6 +265,8 @@ export default function BillingPage() {
             error={historyError}
             onCancel={handleCancelOrder}
             onPayment={handlePayment}
+            onCassoQr={handleCassoQr}
+            onPaidDone={handleBillingRefresh}
             t={t}
           />
         </TabsContent>

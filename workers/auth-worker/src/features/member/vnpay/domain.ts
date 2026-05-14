@@ -26,6 +26,11 @@ export const CreatePaymentSchema = z.object({
   orderId: z.number().int(),
 });
 
+export const CassoQrSchema = z.object({
+  amount: z.number().min(1000, 'Amount must be at least 1,000 VND'),
+  orderId: z.number().int(),
+});
+
 export const CreateRefundSchema = z.object({
   paymentId: z.number().int(),
   transactionType: z.string(),
@@ -55,6 +60,7 @@ export const VNPayReturnSchema = z.object({
 
 // Types
 export type CreatePayment = z.infer<typeof CreatePaymentSchema>;
+export type CassoQrRequest = z.infer<typeof CassoQrSchema>;
 export type CreateRefund = z.infer<typeof CreateRefundSchema>;
 export type PaymentQuery = z.infer<typeof PaymentQuerySchema>;
 export type RefundRequest = z.infer<typeof RefundSchema>;
@@ -95,6 +101,13 @@ export interface IVNPayService {
   createPaymentUrl(request: CreatePayment, ipAddr: string, identifier: string): Promise<string>;
   processReturn(paymentId: number, params: VNPayReturn): Promise<PaymentResult>;
   processIPN(paymentId: number, params: VNPayReturn): Promise<PaymentResult>;
+  createCassoQr(
+    request: CassoQrRequest,
+    identifier: string,
+    kv: KVNamespace,
+    vietqr: { accountNo: string; accountName: string; acqId: string },
+  ): Promise<{ qr: string }>;
+  processCassoIPN(paymentId: number, creditedAmount: number, externalRef: string): Promise<PaymentResult>;
   queryTransaction(request: PaymentQuery, ipAddr: string): Promise<QueryDRResult>;
   refundTransaction(identifier: string, request: RefundRequest, ipAddr: string): Promise<RefundResult>;
 }

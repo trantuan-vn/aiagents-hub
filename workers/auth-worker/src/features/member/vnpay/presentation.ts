@@ -73,6 +73,26 @@ export function createPaymentRoutes(bindingName: string) {
     });
   }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST, false));
 
+  /** Casso bank webhook (signature HMAC SHA512, same response shape spirit as vnpay_ipn). */
+  app.post('/casso_ipn', createRouteHandler(async (c: any) => {
+    const body = await c.req.json();
+    const paymentService = createPaymentApplicationService(c, bindingName);
+    const result = await paymentService.processCassoIPNUseCase(body, c.req.raw.headers, c.env.NONCE_KV);
+    return c.json({
+      RspCode: result.code,
+      Message: result.message,
+    });
+  }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST, false));
+
+  /** VietQR compact QR for Casso transfer (addInfo = internal transfer code, IPN resolves via KV). */
+  app.post('/casso_qr', createRouteHandler(async (c: any) => {
+    const user = requireAuth(c);
+    const request = await c.req.json();
+    const paymentService = createPaymentApplicationService(c, bindingName);
+    const result = await paymentService.createCassoQrUseCase(user.identifier, request, c.env.NONCE_KV);
+    return c.json(result);
+  }, PAYMENT_ERROR_MESSAGES.INVALID_REQUEST));
+
   // Query transaction
   app.post('/querydr', createRouteHandler(async (c: any) => {
     const user = requireAuth(c);

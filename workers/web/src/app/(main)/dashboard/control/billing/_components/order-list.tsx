@@ -28,11 +28,13 @@ interface OrderListProps {
   orders: Order[];
   onCancel: (orderId: number) => Promise<void>;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
+  onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
+  onPaidDone?: () => void;
   /** Read-only mode: không hiển thị nút thanh toán và hủy (dùng cho tab History) */
   readOnly?: boolean;
 }
 
-export function OrderList({ orders, onCancel, onPayment, readOnly = false }: OrderListProps) {
+export function OrderList({ orders, onCancel, onPayment, onCassoQr, onPaidDone, readOnly = false }: OrderListProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -214,6 +216,8 @@ export function OrderList({ orders, onCancel, onPayment, readOnly = false }: Ord
           order={selectedOrder}
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
+          onCassoQr={onCassoQr}
+          onPaidDone={onPaidDone}
           onPayment={async (orderId, amount, bankCode, language) => {
             await onPayment(orderId, amount, bankCode, language);
             setSelectedOrder(null);

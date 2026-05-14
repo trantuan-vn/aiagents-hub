@@ -6,10 +6,12 @@ import { paymentUtils } from './utils';
 
 import { 
   CreatePaymentSchema,
+  CassoQrSchema,
   PaymentQuerySchema,
   RefundSchema,
   VNPayReturnSchema,
   CreatePayment,
+  CassoQrRequest,
   PaymentQuery,
   RefundRequest,
   PaymentResult,
@@ -17,12 +19,16 @@ import {
   RefundResult
 } from './domain';
 import { config } from './config';
+import { getCassoWebhookChecksumKey, getVietQrConfig } from './casso-config';
+import { verifyCassoWebhookSignature, extractCassoTransferCode } from './casso-signature';
 import { PAYMENT_ERROR_MESSAGES } from './constant';
 
 interface IPaymentApplicationService {
   createPaymentUrlUseCase(identifier: string, request: CreatePayment, ipAddr: string): Promise<string>;
   processReturnUseCase(params: any): Promise<PaymentResult>;
   processIPNUseCase(params: any): Promise<PaymentResult>;
+  processCassoIPNUseCase(body: unknown, headers: Headers, kv: KVNamespace): Promise<PaymentResult>;
+  createCassoQrUseCase(identifier: string, request: CassoQrRequest, kv: KVNamespace): Promise<{ qr: string }>;
   queryTransactionUseCase(identifier: string, request: PaymentQuery, ipAddr: string): Promise<QueryDRResult>;
   refundTransactionUseCase(identifier: string, request: RefundRequest, ipAddr: string): Promise<RefundResult>;
 }
@@ -91,6 +97,80 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       const vnpayService = createVNPayService(userDO);
       
       return await vnpayService.processIPN(paymentId, validatedParams);
+    },
+
+    async processCassoIPNUseCase(body: unknown, headers: Headers, kv: KVNamespace): Promise<PaymentResult> {
+      const payload = body as Record<string, unknown>;
+      const checksumKey = getCassoWebhookChecksumKey();
+      const headerSig = headers.get("X-Casso-Signature") ?? headers.get("x-casso-signature") ?? undefined;
+      if (!verifyCassoWebhookSignature(headerSig, payload, checksumKey)) {
+        return {
+          success: false,
+          code: "97",
+          message: PAYMENT_ERROR_MESSAGES.CHECKSUM_FAILED,
+        };
+      }
+
+      const err = payload.error;
+      if (typeof err === "number" && err !== 0) {
+        return { success: true, code: "00", message: "Ignored" };
+      }
+
+      const data = payload.data as Record<string, unknown> | undefined;
+      const description = typeof data?.description === "string" ? data.description : "";
+      const amount = data?.amount;
+      const reference = typeof data?.reference === "string" ? data.reference : "casso";
+
+      if (typeof amount !== "number") {
+        return {
+          success: false,
+          code: "01",
+          message: PAYMENT_ERROR_MESSAGES.INVALID_CASSO_PAYLOAD,
+        };
+      }
+
+      const transferCode = extractCassoTransferCode(description);
+      if (!transferCode) {
+        return {
+          success: false,
+          code: "01",
+          message: PAYMENT_ERROR_MESSAGES.INVALID_CASSO_PAYLOAD,
+        };
+      }
+
+      const mapping = await kv.get(`casso_ref:${transferCode}`);
+      if (!mapping) {
+        return {
+          success: false,
+          code: "01",
+          message: PAYMENT_ERROR_MESSAGES.CASSO_TRANSFER_NOT_FOUND,
+        };
+      }
+
+      let identifier: string;
+      let paymentId: number;
+      try {
+        const parsed = JSON.parse(mapping) as { identifier: string; paymentId: number };
+        identifier = parsed.identifier;
+        paymentId = parsed.paymentId;
+      } catch {
+        return {
+          success: false,
+          code: "01",
+          message: PAYMENT_ERROR_MESSAGES.INVALID_CASSO_PAYLOAD,
+        };
+      }
+
+      const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+      const vnpayService = createVNPayService(userDO);
+      return await vnpayService.processCassoIPN(paymentId, amount, reference);
+    },
+
+    async createCassoQrUseCase(identifier: string, request: CassoQrRequest, kv: KVNamespace): Promise<{ qr: string }> {
+      const validatedRequest = CassoQrSchema.parse(request);
+      const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+      const vnpayService = createVNPayService(userDO);
+      return await vnpayService.createCassoQr(validatedRequest, identifier, kv, getVietQrConfig());
     },
 
     async queryTransactionUseCase(identifier: string, request: PaymentQuery, ipAddr: string): Promise<QueryDRResult> {
