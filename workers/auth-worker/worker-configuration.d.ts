@@ -52,6 +52,7 @@ declare namespace Cloudflare {
 		WS_BROADCAST_QUEUE: Queue;
 		AI: Ai;
 		IMAGES: ImagesBinding;
+        CF_AI_API_TOKEN: SecretsStoreSecret;
 	}
 }
 interface Env extends Cloudflare.Env {}

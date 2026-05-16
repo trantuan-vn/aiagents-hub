@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import {
 	PricePolicySchema,
-	ServiceSchema,
+	ServiceObjectSchema,
 	VoucherSchema,
 	UserSchema,
 	SessionSchema,
@@ -599,7 +599,7 @@ export class D1DatabaseManager {
   private async initializeTables(): Promise<void> {
     // Bảng danh mục (catalog): queue flow + unique index - tương thích với auth worker UserDO
     await this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
-    await this.registerTable('services', ServiceSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
+    await this.registerTable('services', ServiceObjectSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
     await this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
     await this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
     await this.registerTable('sessions', SessionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('hashSessionId'));

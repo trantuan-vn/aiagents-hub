@@ -6,7 +6,7 @@ import { createServiceApplicationService } from '../../admin/service/application
 export function getServicesTool(c: any, bindingName: string, user: any) {
   return tool({
     description:
-      'Lay danh sach dich vu (endpoint, feePercent) cua user da dang nhap.',
+      'Lay danh sach dich vu (endpoint, model, gia token) cua user da dang nhap.',
     inputSchema: z.object({
       activeOnly: z.boolean().default(true),
     }),
@@ -27,6 +27,10 @@ export function getServicesTool(c: any, bindingName: string, user: any) {
           endpoint: service.endpoint,
           isActive: service.isActive,
           expiresAt: service.expiresAt,
+          model: service.model ?? service.model_id,
+          priceInput: service.priceInput ?? service.price_input,
+          priceOutput: service.priceOutput ?? service.price_output,
+          priceInputCache: service.priceInputCache ?? service.price_input_cache,
           feePercent: service.feePercent ?? service.fee_percent ?? 100,
         }));
 

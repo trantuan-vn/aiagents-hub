@@ -24,35 +24,15 @@ import {
 } from './utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
+import {
+  computeUsageChargeUsd,
+  convertUsdToVnd,
+  getServiceModel,
+} from '../../admin/service/pricing';
+import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 
 const AI_GATEWAY_ID = 'unitoken';
-
-async function resolveGatewayCost(env: Env): Promise<number> {
-  const logId = env.AI.aiGatewayLogId;
-  if (!logId) {
-    return 0;
-  }
-  try {
-    const log = await env.AI.gateway(AI_GATEWAY_ID).getLog(logId);
-    const c = log.cost;
-    return typeof c === 'number' && !Number.isNaN(c) ? Math.max(0, c) : 0;
-  } catch (e) {
-    console.warn('[Ekyc] AI Gateway getLog failed for usage cost:', e);
-    return 0;
-  }
-}
-
-function feePercentOf(service: { feePercent?: number | null; fee_percent?: number | null }): number {
-  const raw = service.feePercent ?? service.fee_percent;
-  if (typeof raw === 'number' && !Number.isNaN(raw) && raw >= 0) {
-    return raw;
-  }
-  return 100;
-}
-
-function userChargeFromGateway(service: any, gatewayCost: number): number {
-  return Math.max(0, (feePercentOf(service) / 100) * gatewayCost);
-}
+const DEFAULT_VISION_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
 
 export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IAIDocumentService {
   const validateServiceUsage = async (endpoint: string): Promise<any> => {
@@ -88,45 +68,54 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     endpoint: string,
     request: any,
-    charge: number,
+    chargeUsd: number,
   ): Promise<void> => {
     const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const u = users[0];
     if (!u?.id) {
       throw new Error('User profile not found');
     }
+
+    const usdVndRate = await getUsdVndRateFromEnv(env);
+    const amountVnd = convertUsdToVnd(Math.max(0, Number(chargeUsd) || 0), usdVndRate);
     const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
-    if (charge > balance) {
+    if (amountVnd > balance) {
       throw new Error('Insufficient wallet balance');
     }
-    const newBal = balance - charge;
 
-    await executeUtils.executeDynamicAction(userDO, 'multi-table', {
-      operations: [
-        {
-          table: 'users',
-          operation: 'update',
-          id: u.id,
-          data: { walletBalance: newBal },
-        },
-        {
-          table: 'service_usages',
-          operation: 'insert',
-          data: {
-            serviceId: service.id,
-            endpoint: endpoint,
-            userAgent: request.userAgent,
-            ipAddress: request.ipAddress,
-            isError: false,
-            cost: charge,
-            queueStatus: 'pending',
-          },
-        },
-      ],
+    const operations: Array<{
+      table: string;
+      operation: 'insert' | 'update';
+      id?: number;
+      data: Record<string, unknown>;
+    }> = [];
+
+    if (amountVnd > 0) {
+      operations.push({
+        table: 'users',
+        operation: 'update',
+        id: u.id,
+        data: { ...u, walletBalance: balance - amountVnd },
+      });
+    }
+
+    operations.push({
+      table: 'service_usages',
+      operation: 'insert',
+      data: {
+        serviceId: service.id,
+        endpoint,
+        userAgent: request.userAgent,
+        ipAddress: request.ipAddress,
+        isError: false,
+        cost: amountVnd,
+        queueStatus: 'pending',
+      },
     });
+
+    await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
   };
 
-  /** Record API error (no wallet debit) */
   const recordApiError = async (service: any, endpoint: string, request: any): Promise<void> => {
     try {
       await executeUtils.executeDynamicAction(userDO, 'multi-table', {
@@ -151,14 +140,11 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     }
   };
 
-  const LLAMA_VISION_MODEL = '@cf/meta/llama-3.2-11b-vision-instruct';
-
-  /** One-time agreement to Meta Llama 3.2 license (required before first use). */
-  const agreeToLlamaLicense = async (): Promise<void> => {
-    await env.AI.run(LLAMA_VISION_MODEL, { prompt: 'agree' });
+  const agreeToModelLicense = async (modelId: keyof AiModels): Promise<void> => {
+    await env.AI.run(modelId, { prompt: 'agree' });
   };
 
-  const isLlamaLicenseError = (err: unknown): boolean => {
+  const isModelLicenseError = (err: unknown): boolean => {
     const msg = err instanceof Error ? err.message : String(err);
     return /5016|agree|Prior to using this model/i.test(msg);
   };
@@ -171,9 +157,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     processResult: (response: any, service: any, usageCost: number) => Promise<any>,
   ): Promise<any> => {
     const service = await validateServiceUsage(endpoint);
-    if (!service) {
-      throw new Error('Service not found');
-    }
+    const modelId = (getServiceModel(service) ?? DEFAULT_VISION_MODEL) as keyof AiModels;
 
     const imageB64s = await Promise.all(
       images.map(async (img) => {
@@ -195,12 +179,9 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     const maxTokens = request.options?.maxTokens ?? 500;
     const runModel = () =>
       env.AI.run(
-        LLAMA_VISION_MODEL,
-        {
-          messages,
-          max_tokens: maxTokens,
-        },
-        { gateway: { id: AI_GATEWAY_ID, collectLog: true } },
+        modelId,
+        { messages, max_tokens: maxTokens },
+        { gateway: { id: AI_GATEWAY_ID } },
       );
 
     try {
@@ -208,23 +189,21 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       try {
         response = await runModel();
       } catch (e) {
-        if (isLlamaLicenseError(e)) {
-          await agreeToLlamaLicense();
+        if (isModelLicenseError(e)) {
+          await agreeToModelLicense(modelId);
           response = await runModel();
         } else {
           throw e;
         }
       }
-      const gatewayCost = await resolveGatewayCost(env);
-      const usageCost = userChargeFromGateway(service, gatewayCost);
-      return await processResult(response, service, usageCost);
+      const chargeUsd = computeUsageChargeUsd(service, response);
+      return await processResult(response, service, chargeUsd);
     } catch (e) {
       await recordApiError(service, endpoint, request);
       throw e;
     }
   };
 
-  /** Lấy dữ liệu JSON từ response AI: ưu tiên response.response, fallback response; string → parse, object → dùng luôn. */
   const extractResponseData = (response: any): Record<string, unknown> => {
     const raw = response?.response ?? response;
     if (typeof raw === 'string') {
@@ -247,8 +226,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: DocumentRecognition,
     usageCost: number,
   ): Promise<DocumentExtractionResult> => {
-    console.log('full response:', response);
-
     const extractedData = extractResponseData(response) as any;
 
     const conf =
@@ -271,7 +248,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     return returnData;
   };
 
-  /** Chuyển landmarks dạng { left_eye: {x,y}, ... } sang [{ x, y, type }, ...]. */
   const landmarksToArray = (lm: unknown): { x: number; y: number; type: string }[] => {
     if (!lm || typeof lm !== 'object') return [];
     const entries = Object.entries(lm as Record<string, { x?: number; y?: number }>);
@@ -295,7 +271,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: FaceSearch,
     usageCost: number,
   ): Promise<FaceDetectionResult> => {
-    console.log('response: ', response);
     const data = extractResponseData(response);
     const list = Array.isArray(data?.faces) ? data.faces : [];
     const faces = list.map((f: any) => {
@@ -329,7 +304,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: FaceVerification,
     usageCost: number,
   ): Promise<FaceVerificationResult> => {
-    console.log('response: ', response);
     const result = extractResponseData(response);
     const similarity = Math.min(1, Math.max(0, Number(result?.similarity) ?? 0));
     const threshold = request.options?.similarityThreshold ?? 0.75;
@@ -363,7 +337,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     request: LivenessDetection,
     usageCost: number,
   ): Promise<LivenessResult> => {
-    console.log('response: ', response);
     const result = extractResponseData(response);
     const risk = Math.min(1, Math.max(0, Number(result?.riskScore) ?? 0.8));
     const conf =
@@ -424,7 +397,6 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
 
     async livenessDetection(request: LivenessDetection): Promise<LivenessResult> {
       const prompt = getLivenessDetectionPrompt(request.isVideo);
-      console.log('prompt: ', prompt);
       return executeAIModel(
         request.endpoint,
         request,

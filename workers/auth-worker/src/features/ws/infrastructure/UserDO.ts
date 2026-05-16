@@ -8,7 +8,7 @@ import {
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
   Subscription, WebSocketMessageSchema,
   DEFAULT_SCALE_CONFIGS, ScaleConfig, UserSchema, SessionSchema,
-  PricePolicySchema, ServiceSchema, ServiceUsageSchema, VoucherSchema,
+  PricePolicySchema, ServiceObjectSchema, ServiceUsageSchema, VoucherSchema,
   OrderSchema, OrderItemSchema, OrderItemDiscountSchema, ApiTokenSchema,
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
@@ -105,7 +105,7 @@ export class UserDO extends DurableObject {
 
       // Bảng danh mục (catalog): queue flow nhưng KHÔNG xoá khi cleanup
       this.table('price_policies', extendWithQueue(PricePolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
-      this.table('services', extendWithQueue(ServiceSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
+      this.table('services', extendWithQueue(ServiceObjectSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
       this.table('vouchers', extendWithQueue(VoucherSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       
       this.table('users', extendWithQueue(UserSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));

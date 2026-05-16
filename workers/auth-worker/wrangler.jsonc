@@ -224,7 +224,12 @@
 		"binding": "TWITTER_CLIENT_SECRET",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "TWITTER_CLIENT_SECRET"
-		}  
+		},
+		{
+		"binding": "CF_AI_API_TOKEN",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "CF_AI_API_TOKEN"
+		}
 	],
   	"services": [
 		{
