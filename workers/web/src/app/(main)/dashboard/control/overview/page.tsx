@@ -13,6 +13,7 @@ import { ReferralSummary } from "./_components/referral-summary";
 import { StatsCards } from "./_components/stats-cards";
 import { SubscriptionsCard } from "./_components/subscriptions-card";
 import { TrustHighlights } from "./_components/trust-highlights";
+import { WalletCard } from "./_components/wallet-card";
 import { WelcomeHero } from "./_components/welcome-hero";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
@@ -129,6 +130,8 @@ export default function OverviewPage() {
       </div>
 
       <WelcomeHero t={t} />
+
+      <WalletCard />
 
       <StatsCards stats={data.stats} t={t} />
 

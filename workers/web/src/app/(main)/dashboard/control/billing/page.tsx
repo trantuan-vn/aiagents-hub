@@ -53,6 +53,7 @@ export default function BillingPage() {
   const [datePreset, setDatePreset] = useState<"all" | "7d" | "30d" | "month" | "custom">("all");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [topUpOpen, setTopUpOpen] = useState(false);
 
   const fetchHistory = async (
     offset = 0,
@@ -101,6 +102,19 @@ export default function BillingPage() {
     refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, page, limit]);
+
+  // Mở dialog nạp tiền khi điều hướng từ overview (?topup=1)
+  useEffect(() => {
+    if (searchParams.get("topup") !== "1") return;
+
+    setTopUpOpen(true);
+
+    const newSearchParams = new URLSearchParams(searchParams.toString());
+    newSearchParams.delete("topup");
+    const newUrl = newSearchParams.toString() ? `?${newSearchParams.toString()}` : "";
+    router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Xử lý kết quả thanh toán từ VNPay return
   useEffect(() => {
@@ -192,7 +206,13 @@ export default function BillingPage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <WalletTopUpDialog onCreate={handleCreateOrder} usdVndRate={usdVndRate} minTopUpVnd={minTopUpVnd} />
+        <WalletTopUpDialog
+          onCreate={handleCreateOrder}
+          usdVndRate={usdVndRate}
+          minTopUpVnd={minTopUpVnd}
+          open={topUpOpen}
+          onOpenChange={setTopUpOpen}
+        />
       </div>
 
       <BillingStatsCards

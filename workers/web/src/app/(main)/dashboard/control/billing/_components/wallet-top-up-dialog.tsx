@@ -232,11 +232,26 @@ interface WalletTopUpDialogProps {
   usdVndRate: number;
   /** Minimum top-up amount (VND) from system configuration. */
   minTopUpVnd: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function WalletTopUpDialog({ onCreate, usdVndRate, minTopUpVnd }: WalletTopUpDialogProps) {
+export function WalletTopUpDialog({
+  onCreate,
+  usdVndRate,
+  minTopUpVnd,
+  open: controlledOpen,
+  onOpenChange,
+}: WalletTopUpDialogProps) {
   const t = useTranslations("BillingPage");
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+
+  const setOpen = (next: boolean): void => {
+    if (isControlled) onOpenChange?.(next);
+    else setInternalOpen(next);
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -1297,6 +1297,11 @@
     "guest": "there",
     "notifications": "Notifications",
     "explore_packages": "Explore Packages",
+    "wallet": {
+      "title": "Wallet balance",
+      "top_up": "Top up",
+      "usd_hint": "≈ ${amount} USD (reference)"
+    },
     "welcome": {
       "subtitle": "Professional API Platform",
       "greeting_morning": "Good morning",

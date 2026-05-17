@@ -1297,6 +1297,11 @@
     "guest": "bạn",
     "notifications": "Thông báo",
     "explore_packages": "Khám phá gói dịch vụ",
+    "wallet": {
+      "title": "Số dư ví",
+      "top_up": "Nạp tiền",
+      "usd_hint": "≈ ${amount} USD (tham chiếu)"
+    },
     "welcome": {
       "subtitle": "Nền tảng API chuyên nghiệp",
       "greeting_morning": "Chào buổi sáng",
