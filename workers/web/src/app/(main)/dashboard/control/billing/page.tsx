@@ -224,12 +224,18 @@ export default function BillingPage() {
           void fetchHistory(0, false, dateParams);
         }}
       >
-        <TabsList>
-          <TabsTrigger value="orders" className="gap-1.5">
+        <TabsList className="border-border bg-muted/40 h-auto gap-1 rounded-lg border p-1">
+          <TabsTrigger
+            value="orders"
+            className="border-border/70 data-[state=active]:border-primary data-[state=active]:bg-background gap-1.5 rounded-md border bg-background/60 data-[state=active]:shadow-sm"
+          >
             <Package className="h-4 w-4" />
             {t("tab_orders")}
           </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
+          <TabsTrigger
+            value="history"
+            className="border-border/70 data-[state=active]:border-primary data-[state=active]:bg-background gap-1.5 rounded-md border bg-background/60 data-[state=active]:shadow-sm"
+          >
             <History className="h-4 w-4" />
             {t("tab_history")}
           </TabsTrigger>

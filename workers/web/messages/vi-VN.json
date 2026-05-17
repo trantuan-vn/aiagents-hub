@@ -2194,7 +2194,7 @@
   },
   "BillingPage": {
     "title": "Thanh toán & ví",
-    "description": "Nạp tiền (mức USD gợi ý), thanh toán VNPay bằng VND; mỗi lần gọi API trừ phí = % × cost AI Gateway.",
+    "description": "Nạp tiền (mức USD gợi ý), thanh toán qua Casso/VNPay/Stripe",
     "fetch_error": "Không thể tải danh sách đơn hàng",
     "error": "Lỗi",
     "create_error": "Không thể tạo đơn hàng",
@@ -2257,6 +2257,7 @@
     "language": "Ngôn ngữ",
     "language_description": "Chọn ngôn ngữ giao diện thanh toán",
     "tab_vnpay": "VNPay (sắp có)",
+    "tab_stripe": "Stripe (sắp có)",
     "tab_casso": "Casso",
     "casso_qr_hint": "Quét mã VietQR và chuyển khoản đúng số tiền. Casso gửi webhook tới máy chủ để đối soát (giống tinh thần IPN VNPay).",
     "casso_qr_error": "Không tạo được mã QR VietQR",

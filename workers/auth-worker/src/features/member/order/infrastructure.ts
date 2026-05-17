@@ -254,15 +254,17 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
     },
 
     async updateOrderStatus(orderId: number, request: UpdateOrderStatus): Promise<any> {
-      const updateData = request.notes 
+      const base = request.notes
         ? { status: request.status, notes: request.notes }
         : { status: request.status };
+      const shouldSyncToD1 = request.status === 'COMPLETED' || request.status === 'CANCELLED';
+      const updateData = shouldSyncToD1 ? { ...base, queueStatus: 'pending' as const } : base;
 
       return await executeUtils.executeDynamicAction(userDO, 'update', { id: orderId, ...updateData }, 'orders');
     },
 
     async cancelOrder(orderId: number): Promise<any> {
-      const updateData = { status: 'CANCELLED' };
+      const updateData = { status: 'CANCELLED', queueStatus: 'pending' as const };
       return await executeUtils.executeDynamicAction(userDO, 'update', { id: orderId, ...updateData }, 'orders');
     }
   };
