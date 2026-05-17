@@ -1734,7 +1734,7 @@
       "of_total": "of total",
       "no_errors": "No errors",
       "no_data": "No data",
-      "unit_per_request": "Sum of per-call charges (fixed price or AI Gateway)",
+      "unit_per_request": "Sum of per-call charges",
       "quality_excellent": "Excellent",
       "quality_good": "Good",
       "quality_attention": "Needs attention"

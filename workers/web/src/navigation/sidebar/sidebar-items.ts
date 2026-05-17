@@ -106,6 +106,7 @@ export const sidebarItems: NavGroup[] = [
         title: "API Service",
         url: "/dashboard/service",
         icon: Code,
+        adminOnly: true,
       },
       {
         title: "Discount Vouchers",
@@ -147,22 +148,16 @@ export function filterSidebarItemsByRole(items: NavGroup[], userRole?: "member" 
   return items
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => {
-        // Filter out admin-only items if user is not admin
-        if (item.adminOnly && !isAdmin) {
-          return false;
-        }
-        // Filter subItems as well
-        if (item.subItems) {
-          item.subItems = item.subItems.filter((subItem) => {
-            if (subItem.adminOnly && !isAdmin) {
-              return false;
-            }
-            return true;
-          });
-        }
-        return true;
-      }),
+      items: group.items
+        .filter((item) => !item.adminOnly || isAdmin)
+        .map((item) =>
+          item.subItems
+            ? {
+                ...item,
+                subItems: item.subItems.filter((subItem) => !subItem.adminOnly || isAdmin),
+              }
+            : item,
+        ),
     }))
-    .filter((group) => group.items.length > 0); // Filter out groups with no items
+    .filter((group) => group.items.length > 0);
 }

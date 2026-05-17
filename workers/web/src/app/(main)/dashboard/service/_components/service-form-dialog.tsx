@@ -25,7 +25,6 @@ import {
   updateServiceSchema,
   type CreateService,
   type CreateServiceFormInput,
-  type MemberPricingUpdate,
   type Service,
   type ServiceFormValues,
   type UpdateService,
@@ -38,9 +37,8 @@ type FormMode = "create" | "edit";
 interface ServiceFormDialogProps {
   mode: FormMode;
   service?: Service;
-  isAdmin: boolean;
   onCreate?: (data: CreateService) => Promise<Service>;
-  onUpdate?: (serviceId: string | number, data: UpdateService | MemberPricingUpdate) => Promise<Service>;
+  onUpdate?: (serviceId: string | number, data: UpdateService) => Promise<Service>;
   trigger?: React.ReactNode;
 }
 
@@ -105,7 +103,7 @@ function CreateServiceFormDialog({ onCreate, trigger }: Pick<ServiceFormDialogPr
         </DialogHeader>
         <Form {...form}>
           <form id="service-form-submit" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} lockNonPricing={false} />
+            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
             <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -124,15 +122,13 @@ function CreateServiceFormDialog({ onCreate, trigger }: Pick<ServiceFormDialogPr
 
 function EditServiceFormDialog({
   service,
-  isAdmin,
   onUpdate,
   trigger,
-}: Pick<ServiceFormDialogProps, "service" | "isAdmin" | "onUpdate" | "trigger">) {
+}: Pick<ServiceFormDialogProps, "service" | "onUpdate" | "trigger">) {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const lockNonPricing = !isAdmin;
 
   const form = useForm<UpdateServiceFormInput, unknown, UpdateService>({
     resolver: zodResolver(updateServiceSchema),
@@ -149,16 +145,7 @@ function EditServiceFormDialog({
     if (!onUpdate || service?.id == null) return;
     setIsSubmitting(true);
     try {
-      const payload: UpdateService | MemberPricingUpdate = lockNonPricing
-        ? {
-            model: data.model,
-            priceInput: data.priceInput,
-            priceOutput: data.priceOutput,
-            priceInputCache: data.priceInputCache,
-            feePercent: data.feePercent,
-          }
-        : data;
-      await onUpdate(service.id, payload);
+      await onUpdate(service.id, data);
       toast({ title: t("service_updated"), description: t("service_updated_description") });
       setOpen(false);
     } catch (error) {
@@ -188,7 +175,7 @@ function EditServiceFormDialog({
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} lockNonPricing={lockNonPricing} />
+            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
             <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -205,9 +192,9 @@ function EditServiceFormDialog({
   );
 }
 
-export function ServiceFormDialog({ mode, service, isAdmin, onCreate, onUpdate, trigger }: ServiceFormDialogProps) {
+export function ServiceFormDialog({ mode, service, onCreate, onUpdate, trigger }: ServiceFormDialogProps) {
   if (mode === "create") {
     return <CreateServiceFormDialog onCreate={onCreate} trigger={trigger} />;
   }
-  return <EditServiceFormDialog service={service} isAdmin={isAdmin} onUpdate={onUpdate} trigger={trigger} />;
+  return <EditServiceFormDialog service={service} onUpdate={onUpdate} trigger={trigger} />;
 }

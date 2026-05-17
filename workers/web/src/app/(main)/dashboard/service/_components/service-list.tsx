@@ -8,18 +8,16 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-import type { MemberPricingUpdate, Service, UpdateService } from "./schema";
+import type { Service, UpdateService } from "./schema";
 import { ServiceItem } from "./service-list-item";
 
 interface ServiceListProps {
   services: Service[];
   onDelete: (serviceId: string | number) => Promise<void>;
-  onUpdate: (serviceId: string | number, data: UpdateService | MemberPricingUpdate) => Promise<Service>;
-  canDelete?: boolean;
-  isAdmin: boolean;
+  onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
 }
 
-export function ServiceList({ services, onDelete, onUpdate, canDelete = false, isAdmin }: ServiceListProps) {
+export function ServiceList({ services, onDelete, onUpdate }: ServiceListProps) {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
   const [deletingServiceId, setDeletingServiceId] = useState<string | number | null>(null);
@@ -84,8 +82,6 @@ export function ServiceList({ services, onDelete, onUpdate, canDelete = false, i
               onUpdate={onUpdate}
               formatDate={formatDate}
               t={t}
-              canDelete={canDelete}
-              isAdmin={isAdmin}
             />
           ))}
         </div>

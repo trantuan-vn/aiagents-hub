@@ -13,8 +13,13 @@ export function getOverviewTool(c: any, bindingName: string, user: any) {
       yield { state: 'loading' as const };
 
       try {
+        const db = c.env.D1DB;
+        if (!db) {
+          throw new Error('D1 database binding not configured');
+        }
+        const userId = (c.env[bindingName] as DurableObjectNamespace).idFromName(user.identifier).toString();
         const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-        const overview = await getOverviewData(userDO);
+        const overview = await getOverviewData(userDO, db, userId);
         yield { state: 'ready' as const, ok: true, body: overview };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to get overview data';

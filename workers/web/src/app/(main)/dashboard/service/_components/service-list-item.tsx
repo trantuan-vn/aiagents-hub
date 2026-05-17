@@ -16,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
-import type { MemberPricingUpdate, Service, UpdateService } from "./schema";
+import type { Service, UpdateService } from "./schema";
 import { ServiceFormDialog } from "./service-form-dialog";
 import { ServicePricingLabel } from "./service-pricing-label";
 
@@ -80,49 +80,43 @@ function ServiceItemActions({
   onDelete,
   onUpdate,
   t,
-  canDelete,
-  isAdmin,
 }: {
   service: Service;
   deletingServiceId: string | number | null;
   onDelete: (serviceId: string | number) => Promise<void>;
-  onUpdate: (serviceId: string | number, data: UpdateService | MemberPricingUpdate) => Promise<Service>;
+  onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
   t: TranslateFn;
-  canDelete?: boolean;
-  isAdmin: boolean;
 }) {
   const serviceId = service.id;
   if (!serviceId) return null;
 
   return (
     <div className="flex items-center gap-1">
-      <ServiceFormDialog mode="edit" service={service} isAdmin={isAdmin} onUpdate={onUpdate} />
-      {canDelete ? (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" disabled={deletingServiceId === serviceId} title={t("cancel")}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t("cancel_confirm_title")}</AlertDialogTitle>
-              <AlertDialogDescription>{t("cancel_confirm_description", { name: service.name })}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => {
-                  void onDelete(serviceId);
-                }}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {t("cancel_service")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : null}
+      <ServiceFormDialog mode="edit" service={service} onUpdate={onUpdate} />
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="ghost" size="icon" disabled={deletingServiceId === serviceId} title={t("cancel")}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("cancel_confirm_title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cancel_confirm_description", { name: service.name })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                void onDelete(serviceId);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {t("cancel_service")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -131,11 +125,9 @@ export interface ServiceItemProps {
   service: Service;
   deletingServiceId: string | number | null;
   onDelete: (serviceId: string | number) => Promise<void>;
-  onUpdate: (serviceId: string | number, data: UpdateService | MemberPricingUpdate) => Promise<Service>;
+  onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
   formatDate: (dateString: string | undefined) => string;
   t: TranslateFn;
-  canDelete?: boolean;
-  isAdmin: boolean;
 }
 
 export function ServiceItem({
@@ -145,8 +137,6 @@ export function ServiceItem({
   onUpdate,
   formatDate,
   t,
-  canDelete,
-  isAdmin,
 }: ServiceItemProps) {
   return (
     <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
@@ -157,8 +147,6 @@ export function ServiceItem({
         onDelete={onDelete}
         onUpdate={onUpdate}
         t={t}
-        canDelete={canDelete}
-        isAdmin={isAdmin}
       />
     </div>
   );

@@ -137,10 +137,6 @@ export const createServiceSchema = z
 
 export const updateServiceSchema = serviceObjectSchema.partial().superRefine(refineModelPricing);
 
-export const memberPricingUpdateSchema = z
-  .object(modelPricingFields)
-  .superRefine(refineModelPricing);
-
 export const serviceUsageSchema = z.object({
   id: z.string().uuid().optional(),
   serviceId: z.string().uuid(),
@@ -168,5 +164,4 @@ export type ServiceFormValues = {
   priceInputCache?: number | string | null;
   feePercent?: number | string | null;
 };
-export type MemberPricingUpdate = z.infer<typeof memberPricingUpdateSchema>;
 export type ServiceUsage = z.infer<typeof serviceUsageSchema>;

@@ -9,9 +9,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-import { useDashboardUser } from "../_context/dashboard-user-context";
+import { useRequireAdmin } from "../_hooks/use-require-admin";
 
-import type { CreateService, MemberPricingUpdate, Service, UpdateService } from "./_components/schema";
+import type { CreateService, Service, UpdateService } from "./_components/schema";
 import { ServiceFormDialog } from "./_components/service-form-dialog";
 import { ServiceList } from "./_components/service-list";
 
@@ -20,8 +20,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hu
 export default function ServicePage() {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
-  const user = useDashboardUser();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = useRequireAdmin();
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +56,10 @@ export default function ServicePage() {
   };
 
   useEffect(() => {
+    if (!isAdmin) return;
     void fetchServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAdmin]);
 
   const handleCreateService = async (data: CreateService): Promise<Service> => {
     const response = await fetch(`${API_BASE_URL}/dashboard/admin/service/register`, {
@@ -79,10 +79,7 @@ export default function ServicePage() {
     return result;
   };
 
-  const handleUpdateService = async (
-    serviceId: string | number,
-    data: UpdateService | MemberPricingUpdate,
-  ): Promise<Service> => {
+  const handleUpdateService = async (serviceId: string | number, data: UpdateService): Promise<Service> => {
     const response = await fetch(`${API_BASE_URL}/dashboard/admin/service/${serviceId}`, {
       method: "PUT",
       credentials: "include",
@@ -115,6 +112,10 @@ export default function ServicePage() {
     void fetchServices();
   };
 
+  if (!isAdmin) {
+    return null;
+  }
+
   const activeServices = services.filter((s) => s.isActive);
   const withModelCount = services.filter((s) => s.model?.trim()).length;
 
@@ -125,7 +126,7 @@ export default function ServicePage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        {isAdmin && <ServiceFormDialog mode="create" isAdmin={isAdmin} onCreate={handleCreateService} />}
+        <ServiceFormDialog mode="create" onCreate={handleCreateService} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -178,13 +179,7 @@ export default function ServicePage() {
           </CardContent>
         </Card>
       ) : (
-        <ServiceList
-          services={services}
-          onDelete={handleCancelService}
-          onUpdate={handleUpdateService}
-          canDelete={isAdmin}
-          isAdmin={isAdmin}
-        />
+        <ServiceList services={services} onDelete={handleCancelService} onUpdate={handleUpdateService} />
       )}
     </div>
   );

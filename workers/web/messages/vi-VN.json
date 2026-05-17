@@ -1734,7 +1734,7 @@
       "of_total": "trên tổng",
       "no_errors": "Không có lỗi",
       "no_data": "Không có dữ liệu",
-      "unit_per_request": "Tổng phí mỗi lần gọi (giá cố định hoặc AI Gateway)",
+      "unit_per_request": "Tổng phí của các lần gọi",
       "quality_excellent": "Xuất sắc",
       "quality_good": "Tốt",
       "quality_attention": "Cần chú ý"

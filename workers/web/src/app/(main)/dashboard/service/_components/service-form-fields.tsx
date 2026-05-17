@@ -13,10 +13,9 @@ export { ServiceModelPricingFields } from "./service-model-pricing-fields";
 
 interface ServiceFormFieldsProps {
   control: Control<ServiceFormValues>;
-  lockNonPricing?: boolean;
 }
 
-export function ServiceCoreFields({ control, lockNonPricing = false }: ServiceFormFieldsProps) {
+export function ServiceCoreFields({ control }: ServiceFormFieldsProps) {
   const t = useTranslations("ServicePage");
 
   return (
@@ -28,7 +27,7 @@ export function ServiceCoreFields({ control, lockNonPricing = false }: ServiceFo
           <FormItem>
             <FormLabel>{t("form.name")}</FormLabel>
             <FormControl>
-              <Input placeholder={t("form.name_placeholder")} disabled={lockNonPricing} {...field} />
+              <Input placeholder={t("form.name_placeholder")} {...field} />
             </FormControl>
             <FormMessage />
           </FormItem>
@@ -42,7 +41,7 @@ export function ServiceCoreFields({ control, lockNonPricing = false }: ServiceFo
           <FormItem>
             <FormLabel>{t("form.endpoint")}</FormLabel>
             <FormControl>
-              <Input type="text" placeholder={t("form.endpoint_placeholder")} disabled={lockNonPricing} {...field} />
+              <Input type="text" placeholder={t("form.endpoint_placeholder")} {...field} />
             </FormControl>
             <FormDescription>{t("form.endpoint_description")}</FormDescription>
             <FormMessage />
@@ -60,7 +59,6 @@ export function ServiceCoreFields({ control, lockNonPricing = false }: ServiceFo
               <FormControl>
                 <Input
                   type="datetime-local"
-                  disabled={lockNonPricing}
                   value={field.value ? new Date(field.value).toISOString().slice(0, 16) : ""}
                   onChange={(e) => {
                     const value = e.target.value ? new Date(e.target.value).toISOString() : undefined;
@@ -85,7 +83,7 @@ export function ServiceCoreFields({ control, lockNonPricing = false }: ServiceFo
               <FormDescription>{t("form.is_active_description")}</FormDescription>
             </div>
             <FormControl>
-              <Switch checked={field.value} onCheckedChange={field.onChange} disabled={lockNonPricing} />
+              <Switch checked={field.value} onCheckedChange={field.onChange} />
             </FormControl>
           </FormItem>
         )}

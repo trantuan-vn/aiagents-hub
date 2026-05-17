@@ -156,7 +156,12 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
                 name: service.name,
                 endpoint: service.endpoint,
                 expiresAt: service.expiresAt,
-                isActive: service.isActive
+                isActive: service.isActive,
+                model: service.model,
+                priceInput: service.priceInput,
+                priceOutput: service.priceOutput,
+                priceInputCache: service.priceInputCache,
+                feePercent: service.feePercent,
               },
             });
           });

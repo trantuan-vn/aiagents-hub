@@ -2,8 +2,37 @@ import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 import type { OverviewResponse, OverviewSubscription, OverviewApiKey, OverviewActivity } from './domain';
 
-export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promise<OverviewResponse> {
-  const [services, tokens, serviceUsages] = await Promise.all([
+/** Counts from D1 service_usages (same source as monitor/logs). */
+export async function getApiCallCountsFromD1(
+  db: D1Database,
+  userId: string,
+): Promise<{ total: number; byServiceId: Map<number, number> }> {
+  const totalRow = await db
+    .prepare(`SELECT COUNT(*) as total FROM service_usages WHERE "user_id" = ?`)
+    .bind(userId)
+    .first<{ total: number }>();
+
+  const byServiceResult = await db
+    .prepare(
+      `SELECT "serviceId", COUNT(*) as cnt FROM service_usages WHERE "user_id" = ? GROUP BY "serviceId"`,
+    )
+    .bind(userId)
+    .all<{ serviceId: number; cnt: number }>();
+
+  const byServiceId = new Map<number, number>();
+  for (const row of byServiceResult.results ?? []) {
+    byServiceId.set(row.serviceId, row.cnt);
+  }
+
+  return { total: totalRow?.total ?? 0, byServiceId };
+}
+
+export async function getOverviewData(
+  userDO: DurableObjectStub<UserDO>,
+  db?: D1Database,
+  userId?: string,
+): Promise<OverviewResponse> {
+  const [services, tokens, serviceUsages, apiCallCounts] = await Promise.all([
     executeUtils.executeDynamicAction(
       userDO,
       'select',
@@ -16,11 +45,10 @@ export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promis
     ),
     getApiTokens(userDO),
     getRecentServiceUsages(userDO),
+    db && userId ? getApiCallCountsFromD1(db, userId) : Promise.resolve(null),
   ]);
 
-  const totalApiCalls = Array.isArray(services)
-    ? services.reduce((sum, s) => sum + (Number(s.currentCalls ?? s.current_calls) || 0), 0)
-    : 0;
+  const totalApiCalls = apiCallCounts?.total ?? 0;
   const activeSubscriptions = Array.isArray(services) ? services.length : 0;
   const activeTokens = Array.isArray(tokens)
     ? tokens.filter((t) => t.isActive && (!t.expiresAt || new Date(t.expiresAt) >= new Date())).length
@@ -32,7 +60,7 @@ export async function getOverviewData(userDO: DurableObjectStub<UserDO>): Promis
         name: s.name || 'Service',
         endpoint: s.endpoint,
         plan: s.name,
-        calls: Number(s.currentCalls ?? s.current_calls) || 0,
+        calls: apiCallCounts?.byServiceId.get(s.id) ?? 0,
         limit: 0,
         nextBilling: s.expiresAt ?? s.expires_at
           ? new Date(s.expiresAt ?? s.expires_at).toLocaleDateString('en-US')
@@ -111,10 +139,11 @@ function buildRecentActivity(serviceUsages: any[]): OverviewActivity[] {
   const usages = serviceUsages || [];
   return usages.slice(0, 10).map((u) => {
     const ts = u.created_at ?? u.createdAt ?? Date.now();
+    const isError = u.isError === true || u.isError === 1;
     return {
       action: 'API call',
       endpoint: u.endpoint || '/api',
-      status: 'success' as const,
+      status: isError ? ('error' as const) : ('success' as const),
       time: formatTimeAgo(ts),
     };
   });
