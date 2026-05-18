@@ -23,6 +23,7 @@ import { createVersionApplicationService } from '../admin/version/application';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
 import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../member/referral/utils';
+import { ipFingerprintsMatch, sessionContextsMatch, uaFingerprintsMatch } from './session-fingerprint';
 
 interface IApplicationService {
   // I. OAUTH
@@ -64,6 +65,47 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
   };
 
   const SESSION_LOOKUP_PREFIX = 'SessionLookup:';
+  const NEW_SESSION_EMAIL_COOLDOWN_PREFIX = 'NewSessionEmailCooldown:';
+
+  const hasSimilarActiveSession = async (
+    repository: ReturnType<typeof createRepository>,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<boolean> => {
+    const sessions = await repository.sessions.listAll(50);
+    return sessions.some(
+      (s) =>
+        s.isActive &&
+        s.ipAddress &&
+        s.userAgent &&
+        sessionContextsMatch(s.ipAddress, s.userAgent, ipAddress, userAgent),
+    );
+  };
+
+  const shouldSendNewSessionEmail = async (
+    repository: ReturnType<typeof createRepository>,
+    identifier: string,
+    sessionExisted: boolean,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<boolean> => {
+    if (sessionExisted) return false;
+
+    if (await hasSimilarActiveSession(repository, ipAddress, userAgent)) {
+      return false;
+    }
+
+    const cooldownKey = `${NEW_SESSION_EMAIL_COOLDOWN_PREFIX}${identifier}`;
+    const onCooldown = await c.env.NONCE_KV.get(cooldownKey);
+    return !onCooldown;
+  };
+
+  const markNewSessionEmailSent = async (identifier: string): Promise<void> => {
+    const cooldownKey = `${NEW_SESSION_EMAIL_COOLDOWN_PREFIX}${identifier}`;
+    await c.env.NONCE_KV.put(cooldownKey, '1', {
+      expirationTtl: AUTH_CONSTANTS.NEW_SESSION_EMAIL_COOLDOWN_SEC,
+    });
+  };
 
   const createUserSession = async (
     repository: any,
@@ -103,12 +145,20 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const versionApp = createVersionApplicationService(c, bindingName);
     await versionApp.upgradeVersion(user.identifier);
 
-    // Gửi email thông báo chỉ khi sessionId chưa có trong bảng (thiết bị/địa điểm đăng nhập mới)
-    if (!sessionExisted) {
+    // Email chỉ khi thiết bị/mạng thực sự mới (fingerprint), không phải mỗi lần IP/UA đổi nhẹ
+    const notifyEmail = await shouldSendNewSessionEmail(
+      repository,
+      user.identifier,
+      sessionExisted,
+      ipAddress,
+      userAgent,
+    );
+    if (notifyEmail) {
       const userEmail = user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
       if (userEmail) {
         try {
           await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
+          await markNewSessionEmailSent(user.identifier);
         } catch (e) {
           console.warn('[Auth] sendNewSessionNotification failed:', e);
         }
@@ -648,21 +698,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
       validationUtils.validateSession(session);
 
-      // So sánh IP/UA với session trong DO - nếu khác thì sessionId có thể bị lộ (đánh cắp)
-      // Revoke TẤT CẢ sessions (logoutAll) để đảm bảo: đóng hết WS, gọi unregisterUser đúng 1 lần
-      // Tránh bug: revoke 1 session trong khi có 2 sessionIds→2 connectionIds → chỉ xoá 1 nhưng unregister sai
+      // Revoke khi CẢ subnet IP VÀ browser/OS đều lệch (dấu hiệu thiết bị khác), không phải chỉ IP đổi
       const sessionIp = session.ipAddress;
-      const sessionUa = session.userAgent;
+      const sessionUa = session.userAgent ?? '';
       let ipMismatch = false;
       let uaMismatch = false;
       if (sessionIp != null && sessionIp !== '' && clientIp != null && clientIp !== '') {
-        const norm = (s: string) => s.split(',')[0]?.trim() ?? '';
-        if (norm(sessionIp) !== norm(clientIp)) ipMismatch = true;
+        if (!ipFingerprintsMatch(sessionIp, clientIp)) ipMismatch = true;
       }
-      if (sessionUa != null && sessionUa !== '' && clientUserAgent != null && clientUserAgent !== '') {
-        if (sessionUa !== clientUserAgent) uaMismatch = true;
+      if (sessionUa !== '' && clientUserAgent != null && clientUserAgent !== '') {
+        if (!uaFingerprintsMatch(sessionUa, clientUserAgent)) uaMismatch = true;
       }
-      if (ipMismatch || uaMismatch) {
+      if (ipMismatch && uaMismatch) {
         await this.logoutAllUseCase(identifier);
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }

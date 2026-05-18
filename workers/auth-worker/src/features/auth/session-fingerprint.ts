@@ -1,0 +1,62 @@
+/**
+ * Chuẩn hóa IP/UA để so sánh "cùng thiết bị/mạng" — tránh false positive khi IP mobile đổi
+ * hoặc UA chỉ khác version patch.
+ */
+
+function firstIp(ip: string): string {
+  return ip.split(',')[0]?.trim() ?? ip;
+}
+
+/** IPv4: /24; IPv6: 4 nhóm đầu (~/48). */
+export function normalizeIpFingerprint(ip: string): string {
+  const trimmed = firstIp(ip);
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(trimmed)) {
+    const parts = trimmed.split('.');
+    return `${parts[0]}.${parts[1]}.${parts[2]}`;
+  }
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':').filter((p) => p.length > 0);
+    return parts.slice(0, 4).join(':').toLowerCase();
+  }
+  return trimmed.toLowerCase();
+}
+
+/** Browser family + OS — bỏ version string. */
+export function normalizeUaFingerprint(ua: string): string {
+  const u = (ua || '').trim();
+  if (!u || u === 'apiToken') return u;
+
+  let os = 'other';
+  if (/iPhone|iPad|iPod/i.test(u)) os = 'ios';
+  else if (/Android/i.test(u)) os = 'android';
+  else if (/Windows/i.test(u)) os = 'windows';
+  else if (/Mac OS X|Macintosh/i.test(u)) os = 'macos';
+  else if (/Linux/i.test(u)) os = 'linux';
+
+  let browser = 'other';
+  if (/Edg\//i.test(u)) browser = 'edge';
+  else if (/OPR\/|Opera/i.test(u)) browser = 'opera';
+  else if (/Chrome\//i.test(u) && !/Edg/i.test(u)) browser = 'chrome';
+  else if (/Safari\//i.test(u) && !/Chrome/i.test(u)) browser = 'safari';
+  else if (/Firefox\//i.test(u)) browser = 'firefox';
+
+  return `${browser}|${os}`;
+}
+
+export function ipFingerprintsMatch(a: string, b: string): boolean {
+  return normalizeIpFingerprint(a) === normalizeIpFingerprint(b);
+}
+
+export function uaFingerprintsMatch(a: string, b: string): boolean {
+  return normalizeUaFingerprint(a) === normalizeUaFingerprint(b);
+}
+
+/** Cùng ngữ cảnh thiết bị nếu IP subnet và browser/OS family trùng. */
+export function sessionContextsMatch(
+  ipA: string,
+  uaA: string,
+  ipB: string,
+  uaB: string,
+): boolean {
+  return ipFingerprintsMatch(ipA, ipB) && uaFingerprintsMatch(uaA, uaB);
+}
