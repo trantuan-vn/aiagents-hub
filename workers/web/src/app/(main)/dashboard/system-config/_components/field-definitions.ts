@@ -103,6 +103,13 @@ export function getBillingFields(config: SystemConfigData): FieldDef[] {
       min: 1,
       max: 100000000,
     },
+    {
+      key: "WORKFLOW_ROYALTY_PERCENT",
+      label: "Workflow sharing royalty (%)",
+      value: b.WORKFLOW_ROYALTY_PERCENT ?? 5,
+      min: 0,
+      max: 100,
+    },
   ];
 }
 

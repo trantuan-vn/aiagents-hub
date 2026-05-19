@@ -5,6 +5,8 @@ import {
   ChartBar,
   Code,
   CreditCard,
+  GitBranch,
+  Wallet,
   FileText,
   Key,
   LayoutDashboard,
@@ -137,7 +139,11 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 4,
     label: "Build",
-    items: [{ title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck }],
+    items: [
+      { title: "Agent Workflows", url: "/dashboard/build/workflows", icon: GitBranch, isNew: true },
+      { title: "Workflow Earnings", url: "/dashboard/build/workflows/earnings", icon: Wallet },
+      { title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck },
+    ],
   },
 ];
 

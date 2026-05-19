@@ -1,0 +1,6 @@
+-- Agent workflows & royalties (columns may also be added via runtime ensureSchemaColumns)
+-- Run manually if needed; queue-worker dynamic schema sync handles new Zod fields.
+-- service_usages workflow attribution
+--ALTER TABLE service_usages ADD COLUMN workflowId INTEGER;
+--ALTER TABLE service_usages ADD COLUMN workflowOwnerId TEXT;
+--ALTER TABLE service_usages ADD COLUMN workflowRoyaltyVnd REAL;

@@ -12,7 +12,8 @@ import {
   OrderSchema, OrderItemSchema, OrderItemDiscountSchema, ApiTokenSchema,
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
-  CommissionPolicySchema, CommissionSchema
+  CommissionPolicySchema, CommissionSchema,
+  AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema
 } from '../domain.js';
 
 const MAX_SEND_FAILURE_COUNT = 3;
@@ -46,7 +47,7 @@ export class UserDO extends DurableObject {
   /** Bảng cần xoá record khi cleanup để tiết kiệm không gian lưu trữ */
   private readonly QUEUE_TABLE_NAMES = [
     "service_usages", "orders", "order_items", "order_discounts", 
-    "payments", "refunds"
+    "payments", "refunds", "workflow_royalties"
   ];
 
   /** Bảng danh mục: xử lý giống queue nhưng KHÔNG xoá khi cleanup (giữ lại record) */
@@ -57,7 +58,8 @@ export class UserDO extends DurableObject {
     "api_tokens", "pending_messages",
     "user_mfa", "user_ekyc", "user_did",
     "passkey_credentials", "backup_codes",
-    "commission_policies", "commissions"
+    "commission_policies", "commissions",
+    "agent_workflows", "workflow_user_stars", "workflow_comments"
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -121,7 +123,8 @@ export class UserDO extends DurableObject {
         { name: 'order_discounts', schema: OrderItemDiscountSchema },
         { name: 'payments', schema: PaymentSchema },
         { name: 'refunds', schema: RefundSchema },
-        { name: 'commissions', schema: CommissionSchema }
+        { name: 'commissions', schema: CommissionSchema },
+        { name: 'workflow_royalties', schema: WorkflowRoyaltySchema }
       ];
       
       queueSchemas.forEach(({ name, schema }) => {
@@ -138,6 +141,9 @@ export class UserDO extends DurableObject {
       this.table('passkey_credentials', extendWithQueue(PasskeyCredentialSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
       this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
       this.table('commission_policies', extendWithQueue(CommissionPolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+      this.table('agent_workflows', extendWithQueue(AgentWorkflowSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
+      this.table('workflow_user_stars', extendWithQueue(WorkflowUserStarSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'));
+      this.table('workflow_comments', extendWithQueue(WorkflowCommentSchema), this.TABLE_CONFIGS.queueTable());
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();

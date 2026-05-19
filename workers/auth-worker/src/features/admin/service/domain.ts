@@ -91,6 +91,10 @@ export const ServiceUsageSchema = z.object({
   ipAddress: z.string().optional(),
   cost: z.number().min(0).optional(),
   isError: z.boolean().optional().default(false),
+  /** Shared agent workflow attribution */
+  workflowId: z.number().int().optional(),
+  workflowOwnerId: z.string().optional(),
+  workflowRoyaltyVnd: z.number().min(0).optional(),
 });
 
 export const ServiceIdSchema = z.string().uuid();

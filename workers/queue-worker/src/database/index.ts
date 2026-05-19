@@ -24,6 +24,10 @@ import {
 	BackupCodeSchema,
 	CommissionPolicySchema,
 	CommissionSchema,
+	AgentWorkflowSchema,
+	WorkflowUserStarSchema,
+	WorkflowCommentSchema,
+	WorkflowRoyaltySchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -606,6 +610,8 @@ export class D1DatabaseManager {
     await this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
     await this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
     await this.registerTable('commission_policies', CommissionPolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+    await this.registerTable('agent_workflows', AgentWorkflowSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
+    await this.registerTable('workflow_user_stars', WorkflowUserStarSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'));
 
     // Queue tables (xoá khi cleanup): queue flow, không unique index
     const queueSchemas = [
@@ -615,7 +621,9 @@ export class D1DatabaseManager {
       { name: 'order_discounts', schema: OrderItemDiscountSchema },
       { name: 'payments', schema: PaymentSchema },
       { name: 'refunds', schema: RefundSchema },
-      { name: 'commissions', schema: CommissionSchema }
+      { name: 'commissions', schema: CommissionSchema },
+      { name: 'workflow_royalties', schema: WorkflowRoyaltySchema },
+      { name: 'workflow_comments', schema: WorkflowCommentSchema },
     ];
     for (const { name, schema } of queueSchemas) {
       await this.registerTable(name, schema, this.TABLE_CONFIGS.queueTable());

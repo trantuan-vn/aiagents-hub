@@ -69,6 +69,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     endpoint: string,
     request: any,
     chargeUsd: number,
+    workflowAttribution?: { workflowId: number; workflowOwnerId: string },
   ): Promise<void> => {
     const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const u = users[0];
@@ -99,21 +100,39 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       });
     }
 
+    const usageData: Record<string, unknown> = {
+      serviceId: service.id,
+      endpoint,
+      userAgent: request.userAgent,
+      ipAddress: request.ipAddress,
+      isError: false,
+      cost: amountVnd,
+      queueStatus: 'pending',
+    };
+    if (workflowAttribution) {
+      usageData.workflowId = workflowAttribution.workflowId;
+      usageData.workflowOwnerId = workflowAttribution.workflowOwnerId;
+    }
+
     operations.push({
       table: 'service_usages',
       operation: 'insert',
-      data: {
-        serviceId: service.id,
-        endpoint,
-        userAgent: request.userAgent,
-        ipAddress: request.ipAddress,
-        isError: false,
-        cost: amountVnd,
-        queueStatus: 'pending',
-      },
+      data: usageData,
     });
 
     await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
+
+    if (workflowAttribution && amountVnd > 0) {
+      const consumerId =
+        String(u.identifier ?? u.user_identifier ?? userDO.id?.toString?.() ?? '');
+      const { recordWorkflowRoyalty } = await import('../workflows/royalty.js');
+      await recordWorkflowRoyalty(env, 'USER_DO', {
+        workflowId: workflowAttribution.workflowId,
+        workflowOwnerId: workflowAttribution.workflowOwnerId,
+        consumerIdentifier: consumerId,
+        baseCostVnd: amountVnd,
+      });
+    }
   };
 
   const recordApiError = async (service: any, endpoint: string, request: any): Promise<void> => {

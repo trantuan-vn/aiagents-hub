@@ -29,6 +29,7 @@ export interface D1tor2CronConfig {
 export interface BillingConfig {
   USD_VND_RATE?: number;
   MIN_TOP_UP_VND?: number;
+  WORKFLOW_ROYALTY_PERCENT?: number;
 }
 
 export interface SystemConfigData {
