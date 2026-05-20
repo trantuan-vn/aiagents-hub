@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -27,7 +27,7 @@ interface WorkflowEditorProps {
 function parseDef(json: string): WorkflowDefinition {
   try {
     const p = JSON.parse(json) as WorkflowDefinition;
-    return { nodes: p.nodes, edges: p.edges, viewport: p.viewport };
+    return { nodes: p.nodes ?? [], edges: p.edges ?? [], viewport: p.viewport };
   } catch {
     return { nodes: [], edges: [] };
   }
@@ -47,24 +47,21 @@ export function WorkflowEditor({
 }: WorkflowEditorProps) {
   const t = useTranslations("WorkflowEditorPage");
   const tw = useTranslations("WorkflowsPage");
-  const def = useMemo(() => parseDef(definitionJson), [definitionJson]);
-  const [localDef, setLocalDef] = useState(def);
+  const definition = useMemo(() => parseDef(definitionJson), [definitionJson]);
 
-  useEffect(() => {
-    setLocalDef(def);
-  }, [def]);
-
-  const sync = (next: WorkflowDefinition) => {
-    setLocalDef(next);
-    onDefinitionChange(JSON.stringify(next));
-  };
+  const sync = useCallback(
+    (next: WorkflowDefinition) => {
+      onDefinitionChange(JSON.stringify(next));
+    },
+    [onDefinitionChange],
+  );
 
   const onAddNode = (type: string, label: string) => {
     const extra =
       type === "agent" && serviceEndpoint
         ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
         : undefined;
-    sync(addNodeToDefinition(localDef, type, label, extra));
+    sync(addNodeToDefinition(definition, type, label, extra));
   };
 
   return (
@@ -103,7 +100,7 @@ export function WorkflowEditor({
           </div>
         )}
       </div>
-      <WorkflowCanvas initial={localDef} onChange={sync} />
+      <WorkflowCanvas initial={definition} onChange={sync} />
     </div>
   );
 }
