@@ -14,8 +14,9 @@ export async function processCommissionOnOrder(
   user: { identifier: string; referrerId?: string; id?: number },
   orderRecord: { id: number; orderCode: string; finalAmount: number; currency: string }
 ): Promise<void> {
+  console.log(`processCommissionOnOrder starting`);
   if (!user.referrerId) return;
-
+  console.log(`processCommissionOnOrder: ${JSON.stringify(user.referrerId)}`);
   const adminDO = getIdFromName(c, COMMISSION_ADMIN_IDENTIFIER, bindingName) as DurableObjectStub<UserDO>;
   const policyInfra = createCommissionPolicyInfrastructure(adminDO);
 
@@ -32,17 +33,17 @@ export async function processCommissionOnOrder(
     if (p.applicableTo === 'USER_GROUP' && p.targetIds?.includes(user.referrerId)) return true;
     return false;
   });
-
+  
   if (!applicable) return;
-
+  console.log(`processCommissionOnOrder: ${JSON.stringify(applicable.commissionPercent)}`);
   const percent = applicable.commissionPercent ?? 0;
   if (percent <= 0) return;
-
+  console.log(`processCommissionOnOrder: ${JSON.stringify(percent)}`);
   const commissionAmount = roundVndAmount((orderRecord.finalAmount * percent) / 100);
 
   const referrerDO = getIdFromName(c, user.referrerId, bindingName) as DurableObjectStub<UserDO>;
   const commissionInfra = createCommissionInfrastructure(referrerDO);
-
+  console.log(`processCommissionOnOrder: ${JSON.stringify(commissionInfra)}`);
   await commissionInfra.insert({
     orderId: orderRecord.id,
     orderCode: orderRecord.orderCode,
@@ -53,5 +54,6 @@ export async function processCommissionOnOrder(
     commissionAmount,
     currency: orderRecord.currency ?? 'VND',
     policyId: applicable.id,
+    queueStatus: 'pending',
   });
 }
