@@ -74,7 +74,7 @@ export function ReferralCard() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Button variant="default" size="sm" asChild>
-                <Link href="/dashboard/control/account/commissions">
+                <Link href="/dashboard/monitor/commissions">
                   <ExternalLink className="mr-2 h-4 w-4" />
                   {t("manage_commission")}
                 </Link>

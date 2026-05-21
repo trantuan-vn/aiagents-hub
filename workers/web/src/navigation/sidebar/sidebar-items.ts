@@ -4,6 +4,7 @@ import {
   Bell,
   ChartBar,
   Code,
+  Coins,
   CreditCard,
   GitBranch,
   Wallet,
@@ -56,7 +57,6 @@ export const sidebarItems: NavGroup[] = [
       { title: "Overview", url: "/dashboard/control/overview", icon: LayoutDashboard },
       { title: "Account", url: "/dashboard/control/account", icon: UserCircle },
       { title: "API Keys", url: "/dashboard/control/token", icon: Key },
-      { title: "Assistant", url: "/dashboard/control/assistant", icon: Bot },
       { title: "Billing", url: "/dashboard/control/billing", icon: CreditCard },
       { title: "Notifications", url: "/dashboard/control/notifications", icon: Bell },
       { title: "Settings", url: "/dashboard/control/settings", icon: Settings },
@@ -68,6 +68,8 @@ export const sidebarItems: NavGroup[] = [
     items: [
       { title: "Logs", url: "/dashboard/monitor/logs", icon: FileText },
       { title: "Analytics", url: "/dashboard/monitor/analytics", icon: BarChart3 },
+      { title: "Workflow Earnings", url: "/dashboard/build/workflows/earnings", icon: Wallet },
+      { title: "Commissions", url: "/dashboard/monitor/commissions", icon: Coins },
     ],
   },
   {
@@ -141,7 +143,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Build",
     items: [
       { title: "Agent Workflows", url: "/dashboard/build/workflows", icon: GitBranch, isNew: true },
-      { title: "Workflow Earnings", url: "/dashboard/build/workflows/earnings", icon: Wallet },
+      { title: "Assistant", url: "/dashboard/control/assistant", icon: Bot },
       { title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck },
     ],
   },

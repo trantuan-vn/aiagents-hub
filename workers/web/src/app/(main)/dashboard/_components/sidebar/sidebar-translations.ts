@@ -22,6 +22,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     eKyc: t("ekyc"),
     "Agent Workflows": t("agent_workflows"),
     "Workflow Earnings": t("workflow_earnings"),
+    Commissions: t("commissions"),
     "Ask AI": t("ask_ai"),
     "E-commerce": t("ecommerce"),
     Academy: t("academy"),

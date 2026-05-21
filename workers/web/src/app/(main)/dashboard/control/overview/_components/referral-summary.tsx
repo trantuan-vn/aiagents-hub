@@ -115,7 +115,7 @@ export function ReferralSummary({ t }: ReferralSummaryProps) {
                 {t("referral.copy_link")}
               </Button>
               <Button size="sm" asChild>
-                <Link href="/dashboard/control/account/commissions" className="gap-1.5">
+                <Link href="/dashboard/monitor/commissions" className="gap-1.5">
                   <TrendingUp className="h-4 w-4" />
                   {t("referral.manage")}
                 </Link>
