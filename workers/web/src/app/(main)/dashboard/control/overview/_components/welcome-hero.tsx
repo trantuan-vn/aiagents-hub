@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Bell, ChevronRight, Sparkles, Zap } from "lucide-react";
 
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
@@ -97,10 +99,24 @@ export function WelcomeHero({ t }: WelcomeHeroProps) {
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-3">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Bell className="h-4 w-4" />
-            {t("notifications")}
-          </Button>
+          <NotificationBell
+            user={profile ? { identifier: profile.identifier } : null}
+            renderTrigger={({ unreadCount }) => (
+              <Button variant="outline" size="sm" className="relative gap-2 pr-3">
+                <Bell className="h-4 w-4" />
+                {t("notifications")}
+                {unreadCount > 0 && (
+                  <Badge
+                    variant="destructive"
+                    className="ml-0.5 h-5 min-w-5 shrink-0 rounded-full px-1.5 text-xs font-bold tabular-nums"
+                    aria-label={`${unreadCount} unread`}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
+          />
           <Button size="sm" asChild className="gap-1.5">
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Full page load required: client-side nav from Next.js to React Router causes white screen */}
             <a href="/packages">
