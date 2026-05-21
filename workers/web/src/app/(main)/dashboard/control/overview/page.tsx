@@ -15,6 +15,7 @@ import { SubscriptionsCard } from "./_components/subscriptions-card";
 import { TrustHighlights } from "./_components/trust-highlights";
 import { WalletCard } from "./_components/wallet-card";
 import { WelcomeHero } from "./_components/welcome-hero";
+import { WorkflowIncomeSummary } from "./_components/workflow-income-summary";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -145,6 +146,7 @@ export default function OverviewPage() {
         <div className="space-y-6">
           <ActivityCard activities={data.recentActivity} t={t} />
           <ReferralSummary t={t} />
+          <WorkflowIncomeSummary t={t} />
           <QuickLinksCard t={t} />
         </div>
       </div>

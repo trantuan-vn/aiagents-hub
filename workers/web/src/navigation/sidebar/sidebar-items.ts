@@ -14,7 +14,6 @@ import {
   RefreshCw,
   Send,
   Settings,
-  ShieldCheck,
   Bot,
   Tag,
   Ticket,
@@ -144,7 +143,6 @@ export const sidebarItems: NavGroup[] = [
     items: [
       { title: "Agent Workflows", url: "/dashboard/build/workflows", icon: GitBranch, isNew: true },
       { title: "Assistant", url: "/dashboard/control/assistant", icon: Bot },
-      { title: "eKyc", url: "/dashboard/build/ekyc", icon: ShieldCheck },
     ],
   },
 ];

@@ -96,7 +96,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         table: 'users',
         operation: 'update',
         id: u.id,
-        data: { ...u, walletBalance: balance - amountVnd },
+        data: { ...u, walletBalance: balance - amountVnd, queueStatus: 'pending' },
       });
     }
 

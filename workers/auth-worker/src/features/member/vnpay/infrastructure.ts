@@ -98,7 +98,7 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
         table: 'users',
         operation: 'update',
         id: dbUser.id,
-        data: { walletBalance: prevBal + credit },
+        data: { walletBalance: prevBal + credit, queueStatus: 'pending' },
       });
       
       // Get all order_items for this order
@@ -199,7 +199,7 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
         table: 'users',
         operation: 'update',
         id: dbUser.id,
-        data: { walletBalance: bal - debit },
+        data: { walletBalance: bal - debit, queueStatus: 'pending' },
       });
     }
 

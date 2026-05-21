@@ -479,10 +479,20 @@ export class UserDO extends DurableObject {
     };
     
     const processedOps = operations.map(op => {
-      if (op.data && (op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert')) {
-        return { ...op, data: this.ensureCatalogQueueStatus(op.table, op.data) };
+      if (!op.data || !(op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert')) {
+        return op;
       }
-      return op;
+      // Align with handleDynamicUpdate/handleDynamicUpsert: re-queue sync-table updates for D1 flush.
+      if (this.isSyncTable(op.table) && (op.operation === 'update' || op.operation === 'upsert')) {
+        return {
+          ...op,
+          data: this.ensureCatalogQueueStatus(op.table, {
+            ...op.data,
+            queueStatus: 'pending' as const,
+          }),
+        };
+      }
+      return { ...op, data: this.ensureCatalogQueueStatus(op.table, op.data) };
     });
     const result = await this.database.dynamicMultiTableTransaction(processedOps);
     

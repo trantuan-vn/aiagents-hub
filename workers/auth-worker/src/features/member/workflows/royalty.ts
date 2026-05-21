@@ -58,7 +58,7 @@ export async function recordWorkflowRoyalty(
       table: 'users',
       operation: 'update',
       id: ownerUser.id,
-      data: { ...ownerUser, walletBalance: currentBalance + royaltyAmountVnd },
+      data: { ...ownerUser, walletBalance: currentBalance + royaltyAmountVnd, queueStatus: 'pending' },
     },
     {
       table: 'agent_workflows',

@@ -12,6 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
+const fmtVnd = (n: number): string =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+
 interface ReferralSummaryProps {
   t: (key: string) => string;
 }
@@ -106,7 +109,7 @@ export function ReferralSummary({ t }: ReferralSummaryProps) {
             {totalCommission > 0 && (
               <div className="bg-primary/5 rounded-lg p-3">
                 <p className="text-muted-foreground text-xs">{t("referral.earned")}</p>
-                <p className="text-primary text-2xl font-bold">${totalCommission.toLocaleString()}</p>
+                <p className="text-primary text-2xl font-bold">{fmtVnd(totalCommission)}</p>
               </div>
             )}
             <div className="flex gap-2">

@@ -1369,6 +1369,13 @@
       "setup": "Setup Referral",
       "copied": "Referral link copied"
     },
+    "workflow": {
+      "title": "Workflow Earnings",
+      "description": "Royalties when others use your shared workflows",
+      "earned": "Earned (30 days)",
+      "my_workflows": "My Workflows",
+      "manage": "Details"
+    },
     "quick_links": {
       "title": "Quick Links",
       "description": "Resources to help you succeed",

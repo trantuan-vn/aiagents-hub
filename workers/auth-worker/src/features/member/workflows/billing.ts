@@ -92,7 +92,7 @@ export async function billAgentUsage(
       table: 'users',
       operation: 'update',
       id: u.id,
-      data: { ...u, walletBalance: balance - amountVnd },
+      data: { ...u, walletBalance: balance - amountVnd, queueStatus: 'pending' },
     });
   }
 

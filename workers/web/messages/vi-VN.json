@@ -1369,6 +1369,13 @@
       "setup": "Thiết lập giới thiệu",
       "copied": "Đã sao chép link giới thiệu"
     },
+    "workflow": {
+      "title": "Thu nhập Workflow",
+      "description": "Phí chia sẻ khi người khác dùng workflow của bạn",
+      "earned": "Đã kiếm được (30 ngày)",
+      "my_workflows": "Workflow của tôi",
+      "manage": "Chi tiết"
+    },
     "quick_links": {
       "title": "Liên kết nhanh",
       "description": "Tài nguyên hỗ trợ bạn thành công",
