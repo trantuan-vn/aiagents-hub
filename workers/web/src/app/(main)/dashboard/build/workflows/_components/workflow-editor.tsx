@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 
 import { NodePalette } from "./node-palette";
 import { WorkflowCanvas, addNodeToDefinition, type WorkflowDefinition } from "./workflow-canvas";
+import { normalizeWorkflowEdge } from "./workflow-edge-utils";
 
 interface WorkflowEditorProps {
   definitionJson: string;
@@ -26,8 +27,10 @@ interface WorkflowEditorProps {
 
 function parseDef(json: string): WorkflowDefinition {
   try {
-    const p = JSON.parse(json) as WorkflowDefinition;
-    return { nodes: p.nodes ?? [], edges: p.edges ?? [], viewport: p.viewport };
+    const p = JSON.parse(json) as Partial<WorkflowDefinition> & { nodes?: unknown; edges?: unknown };
+    const nodes = Array.isArray(p.nodes) ? p.nodes : [];
+    const edges = (Array.isArray(p.edges) ? p.edges : []).map((e) => normalizeWorkflowEdge(e));
+    return { nodes, edges, viewport: p.viewport };
   } catch {
     return { nodes: [], edges: [] };
   }
@@ -100,7 +103,7 @@ export function WorkflowEditor({
           </div>
         )}
       </div>
-      <WorkflowCanvas initial={definition} onChange={sync} />
+      <WorkflowCanvas initial={definition} onChange={sync} serviceEndpoint={serviceEndpoint} />
     </div>
   );
 }

@@ -1993,7 +1993,9 @@
     "agent_memory": "Vector memory",
     "agent_tools": "Tools",
     "execute": "Chạy",
-    "chat": "Mở chat"
+    "chat": "Mở chat",
+    "connect_add_node": "Thêm node mới và kết nối",
+    "connect_delete": "Ngắt kết nối"
   },
   "WorkflowChatPage": {
     "title": "Chat workflow",

@@ -1993,7 +1993,9 @@
     "agent_memory": "Vector memory",
     "agent_tools": "Tools",
     "execute": "Execute",
-    "chat": "Open chat"
+    "chat": "Open chat",
+    "connect_add_node": "Add new node and connect",
+    "connect_delete": "Remove connection"
   },
   "WorkflowChatPage": {
     "title": "Workflow chat",

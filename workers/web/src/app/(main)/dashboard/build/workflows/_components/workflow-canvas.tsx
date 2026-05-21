@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import {
   Background,
@@ -17,7 +17,15 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
+import { WorkflowCanvasUiContext, type ConnectedNodeSide } from "./workflow-canvas-ui-context";
+import { WorkflowDeletableEdge } from "./workflow-deletable-edge";
+import { WorkflowEdgeMarkers } from "./workflow-edge-markers";
+import { normalizeWorkflowEdge, WORKFLOW_EDGE_MARKER_END, WORKFLOW_EDGE_STYLE } from "./workflow-edge-utils";
 import { workflowNodeTypes } from "./workflow-nodes";
+
+const workflowEdgeTypes = {
+  workflowDeletable: WorkflowDeletableEdge,
+};
 
 export interface WorkflowDefinition {
   nodes: Node[];
@@ -29,6 +37,7 @@ interface WorkflowCanvasProps {
   initial?: WorkflowDefinition;
   onChange?: (def: WorkflowDefinition) => void;
   readOnly?: boolean;
+  serviceEndpoint?: string;
 }
 
 /** Strip React Flow runtime fields so parent JSON stays stable across emit cycles. */
@@ -41,11 +50,12 @@ export function toPersistedDefinition(
     nodes: nodes.map((n) => ({
       id: n.id,
       type: n.type,
-      position: n.position ?? { x: 0, y: 0 },
-      data: n.data ?? {},
+      position: n.position,
+      data: n.data,
     })),
     edges: edges.map((e) => ({
       id: e.id,
+      type: e.type ?? "workflowDeletable",
       source: e.source,
       target: e.target,
       sourceHandle: e.sourceHandle,
@@ -71,13 +81,16 @@ const READONLY_FLOW_PROPS = {
   elementsSelectable: false,
 } as const;
 
+const CONNECT_OFFSET_X = 280;
+
 function useWorkflowCanvasState(
   initial: WorkflowDefinition | undefined,
   onChange?: WorkflowCanvasProps["onChange"],
   readOnly?: boolean,
+  serviceEndpoint?: string,
 ) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initial?.nodes ?? []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initial?.edges ?? []);
+  const [edges, setEdges, onEdgesChange] = useEdgesState((initial?.edges ?? []).map(normalizeWorkflowEdge));
 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -118,7 +131,7 @@ function useWorkflowCanvasState(
     const missingEdges = extEdges.filter((e) => !localEdgeIdSet.has(e.id));
     if (missingEdges.length > 0) {
       setEdges((eds) => {
-        const merged = [...eds, ...missingEdges];
+        const merged = [...eds, ...missingEdges.map(normalizeWorkflowEdge)];
         lastEmittedRef.current = persistedSignature(nodesRef.current, merged);
         return merged;
       });
@@ -160,7 +173,75 @@ function useWorkflowCanvasState(
     [setEdges],
   );
 
+  const onEdgesChangeWrapped = useCallback(
+    (changes: Parameters<typeof onEdgesChange>[0]) => {
+      onEdgesChange(changes);
+      if (readOnly) return;
+      queueMicrotask(() => {
+        pushToParent();
+      });
+    },
+    [onEdgesChange, pushToParent, readOnly],
+  );
+
+  const createConnectedNode = useCallback(
+    (args: { fromNodeId: string; side: ConnectedNodeSide; type: string; label: string }) => {
+      if (readOnly) return;
+      const fromNode = nodesRef.current.find((n) => n.id === args.fromNodeId);
+      if (!fromNode) return;
+
+      const newId = `${args.type}-${Date.now()}`;
+      const newPosition =
+        args.side === "right"
+          ? { x: fromNode.position.x + CONNECT_OFFSET_X, y: fromNode.position.y }
+          : { x: fromNode.position.x - CONNECT_OFFSET_X, y: fromNode.position.y };
+
+      const extraData =
+        args.type === "agent" && serviceEndpoint
+          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
+          : undefined;
+
+      const newNode: Node = {
+        id: newId,
+        type: args.type,
+        position: newPosition,
+        data: { label: args.label, ...extraData },
+      };
+
+      const conn =
+        args.side === "right"
+          ? { source: args.fromNodeId, sourceHandle: "out" as const, target: newId, targetHandle: "in" as const }
+          : { source: newId, sourceHandle: "out" as const, target: args.fromNodeId, targetHandle: "in" as const };
+
+      const nextNodes = [...nodesRef.current, newNode];
+      const nextEdges = addEdge({ ...conn, animated: true }, edgesRef.current);
+      nodesRef.current = nextNodes;
+      edgesRef.current = nextEdges;
+      setNodes(nextNodes);
+      setEdges(nextEdges);
+      queueMicrotask(() => {
+        lastEmittedRef.current = "";
+        pushToParent();
+      });
+    },
+    [readOnly, serviceEndpoint, setNodes, setEdges, pushToParent],
+  );
+
   return {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange: onEdgesChangeWrapped,
+    onConnect,
+    onNodeDragStop,
+    onNodesDelete,
+    onEdgesDelete,
+    createConnectedNode,
+  };
+}
+
+function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowCanvasProps) {
+  const {
     nodes,
     edges,
     onNodesChange,
@@ -169,12 +250,8 @@ function useWorkflowCanvasState(
     onNodeDragStop,
     onNodesDelete,
     onEdgesDelete,
-  };
-}
-
-function CanvasInner({ initial, onChange, readOnly }: WorkflowCanvasProps) {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeDragStop, onNodesDelete, onEdgesDelete } =
-    useWorkflowCanvasState(initial, onChange, readOnly);
+    createConnectedNode,
+  } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint);
 
   const interactionProps = readOnly
     ? READONLY_FLOW_PROPS
@@ -190,23 +267,38 @@ function CanvasInner({ initial, onChange, readOnly }: WorkflowCanvasProps) {
         elementsSelectable: true,
       };
 
+  const uiValue = useMemo(
+    () => ({ readOnly: !!readOnly, createConnectedNode: readOnly ? undefined : createConnectedNode }),
+    [readOnly, createConnectedNode],
+  );
+
   return (
-    <div className="bg-muted/20 h-[min(70vh,640px)] w-full rounded-xl border">
-      <ReactFlow
-        className="h-full w-full"
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={workflowNodeTypes}
-        fitView={nodes.length > 0}
-        fitViewOptions={{ padding: 0.2 }}
-        proOptions={{ hideAttribution: true }}
-        {...interactionProps}
-      >
-        <Background gap={16} size={1} />
-        <Controls />
-        <MiniMap zoomable pannable className="!bg-card" />
-      </ReactFlow>
-    </div>
+    <WorkflowCanvasUiContext.Provider value={uiValue}>
+      <div className="bg-muted/20 h-[min(70vh,640px)] w-full rounded-xl border">
+        <ReactFlow
+          className="h-full w-full"
+          nodes={nodes}
+          edges={edges}
+          nodeTypes={workflowNodeTypes}
+          edgeTypes={workflowEdgeTypes}
+          defaultEdgeOptions={{
+            type: "workflowDeletable",
+            animated: true,
+            markerEnd: WORKFLOW_EDGE_MARKER_END,
+            style: WORKFLOW_EDGE_STYLE,
+          }}
+          fitView={nodes.length > 0}
+          fitViewOptions={{ padding: 0.2 }}
+          proOptions={{ hideAttribution: true }}
+          {...interactionProps}
+        >
+          <WorkflowEdgeMarkers />
+          <Background gap={16} size={1} />
+          <Controls />
+          <MiniMap zoomable pannable className="!bg-card" />
+        </ReactFlow>
+      </div>
+    </WorkflowCanvasUiContext.Provider>
   );
 }
 
