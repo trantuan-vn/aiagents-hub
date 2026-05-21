@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   description: APP_CONFIG.meta.description,
 };
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const themeMode = await getPreference<ThemeMode>("theme_mode", THEME_MODE_VALUES, "light");
+  const themeMode = await getPreference<ThemeMode>("theme_mode", THEME_MODE_VALUES, "dark");
   const themePreset = await getPreference<ThemePreset>("theme_preset", THEME_PRESET_VALUES, "default");
   const locale = await getPreference<Locale>("locale", LOCALE_VALUES, "en-US");
   const messages = await getMessages();

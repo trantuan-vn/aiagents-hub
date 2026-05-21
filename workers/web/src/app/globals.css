@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 /* Theme preset styles: these override CSS variables based on the selected data-theme-preset */
+@import "../styles/presets/default.css";
 @import "../styles/presets/brutalist.css";
 @import "../styles/presets/soft-pop.css";
 @import "../styles/presets/tangerine.css";
@@ -47,109 +48,36 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
-/* Default theme styles (used when no data-theme-preset is set or when 'default' is selected).
-These serve as the fallback; there is no separate default.css file. */
-:root {
-  --radius: 0.625rem;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.3211 0 0);
-  --chart-2: oklch(0.4495 0 0);
-  --chart-3: oklch(0.5693 0 0);
-  --chart-4: oklch(0.683 0 0);
-  --chart-5: oklch(0.7921 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.9521 0 0);
-  --chart-2: oklch(0.8576 0 0);
-  --chart-3: oklch(0.7572 0 0);
-  --chart-4: oklch(0.6534 0 0);
-  --chart-5: oklch(0.5452 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
-
 @layer utilities {
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xs {
+  [data-theme-preset] .shadow-2xs {
     box-shadow: var(--shadow-2xs);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-xs {
+  [data-theme-preset] .shadow-xs {
     box-shadow: var(--shadow-xs);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-sm {
+  [data-theme-preset] .shadow-sm {
     box-shadow: var(--shadow-sm);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow {
+  [data-theme-preset] .shadow {
     box-shadow: var(--shadow);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-md {
+  [data-theme-preset] .shadow-md {
     box-shadow: var(--shadow-md);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-lg {
+  [data-theme-preset] .shadow-lg {
     box-shadow: var(--shadow-lg);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-xl {
+  [data-theme-preset] .shadow-xl {
     box-shadow: var(--shadow-xl);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xl {
+  [data-theme-preset] .shadow-2xl {
     box-shadow: var(--shadow-2xl);
   }
 }

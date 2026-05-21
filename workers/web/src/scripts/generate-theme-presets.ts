@@ -4,7 +4,7 @@
  * This script scans the /styles/presets directory for CSS files containing theme definitions.
  * It extracts `label:`, `value:`, and primary color definitions (`--primary`) for both light and dark modes.
  * These primary colors are used to visually represent each theme in the UI (e.g., colored dots or theme previews).
- * Default theme colors are fetched from /app/globals.css.
+ * Default theme colors are fetched from /styles/presets/default.css.
  * All extracted metadata is injected into a marked section of the /types/preferences/theme.ts file.
  *
  * Usage:
@@ -28,7 +28,9 @@ if (!fs.existsSync(presetDir)) {
 
 const outputPath = path.resolve(__dirname, "../types/preferences/theme.ts");
 
-const files = fs.readdirSync(presetDir).filter((file) => file.endsWith(".css"));
+const files = fs
+  .readdirSync(presetDir)
+  .filter((file) => file.endsWith(".css") && file !== "default.css");
 
 if (files.length === 0) {
   console.warn("⚠️ No preset CSS files found. Only default preset will be included.");
@@ -68,27 +70,27 @@ const presets = files.map((file) => {
   return { label, value, primary };
 });
 
-const globalStylesPath = path.resolve(__dirname, "../app/globals.css");
+const defaultCssPath = path.join(presetDir, "default.css");
 
-let globalContent = "";
-try {
-  globalContent = fs.readFileSync(globalStylesPath, "utf8");
-} catch (err) {
-  console.error(`❌ Could not read globals.css at ${globalStylesPath}`);
-  console.error(err);
-  process.exit(1);
+let defaultPrimary = { light: "", dark: "" };
+if (fs.existsSync(defaultCssPath)) {
+  const defaultContent = fs.readFileSync(defaultCssPath, "utf8");
+  const defaultLightPrimaryMatch = defaultContent.match(
+    /:root\[data-theme-preset="default"\][\s\S]*?--primary:\s*([^;]+);/,
+  );
+  const defaultDarkPrimaryMatch = defaultContent.match(
+    /\.dark:root\[data-theme-preset="default"\][\s\S]*?--primary:\s*([^;]+);/,
+  );
+  defaultPrimary = {
+    light: defaultLightPrimaryMatch?.[1]?.trim() ?? "",
+    dark: defaultDarkPrimaryMatch?.[1]?.trim() ?? "",
+  };
+  if (!defaultLightPrimaryMatch || !defaultDarkPrimaryMatch) {
+    console.warn("⚠️ Missing --primary in default.css (light or dark). Check CSS syntax.");
+  }
+} else {
+  console.warn("⚠️ default.css not found. Default preset will have empty primary colors.");
 }
-
-const defaultLightPrimaryRegex = /:root\s*{[^}]*--primary:\s*([^;]+);/;
-const defaultDarkPrimaryRegex = /\.dark\s*{[^}]*--primary:\s*([^;]+);/;
-
-const defaultLightPrimaryMatch = defaultLightPrimaryRegex.exec(globalContent);
-const defaultDarkPrimaryMatch = defaultDarkPrimaryRegex.exec(globalContent);
-
-const defaultPrimary = {
-  light: defaultLightPrimaryMatch?.[1]?.trim() ?? "",
-  dark: defaultDarkPrimaryMatch?.[1]?.trim() ?? "",
-};
 
 presets.unshift({ label: "Default", value: "default", primary: defaultPrimary });
 
