@@ -15,7 +15,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -26,6 +25,19 @@ interface WorkflowExecuteDialogProps {
   ownerId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function formatWorkflowOutput(output: unknown): string {
+  if (output == null) return "—";
+  if (typeof output === "string") return output;
+  if (
+    typeof output === "object" &&
+    "text" in output &&
+    typeof (output as { text: unknown }).text === "string"
+  ) {
+    return (output as { text: string }).text;
+  }
+  return JSON.stringify(output, null, 2);
 }
 
 export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange }: WorkflowExecuteDialogProps) {
@@ -58,13 +70,13 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[min(90vh,36rem)] max-w-lg flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
           <div className="space-y-2">
             <Label>{t("input_label")}</Label>
             <Textarea
@@ -80,22 +92,26 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
           </div>
 
           {result ? (
-            <ScrollArea className="max-h-48 rounded-md border p-3">
-              <p className="mb-2 text-sm font-medium">
+            <div className="overflow-hidden rounded-md border">
+              <p className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">
                 {t("status")}: {result.status} · {t("cost")}: {result.totalCostVnd.toLocaleString()} VND
               </p>
-              <pre className="text-muted-foreground text-xs whitespace-pre-wrap">
-                {JSON.stringify(result.output, null, 2)}
-              </pre>
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs">{t("steps")}</summary>
-                <pre className="mt-1 text-xs">{JSON.stringify(result.steps, null, 2)}</pre>
-              </details>
-            </ScrollArea>
+              <div className="max-h-56 overflow-y-auto px-3 py-3">
+                <pre className="text-muted-foreground font-sans text-xs break-words whitespace-pre-wrap">
+                  {formatWorkflowOutput(result.output)}
+                </pre>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs">{t("steps")}</summary>
+                  <pre className="mt-2 max-h-32 overflow-y-auto text-xs break-words whitespace-pre-wrap">
+                    {JSON.stringify(result.steps, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            </div>
           ) : null}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t bg-background px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t("close")}
           </Button>

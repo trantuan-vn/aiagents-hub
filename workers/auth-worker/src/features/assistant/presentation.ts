@@ -45,7 +45,7 @@ export function createAssistantRoutes(bindingName: string) {
       }
 
       const latestUserMessageText = extractLatestUserMessageText(messages);
-      const agent = createAssistantApplicationService(c, bindingName, user, latestUserMessageText);
+      const agent = await createAssistantApplicationService(c, bindingName, user, latestUserMessageText);
 
       return await createAgentUIStreamResponse({
         agent,

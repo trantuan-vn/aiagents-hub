@@ -64,6 +64,7 @@ export function computeUsageChargeUsd(
   response: unknown,
 ): number {
   const usage = extractUsageFromAiResponse(response);
+  console.log('usage: ', JSON.stringify(usage));
   const pricing = getServicePricing(service);
   if (!usage || !pricing) {
     if (usage && !pricing) {
@@ -95,17 +96,38 @@ export function computeTokenCharge(pricing: ServicePricing, usage: Record<string
   return perMillionTokens(prompt, pricing.priceInput) + perMillionTokens(completion, pricing.priceOutput);
 }
 
+function normalizeUsageRecord(usage: Record<string, unknown>): Record<string, unknown> {
+  if (!('inputTokens' in usage) && !('outputTokens' in usage)) {
+    return usage;
+  }
+  const input = Number(usage.inputTokens ?? 0);
+  const output = Number(usage.outputTokens ?? 0);
+  const details = usage.inputTokenDetails;
+  if (details && typeof details === 'object' && !Array.isArray(details)) {
+    const noCache = (details as Record<string, unknown>).noCacheTokens;
+    const cacheRead = (details as Record<string, unknown>).cacheReadTokens;
+    if (typeof noCache === 'number' && typeof cacheRead === 'number') {
+      return {
+        prompt_cache_hit_tokens: cacheRead,
+        prompt_cache_miss_tokens: noCache,
+        completion_tokens: output,
+      };
+    }
+  }
+  return { prompt_tokens: input, completion_tokens: output };
+}
+
 export function extractUsageFromAiResponse(response: unknown): Record<string, unknown> | null {
   if (!response || typeof response !== 'object') return null;
   const r = response as Record<string, unknown>;
   if (r.usage && typeof r.usage === 'object' && !Array.isArray(r.usage)) {
-    return r.usage as Record<string, unknown>;
+    return normalizeUsageRecord(r.usage as Record<string, unknown>);
   }
   const inner = r.response;
   if (typeof inner === 'object' && inner !== null && !Array.isArray(inner)) {
     const u = (inner as Record<string, unknown>).usage;
     if (u && typeof u === 'object' && !Array.isArray(u)) {
-      return u as Record<string, unknown>;
+      return normalizeUsageRecord(u as Record<string, unknown>);
     }
   }
   return null;

@@ -1,6 +1,13 @@
 import { tool, ToolLoopAgent, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
+import { getIdFromName } from '../../shared/utils';
+import { UserDO } from '../ws/infrastructure/UserDO';
+import {
+  billAgentUsage,
+  ensureWalletBalance,
+  resolveServiceByEndpoint,
+} from '../member/workflows/billing';
 import { createApiKeyTool } from './tools/create-api-key-tool';
 import { createPaymentUrlTool } from './tools/create-payment-url-tool';
 import { createOrderTool } from './tools/create-order-tool';
@@ -35,6 +42,14 @@ type AssistantToolConfig = {
 const CONFIRM_APPROVE_TOKEN = '__assistant_confirm_ok__';
 const CONFIRM_REQUIRED_TOKEN = '__assistant_confirm_required__';
 const CONFIRM_SEPARATOR = '::';
+
+const AI_GATEWAY_ID = 'unitoken';
+
+/** Service endpoint + model for dashboard assistant chat billing (register matching service in dashboard). */
+export const ASSISTANT_CHAT_SERVICE = {
+  endpoint: '/dashboard/assistant/chat',
+  model: '@cf/zai-org/glm-4.7-flash',
+} as const;
 
 const TOOL_CONFIGS: AssistantToolConfig[] = [
   {
@@ -249,18 +264,39 @@ function withUserConfirmation(baseTool: any, latestUserMessageText: string, tool
   });
 }
 
-export function createAssistantAgent(c: any, bindingName: string, user: any, latestUserMessageText = '') {
+export async function createAssistantAgent(
+  c: any,
+  bindingName: string,
+  user: any,
+  latestUserMessageText = '',
+) {
+  const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+  await ensureWalletBalance(userDO);
+  const service = await resolveServiceByEndpoint(userDO, ASSISTANT_CHAT_SERVICE.endpoint);
+
   const workersAI = createWorkersAI({
     binding: c.env.AI,
-    gateway: { id: 'unitoken' },
+    gateway: { id: AI_GATEWAY_ID },
   });
 
   const tools = buildToolset(c, bindingName, user, latestUserMessageText);
   const enabledTools = Object.keys(tools);
+  const modelId = ASSISTANT_CHAT_SERVICE.model;
 
   return new ToolLoopAgent({
-    // model: workersAI('@cf/moonshotai/kimi-k2.5'),
-    model: workersAI('@cf/zai-org/glm-4.7-flash'),
+    model: workersAI(modelId as never),
+    onFinish: async ({ totalUsage }) => {
+      try {
+        await billAgentUsage(c.env, bindingName, userDO, user.identifier, service, {
+          endpoint: ASSISTANT_CHAT_SERVICE.endpoint,
+          aiResponse: totalUsage ? { usage: totalUsage } : {},
+          userAgent: c.req?.header?.('user-agent'),
+          ipAddress: c.req?.header?.('cf-connecting-ip') ?? undefined,
+        });
+      } catch (e) {
+        console.error('[assistant] billing failed:', e);
+      }
+    },
     instructions: [
       'You are a friendly Unitoken assistant for the user dashboard.',
       'Use plain, everyday language that is easy to understand.',
