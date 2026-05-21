@@ -2,23 +2,39 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import Link from "next/link";
-
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
-import { listComments, listSharedWorkflows, postComment, setWorkflowStar, type AgentWorkflow } from "../_lib/api";
+import {
+  getWorkflowStar,
+  listComments,
+  listSharedWorkflows,
+  postComment,
+  setWorkflowStar,
+  type AgentWorkflow,
+} from "../_lib/api";
+import { workflowKey } from "../_lib/shared-workflow-utils";
 
-import { StarDisplay } from "./star-display";
+import { SharedWorkflowCard } from "./shared-workflow-card";
 import { WorkflowExecuteDialog } from "./workflow-execute-dialog";
 
-function workflowKey(wf: AgentWorkflow): string {
-  return `${wf.user_id}:${wf.id}`;
+async function fetchMyStarsForWorkflows(workflows: AgentWorkflow[]): Promise<Map<string, number>> {
+  const entries = await Promise.all(
+    workflows
+      .filter((wf) => wf.user_id && wf.id)
+      .map(async (wf) => {
+        try {
+          const { star } = await getWorkflowStar(wf.user_id!, wf.id!);
+          return [workflowKey(wf), star?.starCount ?? 0] as const;
+        } catch {
+          return [workflowKey(wf), 0] as const;
+        }
+      }),
+  );
+  return new Map(entries);
 }
 
 export function SharedWorkflowsTab() {
@@ -31,6 +47,8 @@ export function SharedWorkflowsTab() {
   const [commentDraft, setCommentDraft] = useState<Map<string, string>>(() => new Map());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [comments, setComments] = useState<Map<string, Record<string, unknown>[]>>(() => new Map());
+  const [myStars, setMyStars] = useState<Map<string, number>>(() => new Map());
+  const [ratingBusy, setRatingBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,6 +58,7 @@ export function SharedWorkflowsTab() {
         starCount: starFilter,
       });
       setItems(workflows);
+      setMyStars(await fetchMyStarsForWorkflows(workflows));
     } catch {
       toast.error(t("load_error"));
     } finally {
@@ -72,6 +91,22 @@ export function SharedWorkflowsTab() {
     });
     await loadCommentsFor(wf);
     toast.success(t("add_comment"));
+  };
+
+  const rateWorkflow = async (wf: AgentWorkflow, starCount: number) => {
+    if (!wf.user_id || !wf.id) return;
+    const k = workflowKey(wf);
+    setRatingBusy(k);
+    try {
+      await setWorkflowStar(wf.user_id, wf.id, { starCount });
+      setMyStars((prev) => new Map(prev).set(k, starCount));
+      toast.success(t("rating_saved"));
+      await load();
+    } catch {
+      toast.error(t("rating_error"));
+    } finally {
+      setRatingBusy(null);
+    }
   };
 
   return (
@@ -113,79 +148,23 @@ export function SharedWorkflowsTab() {
         <div className="grid gap-4">
           {items.map((wf) => {
             const k = workflowKey(wf);
-            const draft = commentDraft.get(k) ?? "";
-            const thread = comments.get(k) ?? [];
             return (
-              <Card key={k}>
-                <CardHeader>
-                  <CardTitle className="text-base">{wf.name}</CardTitle>
-                  <CardDescription>{wf.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="text-muted-foreground flex flex-wrap gap-4 text-xs">
-                    <StarDisplay count={wf.starCount} />
-                    {wf.starLabel ? <Badge variant="secondary">{wf.starLabel}</Badge> : null}
-                    <span>
-                      {t("usage_count")}: {wf.usageCount ?? 0}
-                    </span>
-                    <span>
-                      {t("earnings")}: {(wf.totalEarningsVnd ?? 0).toLocaleString()} VND
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" asChild>
-                      <Link
-                        href={`/dashboard/build/workflows/${wf.id}/chat?owner=${encodeURIComponent(wf.user_id ?? "")}`}
-                      >
-                        {t("open_chat")}
-                      </Link>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => wf.id && wf.user_id && setExecuteTarget({ id: wf.id, ownerId: wf.user_id })}
-                    >
-                      {t("execute")}
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => void loadCommentsFor(wf)}>
-                      {t("comments")}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        wf.user_id &&
-                        wf.id &&
-                        setWorkflowStar(wf.user_id, wf.id, { starCount: 5 }).then(() => toast.success(t("stars")))
-                      }
-                    >
-                      ★ {t("stars")}
-                    </Button>
-                  </div>
-                  {expanded === k && (
-                    <div className="space-y-2 border-t pt-3">
-                      {thread.map((c) => (
-                        <div
-                          key={String(c.id ?? c.globalId ?? c.created_at)}
-                          className="bg-muted/50 rounded-md p-2 text-sm"
-                        >
-                          <p>{String(c.content ?? "")}</p>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <Input
-                          value={draft}
-                          onChange={(e) => setCommentDraft((prev) => new Map(prev).set(k, e.target.value))}
-                          placeholder={t("add_comment")}
-                        />
-                        <Button size="sm" onClick={() => void submitComment(wf)}>
-                          {t("add_comment")}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              <SharedWorkflowCard
+                key={k}
+                wf={wf}
+                draft={commentDraft.get(k) ?? ""}
+                thread={comments.get(k) ?? []}
+                avgStars={Math.round(wf.communityStarAvg ?? 0)}
+                raterCount={wf.communityStarCount ?? 0}
+                myStar={myStars.get(k) ?? 0}
+                expanded={expanded === k}
+                ratingBusy={ratingBusy === k}
+                onDraftChange={(value) => setCommentDraft((prev) => new Map(prev).set(k, value))}
+                onRate={(n) => void rateWorkflow(wf, n)}
+                onExecute={() => wf.id && wf.user_id && setExecuteTarget({ id: wf.id, ownerId: wf.user_id })}
+                onToggleComments={() => void loadCommentsFor(wf)}
+                onSubmitComment={() => void submitComment(wf)}
+              />
             );
           })}
         </div>

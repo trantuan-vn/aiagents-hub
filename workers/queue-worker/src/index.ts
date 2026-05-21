@@ -40,7 +40,7 @@ interface CleanupResult {
 const QUEUE_TABLE_NAMES = [
   "service_usages", "orders", "order_items",
   "order_discounts", "payments", "refunds", "commissions",
-  "workflow_royalties",
+  "workflow_royalties", "workflow_user_stars", "workflow_comments",
 ];
 
 /** Tất cả bảng sync (queue + catalog). Bảng catalog không xoá khi cleanup. */
@@ -51,8 +51,8 @@ const SYNC_TABLE_NAMES = [
   "api_tokens", "pending_messages",
   "user_mfa", "user_ekyc", "user_did",
   "passkey_credentials", "backup_codes",
-  "commission_policies", "commissions",
-  "agent_workflows", "workflow_user_stars", "workflow_comments"
+  "commission_policies",
+  "agent_workflows",
 ];
 
 

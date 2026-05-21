@@ -1976,7 +1976,19 @@
     "filter_stars": "Lọc theo sao",
     "search": "Tìm workflow",
     "owner": "Chủ sở hữu",
-    "published": "Đã xuất bản"
+    "published": "Đã xuất bản",
+    "view": "Xem workflow",
+    "your_rating": "Đánh giá của bạn",
+    "rater_count": "{count, plural, =0 {Chưa có đánh giá} other {{count} người đã đánh giá}}",
+    "rating_saved": "Đã lưu đánh giá",
+    "rating_error": "Không lưu được đánh giá"
+  },
+  "WorkflowViewPage": {
+    "back": "Quay lại cộng đồng",
+    "chat": "Mở chat",
+    "execute": "Chạy flow",
+    "invalid": "Workflow không hợp lệ",
+    "rater_count": "{count, plural, =0 {Chưa có đánh giá} other {{count} người đã đánh giá}}"
   },
   "WorkflowEditorPage": {
     "title": "Trình chỉnh sửa workflow",

@@ -4,6 +4,10 @@ import { handleError } from '../../../shared/utils';
 import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
+import {
+  getCommissionStatsFromD1,
+  listCommissionsFromD1,
+} from './commission-d1';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
 
@@ -44,47 +48,33 @@ export function createReferralRoutes(bindingName: string) {
     return c.json({ referralLink, referralCode });
   }, 'Failed to get referral link'));
 
-  // Get commission stats (for chart) - filter: 7d, 30d, 90d. Commissions are in referrer's UserDO.
+  // Commission stats: D1 (synced from DO; DO rows deleted after queue cleanup).
   app.get('/commissions/stats', createRouteHandler(async (c: any, user: any) => {
-    const period = c.req.query('period') || '30'; // 7, 30, 90
+    const period = c.req.query('period') || '30';
     const days = Math.min(90, Math.max(7, parseInt(period, 10) || 30));
     const fromTs = Date.now() - days * 24 * 60 * 60 * 1000;
-
-    const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
-      where: { field: 'created_at', operator: '>=', value: fromTs },
-      orderBy: { field: 'created_at', direction: 'ASC' }
-    }, 'commissions').catch(() => []);
-
-    const byDate = new Map<string, number>();
-    for (const r of rows || []) {
-      const ts = r.created_at ?? r.createdAt ?? 0;
-      const dateKey = new Date(ts).toISOString().slice(0, 10);
-      byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.commissionAmount || 0));
-    }
-    const byDay = Array.from(byDate.entries()).map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date));
-    const totalAmount = byDay.reduce((sum, d) => sum + d.total, 0);
-
+    const db = c.env.D1DB;
+    if (!db) throw new Error('D1 database binding not configured');
+    const userId = (c.env[bindingName] as DurableObjectNamespace)
+      .idFromName(user.identifier)
+      .toString();
+    const { byDay, totalAmount } = await getCommissionStatsFromD1(db, userId, fromTs);
     return c.json({ byDay, totalAmount, period: days });
   }, 'Failed to get commission stats'));
 
-  // Get commission list (table)
   app.get('/commissions', createRouteHandler(async (c: any, user: any) => {
     const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
     const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
     const period = c.req.query('period') || '30';
     const days = Math.min(365, Math.max(1, parseInt(period, 10) || 30));
     const fromTs = Date.now() - days * 24 * 60 * 60 * 1000;
-
-    const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
-      where: { field: 'created_at', operator: '>=', value: fromTs },
-      orderBy: { field: 'created_at', direction: 'DESC' },
-      limit,
-      offset
-    }, 'commissions').catch(() => []);
-
-    return c.json({ commissions: rows || [], limit, offset });
+    const db = c.env.D1DB;
+    if (!db) throw new Error('D1 database binding not configured');
+    const userId = (c.env[bindingName] as DurableObjectNamespace)
+      .idFromName(user.identifier)
+      .toString();
+    const commissions = await listCommissionsFromD1(db, userId, fromTs, limit, offset);
+    return c.json({ commissions, limit, offset });
   }, 'Failed to get commissions'));
 
   return app;

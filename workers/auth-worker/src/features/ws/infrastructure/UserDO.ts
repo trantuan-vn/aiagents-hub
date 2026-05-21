@@ -46,8 +46,9 @@ export class UserDO extends DurableObject {
   
   /** Bảng cần xoá record khi cleanup để tiết kiệm không gian lưu trữ */
   private readonly QUEUE_TABLE_NAMES = [
-    "service_usages", "orders", "order_items", "order_discounts", 
-    "payments", "refunds", "workflow_royalties"
+    "service_usages", "orders", "order_items", "order_discounts",
+    "payments", "refunds", "commissions", "workflow_royalties",
+    "workflow_user_stars", "workflow_comments",
   ];
 
   /** Bảng danh mục: xử lý giống queue nhưng KHÔNG xoá khi cleanup (giữ lại record) */
@@ -58,8 +59,8 @@ export class UserDO extends DurableObject {
     "api_tokens", "pending_messages",
     "user_mfa", "user_ekyc", "user_did",
     "passkey_credentials", "backup_codes",
-    "commission_policies", "commissions",
-    "agent_workflows", "workflow_user_stars", "workflow_comments"
+    "commission_policies",
+    "agent_workflows",
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -123,13 +124,20 @@ export class UserDO extends DurableObject {
         { name: 'order_discounts', schema: OrderItemDiscountSchema },
         { name: 'payments', schema: PaymentSchema },
         { name: 'refunds', schema: RefundSchema },
+        { name: 'workflow_royalties', schema: WorkflowRoyaltySchema },
         { name: 'commissions', schema: CommissionSchema },
-        { name: 'workflow_royalties', schema: WorkflowRoyaltySchema }
+        { name: 'workflow_comments', schema: WorkflowCommentSchema },
       ];
-      
+
       queueSchemas.forEach(({ name, schema }) => {
         this.table(name, extendWithQueue(schema), this.TABLE_CONFIGS.queueTable());
       });
+
+      this.table(
+        'workflow_user_stars',
+        extendWithQueue(WorkflowUserStarSchema),
+        this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
+      );
       
       // Bảng danh mục (userScoped, không unique index)
       this.table('api_tokens', extendWithQueue(ApiTokenSchema), this.TABLE_CONFIGS.queueTable());
@@ -142,8 +150,6 @@ export class UserDO extends DurableObject {
       this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
       this.table('commission_policies', extendWithQueue(CommissionPolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       this.table('agent_workflows', extendWithQueue(AgentWorkflowSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
-      this.table('workflow_user_stars', extendWithQueue(WorkflowUserStarSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'));
-      this.table('workflow_comments', extendWithQueue(WorkflowCommentSchema), this.TABLE_CONFIGS.queueTable());
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();

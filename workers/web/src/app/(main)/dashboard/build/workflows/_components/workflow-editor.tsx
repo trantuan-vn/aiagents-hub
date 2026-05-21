@@ -2,19 +2,14 @@
 
 import { useCallback, useMemo } from "react";
 
-import { useTranslations } from "next-intl";
-
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-
-import { NodePalette } from "./node-palette";
 import { WorkflowCanvas, addNodeToDefinition, type WorkflowDefinition } from "./workflow-canvas";
 import { normalizeWorkflowEdge } from "./workflow-edge-utils";
+import { WorkflowEditorSidebar } from "./workflow-editor-sidebar";
 
 interface WorkflowEditorProps {
   definitionJson: string;
-  onDefinitionChange: (json: string) => void;
+  onDefinitionChange?: (json: string) => void;
+  readOnly?: boolean;
   isShared?: boolean;
   onSharedChange?: (v: boolean) => void;
   starCount?: number;
@@ -39,6 +34,7 @@ function parseDef(json: string): WorkflowDefinition {
 export function WorkflowEditor({
   definitionJson,
   onDefinitionChange,
+  readOnly = false,
   isShared,
   onSharedChange,
   starCount = 0,
@@ -48,65 +44,50 @@ export function WorkflowEditor({
   serviceEndpoint = "",
   onServiceEndpointChange,
 }: WorkflowEditorProps) {
-  const t = useTranslations("WorkflowEditorPage");
-  const tw = useTranslations("WorkflowsPage");
   const definition = useMemo(() => parseDef(definitionJson), [definitionJson]);
 
   const sync = useCallback(
     (next: WorkflowDefinition) => {
-      onDefinitionChange(JSON.stringify(next));
+      onDefinitionChange?.(JSON.stringify(next));
     },
     [onDefinitionChange],
   );
 
-  const onAddNode = (type: string, label: string) => {
-    const extra =
-      type === "agent" && serviceEndpoint
-        ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
-        : undefined;
-    sync(addNodeToDefinition(definition, type, label, extra));
-  };
+  const onAddNode = useCallback(
+    (type: string, label: string) => {
+      if (readOnly) return;
+      const extra =
+        type === "agent" && serviceEndpoint
+          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
+          : undefined;
+      sync(addNodeToDefinition(definition, type, label, extra));
+    },
+    [readOnly, serviceEndpoint, definition, sync],
+  );
+
+  const showSidebar = !readOnly;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[200px_1fr]">
-      <div className="space-y-4">
-        <NodePalette onAdd={onAddNode} />
-        {onSharedChange != null && (
-          <div className="space-y-2 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label htmlFor="share">{tw("share_toggle")}</Label>
-              <Switch id="share" checked={!!isShared} onCheckedChange={onSharedChange} />
-            </div>
-            <p className="text-muted-foreground text-xs">{tw("share_hint")}</p>
-          </div>
-        )}
-        {onStarCountChange != null && (
-          <div className="space-y-2 rounded-lg border p-3">
-            <Label>{tw("stars")} (1-5)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={5}
-              value={starCount}
-              onChange={(e) => onStarCountChange(Number(e.target.value))}
-            />
-            <Label>{tw("star_label")}</Label>
-            <Input value={starLabel} onChange={(e) => onStarLabelChange?.(e.target.value)} />
-          </div>
-        )}
-        {onServiceEndpointChange != null && (
-          <div className="space-y-2 rounded-lg border p-3">
-            <Label>{t("agent_service_endpoint")}</Label>
-            <Input
-              value={serviceEndpoint}
-              onChange={(e) => onServiceEndpointChange(e.target.value)}
-              placeholder="/api/..."
-            />
-            <p className="text-muted-foreground text-xs">{t("agent_model_hint")}</p>
-          </div>
-        )}
-      </div>
-      <WorkflowCanvas initial={definition} onChange={sync} serviceEndpoint={serviceEndpoint} />
+    <div className={`grid gap-4 ${showSidebar ? "lg:grid-cols-[200px_1fr]" : ""}`}>
+      {showSidebar ? (
+        <WorkflowEditorSidebar
+          isShared={isShared}
+          onSharedChange={onSharedChange}
+          starCount={starCount}
+          onStarCountChange={onStarCountChange}
+          starLabel={starLabel}
+          onStarLabelChange={onStarLabelChange}
+          serviceEndpoint={serviceEndpoint}
+          onServiceEndpointChange={onServiceEndpointChange}
+          onAddNode={onAddNode}
+        />
+      ) : null}
+      <WorkflowCanvas
+        initial={definition}
+        onChange={readOnly ? undefined : sync}
+        readOnly={readOnly}
+        serviceEndpoint={serviceEndpoint}
+      />
     </div>
   );
 }

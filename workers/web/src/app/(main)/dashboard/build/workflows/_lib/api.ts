@@ -22,6 +22,8 @@ export interface AgentWorkflow {
   isShared?: boolean;
   starCount?: number;
   starLabel?: string;
+  communityStarAvg?: number;
+  communityStarCount?: number;
   usageCount?: number;
   totalEarningsVnd?: number;
   status?: "draft" | "published";
@@ -136,6 +138,12 @@ export function postComment(
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export function getWorkflowStar(ownerId: string, workflowId: number) {
+  return apiFetch<{ star: { starCount: number; label?: string } | null }>(
+    `/dashboard/build/workflows/shared/${ownerId}/${workflowId}/star`,
+  );
 }
 
 export function setWorkflowStar(ownerId: string, workflowId: number, body: { starCount: number; label?: string }) {

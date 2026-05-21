@@ -12,7 +12,9 @@ import {
 import { executeWorkflowGraph } from './executor.js';
 import {
   getWorkflowCommentsFromD1,
+  getWorkflowCommunityStarStats,
   getWorkflowRoyaltyStats,
+  getWorkflowUserStarFromD1,
   listSharedWorkflowsFromD1,
   listWorkflowRoyalties,
 } from './infrastructure';
@@ -288,11 +290,12 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, slug, starCount, starLabel, usageCount, totalEarningsVnd, status, created_at
+      const sql = `SELECT id, globalId, user_id, name, description, slug, definition, starCount, starLabel, usageCount, totalEarningsVnd, status, created_at
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first();
       if (!result) return c.json({ error: 'Not found' }, 404);
-      return c.json({ workflow: result });
+      const starStats = await getWorkflowCommunityStarStats(db, ownerId, workflowId);
+      return c.json({ workflow: { ...result, ...starStats } });
     }, 'Failed to get shared workflow'),
   );
 
@@ -344,6 +347,35 @@ export function createWorkflowRoutes(bindingName: string) {
       );
       return c.json({ comment: created }, 201);
     }, 'Failed to post comment'),
+  );
+
+  app.get(
+    '/shared/:ownerId/:workflowId/star',
+    createRouteHandler(async (c: any, user: any) => {
+      const workflowId = parseInt(c.req.param('workflowId'), 10);
+      const ownerId = c.req.param('ownerId');
+      if (isNaN(workflowId)) throw new Error('Invalid workflow id');
+      const workflowKey = `${ownerId}:${workflowId}`;
+      const consumerUserId = getUserId(c, user.identifier);
+      const userDO = getUserDO(c, user.identifier);
+      const pending = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'workflowKey', operator: '=', value: workflowKey },
+      }, 'workflow_user_stars');
+      const pendingRow = Array.isArray(pending) ? pending[0] : pending;
+      if (pendingRow) {
+        return c.json({
+          star: { starCount: pendingRow.starCount, label: pendingRow.label },
+        });
+      }
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const d1Row = await getWorkflowUserStarFromD1(db, consumerUserId, workflowKey);
+      return c.json({
+        star: d1Row
+          ? { starCount: d1Row.starCount, label: d1Row.label }
+          : null,
+      });
+    }, 'Failed to get star'),
   );
 
   app.put(

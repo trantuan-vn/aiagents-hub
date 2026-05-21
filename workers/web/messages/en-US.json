@@ -1976,7 +1976,19 @@
     "filter_stars": "Filter by stars",
     "search": "Search workflows",
     "owner": "Owner",
-    "published": "Published"
+    "published": "Published",
+    "view": "View workflow",
+    "your_rating": "Your rating",
+    "rater_count": "{count, plural, =0 {No ratings yet} one {# person rated} other {# people rated}}",
+    "rating_saved": "Rating saved",
+    "rating_error": "Failed to save rating"
+  },
+  "WorkflowViewPage": {
+    "back": "Back to community",
+    "chat": "Open chat",
+    "execute": "Execute",
+    "invalid": "Invalid workflow",
+    "rater_count": "{count, plural, =0 {No ratings yet} one {# person rated} other {# people rated}}"
   },
   "WorkflowEditorPage": {
     "title": "Workflow editor",

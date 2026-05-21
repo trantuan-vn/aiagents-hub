@@ -1,8 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { executeUtils, getIdFromName } from '../../../shared/utils';
-import { UserDO } from '../../ws/infrastructure/UserDO';
+import { getCommissionStatsFromD1 } from '../../member/referral/commission-d1';
 
 const GetReferralCommissionStatsInputSchema = z.object({
   period: z.number().int().min(7).max(90).default(30),
@@ -18,23 +17,12 @@ export function getReferralCommissionStatsTool(c: any, bindingName: string, user
       try {
         const days = Math.min(90, Math.max(7, input.period || 30));
         const fromTs = Date.now() - days * 24 * 60 * 60 * 1000;
-        const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-        const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
-          where: { field: 'created_at', operator: '>=', value: fromTs },
-          orderBy: { field: 'created_at', direction: 'ASC' },
-        }, 'commissions').catch(() => []);
-
-        const byDate = new Map<string, number>();
-        for (const row of rows || []) {
-          const ts = row.created_at ?? row.createdAt ?? 0;
-          const dateKey = new Date(ts).toISOString().slice(0, 10);
-          byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(row.commissionAmount || 0));
-        }
-
-        const byDay = Array.from(byDate.entries())
-          .map(([date, total]) => ({ date, total }))
-          .sort((a, b) => a.date.localeCompare(b.date));
-        const totalAmount = byDay.reduce((sum, item) => sum + item.total, 0);
+        const db = c.env.D1DB;
+        if (!db) throw new Error('D1 database binding not configured');
+        const userId = (c.env[bindingName] as DurableObjectNamespace)
+          .idFromName(user.identifier)
+          .toString();
+        const { byDay, totalAmount } = await getCommissionStatsFromD1(db, userId, fromTs);
 
         yield {
           state: 'ready' as const,

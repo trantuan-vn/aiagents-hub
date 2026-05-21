@@ -611,9 +611,13 @@ export class D1DatabaseManager {
     await this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
     await this.registerTable('commission_policies', CommissionPolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
     await this.registerTable('agent_workflows', AgentWorkflowSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
-    await this.registerTable('workflow_user_stars', WorkflowUserStarSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'));
+    await this.registerTable(
+      'workflow_user_stars',
+      WorkflowUserStarSchema,
+      this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
+    );
 
-    // Queue tables (xoá khi cleanup): queue flow, không unique index
+    // Queue tables (xoá khỏi DO sau cleanup): queue flow
     const queueSchemas = [
       { name: 'orders', schema: OrderSchema },
       { name: 'service_usages', schema: ServiceUsageSchema },
