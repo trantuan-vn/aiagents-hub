@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { roundVndAmount } from '../../admin/service/pricing';
 import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
@@ -37,7 +38,7 @@ export async function processCommissionOnOrder(
   const percent = applicable.commissionPercent ?? 0;
   if (percent <= 0) return;
 
-  const commissionAmount = Math.round((orderRecord.finalAmount * percent) / 100);
+  const commissionAmount = roundVndAmount((orderRecord.finalAmount * percent) / 100);
 
   const referrerDO = getIdFromName(c, user.referrerId, bindingName) as DurableObjectStub<UserDO>;
   const commissionInfra = createCommissionInfrastructure(referrerDO);

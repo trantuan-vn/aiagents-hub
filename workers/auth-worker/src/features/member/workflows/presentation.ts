@@ -228,6 +228,9 @@ export function createWorkflowRoutes(bindingName: string) {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const body = UpdateWorkflowSchema.parse(await c.req.json());
+      if (body.isShared === true) {
+        body.status = 'published';
+      }
       const userDO = getUserDO(c, user.identifier);
       const updated = await executeUtils.executeDynamicAction(
         userDO,

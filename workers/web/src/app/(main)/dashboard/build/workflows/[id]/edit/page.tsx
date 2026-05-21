@@ -71,7 +71,7 @@ export default function EditWorkflowPage() {
         isShared,
         starCount,
         starLabel,
-        status,
+        status: isShared ? "published" : status,
       });
       toast.success(t("saved"));
     } catch {
@@ -129,7 +129,10 @@ export default function EditWorkflowPage() {
         definitionJson={definition}
         onDefinitionChange={setDefinition}
         isShared={isShared}
-        onSharedChange={setIsShared}
+        onSharedChange={(v) => {
+          setIsShared(v);
+          if (v) setStatus("published");
+        }}
         starCount={starCount}
         onStarCountChange={setStarCount}
         starLabel={starLabel}

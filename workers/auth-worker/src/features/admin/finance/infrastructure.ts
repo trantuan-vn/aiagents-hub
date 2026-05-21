@@ -1,3 +1,5 @@
+import { roundVndAmount } from '../service/pricing';
+
 /**
  * Fetches admin Finance stats from D1 - revenue, orders, commissions, cash flow.
  * Supports modern financial management and business decision making.
@@ -289,7 +291,7 @@ export async function getAdminFinanceStats(db: D1Database): Promise<AdminFinance
     commissionPaid: { current: commCurr, previous: commPrev, changePercent: commChange },
     totalDiscounts: { current: dCurr, previous: dPrev, changePercent: discChange },
     netRevenue: { current: netCurr, previous: netPrev, changePercent: netChange },
-    averageOrderValue: { current: Math.round(aovCurr), previous: Math.round(aovPrev), changePercent: aovChange },
+    averageOrderValue: { current: roundVndAmount(aovCurr), previous: roundVndAmount(aovPrev), changePercent: aovChange },
     ordersByStatus,
     revenueByMonth,
     revenueByDay,

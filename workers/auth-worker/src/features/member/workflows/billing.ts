@@ -105,6 +105,10 @@ export async function billAgentUsage(
   await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
 
   if (options.workflowAttribution && amountVnd > 0) {
+    console.log(`workflow attribution: ${JSON.stringify(options.workflowAttribution)}`);
+    console.log(`consumer identifier: ${consumerIdentifier}`);
+    console.log(`base cost vnd: ${amountVnd}`);
+    
     await recordWorkflowRoyalty(env, bindingName, {
       workflowId: options.workflowAttribution.workflowId,
       workflowOwnerId: options.workflowAttribution.workflowOwnerId,

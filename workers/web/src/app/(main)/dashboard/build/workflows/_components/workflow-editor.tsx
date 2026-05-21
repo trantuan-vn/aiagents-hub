@@ -72,9 +72,12 @@ export function WorkflowEditor({
       <div className="space-y-4">
         <NodePalette onAdd={onAddNode} />
         {onSharedChange != null && (
-          <div className="flex items-center justify-between gap-2 rounded-lg border p-3">
-            <Label htmlFor="share">{tw("share_toggle")}</Label>
-            <Switch id="share" checked={!!isShared} onCheckedChange={onSharedChange} />
+          <div className="space-y-2 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="share">{tw("share_toggle")}</Label>
+              <Switch id="share" checked={!!isShared} onCheckedChange={onSharedChange} />
+            </div>
+            <p className="text-muted-foreground text-xs">{tw("share_hint")}</p>
           </div>
         )}
         {onStarCountChange != null && (

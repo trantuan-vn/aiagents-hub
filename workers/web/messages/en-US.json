@@ -1951,6 +1951,7 @@
     "execute": "Execute flow",
     "open_chat": "Open chat",
     "share_toggle": "Share publicly",
+    "share_hint": "Workflows appear in Community sharing only when public sharing is on and status is Published. Click Save after changes. Your own workflows are hidden here (other users see them).",
     "stars": "Stars",
     "star_label": "Category label",
     "usage_count": "Users",

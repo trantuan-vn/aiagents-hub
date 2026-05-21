@@ -1951,6 +1951,7 @@
     "execute": "Chạy flow",
     "open_chat": "Mở chat",
     "share_toggle": "Chia sẻ công khai",
+    "share_hint": "Workflow chỉ hiện ở tab Chia sẻ cộng đồng khi bật chia sẻ và trạng thái Đã xuất bản. Nhấn Lưu sau khi thay đổi. Workflow của bạn không hiện trong tab này (chỉ user khác thấy).",
     "stars": "Sao",
     "star_label": "Nhãn phân loại",
     "usage_count": "Người dùng",

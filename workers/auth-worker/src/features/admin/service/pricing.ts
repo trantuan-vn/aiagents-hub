@@ -51,11 +51,20 @@ export function applyFeePercent(baseCost: number, feePercent: number): number {
   return Math.max(0, baseCost * (pct / 100));
 }
 
+const VND_DECIMAL_PLACES = 8;
+
+/** VND monetary amounts (wallet, usage cost, royalty, commission) — 8 decimal places. */
+export function roundVndAmount(amount: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  const factor = 10 ** VND_DECIMAL_PLACES;
+  return Math.round(amount * factor) / factor;
+}
+
 /** Wallet / service_usages.cost — VND per 1 USD from system config. */
 export function convertUsdToVnd(usdAmount: number, usdVndRate: number): number {
   if (usdAmount <= 0) return 0;
   const rate = usdVndRate > 0 ? usdVndRate : 1;
-  return Math.max(0, Math.round(usdAmount * rate));
+  return roundVndAmount(usdAmount * rate);
 }
 
 /** Token charge with fee% applied (USD). */

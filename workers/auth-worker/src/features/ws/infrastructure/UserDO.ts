@@ -341,7 +341,10 @@ export class UserDO extends DurableObject {
     const { table, id, data } = await request.json() as { table: string; id: number; data: any };
     
     if (this.isSyncTable(table)) {
-      const dataWithQueue = this.ensureCatalogQueueStatus(table, data);
+      const dataWithQueue = this.ensureCatalogQueueStatus(table, {
+        ...data,
+        queueStatus: 'pending' as const,
+      });
       const result = await this.database.dynamicUpdate(table, id, dataWithQueue);
       
       await this.updateTablePendingCount(table);
@@ -369,7 +372,10 @@ export class UserDO extends DurableObject {
     };
     
     if (this.isSyncTable(table)) {
-      const dataWithQueue = this.ensureCatalogQueueStatus(table, data);
+      const dataWithQueue = this.ensureCatalogQueueStatus(table, {
+        ...data,
+        queueStatus: 'pending' as const,
+      });
       const result = await this.database.dynamicUpsert(table, dataWithQueue, conflictField);
       
       await this.updateTablePendingCount(table);
