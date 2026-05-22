@@ -53,6 +53,8 @@ const SYNC_TABLE_NAMES = [
   "passkey_credentials", "backup_codes",
   "commission_policies",
   "agent_workflows",
+  "payout_beneficiary",
+  "earnings_payouts",
 ];
 
 

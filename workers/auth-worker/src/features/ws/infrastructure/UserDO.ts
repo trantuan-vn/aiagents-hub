@@ -13,7 +13,8 @@ import {
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
   CommissionPolicySchema, CommissionSchema,
-  AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema
+  AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
+  PayoutBeneficiarySchema, EarningsPayoutSchema,
 } from '../domain.js';
 
 const MAX_SEND_FAILURE_COUNT = 3;
@@ -61,6 +62,8 @@ export class UserDO extends DurableObject {
     "passkey_credentials", "backup_codes",
     "commission_policies",
     "agent_workflows",
+    "payout_beneficiary",
+    "earnings_payouts",
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -150,6 +153,12 @@ export class UserDO extends DurableObject {
       this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
       this.table('commission_policies', extendWithQueue(CommissionPolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       this.table('agent_workflows', extendWithQueue(AgentWorkflowSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
+      this.table('payout_beneficiary', extendWithQueue(PayoutBeneficiarySchema), this.TABLE_CONFIGS.queueTable());
+      this.table(
+        'earnings_payouts',
+        extendWithQueue(EarningsPayoutSchema),
+        this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
+      );
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
       await this.loadTableStates();

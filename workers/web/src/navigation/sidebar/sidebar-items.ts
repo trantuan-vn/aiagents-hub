@@ -94,6 +94,12 @@ export const sidebarItems: NavGroup[] = [
         adminOnly: true,
       },
       {
+        title: "Earnings Payouts",
+        url: "/dashboard/earnings-payouts",
+        icon: Wallet,
+        adminOnly: true,
+      },
+      {
         title: "Price Policy",
         url: "/dashboard/policy",
         icon: Tag,

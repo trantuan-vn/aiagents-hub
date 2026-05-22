@@ -24,6 +24,8 @@ import { createMonitorAnalyticsRoutes } from './features/member/monitor/analytic
 import { createAdminDefaultRoutes } from './features/admin/default/presentation';
 import { createAdminCrmRoutes } from './features/admin/crm/presentation';
 import { createAdminFinanceRoutes } from './features/admin/finance/presentation';
+import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payout/presentation';
+import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
@@ -77,6 +79,8 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/default-stats', createAdminDefaultRoutes());
   routes.route('/dashboard/admin/crm-stats', createAdminCrmRoutes());
   routes.route('/dashboard/admin/finance-stats', createAdminFinanceRoutes());
+  routes.route('/dashboard/admin/earnings-payouts', createAdminEarningsPayoutRoutes(bindingName));
+  routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
   // Security middleware
   routes.use('/api/*', createTokenValidationMiddleware(bindingName));  

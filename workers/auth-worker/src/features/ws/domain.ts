@@ -21,4 +21,6 @@ export * from '../member/vnpay/domain';
 export * from '../account/domain';
 export * from '../member/referral/domain';
 export * from '../member/workflows/domain';
+export * from '../member/payout/domain';
+export * from '../admin/earnings-payout/domain';
 

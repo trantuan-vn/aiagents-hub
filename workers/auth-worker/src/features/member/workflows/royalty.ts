@@ -45,7 +45,6 @@ export async function recordWorkflowRoyalty(
   const ownerUsers = await executeUtils.executeDynamicAction(ownerDO, 'select', {}, 'users');
   const ownerUser = Array.isArray(ownerUsers) ? ownerUsers[0] : ownerUsers;
   if (!ownerUser?.id) return null;
-  const currentBalance = Number(ownerUser.walletBalance ?? ownerUser.wallet_balance ?? 0) || 0;
   const currentEarnings = Number(wf.totalEarningsVnd ?? wf.total_earnings_vnd ?? 0) || 0;
   const usageCount = Number(wf.usageCount ?? wf.usage_count ?? 0) || 0;
   const operations: Array<{
@@ -54,12 +53,6 @@ export async function recordWorkflowRoyalty(
     id?: number;
     data: Record<string, unknown>;
   }> = [
-    {
-      table: 'users',
-      operation: 'update',
-      id: ownerUser.id,
-      data: { ...ownerUser, walletBalance: currentBalance + royaltyAmountVnd, queueStatus: 'pending' },
-    },
     {
       table: 'agent_workflows',
       operation: 'update',

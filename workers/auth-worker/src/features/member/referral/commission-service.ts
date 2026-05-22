@@ -44,7 +44,7 @@ export async function processCommissionOnOrder(
   const referrerDO = getIdFromName(c, user.referrerId, bindingName) as DurableObjectStub<UserDO>;
   const commissionInfra = createCommissionInfrastructure(referrerDO);
   console.log(`processCommissionOnOrder: ${JSON.stringify(commissionInfra)}`);
-  await commissionInfra.creditToWalletAndRecord({
+  await commissionInfra.recordCommission({
     orderId: orderRecord.id,
     orderCode: orderRecord.orderCode,
     referrerId: user.referrerId,

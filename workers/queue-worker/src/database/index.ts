@@ -28,6 +28,8 @@ import {
 	WorkflowUserStarSchema,
 	WorkflowCommentSchema,
 	WorkflowRoyaltySchema,
+	PayoutBeneficiarySchema,
+	EarningsPayoutSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -615,6 +617,12 @@ export class D1DatabaseManager {
       'workflow_user_stars',
       WorkflowUserStarSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
+    );
+    await this.registerTable('payout_beneficiary', PayoutBeneficiarySchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable(
+      'earnings_payouts',
+      EarningsPayoutSchema,
+      this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
     );
 
     // Queue tables (xoá khỏi DO sau cleanup): queue flow
