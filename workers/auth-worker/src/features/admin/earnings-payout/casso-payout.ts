@@ -1,5 +1,10 @@
 /** Casso outbound (payout) transfer codes — distinct from inbound `C…` codes. */
 
+/** Whole VND for QR / bank transfer (fractions truncated). */
+export function toPayoutAmountVnd(amount: number): number {
+  return Math.floor(amount);
+}
+
 export function randomPayoutTransferCode(): string {
   const buf = new Uint8Array(8);
   crypto.getRandomValues(buf);

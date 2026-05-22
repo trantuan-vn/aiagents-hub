@@ -1,7 +1,7 @@
 import { Context } from 'hono';
 import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
-import { parseEarningsPayoutCassoMapping } from './casso-payout';
+import { parseEarningsPayoutCassoMapping, toPayoutAmountVnd } from './casso-payout';
 import {
   createEarningsPayoutInfrastructure,
   payoutKey,
@@ -157,7 +157,7 @@ export async function getUnpaidPayoutKeysForUser(
   await syncAllPeriodPayoutRecords(db, payoutInfra);
   const all = await payoutInfra.listAll();
   const unpaid = all.filter((p) => p.recipientUserId === recipientUserId && p.status !== 'paid');
-  const totalAmountVnd = unpaid.reduce((s, p) => s + p.totalAmountVnd, 0);
+  const totalAmountVnd = toPayoutAmountVnd(unpaid.reduce((s, p) => s + p.totalAmountVnd, 0));
   const identifier = unpaid[0]?.recipientIdentifier ?? recipientUserId;
   return {
     keys: unpaid.map((p) => p.payoutKey),
@@ -174,6 +174,7 @@ export async function processEarningsPayoutCassoIPN(
   externalRef: string,
   kv: KVNamespace,
 ): Promise<{ success: boolean; code: string; message: string }> {
+
   const mappingRaw = await kv.get(`casso_ref:${transferCode}`);
   if (!mappingRaw) {
     return { success: false, code: '01', message: 'Payout transfer not found' };
@@ -184,8 +185,9 @@ export async function processEarningsPayoutCassoIPN(
     return { success: false, code: '01', message: 'Invalid payout mapping' };
   }
 
-  const absAmount = Math.abs(debitedAmount);
-  if (absAmount !== mapping.amountVnd) {
+  const absAmountVnd = toPayoutAmountVnd(Math.abs(debitedAmount));
+  const expectedVnd = toPayoutAmountVnd(mapping.amountVnd);
+  if (absAmountVnd !== expectedVnd) {
     return { success: false, code: '04', message: 'Payout amount mismatch' };
   }
 

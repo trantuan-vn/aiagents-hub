@@ -17,6 +17,8 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
     const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     if (!row?.id) throw new Error('Payout record not found');
     const paidAt = new Date().toISOString();
+    console.log(`markPaidImpl: ${JSON.stringify(row)}`);
+    console.log(`paymentNote: ${paymentNote}`);
     await executeUtils.executeDynamicAction(
       adminDO,
       'update',
@@ -155,6 +157,8 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
       const results: EarningsPayout[] = [];
       for (const key of keys) {
         try {
+          console.log(`markPaidBatch: ${key}`);
+          console.log(`paymentNote: ${paymentNote}`);
           results.push(await markPaidImpl(key, paymentNote));
         } catch {
           // skip missing keys
