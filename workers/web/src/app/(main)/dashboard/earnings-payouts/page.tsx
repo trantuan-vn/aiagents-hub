@@ -6,9 +6,7 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
 import { useRequireAdmin } from "../_hooks/use-require-admin";
@@ -18,16 +16,10 @@ import { EarningsPayoutTable, type PayoutItem } from "./_components/earnings-pay
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
-function currentPeriod(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export default function EarningsPayoutsPage() {
   const t = useTranslations("EarningsPayoutsPage");
   const { toast } = useToast();
   const isAdmin = useRequireAdmin();
-  const [period, setPeriod] = useState(() => currentPeriod());
   const [items, setItems] = useState<PayoutItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [qrOpen, setQrOpen] = useState(false);
@@ -35,23 +27,22 @@ export default function EarningsPayoutsPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<PayoutItem | null>(null);
-  const [markingId, setMarkingId] = useState<string | null>(null);
 
   const tableLabels = useMemo(
     () => ({
       user: t("user"),
+      period: t("period"),
       commission: t("commission"),
       workflow: t("workflow"),
       total: t("total"),
       beneficiary: t("beneficiary"),
-      status: t("status"),
+      bank_status: t("bank_status"),
       actions: t("actions"),
       configured: t("configured"),
       missing: t("missing"),
-      paid: t("paid"),
-      pending: t("pending"),
+      bank_paid: t("bank_paid"),
+      bank_unpaid: t("bank_unpaid"),
       show_qr: t("show_qr"),
-      mark_paid: t("mark_paid"),
     }),
     [t],
   );
@@ -59,10 +50,11 @@ export default function EarningsPayoutsPage() {
   const fetchList = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/dashboard/admin/earnings-payouts/list?period=${encodeURIComponent(period)}`,
-        { method: "GET", credentials: "include", headers: { "Content-Type": "application/json" } },
-      );
+      const res = await fetch(`${API_BASE_URL}/dashboard/admin/earnings-payouts/list`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
       if (!res.ok) throw new Error(await res.text());
       const data: { items?: PayoutItem[] } = await res.json();
       setItems(data.items ?? []);
@@ -76,7 +68,7 @@ export default function EarningsPayoutsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [period, t, toast]);
+  }, [t, toast]);
 
   useEffect(() => {
     if (isAdmin) void fetchList();
@@ -93,7 +85,7 @@ export default function EarningsPayoutsPage() {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period, recipientUserId: item.recipientUserId }),
+        body: JSON.stringify({ recipientUserId: item.recipientUserId }),
       });
       if (!res.ok) throw new Error(await res.text());
       const data: { qr?: string } = await res.json();
@@ -105,59 +97,24 @@ export default function EarningsPayoutsPage() {
     }
   };
 
-  const markPaid = async (item: PayoutItem) => {
-    setMarkingId(item.recipientUserId);
-    try {
-      const res = await fetch(`${API_BASE_URL}/dashboard/admin/earnings-payouts/mark-paid`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period, recipientUserId: item.recipientUserId }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-      toast({ title: t("marked_paid"), description: item.recipientIdentifier });
-      void fetchList();
-    } catch (e) {
-      toast({
-        title: t("error"),
-        description: e instanceof Error ? e.message : t("mark_paid_error"),
-        variant: "destructive",
-      });
-    } finally {
-      setMarkingId(null);
-    }
+  const handleQrPaid = () => {
+    setQrOpen(false);
+    void fetchList();
   };
 
   if (!isAdmin) return null;
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
-      <div>
-        <h1 className="mb-1 text-2xl font-bold">{t("page_title")}</h1>
-        <p className="text-muted-foreground">{t("page_description")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="mb-1 text-2xl font-bold">{t("page_title")}</h1>
+          <p className="text-muted-foreground">{t("page_description")}</p>
+        </div>
+        <Button variant="outline" onClick={() => void fetchList()} disabled={isLoading}>
+          {t("refresh")}
+        </Button>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>{t("period_title")}</CardTitle>
-          <CardDescription>{t("period_description")}</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-end gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="period">{t("period_label")}</Label>
-            <Input
-              id="period"
-              type="month"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="w-[200px]"
-            />
-          </div>
-          <Button variant="outline" onClick={() => void fetchList()} disabled={isLoading}>
-            {t("refresh")}
-          </Button>
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -174,10 +131,8 @@ export default function EarningsPayoutsPage() {
           {!isLoading && items.length > 0 && (
             <EarningsPayoutTable
               items={items}
-              markingId={markingId}
               labels={tableLabels}
               onShowQr={(item) => void openQr(item)}
-              onMarkPaid={(item) => void markPaid(item)}
             />
           )}
         </CardContent>
@@ -192,6 +147,9 @@ export default function EarningsPayoutsPage() {
         qrSrc={qrSrc}
         title={t("qr_dialog_title")}
         hint={t("qr_hint")}
+        cancelLabel={t("cancel")}
+        paidLabel={t("confirm_paid")}
+        onPaid={handleQrPaid}
       />
     </div>
   );

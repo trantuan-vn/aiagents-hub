@@ -7,7 +7,65 @@ export function payoutKey(period: string, recipientUserId: string): string {
 }
 
 export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<UserDO>) {
+  const markPaidImpl = async (key: string, paymentNote?: string): Promise<EarningsPayout> => {
+    const rows = await executeUtils.executeDynamicAction(
+      adminDO,
+      'select',
+      { where: { field: 'payoutKey', operator: '=', value: key }, limit: 1 },
+      'earnings_payouts',
+    );
+    const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    if (!row?.id) throw new Error('Payout record not found');
+    const paidAt = new Date().toISOString();
+    await executeUtils.executeDynamicAction(
+      adminDO,
+      'update',
+      {
+        id: row.id,
+        status: 'paid',
+        paidAt,
+        paymentNote: paymentNote ?? row.paymentNote,
+        queueStatus: 'pending',
+      },
+      'earnings_payouts',
+    );
+    return {
+      payoutKey: String(row.payoutKey),
+      period: String(row.period),
+      recipientUserId: String(row.recipientUserId),
+      recipientIdentifier: String(row.recipientIdentifier),
+      commissionAmountVnd: Number(row.commissionAmountVnd ?? 0) || 0,
+      workflowRoyaltyAmountVnd: Number(row.workflowRoyaltyAmountVnd ?? 0) || 0,
+      totalAmountVnd: Number(row.totalAmountVnd ?? 0) || 0,
+      status: 'paid',
+      paidAt,
+      paymentNote: paymentNote ?? (row.paymentNote ? String(row.paymentNote) : undefined),
+    };
+  };
+
   return {
+    listAll: async (): Promise<EarningsPayout[]> => {
+      const rows = await executeUtils.executeDynamicAction(
+        adminDO,
+        'select',
+        { limit: 2000 },
+        'earnings_payouts',
+      );
+      const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+      return list.map((r: Record<string, unknown>) => ({
+        payoutKey: String(r.payoutKey ?? ''),
+        period: String(r.period ?? ''),
+        recipientUserId: String(r.recipientUserId ?? ''),
+        recipientIdentifier: String(r.recipientIdentifier ?? ''),
+        commissionAmountVnd: Number(r.commissionAmountVnd ?? 0) || 0,
+        workflowRoyaltyAmountVnd: Number(r.workflowRoyaltyAmountVnd ?? 0) || 0,
+        totalAmountVnd: Number(r.totalAmountVnd ?? 0) || 0,
+        status: (r.status === 'paid' ? 'paid' : 'pending') as 'pending' | 'paid',
+        paidAt: r.paidAt ? String(r.paidAt) : undefined,
+        paymentNote: r.paymentNote ? String(r.paymentNote) : undefined,
+      }));
+    },
+
     listByPeriod: async (period: string): Promise<EarningsPayout[]> => {
       const rows = await executeUtils.executeDynamicAction(
         adminDO,
@@ -88,43 +146,21 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
       }
     },
 
-    markPaid: async (
-      key: string,
+    markPaid: markPaidImpl,
+
+    markPaidBatch: async (
+      keys: string[],
       paymentNote?: string,
-    ): Promise<EarningsPayout> => {
-      const rows = await executeUtils.executeDynamicAction(
-        adminDO,
-        'select',
-        { where: { field: 'payoutKey', operator: '=', value: key }, limit: 1 },
-        'earnings_payouts',
-      );
-      const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-      if (!row?.id) throw new Error('Payout record not found');
-      const paidAt = new Date().toISOString();
-      await executeUtils.executeDynamicAction(
-        adminDO,
-        'update',
-        {
-          id: row.id,
-          status: 'paid',
-          paidAt,
-          paymentNote: paymentNote ?? row.paymentNote,
-          queueStatus: 'pending',
-        },
-        'earnings_payouts',
-      );
-      return {
-        payoutKey: String(row.payoutKey),
-        period: String(row.period),
-        recipientUserId: String(row.recipientUserId),
-        recipientIdentifier: String(row.recipientIdentifier),
-        commissionAmountVnd: Number(row.commissionAmountVnd ?? 0) || 0,
-        workflowRoyaltyAmountVnd: Number(row.workflowRoyaltyAmountVnd ?? 0) || 0,
-        totalAmountVnd: Number(row.totalAmountVnd ?? 0) || 0,
-        status: 'paid',
-        paidAt,
-        paymentNote: paymentNote ?? (row.paymentNote ? String(row.paymentNote) : undefined),
-      };
+    ): Promise<EarningsPayout[]> => {
+      const results: EarningsPayout[] = [];
+      for (const key of keys) {
+        try {
+          results.push(await markPaidImpl(key, paymentNote));
+        } catch {
+          // skip missing keys
+        }
+      }
+      return results;
     },
   };
 }

@@ -18,13 +18,6 @@ export const EarningsPayoutSchema = z.object({
 
 export type EarningsPayout = z.infer<typeof EarningsPayoutSchema>;
 
-export const MarkEarningsPaidSchema = z.object({
-  period: z.string().regex(/^\d{4}-\d{2}$/),
-  recipientUserId: z.string().min(1),
-  paymentNote: z.string().max(500).optional(),
-});
-
 export const GeneratePayoutQrSchema = z.object({
-  period: z.string().regex(/^\d{4}-\d{2}$/),
   recipientUserId: z.string().min(1),
 });

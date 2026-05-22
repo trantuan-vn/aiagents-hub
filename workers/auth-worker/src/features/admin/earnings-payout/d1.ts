@@ -1,5 +1,10 @@
 /** D1 aggregates for monthly commission & workflow royalty earnings. */
 
+export function currentPeriod(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
 export function periodToRange(period: string): { fromTs: number; toTs: number } {
   const [y, m] = period.split('-').map(Number);
   const from = new Date(y, m - 1, 1);
@@ -109,4 +114,41 @@ export async function mergePeriodEarnings(
 
   rows.sort((a, b) => b.totalAmountVnd - a.totalAmountVnd);
   return rows;
+}
+
+/** Earliest YYYY-MM with commission or workflow royalty activity. */
+export async function getEarliestEarningPeriod(db: D1Database): Promise<string> {
+  const row = await db
+    .prepare(
+      `SELECT MIN(ts) AS min_ts FROM (
+        SELECT MIN(created_at) AS ts FROM commissions
+        UNION ALL
+        SELECT MIN(created_at) AS ts FROM workflow_royalties
+      )`,
+    )
+    .first<{ min_ts?: number | null }>();
+  const minTs = row?.min_ts;
+  if (minTs == null || !Number.isFinite(minTs)) {
+    return currentPeriod();
+  }
+  const d = new Date(minTs);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Inclusive range of YYYY-MM from start through current month. */
+export function enumeratePeriods(fromPeriod: string, toPeriod: string = currentPeriod()): string[] {
+  const [fy, fm] = fromPeriod.split('-').map(Number);
+  const [ty, tm] = toPeriod.split('-').map(Number);
+  const periods: string[] = [];
+  let y = fy;
+  let m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    periods.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return periods;
 }

@@ -20,7 +20,8 @@ import {
 } from './domain';
 import { config } from './config';
 import { getCassoWebhookChecksumKey, getVietQrConfig } from './casso-config';
-import { verifyCassoWebhookSignature, extractCassoTransferCode } from './casso-signature';
+import { verifyCassoWebhookSignature, extractCassoTransfer } from './casso-signature';
+import { processEarningsPayoutCassoIPN } from '../../admin/earnings-payout/service';
 import { PAYMENT_ERROR_MESSAGES } from './constant';
 
 interface IPaymentApplicationService {
@@ -129,8 +130,8 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
         };
       }
 
-      const transferCode = extractCassoTransferCode(description);
-      if (!transferCode) {
+      const transfer = extractCassoTransfer(description);
+      if (!transfer) {
         return {
           success: false,
           code: "01",
@@ -138,7 +139,18 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
         };
       }
 
-      const mapping = await kv.get(`casso_ref:${transferCode}`);
+      if (transfer.kind === 'payout' || amount < 0) {
+        return await processEarningsPayoutCassoIPN(
+          c,
+          bindingName,
+          transfer.code,
+          amount,
+          reference,
+          kv,
+        );
+      }
+
+      const mapping = await kv.get(`casso_ref:${transfer.code}`);
       if (!mapping) {
         return {
           success: false,

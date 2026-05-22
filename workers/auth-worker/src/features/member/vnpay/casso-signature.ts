@@ -40,16 +40,31 @@ export function verifyCassoWebhookSignature(
   return signature === generatedSignature;
 }
 
-const TRANSFER_CODE_RE = /C[0-9A-F]{16}/i;
+const INBOUND_TRANSFER_CODE_RE = /C[0-9A-F]{16}/i;
+const PAYOUT_TRANSFER_CODE_RE = /P[0-9A-F]{16}/i;
+
+export type CassoTransferKind = 'inbound' | 'payout';
 
 /** Extract VietQR / Casso transfer code embedded in bank transfer description (addInfo). */
 export function extractCassoTransferCode(description: string): string | null {
+  const found = extractCassoTransfer(description);
+  return found?.code ?? null;
+}
+
+/** Inbound payments use `C…`; outbound earnings payouts use `P…`. */
+export function extractCassoTransfer(
+  description: string,
+): { code: string; kind: CassoTransferKind } | null {
   if (!description) {
     return null;
   }
-  const m = description.match(TRANSFER_CODE_RE);
-  if (!m) {
-    return null;
+  const payout = description.match(PAYOUT_TRANSFER_CODE_RE);
+  if (payout) {
+    return { code: payout[0].toUpperCase(), kind: 'payout' };
   }
-  return m[0].toUpperCase();
+  const inbound = description.match(INBOUND_TRANSFER_CODE_RE);
+  if (inbound) {
+    return { code: inbound[0].toUpperCase(), kind: 'inbound' };
+  }
+  return null;
 }
