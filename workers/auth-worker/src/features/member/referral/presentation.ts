@@ -8,6 +8,7 @@ import {
   getCommissionStatsFromD1,
   listCommissionsFromD1,
 } from './commission-d1';
+import { getCommissionMonthlySummary } from './commission-monthly';
 
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
 
@@ -47,6 +48,16 @@ export function createReferralRoutes(bindingName: string) {
     const referralLink = `${baseUrl}/auth/v3/login?ref=${encodeURIComponent(referralCode)}`;
     return c.json({ referralLink, referralCode });
   }, 'Failed to get referral link'));
+
+  app.get('/commissions/monthly-summary', createRouteHandler(async (c: any, user: any) => {
+    const db = c.env.D1DB;
+    if (!db) throw new Error('D1 database binding not configured');
+    const userId = (c.env[bindingName] as DurableObjectNamespace)
+      .idFromName(user.identifier)
+      .toString();
+    const summary = await getCommissionMonthlySummary(db, userId);
+    return c.json(summary);
+  }, 'Failed to get monthly commission summary'));
 
   // Commission stats: D1 (synced from DO; DO rows deleted after queue cleanup).
   app.get('/commissions/stats', createRouteHandler(async (c: any, user: any) => {
