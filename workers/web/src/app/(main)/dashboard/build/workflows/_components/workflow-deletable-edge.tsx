@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { useWorkflowCanvasUi } from "./workflow-canvas-ui-context";
-import { WORKFLOW_EDGE_MARKER_END_URL } from "./workflow-edge-utils";
+import { WORKFLOW_EDGE_MARKER_END, WORKFLOW_EDGE_STROKE_WIDTH } from "./workflow-edge-utils";
 
 const HOVER_LEAVE_MS = 180;
 
 function WorkflowDeletableEdgeComponent(props: EdgeProps) {
-  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, selected } = props;
+  const { id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, selected } = props;
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -74,8 +74,8 @@ function WorkflowDeletableEdgeComponent(props: EdgeProps) {
       />
       <BaseEdge
         path={edgePath}
-        markerEnd={markerEnd ?? WORKFLOW_EDGE_MARKER_END_URL}
-        style={{ strokeWidth: 2, ...style }}
+        markerEnd={WORKFLOW_EDGE_MARKER_END}
+        style={{ strokeWidth: WORKFLOW_EDGE_STROKE_WIDTH, ...style }}
         interactionWidth={0}
       />
       {!readOnly && (

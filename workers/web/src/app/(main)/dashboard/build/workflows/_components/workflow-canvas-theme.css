@@ -1,0 +1,50 @@
+/* Align React Flow chrome (controls, minimap, background) with app design tokens. */
+.react-flow.light,
+.react-flow.dark {
+  --xy-edge-stroke-default: var(--border);
+  --xy-edge-stroke-selected-default: var(--primary);
+  --xy-connectionline-stroke-default: var(--muted-foreground);
+  --xy-background-pattern-dots-color-default: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  --xy-background-pattern-line-color-default: var(--border);
+  --xy-background-pattern-cross-color-default: var(--border);
+  --xy-minimap-background-color-default: var(--card);
+  --xy-minimap-mask-color: color-mix(in oklch, var(--background) 55%, transparent);
+  --xy-minimap-node-color: var(--muted-foreground);
+  --xy-minimap-node-stroke-color: var(--border);
+  --xy-controls-button-background-color-default: var(--card);
+  --xy-controls-button-background-color-hover-default: var(--muted);
+  --xy-controls-button-color-default: var(--foreground);
+  --xy-controls-button-color-hover-default: var(--foreground);
+  --xy-controls-button-border-color-default: var(--border);
+  --xy-controls-box-shadow-default: var(--shadow-sm);
+  --xy-handle-background-color-default: var(--primary);
+  --xy-handle-border-color-default: var(--card);
+  --xy-selection-background-color-default: color-mix(in oklch, var(--primary) 12%, transparent);
+  --xy-selection-border-default: 1px dotted var(--primary);
+}
+
+.react-flow__controls {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.react-flow__controls-button {
+  border-bottom: 1px solid var(--border);
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+.react-flow__minimap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}

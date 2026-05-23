@@ -16,6 +16,9 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import "./workflow-canvas-theme.css";
+
+import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { WorkflowCanvasUiContext, type ConnectedNodeSide } from "./workflow-canvas-ui-context";
 import { WorkflowDeletableEdge } from "./workflow-deletable-edge";
@@ -241,6 +244,7 @@ function useWorkflowCanvasState(
 }
 
 function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowCanvasProps) {
+  const themeMode = usePreferencesStore((s) => s.themeMode);
   const {
     nodes,
     edges,
@@ -277,6 +281,7 @@ function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowC
       <div className="bg-muted/20 h-[min(70vh,640px)] w-full rounded-xl border">
         <ReactFlow
           className="h-full w-full"
+          colorMode={themeMode}
           nodes={nodes}
           edges={edges}
           nodeTypes={workflowNodeTypes}
@@ -294,8 +299,8 @@ function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowC
         >
           <WorkflowEdgeMarkers />
           <Background gap={16} size={1} />
-          <Controls />
-          <MiniMap zoomable pannable className="!bg-card" />
+          <Controls showInteractive={false} />
+          <MiniMap zoomable pannable />
         </ReactFlow>
       </div>
     </WorkflowCanvasUiContext.Provider>
