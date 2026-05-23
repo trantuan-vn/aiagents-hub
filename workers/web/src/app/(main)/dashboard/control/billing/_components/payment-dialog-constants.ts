@@ -1,3 +1,5 @@
+import { formatUsd } from "@/lib/utils";
+
 export const BANK_CODES = [
   { value: "VNPAYQR", label: "Thanh toán quét mã QR" },
   { value: "VNBANK", label: "Thẻ ATM - Tài khoản ngân hàng nội địa" },
@@ -15,6 +17,14 @@ export const PAYMENT_TAB_TRIGGER_CLASS =
 
 export type PaymentMethodTab = "vnpay" | "casso";
 
-export function formatPaymentCurrency(amount: number, currency: string = "VND"): string {
-  return new Intl.NumberFormat("vi-VN", { style: "currency", currency }).format(amount);
+/** Wallet credit (USD). */
+export function formatPaymentCurrency(amount: number): string {
+  return formatUsd(amount);
+}
+
+/** VND amount shown only at bank checkout (top-up / order payment conversion). */
+export function formatVndCheckoutAmount(amount: number): string {
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND", maximumFractionDigits: 0 }).format(
+    Math.round(amount),
+  );
 }

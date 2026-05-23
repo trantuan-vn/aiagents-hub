@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { formatUsd } from "@/lib/utils";
 
 import { EditPolicyDialog } from "./edit-policy-dialog";
 import type { PricePolicy, UpdatePricePolicy } from "./schema";
@@ -55,7 +56,8 @@ function PolicyItemContent({
   const isExpired = policy.expiresAt ? new Date(policy.expiresAt) < new Date() : false;
   const badgeVariant = !isActive ? "secondary" : isExpired ? "destructive" : "default";
   const statusLabel = !isActive ? t("status.inactive") : isExpired ? t("status.expired") : t("status.active");
-  const valueDisplay = policy.type === "PERCENTAGE" ? `${policy.value}%` : `${policy.value.toLocaleString()} VND`;
+  const valueDisplay =
+    policy.type === "PERCENTAGE" ? `${policy.value}%` : formatUsd(Number(policy.value) || 0);
 
   return (
     <div className="flex flex-1 items-center gap-3">

@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription }
 import { ChartContainer } from "@/components/ui/chart";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency, cn } from "@/lib/utils";
+import { cn, formatUsd } from "@/lib/utils";
 
 import { salesPipelineChartData, salesPipelineChartConfig, regionSalesData, actionItems } from "./crm.config";
 
@@ -38,7 +38,7 @@ export function OperationalCards() {
         <CardHeader>
           <CardTitle>Sales by Region</CardTitle>
           <CardDescription className="font-medium tabular-nums">
-            {formatCurrency(totalSales, { noDecimals: true })}
+            {formatUsd(totalSales)}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -49,7 +49,7 @@ export function OperationalCards() {
                   <span className="text-sm font-medium">{region.region}</span>
                   <div className="flex items-baseline gap-1">
                     <span className="text-sm font-semibold tabular-nums">
-                      {formatCurrency(region.sales, { noDecimals: true })}
+                      {formatUsd(region.sales)}
                     </span>
                     <span
                       className={cn(

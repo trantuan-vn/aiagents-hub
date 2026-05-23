@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { PayoutItem } from "./earnings-payout-table";
 
@@ -74,7 +74,7 @@ export function EarningsPayoutQrDialog({
   onPaid,
 }: EarningsPayoutQrDialogProps) {
   const description = selectedItem
-    ? `${selectedItem.recipientIdentifier} — ${formatCurrency(selectedItem.totalAmountUsd, { currency: "USD", maximumFractionDigits: 4 })}`
+    ? `${selectedItem.recipientIdentifier} — ${formatUsd(selectedItem.totalAmountUsd)}`
     : "";
 
   return (

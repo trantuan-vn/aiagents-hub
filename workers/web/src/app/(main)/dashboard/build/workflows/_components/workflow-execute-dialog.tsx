@@ -17,6 +17,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { formatUsd } from "@/lib/utils";
 
 import { executeWorkflow, type WorkflowExecutionResult } from "../_lib/api";
 
@@ -94,7 +95,7 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
           {result ? (
             <div className="overflow-hidden rounded-md border">
               <p className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">
-                {t("status")}: {result.status} · {t("cost")}: {result.totalCostVnd.toLocaleString()} VND
+                {t("status")}: {result.status} · {t("cost")}: {formatUsd(result.totalCostVnd)}
               </p>
               <div className="max-h-56 overflow-y-auto px-3 py-3">
                 <pre className="text-muted-foreground font-sans text-xs break-words whitespace-pre-wrap">

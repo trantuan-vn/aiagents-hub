@@ -8,7 +8,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 const chartData = [
   { month: "Jan", scheduled: 2000, expenses: 4000, income: 9500 },
@@ -73,7 +73,7 @@ export function FinancialOverview() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs uppercase">{t("income")}</p>
-              <p className="font-medium tabular-nums">{formatCurrency(totalIncome, { noDecimals: true })}</p>
+              <p className="font-medium tabular-nums">{formatUsd(totalIncome)}</p>
             </div>
           </div>
           <Separator orientation="vertical" className="!h-auto" />
@@ -83,7 +83,7 @@ export function FinancialOverview() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs uppercase">{t("expenses")}</p>
-              <p className="font-medium tabular-nums">{formatCurrency(totalExpenses, { noDecimals: true })}</p>
+              <p className="font-medium tabular-nums">{formatUsd(totalExpenses)}</p>
             </div>
           </div>
           <Separator orientation="vertical" className="!h-auto" />
@@ -93,7 +93,7 @@ export function FinancialOverview() {
             </div>
             <div>
               <p className="text-muted-foreground text-xs uppercase">{t("scheduled")}</p>
-              <p className="font-medium tabular-nums">{formatCurrency(totalScheduled, { noDecimals: true })}</p>
+              <p className="font-medium tabular-nums">{formatUsd(totalScheduled)}</p>
             </div>
           </div>
         </div>

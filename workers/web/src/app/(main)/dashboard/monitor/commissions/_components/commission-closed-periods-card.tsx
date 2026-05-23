@@ -3,7 +3,7 @@
 import { PayoutStatusBadge } from "@/app/(main)/dashboard/build/workflows/earnings/_components/payout-status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { CommissionClosedPeriodRow, CommissionMonthlySummary } from "../_lib/api";
 
@@ -53,11 +53,7 @@ export function CommissionClosedPeriodsCard({
             <p className="text-muted-foreground mb-4 text-sm">
               {closedTotalLabel}:{" "}
               <span className="text-foreground font-medium">
-                {formatCurrency(summary?.closedTotalAmountUsd ?? 0, {
-                  currency: "USD",
-                  maximumFractionDigits: 4,
-                  noDecimals: true,
-                })}
+                {formatUsd(summary?.closedTotalAmountUsd ?? 0)}
               </span>
             </p>
             <Table>
@@ -73,7 +69,7 @@ export function CommissionClosedPeriodsCard({
                   <TableRow key={row.period}>
                     <TableCell className="font-mono text-sm">{row.period}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(row.totalAmountUsd, { currency: "USD", maximumFractionDigits: 4 })}
+                      {formatUsd(row.totalAmountUsd)}
                     </TableCell>
                     <TableCell>
                       <PayoutStatusBadge status={row.payoutStatus} labels={payoutLabels} />

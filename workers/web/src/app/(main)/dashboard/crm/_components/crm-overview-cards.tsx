@@ -4,7 +4,7 @@ import { Users, UserPlus, Wallet, BadgeDollarSign, Link2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatUsd } from "@/lib/utils";
 
 import type { AdminCrmStats } from "../page";
 
@@ -55,7 +55,7 @@ export function CrmOverviewCards({ stats }: CrmOverviewCardsProps) {
       key: "total_revenue",
       title: t("total_revenue"),
       desc: t("this_month"),
-      value: formatCurrency(stats.totalRevenue.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.totalRevenue.current),
       change: stats.totalRevenue.changePercent,
       icon: Wallet,
       iconBg: "bg-amber-500/10",
@@ -65,7 +65,7 @@ export function CrmOverviewCards({ stats }: CrmOverviewCardsProps) {
       key: "commission_paid",
       title: t("commission_paid"),
       desc: t("this_month"),
-      value: formatCurrency(stats.commissionPaid.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.commissionPaid.current),
       change: stats.commissionPaid.changePercent,
       icon: BadgeDollarSign,
       iconBg: "bg-violet-500/10",

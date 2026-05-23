@@ -5,7 +5,7 @@ import { Area, AreaChart, Bar, BarChart, Pie, PieChart, XAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { AdminFinanceStats } from "../page";
 
@@ -54,7 +54,7 @@ export function FinanceInsightCharts({ stats }: FinanceInsightChartsProps) {
                       formatter={(value, name, item: { payload?: { count: number; amount: number; name: string } }) =>
                         item.payload
                           ? [
-                              `${item.payload.count} ${t("orders")} · ${formatCurrency(item.payload.amount, { currency: "VND", noDecimals: true })}`,
+                              `${item.payload.count} ${t("orders")} · ${formatUsd(item.payload.amount)}`,
                               item.payload.name,
                             ]
                           : [value, name]
@@ -103,7 +103,7 @@ export function FinanceInsightCharts({ stats }: FinanceInsightChartsProps) {
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
-                      formatter={(value) => formatCurrency(value as number, { currency: "VND", noDecimals: true })}
+                      formatter={(value) => formatUsd(value as number)}
                     />
                   }
                 />
@@ -130,7 +130,7 @@ export function FinanceInsightCharts({ stats }: FinanceInsightChartsProps) {
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
-                      formatter={(value) => formatCurrency(value as number, { currency: "VND", noDecimals: true })}
+                      formatter={(value) => formatUsd(value as number)}
                     />
                   }
                 />

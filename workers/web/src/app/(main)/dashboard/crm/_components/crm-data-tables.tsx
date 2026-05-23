@@ -3,7 +3,7 @@
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { AdminCrmStats } from "../page";
 
@@ -43,7 +43,7 @@ export function CrmDataTables({ stats }: CrmDataTablesProps) {
                       {ref.referredCount} {t("referred")}
                     </span>
                     <span className="font-semibold tabular-nums">
-                      {formatCurrency(ref.commissionAmount, { currency: "VND", noDecimals: true })}
+                      {formatUsd(ref.commissionAmount)}
                     </span>
                   </div>
                 </div>

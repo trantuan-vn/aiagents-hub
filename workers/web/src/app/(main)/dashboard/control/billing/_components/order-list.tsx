@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import { PaymentDialog } from "./payment-dialog";
 import type { Order, OrderStatus } from "./schema";
@@ -162,7 +162,7 @@ export function OrderList({
                         </div>
                         <div className="flex items-center gap-1">
                           <CreditCard className="h-3 w-3" />
-                          {formatCurrency(order.finalAmount, { currency: "USD", maximumFractionDigits: 4 })}
+                          {formatUsd(order.finalAmount)}
                         </div>
                         {order.appliedVoucherCode && (
                           <div className="text-muted-foreground text-xs">

@@ -22,8 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, formatUsd } from "@/lib/utils";
 
+import { formatVndCheckoutAmount } from "./payment-dialog-constants";
 import { createCreateOrderSchema, type CreateOrder } from "./schema";
 
 const FALLBACK_USD_VND =
@@ -48,6 +49,7 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
 
   const effectiveRate = usdVndRate > 0 ? usdVndRate : FALLBACK_USD_VND;
   const effectiveMin = Math.max(1, Math.floor(minTopUpVnd));
+  const effectiveMinUsd = effectiveMin / effectiveRate;
 
   const orderSchema = useMemo(() => createCreateOrderSchema(effectiveMin), [effectiveMin]);
 
@@ -123,7 +125,7 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
 
         <div className="space-y-2">
           <p className="text-muted-foreground text-sm">
-            {t("min_top_up_hint", { amount: effectiveMin.toLocaleString("vi-VN") })}
+            {t("min_top_up_hint", { amount: formatUsd(effectiveMinUsd) })}
           </p>
         </div>
 
@@ -152,14 +154,14 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
           name="amount"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t("amount_vnd_label")}</FormLabel>
+              <FormLabel>{t("amount_usd_label")}</FormLabel>
               <FormControl>
                 <Input
                   type="number"
-                  inputMode="numeric"
-                  min={effectiveMin}
-                  step={1}
-                  {...field}
+                  inputMode="decimal"
+                  min={effectiveMinUsd}
+                  step="any"
+                  value={approxUsd > 0 ? approxUsd : ""}
                   onChange={(e) => {
                     const raw = e.target.value;
                     if (raw === "") {
@@ -167,16 +169,24 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
                       setSelectedUsd(null);
                       return;
                     }
-                    const n = Number.parseInt(raw, 10);
-                    field.onChange(Number.isFinite(n) ? n : 0);
+                    const usd = Number.parseFloat(raw);
+                    if (!Number.isFinite(usd) || usd <= 0) {
+                      field.onChange(0);
+                      setSelectedUsd(null);
+                      return;
+                    }
                     setSelectedUsd(null);
+                    field.onChange(Math.max(effectiveMin, Math.round(usd * effectiveRate)));
                   }}
                 />
               </FormControl>
               <FormDescription>
-                {t("approx_usd", {
-                  amount: approxUsd.toLocaleString("en-US", { maximumFractionDigits: 2 }),
-                })}
+                {t("amount_usd_checkout_hint")}
+                {amountVnd >= effectiveMin ? (
+                  <span className="mt-1 block tabular-nums">
+                    {t("amount_vnd_checkout", { amount: formatVndCheckoutAmount(Number(amountVnd) || 0) })}
+                  </span>
+                ) : null}
               </FormDescription>
               <FormMessage />
             </FormItem>
@@ -259,7 +269,7 @@ export function WalletTopUpDialog({
         <DialogTrigger asChild>
           <Button>
             <Wallet className="mr-1 h-4 w-4" />
-            {t("top_up_vnd")}
+            {t("top_up")}
           </Button>
         </DialogTrigger>
         <Button type="button" variant="outline" disabled>

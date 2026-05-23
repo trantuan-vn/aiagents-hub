@@ -7,7 +7,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, Clock, DollarSign, QrCode } fr
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 export interface PayoutPeriodRow {
   period: string;
@@ -57,8 +57,6 @@ interface EarningsPayoutTableProps {
   labels: TableLabels;
   onShowQr?: (item: PayoutItem) => void;
 }
-
-const fmtUsd = (n: number) => formatCurrency(n, { currency: "USD", maximumFractionDigits: 4 });
 
 function canShowVietQr(item: PayoutItem): boolean {
   return item.earningsPayoutCurrency === "VND" && item.hasBeneficiary && item.bankStatus !== "paid";
@@ -159,9 +157,9 @@ function PayoutItemRows({
       <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={onToggle}>
         <ExpandToggleCell isOpen={isOpen} />
         <TableCell className="font-mono text-sm">{item.recipientIdentifier}</TableCell>
-        <TableCell className="text-right">{fmtUsd(item.commissionAmountUsd)}</TableCell>
-        <TableCell className="text-right">{fmtUsd(item.workflowRoyaltyAmountUsd)}</TableCell>
-        <TableCell className="text-right font-medium">{fmtUsd(item.totalAmountUsd)}</TableCell>
+        <TableCell className="text-right">{formatUsd(item.commissionAmountUsd)}</TableCell>
+        <TableCell className="text-right">{formatUsd(item.workflowRoyaltyAmountUsd)}</TableCell>
+        <TableCell className="text-right font-medium">{formatUsd(item.totalAmountUsd)}</TableCell>
         {!isAccruing && <PayoutCurrencyCell currency={item.earningsPayoutCurrency} />}
         {!isAccruing && <BeneficiaryCell hasBeneficiary={item.hasBeneficiary} labels={labels} />}
         <PayoutStatusCell isAccruing={isAccruing} bankStatus={item.bankStatus} labels={labels} />
@@ -194,9 +192,9 @@ function PayoutPeriodRow({
     <TableRow className="bg-muted/30">
       <TableCell />
       <TableCell className="text-muted-foreground pl-6 text-sm">{period.period}</TableCell>
-      <TableCell className="text-right text-sm">{fmtUsd(period.commissionAmountUsd)}</TableCell>
-      <TableCell className="text-right text-sm">{fmtUsd(period.workflowRoyaltyAmountUsd)}</TableCell>
-      <TableCell className="text-right text-sm">{fmtUsd(period.totalAmountUsd)}</TableCell>
+      <TableCell className="text-right text-sm">{formatUsd(period.commissionAmountUsd)}</TableCell>
+      <TableCell className="text-right text-sm">{formatUsd(period.workflowRoyaltyAmountUsd)}</TableCell>
+      <TableCell className="text-right text-sm">{formatUsd(period.totalAmountUsd)}</TableCell>
       {!isAccruing && <TableCell />}
       {!isAccruing && <TableCell />}
       <PayoutStatusCell isAccruing={isAccruing} bankStatus={period.bankStatus} labels={labels} />

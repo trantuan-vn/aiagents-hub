@@ -8,11 +8,9 @@ import { GitBranch, TrendingUp, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatUsd } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
-
-const fmtUsd = (n: number): string =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(n);
 
 interface WorkflowIncomeSummaryProps {
   t: (key: string) => string;
@@ -79,7 +77,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
         {totalEarnings > 0 && (
           <div className="bg-primary/5 rounded-lg p-3">
             <p className="text-muted-foreground text-xs">{t("workflow.earned")}</p>
-            <p className="text-primary text-2xl font-bold">{fmtUsd(totalEarnings)}</p>
+            <p className="text-primary text-2xl font-bold">{formatUsd(totalEarnings)}</p>
           </div>
         )}
         <div className="flex gap-2">

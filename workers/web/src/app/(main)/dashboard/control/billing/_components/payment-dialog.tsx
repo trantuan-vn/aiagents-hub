@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
 import { PaymentCassoPanel } from "./payment-casso-panel";
-import { formatPaymentCurrency, type PaymentMethodTab } from "./payment-dialog-constants";
+import { formatPaymentCurrency, formatVndCheckoutAmount, type PaymentMethodTab } from "./payment-dialog-constants";
 import { PaymentMethodTabs } from "./payment-method-tabs";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
 import { CreatePaymentSchema, getOrderPayableVnd, type CreatePayment, type Order } from "./schema";
@@ -118,15 +118,11 @@ export function PaymentDialog({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{t("wallet_credit_usd")}</span>
-                <span className="text-sm font-bold">
-                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(
-                    order.finalAmount,
-                  )}
-                </span>
+                <span className="text-sm font-bold">{formatPaymentCurrency(order.finalAmount)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{t("payable_vnd")}</span>
-                <span className="text-sm font-bold">{formatPaymentCurrency(payableVnd, "VND")}</span>
+                <span className="text-sm font-bold tabular-nums">{formatVndCheckoutAmount(payableVnd)}</span>
               </div>
             </div>
 

@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 const chartConfig = {
   total: { label: "Royalty", color: "var(--chart-1)" },
@@ -24,7 +24,7 @@ export function AccruingEarningsChart({ byDay }: AccruingEarningsChartProps) {
           content={
             <ChartTooltipContent
               formatter={(value) =>
-                formatCurrency(value as number, { currency: "USD", maximumFractionDigits: 4 })
+                formatUsd(value as number)
               }
             />
           }

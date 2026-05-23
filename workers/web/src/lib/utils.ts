@@ -27,6 +27,9 @@ export const getInitials = (str: string): string => {
   );
 };
 
+/** Matches auth-worker `roundUsdAmount` precision for wallet, earnings, and usage. */
+export const USD_DECIMAL_PLACES = 8;
+
 export function formatCurrency(
   amount: number,
   opts?: {
@@ -47,4 +50,13 @@ export function formatCurrency(
   };
 
   return new Intl.NumberFormat(locale, formatOptions).format(amount);
+}
+
+/** USD amounts (wallet balance, earnings, orders) — up to 8 decimal places. */
+export function formatUsd(amount: number, locale = "en-US"): string {
+  return formatCurrency(amount, {
+    currency: "USD",
+    locale,
+    maximumFractionDigits: USD_DECIMAL_PLACES,
+  });
 }

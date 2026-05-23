@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { AdminFinanceStats } from "../page";
 
@@ -55,7 +55,7 @@ export function FinanceDataTables({ stats }: FinanceDataTablesProps) {
                   <TableRow key={order.id}>
                     <TableCell className="font-mono font-medium">{order.orderCode}</TableCell>
                     <TableCell className="tabular-nums">
-                      {formatCurrency(order.finalAmount, { currency: "VND", noDecimals: true })}
+                      {formatUsd(order.finalAmount)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(order.status)}>

@@ -1,26 +1,23 @@
 "use client";
 
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatUsd } from "@/lib/utils";
 
 function commissionRowKey(c: Record<string, unknown>, index: number): string {
   return String(c.id ?? c.globalId ?? c.created_at ?? index);
 }
 
 function CommissionRow({ commission }: { commission: Record<string, unknown> }) {
-  const currency = String(commission.currency ?? "USD");
+  const currency = String(commission.currency ?? "USD").toUpperCase();
   const createdAt = commission.created_at ? new Date(Number(commission.created_at)).toLocaleString() : "—";
+  const fmtAmount = (n: number) => (currency === "USD" ? formatUsd(n) : formatCurrency(n, { currency }));
 
   return (
     <tr className="border-muted/50 border-b">
       <td className="text-muted-foreground py-2">{createdAt}</td>
       <td className="py-2 font-mono text-xs">{String(commission.referredUserId ?? "—")}</td>
-      <td className="py-2">
-        {formatCurrency(Number(commission.orderAmount ?? 0), { currency, noDecimals: true })}
-      </td>
+      <td className="py-2">{fmtAmount(Number(commission.orderAmount ?? 0))}</td>
       <td className="py-2">{String(commission.commissionPercent ?? "—")}%</td>
-      <td className="py-2">
-        {formatCurrency(Number(commission.commissionAmount ?? 0), { currency, noDecimals: true })}
-      </td>
+      <td className="py-2">{fmtAmount(Number(commission.commissionAmount ?? 0))}</td>
     </tr>
   );
 }

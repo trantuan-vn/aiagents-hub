@@ -221,7 +221,6 @@ export default function BillingPage() {
         completedVolumeUsd={orders
           .filter((o) => o.status === "COMPLETED")
           .reduce((s, o) => s + o.finalAmount, 0)}
-        usdVndRate={usdVndRate}
       />
 
       {/* Error Alert */}

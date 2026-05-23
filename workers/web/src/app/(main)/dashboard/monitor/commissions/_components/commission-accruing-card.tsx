@@ -5,7 +5,7 @@ import { Clock } from "lucide-react";
 import { AccruingEarningsChart } from "@/app/(main)/dashboard/build/workflows/earnings/_components/accruing-earnings-chart";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
 import type { CommissionMonthlySummary } from "../_lib/api";
 
@@ -90,7 +90,7 @@ export function CommissionAccruingCard({
   const accruing = summary?.accruing;
   const totalLabel = loading
     ? "..."
-    : formatCurrency(accruing?.totalAmountUsd ?? 0, { currency: "USD", maximumFractionDigits: 4 });
+    : formatUsd(accruing?.totalAmountUsd ?? 0);
 
   return (
     <Card>

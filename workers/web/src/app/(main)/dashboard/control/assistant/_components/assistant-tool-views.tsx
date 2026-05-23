@@ -1,6 +1,13 @@
 "use client";
 
+import { formatUsd } from "@/lib/utils";
+
 import type { AssistantUIMessage } from "./assistant-types";
+
+const FALLBACK_USD_VND =
+  Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000") > 0
+    ? Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000")
+    : 26000;
 
 type CreateApiKeyPart = Extract<AssistantUIMessage["parts"][number], { type: "tool-createApiKey" }>;
 type CreateOrderPart = Extract<AssistantUIMessage["parts"][number], { type: "tool-createOrder" }>;
@@ -101,7 +108,9 @@ export function CreateOrderToolView({ part }: { part: CreateOrderPart }) {
     case "input-available": {
       const { input } = part;
       const amt = "amount" in input && typeof input.amount === "number" ? input.amount : 0;
-      return <p className="text-muted-foreground text-sm">Chuẩn bị nạp ví với số tiền {amt.toLocaleString("vi-VN")} VND…</p>;
+      const rate = FALLBACK_USD_VND;
+      const usd = rate > 0 ? amt / rate : amt;
+      return <p className="text-muted-foreground text-sm">Chuẩn bị nạp ví với số tiền {formatUsd(usd)}…</p>;
     }
     case "output-available":
       return renderCreateOrderOutput(part.output as OrderOutput);

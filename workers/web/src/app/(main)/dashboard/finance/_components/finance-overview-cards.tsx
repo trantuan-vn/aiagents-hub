@@ -4,7 +4,7 @@ import { Wallet, ShoppingCart, CheckCircle2, BadgeDollarSign, Tag, TrendingUp, B
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatUsd } from "@/lib/utils";
 
 import type { AdminFinanceStats } from "../page";
 
@@ -25,7 +25,7 @@ export function FinanceOverviewCards({ stats }: FinanceOverviewCardsProps) {
       key: "total_revenue",
       title: t("total_revenue"),
       desc: t("this_month"),
-      value: formatCurrency(stats.totalRevenue.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.totalRevenue.current),
       change: stats.totalRevenue.changePercent,
       icon: Wallet,
       iconBg: "bg-emerald-500/10",
@@ -35,7 +35,7 @@ export function FinanceOverviewCards({ stats }: FinanceOverviewCardsProps) {
       key: "net_revenue",
       title: t("net_revenue"),
       desc: t("this_month"),
-      value: formatCurrency(stats.netRevenue.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.netRevenue.current),
       change: stats.netRevenue.changePercent,
       icon: TrendingUp,
       iconBg: "bg-blue-500/10",
@@ -65,7 +65,7 @@ export function FinanceOverviewCards({ stats }: FinanceOverviewCardsProps) {
       key: "commission_paid",
       title: t("commission_paid"),
       desc: t("this_month"),
-      value: formatCurrency(stats.commissionPaid.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.commissionPaid.current),
       change: stats.commissionPaid.changePercent,
       icon: BadgeDollarSign,
       iconBg: "bg-violet-500/10",
@@ -75,7 +75,7 @@ export function FinanceOverviewCards({ stats }: FinanceOverviewCardsProps) {
       key: "total_discounts",
       title: t("total_discounts"),
       desc: t("this_month"),
-      value: formatCurrency(stats.totalDiscounts.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.totalDiscounts.current),
       change: stats.totalDiscounts.changePercent,
       icon: Tag,
       iconBg: "bg-rose-500/10",
@@ -85,7 +85,7 @@ export function FinanceOverviewCards({ stats }: FinanceOverviewCardsProps) {
       key: "average_order_value",
       title: t("average_order_value"),
       desc: t("this_month"),
-      value: formatCurrency(stats.averageOrderValue.current, { currency: "VND", noDecimals: true }),
+      value: formatUsd(stats.averageOrderValue.current),
       change: stats.averageOrderValue.changePercent,
       icon: BarChart3,
       iconBg: "bg-cyan-500/10",

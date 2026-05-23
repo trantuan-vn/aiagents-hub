@@ -9,34 +9,22 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { formatUsd } from "@/lib/utils";
 
-import {
-  FALLBACK_USD_VND,
-  fetchMemberBillingParams,
-  fetchWalletBalance,
-} from "../../billing/_components/billing-api";
+import { fetchWalletBalance } from "../../billing/_components/billing-api";
 
 export function WalletCard() {
   const t = useTranslations("OverviewPage");
   const [balanceUsd, setBalanceUsd] = useState<number | null>(null);
-  const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
 
   const loadWallet = useCallback(async () => {
-    const [balance, params] = await Promise.all([fetchWalletBalance(), fetchMemberBillingParams()]);
+    const balance = await fetchWalletBalance();
     setBalanceUsd(balance);
-    setUsdVndRate(params.usdVndRate);
   }, []);
 
   useEffect(() => {
     void loadWallet();
   }, [loadWallet]);
-
-  const rate = usdVndRate > 0 ? usdVndRate : FALLBACK_USD_VND;
-  const approxVnd =
-    balanceUsd != null
-      ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(balanceUsd * rate)
-      : null;
 
   return (
     <Card className="border-primary/20 from-primary/5 bg-gradient-to-br to-background">
@@ -52,11 +40,8 @@ export function WalletCard() {
             ) : (
               <>
                 <p className="text-primary mt-0.5 text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
-                  {formatCurrency(balanceUsd, { currency: "USD", maximumFractionDigits: 4 })}
+                  {formatUsd(balanceUsd)}
                 </p>
-                {approxVnd != null ? (
-                  <p className="text-muted-foreground mt-0.5 text-xs">{t("wallet.vnd_hint", { amount: approxVnd })}</p>
-                ) : null}
               </>
             )}
           </div>
