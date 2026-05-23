@@ -5,6 +5,20 @@ export function currentPeriod(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Only past months (YYYY-MM strictly before current month) may be paid out. */
+export function isPeriodEligibleForPayout(period: string): boolean {
+  if (!/^\d{4}-\d{2}$/.test(period)) return false;
+  return period < currentPeriod();
+}
+
+export function assertPeriodEligibleForPayout(period: string): void {
+  if (!isPeriodEligibleForPayout(period)) {
+    throw new Error(
+      `Cannot pay out period ${period}: only closed months before ${currentPeriod()} are payable`,
+    );
+  }
+}
+
 export function periodToRange(period: string): { fromTs: number; toTs: number } {
   const [y, m] = period.split('-').map(Number);
   const from = new Date(y, m - 1, 1);

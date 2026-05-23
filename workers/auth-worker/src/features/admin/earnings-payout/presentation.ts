@@ -9,8 +9,10 @@ import {
   createEarningsPayoutInfrastructure,
 } from './infrastructure';
 import { GeneratePayoutQrSchema } from './domain';
+import { currentPeriod } from './d1';
 import {
   attachBeneficiaries,
+  buildAccruingPayoutList,
   buildAggregatedPayoutList,
   COMMISSION_ADMIN_IDENTIFIER,
   getUnpaidPayoutKeysForUser,
@@ -32,9 +34,13 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
 
       const allRecords = await syncAllPeriodPayoutRecords(db, payoutInfra);
       const aggregated = buildAggregatedPayoutList(allRecords);
-      const items = await attachBeneficiaries(c, bindingName, aggregated);
+      const accruing = buildAccruingPayoutList(allRecords);
+      const [items, accruingItems] = await Promise.all([
+        attachBeneficiaries(c, bindingName, aggregated),
+        attachBeneficiaries(c, bindingName, accruing),
+      ]);
 
-      return c.json({ items });
+      return c.json({ items, accruingItems, accruingPeriod: currentPeriod() });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to list earnings payouts');
       return c.json(errorResponse, status);
@@ -62,7 +68,9 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
         recipientUserId,
       );
       if (keys.length === 0 || totalAmountVnd <= 0) {
-        throw new Error('No unpaid earnings for this user');
+        throw new Error(
+          'No unpaid earnings for closed periods for this user (current month cannot be paid yet)',
+        );
       }
 
       const binding = c.env[bindingName as keyof Env] as DurableObjectNamespace;

@@ -1,5 +1,6 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
+import { assertPeriodEligibleForPayout } from './d1';
 import { EarningsPayout, EarningsPayoutSchema } from './domain';
 
 export function payoutKey(period: string, recipientUserId: string): string {
@@ -16,6 +17,7 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
     );
     const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
     if (!row?.id) throw new Error('Payout record not found');
+    assertPeriodEligibleForPayout(String(row.period ?? ''));
     const paidAt = new Date().toISOString();
     console.log(`markPaidImpl: ${JSON.stringify(row)}`);
     console.log(`paymentNote: ${paymentNote}`);

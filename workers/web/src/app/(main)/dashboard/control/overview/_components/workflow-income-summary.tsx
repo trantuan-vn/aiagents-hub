@@ -18,24 +18,23 @@ interface WorkflowIncomeSummaryProps {
   t: (key: string) => string;
 }
 
-interface EarningsStats {
-  totalAmount?: number;
-  byDay?: { date: string; total: number }[];
+interface WorkflowMonthlyPreview {
+  accruing?: { totalAmountVnd?: number };
 }
 
 export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
-  const [stats, setStats] = useState<EarningsStats | null>(null);
+  const [stats, setStats] = useState<WorkflowMonthlyPreview | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/dashboard/build/workflows/earnings/stats?period=30`, {
+      const res = await fetch(`${API_BASE_URL}/dashboard/build/workflows/earnings/monthly-summary`, {
         method: "GET",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
       if (res.ok) {
-        const data: EarningsStats = await res.json();
+        const data: WorkflowMonthlyPreview = await res.json();
         setStats(data);
       } else {
         setStats(null);
@@ -65,7 +64,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
     );
   }
 
-  const totalEarnings = stats?.totalAmount ?? 0;
+  const totalEarnings = stats?.accruing?.totalAmountVnd ?? 0;
 
   return (
     <Card className="border-primary/20 overflow-hidden transition-shadow hover:shadow-md">

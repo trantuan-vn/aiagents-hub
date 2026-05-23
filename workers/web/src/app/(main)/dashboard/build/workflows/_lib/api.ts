@@ -164,3 +164,27 @@ export function listEarnings(period: number, limit = 50, offset = 0) {
     `/dashboard/build/workflows/earnings?period=${period}&limit=${limit}&offset=${offset}`,
   );
 }
+
+export interface WorkflowClosedPeriodRow {
+  period: string;
+  totalAmountVnd: number;
+  payoutStatus: "pending" | "paid" | null;
+}
+
+export interface WorkflowEarningsMonthlySummary {
+  currentPeriod: string;
+  accruing: {
+    period: string;
+    totalAmountVnd: number;
+    byDay: { date: string; total: number }[];
+    royalties: Record<string, unknown>[];
+  };
+  closedPeriods: WorkflowClosedPeriodRow[];
+  closedTotalAmountVnd: number;
+}
+
+export function getWorkflowEarningsMonthlySummary() {
+  return apiFetch<WorkflowEarningsMonthlySummary>(
+    "/dashboard/build/workflows/earnings/monthly-summary",
+  );
+}

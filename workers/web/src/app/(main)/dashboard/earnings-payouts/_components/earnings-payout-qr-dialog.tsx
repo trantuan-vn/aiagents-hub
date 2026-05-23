@@ -52,14 +52,7 @@ function QrDialogBody({
     <>
       {qrSrc && (
         <div className="flex justify-center p-2">
-          <Image
-            src={qrSrc}
-            alt=""
-            width={280}
-            height={280}
-            unoptimized
-            className="max-h-[280px] object-contain"
-          />
+          <Image src={qrSrc} alt="" width={280} height={280} unoptimized className="max-h-[280px] object-contain" />
         </div>
       )}
       {selectedItem && <p className="text-muted-foreground text-center text-xs">{hint}</p>}
@@ -91,13 +84,7 @@ export function EarningsPayoutQrDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <QrDialogBody
-          selectedItem={selectedItem}
-          qrLoading={qrLoading}
-          qrError={qrError}
-          qrSrc={qrSrc}
-          hint={hint}
-        />
+        <QrDialogBody selectedItem={selectedItem} qrLoading={qrLoading} qrError={qrError} qrSrc={qrSrc} hint={hint} />
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}

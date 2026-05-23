@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from "react";
 
-import { CheckCircle2, ChevronDown, ChevronRight, QrCode } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, Clock, QrCode } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,8 +29,11 @@ export interface PayoutItem {
   periods: PayoutPeriodRow[];
 }
 
+export type EarningsPayoutTableVariant = "payable" | "accruing";
+
 interface EarningsPayoutTableProps {
   items: PayoutItem[];
+  variant?: EarningsPayoutTableVariant;
   labels: {
     user: string;
     period: string;
@@ -45,11 +48,13 @@ interface EarningsPayoutTableProps {
     bank_paid: string;
     bank_unpaid: string;
     show_qr: string;
+    accruing_status?: string;
   };
-  onShowQr: (item: PayoutItem) => void;
+  onShowQr?: (item: PayoutItem) => void;
 }
 
-export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutTableProps) {
+export function EarningsPayoutTable({ items, variant = "payable", labels, onShowQr }: EarningsPayoutTableProps) {
+  const isAccruing = variant === "accruing";
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (userId: string) => {
@@ -70,9 +75,9 @@ export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutT
           <TableHead className="text-right">{labels.commission}</TableHead>
           <TableHead className="text-right">{labels.workflow}</TableHead>
           <TableHead className="text-right">{labels.total}</TableHead>
-          <TableHead>{labels.beneficiary}</TableHead>
-          <TableHead>{labels.bank_status}</TableHead>
-          <TableHead className="text-right">{labels.actions}</TableHead>
+          {!isAccruing && <TableHead>{labels.beneficiary}</TableHead>}
+          <TableHead>{isAccruing ? (labels.accruing_status ?? labels.bank_status) : labels.bank_status}</TableHead>
+          {!isAccruing && <TableHead className="text-right">{labels.actions}</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -80,10 +85,7 @@ export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutT
           const isOpen = expanded.has(item.recipientUserId);
           return (
             <Fragment key={item.recipientUserId}>
-              <TableRow
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => toggle(item.recipientUserId)}
-              >
+              <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => toggle(item.recipientUserId)}>
                 <TableCell>
                   {isOpen ? (
                     <ChevronDown className="text-muted-foreground h-4 w-4" />
@@ -101,31 +103,39 @@ export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutT
                 <TableCell className="text-right font-medium">
                   {formatCurrency(item.totalAmountVnd, { currency: "VND", noDecimals: true })}
                 </TableCell>
+                {!isAccruing && (
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    {item.hasBeneficiary ? (
+                      <Badge variant="secondary">{labels.configured}</Badge>
+                    ) : (
+                      <Badge variant="outline">{labels.missing}</Badge>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  {item.hasBeneficiary ? (
-                    <Badge variant="secondary">{labels.configured}</Badge>
+                  {isAccruing ? (
+                    <AccruingBadge label={labels.accruing_status ?? ""} />
                   ) : (
-                    <Badge variant="outline">{labels.missing}</Badge>
+                    <BankStatusBadge
+                      status={item.bankStatus}
+                      paidLabel={labels.bank_paid}
+                      unpaidLabel={labels.bank_unpaid}
+                    />
                   )}
                 </TableCell>
-                <TableCell onClick={(e) => e.stopPropagation()}>
-                  <BankStatusBadge
-                    status={item.bankStatus}
-                    paidLabel={labels.bank_paid}
-                    unpaidLabel={labels.bank_unpaid}
-                  />
-                </TableCell>
-                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!item.hasBeneficiary}
-                    onClick={() => onShowQr(item)}
-                  >
-                    <QrCode className="mr-1 h-4 w-4" />
-                    {labels.show_qr}
-                  </Button>
-                </TableCell>
+                {!isAccruing && (
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!item.hasBeneficiary}
+                      onClick={() => onShowQr?.(item)}
+                    >
+                      <QrCode className="mr-1 h-4 w-4" />
+                      {labels.show_qr}
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
               {isOpen &&
                 item.periods.map((p) => (
@@ -141,15 +151,19 @@ export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutT
                     <TableCell className="text-right text-sm">
                       {formatCurrency(p.totalAmountVnd, { currency: "VND", noDecimals: true })}
                     </TableCell>
-                    <TableCell />
+                    {!isAccruing && <TableCell />}
                     <TableCell>
-                      <BankStatusBadge
-                        status={p.bankStatus}
-                        paidLabel={labels.bank_paid}
-                        unpaidLabel={labels.bank_unpaid}
-                      />
+                      {isAccruing ? (
+                        <AccruingBadge label={labels.accruing_status ?? ""} />
+                      ) : (
+                        <BankStatusBadge
+                          status={p.bankStatus}
+                          paidLabel={labels.bank_paid}
+                          unpaidLabel={labels.bank_unpaid}
+                        />
+                      )}
                     </TableCell>
-                    <TableCell />
+                    {!isAccruing && <TableCell />}
                   </TableRow>
                 ))}
             </Fragment>
@@ -157,6 +171,15 @@ export function EarningsPayoutTable({ items, labels, onShowQr }: EarningsPayoutT
         })}
       </TableBody>
     </Table>
+  );
+}
+
+function AccruingBadge({ label }: { label: string }) {
+  return (
+    <Badge variant="secondary" className="gap-1">
+      <Clock className="h-3 w-3" />
+      {label}
+    </Badge>
   );
 }
 

@@ -18,6 +18,7 @@ import {
   listSharedWorkflowsFromD1,
   listWorkflowRoyalties,
 } from './infrastructure';
+import { getWorkflowEarningsMonthlySummary } from './earnings-monthly.js';
 import { resolveWorkflow } from './workflow-context.js';
 import { createWorkflowChatStreamResponse } from './workflow-chat.js';
 
@@ -154,6 +155,17 @@ export function createWorkflowRoutes(bindingName: string) {
       });
       return c.json({ workflows, hasMore });
     }, 'Failed to list shared workflows'),
+  );
+
+  app.get(
+    '/earnings/monthly-summary',
+    createRouteHandler(async (c: any, user: any) => {
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const ownerId = getUserId(c, user.identifier);
+      const summary = await getWorkflowEarningsMonthlySummary(db, ownerId);
+      return c.json(summary);
+    }, 'Failed to get monthly workflow earnings'),
   );
 
   app.get(

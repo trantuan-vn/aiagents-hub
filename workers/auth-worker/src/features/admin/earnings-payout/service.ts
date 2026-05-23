@@ -10,6 +10,7 @@ import {
   currentPeriod,
   enumeratePeriods,
   getEarliestEarningPeriod,
+  isPeriodEligibleForPayout,
   mergePeriodEarnings,
 } from './d1';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
@@ -83,14 +84,14 @@ export async function syncAllPeriodPayoutRecords(
   return allRecords;
 }
 
-export function buildAggregatedPayoutList(
+function aggregatePayoutRecords(
   allRecords: Map<string, import('./domain').EarningsPayout>,
+  includeRecord: (record: import('./domain').EarningsPayout) => boolean,
 ): AggregatedPayoutItem[] {
   const byUser = new Map<string, AggregatedPayoutItem>();
 
   for (const record of allRecords.values()) {
-    if (record.status === 'paid') continue;
-    if (record.totalAmountVnd <= 0) continue;
+    if (!includeRecord(record)) continue;
 
     let agg = byUser.get(record.recipientUserId);
     if (!agg) {
@@ -128,6 +129,33 @@ export function buildAggregatedPayoutList(
   return items;
 }
 
+/** Closed periods only — eligible for bank payout. */
+export function buildAggregatedPayoutList(
+  allRecords: Map<string, import('./domain').EarningsPayout>,
+): AggregatedPayoutItem[] {
+  return aggregatePayoutRecords(
+    allRecords,
+    (record) =>
+      record.status !== 'paid' &&
+      isPeriodEligibleForPayout(record.period) &&
+      record.totalAmountVnd > 0,
+  );
+}
+
+/** Current month — view only, not payable until the period closes. */
+export function buildAccruingPayoutList(
+  allRecords: Map<string, import('./domain').EarningsPayout>,
+): AggregatedPayoutItem[] {
+  const period = currentPeriod();
+  return aggregatePayoutRecords(
+    allRecords,
+    (record) =>
+      record.status !== 'paid' &&
+      record.period === period &&
+      record.totalAmountVnd > 0,
+  );
+}
+
 export async function attachBeneficiaries(
   c: Context,
   bindingName: string,
@@ -156,7 +184,12 @@ export async function getUnpaidPayoutKeysForUser(
 ): Promise<{ keys: string[]; totalAmountVnd: number; identifier: string }> {
   await syncAllPeriodPayoutRecords(db, payoutInfra);
   const all = await payoutInfra.listAll();
-  const unpaid = all.filter((p) => p.recipientUserId === recipientUserId && p.status !== 'paid');
+  const unpaid = all.filter(
+    (p) =>
+      p.recipientUserId === recipientUserId &&
+      p.status !== 'paid' &&
+      isPeriodEligibleForPayout(p.period),
+  );
   const totalAmountVnd = toPayoutAmountVnd(unpaid.reduce((s, p) => s + p.totalAmountVnd, 0));
   const identifier = unpaid[0]?.recipientIdentifier ?? recipientUserId;
   return {
@@ -197,6 +230,19 @@ export async function processEarningsPayoutCassoIPN(
     bindingName,
   ) as DurableObjectStub<UserDO>;
   const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
+  for (const key of mapping.payoutKeys) {
+    const record = await payoutInfra.getByKey(key);
+    if (!record) {
+      return { success: false, code: '01', message: 'Payout record not found' };
+    }
+    if (!isPeriodEligibleForPayout(record.period)) {
+      return {
+        success: false,
+        code: '05',
+        message: `Payout period ${record.period} is not closed yet`,
+      };
+    }
+  }
   const note = `Casso ${externalRef}`;
   await payoutInfra.markPaidBatch(mapping.payoutKeys, note);
   await kv.delete(`casso_ref:${transferCode}`);
