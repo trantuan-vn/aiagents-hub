@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 
 import { ConnectionHandle } from "./connection-handle";
 import { WorkflowNodeShell } from "./workflow-node-shell";
+import { StickyNoteNode } from "./workflow-sticky-note-node";
 
 function AgentNode({ data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");
@@ -173,4 +174,5 @@ export const workflowNodeTypes = {
   core: CoreNode,
   action_in_app: ActionNode,
   data_transformation: TransformNode,
+  sticky_note: StickyNoteNode,
 };

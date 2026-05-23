@@ -2,13 +2,17 @@
 
 import { useCallback, useMemo, useRef } from "react";
 
-import { Background, MiniMap, ReactFlow, ReactFlowProvider, type Node } from "@xyflow/react";
+import { Background, ReactFlow, ReactFlowProvider, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./workflow-canvas-theme.css";
 
+import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { useWorkflowCanvasState } from "./use-workflow-canvas-state";
+import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
+import { WorkflowCanvasMinimap } from "./workflow-canvas-minimap";
+import { WorkflowCanvasSideToolbar } from "./workflow-canvas-side-toolbar";
 import { WorkflowCanvasTidyBridge } from "./workflow-canvas-ui-bridge";
 import { WorkflowCanvasUiContext } from "./workflow-canvas-ui-context";
 import { toPersistedDefinition, type WorkflowDefinition } from "./workflow-definition";
@@ -29,6 +33,8 @@ interface WorkflowCanvasProps {
   onChange?: (def: WorkflowDefinition) => void;
   readOnly?: boolean;
   serviceEndpoint?: string;
+  onExecute?: () => void;
+  className?: string;
 }
 
 const READONLY_FLOW_PROPS = {
@@ -43,7 +49,14 @@ const READONLY_FLOW_PROPS = {
   elementsSelectable: false,
 } as const;
 
-function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowCanvasProps) {
+function CanvasInner({
+  initial,
+  onChange,
+  readOnly,
+  serviceEndpoint,
+  onExecute,
+  className,
+}: WorkflowCanvasProps) {
   const themeMode = usePreferencesStore((s) => s.themeMode);
   const {
     nodes,
@@ -99,7 +112,7 @@ function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowC
 
   return (
     <WorkflowCanvasUiContext.Provider value={uiValue}>
-      <div className="bg-muted/20 h-[min(70vh,640px)] w-full rounded-xl border">
+      <div className={cn("workflow-canvas-surface dark:bg-muted/15 h-full w-full bg-[#f9f9f9]", className)}>
         <ReactFlow
           className="h-full w-full"
           colorMode={themeMode}
@@ -119,13 +132,15 @@ function CanvasInner({ initial, onChange, readOnly, serviceEndpoint }: WorkflowC
           {...interactionProps}
         >
           <WorkflowEdgeMarkers />
-          <Background gap={16} size={1} />
+          <Background gap={20} size={1} />
           <WorkflowCanvasTidyBridge
             readOnly={readOnly}
             tidyLayout={tidyLayout}
             onTidyWithFitReady={onTidyWithFitReady}
           />
-          <MiniMap zoomable pannable />
+          {onExecute ? <WorkflowCanvasExecutePanel onExecute={onExecute} /> : null}
+          <WorkflowCanvasSideToolbar />
+          <WorkflowCanvasMinimap />
         </ReactFlow>
       </div>
     </WorkflowCanvasUiContext.Provider>
@@ -152,6 +167,19 @@ export function addNodeToDefinition(
     type,
     position: { x: 120 + def.nodes.length * 40, y: 80 + def.nodes.length * 30 },
     data: { label, ...extraData },
+  };
+  return { ...def, nodes: [...def.nodes, node] };
+}
+
+export function addStickyNoteToDefinition(def: WorkflowDefinition): WorkflowDefinition {
+  const id = `sticky_note-${Date.now()}`;
+  const node: Node = {
+    id,
+    type: "sticky_note",
+    position: { x: 160 + def.nodes.length * 24, y: 120 + def.nodes.length * 24 },
+    data: { text: "" },
+    draggable: true,
+    selectable: true,
   };
   return { ...def, nodes: [...def.nodes, node] };
 }

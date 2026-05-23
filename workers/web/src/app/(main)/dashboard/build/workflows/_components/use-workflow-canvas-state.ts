@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-import { addEdge, useEdgesState, useNodesState, type Connection, type Edge, type Node } from "@xyflow/react";
+import {
+  addEdge,
+  useEdgesState,
+  useNodesState,
+  type Connection,
+  type Edge,
+  type Node,
+  type NodeChange,
+} from "@xyflow/react";
 
 import type { ConnectedNodeSide } from "./workflow-canvas-ui-context";
 import { isValidWorkflowConnection } from "./workflow-connection-utils";
@@ -218,6 +226,24 @@ export function useWorkflowCanvasState(
     [onEdgesChange, pushToParent, readOnly],
   );
 
+  const onNodesChangeWrapped = useCallback(
+    (changes: NodeChange[]) => {
+      onNodesChange(changes);
+      if (readOnly) return;
+      const shouldPersist = changes.some(
+        (c) =>
+          c.type === "add" ||
+          c.type === "remove" ||
+          c.type === "replace" ||
+          (c.type === "position" && "dragging" in c && c.dragging === false),
+      );
+      if (shouldPersist) {
+        queueMicrotask(() => pushToParent());
+      }
+    },
+    [onNodesChange, pushToParent, readOnly],
+  );
+
   const createConnectedNode = useCallback(
     (args: { fromNodeId: string; side: ConnectedNodeSide; type: string; label: string }) => {
       if (readOnly) return;
@@ -266,7 +292,7 @@ export function useWorkflowCanvasState(
   return {
     nodes,
     edges,
-    onNodesChange,
+    onNodesChange: onNodesChangeWrapped,
     onEdgesChange: onEdgesChangeWrapped,
     onConnect,
     onNodeDragStop,

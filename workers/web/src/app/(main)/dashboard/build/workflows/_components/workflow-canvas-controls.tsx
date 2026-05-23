@@ -46,7 +46,7 @@ function ControlButton({
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side="top">{label}</TooltipContent>
     </Tooltip>
   );
 }
@@ -79,17 +79,17 @@ export function WorkflowCanvasControls({ readOnly, onTidy }: WorkflowCanvasContr
   return (
     <Panel position="bottom-left" className="!m-3 !p-0">
       <div
-        className="bg-card/95 border-border flex flex-col overflow-hidden rounded-lg border shadow-sm backdrop-blur-sm"
+        className="bg-card/95 border-border flex flex-row items-center overflow-hidden rounded-lg border shadow-sm backdrop-blur-sm"
         role="toolbar"
         aria-label="Canvas zoom"
       >
-        <ControlButton label={t("canvas_zoom_in")} onClick={handleZoomIn}>
-          <ZoomIn className={controlIconClass} aria-hidden />
-        </ControlButton>
         <ControlButton label={t("canvas_zoom_out")} onClick={handleZoomOut}>
           <ZoomOut className={controlIconClass} aria-hidden />
         </ControlButton>
-        <div className="bg-border h-px w-full" />
+        <ControlButton label={t("canvas_zoom_in")} onClick={handleZoomIn}>
+          <ZoomIn className={controlIconClass} aria-hidden />
+        </ControlButton>
+        <div className="bg-border h-6 w-px shrink-0" />
         <ControlButton label={t("canvas_reset_zoom")} onClick={handleResetZoom}>
           <span className="text-[10px] font-semibold tracking-tight" aria-hidden>
             1:1
@@ -100,7 +100,7 @@ export function WorkflowCanvasControls({ readOnly, onTidy }: WorkflowCanvasContr
         </ControlButton>
         {!readOnly && onTidy ? (
           <>
-            <div className="bg-border h-px w-full" />
+            <div className="bg-border h-6 w-px shrink-0" />
             <ControlButton label={t("canvas_tidy")} onClick={handleTidy}>
               <Sparkles className={controlIconClass} aria-hidden />
             </ControlButton>

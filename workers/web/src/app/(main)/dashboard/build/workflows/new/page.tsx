@@ -67,11 +67,18 @@ export default function NewWorkflowPage() {
           <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
         </div>
       </div>
+      <div className="space-y-2">
+        <Label>{te("agent_service_endpoint")}</Label>
+        <Input
+          value={serviceEndpoint}
+          onChange={(e) => setServiceEndpoint(e.target.value)}
+          placeholder="/api/..."
+        />
+      </div>
       <WorkflowEditor
         definitionJson={definition}
         onDefinitionChange={setDefinition}
         serviceEndpoint={serviceEndpoint}
-        onServiceEndpointChange={setServiceEndpoint}
       />
       <div className="flex gap-2">
         <Button onClick={() => void onSave()} disabled={saving}>

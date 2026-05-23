@@ -43,8 +43,26 @@
 }
 
 .react-flow__minimap {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border: none;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
+}
+
+.workflow-canvas-surface .react-flow__panel .react-flow__minimap {
+  position: relative;
+  margin: 0;
+}
+
+.workflow-editor-shell {
+  --workflow-accent: #ff6f00;
+  --workflow-ai-accent: #8a2be2;
+}
+
+.workflow-canvas-surface .react-flow__background {
+  background-color: #f9f9f9;
+}
+
+.dark .workflow-canvas-surface .react-flow__background {
+  background-color: color-mix(in oklch, var(--muted) 25%, var(--background));
 }

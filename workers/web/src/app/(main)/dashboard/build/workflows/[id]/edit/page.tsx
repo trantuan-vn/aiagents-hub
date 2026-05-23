@@ -2,27 +2,34 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-
+import { addNodeToDefinition, addStickyNoteToDefinition, type WorkflowDefinition } from "../../_components/workflow-canvas";
+import { normalizeWorkflowEdge } from "../../_components/workflow-edge-utils";
 import { WorkflowEditor } from "../../_components/workflow-editor";
+import { WorkflowEditorShell } from "../../_components/workflow-editor-shell";
 import { WorkflowExecuteDialog } from "../../_components/workflow-execute-dialog";
 import { getWorkflow, updateWorkflow } from "../../_lib/api";
 import { mergeAgentServiceEndpoint, readServiceEndpointFromDefinition } from "../../_lib/definition-utils";
+
+function parseDef(json: string): WorkflowDefinition {
+  try {
+    const p = JSON.parse(json) as Partial<WorkflowDefinition> & { nodes?: unknown; edges?: unknown };
+    const nodes = Array.isArray(p.nodes) ? p.nodes : [];
+    const edges = (Array.isArray(p.edges) ? p.edges : []).map((e) => normalizeWorkflowEdge(e));
+    return { nodes, edges, viewport: p.viewport };
+  } catch {
+    return { nodes: [], edges: [] };
+  }
+}
 
 export default function EditWorkflowPage() {
   const params = useParams();
   const id = Number(params.id);
   const t = useTranslations("WorkflowsPage");
-  const te = useTranslations("WorkflowEditorPage");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -61,6 +68,22 @@ export default function EditWorkflowPage() {
     void load();
   }, [load]);
 
+  const handleAddNode = useCallback(
+    (type: string, label: string) => {
+      const def = parseDef(definition);
+      const extra =
+        type === "agent" && serviceEndpoint
+          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
+          : undefined;
+      setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra)));
+    },
+    [definition, serviceEndpoint],
+  );
+
+  const handleAddStickyNote = useCallback(() => {
+    setDefinition(JSON.stringify(addStickyNoteToDefinition(parseDef(definition))));
+  }, [definition]);
+
   const onSave = async () => {
     setSaving(true);
     try {
@@ -81,65 +104,49 @@ export default function EditWorkflowPage() {
     }
   };
 
-  if (loading) return <p className="text-muted-foreground p-6 text-sm">...</p>;
+  if (loading) {
+    return <p className="text-muted-foreground p-6 text-sm">...</p>;
+  }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-1">
+    <>
       <WorkflowExecuteDialog workflowId={id} open={executeOpen} onOpenChange={setExecuteOpen} />
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" asChild>
-          <Link href="/dashboard/build/workflows">{te("back")}</Link>
-        </Button>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/build/workflows/${id}/chat`}>{te("chat")}</Link>
-          </Button>
-          <Button variant="secondary" onClick={() => setExecuteOpen(true)}>
-            {te("execute")}
-          </Button>
-          <Button onClick={() => void onSave()} disabled={saving}>
-            {te("save")}
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label>{t("name")}</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label>
-            {t("status_draft")} / {t("status_published")}
-          </Label>
-          <select
-            className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as "draft" | "published")}
-          >
-            <option value="draft">{t("status_draft")}</option>
-            <option value="published">{t("status_published")}</option>
-          </select>
-        </div>
-        <div className="space-y-2 sm:col-span-2">
-          <Label>{t("description_field")}</Label>
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
-        </div>
-      </div>
-      <WorkflowEditor
-        definitionJson={definition}
-        onDefinitionChange={setDefinition}
-        isShared={isShared}
-        onSharedChange={(v) => {
-          setIsShared(v);
-          if (v) setStatus("published");
-        }}
-        starCount={starCount}
-        onStarCountChange={setStarCount}
-        starLabel={starLabel}
-        onStarLabelChange={setStarLabel}
+      <WorkflowEditorShell
+        workflowId={id}
+        workflowName={name}
         serviceEndpoint={serviceEndpoint}
-        onServiceEndpointChange={setServiceEndpoint}
-      />
-    </div>
+        saving={saving}
+        onSave={() => void onSave()}
+        onExecute={() => setExecuteOpen(true)}
+        onAddNode={handleAddNode}
+        onAddStickyNote={handleAddStickyNote}
+        settings={{
+          name,
+          onNameChange: setName,
+          description,
+          onDescriptionChange: setDescription,
+          status,
+          onStatusChange: setStatus,
+          isShared,
+          onSharedChange: (v) => {
+            setIsShared(v);
+            if (v) setStatus("published");
+          },
+          starCount,
+          onStarCountChange: setStarCount,
+          starLabel,
+          onStarLabelChange: setStarLabel,
+          serviceEndpoint,
+          onServiceEndpointChange: setServiceEndpoint,
+        }}
+      >
+        <WorkflowEditor
+          definitionJson={definition}
+          onDefinitionChange={setDefinition}
+          serviceEndpoint={serviceEndpoint}
+          onExecute={() => setExecuteOpen(true)}
+        />
+      </WorkflowEditorShell>
+    </>
   );
 }

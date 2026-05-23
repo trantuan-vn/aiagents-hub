@@ -2,22 +2,16 @@
 
 import { useCallback, useMemo } from "react";
 
-import { WorkflowCanvas, addNodeToDefinition, type WorkflowDefinition } from "./workflow-canvas";
+import { WorkflowCanvas, type WorkflowDefinition } from "./workflow-canvas";
 import { normalizeWorkflowEdge } from "./workflow-edge-utils";
-import { WorkflowEditorSidebar } from "./workflow-editor-sidebar";
 
 interface WorkflowEditorProps {
   definitionJson: string;
   onDefinitionChange?: (json: string) => void;
   readOnly?: boolean;
-  isShared?: boolean;
-  onSharedChange?: (v: boolean) => void;
-  starCount?: number;
-  onStarCountChange?: (n: number) => void;
-  starLabel?: string;
-  onStarLabelChange?: (s: string) => void;
   serviceEndpoint?: string;
-  onServiceEndpointChange?: (s: string) => void;
+  onExecute?: () => void;
+  className?: string;
 }
 
 function parseDef(json: string): WorkflowDefinition {
@@ -35,14 +29,9 @@ export function WorkflowEditor({
   definitionJson,
   onDefinitionChange,
   readOnly = false,
-  isShared,
-  onSharedChange,
-  starCount = 0,
-  onStarCountChange,
-  starLabel = "",
-  onStarLabelChange,
   serviceEndpoint = "",
-  onServiceEndpointChange,
+  onExecute,
+  className,
 }: WorkflowEditorProps) {
   const definition = useMemo(() => parseDef(definitionJson), [definitionJson]);
 
@@ -53,41 +42,14 @@ export function WorkflowEditor({
     [onDefinitionChange],
   );
 
-  const onAddNode = useCallback(
-    (type: string, label: string) => {
-      if (readOnly) return;
-      const extra =
-        type === "agent" && serviceEndpoint
-          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
-          : undefined;
-      sync(addNodeToDefinition(definition, type, label, extra));
-    },
-    [readOnly, serviceEndpoint, definition, sync],
-  );
-
-  const showSidebar = !readOnly;
-
   return (
-    <div className={`grid gap-4 ${showSidebar ? "lg:grid-cols-[200px_1fr]" : ""}`}>
-      {showSidebar ? (
-        <WorkflowEditorSidebar
-          isShared={isShared}
-          onSharedChange={onSharedChange}
-          starCount={starCount}
-          onStarCountChange={onStarCountChange}
-          starLabel={starLabel}
-          onStarLabelChange={onStarLabelChange}
-          serviceEndpoint={serviceEndpoint}
-          onServiceEndpointChange={onServiceEndpointChange}
-          onAddNode={onAddNode}
-        />
-      ) : null}
-      <WorkflowCanvas
-        initial={definition}
-        onChange={readOnly ? undefined : sync}
-        readOnly={readOnly}
-        serviceEndpoint={serviceEndpoint}
-      />
-    </div>
+    <WorkflowCanvas
+      className={className}
+      initial={definition}
+      onChange={readOnly ? undefined : sync}
+      readOnly={readOnly}
+      serviceEndpoint={serviceEndpoint}
+      onExecute={onExecute}
+    />
   );
 }
