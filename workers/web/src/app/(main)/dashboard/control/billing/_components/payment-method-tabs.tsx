@@ -16,7 +16,6 @@ interface PaymentMethodTabsProps {
   onValueChange: (tab: PaymentMethodTab) => void;
   cassoLabel: string;
   vnpayLabel: string;
-  stripeLabel: string;
   cassoPanel: ReactNode;
   vnpayPanel: ReactNode;
 }
@@ -26,7 +25,6 @@ export function PaymentMethodTabs({
   onValueChange,
   cassoLabel,
   vnpayLabel,
-  stripeLabel,
   cassoPanel,
   vnpayPanel,
 }: PaymentMethodTabsProps) {
@@ -36,7 +34,6 @@ export function PaymentMethodTabs({
       onValueChange={(v) => {
         const next = v as PaymentMethodTab;
         if (next === "vnpay" && !IS_VNPAY_PAYMENT_ENABLED) return;
-        if (next === "stripe") return;
         onValueChange(next);
       }}
       className="w-full"
@@ -47,9 +44,6 @@ export function PaymentMethodTabs({
         </TabsTrigger>
         <TabsTrigger value="vnpay" disabled={!IS_VNPAY_PAYMENT_ENABLED} className={PAYMENT_TAB_TRIGGER_CLASS}>
           {vnpayLabel}
-        </TabsTrigger>
-        <TabsTrigger value="stripe" disabled className={PAYMENT_TAB_TRIGGER_CLASS}>
-          {stripeLabel}
         </TabsTrigger>
       </TabsList>
 

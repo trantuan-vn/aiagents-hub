@@ -2582,7 +2582,7 @@
   },
   "BillingPage": {
     "title": "Billing & wallet",
-    "description": "Top up your balance (USD presets), pay via Casso/VNPay/Stripe",
+    "description": "Top up your balance (USD presets), pay via Casso/VNPay",
     "fetch_error": "Failed to fetch orders",
     "error": "Error",
     "create_error": "Failed to create order",
@@ -2647,7 +2647,6 @@
     "language": "Language",
     "language_description": "Select payment interface language",
     "tab_vnpay": "VNPay (coming soon)",
-    "tab_stripe": "Stripe (coming soon)",
     "tab_casso": "Casso",
     "casso_qr_hint": "Scan the VietQR code and transfer the exact amount. Casso notifies our server to reconcile (same spirit as VNPay IPN).",
     "casso_qr_error": "Could not generate VietQR",

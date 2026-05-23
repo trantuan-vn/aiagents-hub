@@ -156,7 +156,6 @@ export function PaymentDialog({
               onValueChange={setPaymentTab}
               cassoLabel={t("tab_casso")}
               vnpayLabel={t("tab_vnpay")}
-              stripeLabel={t("tab_stripe")}
               cassoPanel={
                 <PaymentCassoPanel
                   hint={t("casso_qr_hint")}
