@@ -1,6 +1,6 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createPriceApplicationService } from '../../admin/policy/application';
-import { convertVndToUsd } from '../../admin/service/pricing';
+import { convertVndToUsd, roundWalletTopUpUsd } from '../../admin/service/pricing';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { createVoucherApplicationService } from '../../admin/voucher/application';
 import { processCommissionOnOrder } from '../referral/commission-service';
@@ -8,6 +8,7 @@ import {
   CreateOrder,
   UpdateOrderStatus,
   IOrderInfrastructureService,
+  mapOrderForMemberApi,
 } from './domain';
 import { executeUtils } from '../../../shared/utils';
 
@@ -155,46 +156,66 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
   return {
     async createOrder(user: any, request: CreateOrder): Promise<any> {
       const calculationResult = await calculateWalletTopUp(user, request);
+      const isUsdTopUp = (request.currency ?? 'USD').toUpperCase() === 'USD';
 
-      const subtotalVnd = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
-      const discountVnd = calculationResult.reduce(
+      const subtotal = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
+      const discount = calculationResult.reduce(
         (total, item) => total + (item.policy.totalDiscount + item.voucher.discountAmount) * item.quantity,
         0,
       );
-      const finalAmountVnd = Math.max(0, subtotalVnd - discountVnd);
-      const payableAmountVnd = Math.round(finalAmountVnd);
+      const finalRaw = Math.max(0, subtotal - discount);
 
-      const usdVndRate = await getUsdVndRateFromEnv(context.env, bindingName);
-      const toUsd = (vnd: number): number => convertVndToUsd(vnd, usdVndRate);
+      let subtotalAmount: number;
+      let discountAmount: number;
+      let finalAmount: number;
+      let payableAmountVnd: number | undefined;
 
-      const subtotalAmount = toUsd(subtotalVnd);
-      const discountAmount = toUsd(discountVnd);
-      const finalAmount = toUsd(finalAmountVnd);
+      if (isUsdTopUp) {
+        subtotalAmount = roundWalletTopUpUsd(subtotal);
+        discountAmount = roundWalletTopUpUsd(discount);
+        finalAmount = roundWalletTopUpUsd(finalRaw);
+        payableAmountVnd = undefined;
+      } else {
+        const usdVndRate = await getUsdVndRateFromEnv(context.env, bindingName);
+        const toUsd = (vnd: number): number => convertVndToUsd(vnd, usdVndRate);
+        subtotalAmount = toUsd(subtotal);
+        discountAmount = toUsd(discount);
+        finalAmount = toUsd(finalRaw);
+        payableAmountVnd = Math.round(finalRaw);
+      }
 
-      const orderData = {
-        orderCode: generateOrderCode(),
+      const orderCode = generateOrderCode();
+      const orderData: Record<string, unknown> = {
+        orderCode,
         subtotalAmount,
         discountAmount,
         finalAmount,
-        payableAmountVnd,
         currency: 'USD',
         appliedVoucherCode: request.voucherCode,
         status: 'PENDING',
         notes: request.notes,
       };
+      if (payableAmountVnd != null) {
+        orderData.payableAmountVnd = payableAmountVnd;
+      }
 
       const orderRecord = await executeUtils.executeDynamicAction(userDO, 'insert', orderData, 'orders');
 
-      // Tạo order items và discounts
+      const usdVndRateForLines = isUsdTopUp
+        ? 0
+        : await getUsdVndRateFromEnv(context.env, bindingName);
+      const mapLineAmount = (v: number): number =>
+        isUsdTopUp ? roundWalletTopUpUsd(v) : convertVndToUsd(v, usdVndRateForLines);
+
       for (const item of calculationResult) {
-        const itemDiscountVnd = item.policy.totalDiscount + item.voucher.discountAmount;
-        const itemFinalVnd = item.basePrice - itemDiscountVnd;
+        const itemDiscount = item.policy.totalDiscount + item.voucher.discountAmount;
+        const itemFinal = item.basePrice - itemDiscount;
         const orderItem = await executeUtils.executeDynamicAction(userDO, 'insert', {
           serviceId: item.serviceId,
-          basePrice: toUsd(item.basePrice),
+          basePrice: mapLineAmount(item.basePrice),
           quantity: item.quantity,
-          finalAmount: toUsd(itemFinalVnd),
-          discountAmount: toUsd(itemDiscountVnd),
+          finalAmount: mapLineAmount(itemFinal),
+          discountAmount: mapLineAmount(itemDiscount),
           orderId: orderRecord.id
         }, 'order_items');
 
@@ -203,13 +224,13 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
           if (item.discounts.policyDiscount) {
             discountsUsd.policyDiscount = {
               ...item.discounts.policyDiscount,
-              amount: toUsd(item.discounts.policyDiscount.amount),
+              amount: mapLineAmount(item.discounts.policyDiscount.amount),
             };
           }
           if (item.discounts.voucherDiscount) {
             discountsUsd.voucherDiscount = {
               ...item.discounts.voucherDiscount,
-              amount: toUsd(item.discounts.voucherDiscount.amount),
+              amount: mapLineAmount(item.discounts.voucherDiscount.amount),
             };
           }
           await createOrderDiscounts(orderItem.id, discountsUsd);
@@ -220,7 +241,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
       try {
         await processCommissionOnOrder(context, bindingName, user, {
           id: orderRecord.id,
-          orderCode: orderData.orderCode,
+          orderCode,
           finalAmount,
           currency: 'USD',
         });
@@ -248,9 +269,9 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
         orders.map(async (order: any) => {
           const items = await executeUtils.executeDynamicAction(userDO, 'select', {
             where: { field: "order_id", operator: '=', value: order.id }
-          }, 'order_items') 
-          return { ...order, items };
-        })
+          }, 'order_items');
+          return { ...mapOrderForMemberApi(order as Record<string, unknown>), items };
+        }),
       );
 
       return ordersWithItems;
@@ -275,7 +296,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
         )
       ]);
 
-      return { ...order, items, discounts };
+      return { ...mapOrderForMemberApi(order as Record<string, unknown>), items, discounts };
     },
 
     async updateOrderStatus(orderId: number, request: UpdateOrderStatus): Promise<any> {

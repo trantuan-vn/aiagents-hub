@@ -13,7 +13,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 import {
-  FALLBACK_MIN_TOP_UP_VND,
   FALLBACK_USD_VND,
   fetchMemberBillingParams,
   fetchOrdersList,
@@ -38,7 +37,6 @@ export default function BillingPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
   const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
-  const [minTopUpVnd, setMinTopUpVnd] = useState(FALLBACK_MIN_TOP_UP_VND);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status] = useState<string | undefined>(undefined);
@@ -77,7 +75,6 @@ export default function BillingPage() {
   const refreshBillingParams = (): void => {
     void fetchMemberBillingParams().then((p) => {
       setUsdVndRate(p.usdVndRate);
-      setMinTopUpVnd(p.minTopUpVnd);
     });
   };
 
@@ -158,7 +155,7 @@ export default function BillingPage() {
   }, [searchParams, router]);
 
   const handleCreateOrder = async (data: CreateOrder): Promise<unknown> => {
-    const result = await postCreateOrder(data, t("create_error"));
+    const result = await postCreateOrder({ ...data, currency: "USD" }, t("create_error"));
     void fetchOrders();
     void fetchWalletBalance().then(setWalletBalanceUsd);
     refreshBillingParams();
@@ -206,13 +203,7 @@ export default function BillingPage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <WalletTopUpDialog
-          onCreate={handleCreateOrder}
-          usdVndRate={usdVndRate}
-          minTopUpVnd={minTopUpVnd}
-          open={topUpOpen}
-          onOpenChange={setTopUpOpen}
-        />
+        <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={setTopUpOpen} />
       </div>
 
       <BillingStatsCards

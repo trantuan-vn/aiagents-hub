@@ -11,7 +11,6 @@ interface UseCassoQrOptions {
   paymentTab: PaymentMethodTab;
   orderId: number;
   orderPayableVnd: number;
-  watchedAmount: number;
   onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
 }
 
@@ -20,7 +19,6 @@ export function useCassoQr({
   paymentTab,
   orderId,
   orderPayableVnd,
-  watchedAmount,
   onCassoQr,
 }: UseCassoQrOptions) {
   const t = useTranslations("BillingPage");
@@ -45,8 +43,7 @@ export function useCassoQr({
     setCassoLoading(true);
     setCassoError(null);
     setCassoQr(null);
-    const amount = typeof watchedAmount === "number" && !Number.isNaN(watchedAmount) ? watchedAmount : orderPayableVnd;
-    void onCassoQr(orderId, amount)
+    void onCassoQr(orderId, orderPayableVnd)
       .then((res) => {
         if (!cancelled) {
           setCassoQr(res.qr);
@@ -67,7 +64,7 @@ export function useCassoQr({
     return () => {
       cancelled = true;
     };
-  }, [open, paymentTab, watchedAmount, orderId, onCassoQr, orderPayableVnd, t, toast]);
+  }, [open, paymentTab, orderId, onCassoQr, orderPayableVnd, t, toast]);
 
   return { cassoQr, cassoLoading, cassoError };
 }

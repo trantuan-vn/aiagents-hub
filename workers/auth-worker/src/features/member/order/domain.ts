@@ -53,20 +53,39 @@ export const OrderItemDiscountSchema = z.object({
   description: z.string().optional(),
 });
 
-/** Wallet top-up: `amount` is VND payable; stored order amounts are USD at daily rate. */
+/** Wallet top-up request (USD or legacy VND). */
 export const CreateOrderSchema = z.object({
-  amount: z.number().int().positive(),
+  amount: z.number().positive(),
   currency: z.string().default('USD'),
   voucherCode: z.string().optional(),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
 });
 
-/** Validates create-order JSON; `minTopUpVnd` from system config `billing.MIN_TOP_UP_VND`. */
+const MIN_TOP_UP_USD = 1;
+
+/** Validates create-order JSON. USD top-ups are stored as entered; VND uses `minTopUpVnd` from config. */
 export function parseCreateOrderRequest(body: unknown, minTopUpVnd: number): CreateOrder {
-  return CreateOrderSchema.extend({
-    amount: z.number().int().min(minTopUpVnd, `Amount must be at least ${minTopUpVnd} VND`),
-  }).parse(body);
+  const parsed = CreateOrderSchema.parse(body);
+  const currency = (parsed.currency ?? 'USD').toUpperCase();
+
+  if (currency === 'USD') {
+    const cents = Math.round(parsed.amount * 100);
+    if (!Number.isFinite(cents) || cents < Math.round(MIN_TOP_UP_USD * 100)) {
+      throw new Error(`Amount must be at least ${MIN_TOP_UP_USD} USD`);
+    }
+    if (Math.abs(parsed.amount * 100 - cents) > 1e-6) {
+      throw new Error('Amount supports at most 2 decimal places');
+    }
+    return { ...parsed, currency: 'USD', amount: cents / 100 };
+  }
+
+  const minVnd = Math.max(1, Math.floor(minTopUpVnd));
+  const amount = Math.round(parsed.amount);
+  if (!Number.isInteger(parsed.amount) || amount < minVnd) {
+    throw new Error(`Amount must be at least ${minVnd} VND`);
+  }
+  return { ...parsed, currency: 'VND', amount };
 }
 
 export const UpdateOrderStatusSchema = z.object({
@@ -221,6 +240,40 @@ export type OrderError = z.infer<typeof OrderErrorSchema>;
 export const ORDER_DEFAULT_LIMIT = 20;
 export const ORDER_DEFAULT_PAGE = 1;
 export const ORDER_CURRENCY = 'USD';
+
+function timestampToIso(value: unknown): string {
+  if (value == null) return new Date().toISOString();
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
+  if (typeof value === 'string') {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+/** Normalize UserDO row (created_at ms) to member API shape (createdAt ISO string). */
+export function mapOrderForMemberApi(row: Record<string, unknown>): Record<string, unknown> {
+  const payable = row.payableAmountVnd ?? row.payable_amount_vnd;
+  const mapped: Record<string, unknown> = {
+    id: row.id,
+    orderCode: row.orderCode ?? row.order_code,
+    subtotalAmount: row.subtotalAmount ?? row.subtotal_amount,
+    discountAmount: row.discountAmount ?? row.discount_amount ?? 0,
+    finalAmount: row.finalAmount ?? row.final_amount,
+    status: row.status,
+    currency: row.currency ?? ORDER_CURRENCY,
+    appliedVoucherCode: row.appliedVoucherCode ?? row.applied_voucher_code ?? null,
+    notes: row.notes ?? null,
+    internalNotes: row.internalNotes ?? row.internal_notes ?? null,
+    createdAt: timestampToIso(row.createdAt ?? row.created_at),
+    updatedAt: timestampToIso(row.updatedAt ?? row.updated_at),
+  };
+  if (typeof payable === 'number' && payable > 0) {
+    mapped.payableAmountVnd = Math.round(payable);
+  }
+  return mapped;
+}
 
 /** VND amount to charge at payment gateways (legacy orders without payableAmountVnd use finalAmount as VND). */
 export function getOrderPayableVnd(

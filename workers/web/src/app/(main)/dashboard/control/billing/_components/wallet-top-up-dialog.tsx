@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Wallet } from "lucide-react";
@@ -19,46 +19,55 @@ import {
 } from "@/components/ui/dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn, formatUsd } from "@/lib/utils";
 
-import { formatVndCheckoutAmount } from "./payment-dialog-constants";
-import { createCreateOrderSchema, type CreateOrder } from "./schema";
-
-const FALLBACK_USD_VND =
-  Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000") > 0
-    ? Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000")
-    : 26000;
+import { createUsdTopUpOrderSchema, MIN_TOP_UP_USD, type CreateOrder } from "./schema";
 
 const PRESET_USD = [2, 5, 10, 20, 50, 100] as const;
 
+/** Allow digits and one decimal separator, up to 2 fractional digits. */
+function sanitizeUsdInput(raw: string): string {
+  const cleaned = raw.replace(/[^\d.]/g, "");
+  if (!cleaned) return "";
+  const [whole, ...rest] = cleaned.split(".");
+  if (rest.length === 0) return whole;
+  return `${whole}.${rest.join("").slice(0, 2)}`;
+}
+
+function parseUsdInput(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed === ".") return null;
+  const n = Number.parseFloat(trimmed);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function formatUsdInputValue(usd: number): string {
+  const rounded = Math.round(usd * 100) / 100;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
 interface WalletTopUpFormProps {
   onCreate: (data: CreateOrder) => Promise<unknown>;
-  usdVndRate: number;
-  minTopUpVnd: number;
   onDismiss: () => void;
 }
 
-function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: WalletTopUpFormProps) {
+function WalletTopUpForm({ onCreate, onDismiss }: WalletTopUpFormProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedUsd, setSelectedUsd] = useState<number | null>(10);
+  const [usdInput, setUsdInput] = useState("10");
+  const [selectedPreset, setSelectedPreset] = useState<number | null>(10);
+  const [usdInputError, setUsdInputError] = useState<string | null>(null);
 
-  const effectiveRate = usdVndRate > 0 ? usdVndRate : FALLBACK_USD_VND;
-  const effectiveMin = Math.max(1, Math.floor(minTopUpVnd));
-  const effectiveMinUsd = effectiveMin / effectiveRate;
-
-  const orderSchema = useMemo(() => createCreateOrderSchema(effectiveMin), [effectiveMin]);
-
-  const defaultAmount = Math.max(effectiveMin, Math.round(10 * effectiveRate));
+  const orderSchema = useMemo(() => createUsdTopUpOrderSchema(MIN_TOP_UP_USD), []);
 
   const form = useForm<CreateOrder>({
     resolver: zodResolver(orderSchema) as Resolver<CreateOrder>,
     defaultValues: {
-      amount: defaultAmount,
+      amount: 10,
       currency: "USD",
       voucherCode: "",
       notes: "",
@@ -66,32 +75,34 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
     },
   });
 
-  const amountVnd = form.watch("amount");
-
-  const approxUsd = useMemo(() => {
-    const v = Number(amountVnd) || 0;
-    return v / effectiveRate;
-  }, [amountVnd, effectiveRate]);
-
-  const syncAmountFromUsd = useCallback(
-    (usd: number): void => {
-      const vnd = Math.max(effectiveMin, Math.round(usd * effectiveRate));
-      form.setValue("amount", vnd, { shouldValidate: true });
+  const applyUsdAmount = useCallback(
+    (usd: number, preset: number | null): void => {
+      const value = Math.round(usd * 100) / 100;
+      setUsdInput(formatUsdInputValue(value));
+      setSelectedPreset(preset);
+      setUsdInputError(null);
+      form.setValue("amount", value, { shouldValidate: false });
     },
-    [form, effectiveMin, effectiveRate],
+    [form],
   );
 
-  useEffect(() => {
-    if (selectedUsd != null) {
-      syncAmountFromUsd(selectedUsd);
-    }
-  }, [selectedUsd, syncAmountFromUsd]);
-
   const onSubmit = async (data: CreateOrder): Promise<void> => {
+    const usd = parseUsdInput(usdInput);
+    if (usd == null) {
+      setUsdInputError(t("amount_usd_required"));
+      return;
+    }
+    if (usd < MIN_TOP_UP_USD) {
+      setUsdInputError(t("min_top_up_hint", { amount: formatUsd(MIN_TOP_UP_USD) }));
+      return;
+    }
+    setUsdInputError(null);
+
     setIsLoading(true);
     try {
-      await onCreate(data);
+      await onCreate({ ...data, amount: usd, currency: "USD" });
       form.reset();
+      applyUsdAmount(10, 10);
       onDismiss();
       toast({
         title: t("order_created"),
@@ -111,23 +122,9 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="usd-vnd-rate-readonly">{t("exchange_rate_label")}</Label>
-          <Input
-            id="usd-vnd-rate-readonly"
-            readOnly
-            tabIndex={-1}
-            className="bg-muted font-mono"
-            value={effectiveRate.toLocaleString("vi-VN")}
-          />
-          <p className="text-muted-foreground text-xs">{t("exchange_rate_hint")}</p>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-muted-foreground text-sm">
-            {t("min_top_up_hint", { amount: formatUsd(effectiveMinUsd) })}
-          </p>
-        </div>
+        <p className="text-muted-foreground text-sm">
+          {t("min_top_up_hint", { amount: formatUsd(MIN_TOP_UP_USD) })}
+        </p>
 
         <div className="space-y-2">
           <p className="text-muted-foreground text-sm">{t("preset_usd_label")}</p>
@@ -136,12 +133,9 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
               <Button
                 key={usd}
                 type="button"
-                variant={selectedUsd === usd ? "default" : "outline"}
+                variant={selectedPreset === usd ? "default" : "outline"}
                 className={cn("h-11 font-semibold")}
-                onClick={() => {
-                  setSelectedUsd(usd);
-                  syncAmountFromUsd(usd);
-                }}
+                onClick={() => applyUsdAmount(usd, usd)}
               >
                 ${usd}
               </Button>
@@ -149,49 +143,35 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
           </div>
         </div>
 
-        <FormField
-          control={form.control}
-          name="amount"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>{t("amount_usd_label")}</FormLabel>
-              <FormControl>
-                <Input
-                  type="number"
-                  inputMode="decimal"
-                  min={effectiveMinUsd}
-                  step="any"
-                  value={approxUsd > 0 ? approxUsd : ""}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    if (raw === "") {
-                      field.onChange(0);
-                      setSelectedUsd(null);
-                      return;
-                    }
-                    const usd = Number.parseFloat(raw);
-                    if (!Number.isFinite(usd) || usd <= 0) {
-                      field.onChange(0);
-                      setSelectedUsd(null);
-                      return;
-                    }
-                    setSelectedUsd(null);
-                    field.onChange(Math.max(effectiveMin, Math.round(usd * effectiveRate)));
-                  }}
-                />
-              </FormControl>
-              <FormDescription>
-                {t("amount_usd_checkout_hint")}
-                {amountVnd >= effectiveMin ? (
-                  <span className="mt-1 block tabular-nums">
-                    {t("amount_vnd_checkout", { amount: formatVndCheckoutAmount(Number(amountVnd) || 0) })}
-                  </span>
-                ) : null}
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <FormItem>
+          <FormLabel htmlFor="top-up-usd-amount">{t("amount_usd_label")}</FormLabel>
+          <FormControl>
+            <div className="relative">
+              <span className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 font-medium">
+                $
+              </span>
+              <Input
+                id="top-up-usd-amount"
+                type="text"
+                inputMode="decimal"
+                autoComplete="off"
+                className="pl-7"
+                value={usdInput}
+                onChange={(e) => {
+                  const next = sanitizeUsdInput(e.target.value);
+                  setUsdInput(next);
+                  setSelectedPreset(null);
+                  setUsdInputError(null);
+                  const parsed = parseUsdInput(next);
+                  if (parsed != null) {
+                    form.setValue("amount", parsed, { shouldValidate: false });
+                  }
+                }}
+              />
+            </div>
+          </FormControl>
+          {usdInputError ? <p className="text-destructive text-sm">{usdInputError}</p> : null}
+        </FormItem>
 
         <FormField
           control={form.control}
@@ -238,18 +218,12 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
 
 interface WalletTopUpDialogProps {
   onCreate: (data: CreateOrder) => Promise<unknown>;
-  /** VND per 1 USD from system configuration (page loads via API). */
-  usdVndRate: number;
-  /** Minimum top-up amount (VND) from system configuration. */
-  minTopUpVnd: number;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }
 
 export function WalletTopUpDialog({
   onCreate,
-  usdVndRate,
-  minTopUpVnd,
   open: controlledOpen,
   onOpenChange,
 }: WalletTopUpDialogProps) {
@@ -282,15 +256,7 @@ export function WalletTopUpDialog({
           <DialogDescription>{t("top_up_description")}</DialogDescription>
         </DialogHeader>
 
-        {open ? (
-          <WalletTopUpForm
-            key={`${minTopUpVnd}-${usdVndRate}`}
-            onCreate={onCreate}
-            usdVndRate={usdVndRate}
-            minTopUpVnd={minTopUpVnd}
-            onDismiss={() => setOpen(false)}
-          />
-        ) : null}
+        {open ? <WalletTopUpForm onCreate={onCreate} onDismiss={() => setOpen(false)} /> : null}
       </DialogContent>
     </Dialog>
   );

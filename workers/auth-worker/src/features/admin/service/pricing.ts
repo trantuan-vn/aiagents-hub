@@ -60,6 +60,12 @@ export function roundUsdAmount(amount: number): number {
   return Math.round(amount * factor) / factor;
 }
 
+/** User-entered wallet top-up (max 2 decimal places; avoids float noise like 110.00008344). */
+export function roundWalletTopUpUsd(amount: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * 100) / 100;
+}
+
 /** @deprecated Use roundUsdAmount */
 export const roundVndAmount = roundUsdAmount;
 

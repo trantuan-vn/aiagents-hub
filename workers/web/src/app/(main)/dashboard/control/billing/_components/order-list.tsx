@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatUsd } from "@/lib/utils";
 
 import { PaymentDialog } from "./payment-dialog";
-import type { Order, OrderStatus } from "./schema";
+import { formatOrderDate, type Order, OrderStatus } from "./schema";
 
 interface OrderListProps {
   orders: Order[];
@@ -49,16 +49,6 @@ export function OrderList({
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
 
   const getStatusBadgeVariant = (status: OrderStatus): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -158,7 +148,7 @@ export function OrderList({
                       <div className="text-muted-foreground flex flex-wrap items-center gap-4 text-xs">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {formatDate(order.createdAt)}
+                          {formatOrderDate(order.createdAt)}
                         </div>
                         <div className="flex items-center gap-1">
                           <CreditCard className="h-3 w-3" />
@@ -174,12 +164,18 @@ export function OrderList({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {!readOnly && canPay(order.status) && (
-                    <Button size="sm" onClick={() => setSelectedOrder(order)} className="flex items-center gap-1">
-                      <CreditCard className="h-4 w-4" />
-                      {t("pay_now")}
-                    </Button>
+                    <>
+                      <Button size="sm" onClick={() => setSelectedOrder(order)} className="flex items-center gap-1">
+                        <CreditCard className="h-4 w-4" />
+                        {t("pay_with_vnd")}
+                      </Button>
+                      <Button size="sm" variant="outline" disabled className="flex items-center gap-1">
+                        <CreditCard className="h-4 w-4" />
+                        {t("pay_with_usd_coming_soon")}
+                      </Button>
+                    </>
                   )}
                   {!readOnly && canCancel(order.status) && (
                     <AlertDialog>

@@ -7,8 +7,7 @@ import { useTranslations } from "next-intl";
 import { useForm, type Resolver } from "react-hook-form";
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 
 import { PaymentCassoPanel } from "./payment-casso-panel";
@@ -54,20 +53,18 @@ export function PaymentDialog({
     },
   });
 
-  const watchedAmount = form.watch("amount");
   const { cassoQr, cassoLoading, cassoError } = useCassoQr({
     open,
     paymentTab,
     orderId: order.id,
     orderPayableVnd: payableVnd,
-    watchedAmount,
     onCassoQr,
   });
 
   const onSubmit = async (data: CreatePayment): Promise<void> => {
     setIsLoading(true);
     try {
-      await onPayment(data.orderId, data.amount, data.bankCode, data.language);
+      await onPayment(data.orderId, payableVnd, data.bankCode, data.language);
     } catch (error) {
       toast({
         title: t("error"),
@@ -125,27 +122,6 @@ export function PaymentDialog({
                 <span className="text-sm font-bold tabular-nums">{formatVndCheckoutAmount(payableVnd)}</span>
               </div>
             </div>
-
-            <FormField
-              control={form.control}
-              name="amount"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>{t("payment_amount")}</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min={1000}
-                      placeholder={payableVnd.toString()}
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || payableVnd)}
-                    />
-                  </FormControl>
-                  <FormDescription>{t("payment_amount_description")}</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <PaymentMethodTabs
               value={paymentTab}

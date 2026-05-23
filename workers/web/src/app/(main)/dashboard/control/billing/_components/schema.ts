@@ -11,10 +11,43 @@ export function createCreateOrderSchema(minTopUpVnd: number) {
       .number()
       .int("Amount must be a whole number")
       .min(m, `Amount must be at least ${m.toLocaleString("vi-VN")} VND`),
-    currency: z.string().default("VND"),
+    currency: z.string().default("USD"),
     voucherCode: z.string().optional(),
     notes: z.string().optional(),
     paymentMethod: z.string().optional(),
+  });
+}
+
+/** Minimum wallet top-up in USD (no exchange rate on the entry screen). */
+export const MIN_TOP_UP_USD = 1;
+
+/** Wallet top-up dialog: user enters USD (up to 2 decimals); VND is computed at payment. */
+export function createUsdTopUpOrderSchema(minTopUpUsd: number) {
+  const m = Math.max(0.01, minTopUpUsd);
+  return z.object({
+    amount: z
+      .number()
+      .positive("Amount must be greater than zero")
+      .min(m, `Amount must be at least ${m} USD`)
+      .refine((v) => Number.isInteger(Math.round(v * 100)), "Amount supports at most 2 decimal places"),
+    currency: z.literal("USD").default("USD"),
+    voucherCode: z.string().optional(),
+    notes: z.string().optional(),
+    paymentMethod: z.string().optional(),
+  });
+}
+
+/** Format order timestamp for display (handles ISO string or Unix ms). */
+export function formatOrderDate(value: string | number | null | undefined): string {
+  if (value == null || value === "") return "—";
+  const d = typeof value === "number" ? new Date(value) : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
