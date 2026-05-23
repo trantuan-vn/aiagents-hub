@@ -57,6 +57,7 @@ export const sidebarItems: NavGroup[] = [
     label: "Control",
     items: [
       { title: "Overview", url: "/dashboard/control/overview", icon: LayoutDashboard },
+      { title: "Assistant", url: "/dashboard/control/assistant", icon: Bot },
       { title: "Account", url: "/dashboard/control/account", icon: UserCircle },
       { title: "API Keys", url: "/dashboard/control/token", icon: Key },
       { title: "Billing", url: "/dashboard/control/billing", icon: CreditCard },
@@ -161,10 +162,7 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 4,
     label: "Build",
-    items: [
-      { title: "Agent Workflows", url: "/dashboard/build/workflows", icon: GitBranch, isNew: true },
-      { title: "Assistant", url: "/dashboard/control/assistant", icon: Bot },
-    ],
+    items: [{ title: "Agent Workflows", url: "/dashboard/build/workflows", icon: GitBranch, isNew: true }],
   },
 ];
 
