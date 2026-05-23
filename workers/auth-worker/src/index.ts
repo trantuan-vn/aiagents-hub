@@ -16,6 +16,7 @@ import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
 import { createSystemConfigRoutes } from './features/admin/system-config/presentation';
+import { createExchangeRateRoutes } from './features/admin/exchange-rate/presentation';
 import { createReferralRoutes } from './features/member/referral/presentation';
 import { createCommissionPolicyRoutes } from './features/member/referral/commission-policy-presentation';
 import { createOverviewRoutes } from './features/member/overview/presentation';
@@ -71,6 +72,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));
   routes.route('/dashboard/admin/system-config', createSystemConfigRoutes(bindingName));
+  routes.route('/dashboard/admin/exchange-rates', createExchangeRateRoutes(bindingName));
   routes.route('/dashboard/referral', createReferralRoutes(bindingName));
   routes.route('/dashboard/admin/commission-policy', createCommissionPolicyRoutes(bindingName));
   routes.route('/dashboard/overview', createOverviewRoutes(bindingName));

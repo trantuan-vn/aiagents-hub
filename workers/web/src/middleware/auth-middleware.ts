@@ -8,7 +8,8 @@ function requiresAdminAccess(pathname: string): boolean {
     pathname.startsWith("/dashboard/finance") ||
     pathname.startsWith("/dashboard/system-config") ||
     pathname.startsWith("/dashboard/commission-policy") ||
-    pathname.startsWith("/dashboard/earnings-payouts")
+    pathname.startsWith("/dashboard/earnings-payouts") ||
+    pathname.startsWith("/dashboard/exchange-rates")
   );
 }
 

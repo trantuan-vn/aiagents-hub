@@ -55,6 +55,7 @@ const SYNC_TABLE_NAMES = [
   "agent_workflows",
   "payout_beneficiary",
   "earnings_payouts",
+  "exchange_rates",
 ];
 
 

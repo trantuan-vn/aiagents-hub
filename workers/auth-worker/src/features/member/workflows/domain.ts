@@ -46,7 +46,7 @@ export const AgentWorkflowSchema = z.object({
   starCount: z.number().int().min(0).max(5).default(0),
   starLabel: z.string().max(100).optional(),
   usageCount: z.number().int().min(0).default(0),
-  totalEarningsVnd: z.number().min(0).default(0),
+  totalEarningsUsd: z.number().min(0).default(0),
   status: z.enum(['draft', 'published']).default('draft'),
 });
 
@@ -75,10 +75,10 @@ export const WorkflowRoyaltySchema = z.object({
   workflowOwnerId: z.string(),
   consumerUserId: z.string(),
   serviceUsageGlobalId: z.number().int().optional(),
-  baseCostVnd: z.number().min(0),
+  baseCostUsd: z.number().min(0),
   royaltyPercent: z.number().min(0).max(100),
-  royaltyAmountVnd: z.number().min(0),
-  currency: z.string().default('VND'),
+  royaltyAmountUsd: z.number().min(0),
+  currency: z.string().default('USD'),
 });
 
 export type AgentWorkflow = z.infer<typeof AgentWorkflowSchema>;

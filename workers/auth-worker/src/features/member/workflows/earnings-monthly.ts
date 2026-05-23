@@ -7,7 +7,7 @@ import type { RoyaltyStatsRow } from './infrastructure';
 
 export interface WorkflowClosedPeriodRow {
   period: string;
-  totalAmountVnd: number;
+  totalAmountUsd: number;
   payoutStatus: 'pending' | 'paid' | null;
 }
 
@@ -15,12 +15,12 @@ export interface WorkflowEarningsMonthlySummary {
   currentPeriod: string;
   accruing: {
     period: string;
-    totalAmountVnd: number;
+    totalAmountUsd: number;
     byDay: RoyaltyStatsRow[];
     royalties: Record<string, unknown>[];
   };
   closedPeriods: WorkflowClosedPeriodRow[];
-  closedTotalAmountVnd: number;
+  closedTotalAmountUsd: number;
 }
 
 function lastClosedPeriod(): string {
@@ -53,7 +53,7 @@ async function getWorkflowRoyaltyTotalInRange(
 ): Promise<number> {
   const row = await db
     .prepare(
-      `SELECT SUM("royaltyAmountVnd") AS total FROM workflow_royalties
+      `SELECT SUM(COALESCE("royaltyAmountUsd", "royaltyAmountVnd", 0)) AS total FROM workflow_royalties
        WHERE "workflowOwnerId" = ? AND created_at >= ? AND created_at < ?`,
     )
     .bind(ownerUserId, fromTs, toTs)
@@ -69,18 +69,18 @@ export async function getWorkflowRoyaltyStatsInRange(
 ): Promise<{ byDay: RoyaltyStatsRow[]; totalAmount: number }> {
   const result = await db
     .prepare(
-      `SELECT created_at, "royaltyAmountVnd" FROM workflow_royalties
+      `SELECT created_at, COALESCE("royaltyAmountUsd", "royaltyAmountVnd", 0) AS "royaltyAmountUsd" FROM workflow_royalties
        WHERE "workflowOwnerId" = ? AND created_at >= ? AND created_at < ?
        ORDER BY created_at ASC`,
     )
     .bind(ownerUserId, fromTs, toTs)
-    .all<{ created_at?: number; royaltyAmountVnd?: number }>();
+    .all<{ created_at?: number; royaltyAmountUsd?: number }>();
 
   const byDate = new Map<string, number>();
   for (const r of result.results ?? []) {
     const ts = r.created_at ?? 0;
     const dateKey = new Date(ts).toISOString().slice(0, 10);
-    byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.royaltyAmountVnd ?? 0));
+    byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.royaltyAmountUsd ?? 0));
   }
   const byDay = Array.from(byDate.entries())
     .map(([date, total]) => ({ date, total }))
@@ -150,28 +150,28 @@ export async function getWorkflowEarningsMonthlySummary(
     const periods = enumeratePeriods(earliest, closedEnd);
     for (const p of periods) {
       const { fromTs, toTs } = periodToRange(p);
-      const totalAmountVnd = await getWorkflowRoyaltyTotalInRange(db, ownerUserId, fromTs, toTs);
-      if (totalAmountVnd <= 0) continue;
+      const totalAmountUsd = await getWorkflowRoyaltyTotalInRange(db, ownerUserId, fromTs, toTs);
+      if (totalAmountUsd <= 0) continue;
       closedPeriods.push({
         period: p,
-        totalAmountVnd,
+        totalAmountUsd,
         payoutStatus: payoutByPeriod.get(p) ?? null,
       });
     }
     closedPeriods.sort((a, b) => b.period.localeCompare(a.period));
   }
 
-  const closedTotalAmountVnd = closedPeriods.reduce((s, r) => s + r.totalAmountVnd, 0);
+  const closedTotalAmountUsd = closedPeriods.reduce((s, r) => s + r.totalAmountUsd, 0);
 
   return {
     currentPeriod: current,
     accruing: {
       period: current,
-      totalAmountVnd: accruingStats.totalAmount,
+      totalAmountUsd: accruingStats.totalAmount,
       byDay: accruingStats.byDay,
       royalties: accruingRoyalties,
     },
     closedPeriods,
-    closedTotalAmountVnd,
+    closedTotalAmountUsd,
   };
 }

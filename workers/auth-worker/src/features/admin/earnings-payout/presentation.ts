@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { requireAdmin } from '../../auth/authMiddleware';
-import { handleError, getIdFromName } from '../../../shared/utils';
+import { handleError, getIdFromName, executeUtils } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
+import { convertUsdToVnd } from '../../admin/service/pricing';
+import { getUsdVndRateForDate, todayDateString } from '../exchange-rate/get-rate';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
 import { generateVietQr } from '../../member/payout/vietqr';
-import { randomPayoutTransferCode } from './casso-payout';
+import { randomPayoutTransferCode, toPayoutAmountVnd } from './casso-payout';
 import {
   createEarningsPayoutInfrastructure,
 } from './infrastructure';
@@ -62,12 +64,12 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
 
-      const { keys, totalAmountVnd, identifier } = await getUnpaidPayoutKeysForUser(
+      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
         db,
         payoutInfra,
         recipientUserId,
       );
-      if (keys.length === 0 || totalAmountVnd <= 0) {
+      if (keys.length === 0 || totalAmountUsd <= 0) {
         throw new Error(
           'No unpaid earnings for closed periods for this user (current month cannot be paid yet)',
         );
@@ -75,10 +77,21 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
 
       const binding = c.env[bindingName as keyof Env] as DurableObjectNamespace;
       const userStub = binding.get(binding.idFromString(recipientUserId)) as DurableObjectStub<UserDO>;
+      const users = await executeUtils.executeDynamicAction(userStub, 'select', {}, 'users');
+      const u = Array.isArray(users) ? users[0] : users;
+      const payoutCurrency =
+        (u?.earningsPayoutCurrency ?? u?.earnings_payout_currency) === 'USD' ? 'USD' : 'VND';
+      if (payoutCurrency !== 'VND') {
+        throw new Error('VietQR payout requires user earnings payout currency to be VND');
+      }
+
       const beneficiary = await createPayoutBeneficiaryInfrastructure(userStub).get();
       if (!beneficiary) {
         throw new Error('User has not configured payout beneficiary account');
       }
+
+      const usdVndRate = await getUsdVndRateForDate(c, bindingName, todayDateString());
+      const totalAmountVnd = toPayoutAmountVnd(convertUsdToVnd(totalAmountUsd, usdVndRate));
 
       const transferCode = randomPayoutTransferCode();
       const kv = c.env.NONCE_KV;
@@ -103,12 +116,15 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
 
       return c.json({
         qr,
-        amount: totalAmountVnd,
+        amountUsd: totalAmountUsd,
+        amountVnd: totalAmountVnd,
+        usdVndRate,
         beneficiary,
         addInfo: transferCode,
         recipientUserId,
         recipientIdentifier: identifier,
         payoutKeys: keys,
+        earningsPayoutCurrency: payoutCurrency,
       });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to generate payout QR');

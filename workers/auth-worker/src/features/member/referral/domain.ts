@@ -26,13 +26,13 @@ export const CommissionSchema = z.object({
   referrerId: z.string(),
   /** Referred user identifier - placed the order */
   referredUserId: z.string(),
-  /** Order final amount (VND or currency) */
+  /** Order amount in USD (converted from VND top-up when applicable) */
   orderAmount: z.number().min(0),
   /** Commission % applied */
   commissionPercent: z.number().min(0).max(100),
-  /** Commission amount in same currency as order */
+  /** Commission amount in USD */
   commissionAmount: z.number().min(0),
-  currency: z.string().default('VND'),
+  currency: z.string().default('USD'),
   policyId: z.number().int().optional(),
 });
 

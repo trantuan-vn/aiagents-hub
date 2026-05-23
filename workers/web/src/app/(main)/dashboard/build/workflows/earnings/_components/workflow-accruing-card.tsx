@@ -80,7 +80,7 @@ export function WorkflowAccruingCard({
   const accruing = summary?.accruing;
   const totalLabel = loading
     ? "..."
-    : formatCurrency(accruing?.totalAmountVnd ?? 0, { currency: "VND", noDecimals: true });
+    : formatCurrency(accruing?.totalAmountUsd ?? 0, { currency: "USD", maximumFractionDigits: 4 });
 
   return (
     <Card>

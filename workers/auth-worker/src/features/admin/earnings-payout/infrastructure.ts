@@ -7,6 +7,28 @@ export function payoutKey(period: string, recipientUserId: string): string {
   return `${period}|${recipientUserId}`;
 }
 
+function readUsdField(row: Record<string, unknown>, usdKey: string, vndKey: string): number {
+  const usd = row[usdKey] ?? row[usdKey.replace(/([A-Z])/g, '_$1').toLowerCase()];
+  if (usd != null && usd !== '') return Number(usd) || 0;
+  const legacy = row[vndKey];
+  return legacy != null ? Number(legacy) || 0 : 0;
+}
+
+function mapPayoutRow(r: Record<string, unknown>): EarningsPayout {
+  return {
+    payoutKey: String(r.payoutKey ?? ''),
+    period: String(r.period ?? ''),
+    recipientUserId: String(r.recipientUserId ?? ''),
+    recipientIdentifier: String(r.recipientIdentifier ?? ''),
+    commissionAmountUsd: readUsdField(r, 'commissionAmountUsd', 'commissionAmountVnd'),
+    workflowRoyaltyAmountUsd: readUsdField(r, 'workflowRoyaltyAmountUsd', 'workflowRoyaltyAmountVnd'),
+    totalAmountUsd: readUsdField(r, 'totalAmountUsd', 'totalAmountVnd'),
+    status: (r.status === 'paid' ? 'paid' : 'pending') as 'pending' | 'paid',
+    paidAt: r.paidAt ? String(r.paidAt) : undefined,
+    paymentNote: r.paymentNote ? String(r.paymentNote) : undefined,
+  };
+}
+
 export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<UserDO>) {
   const markPaidImpl = async (key: string, paymentNote?: string): Promise<EarningsPayout> => {
     const rows = await executeUtils.executeDynamicAction(
@@ -33,18 +55,7 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
       },
       'earnings_payouts',
     );
-    return {
-      payoutKey: String(row.payoutKey),
-      period: String(row.period),
-      recipientUserId: String(row.recipientUserId),
-      recipientIdentifier: String(row.recipientIdentifier),
-      commissionAmountVnd: Number(row.commissionAmountVnd ?? 0) || 0,
-      workflowRoyaltyAmountVnd: Number(row.workflowRoyaltyAmountVnd ?? 0) || 0,
-      totalAmountVnd: Number(row.totalAmountVnd ?? 0) || 0,
-      status: 'paid',
-      paidAt,
-      paymentNote: paymentNote ?? (row.paymentNote ? String(row.paymentNote) : undefined),
-    };
+    return { ...mapPayoutRow(row as Record<string, unknown>), status: 'paid' as const, paidAt, paymentNote: paymentNote ?? (row.paymentNote ? String(row.paymentNote) : undefined) };
   };
 
   return {
@@ -56,18 +67,7 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
         'earnings_payouts',
       );
       const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-      return list.map((r: Record<string, unknown>) => ({
-        payoutKey: String(r.payoutKey ?? ''),
-        period: String(r.period ?? ''),
-        recipientUserId: String(r.recipientUserId ?? ''),
-        recipientIdentifier: String(r.recipientIdentifier ?? ''),
-        commissionAmountVnd: Number(r.commissionAmountVnd ?? 0) || 0,
-        workflowRoyaltyAmountVnd: Number(r.workflowRoyaltyAmountVnd ?? 0) || 0,
-        totalAmountVnd: Number(r.totalAmountVnd ?? 0) || 0,
-        status: (r.status === 'paid' ? 'paid' : 'pending') as 'pending' | 'paid',
-        paidAt: r.paidAt ? String(r.paidAt) : undefined,
-        paymentNote: r.paymentNote ? String(r.paymentNote) : undefined,
-      }));
+      return list.map((r: Record<string, unknown>) => mapPayoutRow(r));
     },
 
     listByPeriod: async (period: string): Promise<EarningsPayout[]> => {
@@ -81,18 +81,7 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
         'earnings_payouts',
       );
       const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-      return list.map((r: Record<string, unknown>) => ({
-        payoutKey: String(r.payoutKey ?? ''),
-        period: String(r.period ?? period),
-        recipientUserId: String(r.recipientUserId ?? ''),
-        recipientIdentifier: String(r.recipientIdentifier ?? ''),
-        commissionAmountVnd: Number(r.commissionAmountVnd ?? 0) || 0,
-        workflowRoyaltyAmountVnd: Number(r.workflowRoyaltyAmountVnd ?? 0) || 0,
-        totalAmountVnd: Number(r.totalAmountVnd ?? 0) || 0,
-        status: (r.status === 'paid' ? 'paid' : 'pending') as 'pending' | 'paid',
-        paidAt: r.paidAt ? String(r.paidAt) : undefined,
-        paymentNote: r.paymentNote ? String(r.paymentNote) : undefined,
-      }));
+      return list.map((r: Record<string, unknown>) => mapPayoutRow({ ...r, period: r.period ?? period }));
     },
 
     getByKey: async (key: string): Promise<EarningsPayout | null> => {
@@ -104,18 +93,7 @@ export function createEarningsPayoutInfrastructure(adminDO: DurableObjectStub<Us
       );
       const r = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
       if (!r) return null;
-      return {
-        payoutKey: String(r.payoutKey),
-        period: String(r.period),
-        recipientUserId: String(r.recipientUserId),
-        recipientIdentifier: String(r.recipientIdentifier),
-        commissionAmountVnd: Number(r.commissionAmountVnd ?? 0) || 0,
-        workflowRoyaltyAmountVnd: Number(r.workflowRoyaltyAmountVnd ?? 0) || 0,
-        totalAmountVnd: Number(r.totalAmountVnd ?? 0) || 0,
-        status: r.status === 'paid' ? 'paid' : 'pending',
-        paidAt: r.paidAt ? String(r.paidAt) : undefined,
-        paymentNote: r.paymentNote ? String(r.paymentNote) : undefined,
-      };
+      return mapPayoutRow(r as Record<string, unknown>);
     },
 
     upsertPending: async (data: EarningsPayout): Promise<void> => {

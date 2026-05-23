@@ -53,7 +53,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
   return {
     async createPaymentUrlUseCase(identifier: string, request: CreatePayment, ipAddr: string): Promise<string> {
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       
       const validatedRequest = CreatePaymentSchema.parse(request);
       return await vnpayService.createPaymentUrl(validatedRequest, ipAddr, identifier);
@@ -76,7 +76,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       }
       const validatedParams = VNPayReturnSchema.parse(params);      
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       
       return await vnpayService.processReturn(paymentId, validatedParams);
     },
@@ -95,7 +95,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       const validatedParams = VNPayReturnSchema.parse(params); 
 
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       
       return await vnpayService.processIPN(paymentId, validatedParams);
     },
@@ -174,20 +174,20 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       }
 
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       return await vnpayService.processCassoIPN(paymentId, amount, reference);
     },
 
     async createCassoQrUseCase(identifier: string, request: CassoQrRequest, kv: KVNamespace): Promise<{ qr: string }> {
       const validatedRequest = CassoQrSchema.parse(request);
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       return await vnpayService.createCassoQr(validatedRequest, identifier, kv, getVietQrConfig());
     },
 
     async queryTransactionUseCase(identifier: string, request: PaymentQuery, ipAddr: string): Promise<QueryDRResult> {
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       
       const validatedRequest = PaymentQuerySchema.parse(request);
       return await vnpayService.queryTransaction(validatedRequest, ipAddr);
@@ -195,7 +195,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
     async refundTransactionUseCase(identifier: string, request: RefundRequest, ipAddr: string): Promise<RefundResult> {
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-      const vnpayService = createVNPayService(userDO);
+      const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
       
       const validatedRequest = RefundSchema.parse(request);
       return await vnpayService.refundTransaction(identifier, validatedRequest, ipAddr);

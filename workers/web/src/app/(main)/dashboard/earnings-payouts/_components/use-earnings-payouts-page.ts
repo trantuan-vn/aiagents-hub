@@ -38,6 +38,8 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
       bank_paid: t("bank_paid"),
       bank_unpaid: t("bank_unpaid"),
       show_qr: t("show_qr"),
+      pay_usd_coming_soon: t("pay_usd_coming_soon"),
+      payout_currency: t("payout_currency"),
       accruing_status: t("accruing_status"),
     }),
     [t],

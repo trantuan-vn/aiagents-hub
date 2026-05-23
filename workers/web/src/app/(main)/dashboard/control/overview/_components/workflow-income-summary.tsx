@@ -11,15 +11,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
-const fmtVnd = (n: number): string =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+const fmtUsd = (n: number): string =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(n);
 
 interface WorkflowIncomeSummaryProps {
   t: (key: string) => string;
 }
 
 interface WorkflowMonthlyPreview {
-  accruing?: { totalAmountVnd?: number };
+  accruing?: { totalAmountUsd?: number };
 }
 
 export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
@@ -64,7 +64,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
     );
   }
 
-  const totalEarnings = stats?.accruing?.totalAmountVnd ?? 0;
+  const totalEarnings = stats?.accruing?.totalAmountUsd ?? 0;
 
   return (
     <Card className="border-primary/20 overflow-hidden transition-shadow hover:shadow-md">
@@ -79,7 +79,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
         {totalEarnings > 0 && (
           <div className="bg-primary/5 rounded-lg p-3">
             <p className="text-muted-foreground text-xs">{t("workflow.earned")}</p>
-            <p className="text-primary text-2xl font-bold">{fmtVnd(totalEarnings)}</p>
+            <p className="text-primary text-2xl font-bold">{fmtUsd(totalEarnings)}</p>
           </div>
         )}
         <div className="flex gap-2">

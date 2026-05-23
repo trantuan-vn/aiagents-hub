@@ -104,6 +104,12 @@ export const sidebarItems: NavGroup[] = [
         adminOnly: true,
       },
       {
+        title: "Exchange Rates",
+        url: "/dashboard/exchange-rates",
+        icon: RefreshCw,
+        adminOnly: true,
+      },
+      {
         title: "Price Policy",
         url: "/dashboard/policy",
         icon: Tag,

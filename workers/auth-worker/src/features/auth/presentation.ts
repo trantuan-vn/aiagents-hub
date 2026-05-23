@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';  
-import { handleError, parseBody, getIPAndUserAgent, getClientIpAndUserAgentForSession, generateSecureSessionId } from '../../shared/utils';
+import { handleError, parseBody, getIPAndUserAgent, getClientIpAndUserAgentForSession, generateSecureSessionId, getIdFromName, executeUtils } from '../../shared/utils';
+import { UserDO } from '../ws/infrastructure/UserDO';
 import { requireAuth } from './authMiddleware';
 import { createApplicationService } from './application';
 import { 
@@ -356,17 +357,43 @@ export function createAuthRoutes(bindingName: string) {
     }
   });
 
+  app.patch('/profile/payout-preferences', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const body = await c.req.json();
+      const currency = body?.earningsPayoutCurrency === 'USD' ? 'USD' : 'VND';
+      const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+      const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+      const u = Array.isArray(users) ? users[0] : users;
+      if (!u?.id) throw new Error('User not found');
+      await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        { id: u.id, earningsPayoutCurrency: currency, queueStatus: 'pending' },
+        'users',
+      );
+      return c.json({ earningsPayoutCurrency: currency });
+    } catch (e) {
+      const { errorResponse } = await handleError(c, e, 'Failed to update payout preferences');
+      return c.json(errorResponse, 401);
+    }
+  });
+
   app.get('/profile/me', async (c) => {
     try {
       const user = requireAuth(c);
       const wb = user.walletBalance ?? user.wallet_balance;
       const walletBalance = typeof wb === "number" && !Number.isNaN(wb) ? wb : Number(wb) || 0;
+      const rawCurrency = user.earningsPayoutCurrency ?? user.earnings_payout_currency;
+      const earningsPayoutCurrency = rawCurrency === 'USD' ? 'USD' : 'VND';
       return c.json({
         id: user.id,
         identifier: user.identifier,
         address: user.address,
         role: user.role || "member",
         walletBalance: Math.max(0, walletBalance),
+        walletCurrency: 'USD',
+        earningsPayoutCurrency,
       });
     } catch (e) {
       const { errorResponse } = await handleError(c, e, "Get user info failed");

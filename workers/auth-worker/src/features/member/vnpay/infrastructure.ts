@@ -19,7 +19,20 @@ import { paymentUtils, cryptoUtils } from './utils';
 import { VNPAY_CONSTANTS, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_ERROR_MESSAGES } from './constant';
 
 import { executeUtils } from '../../../shared/utils';
-export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPayService {
+import { convertVndToUsd } from '../../admin/service/pricing';
+import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
+
+export type VNPayWalletOptions = { env: Env; bindingName: string };
+
+export function createVNPayService(
+  userDO: DurableObjectStub<UserDO>,
+  walletOptions?: VNPayWalletOptions,
+): IVNPayService {
+  const vndToWalletUsd = async (vndAmount: number): Promise<number> => {
+    if (!walletOptions || vndAmount <= 0) return vndAmount;
+    const rate = await getUsdVndRateFromEnv(walletOptions.env, walletOptions.bindingName);
+    return convertVndToUsd(vndAmount, rate);
+  };
   const validatePayment = async (paymentId: number, expectedAmount: number): Promise<number> => {
     const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
       where: { field: "id", operator: '=', value: paymentId }
@@ -81,7 +94,8 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
       if (!dbUser?.id || !orderRow) {
         throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
       }
-      const credit = Number(orderRow.finalAmount ?? 0) || 0;
+      const creditVnd = Number(orderRow.finalAmount ?? 0) || 0;
+      const credit = await vndToWalletUsd(creditVnd);
       const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
 
       operations.push({
@@ -194,7 +208,9 @@ export function createVNPayService(userDO: DurableObjectStub<UserDO>): IVNPaySer
     const dbUser = userRows[0];
     if (dbUser?.id && orderRow) {
       const bal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
-      const debit = Math.min(bal, Number(orderRow.finalAmount ?? 0) || 0);
+      const debitVnd = Number(orderRow.finalAmount ?? 0) || 0;
+      const debitUsd = await vndToWalletUsd(debitVnd);
+      const debit = Math.min(bal, debitUsd);
       operations.push({
         table: 'users',
         operation: 'update',

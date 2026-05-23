@@ -1,4 +1,6 @@
-import { z } from 'zod'; 
+import { z } from 'zod';
+
+import { normalizeLegacyEarningsPayoutAmounts } from '@auth-worker/features/admin/earnings-payout/domain.js';
 
 import {
 	PricePolicySchema,
@@ -30,6 +32,7 @@ import {
 	WorkflowRoyaltySchema,
 	PayoutBeneficiarySchema,
 	EarningsPayoutSchema,
+	ExchangeRateSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -419,6 +422,8 @@ export class DynamicDataBuilder {
       }
     });
 
+    normalizeLegacyEarningsPayoutAmounts(parsed);
+
     return schema.parse(parsed);
   }
 
@@ -623,6 +628,11 @@ export class D1DatabaseManager {
       'earnings_payouts',
       EarningsPayoutSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
+    );
+    await this.registerTable(
+      'exchange_rates',
+      ExchangeRateSchema,
+      this.TABLE_CONFIGS.queueTableWithUniqueIndex('rateDate'),
     );
 
     // Queue tables (xoá khỏi DO sau cleanup): queue flow
@@ -1214,6 +1224,22 @@ export class D1DatabaseManager {
           await this.db.prepare(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`).run();
           console.log(`[D1DatabaseManager] Migration: added column "${colName}" to table "${name}"`);
         }
+      }
+
+      if (
+        name === 'earnings_payouts' &&
+        existingColumns.has('totalAmountVnd') &&
+        existingColumns.has('totalAmountUsd')
+      ) {
+        await this.db
+          .prepare(
+            `UPDATE "${name}" SET
+              "commissionAmountUsd" = COALESCE("commissionAmountUsd", "commissionAmountVnd", 0),
+              "workflowRoyaltyAmountUsd" = COALESCE("workflowRoyaltyAmountUsd", "workflowRoyaltyAmountVnd", 0),
+              "totalAmountUsd" = COALESCE("totalAmountUsd", "totalAmountVnd", 0)
+            WHERE "totalAmountUsd" IS NULL AND "totalAmountVnd" IS NOT NULL`,
+          )
+          .run();
       }
 
       // Thêm unique index cho conflictField nếu cột vừa được thêm

@@ -25,9 +25,8 @@ export interface D1tor2CronConfig {
   D1_RETENTION_DAYS?: number;
 }
 
-/** Billing UI — tỉ giá USD/VND cho màn nạp tiền */
+/** Billing UI — min top-up & workflow royalty (tỉ giá tại Quản lý tỉ giá) */
 export interface BillingConfig {
-  USD_VND_RATE?: number;
   MIN_TOP_UP_VND?: number;
   WORKFLOW_ROYALTY_PERCENT?: number;
 }

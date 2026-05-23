@@ -7,7 +7,7 @@ function commissionRowKey(c: Record<string, unknown>, index: number): string {
 }
 
 function CommissionRow({ commission }: { commission: Record<string, unknown> }) {
-  const currency = String(commission.currency ?? "VND");
+  const currency = String(commission.currency ?? "USD");
   const createdAt = commission.created_at ? new Date(Number(commission.created_at)).toLocaleString() : "—";
 
   return (

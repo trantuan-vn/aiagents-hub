@@ -1,12 +1,16 @@
 import { DEFAULT_BILLING_CONFIG, KV_KEY, type SystemConfig } from './domain';
+import { getUsdVndRateFromEnv as getRateFromExchangeTable, todayDateString } from '../exchange-rate/get-rate';
 
 export type MemberBillingParams = {
 	usdVndRate: number;
 	minTopUpVnd: number;
 };
 
-/** Tỉ giá + số tiền nạp tối thiểu từ KV system config (member UI + validate tạo đơn). */
-export async function getMemberBillingParamsFromEnv(env: { SYSTEM_CONFIG_KV?: KVNamespace }): Promise<MemberBillingParams> {
+/** Min top-up from KV; tỉ giá từ bảng exchange_rates (một tỉ giá mỗi ngày). */
+export async function getMemberBillingParamsFromEnv(
+	env: { SYSTEM_CONFIG_KV?: KVNamespace; USER_DO?: DurableObjectNamespace },
+	bindingName: string = 'USER_DO',
+): Promise<MemberBillingParams> {
 	const defaults = DEFAULT_BILLING_CONFIG;
 	let billing = { ...defaults };
 	const kv = env.SYSTEM_CONFIG_KV;
@@ -21,10 +25,7 @@ export async function getMemberBillingParamsFromEnv(env: { SYSTEM_CONFIG_KV?: KV
 			}
 		}
 	}
-	const usdVndRate =
-		typeof billing.USD_VND_RATE === 'number' && !Number.isNaN(billing.USD_VND_RATE) && billing.USD_VND_RATE >= 1
-			? billing.USD_VND_RATE
-			: (defaults.USD_VND_RATE ?? 26000);
+	const usdVndRate = await getRateFromExchangeTable(env as Env, bindingName);
 	const rawMin = billing.MIN_TOP_UP_VND;
 	const minTopUpVnd =
 		typeof rawMin === 'number' &&
@@ -37,8 +38,10 @@ export async function getMemberBillingParamsFromEnv(env: { SYSTEM_CONFIG_KV?: KV
 	return { usdVndRate, minTopUpVnd };
 }
 
-/** VND per 1 USD — dùng cho UI nạp tiền & hiển thị (KV system config). */
-export async function getUsdVndRateFromEnv(env: { SYSTEM_CONFIG_KV?: KVNamespace }): Promise<number> {
-	const { usdVndRate } = await getMemberBillingParamsFromEnv(env);
-	return usdVndRate;
+/** VND per 1 USD — tỉ giá ngày hiện tại từ bảng exchange_rates. */
+export async function getUsdVndRateFromEnv(
+	env: Env,
+	bindingName: string = 'USER_DO',
+): Promise<number> {
+	return getRateFromExchangeTable(env, bindingName);
 }

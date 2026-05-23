@@ -24,7 +24,7 @@ export function AccruingEarningsChart({ byDay }: AccruingEarningsChartProps) {
           content={
             <ChartTooltipContent
               formatter={(value) =>
-                formatCurrency(value as number, { currency: "VND", noDecimals: true })
+                formatCurrency(value as number, { currency: "USD", maximumFractionDigits: 4 })
               }
             />
           }

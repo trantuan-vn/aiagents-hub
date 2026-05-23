@@ -1,0 +1,11 @@
+-- USD wallet & daily exchange rates (see auth-worker Zod schemas for runtime columns).
+-- Apply with: wrangler d1 execute <DB> --file=./migrations/006_usd_wallet_and_exchange_rates.sql
+--
+-- Notes:
+-- - walletBalance is now USD (semantic change; no column rename).
+-- - New optional user field: earningsPayoutCurrency (default VND in app).
+-- - earnings_payouts / workflow_royalties USD amount columns are created via DO schema sync.
+-- - exchange_rates table is admin-scoped in User DO.
+
+-- Example manual backfill (run only if migrating existing VND balances):
+-- UPDATE users SET walletBalance = walletBalance / 26000.0 WHERE walletBalance > 1000;

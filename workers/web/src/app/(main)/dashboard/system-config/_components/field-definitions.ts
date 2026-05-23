@@ -90,13 +90,6 @@ export function getBillingFields(config: SystemConfigData): FieldDef[] {
   const b = config.billing ?? {};
   return [
     {
-      key: "USD_VND_RATE",
-      label: "USD/VND rate (VND per 1 USD)",
-      value: b.USD_VND_RATE ?? 26000,
-      min: 1,
-      max: 10000000,
-    },
-    {
       key: "MIN_TOP_UP_VND",
       label: "Minimum wallet top-up (VND)",
       value: b.MIN_TOP_UP_VND ?? 1000,

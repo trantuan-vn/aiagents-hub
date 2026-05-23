@@ -23,4 +23,5 @@ export * from '../member/referral/domain';
 export * from '../member/workflows/domain';
 export * from '../member/payout/domain';
 export * from '../admin/earnings-payout/domain';
+export * from '../admin/exchange-rate/domain';
 

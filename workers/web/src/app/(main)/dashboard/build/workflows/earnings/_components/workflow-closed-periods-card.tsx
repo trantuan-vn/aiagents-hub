@@ -54,7 +54,7 @@ export function WorkflowClosedPeriodsCard({
             <p className="text-muted-foreground mb-4 text-sm">
               {closedTotalLabel}:{" "}
               <span className="text-foreground font-medium">
-                {formatCurrency(summary?.closedTotalAmountVnd ?? 0, {
+                {formatCurrency(summary?.closedTotalAmountUsd ?? 0, {
                   currency: "VND",
                   noDecimals: true,
                 })}
@@ -73,7 +73,7 @@ export function WorkflowClosedPeriodsCard({
                   <TableRow key={row.period}>
                     <TableCell className="font-mono text-sm">{row.period}</TableCell>
                     <TableCell className="text-right">
-                      {formatCurrency(row.totalAmountVnd, { currency: "VND", noDecimals: true })}
+                      {formatCurrency(row.totalAmountUsd, { currency: "USD", maximumFractionDigits: 4 })}
                     </TableCell>
                     <TableCell>
                       <PayoutStatusBadge status={row.payoutStatus} labels={payoutLabels} />

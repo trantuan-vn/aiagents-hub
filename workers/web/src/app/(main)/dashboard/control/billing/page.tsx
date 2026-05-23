@@ -36,7 +36,7 @@ export default function BillingPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [walletBalanceVnd, setWalletBalanceVnd] = useState(0);
+  const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
   const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
   const [minTopUpVnd, setMinTopUpVnd] = useState(FALLBACK_MIN_TOP_UP_VND);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,7 +98,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceVnd);
+    void fetchWalletBalance().then(setWalletBalanceUsd);
     refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, page, limit]);
@@ -138,7 +138,7 @@ export default function BillingPage() {
 
       // Refresh danh sách orders
       void fetchOrders();
-      void fetchWalletBalance().then(setWalletBalanceVnd);
+      void fetchWalletBalance().then(setWalletBalanceUsd);
       refreshBillingParams();
 
       // Xóa query params sau khi xử lý
@@ -160,7 +160,7 @@ export default function BillingPage() {
   const handleCreateOrder = async (data: CreateOrder): Promise<unknown> => {
     const result = await postCreateOrder(data, t("create_error"));
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceVnd);
+    void fetchWalletBalance().then(setWalletBalanceUsd);
     refreshBillingParams();
     return result;
   };
@@ -192,7 +192,7 @@ export default function BillingPage() {
 
   const handleBillingRefresh = (): void => {
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceVnd);
+    void fetchWalletBalance().then(setWalletBalanceUsd);
     refreshBillingParams();
   };
 
@@ -216,7 +216,7 @@ export default function BillingPage() {
       </div>
 
       <BillingStatsCards
-        walletBalanceVnd={walletBalanceVnd}
+        walletBalanceUsd={walletBalanceUsd}
         pendingTopUps={pendingOrders.length}
         completedVolumeVnd={orders.filter((o) => o.status === "COMPLETED").reduce((s, o) => s + o.finalAmount, 0)}
         usdVndRate={usdVndRate}

@@ -27,14 +27,14 @@ export function createOrderRoutes(bindingName: string) {
 
   /** Tỉ giá + số tiền nạp tối thiểu từ system config (member đọc được). */
   app.get('/exchange-rate', createRouteHandler(async (c: any) => {
-    const { usdVndRate, minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env);
+    const { usdVndRate, minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env, bindingName);
     return c.json({ usdVndRate, minTopUpVnd });
   }, 'Failed to get exchange rate'));
 
   // Tạo đơn hàng mới
   app.post('/orders', createRouteHandler(async (c: any, user: any) => {
     const body = await c.req.json();
-    const { minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env);
+    const { minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env, bindingName);
     const request = parseCreateOrderRequest(body, minTopUpVnd);
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.createOrder(user, request);

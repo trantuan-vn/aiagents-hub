@@ -10,7 +10,7 @@ import {
 
 export interface CommissionClosedPeriodRow {
   period: string;
-  totalAmountVnd: number;
+  totalAmountUsd: number;
   payoutStatus: 'pending' | 'paid' | null;
 }
 
@@ -18,12 +18,12 @@ export interface CommissionMonthlySummary {
   currentPeriod: string;
   accruing: {
     period: string;
-    totalAmountVnd: number;
+    totalAmountUsd: number;
     byDay: { date: string; total: number }[];
     commissions: Record<string, unknown>[];
   };
   closedPeriods: CommissionClosedPeriodRow[];
-  closedTotalAmountVnd: number;
+  closedTotalAmountUsd: number;
 }
 
 function lastClosedPeriod(): string {
@@ -104,28 +104,28 @@ export async function getCommissionMonthlySummary(
     const periods = enumeratePeriods(earliest, closedEnd);
     for (const p of periods) {
       const { fromTs, toTs } = periodToRange(p);
-      const totalAmountVnd = await getCommissionTotalInRange(db, userId, fromTs, toTs);
-      if (totalAmountVnd <= 0) continue;
+      const totalAmountUsd = await getCommissionTotalInRange(db, userId, fromTs, toTs);
+      if (totalAmountUsd <= 0) continue;
       closedPeriods.push({
         period: p,
-        totalAmountVnd,
+        totalAmountUsd,
         payoutStatus: payoutByPeriod.get(p) ?? null,
       });
     }
     closedPeriods.sort((a, b) => b.period.localeCompare(a.period));
   }
 
-  const closedTotalAmountVnd = closedPeriods.reduce((s, r) => s + r.totalAmountVnd, 0);
+  const closedTotalAmountUsd = closedPeriods.reduce((s, r) => s + r.totalAmountUsd, 0);
 
   return {
     currentPeriod: current,
     accruing: {
       period: current,
-      totalAmountVnd: accruingStats.totalAmount,
+      totalAmountUsd: accruingStats.totalAmount,
       byDay: accruingStats.byDay,
       commissions: accruingCommissions,
     },
     closedPeriods,
-    closedTotalAmountVnd,
+    closedTotalAmountUsd,
   };
 }

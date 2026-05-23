@@ -148,6 +148,7 @@
     "crm": "CRM",
     "finance": "Tài chính",
     "earnings_payouts": "Thanh toán thu nhập",
+    "exchange_rates": "Quản lý tỉ giá",
     "ekyc": "eKyc",
     "agent_workflows": "Agent Workflows",
     "workflow_earnings": "Thu nhập Workflow",
@@ -1310,7 +1311,7 @@
     "wallet": {
       "title": "Số dư ví",
       "top_up": "Nạp tiền",
-      "usd_hint": "≈ ${amount} USD (tham chiếu)"
+      "vnd_hint": "≈ {amount} (tham chiếu theo tỉ giá ngày)"
     },
     "welcome": {
       "subtitle": "Nền tảng API chuyên nghiệp",
@@ -1916,7 +1917,7 @@
   },
   "SystemConfigPage": {
     "title": "Cấu hình hệ thống",
-    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker, D1tor2-Cron và thanh toán (tỉ giá USD/VND). Thay đổi có hiệu lực ngay khi lưu.",
+    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker, D1tor2-Cron và thanh toán. Tỉ giá USD/VND quản lý tại mục Quản lý tỉ giá.",
     "loading": "Đang tải cấu hình...",
     "save_config": "Lưu cấu hình",
     "saving": "Đang lưu...",
@@ -1932,7 +1933,7 @@
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline và retention D1 → R2",
     "billing": "Thanh toán",
-    "billing_desc": "Nạp ví: số tiền tối thiểu mỗi lệnh và tỉ giá VND cho 1 USD (preset & hiển thị)",
+    "billing_desc": "Nạp ví: số tiền tối thiểu mỗi lệnh và % phí chia sẻ workflow (tỉ giá tại Quản lý tỉ giá)",
     "fields": {
       "QUEUE_BATCH_SIZE": "Kích thước Batch Queue (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Ngưỡng Flush Queue",
@@ -2243,7 +2244,9 @@
     "missing": "Chưa khai báo",
     "bank_paid": "Đã thanh toán",
     "bank_unpaid": "Chưa thanh toán",
-    "show_qr": "QR thanh toán",
+    "show_qr": "QR VietQR",
+    "pay_usd_coming_soon": "Thanh toán USD (sắp có)",
+    "payout_currency": "Loại TT",
     "qr_dialog_title": "Mã QR chuyển khoản",
     "qr_hint": "Quét mã và chuyển khoản. Trạng thái cập nhật tự động khi ngân hàng xác nhận.",
     "cancel": "Hủy",
@@ -2303,6 +2306,24 @@
     "amount": "Số tiền (VND)",
     "load_error": "Không tải được hoa hồng"
   },
+  "ExchangeRatesPage": {
+    "title": "Quản lý tỉ giá",
+    "description": "Thiết lập tỉ giá VND cho 1 USD theo từng ngày. Dùng khi quy đổi nạp ví và thanh toán thu nhập.",
+    "hint": "Mỗi ngày chỉ một tỉ giá. Nếu chưa có tỉ giá cho ngày thanh toán, hệ thống dùng tỉ giá gần nhất trước đó.",
+    "daily_form_title": "Tỉ giá theo ngày",
+    "daily_form_desc": "Lưu hoặc cập nhật tỉ giá cho ngày đã chọn.",
+    "date": "Ngày",
+    "rate_label": "VND / 1 USD",
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "saved": "Đã lưu tỉ giá",
+    "history_title": "Lịch sử tỉ giá",
+    "loading": "Đang tải...",
+    "error": "Lỗi",
+    "load_error": "Không tải được danh sách tỉ giá",
+    "save_error": "Không lưu được tỉ giá",
+    "invalid_rate": "Tỉ giá không hợp lệ"
+  },
   "AccountPage": {
     "title": "Tài khoản",
     "description": "Bảo mật, phiên đăng nhập, eKYC và DID cho tài khoản API",
@@ -2341,6 +2362,17 @@
       "saved_description": "Thông tin tài khoản thụ hưởng đã được cập nhật",
       "error": "Lỗi",
       "save_error": "Không thể lưu thông tin tài khoản"
+    },
+    "payout_preferences": {
+      "title": "Thanh toán thu nhập & hoa hồng",
+      "description": "Chọn loại tiền khi admin thanh toán hoa hồng và thu nhập workflow qua ngân hàng.",
+      "currency_label": "Loại tiền thanh toán",
+      "currency_vnd": "Việt Nam đồng (VietQR)",
+      "currency_usd": "Đô la Mỹ",
+      "hint": "VietQR chỉ khả dụng khi chọn VND. Thanh toán USD qua ngân hàng đang phát triển.",
+      "saved": "Đã lưu cấu hình",
+      "error": "Lỗi",
+      "save_error": "Không lưu được cấu hình"
     },
     "security": {
       "title": "Xác thực hai lớp & phương thức đăng nhập",
@@ -2568,10 +2600,10 @@
     "order_cancelled_description": "Đơn hàng đã được hủy thành công",
     "top_up": "Nạp tiền",
     "top_up_title": "Nạp vào ví",
-    "top_up_description": "Chọn mức (hiển thị USD để tham khảo). Thanh toán VNPay quyết toán bằng VND.",
+    "top_up_description": "Thanh toán bằng VND; số dư ví được ghi nhận bằng USD theo tỉ giá ngày.",
     "preset_usd_label": "Mức nhanh (USD)",
     "exchange_rate_label": "Tỉ giá USD/VND",
-    "exchange_rate_hint": "Do quản trị viên cấu hình trong Cấu hình hệ thống. Chỉ dùng cho mức gợi ý và quy đổi USD ≈.",
+    "exchange_rate_hint": "Tỉ giá theo ngày do quản trị viên thiết lập tại Quản lý tỉ giá. Ví ghi nhận USD sau khi thanh toán VND.",
     "min_top_up_hint": "Số tiền nạp tối thiểu mỗi lệnh: {amount} VND (cấu hình trong Cấu hình hệ thống).",
     "amount_vnd_label": "Số tiền (VND)",
     "approx_usd": "≈ ${amount} USD theo tỷ giá tham chiếu",
@@ -2645,7 +2677,7 @@
     "processing": "Đang xử lý...",
     "stats": {
       "wallet_balance": "Số dư ví",
-      "wallet_balance_usd_hint": "≈ ${amount} USD (tham chiếu)",
+      "wallet_balance_vnd_hint": "≈ {amount} (tham chiếu theo tỉ giá ngày)",
       "pending_topups": "Lệnh nạp chờ thanh toán",
       "pending_topups_description": "Chưa hoàn tất thanh toán ngân hàng",
       "completed_volume": "Đã nạp (trang hiện tại)",

@@ -148,6 +148,7 @@
     "crm": "CRM",
     "finance": "Finance",
     "earnings_payouts": "Earnings Payouts",
+    "exchange_rates": "Exchange Rates",
     "ekyc": "eKyc",
     "agent_workflows": "Agent Workflows",
     "workflow_earnings": "Workflow Earnings",
@@ -1310,7 +1311,7 @@
     "wallet": {
       "title": "Wallet balance",
       "top_up": "Top up",
-      "usd_hint": "≈ ${amount} USD (reference)"
+      "vnd_hint": "≈ {amount} (reference at daily rate)"
     },
     "welcome": {
       "subtitle": "Professional API Platform",
@@ -1932,7 +1933,7 @@
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline and D1 → R2 retention",
     "billing": "Billing",
-    "billing_desc": "Wallet top-up: minimum VND per order, and VND per 1 USD for presets and display",
+    "billing_desc": "Wallet top-up minimum per order and workflow sharing royalty % (exchange rates under Exchange Rates)",
     "fields": {
       "QUEUE_BATCH_SIZE": "Queue Batch Size (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Queue Flush Threshold",
@@ -2243,7 +2244,9 @@
     "missing": "Not set",
     "bank_paid": "Paid",
     "bank_unpaid": "Unpaid",
-    "show_qr": "Payment QR",
+    "show_qr": "VietQR",
+    "pay_usd_coming_soon": "Pay in USD (coming soon)",
+    "payout_currency": "Payout",
     "qr_dialog_title": "Transfer QR code",
     "qr_hint": "Scan and transfer. Status updates automatically when the bank confirms payment.",
     "cancel": "Cancel",
@@ -2303,6 +2306,24 @@
     "amount": "Amount (VND)",
     "load_error": "Failed to load commissions"
   },
+  "ExchangeRatesPage": {
+    "title": "Exchange rate management",
+    "description": "Set the VND amount per 1 USD for each calendar day. Used for wallet top-up conversion and earnings payouts.",
+    "hint": "One rate per day. If a payment date has no rate, the latest prior rate is used.",
+    "daily_form_title": "Daily rate",
+    "daily_form_desc": "Save or update the rate for the selected date.",
+    "date": "Date",
+    "rate_label": "VND per 1 USD",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Rate saved",
+    "history_title": "Rate history",
+    "loading": "Loading...",
+    "error": "Error",
+    "load_error": "Could not load exchange rates",
+    "save_error": "Could not save exchange rate",
+    "invalid_rate": "Invalid rate"
+  },
   "AccountPage": {
     "title": "Account",
     "description": "Security, sessions, eKYC and DID for your API account",
@@ -2341,6 +2362,17 @@
       "saved_description": "Payout beneficiary updated",
       "error": "Error",
       "save_error": "Failed to save beneficiary"
+    },
+    "payout_preferences": {
+      "title": "Commission & workflow payout currency",
+      "description": "Choose the currency admin uses when paying your commissions and workflow earnings via bank transfer.",
+      "currency_label": "Payout currency",
+      "currency_vnd": "Vietnamese đồng (VietQR)",
+      "currency_usd": "US dollar",
+      "hint": "VietQR is only available when VND is selected. USD bank payout is coming soon.",
+      "saved": "Preferences saved",
+      "error": "Error",
+      "save_error": "Could not save preferences"
     },
     "security": {
       "title": "Two-factor & sign-in methods",
@@ -2645,7 +2677,7 @@
     "processing": "Processing...",
     "stats": {
       "wallet_balance": "Wallet balance",
-      "wallet_balance_usd_hint": "≈ ${amount} USD (reference)",
+      "wallet_balance_vnd_hint": "≈ {amount} (reference at daily rate)",
       "pending_topups": "Pending top-ups",
       "pending_topups_description": "Awaiting bank payment",
       "completed_volume": "Paid top-ups (this page)",

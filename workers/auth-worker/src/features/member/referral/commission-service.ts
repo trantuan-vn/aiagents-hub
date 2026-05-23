@@ -1,5 +1,6 @@
 import { Context } from 'hono';
-import { roundVndAmount } from '../../admin/service/pricing';
+import { convertVndToUsd, roundUsdAmount } from '../../admin/service/pricing';
+import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
@@ -39,7 +40,9 @@ export async function processCommissionOnOrder(
   const percent = applicable.commissionPercent ?? 0;
   if (percent <= 0) return;
   console.log(`processCommissionOnOrder: ${JSON.stringify(percent)}`);
-  const commissionAmount = roundVndAmount((orderRecord.finalAmount * percent) / 100);
+  const usdVndRate = await getUsdVndRateFromEnv(c.env, bindingName);
+  const orderAmountUsd = convertVndToUsd(orderRecord.finalAmount, usdVndRate);
+  const commissionAmount = roundUsdAmount((orderAmountUsd * percent) / 100);
 
   const referrerDO = getIdFromName(c, user.referrerId, bindingName) as DurableObjectStub<UserDO>;
   const commissionInfra = createCommissionInfrastructure(referrerDO);
@@ -49,10 +52,10 @@ export async function processCommissionOnOrder(
     orderCode: orderRecord.orderCode,
     referrerId: user.referrerId,
     referredUserId: user.identifier,
-    orderAmount: orderRecord.finalAmount,
+    orderAmount: orderAmountUsd,
     commissionPercent: percent,
     commissionAmount,
-    currency: orderRecord.currency ?? 'VND',
+    currency: 'USD',
     policyId: applicable.id,
     queueStatus: 'pending',
   });

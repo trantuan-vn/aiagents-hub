@@ -15,7 +15,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface CommissionClosedPeriodRow {
   period: string;
-  totalAmountVnd: number;
+  totalAmountUsd: number;
   payoutStatus: "pending" | "paid" | null;
 }
 
@@ -23,12 +23,12 @@ export interface CommissionMonthlySummary {
   currentPeriod: string;
   accruing: {
     period: string;
-    totalAmountVnd: number;
+    totalAmountUsd: number;
     byDay: { date: string; total: number }[];
     commissions: Record<string, unknown>[];
   };
   closedPeriods: CommissionClosedPeriodRow[];
-  closedTotalAmountVnd: number;
+  closedTotalAmountUsd: number;
 }
 
 export function getCommissionMonthlySummary() {

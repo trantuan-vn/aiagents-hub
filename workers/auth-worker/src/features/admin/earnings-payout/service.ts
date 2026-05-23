@@ -13,15 +13,18 @@ import {
   isPeriodEligibleForPayout,
   mergePeriodEarnings,
 } from './d1';
+import { executeUtils } from '../../../shared/utils';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
 
-export const COMMISSION_ADMIN_IDENTIFIER = 'tuanta2021@gmail.com';
+import { COMMISSION_ADMIN_IDENTIFIER } from '../admin-identifier';
+
+export { COMMISSION_ADMIN_IDENTIFIER };
 
 export interface PayoutPeriodRow {
   period: string;
-  commissionAmountVnd: number;
-  workflowRoyaltyAmountVnd: number;
-  totalAmountVnd: number;
+  commissionAmountUsd: number;
+  workflowRoyaltyAmountUsd: number;
+  totalAmountUsd: number;
   bankStatus: 'paid' | 'unpaid';
   paidAt?: string;
 }
@@ -29,11 +32,13 @@ export interface PayoutPeriodRow {
 export interface AggregatedPayoutItem {
   recipientUserId: string;
   recipientIdentifier: string;
-  commissionAmountVnd: number;
-  workflowRoyaltyAmountVnd: number;
-  totalAmountVnd: number;
+  commissionAmountUsd: number;
+  workflowRoyaltyAmountUsd: number;
+  totalAmountUsd: number;
   bankStatus: 'paid' | 'unpaid';
   hasBeneficiary: boolean;
+  /** User preference for bank payout (VietQR when VND) */
+  earningsPayoutCurrency: 'VND' | 'USD';
   periods: PayoutPeriodRow[];
 }
 
@@ -59,17 +64,17 @@ export async function syncAllPeriodPayoutRecords(
           period,
           recipientUserId: row.recipientUserId,
           recipientIdentifier: row.recipientIdentifier,
-          commissionAmountVnd: row.commissionAmountVnd,
-          workflowRoyaltyAmountVnd: row.workflowRoyaltyAmountVnd,
-          totalAmountVnd: row.totalAmountVnd,
+          commissionAmountUsd: row.commissionAmountUsd,
+          workflowRoyaltyAmountUsd: row.workflowRoyaltyAmountUsd,
+          totalAmountUsd: row.totalAmountUsd,
           status: 'pending',
         });
       } else if (existing.status !== 'paid') {
         await payoutInfra.upsertPending({
           ...existing,
-          commissionAmountVnd: row.commissionAmountVnd,
-          workflowRoyaltyAmountVnd: row.workflowRoyaltyAmountVnd,
-          totalAmountVnd: row.totalAmountVnd,
+          commissionAmountUsd: row.commissionAmountUsd,
+          workflowRoyaltyAmountUsd: row.workflowRoyaltyAmountUsd,
+          totalAmountUsd: row.totalAmountUsd,
           status: 'pending',
         });
       }
@@ -98,31 +103,32 @@ function aggregatePayoutRecords(
       agg = {
         recipientUserId: record.recipientUserId,
         recipientIdentifier: record.recipientIdentifier,
-        commissionAmountVnd: 0,
-        workflowRoyaltyAmountVnd: 0,
-        totalAmountVnd: 0,
+        commissionAmountUsd: 0,
+        workflowRoyaltyAmountUsd: 0,
+        totalAmountUsd: 0,
         bankStatus: 'unpaid',
         hasBeneficiary: false,
+        earningsPayoutCurrency: 'VND',
         periods: [],
       };
       byUser.set(record.recipientUserId, agg);
     }
 
-    agg.commissionAmountVnd += record.commissionAmountVnd;
-    agg.workflowRoyaltyAmountVnd += record.workflowRoyaltyAmountVnd;
-    agg.totalAmountVnd += record.totalAmountVnd;
+    agg.commissionAmountUsd += record.commissionAmountUsd;
+    agg.workflowRoyaltyAmountUsd += record.workflowRoyaltyAmountUsd;
+    agg.totalAmountUsd += record.totalAmountUsd;
     agg.periods.push({
       period: record.period,
-      commissionAmountVnd: record.commissionAmountVnd,
-      workflowRoyaltyAmountVnd: record.workflowRoyaltyAmountVnd,
-      totalAmountVnd: record.totalAmountVnd,
+      commissionAmountUsd: record.commissionAmountUsd,
+      workflowRoyaltyAmountUsd: record.workflowRoyaltyAmountUsd,
+      totalAmountUsd: record.totalAmountUsd,
       bankStatus: 'unpaid',
       paidAt: record.paidAt,
     });
   }
 
   const items = [...byUser.values()];
-  items.sort((a, b) => b.totalAmountVnd - a.totalAmountVnd);
+  items.sort((a, b) => b.totalAmountUsd - a.totalAmountUsd);
   for (const item of items) {
     item.periods.sort((a, b) => b.period.localeCompare(a.period));
   }
@@ -138,7 +144,7 @@ export function buildAggregatedPayoutList(
     (record) =>
       record.status !== 'paid' &&
       isPeriodEligibleForPayout(record.period) &&
-      record.totalAmountVnd > 0,
+      record.totalAmountUsd > 0,
   );
 }
 
@@ -152,7 +158,7 @@ export function buildAccruingPayoutList(
     (record) =>
       record.status !== 'paid' &&
       record.period === period &&
-      record.totalAmountVnd > 0,
+      record.totalAmountUsd > 0,
   );
 }
 
@@ -165,14 +171,19 @@ export async function attachBeneficiaries(
   return Promise.all(
     items.map(async (row) => {
       let hasBeneficiary = false;
+      let earningsPayoutCurrency: 'VND' | 'USD' = 'VND';
       try {
         const stub = binding.get(binding.idFromString(row.recipientUserId)) as DurableObjectStub<UserDO>;
         const beneficiary = await createPayoutBeneficiaryInfrastructure(stub).get();
         hasBeneficiary = !!beneficiary;
+        const users = await executeUtils.executeDynamicAction(stub, 'select', {}, 'users');
+        const u = Array.isArray(users) ? users[0] : users;
+        const raw = u?.earningsPayoutCurrency ?? u?.earnings_payout_currency;
+        earningsPayoutCurrency = raw === 'USD' ? 'USD' : 'VND';
       } catch {
         hasBeneficiary = false;
       }
-      return { ...row, hasBeneficiary };
+      return { ...row, hasBeneficiary, earningsPayoutCurrency };
     }),
   );
 }
@@ -181,7 +192,7 @@ export async function getUnpaidPayoutKeysForUser(
   db: D1Database,
   payoutInfra: ReturnType<typeof createEarningsPayoutInfrastructure>,
   recipientUserId: string,
-): Promise<{ keys: string[]; totalAmountVnd: number; identifier: string }> {
+): Promise<{ keys: string[]; totalAmountUsd: number; identifier: string }> {
   await syncAllPeriodPayoutRecords(db, payoutInfra);
   const all = await payoutInfra.listAll();
   const unpaid = all.filter(
@@ -190,11 +201,11 @@ export async function getUnpaidPayoutKeysForUser(
       p.status !== 'paid' &&
       isPeriodEligibleForPayout(p.period),
   );
-  const totalAmountVnd = toPayoutAmountVnd(unpaid.reduce((s, p) => s + p.totalAmountVnd, 0));
+  const totalAmountUsd = unpaid.reduce((s, p) => s + p.totalAmountUsd, 0);
   const identifier = unpaid[0]?.recipientIdentifier ?? recipientUserId;
   return {
     keys: unpaid.map((p) => p.payoutKey),
-    totalAmountVnd,
+    totalAmountUsd,
     identifier,
   };
 }

@@ -33,10 +33,8 @@ export const D1tor2CronConfigSchema = z.object({
 });
 export type D1tor2CronConfig = z.infer<typeof D1tor2CronConfigSchema>;
 
-/** Billing / ví (tỉ giá hiển thị USD ↔ VND khi tạo lệnh nạp) */
+/** Billing / ví (tỉ giá quản lý riêng tại admin → Quản lý tỉ giá) */
 export const BillingConfigSchema = z.object({
-	/** Số VND tương đương 1 USD (dùng UI preset & quy đổi, VNPay vẫn VND) */
-	USD_VND_RATE: z.number().min(1).max(10000000).optional(),
 	/** Số tiền nạp tối thiểu mỗi lệnh (VND, số nguyên ≥ 1) */
 	MIN_TOP_UP_VND: z.number().int().min(1).max(100000000).optional(),
 	/** % phí chia cho chủ workflow khi user khác dùng workflow sharing (mặc định 5) */
@@ -79,7 +77,6 @@ export const DEFAULT_D1TOR2_CONFIG: D1tor2CronConfig = {
 };
 
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
-	USD_VND_RATE: 26000,
 	MIN_TOP_UP_VND: 1000,
 	WORKFLOW_ROYALTY_PERCENT: 5,
 };

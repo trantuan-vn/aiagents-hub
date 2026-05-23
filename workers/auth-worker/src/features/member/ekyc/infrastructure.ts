@@ -26,10 +26,9 @@ import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 import {
   computeUsageChargeUsd,
-  convertUsdToVnd,
   getServiceModel,
+  roundUsdAmount,
 } from '../../admin/service/pricing';
-import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 
 const AI_GATEWAY_ID = 'unitoken';
 const DEFAULT_VISION_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
@@ -77,10 +76,9 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       throw new Error('User profile not found');
     }
 
-    const usdVndRate = await getUsdVndRateFromEnv(env);
-    const amountVnd = convertUsdToVnd(Math.max(0, Number(chargeUsd) || 0), usdVndRate);
+    const amountUsd = roundUsdAmount(Math.max(0, Number(chargeUsd) || 0));
     const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
-    if (amountVnd > balance) {
+    if (amountUsd > balance) {
       throw new Error('Insufficient wallet balance');
     }
 
@@ -91,12 +89,12 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       data: Record<string, unknown>;
     }> = [];
 
-    if (amountVnd > 0) {
+    if (amountUsd > 0) {
       operations.push({
         table: 'users',
         operation: 'update',
         id: u.id,
-        data: { ...u, walletBalance: balance - amountVnd, queueStatus: 'pending' },
+        data: { ...u, walletBalance: balance - amountUsd, queueStatus: 'pending' },
       });
     }
 
@@ -106,7 +104,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       userAgent: request.userAgent,
       ipAddress: request.ipAddress,
       isError: false,
-      cost: amountVnd,
+      cost: amountUsd,
       queueStatus: 'pending',
     };
     if (workflowAttribution) {
@@ -122,7 +120,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
 
     await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
 
-    if (workflowAttribution && amountVnd > 0) {
+    if (workflowAttribution && amountUsd > 0) {
       const consumerId =
         String(u.identifier ?? u.user_identifier ?? userDO.id?.toString?.() ?? '');
       const { recordWorkflowRoyalty } = await import('../workflows/royalty.js');
@@ -130,7 +128,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         workflowId: workflowAttribution.workflowId,
         workflowOwnerId: workflowAttribution.workflowOwnerId,
         consumerIdentifier: consumerId,
-        baseCostVnd: amountVnd,
+        baseCostUsd: amountUsd,
       });
     }
   };

@@ -29,9 +29,9 @@ export function periodToRange(period: string): { fromTs: number; toTs: number } 
 export interface PeriodEarningsRow {
   recipientUserId: string;
   recipientIdentifier: string;
-  commissionAmountVnd: number;
-  workflowRoyaltyAmountVnd: number;
-  totalAmountVnd: number;
+  commissionAmountUsd: number;
+  workflowRoyaltyAmountUsd: number;
+  totalAmountUsd: number;
 }
 
 export async function getCommissionTotalsByUserForPeriod(
@@ -66,7 +66,7 @@ export async function getWorkflowRoyaltyTotalsByOwnerForPeriod(
   fromTs: number,
   toTs: number,
 ): Promise<Map<string, number>> {
-  const sql = `SELECT "workflowOwnerId", SUM("royaltyAmountVnd") AS total
+  const sql = `SELECT "workflowOwnerId", SUM(COALESCE("royaltyAmountUsd", "royaltyAmountVnd", 0)) AS total
     FROM workflow_royalties
     WHERE created_at >= ? AND created_at < ?
     GROUP BY "workflowOwnerId"`;
@@ -120,13 +120,13 @@ export async function mergePeriodEarnings(
     rows.push({
       recipientUserId: userId,
       recipientIdentifier: identifier,
-      commissionAmountVnd: commissionTotal,
-      workflowRoyaltyAmountVnd: workflowTotal,
-      totalAmountVnd: total,
+      commissionAmountUsd: commissionTotal,
+      workflowRoyaltyAmountUsd: workflowTotal,
+      totalAmountUsd: total,
     });
   }
 
-  rows.sort((a, b) => b.totalAmountVnd - a.totalAmountVnd);
+  rows.sort((a, b) => b.totalAmountUsd - a.totalAmountUsd);
   return rows;
 }
 

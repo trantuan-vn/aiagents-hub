@@ -2,10 +2,9 @@ import { executeUtils } from '../../../shared/utils.js';
 import { UserDO } from '../../ws/infrastructure/UserDO.js';
 import {
   computeUsageChargeUsd,
-  convertUsdToVnd,
   getServiceModel,
+  roundUsdAmount,
 } from '../../admin/service/pricing.js';
-import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate.js';
 import { recordWorkflowRoyalty } from './royalty.js';
 
 const AI_GATEWAY_ID = 'unitoken';
@@ -54,16 +53,15 @@ export async function billAgentUsage(
   service: Record<string, unknown>,
   options: BillAgentUsageOptions,
 ): Promise<number> {
-  const chargeUsd = computeUsageChargeUsd(service, options.aiResponse);
-  const usdVndRate = await getUsdVndRateFromEnv(env);
-  const amountVnd = convertUsdToVnd(Math.max(0, chargeUsd), usdVndRate);
+  const chargeUsd = roundUsdAmount(computeUsageChargeUsd(service, options.aiResponse));
+  const amountUsd = chargeUsd;
 
   const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
   const u = Array.isArray(users) ? users[0] : users;
   if (!u?.id) throw new Error('User profile not found');
 
   const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
-  if (amountVnd > balance) throw new Error('Insufficient wallet balance');
+  if (amountUsd > balance) throw new Error('Insufficient wallet balance');
 
   const usageData: Record<string, unknown> = {
     serviceId: service.id,
@@ -71,7 +69,7 @@ export async function billAgentUsage(
     userAgent: options.userAgent,
     ipAddress: options.ipAddress,
     isError: false,
-    cost: amountVnd,
+    cost: amountUsd,
     queueStatus: 'pending',
   };
 
@@ -87,12 +85,12 @@ export async function billAgentUsage(
     data: Record<string, unknown>;
   }> = [];
 
-  if (amountVnd > 0) {
+  if (amountUsd > 0) {
     operations.push({
       table: 'users',
       operation: 'update',
       id: u.id,
-      data: { ...u, walletBalance: balance - amountVnd, queueStatus: 'pending' },
+      data: { ...u, walletBalance: balance - amountUsd, queueStatus: 'pending' },
     });
   }
 
@@ -104,20 +102,16 @@ export async function billAgentUsage(
 
   await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
 
-  if (options.workflowAttribution && amountVnd > 0) {
-    console.log(`workflow attribution: ${JSON.stringify(options.workflowAttribution)}`);
-    console.log(`consumer identifier: ${consumerIdentifier}`);
-    console.log(`base cost vnd: ${amountVnd}`);
-    
+  if (options.workflowAttribution && amountUsd > 0) {
     await recordWorkflowRoyalty(env, bindingName, {
       workflowId: options.workflowAttribution.workflowId,
       workflowOwnerId: options.workflowAttribution.workflowOwnerId,
       consumerIdentifier,
-      baseCostVnd: amountVnd,
+      baseCostUsd: amountUsd,
     });
   }
 
-  return amountVnd;
+  return amountUsd;
 }
 
 export async function runTextModel(

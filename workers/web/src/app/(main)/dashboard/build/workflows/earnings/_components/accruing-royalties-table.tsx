@@ -36,8 +36,8 @@ export function AccruingRoyaltiesTable({
             >
               <td className="py-2">{String(r.workflowId ?? "")}</td>
               <td className="py-2">
-                {formatCurrency(Number(r.royaltyAmountVnd ?? 0), {
-                  currency: "VND",
+                {formatCurrency(Number(r.royaltyAmountUsd ?? 0), {
+                  currency: "USD",
                   noDecimals: true,
                 })}
               </td>

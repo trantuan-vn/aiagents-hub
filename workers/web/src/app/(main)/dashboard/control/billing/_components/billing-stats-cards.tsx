@@ -4,18 +4,20 @@ import { CreditCard, Receipt, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 
 interface BillingStatsCardsProps {
-  walletBalanceVnd: number;
+  /** Wallet balance in USD */
+  walletBalanceUsd: number;
   pendingTopUps: number;
-  /** Sum of finalAmount for completed top-up orders (same page batch). */
+  /** Sum of finalAmount (VND) for completed top-up orders on this page */
   completedVolumeVnd: number;
-  /** VND per 1 USD from system configuration (fallback: env). */
+  /** VND per 1 USD (daily exchange rate) */
   usdVndRate: number;
 }
 
 export function BillingStatsCards({
-  walletBalanceVnd,
+  walletBalanceUsd,
   pendingTopUps,
   completedVolumeVnd,
   usdVndRate,
@@ -27,7 +29,7 @@ export function BillingStatsCards({
 
   const envRate = Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000");
   const rate = usdVndRate > 0 ? usdVndRate : envRate > 0 ? envRate : 26000;
-  const approxUsd = walletBalanceVnd / rate;
+  const approxVnd = walletBalanceUsd * rate;
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
@@ -37,11 +39,11 @@ export function BillingStatsCards({
           <Wallet className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{fmtVnd(walletBalanceVnd)}</div>
+          <div className="text-2xl font-bold">
+            {formatCurrency(walletBalanceUsd, { currency: "USD", maximumFractionDigits: 4 })}
+          </div>
           <p className="text-muted-foreground text-xs">
-            {t("stats.wallet_balance_usd_hint", {
-              amount: approxUsd.toLocaleString("en-US", { maximumFractionDigits: 2 }),
-            })}
+            {t("stats.wallet_balance_vnd_hint", { amount: fmtVnd(approxVnd) })}
           </p>
         </CardContent>
       </Card>

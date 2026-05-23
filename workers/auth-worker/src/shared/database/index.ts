@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizeLegacyEarningsPayoutAmounts } from '../../features/admin/earnings-payout/domain.js';
 import { GenericTable } from './table.js';
 
 export interface TableOptions {
@@ -387,6 +388,8 @@ export class DynamicDataBuilder {
         }
       }        
     });
+
+    normalizeLegacyEarningsPayoutAmounts(parsed);
 
     const result = schema.parse(parsed);
     
@@ -1049,6 +1052,20 @@ export class UserDODatabase {
           this.storage.sql.exec(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`);
           console.log(`[UserDODatabase] Migration: added column "${colName}" to table "${name}"`);
         }
+      }
+
+      if (
+        name === 'earnings_payouts' &&
+        existingColumns.has('totalAmountVnd') &&
+        existingColumns.has('totalAmountUsd')
+      ) {
+        this.storage.sql.exec(
+          `UPDATE "${name}" SET
+            "commissionAmountUsd" = COALESCE("commissionAmountUsd", "commissionAmountVnd", 0),
+            "workflowRoyaltyAmountUsd" = COALESCE("workflowRoyaltyAmountUsd", "workflowRoyaltyAmountVnd", 0),
+            "totalAmountUsd" = COALESCE("totalAmountUsd", "totalAmountVnd", 0)
+          WHERE "totalAmountUsd" IS NULL AND "totalAmountVnd" IS NOT NULL`,
+        );
       }
 
       // Thêm unique index cho conflictField nếu cột vừa được thêm (trường hợp connectionId)

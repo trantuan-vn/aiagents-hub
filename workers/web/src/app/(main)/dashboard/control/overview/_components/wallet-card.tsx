@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 
 import {
   FALLBACK_USD_VND,
@@ -18,12 +19,12 @@ import {
 
 export function WalletCard() {
   const t = useTranslations("OverviewPage");
-  const [balanceVnd, setBalanceVnd] = useState<number | null>(null);
+  const [balanceUsd, setBalanceUsd] = useState<number | null>(null);
   const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
 
   const loadWallet = useCallback(async () => {
     const [balance, params] = await Promise.all([fetchWalletBalance(), fetchMemberBillingParams()]);
-    setBalanceVnd(balance);
+    setBalanceUsd(balance);
     setUsdVndRate(params.usdVndRate);
   }, []);
 
@@ -31,13 +32,10 @@ export function WalletCard() {
     void loadWallet();
   }, [loadWallet]);
 
-  const fmtVnd = (n: number): string =>
-    new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
-
   const rate = usdVndRate > 0 ? usdVndRate : FALLBACK_USD_VND;
-  const approxUsd =
-    balanceVnd != null
-      ? (balanceVnd / rate).toLocaleString("en-US", { maximumFractionDigits: 2 })
+  const approxVnd =
+    balanceUsd != null
+      ? new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(balanceUsd * rate)
       : null;
 
   return (
@@ -49,17 +47,15 @@ export function WalletCard() {
           </div>
           <div className="min-w-0">
             <p className="text-muted-foreground text-sm font-medium">{t("wallet.title")}</p>
-            {balanceVnd == null ? (
+            {balanceUsd == null ? (
               <div className="bg-muted mt-2 h-8 w-36 animate-pulse rounded-md" />
             ) : (
               <>
                 <p className="text-primary mt-0.5 text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
-                  {fmtVnd(balanceVnd)}
+                  {formatCurrency(balanceUsd, { currency: "USD", maximumFractionDigits: 4 })}
                 </p>
-                {approxUsd != null ? (
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    {t("wallet.usd_hint", { amount: approxUsd })}
-                  </p>
+                {approxVnd != null ? (
+                  <p className="text-muted-foreground mt-0.5 text-xs">{t("wallet.vnd_hint", { amount: approxVnd })}</p>
                 ) : null}
               </>
             )}

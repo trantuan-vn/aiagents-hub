@@ -163,11 +163,13 @@ export const UserSchema = BaseUserSchema.extend({
   phone: z.string().optional(),
   privateKey: z.string().optional(),
   mnemonicPhrase: z.string().optional(),
-  /** VND balance after successful top-ups; usage deducts by fee% × AI Gateway cost */
+  /** USD balance after successful top-ups (VND payments converted at daily rate); usage deducts in USD */
   walletBalance: z.preprocess(
     (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
     z.number().min(0),
   ).optional(),
+  /** Currency for commission & workflow earnings bank payout (VietQR when VND) */
+  earningsPayoutCurrency: z.enum(['VND', 'USD']).default('VND').optional(),
   /** Identifier of the referrer (user who owns the referral link) */
   referrerId: z.string().optional(),
   /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */

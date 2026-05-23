@@ -148,17 +148,17 @@ export async function getWorkflowRoyaltyStats(
   ownerUserId: string,
   fromTs: number,
 ): Promise<{ byDay: RoyaltyStatsRow[]; totalAmount: number }> {
-  const sql = `SELECT created_at, royaltyAmountVnd FROM workflow_royalties
+  const sql = `SELECT created_at, royaltyAmountUsd FROM workflow_royalties
     WHERE "workflowOwnerId" = ? AND created_at >= ? ORDER BY created_at ASC`;
   const result = await db.prepare(sql).bind(ownerUserId, fromTs).all<{
     created_at?: number;
-    royaltyAmountVnd?: number;
+    royaltyAmountUsd?: number;
   }>();
   const byDate = new Map<string, number>();
   for (const r of result.results ?? []) {
     const ts = r.created_at ?? 0;
     const dateKey = new Date(ts).toISOString().slice(0, 10);
-    byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.royaltyAmountVnd || 0));
+    byDate.set(dateKey, (byDate.get(dateKey) || 0) + Number(r.royaltyAmountUsd || 0));
   }
   const byDay = Array.from(byDate.entries())
     .map(([date, total]) => ({ date, total }))

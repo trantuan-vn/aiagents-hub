@@ -1,9 +1,17 @@
+drop table agent_workflows; 
 drop table api_tokens; 
+drop table backup_codes;
+drop table commission_policies;
+drop table commissions;
 drop table connections;
+drop table earnings_payouts;
+drop table exchange_rates;
 drop table order_discounts;
 drop table order_items;
 drop table orders;
+drop table passkey_credentials;
 drop table payments;
+drop table payout_beneficiary;
 drop table pending_messages;
 drop table price_policies;
 drop table refunds;
@@ -11,16 +19,17 @@ drop table service_usages;
 drop table services;
 drop table sessions;
 drop table subscriptions;
+drop table user_did;
+drop table user_ekyc;
+drop table user_mfa;
 drop table users;
 drop table versions;
 drop table vouchers;
-drop table backup_codes;
-drop table passkey_credentials;
-drop table user_ekyc;
-drop table user_mfa;
-drop table user_did;
-drop table commission_policies;
-drop table commissions;
+drop table workflow_comments;
+drop table workflow_royalties;
+drop table workflow_user_stars;
+
+
 
 
 drop table user_shards;

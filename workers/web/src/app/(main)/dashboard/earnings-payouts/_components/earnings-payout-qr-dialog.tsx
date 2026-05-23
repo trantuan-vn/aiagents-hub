@@ -74,7 +74,7 @@ export function EarningsPayoutQrDialog({
   onPaid,
 }: EarningsPayoutQrDialogProps) {
   const description = selectedItem
-    ? `${selectedItem.recipientIdentifier} — ${formatCurrency(selectedItem.totalAmountVnd, { currency: "VND", noDecimals: true })}`
+    ? `${selectedItem.recipientIdentifier} — ${formatCurrency(selectedItem.totalAmountUsd, { currency: "USD", maximumFractionDigits: 4 })}`
     : "";
 
   return (

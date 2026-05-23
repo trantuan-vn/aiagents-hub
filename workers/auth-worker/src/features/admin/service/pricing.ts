@@ -51,20 +51,30 @@ export function applyFeePercent(baseCost: number, feePercent: number): number {
   return Math.max(0, baseCost * (pct / 100));
 }
 
-const VND_DECIMAL_PLACES = 8;
+const USD_DECIMAL_PLACES = 8;
 
-/** VND monetary amounts (wallet, usage cost, royalty, commission) — 8 decimal places. */
-export function roundVndAmount(amount: number): number {
+/** USD monetary amounts (wallet, usage cost, royalty, commission) — 8 decimal places. */
+export function roundUsdAmount(amount: number): number {
   if (!Number.isFinite(amount) || amount <= 0) return 0;
-  const factor = 10 ** VND_DECIMAL_PLACES;
+  const factor = 10 ** USD_DECIMAL_PLACES;
   return Math.round(amount * factor) / factor;
 }
 
-/** Wallet / service_usages.cost — VND per 1 USD from system config. */
+/** @deprecated Use roundUsdAmount */
+export const roundVndAmount = roundUsdAmount;
+
+/** VND top-up → USD wallet credit. */
+export function convertVndToUsd(vndAmount: number, usdVndRate: number): number {
+  if (vndAmount <= 0) return 0;
+  const rate = usdVndRate > 0 ? usdVndRate : 1;
+  return roundUsdAmount(vndAmount / rate);
+}
+
+/** Payout QR — USD earnings → VND transfer amount. */
 export function convertUsdToVnd(usdAmount: number, usdVndRate: number): number {
   if (usdAmount <= 0) return 0;
   const rate = usdVndRate > 0 ? usdVndRate : 1;
-  return roundVndAmount(usdAmount * rate);
+  return Math.round(usdAmount * rate);
 }
 
 /** Token charge with fee% applied (USD). */
