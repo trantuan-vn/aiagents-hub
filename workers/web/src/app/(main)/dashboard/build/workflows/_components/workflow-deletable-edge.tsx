@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useRef, useState } from "react";
 
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useReactFlow, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from "@xyflow/react";
 import { Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -29,7 +29,7 @@ function WorkflowDeletableEdgeComponent(props: EdgeProps) {
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ui = useWorkflowCanvasUi();
   const readOnly = ui?.readOnly ?? true;
-  const { setEdges } = useReactFlow();
+  const deleteEdge = ui?.deleteEdge;
   const t = useTranslations("WorkflowEditorPage");
 
   const clearLeaveTimer = useCallback(() => {
@@ -54,9 +54,9 @@ function WorkflowDeletableEdgeComponent(props: EdgeProps) {
       e.stopPropagation();
       clearLeaveTimer();
       setHovered(false);
-      setEdges((eds) => eds.filter((edge) => edge.id !== id));
+      deleteEdge?.(id);
     },
-    [clearLeaveTimer, id, setEdges],
+    [clearLeaveTimer, deleteEdge, id],
   );
 
   const showDelete = !readOnly && (hovered || selected);

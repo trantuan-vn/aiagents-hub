@@ -12,6 +12,12 @@ export interface WorkflowCanvasUiValue {
     type: string;
     label: string;
   }) => void;
+  deleteEdge?: (edgeId: string) => void;
+  deleteNode?: (nodeId: string) => void;
+  toggleNodeActive?: (nodeId: string) => void;
+  runNode?: (nodeId: string) => void;
+  onNodeMenuAction?: (nodeId: string, action: string) => void;
+  tidyLayout?: () => void;
 }
 
 export const WorkflowCanvasUiContext = createContext<WorkflowCanvasUiValue | null>(null);

@@ -11,24 +11,44 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 
 import { useWorkflowCanvasUi, type ConnectedNodeSide } from "./workflow-canvas-ui-context";
+import { edgeUsesHandle, type WorkflowHandleId } from "./workflow-connection-utils";
 import { WORKFLOW_NODE_PALETTE } from "./workflow-node-palette";
 
-function edgeUsesSourceOut(e: { source: string; sourceHandle?: string | null }): boolean {
-  return e.sourceHandle === "out" || e.sourceHandle == null || e.sourceHandle === "";
-}
-
-function edgeUsesTargetIn(e: { target: string; targetHandle?: string | null }): boolean {
-  return e.targetHandle === "in" || e.targetHandle == null || e.targetHandle === "";
-}
-
-function useHandleConnectionState(nodeId: string | null, type: "target" | "source", edges: Edge[]) {
+function useHandleConnectionState(
+  nodeId: string | null,
+  handleId: WorkflowHandleId,
+  type: "target" | "source",
+  edges: Edge[],
+) {
   return useMemo(() => {
     if (!nodeId) return true;
-    if (type === "source") {
-      return edges.some((e) => e.source === nodeId && edgeUsesSourceOut(e));
-    }
-    return edges.some((e) => e.target === nodeId && edgeUsesTargetIn(e));
-  }, [edges, nodeId, type]);
+    return edges.some((e) => edgeUsesHandle(e, nodeId, handleId, type === "source" ? "source" : "target"));
+  }, [edges, handleId, nodeId, type]);
+}
+
+function getHandleClusterClass(position: Position): string {
+  if (position === Position.Left) {
+    return "absolute left-0 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1";
+  }
+  if (position === Position.Right) {
+    return "absolute right-0 top-1/2 z-20 flex translate-x-1/2 -translate-y-1/2 items-center gap-1";
+  }
+  return "relative z-20 flex flex-col items-center gap-0.5";
+}
+
+function getConnectedSide(position: Position): ConnectedNodeSide {
+  return position === Position.Left ? "left" : "right";
+}
+
+function canShowConnectionPlus(
+  showAddNode: boolean,
+  readOnly: boolean,
+  hasConnection: boolean,
+  canCreate: boolean,
+  position: Position,
+): boolean {
+  if (!showAddNode || readOnly || hasConnection || !canCreate) return false;
+  return position !== Position.Bottom;
 }
 
 function ConnectionHandleRow({
@@ -50,52 +70,32 @@ function ConnectionHandleRow({
       </>
     );
   }
+  if (position === Position.Right) {
+    return (
+      <>
+        {handleEl}
+        {showPlus ? plusPopover : null}
+      </>
+    );
+  }
+  return handleEl;
+}
+
+function ConnectionHandlePlusMenu({
+  open,
+  onOpenChange,
+  side,
+  onPickType,
+  t,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  side: ConnectedNodeSide;
+  onPickType: (nodeType: string, nodeLabel: string) => void;
+  t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
+}) {
   return (
-    <>
-      {handleEl}
-      {showPlus ? plusPopover : null}
-    </>
-  );
-}
-
-interface ConnectionHandleProps {
-  handleId: "in" | "out";
-  type: "target" | "source";
-  position: Position;
-  accentClass?: string;
-}
-
-function ConnectionHandleInner({ handleId, type, position, accentClass }: ConnectionHandleProps) {
-  const nodeId = useNodeId();
-  const ui = useWorkflowCanvasUi();
-  const readOnly = ui?.readOnly ?? true;
-  const createConnectedNode = ui?.createConnectedNode;
-  const t = useTranslations("WorkflowEditorPage");
-  const [open, setOpen] = useState(false);
-
-  const edges = useStore((s) => s.edges);
-  const hasConnection = useHandleConnectionState(nodeId ?? null, type, edges);
-
-  const side: ConnectedNodeSide = position === Position.Left ? "left" : "right";
-
-  const onPickType = useCallback(
-    (nodeType: string, label: string) => {
-      if (!nodeId || !createConnectedNode) return;
-      createConnectedNode({ fromNodeId: nodeId, side, type: nodeType, label });
-      setOpen(false);
-    },
-    [createConnectedNode, nodeId, side],
-  );
-
-  const showPlus = !readOnly && !hasConnection && !!createConnectedNode;
-
-  const clusterClass =
-    position === Position.Left
-      ? "absolute left-0 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1"
-      : "absolute right-0 top-1/2 z-20 flex translate-x-1/2 -translate-y-1/2 items-center gap-1";
-
-  const plusPopover = (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -132,6 +132,64 @@ function ConnectionHandleInner({ handleId, type, position, accentClass }: Connec
       </PopoverContent>
     </Popover>
   );
+}
+
+interface ConnectionHandleProps {
+  handleId: WorkflowHandleId;
+  type: "target" | "source";
+  position: Position;
+  accentClass?: string;
+  label?: string;
+  showAddNode?: boolean;
+}
+
+function useConnectionHandleModel({ handleId, type, position, showAddNode = true }: ConnectionHandleProps) {
+  const nodeId = useNodeId();
+  const ui = useWorkflowCanvasUi();
+  const readOnly = ui?.readOnly ?? true;
+  const createConnectedNode = ui?.createConnectedNode;
+  const t = useTranslations("WorkflowEditorPage");
+  const [open, setOpen] = useState(false);
+  const edges = useStore((s) => s.edges);
+  const hasConnection = useHandleConnectionState(nodeId ?? null, handleId, type, edges);
+  const side = getConnectedSide(position);
+
+  const onPickType = useCallback(
+    (nodeType: string, nodeLabel: string) => {
+      if (!nodeId || !createConnectedNode) return;
+      createConnectedNode({ fromNodeId: nodeId, side, type: nodeType, label: nodeLabel });
+      setOpen(false);
+    },
+    [createConnectedNode, nodeId, side],
+  );
+
+  const showPlus = canShowConnectionPlus(showAddNode, readOnly, hasConnection, !!createConnectedNode, position);
+
+  return {
+    t,
+    open,
+    setOpen,
+    side,
+    onPickType,
+    showPlus,
+    clusterClass: getHandleClusterClass(position),
+    isSideHandle: position === Position.Left || position === Position.Right,
+  };
+}
+
+function ConnectionHandleView({
+  handleId,
+  type,
+  position,
+  accentClass,
+  label,
+  model,
+}: ConnectionHandleProps & { model: ReturnType<typeof useConnectionHandleModel> }) {
+  const { t, open, setOpen, side, onPickType, showPlus, clusterClass, isSideHandle } = model;
+
+  const plusPopover = (
+    <ConnectionHandlePlusMenu open={open} onOpenChange={setOpen} side={side} onPickType={onPickType} t={t} />
+  );
 
   const handleEl = (
     <Handle
@@ -146,12 +204,18 @@ function ConnectionHandleInner({ handleId, type, position, accentClass }: Connec
   );
 
   return (
-    <div className={cn("pointer-events-none", clusterClass)}>
-      <div className="pointer-events-auto flex items-center gap-1">
+    <div className={cn(isSideHandle ? "pointer-events-none" : "pointer-events-auto", clusterClass)}>
+      {label ? <span className="text-muted-foreground text-[10px] leading-none">{label}</span> : null}
+      <div className={cn("flex items-center gap-1", isSideHandle && "pointer-events-auto")}>
         <ConnectionHandleRow position={position} showPlus={showPlus} plusPopover={plusPopover} handleEl={handleEl} />
       </div>
     </div>
   );
+}
+
+function ConnectionHandleInner(props: ConnectionHandleProps) {
+  const model = useConnectionHandleModel(props);
+  return <ConnectionHandleView {...props} model={model} />;
 }
 
 export const ConnectionHandle = memo(ConnectionHandleInner);
