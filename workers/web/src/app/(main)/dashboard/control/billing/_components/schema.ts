@@ -41,9 +41,12 @@ export const OrderSchema = z.object({
   orderCode: z.string(),
   subtotalAmount: z.number().min(0),
   discountAmount: z.number().min(0).default(0),
+  /** USD wallet credit */
   finalAmount: z.number().min(0),
+  /** VND payable at checkout */
+  payableAmountVnd: z.number().int().min(0).optional(),
   status: OrderStatusSchema,
-  currency: z.string().default("VND"),
+  currency: z.string().default("USD"),
   appliedVoucherCode: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
@@ -81,3 +84,18 @@ export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderDetail = z.infer<typeof OrderDetailSchema>;
 export type CreatePayment = z.infer<typeof CreatePaymentSchema>;
 export type PaymentResult = z.infer<typeof PaymentResultSchema>;
+
+/** VND amount for VNPay/Casso (legacy orders without payableAmountVnd). */
+export function getOrderPayableVnd(
+  order: Pick<Order, "finalAmount" | "payableAmountVnd" | "currency">,
+  usdVndRate: number,
+): number {
+  const payable = order.payableAmountVnd;
+  if (typeof payable === "number" && payable > 0) return Math.round(payable);
+  const cur = (order.currency ?? "VND").toUpperCase();
+  if (cur === "USD") {
+    const rate = usdVndRate > 0 ? usdVndRate : 26000;
+    return Math.round(order.finalAmount * rate);
+  }
+  return Math.round(order.finalAmount);
+}

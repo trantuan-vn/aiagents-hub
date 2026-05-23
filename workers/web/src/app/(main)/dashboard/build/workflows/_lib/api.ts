@@ -25,7 +25,7 @@ export interface AgentWorkflow {
   communityStarAvg?: number;
   communityStarCount?: number;
   usageCount?: number;
-  totalEarningsVnd?: number;
+  totalEarningsUsd?: number;
   status?: "draft" | "published";
   user_id?: string;
 }

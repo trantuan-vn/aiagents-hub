@@ -53,6 +53,7 @@ interface OrderHistoryTabProps {
   onToDateChange: (v: string) => void;
   onApply: (dateParams?: { fromDate: string; toDate: string }) => void;
   orders: Order[];
+  usdVndRate: number;
   loading: boolean;
   error: string | null;
   onCancel: (orderId: number) => Promise<void>;
@@ -71,6 +72,7 @@ export function OrderHistoryTab({
   onToDateChange,
   onApply,
   orders,
+  usdVndRate,
   loading,
   error,
   onCancel,
@@ -173,6 +175,7 @@ export function OrderHistoryTab({
       ) : (
         <OrderList
           orders={orders}
+          usdVndRate={usdVndRate}
           onCancel={onCancel}
           onPayment={onPayment}
           onCassoQr={onCassoQr}

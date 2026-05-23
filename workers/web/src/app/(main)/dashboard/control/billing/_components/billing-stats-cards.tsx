@@ -10,8 +10,8 @@ interface BillingStatsCardsProps {
   /** Wallet balance in USD */
   walletBalanceUsd: number;
   pendingTopUps: number;
-  /** Sum of finalAmount (VND) for completed top-up orders on this page */
-  completedVolumeVnd: number;
+  /** Sum of finalAmount (USD) for completed top-up orders on this page */
+  completedVolumeUsd: number;
   /** VND per 1 USD (daily exchange rate) */
   usdVndRate: number;
 }
@@ -19,13 +19,15 @@ interface BillingStatsCardsProps {
 export function BillingStatsCards({
   walletBalanceUsd,
   pendingTopUps,
-  completedVolumeVnd,
+  completedVolumeUsd,
   usdVndRate,
 }: BillingStatsCardsProps) {
   const t = useTranslations("BillingPage");
 
   const fmtVnd = (n: number): string =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+
+  const fmtUsd = (n: number): string => formatCurrency(n, { currency: "USD", maximumFractionDigits: 4 });
 
   const envRate = Number(process.env.NEXT_PUBLIC_USD_VND_RATE ?? "26000");
   const rate = usdVndRate > 0 ? usdVndRate : envRate > 0 ? envRate : 26000;
@@ -63,7 +65,7 @@ export function BillingStatsCards({
           <CreditCard className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{fmtVnd(completedVolumeVnd)}</div>
+          <div className="text-2xl font-bold">{fmtUsd(completedVolumeUsd)}</div>
           <p className="text-muted-foreground text-xs">{t("stats.completed_volume_description")}</p>
         </CardContent>
       </Card>

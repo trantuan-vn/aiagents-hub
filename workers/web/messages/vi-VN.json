@@ -2599,6 +2599,8 @@
     "order_cancelled": "Đã hủy đơn hàng",
     "order_cancelled_description": "Đơn hàng đã được hủy thành công",
     "top_up": "Nạp tiền",
+    "top_up_vnd": "Nạp tiền VNĐ",
+    "top_up_usd_coming_soon": "Nạp tiền USD (sắp có)",
     "top_up_title": "Nạp vào ví",
     "top_up_description": "Thanh toán bằng VND; số dư ví được ghi nhận bằng USD theo tỉ giá ngày.",
     "preset_usd_label": "Mức nhanh (USD)",
@@ -2652,6 +2654,8 @@
     "paid_done": "Đã thanh toán",
     "order_code": "Mã đơn hàng",
     "amount": "Số tiền",
+    "wallet_credit_usd": "Ghi có ví (USD)",
+    "payable_vnd": "Thanh toán (VND)",
     "voucher": "Voucher",
     "voucher_code": "Mã Voucher",
     "voucher_code_placeholder": "ví dụ: SUMMER2024",
@@ -2681,7 +2685,7 @@
       "pending_topups": "Lệnh nạp chờ thanh toán",
       "pending_topups_description": "Chưa hoàn tất thanh toán ngân hàng",
       "completed_volume": "Đã nạp (trang hiện tại)",
-      "completed_volume_description": "Tổng các đơn hoàn thành trong danh sách đang xem"
+      "completed_volume_description": "Tổng USD ghi có từ các đơn hoàn thành trong danh sách đang xem"
     },
     "status": {
       "pending": "Chờ thanh toán",

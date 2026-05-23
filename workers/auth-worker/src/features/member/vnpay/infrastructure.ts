@@ -21,6 +21,7 @@ import { VNPAY_CONSTANTS, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_ERROR_MESSAGES }
 import { executeUtils } from '../../../shared/utils';
 import { convertVndToUsd } from '../../admin/service/pricing';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
+import { getOrderPayableVnd } from '../order/domain';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
 
@@ -28,12 +29,20 @@ export function createVNPayService(
   userDO: DurableObjectStub<UserDO>,
   walletOptions?: VNPayWalletOptions,
 ): IVNPayService {
-  const vndToWalletUsd = async (vndAmount: number): Promise<number> => {
-    if (!walletOptions || vndAmount <= 0) return vndAmount;
-    const rate = await getUsdVndRateFromEnv(walletOptions.env, walletOptions.bindingName);
-    return convertVndToUsd(vndAmount, rate);
+  const getRate = async (): Promise<number> => {
+    if (!walletOptions) return 26000;
+    return getUsdVndRateFromEnv(walletOptions.env, walletOptions.bindingName);
   };
-  const validatePayment = async (paymentId: number, expectedAmount: number): Promise<number> => {
+
+  const walletCreditUsd = async (orderRow: { finalAmount?: number; currency?: string | null }): Promise<number> => {
+    const raw = Number(orderRow.finalAmount ?? 0) || 0;
+    if (raw <= 0) return 0;
+    if ((orderRow.currency ?? 'VND').toUpperCase() === 'USD') return raw;
+    const rate = await getRate();
+    return convertVndToUsd(raw, rate);
+  };
+
+  const validatePayment = async (paymentId: number, expectedAmountVnd: number): Promise<number> => {
     const payments = await executeUtils.executeDynamicAction(userDO, 'select', {
       where: { field: "id", operator: '=', value: paymentId }
     }, 'payments');
@@ -55,7 +64,9 @@ export function createVNPayService(
     }
 
     const order = orders[0];
-    if (order.finalAmount !== expectedAmount) {
+    const rate = await getRate();
+    const payableVnd = getOrderPayableVnd(order, rate);
+    if (payableVnd !== Math.round(expectedAmountVnd)) {
       throw new Error(PAYMENT_ERROR_MESSAGES.INVALID_AMOUNT);
     }
     return order.id;
@@ -94,8 +105,7 @@ export function createVNPayService(
       if (!dbUser?.id || !orderRow) {
         throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
       }
-      const creditVnd = Number(orderRow.finalAmount ?? 0) || 0;
-      const credit = await vndToWalletUsd(creditVnd);
+      const credit = await walletCreditUsd(orderRow);
       const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
 
       operations.push({
@@ -208,9 +218,7 @@ export function createVNPayService(
     const dbUser = userRows[0];
     if (dbUser?.id && orderRow) {
       const bal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
-      const debitVnd = Number(orderRow.finalAmount ?? 0) || 0;
-      const debitUsd = await vndToWalletUsd(debitVnd);
-      const debit = Math.min(bal, debitUsd);
+      const debit = Math.min(bal, await walletCreditUsd(orderRow));
       operations.push({
         table: 'users',
         operation: 'update',
@@ -369,7 +377,9 @@ export function createVNPayService(
     }
 
     const order = orders[0];
-    if (order.finalAmount !== expectedAmount) {
+    const rate = await getRate();
+    const payableVnd = getOrderPayableVnd(order, rate);
+    if (payableVnd !== Math.round(expectedAmount)) {
       return {
         success: false,
         code: '04',
@@ -530,8 +540,10 @@ export function createVNPayService(
       };
     }
 
-    const order = orders[0] as { id: number; finalAmount: number };
-    if (order.finalAmount !== expectedAmount || creditedAmount !== order.finalAmount) {
+    const order = orders[0] as { id: number; finalAmount: number; payableAmountVnd?: number; currency?: string };
+    const rate = await getRate();
+    const payableVnd = getOrderPayableVnd(order, rate);
+    if (payableVnd !== Math.round(expectedAmount) || Math.round(creditedAmount) !== payableVnd) {
       return {
         success: false,
         code: "04",
@@ -670,8 +682,10 @@ export function createVNPayService(
     }
 
     const order = orders[0];
+    const rate = await getRate();
+    const refundVnd = getOrderPayableVnd(order, rate);
 
-    const data = `${vnp_RequestId}|${VNPAY_CONSTANTS.VERSION}|${VNPAY_CONSTANTS.COMMAND_REFUND}|${vnp_TmnCode}|${request.transactionType}|${order.orderCode}|${order.finalAmount}|${order.finalAmount * 100}|${vnp_TransactionNo}|${vnp_CreateDate}|${identifier}|${vnp_CreateDate}|${ipAddr}|Hoan tien GD ma: ${order.orderCode} voi ly do: ${request.reason}`;
+    const data = `${vnp_RequestId}|${VNPAY_CONSTANTS.VERSION}|${VNPAY_CONSTANTS.COMMAND_REFUND}|${vnp_TmnCode}|${request.transactionType}|${order.orderCode}|${refundVnd}|${refundVnd * 100}|${vnp_TransactionNo}|${vnp_CreateDate}|${identifier}|${vnp_CreateDate}|${ipAddr}|Hoan tien GD ma: ${order.orderCode} voi ly do: ${request.reason}`;
     
     const vnp_SecureHash = cryptoService.createSHA512Signature(data, secretKey);
 
@@ -682,7 +696,7 @@ export function createVNPayService(
       'vnp_TmnCode': vnp_TmnCode,
       'vnp_TransactionType': request.transactionType,
       'vnp_TxnRef': order.orderCode,
-      'vnp_Amount': order.finalAmount * 100,
+      'vnp_Amount': refundVnd * 100,
       'vnp_OrderInfo': `Hoan tien GD ma: ${order.orderCode} voi ly do: ${request.reason}`,
       'vnp_TransactionNo': vnp_TransactionNo,
       'vnp_TransactionDate': vnp_CreateDate,      

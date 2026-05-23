@@ -302,7 +302,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, slug, definition, starCount, starLabel, usageCount, totalEarningsVnd, status, created_at
+      const sql = `SELECT id, globalId, user_id, name, description, slug, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first();
       if (!result) return c.json({ error: 'Not found' }, 404);

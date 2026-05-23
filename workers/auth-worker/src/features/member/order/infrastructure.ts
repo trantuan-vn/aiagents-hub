@@ -1,5 +1,7 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createPriceApplicationService } from '../../admin/policy/application';
+import { convertVndToUsd } from '../../admin/service/pricing';
+import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { createVoucherApplicationService } from '../../admin/voucher/application';
 import { processCommissionOnOrder } from '../referral/commission-service';
 import {
@@ -154,19 +156,28 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
     async createOrder(user: any, request: CreateOrder): Promise<any> {
       const calculationResult = await calculateWalletTopUp(user, request);
 
-      const subtotalAmount = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
-      const discountAmount = calculationResult.reduce(
+      const subtotalVnd = calculationResult.reduce((total, item) => total + item.basePrice * item.quantity, 0);
+      const discountVnd = calculationResult.reduce(
         (total, item) => total + (item.policy.totalDiscount + item.voucher.discountAmount) * item.quantity,
         0,
       );
-      const finalAmount = Math.max(0, subtotalAmount - discountAmount);
+      const finalAmountVnd = Math.max(0, subtotalVnd - discountVnd);
+      const payableAmountVnd = Math.round(finalAmountVnd);
+
+      const usdVndRate = await getUsdVndRateFromEnv(context.env, bindingName);
+      const toUsd = (vnd: number): number => convertVndToUsd(vnd, usdVndRate);
+
+      const subtotalAmount = toUsd(subtotalVnd);
+      const discountAmount = toUsd(discountVnd);
+      const finalAmount = toUsd(finalAmountVnd);
 
       const orderData = {
         orderCode: generateOrderCode(),
         subtotalAmount,
         discountAmount,
         finalAmount,
-        currency: request.currency,
+        payableAmountVnd,
+        currency: 'USD',
         appliedVoucherCode: request.voucherCode,
         status: 'PENDING',
         notes: request.notes,
@@ -176,18 +187,32 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
 
       // Tạo order items và discounts
       for (const item of calculationResult) {
+        const itemDiscountVnd = item.policy.totalDiscount + item.voucher.discountAmount;
+        const itemFinalVnd = item.basePrice - itemDiscountVnd;
         const orderItem = await executeUtils.executeDynamicAction(userDO, 'insert', {
           serviceId: item.serviceId,
-          basePrice: item.basePrice,
+          basePrice: toUsd(item.basePrice),
           quantity: item.quantity,
-          finalAmount:
-            item.basePrice - (item.policy.totalDiscount + item.voucher.discountAmount),
-          discountAmount: item.policy.totalDiscount + item.voucher.discountAmount,
+          finalAmount: toUsd(itemFinalVnd),
+          discountAmount: toUsd(itemDiscountVnd),
           orderId: orderRecord.id
         }, 'order_items');
 
         if (item.discounts) {
-          await createOrderDiscounts(orderItem.id, item.discounts);
+          const discountsUsd: Record<string, { amount: number; type: string; appliedPolicies?: unknown; voucher?: string }> = {};
+          if (item.discounts.policyDiscount) {
+            discountsUsd.policyDiscount = {
+              ...item.discounts.policyDiscount,
+              amount: toUsd(item.discounts.policyDiscount.amount),
+            };
+          }
+          if (item.discounts.voucherDiscount) {
+            discountsUsd.voucherDiscount = {
+              ...item.discounts.voucherDiscount,
+              amount: toUsd(item.discounts.voucherDiscount.amount),
+            };
+          }
+          await createOrderDiscounts(orderItem.id, discountsUsd);
         }
       }
 
@@ -197,7 +222,7 @@ export function createOrderInfrastructureService(userDO: DurableObjectStub<UserD
           id: orderRecord.id,
           orderCode: orderData.orderCode,
           finalAmount,
-          currency: request.currency ?? 'VND',
+          currency: 'USD',
         });
       } catch (e) {
         console.warn('[Order] Commission processing failed:', e);

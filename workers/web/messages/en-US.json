@@ -2599,6 +2599,8 @@
     "order_cancelled": "Order cancelled",
     "order_cancelled_description": "Order has been cancelled successfully",
     "top_up": "Top up",
+    "top_up_vnd": "Top up VND",
+    "top_up_usd_coming_soon": "Top up USD (coming soon)",
     "top_up_title": "Add balance",
     "top_up_description": "Choose an amount (shown in USD for convenience). Checkout via VNPay is settled in VND.",
     "preset_usd_label": "Quick amounts (USD)",
@@ -2652,6 +2654,8 @@
     "paid_done": "I've paid",
     "order_code": "Order Code",
     "amount": "Amount",
+    "wallet_credit_usd": "Wallet credit (USD)",
+    "payable_vnd": "Payable (VND)",
     "voucher": "Voucher",
     "voucher_code": "Voucher Code",
     "voucher_code_placeholder": "e.g., SUMMER2024",
@@ -2681,7 +2685,7 @@
       "pending_topups": "Pending top-ups",
       "pending_topups_description": "Awaiting bank payment",
       "completed_volume": "Paid top-ups (this page)",
-      "completed_volume_description": "Sum of completed orders in the current list"
+      "completed_volume_description": "Total USD credited from completed orders in the current list"
     },
     "status": {
       "pending": "Pending",

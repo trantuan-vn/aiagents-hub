@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatCurrency } from "@/lib/utils";
 
 import { deleteWorkflow, listMyWorkflows, type AgentWorkflow } from "../_lib/api";
 
@@ -79,7 +80,7 @@ export function MyWorkflowsTab() {
                   {t("usage_count")}: {wf.usageCount ?? 0}
                 </span>
                 <span>
-                  {t("earnings")}: {(wf.totalEarningsVnd ?? 0).toLocaleString()}
+                  {t("earnings")}: {formatCurrency(wf.totalEarningsUsd ?? 0, { maximumFractionDigits: 4 })}
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">

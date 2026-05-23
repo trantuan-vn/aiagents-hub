@@ -15,11 +15,12 @@ import { PaymentCassoPanel } from "./payment-casso-panel";
 import { formatPaymentCurrency, type PaymentMethodTab } from "./payment-dialog-constants";
 import { PaymentMethodTabs } from "./payment-method-tabs";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
-import { CreatePaymentSchema, type CreatePayment, type Order } from "./schema";
+import { CreatePaymentSchema, getOrderPayableVnd, type CreatePayment, type Order } from "./schema";
 import { useCassoQr } from "./use-casso-qr";
 
 interface PaymentDialogProps {
   order: Order;
+  usdVndRate: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
@@ -27,17 +28,27 @@ interface PaymentDialogProps {
   onPaidDone?: () => void;
 }
 
-export function PaymentDialog({ order, open, onOpenChange, onPayment, onCassoQr, onPaidDone }: PaymentDialogProps) {
+export function PaymentDialog({
+  order,
+  usdVndRate,
+  open,
+  onOpenChange,
+  onPayment,
+  onCassoQr,
+  onPaidDone,
+}: PaymentDialogProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>("casso");
 
+  const payableVnd = getOrderPayableVnd(order, usdVndRate);
+
   const form = useForm<CreatePayment>({
     resolver: zodResolver(CreatePaymentSchema) as Resolver<CreatePayment>,
     defaultValues: {
       orderId: order.id,
-      amount: order.finalAmount,
+      amount: payableVnd,
       bankCode: "",
       language: "vn",
     },
@@ -48,7 +59,7 @@ export function PaymentDialog({ order, open, onOpenChange, onPayment, onCassoQr,
     open,
     paymentTab,
     orderId: order.id,
-    orderFinalAmount: order.finalAmount,
+    orderPayableVnd: payableVnd,
     watchedAmount,
     onCassoQr,
   });
@@ -106,8 +117,16 @@ export function PaymentDialog({ order, open, onOpenChange, onPayment, onCassoQr,
                 <span className="text-sm">{order.orderCode}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{t("amount")}</span>
-                <span className="text-sm font-bold">{formatPaymentCurrency(order.finalAmount, order.currency)}</span>
+                <span className="text-sm font-medium">{t("wallet_credit_usd")}</span>
+                <span className="text-sm font-bold">
+                  {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 }).format(
+                    order.finalAmount,
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{t("payable_vnd")}</span>
+                <span className="text-sm font-bold">{formatPaymentCurrency(payableVnd, "VND")}</span>
               </div>
             </div>
 
@@ -121,9 +140,9 @@ export function PaymentDialog({ order, open, onOpenChange, onPayment, onCassoQr,
                     <Input
                       type="number"
                       min={1000}
-                      placeholder={order.finalAmount.toString()}
+                      placeholder={payableVnd.toString()}
                       {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || order.finalAmount)}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || payableVnd)}
                     />
                   </FormControl>
                   <FormDescription>{t("payment_amount_description")}</FormDescription>

@@ -218,7 +218,9 @@ export default function BillingPage() {
       <BillingStatsCards
         walletBalanceUsd={walletBalanceUsd}
         pendingTopUps={pendingOrders.length}
-        completedVolumeVnd={orders.filter((o) => o.status === "COMPLETED").reduce((s, o) => s + o.finalAmount, 0)}
+        completedVolumeUsd={orders
+          .filter((o) => o.status === "COMPLETED")
+          .reduce((s, o) => s + o.finalAmount, 0)}
         usdVndRate={usdVndRate}
       />
 
@@ -270,6 +272,7 @@ export default function BillingPage() {
           ) : (
             <OrderList
               orders={orders}
+              usdVndRate={usdVndRate}
               onCancel={handleCancelOrder}
               onPayment={handlePayment}
               onCassoQr={handleCassoQr}
@@ -287,6 +290,7 @@ export default function BillingPage() {
             onToDateChange={setToDate}
             onApply={(p) => void fetchHistory(0, false, p)}
             orders={historyOrders}
+            usdVndRate={usdVndRate}
             loading={historyLoading}
             error={historyError}
             onCancel={handleCancelOrder}

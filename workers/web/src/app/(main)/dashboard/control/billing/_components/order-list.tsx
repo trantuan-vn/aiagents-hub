@@ -20,12 +20,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { formatCurrency } from "@/lib/utils";
 
 import { PaymentDialog } from "./payment-dialog";
 import type { Order, OrderStatus } from "./schema";
 
 interface OrderListProps {
   orders: Order[];
+  usdVndRate: number;
   onCancel: (orderId: number) => Promise<void>;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
   onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
@@ -34,7 +36,15 @@ interface OrderListProps {
   readOnly?: boolean;
 }
 
-export function OrderList({ orders, onCancel, onPayment, onCassoQr, onPaidDone, readOnly = false }: OrderListProps) {
+export function OrderList({
+  orders,
+  usdVndRate,
+  onCancel,
+  onPayment,
+  onCassoQr,
+  onPaidDone,
+  readOnly = false,
+}: OrderListProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -48,13 +58,6 @@ export function OrderList({ orders, onCancel, onPayment, onCassoQr, onPaidDone, 
       hour: "2-digit",
       minute: "2-digit",
     });
-  };
-
-  const formatCurrency = (amount: number, currency: string = "VND"): string => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: currency,
-    }).format(amount);
   };
 
   const getStatusBadgeVariant = (status: OrderStatus): "default" | "secondary" | "destructive" | "outline" => {
@@ -159,7 +162,7 @@ export function OrderList({ orders, onCancel, onPayment, onCassoQr, onPaidDone, 
                         </div>
                         <div className="flex items-center gap-1">
                           <CreditCard className="h-3 w-3" />
-                          {formatCurrency(order.finalAmount, order.currency)}
+                          {formatCurrency(order.finalAmount, { currency: "USD", maximumFractionDigits: 4 })}
                         </div>
                         {order.appliedVoucherCode && (
                           <div className="text-muted-foreground text-xs">
@@ -214,6 +217,7 @@ export function OrderList({ orders, onCancel, onPayment, onCassoQr, onPaidDone, 
       {selectedOrder && (
         <PaymentDialog
           order={selectedOrder}
+          usdVndRate={usdVndRate}
           open={!!selectedOrder}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
           onCassoQr={onCassoQr}

@@ -41,7 +41,10 @@ export async function processCommissionOnOrder(
   if (percent <= 0) return;
   console.log(`processCommissionOnOrder: ${JSON.stringify(percent)}`);
   const usdVndRate = await getUsdVndRateFromEnv(c.env, bindingName);
-  const orderAmountUsd = convertVndToUsd(orderRecord.finalAmount, usdVndRate);
+  const orderAmountUsd =
+    (orderRecord.currency ?? 'USD').toUpperCase() === 'USD'
+      ? orderRecord.finalAmount
+      : convertVndToUsd(orderRecord.finalAmount, usdVndRate);
   const commissionAmount = roundUsdAmount((orderAmountUsd * percent) / 100);
 
   const referrerDO = getIdFromName(c, user.referrerId, bindingName) as DurableObjectStub<UserDO>;

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { convertUsdToVnd } from '../../admin/service/pricing';
+
 // Common Schemas
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
 export const DiscountTypeSchema = z.enum([
@@ -14,11 +16,14 @@ export const DiscountTypeSchema = z.enum([
 // Main Schemas
 export const OrderSchema = z.object({
   orderCode: z.string(),
+  /** USD — wallet credit after successful payment */
   subtotalAmount: z.number().min(0),
   discountAmount: z.number().min(0).default(0),
   finalAmount: z.number().min(0),
+  /** VND payable via VNPay/Casso (frozen at order creation) */
+  payableAmountVnd: z.number().int().min(0).optional(),
   status: OrderStatusSchema,
-  currency: z.string().default('VND'),
+  currency: z.string().default('USD'),
   appliedVoucherCode: z.string().optional(),
   notes: z.string().optional(),
   internalNotes: z.string().optional().nullable(),
@@ -48,10 +53,10 @@ export const OrderItemDiscountSchema = z.object({
   description: z.string().optional(),
 });
 
-/** Wallet top-up: amount is VND credited after payment (policies / vouchers apply to payable amount). */
+/** Wallet top-up: `amount` is VND payable; stored order amounts are USD at daily rate. */
 export const CreateOrderSchema = z.object({
   amount: z.number().int().positive(),
-  currency: z.string().default('VND'),
+  currency: z.string().default('USD'),
   voucherCode: z.string().optional(),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
@@ -215,7 +220,19 @@ export type OrderError = z.infer<typeof OrderErrorSchema>;
 
 export const ORDER_DEFAULT_LIMIT = 20;
 export const ORDER_DEFAULT_PAGE = 1;
-export const ORDER_CURRENCY = 'VND';
+export const ORDER_CURRENCY = 'USD';
+
+/** VND amount to charge at payment gateways (legacy orders without payableAmountVnd use finalAmount as VND). */
+export function getOrderPayableVnd(
+  order: { finalAmount: number; payableAmountVnd?: number | null; currency?: string | null },
+  usdVndRate: number,
+): number {
+  const payable = order.payableAmountVnd;
+  if (typeof payable === 'number' && payable > 0) return Math.round(payable);
+  const cur = (order.currency ?? 'VND').toUpperCase();
+  if (cur === 'USD') return convertUsdToVnd(order.finalAmount, usdVndRate);
+  return Math.round(order.finalAmount);
+}
 
 // Helper Functions
 export const validateOrderAmounts = (order: Order): boolean => {

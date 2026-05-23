@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { formatCurrency } from "@/lib/utils";
 
 import type { AgentWorkflow } from "../_lib/api";
 import { sharedWorkflowChatHref, sharedWorkflowViewHref } from "../_lib/shared-workflow-utils";
@@ -70,7 +71,7 @@ export function SharedWorkflowCard({
             {t("usage_count")}: {wf.usageCount ?? 0}
           </span>
           <span>
-            {t("earnings")}: {(wf.totalEarningsVnd ?? 0).toLocaleString()} VND
+            {t("earnings")}: {formatCurrency(wf.totalEarningsUsd ?? 0, { maximumFractionDigits: 4 })}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">

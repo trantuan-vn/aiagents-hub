@@ -57,7 +57,7 @@ function WalletTopUpForm({ onCreate, usdVndRate, minTopUpVnd, onDismiss }: Walle
     resolver: zodResolver(orderSchema) as Resolver<CreateOrder>,
     defaultValues: {
       amount: defaultAmount,
-      currency: "VND",
+      currency: "USD",
       voucherCode: "",
       notes: "",
       paymentMethod: "",
@@ -255,12 +255,17 @@ export function WalletTopUpDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Wallet className="mr-1 h-4 w-4" />
-          {t("top_up")}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <DialogTrigger asChild>
+          <Button>
+            <Wallet className="mr-1 h-4 w-4" />
+            {t("top_up_vnd")}
+          </Button>
+        </DialogTrigger>
+        <Button type="button" variant="outline" disabled>
+          {t("top_up_usd_coming_soon")}
         </Button>
-      </DialogTrigger>
+      </div>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>{t("top_up_title")}</DialogTitle>
