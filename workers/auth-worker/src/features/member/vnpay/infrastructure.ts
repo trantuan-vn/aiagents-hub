@@ -129,7 +129,7 @@ export function createVNPayService(
       });
 
       await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
-      await recordTopUpAndUpgradeTier(userDO, topUpVnd);
+      await recordTopUpAndUpgradeTier(userDO, topUpVnd, walletOptions?.env);
       return;
     }
 

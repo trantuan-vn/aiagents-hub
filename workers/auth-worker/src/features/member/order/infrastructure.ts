@@ -25,7 +25,7 @@ export function createOrderInfrastructureService(
   };
 
   const loadDbUser = async () => {
-    const synced = await syncUserMembershipTierOnAccess(userDO);
+    const synced = await syncUserMembershipTierOnAccess(userDO, context.env);
     if (synced) return synced;
     const rows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     return rows[0];

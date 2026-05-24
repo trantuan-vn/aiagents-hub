@@ -3,11 +3,14 @@ import { executeUtils } from '../../../shared/utils';
 import {
   currentPeriodYm,
   downgradeOneTier,
+  getDefaultTierConfigs,
   minVndToRetainTier,
   tierFromMonthlyTopUpVnd,
   upgradeTierIfHigher,
   type MembershipTier,
+  type MembershipTierConfig,
 } from './domain';
+import { getTierConfigsFromEnv } from './get-tier-configs';
 
 type DbUser = Record<string, unknown>;
 
@@ -29,7 +32,10 @@ function readMonthlyTopUp(user: DbUser): number {
 }
 
 /** At month boundary: downgrade one tier if previous month did not meet retention threshold. */
-export function applyMonthlyTierDowngrade(user: DbUser): { tier: MembershipTier; periodYm: string; monthlyTopUpVnd: number } {
+export function applyMonthlyTierDowngrade(
+  user: DbUser,
+  configs: MembershipTierConfig[],
+): { tier: MembershipTier; periodYm: string; monthlyTopUpVnd: number } {
   const nowYm = currentPeriodYm();
   let tier = readTier(user);
   let periodYm = readPeriod(user);
@@ -37,7 +43,7 @@ export function applyMonthlyTierDowngrade(user: DbUser): { tier: MembershipTier;
 
   if (periodYm !== nowYm) {
     const prevTotal = monthlyTopUpVnd;
-    const required = minVndToRetainTier(tier);
+    const required = minVndToRetainTier(tier, configs);
     if (tier !== 'member' && prevTotal < required) {
       tier = downgradeOneTier(tier);
     }
@@ -50,12 +56,14 @@ export function applyMonthlyTierDowngrade(user: DbUser): { tier: MembershipTier;
 
 export async function syncUserMembershipTierOnAccess(
   userDO: DurableObjectStub<UserDO>,
+  env?: { SYSTEM_CONFIG_KV?: KVNamespace },
 ): Promise<DbUser | null> {
+  const configs = env ? await getTierConfigsFromEnv(env) : getDefaultTierConfigs();
   const rows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
   const dbUser = rows[0] as DbUser | undefined;
   if (!dbUser?.id) return null;
 
-  const { tier, periodYm, monthlyTopUpVnd } = applyMonthlyTierDowngrade(dbUser);
+  const { tier, periodYm, monthlyTopUpVnd } = applyMonthlyTierDowngrade(dbUser, configs);
   const storedTier = readTier(dbUser);
   const storedPeriod = readPeriod(dbUser);
   const storedMonthly = readMonthlyTopUp(dbUser);
@@ -83,16 +91,18 @@ export async function syncUserMembershipTierOnAccess(
 export async function recordTopUpAndUpgradeTier(
   userDO: DurableObjectStub<UserDO>,
   topUpVnd: number,
+  env?: { SYSTEM_CONFIG_KV?: KVNamespace },
 ): Promise<MembershipTier> {
-  const synced = await syncUserMembershipTierOnAccess(userDO);
+  const configs = env ? await getTierConfigsFromEnv(env) : getDefaultTierConfigs();
+  const synced = await syncUserMembershipTierOnAccess(userDO, env);
   const dbUser = synced ?? (await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users'))[0];
   if (!dbUser?.id) return 'member';
 
   const add = Math.max(0, Math.round(topUpVnd));
-  let { tier, periodYm, monthlyTopUpVnd } = applyMonthlyTierDowngrade(dbUser as DbUser);
+  let { tier, periodYm, monthlyTopUpVnd } = applyMonthlyTierDowngrade(dbUser as DbUser, configs);
   monthlyTopUpVnd += add;
 
-  const tierFromAmount = tierFromMonthlyTopUpVnd(monthlyTopUpVnd);
+  const tierFromAmount = tierFromMonthlyTopUpVnd(monthlyTopUpVnd, configs);
   tier = upgradeTierIfHigher(tier, tierFromAmount);
 
   await executeUtils.executeDynamicAction(

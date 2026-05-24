@@ -76,7 +76,7 @@ export function createVersionCheckMiddleware(bindingName: string) {
       await versionApplicationService.upgradeVersion(user.identifier);
       if (user.role !== 'admin') {
         const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-        await syncUserMembershipTierOnAccess(userDO);
+        await syncUserMembershipTierOnAccess(userDO, c.env);
       }
     } catch (error) {
       handleErrorWithoutIp(error, "Failed to upgrade version");      

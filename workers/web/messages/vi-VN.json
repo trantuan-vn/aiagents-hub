@@ -1875,7 +1875,14 @@
     "tier_rules": "Ngưỡng hạng",
     "tier_rules_description": "User được nâng hạng ngay khi tổng nạp trong tháng đạt ngưỡng. Đầu tháng mới, nếu tháng trước không đủ điều kiện giữ hạng hiện tại thì hạ 1 cấp.",
     "downgrade_rule": "Hạ hạng đầu tháng",
-    "downgrade_rule_description": "Nếu tổng nạp tháng trước không đủ mức tối thiểu của hạng hiện tại, user hạ 1 cấp (member không hạ thêm)."
+    "downgrade_rule_description": "Nếu tổng nạp tháng trước không đủ mức tối thiểu của hạng hiện tại, user hạ 1 cấp (member không hạ thêm).",
+    "save": "Lưu",
+    "saving": "Đang lưu...",
+    "save_success": "Đã lưu ngưỡng hạng",
+    "save_success_description": "Cấu hình có hiệu lực ngay cho nạp tiền và phân hạng mới.",
+    "save_error": "Không thể lưu cấu hình",
+    "min_top_up_label": "Ngưỡng nạp tối thiểu ({tier})",
+    "min_top_up_placeholder": "Nhập số tiền VND"
   },
   "VersionPage": {
     "title": "Quản lý Phiên bản",

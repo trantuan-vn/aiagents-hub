@@ -1875,7 +1875,14 @@
     "tier_rules": "Tier thresholds",
     "tier_rules_description": "Users are upgraded immediately when monthly top-up meets a tier. At the start of each month, users who did not meet their current tier threshold in the previous month are downgraded one level.",
     "downgrade_rule": "Monthly downgrade",
-    "downgrade_rule_description": "If the previous month’s top-up does not meet the minimum for the current tier, the user drops one tier (member never drops further)."
+    "downgrade_rule_description": "If the previous month’s top-up does not meet the minimum for the current tier, the user drops one tier (member never drops further).",
+    "save": "Save",
+    "saving": "Saving...",
+    "save_success": "Tier thresholds saved",
+    "save_success_description": "Changes apply immediately to new top-ups and tier calculations.",
+    "save_error": "Failed to save configuration",
+    "min_top_up_label": "Minimum top-up threshold ({tier})",
+    "min_top_up_placeholder": "Enter VND amount"
   },
   "VersionPage": {
     "title": "Version Management",

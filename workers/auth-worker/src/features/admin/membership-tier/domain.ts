@@ -6,6 +6,24 @@ export type MembershipTier = z.infer<typeof MembershipTierSchema>;
 
 export const MEMBERSHIP_TIER_ORDER: MembershipTier[] = ['member', 'silver', 'gold', 'diamond'];
 
+export const MEMBERSHIP_TIER_KV_KEY = 'membership-tier-configs';
+
+export const TierThresholdsSchema = z
+  .object({
+    silver: z.number().int().min(1),
+    gold: z.number().int().min(1),
+    diamond: z.number().int().min(1),
+  })
+  .refine((d) => d.silver < d.gold && d.gold < d.diamond, {
+    message: 'Thresholds must be strictly increasing: silver < gold < diamond',
+  });
+
+export type TierThresholds = z.infer<typeof TierThresholdsSchema>;
+
+export const UpdateTierConfigsSchema = z.object({
+  thresholds: TierThresholdsSchema,
+});
+
 export const MembershipTierConfigSchema = z.object({
   tier: MembershipTierSchema,
   label: z.string(),
@@ -16,13 +34,72 @@ export const MembershipTierConfigSchema = z.object({
 
 export type MembershipTierConfig = z.infer<typeof MembershipTierConfigSchema>;
 
-export function getDefaultTierConfigs(): MembershipTierConfig[] {
+export const DEFAULT_TIER_THRESHOLDS: TierThresholds = {
+  silver: 500_000,
+  gold: 20_000_000,
+  diamond: 50_000_000,
+};
+
+export const TIER_LABELS: Record<MembershipTier, string> = {
+  member: 'Member',
+  silver: 'Silver',
+  gold: 'Gold',
+  diamond: 'Diamond',
+};
+
+function formatVndShort(amount: number): string {
+  if (amount >= 1_000_000) {
+    const m = amount / 1_000_000;
+    return Number.isInteger(m) ? `${m} triệu` : `${m.toFixed(1)} triệu`;
+  }
+  if (amount >= 1_000) return `${Math.round(amount / 1_000)}K`;
+  return String(amount);
+}
+
+export function buildTierConfigs(thresholds: TierThresholds = DEFAULT_TIER_THRESHOLDS): MembershipTierConfig[] {
+  const { silver, gold, diamond } = thresholds;
   return [
-    { tier: 'member', label: 'Member', minVnd: 0, maxVndExclusive: 500_000, description: '>=0 và <500K VND/tháng' },
-    { tier: 'silver', label: 'Silver', minVnd: 500_000, maxVndExclusive: 20_000_000, description: '>=500K và <20 triệu VND/tháng' },
-    { tier: 'gold', label: 'Gold', minVnd: 20_000_000, maxVndExclusive: 50_000_000, description: '>=20 triệu và <50 triệu VND/tháng' },
-    { tier: 'diamond', label: 'Diamond', minVnd: 50_000_000, description: '>50 triệu VND/tháng' },
+    {
+      tier: 'member',
+      label: TIER_LABELS.member,
+      minVnd: 0,
+      maxVndExclusive: silver,
+      description: `>=0 và <${formatVndShort(silver)} VND/tháng`,
+    },
+    {
+      tier: 'silver',
+      label: TIER_LABELS.silver,
+      minVnd: silver,
+      maxVndExclusive: gold,
+      description: `>=${formatVndShort(silver)} và <${formatVndShort(gold)} VND/tháng`,
+    },
+    {
+      tier: 'gold',
+      label: TIER_LABELS.gold,
+      minVnd: gold,
+      maxVndExclusive: diamond,
+      description: `>=${formatVndShort(gold)} và <${formatVndShort(diamond)} VND/tháng`,
+    },
+    {
+      tier: 'diamond',
+      label: TIER_LABELS.diamond,
+      minVnd: diamond,
+      description: `>${formatVndShort(diamond)} VND/tháng`,
+    },
   ];
+}
+
+export function getDefaultTierConfigs(): MembershipTierConfig[] {
+  return buildTierConfigs(DEFAULT_TIER_THRESHOLDS);
+}
+
+export function thresholdsFromConfigs(configs: MembershipTierConfig[]): TierThresholds {
+  const byTier = Object.fromEntries(configs.map((c) => [c.tier, c.minVnd])) as Record<MembershipTier, number>;
+  return {
+    silver: byTier.silver ?? DEFAULT_TIER_THRESHOLDS.silver,
+    gold: byTier.gold ?? DEFAULT_TIER_THRESHOLDS.gold,
+    diamond: byTier.diamond ?? DEFAULT_TIER_THRESHOLDS.diamond,
+  };
 }
 
 export function currentPeriodYm(date = new Date()): string {
@@ -31,24 +108,30 @@ export function currentPeriodYm(date = new Date()): string {
   return `${y}-${m}`;
 }
 
-/** Tier from cumulative monthly top-up (VND). Diamond when amount > 50M. */
-export function tierFromMonthlyTopUpVnd(amountVnd: number): MembershipTier {
+function resolveThresholds(configs?: MembershipTierConfig[]): TierThresholds {
+  return configs ? thresholdsFromConfigs(configs) : DEFAULT_TIER_THRESHOLDS;
+}
+
+/** Tier from cumulative monthly top-up (VND). Diamond when amount > diamond threshold. */
+export function tierFromMonthlyTopUpVnd(amountVnd: number, configs?: MembershipTierConfig[]): MembershipTier {
+  const { silver, gold, diamond } = resolveThresholds(configs);
   const v = Math.max(0, Math.floor(amountVnd));
-  if (v > 50_000_000) return 'diamond';
-  if (v >= 20_000_000) return 'gold';
-  if (v >= 500_000) return 'silver';
+  if (v > diamond) return 'diamond';
+  if (v >= gold) return 'gold';
+  if (v >= silver) return 'silver';
   return 'member';
 }
 
 /** Minimum VND in the previous month required to retain this tier. */
-export function minVndToRetainTier(tier: MembershipTier): number {
+export function minVndToRetainTier(tier: MembershipTier, configs?: MembershipTierConfig[]): number {
+  const { silver, gold, diamond } = resolveThresholds(configs);
   switch (tier) {
     case 'diamond':
-      return 50_000_000 + 1;
+      return diamond + 1;
     case 'gold':
-      return 20_000_000;
+      return gold;
     case 'silver':
-      return 500_000;
+      return silver;
     default:
       return 0;
   }

@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
-import { getDefaultTierConfigs } from './domain';
+import { UpdateTierConfigsSchema, thresholdsFromConfigs } from './domain';
+import { getTierConfigsFromEnv, saveTierConfigsToKv } from './get-tier-configs';
 
 export function createMembershipTierRoutes(_bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -24,8 +25,28 @@ export function createMembershipTierRoutes(_bindingName: string) {
   app.get(
     '/configs',
     adminHandler(async (c) => {
-      return c.json({ tiers: getDefaultTierConfigs() });
+      const tiers = await getTierConfigsFromEnv(c.env);
+      return c.json({ tiers, thresholds: thresholdsFromConfigs(tiers) });
     }, 'Failed to get tier configs'),
+  );
+
+  app.put(
+    '/configs',
+    adminHandler(async (c) => {
+      const kv = c.env.SYSTEM_CONFIG_KV;
+      if (!kv) {
+        throw new Error('SYSTEM_CONFIG_KV not configured');
+      }
+      const body = await c.req.json();
+      const { thresholds } = UpdateTierConfigsSchema.parse(body);
+      const tiers = await saveTierConfigsToKv(kv, thresholds);
+      return c.json({
+        success: true,
+        message: 'Tier thresholds saved.',
+        tiers,
+        thresholds,
+      });
+    }, 'Failed to save tier configs'),
   );
 
   app.get(
