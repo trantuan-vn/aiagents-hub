@@ -1,13 +1,31 @@
 import { Context } from 'hono';
 import { convertVndToUsd, roundUsdAmount } from '../../admin/service/pricing';
+import type { MembershipTier } from '../../admin/membership-tier/domain';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
-import { getIdFromName } from '../../../shared/utils';
+import { executeUtils, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
 import { createCommissionInfrastructure } from './commission-infrastructure';
 
 /** Admin identifier for commission policy storage (policies are stored in admin's UserDO) */
 const COMMISSION_ADMIN_IDENTIFIER = 'tuanta2021@gmail.com';
+
+async function getReferrerMembershipTier(
+  c: Context,
+  bindingName: string,
+  referrerId: string,
+): Promise<MembershipTier> {
+  const referrerDO = getIdFromName(c, referrerId, bindingName) as DurableObjectStub<UserDO>;
+  const rows = await executeUtils.executeDynamicAction(referrerDO, 'select', {}, 'users');
+  const dbUser = rows[0] as Record<string, unknown> | undefined;
+  const tier = dbUser?.membershipTier ?? dbUser?.membership_tier ?? 'member';
+  return String(tier) as MembershipTier;
+}
+
+function policyMembershipTiers(policy: Record<string, unknown>): string[] {
+  const tiers = policy.membershipTiers ?? policy.membership_tiers;
+  return Array.isArray(tiers) ? tiers.map(String) : [];
+}
 
 export async function processCommissionOnOrder(
   c: Context,
@@ -23,15 +41,21 @@ export async function processCommissionOnOrder(
 
   const policies = await policyInfra.list(50, 0, 'ACTIVE');
   const now = new Date();
+  const referrerTier = await getReferrerMembershipTier(c, bindingName, user.referrerId);
 
-  const applicable = policies.find((p: any) => {
+  const applicable = policies.find((p: Record<string, unknown>) => {
     if (p.status !== 'ACTIVE') return false;
-    const from = new Date(p.effectiveFrom);
-    const to = new Date(p.effectiveTo);
+    const from = new Date(String(p.effectiveFrom));
+    const to = new Date(String(p.effectiveTo));
     if (now < from || now > to) return false;
     if (p.applicableTo === 'ALL') return true;
-    if (p.applicableTo === 'SPECIFIC' && p.targetIds?.includes(user.referrerId)) return true;
-    if (p.applicableTo === 'USER_GROUP' && p.targetIds?.includes(user.referrerId)) return true;
+    if (p.applicableTo === 'SPECIFIC' && Array.isArray(p.targetIds) && p.targetIds.includes(user.referrerId)) {
+      return true;
+    }
+    if (p.applicableTo === 'USER_GROUP') {
+      const tiers = policyMembershipTiers(p);
+      return tiers.length > 0 && tiers.includes(referrerTier);
+    }
     return false;
   });
   

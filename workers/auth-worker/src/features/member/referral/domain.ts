@@ -1,14 +1,18 @@
 import { z } from 'zod';
 
-/** Commission policy: % commission referrer gets from referred user's orders */
-export const CommissionPolicySchema = z.object({
+import { MembershipTierSchema } from '../../admin/membership-tier/domain';
+
+/** Plain object schema for UserDO table registration (must stay ZodObject for .extend()). */
+export const CommissionPolicyObjectSchema = z.object({
   name: z.string().min(1).max(300),
   code: z.string().min(3).max(50),
   /** Commission percentage (0-100) */
   commissionPercent: z.number().min(0).max(100),
-  /** Apply to: ALL users, SPECIFIC user(s), or USER_GROUP (targetIds = referrer identifiers) */
-  applicableTo: z.enum(['ALL', 'SPECIFIC', 'USER_GROUP']),
-  /** For SPECIFIC: referrer identifiers. For USER_GROUP: group identifiers (if any) */
+  /** ALL referrers, or USER_GROUP (membership tiers of the referrer) */
+  applicableTo: z.enum(['ALL', 'USER_GROUP']),
+  /** Referrer membership tiers when applicableTo is USER_GROUP */
+  membershipTiers: z.array(MembershipTierSchema).optional(),
+  /** @deprecated Legacy SPECIFIC policies stored referrer identifiers here */
   targetIds: z.array(z.string()).optional(),
   /** Policy effective from (ISO date) */
   effectiveFrom: z.string().datetime(),
@@ -17,6 +21,15 @@ export const CommissionPolicySchema = z.object({
   priority: z.number().min(0).default(0),
   status: z.enum(['ACTIVE', 'INACTIVE']).default('ACTIVE'),
 });
+
+/** Commission policy: % commission referrer gets from referred user's orders */
+export const CommissionPolicySchema = CommissionPolicyObjectSchema.refine(
+  (data) => data.applicableTo !== 'USER_GROUP' || (data.membershipTiers?.length ?? 0) > 0,
+  {
+    message: 'USER_GROUP policies require at least one membership tier',
+    path: ['membershipTiers'],
+  },
+);
 
 /** Single commission record from an order */
 export const CommissionSchema = z.object({

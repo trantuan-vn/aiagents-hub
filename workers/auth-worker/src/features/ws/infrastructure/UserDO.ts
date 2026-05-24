@@ -12,7 +12,7 @@ import {
   OrderSchema, ApiTokenSchema,
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
-  CommissionPolicySchema, CommissionSchema,
+  CommissionPolicyObjectSchema, CommissionSchema,
   AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
   PayoutBeneficiarySchema, EarningsPayoutSchema, ExchangeRateSchema,
 } from '../domain.js';
@@ -149,7 +149,7 @@ export class UserDO extends DurableObject {
       this.table('user_did', extendWithQueue(UserDidSchema), this.TABLE_CONFIGS.queueTable());
       this.table('passkey_credentials', extendWithQueue(PasskeyCredentialSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('credentialId'));
       this.table('backup_codes', extendWithQueue(BackupCodeSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('codeHash'));
-      this.table('commission_policies', extendWithQueue(CommissionPolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
+      this.table('commission_policies', extendWithQueue(CommissionPolicyObjectSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       this.table('agent_workflows', extendWithQueue(AgentWorkflowSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
       this.table('payout_beneficiary', extendWithQueue(PayoutBeneficiarySchema), this.TABLE_CONFIGS.queueTable());
       this.table(

@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 
 import type { Voucher } from "./schema";
+import { ViewVoucherDialog } from "./view-voucher-dialog";
 import { VoucherItemContent } from "./voucher-item-content";
 
 interface VoucherItemProps {
@@ -35,11 +36,13 @@ function VoucherItemActions({
   voucher,
   deletingVoucherId,
   onDelete,
+  formatDate,
   t,
 }: {
   voucher: Voucher;
   deletingVoucherId: string | number | null;
   onDelete: (voucherId: string | number) => Promise<void>;
+  formatDate: (dateString: string | undefined) => string;
   t: (key: string, params?: Record<string, string>) => string;
 }) {
   const voucherId = voucher.id;
@@ -47,6 +50,7 @@ function VoucherItemActions({
 
   return (
     <div className="flex items-center gap-1">
+      <ViewVoucherDialog voucher={voucher} formatDate={formatDate} />
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button variant="ghost" size="icon" disabled={deletingVoucherId === voucherId} title={t("delete")}>
@@ -79,7 +83,13 @@ function VoucherItem({ voucher, deletingVoucherId, onDelete, formatDate, t }: Vo
   return (
     <div className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
       <VoucherItemContent voucher={voucher} formatDate={formatDate} t={t} />
-      <VoucherItemActions voucher={voucher} deletingVoucherId={deletingVoucherId} onDelete={onDelete} t={t} />
+      <VoucherItemActions
+        voucher={voucher}
+        deletingVoucherId={deletingVoucherId}
+        onDelete={onDelete}
+        formatDate={formatDate}
+        t={t}
+      />
     </div>
   );
 }
