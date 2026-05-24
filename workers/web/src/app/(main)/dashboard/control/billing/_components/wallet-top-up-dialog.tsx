@@ -37,17 +37,12 @@ export function WalletTopUpDialog({ onCreate, open: controlledOpen, onOpenChange
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <DialogTrigger asChild>
-          <Button>
-            <Wallet className="mr-1 h-4 w-4" />
-            {t("top_up")}
-          </Button>
-        </DialogTrigger>
-        <Button type="button" variant="outline" disabled>
-          {t("top_up_usd_coming_soon")}
+      <DialogTrigger asChild>
+        <Button>
+          <Wallet className="mr-1 h-4 w-4" />
+          {t("top_up")}
         </Button>
-      </div>
+      </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle>{t("top_up_title")}</DialogTitle>

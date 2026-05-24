@@ -2644,7 +2644,6 @@
     "order_cancelled_description": "Order has been cancelled successfully",
     "top_up": "Top up",
     "top_up_vnd": "Top up VND",
-    "top_up_usd_coming_soon": "Top up USD (coming soon)",
     "top_up_title": "Add balance",
     "top_up_description": "Enter how much USD to add to your wallet. After creating the order, use Pay with VND on the orders list to complete payment.",
     "preset_usd_label": "Quick amounts (USD)",
