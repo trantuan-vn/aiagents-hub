@@ -2350,7 +2350,7 @@
   },
   "AccountPage": {
     "title": "Tài khoản",
-    "description": "Bảo mật, phiên đăng nhập, eKYC và DID cho tài khoản API",
+    "description": "Giới thiệu, thanh toán, bảo mật và phiên đăng nhập cho tài khoản của bạn",
     "referral": {
       "title": "Giới thiệu & Hoa hồng",
       "description": "Chia sẻ link giới thiệu để mời người khác và nhận hoa hồng từ đơn hàng của họ (thanh toán hàng tháng, không cộng vào ví)",
@@ -2359,6 +2359,10 @@
       "loading": "Đang tải...",
       "copied": "Đã sao chép",
       "copied_description": "Link giới thiệu đã được sao chép"
+    },
+    "payout_settings": {
+      "title": "Thanh toán thu nhập & hoa hồng",
+      "description": "Khai báo tài khoản ngân hàng thụ hưởng và chọn loại tiền khi admin thanh toán hoa hồng, thu nhập workflow qua ngân hàng."
     },
     "payout_beneficiary": {
       "title": "Tài khoản thụ hưởng",

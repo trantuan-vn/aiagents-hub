@@ -2350,7 +2350,7 @@
   },
   "AccountPage": {
     "title": "Account",
-    "description": "Security, sessions, eKYC and DID for your API account",
+    "description": "Referral, payouts, security and sessions for your account",
     "referral": {
       "title": "Referral & Commission",
       "description": "Share your referral link to invite others and earn commission from their orders (paid monthly, not added to wallet)",
@@ -2359,6 +2359,10 @@
       "loading": "Loading...",
       "copied": "Copied",
       "copied_description": "Referral link copied to clipboard"
+    },
+    "payout_settings": {
+      "title": "Commission & workflow payouts",
+      "description": "Set your payout bank account and the currency admin uses when paying commissions and workflow earnings via bank transfer."
     },
     "payout_beneficiary": {
       "title": "Payout beneficiary account",
