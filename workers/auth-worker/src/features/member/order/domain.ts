@@ -2,18 +2,8 @@ import { z } from 'zod';
 
 import { convertUsdToVnd } from '../../admin/service/pricing';
 
-// Common Schemas
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
-export const DiscountTypeSchema = z.enum([
-  'POLICY',
-  'VOUCHER',
-  'USER_PRICE',
-  'USER_VOUCHER',
-  'SERVICE_PRICE',
-  'SERVICE_VOUCHER',
-]);
 
-// Main Schemas
 export const OrderSchema = z.object({
   orderCode: z.string(),
   /** USD — wallet credit after successful payment */
@@ -29,30 +19,6 @@ export const OrderSchema = z.object({
   internalNotes: z.string().optional().nullable(),
 });
 
-export const OrderItemSchema = z.object({
-  orderId: z.number().int(),
-  /** 0 = wallet top-up line */
-  serviceId: z.number().int().min(0),
-  basePrice: z.number().min(0),
-  discountAmount: z.number().min(0).default(0),
-  finalAmount: z.number().min(0),
-  quantity: z.number().min(1),
-});
-
-export const OrderItemDiscountSchema = z.object({
-  orderItemId: z.number().int(),
-  discountType: DiscountTypeSchema,
-  discountAmount: z.number().min(0),
-  appliedPolicies: z.array(z.object({
-    policyId: z.number().int(),
-    policyName: z.string(),
-    discount: z.number(),
-    type: z.string(),
-  })).optional(),  
-  appliedVoucherCode: z.string().optional(),
-  description: z.string().optional(),
-});
-
 /** Wallet top-up request (USD or legacy VND). */
 export const CreateOrderSchema = z.object({
   amount: z.number().positive(),
@@ -64,7 +30,6 @@ export const CreateOrderSchema = z.object({
 
 const MIN_TOP_UP_USD = 1;
 
-/** Validates create-order JSON. USD top-ups are stored as entered; VND uses `minTopUpVnd` from config. */
 export function parseCreateOrderRequest(body: unknown, minTopUpVnd: number): CreateOrder {
   const parsed = CreateOrderSchema.parse(body);
   const currency = (parsed.currency ?? 'USD').toUpperCase();
@@ -93,149 +58,30 @@ export const UpdateOrderStatusSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const ApplyVoucherToOrderSchema = z.object({
-  voucherCode: z.string().min(1, "Voucher code is required"),
-});
-
-export const CalculateOrderRequestSchema = z.object({
-  amount: z.number().int().min(1),
-  voucherCode: z.string().optional(),
-  currency: z.string().default('VND'),
-});
-
-// Calculation Result Schemas (mới thêm)
-export const PriceCalculationResultSchema = z.object({
-  finalPrice: z.number().min(0),
-  totalDiscount: z.number().min(0),
-  appliedPolicies: z.array(z.object({
-    policyId: z.number().int(),
-    policyName: z.string(),
-    discount: z.number(),
-    type: z.string(),
-  })).default([]),
-});
-
-export const VoucherCalculationResultSchema = z.object({
-  finalAmount: z.number().min(0),
-  discountAmount: z.number().min(0),
-  voucher: z.any().optional(),
-});
-
-export const DiscountDetailSchema = z.object({
-  policyDiscount: z
-    .object({
-      amount: z.number().min(0),
-      type: z.literal('POLICY'),
-      appliedPolicies: z.array(
-        z.object({
-          policyId: z.number().int(),
-          policyName: z.string(),
-          discount: z.number(),
-          type: z.string(),
-        }),
-      ),
-    })
-    .optional(),
-  voucherDiscount: z
-    .object({
-      amount: z.number().min(0),
-      type: z.literal('VOUCHER'),
-      voucher: z.any(),
-    })
-    .optional(),
-});
-
-export const OrderCalculationItemSchema = z.object({
-  serviceId: z.number().int().min(0),
-  basePrice: z.number().min(0),
-  quantity: z.number().min(1),
-  policy: PriceCalculationResultSchema,
-  voucher: VoucherCalculationResultSchema,
-  discounts: DiscountDetailSchema.optional(),
-});
-
-export const OrderCalculationResultSchema = z.object({
-  items: z.array(OrderCalculationItemSchema),
-});
-
-
-
-// Types
 export type Order = z.infer<typeof OrderSchema>;
-export type OrderItem = z.infer<typeof OrderItemSchema>;
-export type OrderItemDiscount = z.infer<typeof OrderItemDiscountSchema>;
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
-export type DiscountType = z.infer<typeof DiscountTypeSchema>;
-
 export type CreateOrder = z.infer<typeof CreateOrderSchema>;
 export type UpdateOrderStatus = z.infer<typeof UpdateOrderStatusSchema>;
-export type ApplyVoucherToOrder = z.infer<typeof ApplyVoucherToOrderSchema>;
-export type CalculateOrderRequest = z.infer<typeof CalculateOrderRequestSchema>;
 
-export type PriceCalculationResult = z.infer<typeof PriceCalculationResultSchema>;
-export type VoucherCalculationResult = z.infer<typeof VoucherCalculationResultSchema>;
-export type DiscountDetail = z.infer<typeof DiscountDetailSchema>;
-export type OrderCalculationItem = z.infer<typeof OrderCalculationItemSchema>;
-export type OrderCalculationResult = z.infer<typeof OrderCalculationResultSchema>;
-
-export interface OrderResponse {
-  success: boolean;
-  data: {
-    id: string;
-    orderCode: string;
-    items: Array<{
-      serviceId: string;
-      quantity: number;
-      basePrice: number;
-      discounts: Array<any>;
-    }>;
-    summary: {
-      subtotalAmount: number;
-      discountAmount: number;
-      finalAmount: number;
-      currency: string;
-    };
-  };
-  message: string;
-}
 export interface OrderDetail extends Order {
-  items: OrderItem[];
-  discounts: OrderItemDiscount[];
+  id?: number | string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-// Filter Types
 export interface OrderFilters {
   status?: OrderStatus;
   page?: number;
   limit?: number;
 }
 
-// Domain Interfaces
 export interface IOrderInfrastructureService {
-  createOrder(user: any, request: CreateOrder): Promise<{ id: string; items: OrderCalculationItem[] }>;
+  createOrder(user: any, request: CreateOrder): Promise<{ id: string; order: OrderDetail }>;
   getOrders(filters: OrderFilters): Promise<OrderDetail[]>;
   getOrderDetail(orderId: number): Promise<OrderDetail>;
   updateOrderStatus(orderId: number, request: UpdateOrderStatus): Promise<Order>;
   cancelOrder(orderId: number): Promise<Order>;
 }
-
-// Service Interfaces cho external services
-export interface IPriceApplicationService {
-  calculatePrice(identifier: string, request: any): Promise<PriceCalculationResult>;
-}
-
-export interface IVoucherApplicationService {
-  applyVoucher(identifier: string, request: any): Promise<VoucherCalculationResult>;
-}
-
-// Error Types
-export const OrderErrorSchema = z.object({
-  code: z.string(),
-  message: z.string(),
-  details: z.any().optional(),
-});
-
-export type OrderError = z.infer<typeof OrderErrorSchema>;
 
 export const ORDER_DEFAULT_LIMIT = 20;
 export const ORDER_DEFAULT_PAGE = 1;
@@ -252,7 +98,6 @@ function timestampToIso(value: unknown): string {
   return new Date().toISOString();
 }
 
-/** Normalize UserDO row (created_at ms) to member API shape (createdAt ISO string). */
 export function mapOrderForMemberApi(row: Record<string, unknown>): Record<string, unknown> {
   const payable = row.payableAmountVnd ?? row.payable_amount_vnd;
   const mapped: Record<string, unknown> = {
@@ -275,7 +120,6 @@ export function mapOrderForMemberApi(row: Record<string, unknown>): Record<strin
   return mapped;
 }
 
-/** VND amount to charge at payment gateways (legacy orders without payableAmountVnd use finalAmount as VND). */
 export function getOrderPayableVnd(
   order: { finalAmount: number; payableAmountVnd?: number | null; currency?: string | null },
   usdVndRate: number,
@@ -287,7 +131,6 @@ export function getOrderPayableVnd(
   return Math.round(order.finalAmount);
 }
 
-// Helper Functions
 export const validateOrderAmounts = (order: Order): boolean => {
   return order.finalAmount === order.subtotalAmount - order.discountAmount;
 };
@@ -295,3 +138,4 @@ export const validateOrderAmounts = (order: Order): boolean => {
 export const canCancelOrder = (status: OrderStatus): boolean => {
   return !['COMPLETED', 'CANCELLED'].includes(status);
 };
+

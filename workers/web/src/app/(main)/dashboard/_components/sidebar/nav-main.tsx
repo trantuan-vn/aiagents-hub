@@ -34,7 +34,7 @@ const QUICK_CREATE_ITEMS: {
   adminOnly?: boolean;
 }[] = [
   { url: "/dashboard/control/token", translationKey: "quick_create_api_token", icon: Key },
-  { url: "/dashboard/policy", translationKey: "quick_create_policy", icon: Tag, adminOnly: true },
+  { url: "/dashboard/user-groups", translationKey: "quick_user_groups", icon: Tag, adminOnly: true },
   { url: "/dashboard/workflow/services", translationKey: "quick_create_service", icon: Code, adminOnly: true },
   { url: "/dashboard/voucher", translationKey: "quick_create_voucher", icon: Ticket, adminOnly: true },
   { url: "/dashboard/control/billing", translationKey: "quick_create_order", icon: CreditCard },

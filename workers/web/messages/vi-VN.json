@@ -180,7 +180,8 @@
     "coming_soon": "Sắp ra mắt",
     "quick_create": "Tạo nhanh",
     "quick_create_api_token": "API Token",
-    "quick_create_policy": "Chính sách giá",
+    "quick_user_groups": "Nhóm thành viên",
+    "user_groups": "Nhóm thành viên",
     "quick_create_service": "Dịch vụ API",
     "quick_create_voucher": "Voucher giảm giá",
     "quick_create_order": "Đơn hàng",
@@ -1857,8 +1858,24 @@
       "status_placeholder": "Chọn trạng thái",
       "eligible_user_ids": "ID người dùng được hưởng (tùy chọn)",
       "eligible_user_ids_placeholder": "ví dụ: 12, 34 — để trống = mọi user (vẫn theo vai trò)",
-      "eligible_user_ids_description": "Nếu điền, chỉ các user có id trong CSDL mới dùng được voucher (vẫn kiểm tra vai trò nếu cấu hình)."
-    }
+      "eligible_user_ids_description": "Nếu điền, chỉ các user có id trong CSDL mới dùng được voucher (vẫn kiểm tra vai trò nếu cấu hình).",
+      "discount_percent": "Giảm giá (%)",
+      "applicable_to": "Áp dụng cho",
+      "applicable_to_placeholder": "Chọn đối tượng",
+      "applicable_all": "Tất cả user",
+      "applicable_groups": "Nhóm thành viên",
+      "membership_tiers": "Nhóm thành viên"
+    },
+    "tiers": "Nhóm: {value}"
+  },
+  "UserGroupsPage": {
+    "title": "Nhóm thành viên",
+    "description": "Phân hạng theo tổng nạp tiền hàng tháng (VND)",
+    "loading": "Đang tải cấu hình nhóm...",
+    "tier_rules": "Ngưỡng hạng",
+    "tier_rules_description": "User được nâng hạng ngay khi tổng nạp trong tháng đạt ngưỡng. Đầu tháng mới, nếu tháng trước không đủ điều kiện giữ hạng hiện tại thì hạ 1 cấp.",
+    "downgrade_rule": "Hạ hạng đầu tháng",
+    "downgrade_rule_description": "Nếu tổng nạp tháng trước không đủ mức tối thiểu của hạng hiện tại, user hạ 1 cấp (member không hạ thêm)."
   },
   "VersionPage": {
     "title": "Quản lý Phiên bản",
@@ -2662,7 +2679,11 @@
     "voucher": "Voucher",
     "voucher_code": "Mã Voucher",
     "voucher_code_placeholder": "ví dụ: SUMMER2024",
-    "voucher_code_description": "Mã voucher tùy chọn để giảm giá",
+    "voucher_code_description": "Tự chọn voucher tốt nhất. Bấm để tìm và chọn voucher khác.",
+    "voucher_auto_best": "Voucher tốt nhất (tự động)",
+    "voucher_search_placeholder": "Tìm mã hoặc tên voucher...",
+    "loading_vouchers": "Đang tải voucher...",
+    "no_vouchers": "Không có voucher khả dụng",
     "select_voucher": "Chọn voucher",
     "no_voucher": "Không dùng voucher",
     "no_vouchers_available": "Không có voucher nào",

@@ -180,7 +180,8 @@
     "coming_soon": "Coming Soon",
     "quick_create": "Quick Create",
     "quick_create_api_token": "API Token",
-    "quick_create_policy": "Price Policy",
+    "quick_user_groups": "User Groups",
+    "user_groups": "User Groups",
     "quick_create_service": "API Service",
     "quick_create_voucher": "Discount Voucher",
     "quick_create_order": "Order",
@@ -1857,8 +1858,24 @@
       "status_placeholder": "Select status",
       "eligible_user_ids": "Eligible user IDs (optional)",
       "eligible_user_ids_placeholder": "e.g., 12, 34 — leave empty for any user",
-      "eligible_user_ids_description": "If set, only these database user ids can use the voucher (still subject to roles below)."
-    }
+      "eligible_user_ids_description": "If set, only these database user ids can use the voucher (still subject to roles below).",
+      "discount_percent": "Discount (%)",
+      "applicable_to": "Applicable to",
+      "applicable_to_placeholder": "Select audience",
+      "applicable_all": "All users",
+      "applicable_groups": "Membership groups",
+      "membership_tiers": "Membership tiers"
+    },
+    "tiers": "Groups: {value}"
+  },
+  "UserGroupsPage": {
+    "title": "User Groups",
+    "description": "Membership tiers based on monthly top-up volume (VND)",
+    "loading": "Loading tier configuration...",
+    "tier_rules": "Tier thresholds",
+    "tier_rules_description": "Users are upgraded immediately when monthly top-up meets a tier. At the start of each month, users who did not meet their current tier threshold in the previous month are downgraded one level.",
+    "downgrade_rule": "Monthly downgrade",
+    "downgrade_rule_description": "If the previous month’s top-up does not meet the minimum for the current tier, the user drops one tier (member never drops further)."
   },
   "VersionPage": {
     "title": "Version Management",
@@ -2662,7 +2679,11 @@
     "voucher": "Voucher",
     "voucher_code": "Voucher Code",
     "voucher_code_placeholder": "e.g., SUMMER2024",
-    "voucher_code_description": "Optional voucher code for discount",
+    "voucher_code_description": "Best voucher is auto-selected. Click to search and choose another.",
+    "voucher_auto_best": "Best voucher (auto)",
+    "voucher_search_placeholder": "Search voucher code or name...",
+    "loading_vouchers": "Loading vouchers...",
+    "no_vouchers": "No vouchers available",
     "select_voucher": "Select a voucher",
     "no_voucher": "No voucher",
     "no_vouchers_available": "No vouchers available",

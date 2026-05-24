@@ -21,6 +21,7 @@ import { VNPAY_CONSTANTS, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_ERROR_MESSAGES }
 import { executeUtils } from '../../../shared/utils';
 import { convertVndToUsd } from '../../admin/service/pricing';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
+import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastructure';
 import { getOrderPayableVnd } from '../order/domain';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
@@ -107,6 +108,8 @@ export function createVNPayService(
       }
       const credit = await walletCreditUsd(orderRow);
       const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
+      const rate = await getRate();
+      const topUpVnd = getOrderPayableVnd(orderRow, rate);
 
       operations.push({
         table: 'orders',
@@ -124,51 +127,11 @@ export function createVNPayService(
         id: dbUser.id,
         data: { walletBalance: prevBal + credit, queueStatus: 'pending' },
       });
-      
-      // Get all order_items for this order
-      const orderItems = await executeUtils.executeDynamicAction(userDO, 'select', {
-        where: { field: "orderId", operator: '=', value: orderId }
-      }, 'order_items');
-      
-      // Update each order_item queueStatus
-      for (const item of orderItems) {
-        operations.push({
-          table: 'order_items',
-          operation: 'update',          
-          id: item.id,
-          data: { 
-            
-            queueStatus: 'pending' 
-          }
-        });
-      }
-      
-      // Get all order_discounts for these order_items
-      if (orderItems.length > 0) {
-        // Query order_discounts for each order_item_id in parallel
-        const orderDiscountsPromises = orderItems.map((item: { id: number }) =>
-          executeUtils.executeDynamicAction(userDO, 'select', {
-            where: { field: "orderItemId", operator: '=', value: item.id }
-          }, 'order_discounts')
-        );
-        
-        const orderDiscountsResults = await Promise.all(orderDiscountsPromises);
-        
-        // Flatten the results and update each order_discount queueStatus
-        const allOrderDiscounts = orderDiscountsResults.flat();
-        for (const discount of allOrderDiscounts) {
-          operations.push({
-            table: 'order_discounts',
-            operation: 'update',            
-            id: discount.id,
-            data: { 
-              
-              queueStatus: 'pending' 
-            }
-          });
-        }
-      }
-    } 
+
+      await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
+      await recordTopUpAndUpgradeTier(userDO, topUpVnd);
+      return;
+    }
 
     await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
   };

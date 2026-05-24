@@ -4,6 +4,12 @@ import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createVoucherInfrastructureService } from './infrastructure';
 import { ApplyVoucher, ValidateVoucherRequest, Voucher } from './domain';
 
+import { Context } from 'hono';
+import { getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
+import { createVoucherInfrastructureService } from './infrastructure';
+import { ApplyVoucher, ValidateVoucherRequest, Voucher } from './domain';
+
 export interface IVoucherApplicationService {
   createVoucher(identifier: string, request: Voucher): Promise<Voucher>;
   applyVoucher(identifier: string, request: ApplyVoucher): Promise<any>;
@@ -11,7 +17,18 @@ export interface IVoucherApplicationService {
   getVoucherByCode(identifier: string, voucherCode: string): Promise<Voucher>;
   validateVoucher(identifier: string, request: ValidateVoucherRequest): Promise<any>;
   updateVoucherStatus(identifier: string, voucherId: number, status: string): Promise<Voucher>;
-  getAvailableVouchers(identifier: string, userId: number, userRole?: string, basePrice?: number): Promise<Voucher[]>;
+  getAvailableVouchers(
+    identifier: string,
+    userId: number,
+    membershipTier?: string,
+    basePrice?: number,
+  ): Promise<any[]>;
+  pickBestVoucher(
+    identifier: string,
+    userId: number,
+    membershipTier: string | undefined,
+    basePrice: number,
+  ): Promise<{ code: string; discountAmount: number; voucher: any } | null>;
 }
 
 export function createVoucherApplicationService(c: Context, bindingName: string): IVoucherApplicationService {
@@ -30,14 +47,13 @@ export function createVoucherApplicationService(c: Context, bindingName: string)
         id: voucher.id,
         code: voucher.code,
         name: voucher.name,
-        type: voucher.type,
-        discountValue: voucher.discountValue,
+        discountPercent: voucher.discountPercent ?? voucher.discountValue,
         minOrderAmount: voucher.minOrderAmount,
         maxDiscountAmount: voucher.maxDiscountAmount,
         usageLimit: voucher.usageLimit,
         usedCount: voucher.usedCount,
-        applicableUsers: voucher.applicableUsers,
-        userRoles: voucher.userRoles,
+        applicableTo: voucher.applicableTo ?? voucher.applicable_to ?? 'ALL',
+        membershipTiers: voucher.membershipTiers ?? voucher.membership_tiers,
         expiresAt: voucher.expiresAt,
         status: voucher.status,
         createdAt: voucher.createdAt,
@@ -57,10 +73,11 @@ export function createVoucherApplicationService(c: Context, bindingName: string)
         id: voucher.id,
         code: voucher.code,
         name: voucher.name,
-        type: voucher.type,
-        discountValue: voucher.discountValue,
+        discountPercent: voucher.discountPercent ?? voucher.discountValue,
         usedCount: voucher.usedCount,
         usageLimit: voucher.usageLimit,
+        applicableTo: voucher.applicableTo ?? voucher.applicable_to ?? 'ALL',
+        membershipTiers: voucher.membershipTiers ?? voucher.membership_tiers,
         status: voucher.status,
         expiresAt: voucher.expiresAt,
       }));
@@ -74,14 +91,13 @@ export function createVoucherApplicationService(c: Context, bindingName: string)
         id: voucher.id,
         code: voucher.code,
         name: voucher.name,
-        type: voucher.type,
-        discountValue: voucher.discountValue,
+        discountPercent: voucher.discountPercent ?? voucher.discountValue,
         minOrderAmount: voucher.minOrderAmount,
         maxDiscountAmount: voucher.maxDiscountAmount,
         usageLimit: voucher.usageLimit,
         usedCount: voucher.usedCount,
-        applicableUsers: voucher.applicableUsers,
-        userRoles: voucher.userRoles,
+        applicableTo: voucher.applicableTo ?? voucher.applicable_to ?? 'ALL',
+        membershipTiers: voucher.membershipTiers ?? voucher.membership_tiers,
         expiresAt: voucher.expiresAt,
         status: voucher.status,
       };
@@ -104,9 +120,24 @@ export function createVoucherApplicationService(c: Context, bindingName: string)
       };
     },
 
-    async getAvailableVouchers(identifier: string, userId: number, userRole?: string, basePrice?: number): Promise<any[]> {
+    async getAvailableVouchers(
+      identifier: string,
+      userId: number,
+      membershipTier?: string,
+      basePrice?: number,
+    ): Promise<any[]> {
       const voucherInfra = getVoucherInfrastructure(identifier);
-      return await voucherInfra.getAvailableVouchers(userId, userRole, basePrice);
+      return voucherInfra.getAvailableVouchers(userId, membershipTier, basePrice);
+    },
+
+    async pickBestVoucher(
+      identifier: string,
+      userId: number,
+      membershipTier: string | undefined,
+      basePrice: number,
+    ): Promise<{ code: string; discountAmount: number; voucher: any } | null> {
+      const voucherInfra = getVoucherInfrastructure(identifier);
+      return voucherInfra.pickBestVoucher(userId, membershipTier, basePrice);
     },
   };
 }

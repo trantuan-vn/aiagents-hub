@@ -38,15 +38,13 @@ interface CleanupResult {
 
 /** Bảng cần xoá khi cleanup (tiết kiệm storage) */
 const QUEUE_TABLE_NAMES = [
-  "service_usages", "orders", "order_items",
-  "order_discounts", "payments", "refunds", "commissions",
+  "service_usages", "orders", "payments", "refunds", "commissions",
   "workflow_royalties", "workflow_user_stars", "workflow_comments",
 ];
 
-/** Tất cả bảng sync (queue + catalog). Bảng catalog không xoá khi cleanup. */
 const SYNC_TABLE_NAMES = [
   ...QUEUE_TABLE_NAMES,
-  "price_policies", "services", "vouchers", "versions",
+  "services", "vouchers", "versions",
   "users", "sessions", "connections", "subscriptions",
   "api_tokens", "pending_messages",
   "user_mfa", "user_ekyc", "user_did",

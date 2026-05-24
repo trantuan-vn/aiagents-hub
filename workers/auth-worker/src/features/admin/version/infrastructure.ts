@@ -4,98 +4,82 @@ import {
   VersionInfo,
   VersionData,
   VersionListResponse,
-  IVersionInfrastructureService, VersionInfoSchema
+  IVersionInfrastructureService,
+  VersionInfoSchema,
 } from './domain';
 import { executeUtils } from '../../../shared/utils';
 
 export function createVersionInfrastructureService(env: Env, userDO: DurableObjectStub<UserDO>): IVersionInfrastructureService {
-  
-  // Helper method để lấy dữ liệu từ Durable Object
-
-  // Helper để lấy tất cả dữ liệu từ các bảng
   const fetchAllTableData = async () => {
-    const [pricePolicies, services, vouchers, commissionPolicies] = await Promise.all([
+    const [services, vouchers, commissionPolicies] = await Promise.all([
       executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'createdAt', direction: 'DESC' }
-      }, 'price_policies'),
-      executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'createdAt', direction: 'DESC' }
+        orderBy: { field: 'createdAt', direction: 'DESC' },
       }, 'services'),
       executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'createdAt', direction: 'DESC' }
+        orderBy: { field: 'createdAt', direction: 'DESC' },
       }, 'vouchers'),
       executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'createdAt', direction: 'DESC' }
-      }, 'commission_policies')
+        orderBy: { field: 'createdAt', direction: 'DESC' },
+      }, 'commission_policies'),
     ]);
 
-    return { pricePolicies, services, vouchers, commissionPolicies };
+    return { services, vouchers, commissionPolicies };
   };
 
-  // Helper để quản lý version trong KV
   const getCurrentVersionNumber = async (): Promise<string> => {
     const currentVersion = await env.NONCE_KV.get('version:current');
     return currentVersion || '1';
   };
 
   const incrementVersionNumber = async (currentVersion: string): Promise<string> => {
-    const newVersion = (parseInt(currentVersion) + 1).toString();
+    const newVersion = (parseInt(currentVersion, 10) + 1).toString();
     await env.NONCE_KV.put('version:current', newVersion);
     return newVersion;
   };
 
-  // Helper để lưu version data vào R2
-  const saveVersionToR2 = async (version: string, data: any): Promise<void> => {
-    await env.R2_VERSION_BUCKET.put(
-      `version-${version}.json`,
-      JSON.stringify(data),
-      { httpMetadata: { contentType: 'application/json' } }
-    );
+  const saveVersionToR2 = async (version: string, data: unknown): Promise<void> => {
+    await env.R2_VERSION_BUCKET.put(`version-${version}.json`, JSON.stringify(data), {
+      httpMetadata: { contentType: 'application/json' },
+    });
   };
-
 
   return {
     async saveNewVersion(): Promise<VersionSaveResponse> {
       const currentVersion = await getCurrentVersionNumber();
       const newVersion = await incrementVersionNumber(currentVersion);
-      
-      // Lấy toàn bộ dữ liệu từ các bảng
-      const { pricePolicies, services, vouchers, commissionPolicies } = await fetchAllTableData();
-      
+
+      const { services, vouchers, commissionPolicies } = await fetchAllTableData();
+
       const recordCounts = {
-        price_policies: pricePolicies.length,
         services: services.length,
         vouchers: vouchers.length,
         commission_policies: commissionPolicies.length,
       };
 
-      // Tạo data object để lưu
       const versionData = {
-        price_policies: pricePolicies,
-        services: services,
-        vouchers: vouchers,
+        services,
+        vouchers,
         commission_policies: commissionPolicies,
         timestamp: new Date().toISOString(),
-        version: newVersion
+        version: newVersion,
       };
 
-      // Lưu vào R2 và KV
       await saveVersionToR2(newVersion, versionData);
 
       const version = VersionInfoSchema.parse({
         version: newVersion,
         timestamp: versionData.timestamp,
-        recordCounts
+        recordCounts,
       });
-      return await executeUtils.executeDynamicAction(userDO, 'insert', version, 'versions');
+      return executeUtils.executeDynamicAction(userDO, 'insert', version, 'versions');
     },
 
     async upgradeVersion(): Promise<VersionInfo> {
       const version = await getCurrentVersionNumber();
-       
+
       const versions = await executeUtils.executeRepositorySelect(
-        userDO, 
-        'SELECT version FROM versions where version = (select max(version) from versions)'
+        userDO,
+        'SELECT version FROM versions where version = (select max(version) from versions)',
       );
 
       const hasStoredVersion = versions.length > 0;
@@ -103,7 +87,7 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
 
       if (needsUpgrade) {
         const object = await env.R2_VERSION_BUCKET.get(`version-${version}.json`);
-        
+
         if (object) {
           const data = await object.text();
           const versionData = JSON.parse(data);
@@ -113,42 +97,18 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
           if (versionData.version !== version) {
             throw new Error(`Version ${version} in R2 bucket is incorrect`);
           }
-          if (!(versionData.price_policies && Array.isArray(versionData.price_policies))
-          || !(versionData.services && Array.isArray(versionData.services))
-          || !(versionData.vouchers && Array.isArray(versionData.vouchers))) {
+          if (!(versionData.services && Array.isArray(versionData.services))
+            || !(versionData.vouchers && Array.isArray(versionData.vouchers))) {
             throw new Error(`Version ${version} in R2 bucket has invalid data`);
           }
+
           const commissionPolicies = Array.isArray(versionData.commission_policies)
             ? versionData.commission_policies
             : [];
-          // Tạo operations cho multi-table
-          const operations = [];
-          
-          // Xử lý price_policies
-          // Thêm lệnh delete trước khi insert
-          operations.push({
-            table: 'price_policies',
-            operation: 'delete'
-          });
-          
-          // Thêm operations insert cho price_policies
-          versionData.price_policies.forEach( (policy : any) => {
-            operations.push({
-              table: 'price_policies',
-              operation: 'insert',
-              data: policy
-            });
-          });
-          
-          // Xử lý services
-          // Thêm lệnh delete trước khi insert
-          // operations.push({
-          //   table: 'services',
-          //   operation: 'delete'
-          // });
-          
-          // Thêm operations insert cho services
-          versionData.services.forEach( (service : any) => {
+
+          const operations: Array<Record<string, unknown>> = [];
+
+          versionData.services.forEach((service: Record<string, unknown>) => {
             operations.push({
               table: 'services',
               operation: 'upsert',
@@ -165,87 +125,58 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
               },
             });
           });
-          
-          // Xử lý vouchers
-          // Thêm lệnh delete trước khi insert
-          operations.push({
-            table: 'vouchers',
-            operation: 'delete'
-          });
-          
-          // Thêm operations insert cho vouchers
-          versionData.vouchers.forEach( (voucher : any) => {
-            operations.push({
-              table: 'vouchers',
-              operation: 'insert',
-              data: voucher
-            });
-          });
-          // Xử lý commission_policies (tương thích phiên bản cũ không có dữ liệu)
-          operations.push({
-            table: 'commission_policies',
-            operation: 'delete'
-          });
-          commissionPolicies.forEach((policy: any) => {
-            operations.push({
-              table: 'commission_policies',
-              operation: 'insert',
-              data: policy
-            });
+
+          operations.push({ table: 'vouchers', operation: 'delete' });
+          versionData.vouchers.forEach((voucher: Record<string, unknown>) => {
+            operations.push({ table: 'vouchers', operation: 'insert', data: voucher });
           });
 
-          // xử lý versions
+          operations.push({ table: 'commission_policies', operation: 'delete' });
+          commissionPolicies.forEach((policy: Record<string, unknown>) => {
+            operations.push({ table: 'commission_policies', operation: 'insert', data: policy });
+          });
+
           const recordCounts = {
-            price_policies: versionData.price_policies.length,
             services: versionData.services.length,
             vouchers: versionData.vouchers.length,
             commission_policies: commissionPolicies.length,
-          };          
+          };
+
           operations.push({
             table: 'versions',
             operation: 'insert',
             data: {
               version: versionData.version,
               timestamp: versionData.timestamp,
-              recordCounts: recordCounts
-            }
-          })
-          // Thực hiện multi-table operations nếu có
-          if (operations.length > 0) {
-            await executeUtils.executeDynamicAction(userDO, 'multi-table', {
-              operations: operations
-            });            
-          }
+              recordCounts,
+            },
+          });
 
-        }
-        else {
-          // First-login bootstrap: no local version row and no snapshot file yet.
-          // Do not block authentication flow in this case.
-          if (!hasStoredVersion) {
-            await executeUtils.executeDynamicAction(userDO, 'insert', {
+          if (operations.length > 0) {
+            await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
+          }
+        } else if (!hasStoredVersion) {
+          await executeUtils.executeDynamicAction(
+            userDO,
+            'insert',
+            {
               version,
               timestamp: new Date().toISOString(),
-              recordCounts: {
-                price_policies: 0,
-                services: 0,
-                vouchers: 0,
-                commission_policies: 0,
-              }
-            }, 'versions');
-          } else {
-            throw new Error(`Version ${version} on R2_VERSION_BUCKET not found`);
-          }
+              recordCounts: { services: 0, vouchers: 0, commission_policies: 0 },
+            },
+            'versions',
+          );
+        } else {
+          throw new Error(`Version ${version} on R2_VERSION_BUCKET not found`);
         }
       }
-            
-      return { 
-        version: version,
-      };
+
+      return { version };
     },
-    
+
     async getVersionData(versionId: number): Promise<VersionData> {
       const object = await env.R2_VERSION_BUCKET.get(`version-${versionId}.json`);
-      
+
       if (!object) {
         throw new Error(`Version ${versionId} not found`);
       }
@@ -257,22 +188,21 @@ export function createVersionInfrastructureService(env: Env, userDO: DurableObje
         version: versionData.version,
         timestamp: versionData.timestamp,
         data: {
-          price_policies: versionData.price_policies,
           services: versionData.services,
           vouchers: versionData.vouchers,
           commission_policies: versionData.commission_policies ?? [],
-        }
+        },
       };
     },
 
     async getVersionList(): Promise<VersionListResponse> {
       const versions = await executeUtils.executeDynamicAction(userDO, 'select', {
-        orderBy: { field: 'version', direction: 'DESC' }
-      }, 'versions')
-            
+        orderBy: { field: 'version', direction: 'DESC' },
+      }, 'versions');
+
       return {
         versions,
-        total: versions.length
+        total: versions.length,
       };
     },
   };

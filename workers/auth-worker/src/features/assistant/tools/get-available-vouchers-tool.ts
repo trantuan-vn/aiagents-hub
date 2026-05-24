@@ -24,10 +24,11 @@ export function getAvailableVouchersTool(c: any, bindingName: string, user: any)
           return;
         }
 
+        const membershipTier = String(user.membershipTier ?? user.membership_tier ?? 'member');
         const vouchers = await voucherApp.getAvailableVouchers(
           user.identifier,
           userId,
-          user.role,
+          membershipTier,
           input.basePrice,
         );
 
@@ -35,10 +36,10 @@ export function getAvailableVouchersTool(c: any, bindingName: string, user: any)
           id: voucher.id,
           code: voucher.code,
           name: voucher.name,
-          type: voucher.type,
-          discountValue: voucher.discountValue,
+          discountPercent: voucher.discountPercent ?? voucher.discountValue,
           minOrderAmount: voucher.minOrderAmount,
           maxDiscountAmount: voucher.maxDiscountAmount,
+          estimatedDiscount: voucher.estimatedDiscount,
           status: voucher.status,
           expiresAt: voucher.expiresAt,
         }));

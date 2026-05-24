@@ -49,7 +49,7 @@ function VersionItemContent({
   t: (key: string, params?: Record<string, string>) => string;
 }) {
   const totalRecords = version.recordCounts
-    ? version.recordCounts.price_policies +
+    ? (version.recordCounts.price_policies ?? 0) +
       version.recordCounts.services +
       version.recordCounts.vouchers +
       (version.recordCounts.commission_policies ?? 0)
@@ -76,9 +76,6 @@ function VersionItemContent({
           )}
           {version.recordCounts && (
             <>
-              <div className="flex items-center gap-1">
-                <span>{t("records.price_policies", { count: String(version.recordCounts.price_policies) })}</span>
-              </div>
               <div className="flex items-center gap-1">
                 <span>{t("records.services", { count: String(version.recordCounts.services) })}</span>
               </div>

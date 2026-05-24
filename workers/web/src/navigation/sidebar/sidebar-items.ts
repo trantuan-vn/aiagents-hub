@@ -16,7 +16,6 @@ import {
   RefreshCw,
   Send,
   Settings,
-  Tag,
   Ticket,
   UserCircle,
   Wallet,
@@ -110,9 +109,9 @@ export const sidebarItems: NavGroup[] = [
         adminOnly: true,
       },
       {
-        title: "Price Policy",
-        url: "/dashboard/policy",
-        icon: Tag,
+        title: "User Groups",
+        url: "/dashboard/user-groups",
+        icon: UserCircle,
         adminOnly: true,
       },
       {

@@ -8,8 +8,8 @@ import {
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
   Subscription, WebSocketMessageSchema,
   DEFAULT_SCALE_CONFIGS, ScaleConfig, UserSchema, SessionSchema,
-  PricePolicySchema, ServiceObjectSchema, ServiceUsageSchema, VoucherSchema,
-  OrderSchema, OrderItemSchema, OrderItemDiscountSchema, ApiTokenSchema,
+  ServiceObjectSchema, ServiceUsageSchema, VoucherSchema,
+  OrderSchema, ApiTokenSchema,
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
   CommissionPolicySchema, CommissionSchema,
@@ -47,7 +47,7 @@ export class UserDO extends DurableObject {
   
   /** Bảng cần xoá record khi cleanup để tiết kiệm không gian lưu trữ */
   private readonly QUEUE_TABLE_NAMES = [
-    "service_usages", "orders", "order_items", "order_discounts",
+    "service_usages", "orders",
     "payments", "refunds", "commissions", "workflow_royalties",
     "workflow_user_stars", "workflow_comments",
   ];
@@ -55,7 +55,7 @@ export class UserDO extends DurableObject {
   /** Bảng danh mục: xử lý giống queue nhưng KHÔNG xoá khi cleanup (giữ lại record) */
   private readonly SYNC_TABLE_NAMES = [
     ...this.QUEUE_TABLE_NAMES,
-    "price_policies", "services", "vouchers", "versions",
+    "services", "vouchers", "versions",
     "users", "sessions", "connections", "subscriptions",
     "api_tokens", "pending_messages",
     "user_mfa", "user_ekyc", "user_did",
@@ -111,7 +111,6 @@ export class UserDO extends DurableObject {
         schema.extend(this.QUEUE_SCHEMA_EXTENSION);
 
       // Bảng danh mục (catalog): queue flow nhưng KHÔNG xoá khi cleanup
-      this.table('price_policies', extendWithQueue(PricePolicySchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       this.table('services', extendWithQueue(ServiceObjectSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
       this.table('vouchers', extendWithQueue(VoucherSchema), this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
       
@@ -124,8 +123,6 @@ export class UserDO extends DurableObject {
       const queueSchemas = [
         { name: 'orders', schema: OrderSchema },
         { name: 'service_usages', schema: ServiceUsageSchema },
-        { name: 'order_items', schema: OrderItemSchema },
-        { name: 'order_discounts', schema: OrderItemDiscountSchema },
         { name: 'payments', schema: PaymentSchema },
         { name: 'refunds', schema: RefundSchema },
         { name: 'workflow_royalties', schema: WorkflowRoyaltySchema },

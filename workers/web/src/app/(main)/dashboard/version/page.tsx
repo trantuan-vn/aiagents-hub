@@ -115,7 +115,7 @@ export default function VersionPage() {
   const totalVersions = versions.length;
   const totalRecords = versions.reduce((sum, v) => {
     if (v.recordCounts) {
-      return sum + v.recordCounts.price_policies + v.recordCounts.services + v.recordCounts.vouchers;
+      return sum + (v.recordCounts.price_policies ?? 0) + v.recordCounts.services + v.recordCounts.vouchers + (v.recordCounts.commission_policies ?? 0);
     }
     return sum;
   }, 0);

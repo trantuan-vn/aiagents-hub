@@ -2,6 +2,9 @@ import { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
 import { createApplicationService } from './application';
 import { createVersionApplicationService } from '../admin/version/application';
+import { syncUserMembershipTierOnAccess } from '../admin/membership-tier/infrastructure';
+import { getIdFromName } from '../../shared/utils';
+import { UserDO } from '../ws/infrastructure/UserDO';
 import { cookieUtils } from './utils';
 import { getClientIpAndUserAgentForSession, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
@@ -70,7 +73,11 @@ export function createVersionCheckMiddleware(bindingName: string) {
     try {
       const user = requireAuth(c);
       const versionApplicationService = createVersionApplicationService(c, bindingName);
-      await versionApplicationService.upgradeVersion(user.identifier);            
+      await versionApplicationService.upgradeVersion(user.identifier);
+      if (user.role !== 'admin') {
+        const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+        await syncUserMembershipTierOnAccess(userDO);
+      }
     } catch (error) {
       handleErrorWithoutIp(error, "Failed to upgrade version");      
     } 

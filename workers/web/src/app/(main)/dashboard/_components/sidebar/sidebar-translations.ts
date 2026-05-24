@@ -49,7 +49,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     "Register v2": t("register_v2"),
     Others: t("others"),
     "System Configuration": t("aiagents-hub-system-config"),
-    "Price Policy": t("price_policy"),
+    "User Groups": t("user_groups"),
     "Commission Policy": t("commission_policy"),
     "API Service": t("api_service"),
     "Discount Vouchers": t("discount_vouchers"),

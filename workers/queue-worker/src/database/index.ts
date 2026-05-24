@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { normalizeLegacyEarningsPayoutAmounts } from '@auth-worker/features/admin/earnings-payout/domain.js';
 
 import {
-	PricePolicySchema,
 	ServiceObjectSchema,
 	VoucherSchema,
 	UserSchema,
@@ -12,8 +11,6 @@ import {
 	SubscriptionSchema,
 	OrderSchema,
 	ServiceUsageSchema,
-	OrderItemSchema,
-	OrderItemDiscountSchema,
 	PaymentSchema,
 	RefundSchema,
 	ApiTokenSchema,
@@ -609,7 +606,6 @@ export class D1DatabaseManager {
 
   private async initializeTables(): Promise<void> {
     // Bảng danh mục (catalog): queue flow + unique index - tương thích với auth worker UserDO
-    await this.registerTable('price_policies', PricePolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
     await this.registerTable('services', ServiceObjectSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
     await this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
     await this.registerTable('users', UserSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('identifier'));
@@ -639,8 +635,6 @@ export class D1DatabaseManager {
     const queueSchemas = [
       { name: 'orders', schema: OrderSchema },
       { name: 'service_usages', schema: ServiceUsageSchema },
-      { name: 'order_items', schema: OrderItemSchema },
-      { name: 'order_discounts', schema: OrderItemDiscountSchema },
       { name: 'payments', schema: PaymentSchema },
       { name: 'refunds', schema: RefundSchema },
       { name: 'commissions', schema: CommissionSchema },

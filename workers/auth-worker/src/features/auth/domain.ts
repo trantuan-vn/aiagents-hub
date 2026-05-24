@@ -168,6 +168,15 @@ export const UserSchema = BaseUserSchema.extend({
     (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
     z.number().min(0),
   ).optional(),
+  /** Membership tier from monthly top-up volume (VND). */
+  membershipTier: z.enum(['member', 'silver', 'gold', 'diamond']).default('member').optional(),
+  /** YYYY-MM period for `monthlyTopUpVnd` accumulation. */
+  tierPeriodYm: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  /** Cumulative successful top-up VND in `tierPeriodYm`. */
+  monthlyTopUpVnd: z.preprocess(
+    (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
+    z.number().min(0),
+  ).optional(),
   /** Currency for commission & workflow earnings bank payout (VietQR when VND) */
   earningsPayoutCurrency: z.enum(['VND', 'USD']).default('VND').optional(),
   /** Identifier of the referrer (user who owns the referral link) */

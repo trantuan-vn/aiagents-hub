@@ -386,11 +386,15 @@ export function createAuthRoutes(bindingName: string) {
       const walletBalance = typeof wb === "number" && !Number.isNaN(wb) ? wb : Number(wb) || 0;
       const rawCurrency = user.earningsPayoutCurrency ?? user.earnings_payout_currency;
       const earningsPayoutCurrency = rawCurrency === 'USD' ? 'USD' : 'VND';
+      const membershipTier = user.membershipTier ?? user.membership_tier ?? 'member';
       return c.json({
         id: user.id,
         identifier: user.identifier,
         address: user.address,
         role: user.role || "member",
+        membershipTier,
+        monthlyTopUpVnd: Number(user.monthlyTopUpVnd ?? user.monthly_top_up_vnd ?? 0) || 0,
+        tierPeriodYm: user.tierPeriodYm ?? user.tier_period_ym ?? null,
         walletBalance: Math.max(0, walletBalance),
         walletCurrency: 'USD',
         earningsPayoutCurrency,

@@ -155,6 +155,20 @@ export async function fetchOrdersList(query: {
   return response.json();
 }
 
+export async function fetchAvailableVouchers(basePriceUsd: number): Promise<
+  Array<{ code: string; name: string; discountPercent?: number; estimatedDiscount?: number }>
+> {
+  const params = new URLSearchParams({ basePrice: String(basePriceUsd) });
+  const response = await fetch(`${API_BASE_URL}/dashboard/admin/voucher/available?${params}`, {
+    method: "GET",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+  });
+  if (!response.ok) return [];
+  const json: unknown = await response.json();
+  return Array.isArray(json) ? (json as Array<{ code: string; name: string; discountPercent?: number; estimatedDiscount?: number }>) : [];
+}
+
 export async function postCreateOrder(data: CreateOrder, createErrorFallback: string): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL}/dashboard/order/orders`, {
     method: "POST",

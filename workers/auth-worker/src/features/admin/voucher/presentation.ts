@@ -104,7 +104,8 @@ export function createVoucherRoutes(bindingName: string) {
       if (!Number.isFinite(userId)) {
         throw new Error('User id is required for available vouchers');
       }
-      const result = await voucherApp.getAvailableVouchers(user.identifier, userId, user.role, basePrice);
+      const membershipTier = String(user.membershipTier ?? user.membership_tier ?? 'member');
+      const result = await voucherApp.getAvailableVouchers(user.identifier, userId, membershipTier, basePrice);
       return c.json(result);
     }, 'Failed to get available vouchers', false),
   );

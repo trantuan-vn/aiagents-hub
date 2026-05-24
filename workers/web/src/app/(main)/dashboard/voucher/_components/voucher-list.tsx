@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Calendar, Gift, Trash2 } from "lucide-react";
+import { Gift, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -16,12 +16,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
 import type { Voucher } from "./schema";
+import { VoucherItemContent } from "./voucher-item-content";
 
 interface VoucherItemProps {
   voucher: Voucher;
@@ -29,63 +29,6 @@ interface VoucherItemProps {
   onDelete: (voucherId: string | number) => Promise<void>;
   formatDate: (dateString: string | undefined) => string;
   t: (key: string, params?: Record<string, string>) => string;
-}
-
-function VoucherItemContent({
-  voucher,
-  formatDate,
-  t,
-}: {
-  voucher: Voucher;
-  formatDate: (dateString: string | undefined) => string;
-  t: (key: string, params?: Record<string, string>) => string;
-}) {
-  const isActive = voucher.status === "ACTIVE";
-  const isExpired = voucher.expiresAt ? new Date(voucher.expiresAt) < new Date() : false;
-  const badgeVariant = !isActive ? "secondary" : isExpired ? "destructive" : "default";
-  const statusLabel = !isActive ? t("status.inactive") : isExpired ? t("status.expired") : t("status.active");
-
-  const discountDisplay = voucher.type === "PERCENTAGE" ? `${voucher.discountValue}%` : `$${voucher.discountValue}`;
-
-  return (
-    <div className="flex flex-1 items-center gap-3">
-      <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
-        <Gift className="text-primary h-5 w-5" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-2">
-          <span className="text-sm font-medium">{voucher.name}</span>
-          <Badge variant={badgeVariant} className="text-xs">
-            {statusLabel}
-          </Badge>
-        </div>
-        <div className="text-muted-foreground flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1">
-            <span className="font-mono">{voucher.code}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span>{t("discount", { value: discountDisplay })}</span>
-          </div>
-          {voucher.usageLimit && (
-            <div className="flex items-center gap-1">
-              <span>
-                {t("usage", {
-                  used: String(voucher.usedCount || 0),
-                  limit: String(voucher.usageLimit),
-                })}
-              </span>
-            </div>
-          )}
-          {voucher.expiresAt && (
-            <div className="flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {formatDate(voucher.expiresAt)}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function VoucherItemActions({
