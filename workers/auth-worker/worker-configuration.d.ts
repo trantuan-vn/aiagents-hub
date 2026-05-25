@@ -53,6 +53,10 @@ declare namespace Cloudflare {
 		AI: Ai;
 		IMAGES: ImagesBinding;
         CF_AI_API_TOKEN: SecretsStoreSecret;
+		VIETQR_ACCOUNT_NO: SecretsStoreSecret;
+		VIETQR_ACCOUNT_NAME: SecretsStoreSecret;
+		VIETQR_ACQ_ID: SecretsStoreSecret;
+		CASSO_WEBHOOK_CHECKSUM_KEY: SecretsStoreSecret;
 	}
 }
 interface Env extends Cloudflare.Env {}

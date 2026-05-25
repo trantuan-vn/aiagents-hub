@@ -102,7 +102,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
     async processCassoIPNUseCase(body: unknown, headers: Headers, kv: KVNamespace): Promise<PaymentResult> {
       const payload = body as Record<string, unknown>;
-      const checksumKey = getCassoWebhookChecksumKey();
+      const checksumKey = await getCassoWebhookChecksumKey(c.env);
       const headerSig = headers.get("X-Casso-Signature") ?? headers.get("x-casso-signature") ?? undefined;
       if (!verifyCassoWebhookSignature(headerSig, payload, checksumKey)) {
         return {
@@ -182,7 +182,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       const validatedRequest = CassoQrSchema.parse(request);
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
       const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
-      return await vnpayService.createCassoQr(validatedRequest, identifier, kv, getVietQrConfig());
+      return await vnpayService.createCassoQr(validatedRequest, identifier, kv, await getVietQrConfig(c.env));
     },
 
     async queryTransactionUseCase(identifier: string, request: PaymentQuery, ipAddr: string): Promise<QueryDRResult> {

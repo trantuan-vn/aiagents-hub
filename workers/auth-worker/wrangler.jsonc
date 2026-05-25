@@ -229,6 +229,26 @@
 		"binding": "CF_AI_API_TOKEN",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "CF_AI_API_TOKEN"
+		},
+		{
+		"binding": "VIETQR_ACCOUNT_NO",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "VIETQR_ACCOUNT_NO"
+		},
+		{
+		"binding": "VIETQR_ACCOUNT_NAME",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "VIETQR_ACCOUNT_NAME"
+		},
+		{
+		"binding": "VIETQR_ACQ_ID",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "VIETQR_ACQ_ID"
+		},
+		{
+		"binding": "CASSO_WEBHOOK_CHECKSUM_KEY",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "CASSO_WEBHOOK_CHECKSUM_KEY"
 		}
 	],
   	"services": [
