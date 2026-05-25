@@ -91,7 +91,10 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
 
   async existsByHashSessionId(sessionId: string): Promise<boolean> {
     const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
-      where: [{ field: 'hashSessionId', operator: '=', value: sessionId }],
+      where: [
+        { field: 'hashSessionId', operator: '=', value: sessionId },
+        { field: 'isActive', operator: '=', value: 1 },
+      ],
       limit: 1,
     }, 'sessions');
     return Array.isArray(rows) && rows.length > 0;

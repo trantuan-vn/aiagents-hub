@@ -23,36 +23,46 @@ import { createVersionApplicationService } from '../admin/version/application';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
 import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../member/referral/utils';
-import { ipFingerprintsMatch, sessionContextsMatch, uaFingerprintsMatch } from './session-fingerprint';
+import {
+  decideNewSessionEmail,
+  evaluateNovelDeviceStepUp,
+  forgetKnownDeviceIfUnused,
+  KNOWN_DEVICE_KV_PREFIX,
+  markKnownDevice,
+  normalizeDeviceId,
+  parsePendingAuth,
+  serializePendingAuth,
+} from './device-trust';
+import { ipFingerprintsMatch, normalizeLoginCountry, uaFingerprintsMatch } from './session-fingerprint';
 
 interface IApplicationService {
   // I. OAUTH
   getAuthUrlUseCase(provider: OAuthProvider, sessionId: string): Promise<string>;
   exchangeOAuthCodeUseCase(provider: string, state: string, code: string): Promise<{ userInfo: any; sessionId: string }>;
-  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   
   // II. EMAIL/PHONE
   getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
-  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
-  verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
-  verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
-  verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
-  recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
+  verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
+  verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
+  verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
+  recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
 
   // III. WALLET
   generateNonceUseCase(sessionId: string): Promise<string>;
   verifySignatureUseCase(sessionId: string, message: string, signature: string): Promise<SiweMessage>;
-  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
+  connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
 
   // IIIb. PASSKEY (login)
-  connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }>;
+  connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   
   // IV. Common
   logoutUseCase(identifier: string, sessionId: string): Promise<void>;
   /** Revoke session by sessionId only (dùng khi middleware catch lỗi, chưa có identifier). Lấy identifier từ KV nếu còn. */
   revokeSessionBySessionIdUseCase(sessionId: string): Promise<void>;
   logoutAllUseCase(identifier: string): Promise<void>;
-  listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
+  listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; deviceId?: string; country?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
   verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }>;
 }
@@ -65,47 +75,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
   };
 
   const SESSION_LOOKUP_PREFIX = 'SessionLookup:';
-  const NEW_SESSION_EMAIL_COOLDOWN_PREFIX = 'NewSessionEmailCooldown:';
-
-  const hasSimilarActiveSession = async (
-    repository: ReturnType<typeof createRepository>,
-    ipAddress: string,
-    userAgent: string,
-  ): Promise<boolean> => {
-    const sessions = await repository.sessions.listAll(50);
-    return sessions.some(
-      (s) =>
-        s.isActive &&
-        s.ipAddress &&
-        s.userAgent &&
-        sessionContextsMatch(s.ipAddress, s.userAgent, ipAddress, userAgent),
-    );
-  };
-
-  const shouldSendNewSessionEmail = async (
-    repository: ReturnType<typeof createRepository>,
-    identifier: string,
-    sessionExisted: boolean,
-    ipAddress: string,
-    userAgent: string,
-  ): Promise<boolean> => {
-    if (sessionExisted) return false;
-
-    if (await hasSimilarActiveSession(repository, ipAddress, userAgent)) {
-      return false;
-    }
-
-    const cooldownKey = `${NEW_SESSION_EMAIL_COOLDOWN_PREFIX}${identifier}`;
-    const onCooldown = await c.env.NONCE_KV.get(cooldownKey);
-    return !onCooldown;
-  };
-
-  const markNewSessionEmailSent = async (identifier: string): Promise<void> => {
-    const cooldownKey = `${NEW_SESSION_EMAIL_COOLDOWN_PREFIX}${identifier}`;
-    await c.env.NONCE_KV.put(cooldownKey, '1', {
-      expirationTtl: AUTH_CONSTANTS.NEW_SESSION_EMAIL_COOLDOWN_SEC,
-    });
-  };
 
   const createUserSession = async (
     repository: any,
@@ -113,7 +82,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     type: 'otp' | 'siwe' | 'oauth' | 'passkey',
     ipAddress: string,
     userAgent: string,
-    country?: string
+    country?: string,
+    deviceId?: string | null,
   ) => {
     const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
     if (!encryptSecret) {
@@ -123,6 +93,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const sessionId = getSessionIdHash(ipAddress, userAgent, `${encryptSecret}|${user.identifier}`);
 
     const sessionExisted = await repository.sessions.existsByHashSessionId(sessionId);
+    const normalizedDeviceId = normalizeDeviceId(deviceId);
+    const activeSessionsBeforeCreate = await repository.sessions.listAll(50);
 
     const sessionData: Session = {
       hashSessionId: sessionId,
@@ -130,7 +102,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       expiresAt: new Date(Date.now() + expiry.sessionExpiry * 1000).toISOString(),
       ipAddress,
       userAgent,
-      country: country && country.length === 2 ? country : undefined,
+      country: normalizeLoginCountry(country) ?? undefined,
+      deviceId: normalizedDeviceId ?? undefined,
       isActive: true,
     };
     await repository.sessions.create(sessionData);
@@ -145,25 +118,89 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const versionApp = createVersionApplicationService(c, bindingName);
     await versionApp.upgradeVersion(user.identifier);
 
-    // Email chỉ khi thiết bị/mạng thực sự mới (fingerprint), không phải mỗi lần IP/UA đổi nhẹ
-    const notifyEmail = await shouldSendNewSessionEmail(
-      repository,
+    console.log(
+      '[NewSessionEmail]',
+      JSON.stringify({
+        step: 'createUserSession:before_decide',
+        identifier: user.identifier,
+        type,
+        sessionExisted,
+        deviceId: normalizedDeviceId,
+        country,
+        activeSessionsBeforeCreate: activeSessionsBeforeCreate.length,
+      }),
+    );
+
+    const emailDecision = await decideNewSessionEmail(
+      c.env.NONCE_KV,
       user.identifier,
       sessionExisted,
+      normalizedDeviceId,
       ipAddress,
       userAgent,
+      country,
+      activeSessionsBeforeCreate,
     );
-    if (notifyEmail) {
-      const userEmail = user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
-      if (userEmail) {
-        try {
-          await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
-          await markNewSessionEmailSent(user.identifier);
-        } catch (e) {
-          console.warn('[Auth] sendNewSessionNotification failed:', e);
+
+    const userEmail =
+      user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
+
+    if (!emailDecision.send) {
+      console.log(
+        '[NewSessionEmail]',
+        JSON.stringify({
+          step: 'createUserSession:skipped',
+          identifier: user.identifier,
+          reason: 'decide_send_false',
+          emailDecision,
+        }),
+      );
+    } else if (!userEmail) {
+      console.log(
+        '[NewSessionEmail]',
+        JSON.stringify({
+          step: 'createUserSession:skipped',
+          identifier: user.identifier,
+          reason: 'no_user_email',
+          hasUserEmailField: !!user.email,
+          identifierIsEmail: validationUtils.isValidEmail(user.identifier),
+          emailDecision,
+        }),
+      );
+    } else {
+      console.log(
+        '[NewSessionEmail]',
+        JSON.stringify({
+          step: 'createUserSession:sending',
+          identifier: user.identifier,
+          to: userEmail,
+          cooldownKey: emailDecision.cooldownKey ?? null,
+        }),
+      );
+      try {
+        await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
+        if (emailDecision.cooldownKey) {
+          await c.env.NONCE_KV.put(emailDecision.cooldownKey, '1', {
+            expirationTtl: AUTH_CONSTANTS.NEW_SESSION_EMAIL_COOLDOWN_SEC,
+          });
         }
+        console.log(
+          '[NewSessionEmail]',
+          JSON.stringify({
+            step: 'createUserSession:sent',
+            identifier: user.identifier,
+            cooldownKey: emailDecision.cooldownKey ?? null,
+          }),
+        );
+      } catch (e) {
+        console.warn('[NewSessionEmail] createUserSession:send_failed', {
+          identifier: user.identifier,
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
     }
+
+    await markKnownDevice(c.env.NONCE_KV, user.identifier, normalizedDeviceId);
 
     return { sessionId };
   };
@@ -269,9 +306,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return { userInfo, sessionId };
     },
 
-    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(identifier);
       const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      const dId = normalizeDeviceId(deviceId);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -280,10 +319,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
-        const normalizedId = validationUtils.normalizeIdentifier(identifier);
         console.log('[Auth] OAuth: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', normalizedId);
-        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, normalizedId, { expirationTtl: 300 });
-        console.log(`[connectOAuthUseCase] PendingTotp:${sessionId} is set value(${normalizedId}) with expirationTtl(300)`);
+        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedId, dId), { expirationTtl: 300 });
+        console.log(`[connectOAuthUseCase] PendingTotp:${sessionId} is set with expirationTtl(300)`);
         return { requiresTotp: true };
       }
 
@@ -316,13 +354,20 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier, otp: smsOtp }), { expirationTtl: 300 });
+        await c.env.NONCE_KV.put(
+          `PendingSmsLogin:${sessionId}`,
+          JSON.stringify({ identifier, otp: smsOtp, deviceId: dId ?? undefined }),
+          { expirationTtl: 300 },
+        );
         await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         return { requiresSms: true };
       }
 
+      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dId);
+      if (stepUp) return stepUp;
+
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, user, 'oauth', ipAddress, userAgent, country);
+      const result = await createUserSession(repository, user, 'oauth', ipAddress, userAgent, country, dId);
       console.log('[Auth] OAuth login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       // Notification gửi khi WS connect (đúng flow: login → token → client connect WS → gửi notification)
       if (isNewUser) {
@@ -346,7 +391,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const otpService = createOTPService(c.env);
       const isValid = await otpService.verifyOTP(otp, sessionId);
       if (!isValid) {
@@ -355,6 +400,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       const repository = getRepository(identifier);
       const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      const dId = normalizeDeviceId(deviceId);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -363,7 +410,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Cả authenticator và SMS đều bật -> chọn authenticator
       if (totpStatus.enabled) {
-        const normalizedId = validationUtils.normalizeIdentifier(identifier);
         console.log('[Auth] OTP: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', normalizedId, 'sessionId=', sessionId, 'NONCE_KV=', !!c.env.NONCE_KV);
         if (!c.env.NONCE_KV) {
           console.error('[Auth] OTP: NONCE_KV binding is missing');
@@ -374,8 +420,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
           throw new Error('Invalid session for 2FA');
         }
         try {
-          await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, normalizedId, { expirationTtl: 300 });
-          console.log(`PendingTotp:${sessionId} is set value(${normalizedId}) with expirationTtl(300)`);
+          await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedId, dId), { expirationTtl: 300 });
+          console.log(`PendingTotp:${sessionId} is set with expirationTtl(300)`);
         } catch (kvErr) {
           console.error('[Auth] OTP: NONCE_KV.put PendingTotp failed sessionId=', sessionId, 'normalizedId=', normalizedId, 'error=', kvErr);
           throw kvErr;
@@ -412,13 +458,20 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier, otp: smsOtp }), { expirationTtl: 300 });
+        await c.env.NONCE_KV.put(
+          `PendingSmsLogin:${sessionId}`,
+          JSON.stringify({ identifier, otp: smsOtp, deviceId: dId ?? undefined }),
+          { expirationTtl: 300 },
+        );
         await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         return { requiresSms: true };
       }
 
+      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dId);
+      if (stepUp) return stepUp;
+
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, user, 'otp', ipAddress, userAgent, country);
+      const result = await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, dId);
       console.log('[Auth] OTP login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       if (isNewUser) {
         console.log('[Auth] Storing pending 2FA notification for new user (OTP):', identifier);
@@ -428,14 +481,16 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return result;
     },
 
-    async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }> {
-      
-      const identifier = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
-      console.log(`[verifyTotpLoginUseCase] PendingTotp:${sessionId} is value(${identifier}) with expirationTtl(300)`);
-      if (!identifier) {
+    async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
+      const pendingRaw = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
+      const pending = parsePendingAuth(pendingRaw);
+      console.log(`[verifyTotpLoginUseCase] PendingTotp:${sessionId} parsed=`, !!pending);
+      if (!pending) {
         console.log('[Auth] verifyTotpLoginUseCase: PendingTotp missing for sessionId (có thể session hết hạn hoặc cookie không khớp)');
         throw new Error(ERROR_MESSAGES.AUTH.TOTP_SESSION_EXPIRED);
       }
+      const { identifier } = pending;
+      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? pending.deviceId ?? null;
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
@@ -459,39 +514,42 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       console.log('[Auth] verifyTotpLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
-      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
-    async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }> {
+    async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
       if (!raw) {
         console.log('[Auth] verifySmsLoginUseCase: PendingSmsLogin missing for sessionId');
         throw new Error(ERROR_MESSAGES.AUTH.SMS_SESSION_EXPIRED);
       }
 
-      const { identifier, otp } = JSON.parse(raw) as { identifier: string; otp: string };
-      if (otp !== code) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      const parsed = JSON.parse(raw) as { identifier: string; otp: string; deviceId?: string };
+      if (parsed.otp !== code) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? normalizeDeviceId(parsed.deviceId) ?? null;
 
       await c.env.NONCE_KV.delete(`PendingSmsLogin:${sessionId}`);
 
-      const repository = getRepository(identifier);
+      const repository = getRepository(parsed.identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      console.log('[Auth] verifySmsLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
-      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country);
+      console.log('[Auth] verifySmsLoginUseCase: completing login (no isNewUser/notification here) identifier=', parsed.identifier);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
-    async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }> {
-      let identifier = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
-      if (!identifier) {
+    async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
+      let pending = parsePendingAuth(await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`));
+      if (!pending) {
         const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
         if (!raw) {
           console.log('[Auth] verifyBackupCodeLoginUseCase: PendingTotp and PendingSmsLogin both missing');
           throw new Error(ERROR_MESSAGES.AUTH.TWO_FA_SESSION_EXPIRED);
         }
-        const parsed = JSON.parse(raw) as { identifier: string };
-        identifier = parsed.identifier;
+        const parsed = JSON.parse(raw) as { identifier: string; deviceId?: string };
+        pending = { identifier: parsed.identifier, deviceId: normalizeDeviceId(parsed.deviceId) ?? undefined };
       }
+      const { identifier } = pending;
+      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? pending.deviceId ?? null;
 
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
       const backupRepo = createBackupCodeRepository(userDO);
@@ -505,10 +563,10 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
-    async recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }> {
+    async recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
       const repository = getRepository(nIdentifier);
       const user = await repository.users.get();
@@ -520,7 +578,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const consumed = await backupRepo.consumeCode(normalized);
       if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
 
-      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, normalizeDeviceId(deviceId));
     },
 
     // III. WALLET
@@ -534,9 +592,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return await walletService.verifySignature(sessionId, message, signature, c.env.SIWE_DOMAIN, c.env.FRONTEND_URL);
     },
 
-    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+    async connectWalletUseCase(sessionId: string, address: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(address);
       const { user, isNewUser } = await getOrCreateUser(repository, address, { address }, ref);
+      const normalizedAddr = validationUtils.normalizeIdentifier(address);
+      const dId = normalizeDeviceId(deviceId);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
@@ -545,9 +605,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
-        const normalizedAddr = validationUtils.normalizeIdentifier(address);
         console.log('[Auth] SIWE: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'address=', normalizedAddr);
-        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, normalizedAddr, { expirationTtl: 300 });
+        await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedAddr, dId), { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
@@ -580,13 +639,20 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(`PendingSmsLogin:${sessionId}`, JSON.stringify({ identifier: address, otp: smsOtp }), { expirationTtl: 300 });
+        await c.env.NONCE_KV.put(
+          `PendingSmsLogin:${sessionId}`,
+          JSON.stringify({ identifier: address, otp: smsOtp, deviceId: dId ?? undefined }),
+          { expirationTtl: 300 },
+        );
         await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         return { requiresSms: true };
       }
 
+      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedAddr, sessionId, dId);
+      if (stepUp) return stepUp;
+
       // 3. Cả hai đều không bật -> đăng nhập bình thường
-      const result = await createUserSession(repository, user, 'siwe', ipAddress, userAgent, country);
+      const result = await createUserSession(repository, user, 'siwe', ipAddress, userAgent, country, dId);
       console.log('[Auth] SIWE login: isNewUser=', isNewUser, 'address=', address, 'flow=normal');
       if (isNewUser) {
         console.log('[Auth] Storing pending 2FA notification for new user (SIWE):', address);
@@ -596,11 +662,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return result;
     },
 
-    async connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string): Promise<{ sessionId: string }> {
+    async connectPasskeyUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      return await createUserSession(repository, user, 'passkey', ipAddress, userAgent, country);
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      const dId = normalizeDeviceId(deviceId);
+
+      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dId);
+      if (stepUp) return stepUp;
+
+      return await createUserSession(repository, user, 'passkey', ipAddress, userAgent, country, dId);
     },
 
     // IV. Common
@@ -614,8 +686,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
       console.log('[logoutUseCase] DEBUG: identifier=%s sessionId=%s', identifier, sessionId);
       const repository = getRepository(identifier);
+      const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });
       await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
+      const activeSessions = await repository.sessions.listAll(50);
+      await forgetKnownDeviceIfUnused(c.env.NONCE_KV, identifier, session?.deviceId, activeSessions);
       // Đóng WebSocket để trigger webSocketClose → unregisterUser trên BroadcastServiceDO
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
@@ -633,9 +708,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async logoutAllUseCase(identifier: string): Promise<void> {
       const repository = getRepository(identifier);
+      const beforeDeactivate = await repository.sessions.listAll(500);
       const hashSessionIds = await repository.sessions.deactivateAllUserSessions(identifier);
       for (const sid of hashSessionIds) {
         await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sid}`);
+      }
+      const deviceIds = new Set<string>();
+      for (const s of beforeDeactivate) {
+        const d = normalizeDeviceId(s.deviceId);
+        if (d) deviceIds.add(d);
+      }
+      for (const d of deviceIds) {
+        await c.env.NONCE_KV.delete(`${KNOWN_DEVICE_KV_PREFIX}${identifier}:${d}`);
       }
       // Đóng tất cả WebSocket để trigger unregisterUser
       try {
@@ -650,7 +734,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }> {
+    async listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; deviceId?: string; country?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }> {
       const repository = getRepository(identifier);
       const list = await repository.sessions.listAll(50);
       const sessions = list.map((s: any, index: number) => ({
@@ -659,6 +743,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         type: s.type ?? 'unknown',
         ipAddress: s.ipAddress,
         userAgent: s.userAgent,
+        deviceId: s.deviceId,
+        country: s.country,
         expiresAt: s.expiresAt,
         isActive: !!s.isActive,
         isCurrent: currentSessionId ? s.hashSessionId === currentSessionId : undefined,
@@ -668,8 +754,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async revokeSessionUseCase(identifier: string, sessionId: string): Promise<void> {
       const repository = getRepository(identifier);
+      const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });
       await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
+      const activeSessions = await repository.sessions.listAll(50);
+      await forgetKnownDeviceIfUnused(c.env.NONCE_KV, identifier, session?.deviceId, activeSessions);
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         await userDO.fetch('https://user.internal/', {

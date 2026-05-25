@@ -188,7 +188,7 @@ export function corsMiddleware() {
       c.header('Access-Control-Allow-Origin', origin);
       c.header('Access-Control-Allow-Credentials', 'true');
       c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Client-IP, X-Client-UA');
+      c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cookie, X-Client-IP, X-Client-UA, X-Client-Device-Id');
     }
     
     if (c.req.method === 'OPTIONS') {

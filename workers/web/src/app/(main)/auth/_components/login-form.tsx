@@ -18,10 +18,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 
 type AuthOptionsJSON = Parameters<typeof startAuthentication>[0];
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
+
+function authJsonHeaders(): Record<string, string> {
+  return { ...buildAuthClientHeaders(), "Content-Type": "application/json" };
+}
 
 function debounce<T extends (...args: never[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
@@ -407,7 +412,7 @@ export function LoginForm() {
         const optRes = await fetch(`${AUTH_API_URL}/passkey/auth/options`, {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify({ identifier: email }),
         });
         if (!optRes.ok) {
@@ -425,16 +430,33 @@ export function LoginForm() {
         const verifyRes = await fetch(`${AUTH_API_URL}/passkey/auth/verify`, {
           method: "POST",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify({ response, identifier: email, challengeKey }),
         });
-        if (!verifyRes.ok) {
-          const err = (await verifyRes.json().catch(() => ({}))) as { error?: string };
-          throw new Error(err.error ?? t("passkey_error"));
+        const verifyData = (await verifyRes.json().catch(() => ({}))) as {
+          ok?: boolean;
+          requiresTotp?: boolean;
+          requiresSms?: boolean;
+          error?: string;
+        };
+
+        if (verifyData.requiresTotp) {
+          setShowOtpPopup(false);
+          setShowTotpPopup(true);
+          toast.success(t("totp_required"));
+          return;
+        }
+        if (verifyData.requiresSms) {
+          setShowOtpPopup(false);
+          setShowSmsPopup(true);
+          toast.success(t("sms_required"));
+          return;
         }
 
-        const data = (await verifyRes.json()) as { ok?: boolean };
-        if (!data.ok) throw new Error(t("passkey_error"));
+        if (!verifyRes.ok) {
+          throw new Error(verifyData.error ?? t("passkey_error"));
+        }
+        if (!verifyData.ok) throw new Error(t("passkey_error"));
 
         form.reset();
         router.push("/dashboard");
@@ -473,7 +495,7 @@ export function LoginForm() {
         if (refFromUrl) body.ref = refFromUrl;
         const response = await fetch(`${AUTH_API_URL}/otp/verify`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify(body),
           credentials: "include",
         });
@@ -518,7 +540,7 @@ export function LoginForm() {
       try {
         const response = await fetch(`${AUTH_API_URL}/sms/verify-login`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify({ code }),
           credentials: "include",
         });
@@ -548,7 +570,7 @@ export function LoginForm() {
       try {
         const response = await fetch(`${AUTH_API_URL}/totp/verify`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify({ code }),
           credentials: "include",
         });
@@ -578,7 +600,7 @@ export function LoginForm() {
     try {
       const response = await fetch(`${AUTH_API_URL}/backup-code/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authJsonHeaders(),
         body: JSON.stringify({ code: normalized }),
         credentials: "include",
       });
@@ -621,7 +643,7 @@ export function LoginForm() {
       try {
         const response = await fetch(`${AUTH_API_URL}/backup-code/recover`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify({ identifier: email, code: normalized }),
           credentials: "include",
         });
@@ -654,7 +676,7 @@ export function LoginForm() {
         if (refFromUrl) body.ref = refFromUrl;
         const res = await fetch(`${AUTH_API_URL}/otp/request`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: authJsonHeaders(),
           body: JSON.stringify(body),
           credentials: "include",
         });

@@ -168,6 +168,22 @@ export function getClientIpAndUserAgentForSession(request: Request): {
   };
 }
 
+function readCookieValue(cookieHeader: string | null, name: string): string | undefined {
+  if (!cookieHeader) return undefined;
+  for (const part of cookieHeader.split(';')) {
+    const [k, ...rest] = part.trim().split('=');
+    if (k === name) return rest.join('=').trim();
+  }
+  return undefined;
+}
+
+/** Device UUID từ header (fetch) hoặc cookie (OAuth redirect). */
+export function getClientDeviceIdFromRequest(request: Request): string | undefined {
+  const fromHeader = request.headers.get('X-Client-Device-Id')?.trim();
+  if (fromHeader) return fromHeader;
+  return readCookieValue(request.headers.get('Cookie'), 'client_device_id');
+}
+
 /** Hash từ IP+UA+secret - dùng cho pre-login flow (OTP, OAuth state, wallet nonce) */
 /** Deterministic sessionId for pre-login flows (OTP, OAuth state, wallet nonce). */
 export const getSessionIdHash = (ipAddress: string, userAgent: string, secret: string) => {

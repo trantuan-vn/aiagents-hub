@@ -1,6 +1,20 @@
 import { Hono } from 'hono';
 import { getCookie } from 'hono/cookie';  
-import { handleError, parseBody, getIPAndUserAgent, getClientIpAndUserAgentForSession, generateSecureSessionId, getIdFromName, executeUtils } from '../../shared/utils';
+import {
+  handleError,
+  parseBody,
+  getIPAndUserAgent,
+  getClientIpAndUserAgentForSession,
+  getClientDeviceIdFromRequest,
+  generateSecureSessionId,
+  getIdFromName,
+  executeUtils,
+} from '../../shared/utils';
+import {
+  consumePendingLoginDevice,
+  normalizeDeviceId,
+  storePendingLoginDevice,
+} from './device-trust';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { requireAuth } from './authMiddleware';
 import { createApplicationService } from './application';
@@ -35,6 +49,19 @@ import { processFormData, processDocumentFormData, processFaceFormData, mergeIma
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
 
+  const resolveLoginDeviceId = async (
+    c: { env: Env },
+    request: Request,
+    sessionId: string,
+  ): Promise<string | undefined> => {
+    const fromRequest = normalizeDeviceId(getClientDeviceIdFromRequest(request));
+    if (fromRequest) return fromRequest;
+    if (c.env.NONCE_KV) {
+      return (await consumePendingLoginDevice(c.env.NONCE_KV, sessionId)) ?? undefined;
+    }
+    return undefined;
+  };
+
   // Helper function để xử lý route chung
   const createRouteHandler = (
     handler: Function, 
@@ -58,6 +85,11 @@ export function createAuthRoutes(bindingName: string) {
         }
         const country = (request as Request & { cf?: { country?: string } }).cf?.country ?? 'XX';
         const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c);
+        const deviceId = await resolveLoginDeviceId(c, request, sessionId);
+        if (deviceId && c.env.NONCE_KV) {
+          await storePendingLoginDevice(c.env.NONCE_KV, sessionId, deviceId);
+        }
+        c.set('loginDeviceId', deviceId);
         return await handler(c, sessionId, ipAddress, userAgent, country);
       } catch (e) {
         const { errorResponse, status } = await handleError(c, e, errorMessage);
@@ -125,7 +157,13 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const result = await applicationService.connectOAuthUseCase(
-      oauthSessionId, identifier, ipAddress, userAgent, country, ref
+      oauthSessionId,
+      identifier,
+      ipAddress,
+      userAgent,
+      country,
+      ref,
+      c.get('loginDeviceId') as string | undefined,
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -170,7 +208,14 @@ export function createAuthRoutes(bindingName: string) {
 
     const applicationService = createApplicationService(c, bindingName);
     const result = await applicationService.verifyOtpUseCase(
-      identifier, sessionId, otp, ipAddress, userAgent, country, ref
+      identifier,
+      sessionId,
+      otp,
+      ipAddress,
+      userAgent,
+      country,
+      ref,
+      c.get('loginDeviceId') as string | undefined,
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -191,7 +236,12 @@ export function createAuthRoutes(bindingName: string) {
     const { code } = await parseBody(c, TotpVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifyTotpLoginUseCase(
-      sessionId, code, ipAddress, userAgent, country
+      sessionId,
+      code,
+      ipAddress,
+      userAgent,
+      country,
+      c.get('loginDeviceId') as string | undefined,
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -201,7 +251,12 @@ export function createAuthRoutes(bindingName: string) {
     const { code } = await parseBody(c, SmsVerifyLoginSchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifySmsLoginUseCase(
-      sessionId, code, ipAddress, userAgent, country
+      sessionId,
+      code,
+      ipAddress,
+      userAgent,
+      country,
+      c.get('loginDeviceId') as string | undefined,
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -211,7 +266,12 @@ export function createAuthRoutes(bindingName: string) {
     const { code } = await parseBody(c, BackupCodeVerifySchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.verifyBackupCodeLoginUseCase(
-      sessionId, code, ipAddress, userAgent, country
+      sessionId,
+      code,
+      ipAddress,
+      userAgent,
+      country,
+      c.get('loginDeviceId') as string | undefined,
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -221,7 +281,13 @@ export function createAuthRoutes(bindingName: string) {
     const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.recoverWithBackupCodeUseCase(
-      identifier, code, sessionId, ipAddress, userAgent, country
+      identifier,
+      code,
+      sessionId,
+      ipAddress,
+      userAgent,
+      country,
+      c.get('loginDeviceId') as string | undefined,
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -267,9 +333,25 @@ export function createAuthRoutes(bindingName: string) {
       body.challengeKey,
       origin
     );
-    const { sessionId: newSessionId } = await applicationService.connectPasskeyUseCase(
-      sessionId, identifier, ipAddress, userAgent, country
+    const result = await applicationService.connectPasskeyUseCase(
+      sessionId,
+      identifier,
+      ipAddress,
+      userAgent,
+      country,
+      c.get('loginDeviceId') as string | undefined,
     );
+
+    if ('requiresTotp' in result && result.requiresTotp) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
+      return c.json({ requiresTotp: true });
+    }
+    if ('requiresSms' in result && result.requiresSms) {
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
+      return c.json({ requiresSms: true });
+    }
+
+    const { sessionId: newSessionId } = result as { sessionId: string };
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
   }, "Passkey auth verify failed", true));
@@ -304,7 +386,13 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const result = await applicationService.connectWalletUseCase(
-      sessionId, address, ipAddress, userAgent, country, ref
+      sessionId,
+      address,
+      ipAddress,
+      userAgent,
+      country,
+      ref,
+      c.get('loginDeviceId') as string | undefined,
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {

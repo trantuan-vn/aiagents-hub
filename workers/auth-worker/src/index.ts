@@ -46,7 +46,14 @@ function createRoutes(bindingName: string) {
         'https://sandbox.vnpayment.vn',
         'https://vnpayment.vn'
       ], 
-      allowHeaders: ['Content-Type', 'Authorization'],
+      allowHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Cookie',
+        'X-Client-IP',
+        'X-Client-UA',
+        'X-Client-Device-Id',
+      ],
       credentials: true, 
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   }));

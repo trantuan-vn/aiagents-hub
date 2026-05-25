@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { SimpleIcon } from "@/components/simple-icon";
 import { Button } from "@/components/ui/button";
+import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 import { cn } from "@/lib/utils";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
@@ -26,6 +27,7 @@ export function FacebookButton({ className, ...props }: React.ComponentProps<typ
       if (ref) url.searchParams.set("ref", ref);
       const response = await fetch(url.toString(), {
         credentials: "include",
+        headers: buildAuthClientHeaders(),
       });
 
       if (!response.ok) {

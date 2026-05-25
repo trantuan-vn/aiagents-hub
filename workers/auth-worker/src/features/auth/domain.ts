@@ -197,6 +197,8 @@ export const SessionSchema = z.object({
   userAgent: z.string().optional(),
   /** ISO 3166-1 Alpha 2 country code from Cloudflare cf.country */
   country: z.string().max(2).optional(),
+  /** Client device UUID (X-Client-Device-Id) — nhận diện thiết bị ổn định hơn IP/UA */
+  deviceId: z.string().max(64).optional(),
   isActive: z.preprocess(
     (val) => {
       // Chuyển đổi các giá trị thành boolean

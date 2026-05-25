@@ -29,6 +29,6 @@ export const AUTH_CONSTANTS = {
   REFRESH_TOKEN_EXPIRY: 4 * 60 * 60, // 4 hours
   SESSION_EXPIRY: 4 * 60 * 60, // 4 hours
   NONCE_EXPIRY: 5 * 60, // 5 minutes
-  /** Tối thiểu giữa 2 email "đăng nhập từ thiết bị mới" cho cùng user */
+  /** Tối thiểu giữa 2 email "đăng nhập từ thiết bị mới" cho cùng browser/OS (không theo IP — tránh spam khi mạng đổi) */
   NEW_SESSION_EMAIL_COOLDOWN_SEC: 12 * 60 * 60, // 12 hours
 } as const;

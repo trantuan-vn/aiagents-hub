@@ -2537,7 +2537,10 @@
       "revoked": "Session revoked",
       "revoked_description": "The session has been revoked",
       "revoke_error": "Failed to revoke session",
-      "session_id_copied": "Session ID copied"
+      "session_id_copied": "Session ID copied",
+      "device_id": "Device",
+      "device_id_legacy": "Legacy session (no device ID)",
+      "country": "Country"
     },
     "ekyc": {
       "title": "eKYC",

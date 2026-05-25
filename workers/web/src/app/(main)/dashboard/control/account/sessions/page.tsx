@@ -22,9 +22,15 @@ export interface SessionItem {
   type: string;
   ipAddress?: string;
   userAgent?: string;
+  deviceId?: string;
+  country?: string;
   expiresAt: string;
   isActive: boolean;
   isCurrent?: boolean;
+}
+
+function formatDeviceIdShort(deviceId: string): string {
+  return deviceId.length > 12 ? `${deviceId.slice(0, 8)}…${deviceId.slice(-4)}` : deviceId;
 }
 
 const BROWSER_PATTERNS: { pattern: RegExp; label: string }[] = [
@@ -221,6 +227,18 @@ export default function SessionsPage() {
                             </Badge>
                           </div>
                           <div className="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                            {s.deviceId ? (
+                              <span className="font-mono" title={s.deviceId}>
+                                {t("device_id")}: {formatDeviceIdShort(s.deviceId)}
+                              </span>
+                            ) : (
+                              <span>{t("device_id_legacy")}</span>
+                            )}
+                            {s.country && (
+                              <span>
+                                {t("country")}: {s.country}
+                              </span>
+                            )}
                             {s.ipAddress && (
                               <span className="flex items-center gap-1">
                                 <Globe className="h-3.5 w-3.5 shrink-0" />

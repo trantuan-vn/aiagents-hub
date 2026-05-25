@@ -60,3 +60,40 @@ export function sessionContextsMatch(
 ): boolean {
   return ipFingerprintsMatch(ipA, ipB) && uaFingerprintsMatch(uaA, uaB);
 }
+
+/**
+ * Fingerprint cho email/cooldown "thiết bị mới" — chỉ browser/OS, không gắn IP.
+ * IP nhà mạng/4G hay đổi subnet; UA family (safari|ios, chrome|macos) ổn định hơn trên cùng máy.
+ */
+export function newSessionDeviceFingerprint(_ipAddress: string, userAgent: string): string {
+  return normalizeUaFingerprint(userAgent);
+}
+
+const UNKNOWN_COUNTRY_CODES = new Set(['XX', 'T1']);
+
+/** Mã quốc gia ISO2 từ CF; null nếu không đủ tin cậy. */
+export function normalizeLoginCountry(country?: string): string | null {
+  const c = (country ?? '').trim().toUpperCase();
+  if (c.length !== 2 || UNKNOWN_COUNTRY_CODES.has(c)) return null;
+  return c;
+}
+
+/**
+ * Quốc gia login hiện tại chưa từng thấy trên phiên active → rủi ro geo (VPN/du lịch/tấn công).
+ * Dùng để vẫn gửi email dù cùng browser|os (bù giả UA).
+ */
+export function isNovelLoginCountry(
+  currentCountry: string | undefined,
+  activeSessions: Array<{ country?: string }>,
+): boolean {
+  const current = normalizeLoginCountry(currentCountry);
+  if (!current) return false;
+
+  const known = new Set<string>();
+  for (const s of activeSessions) {
+    const c = normalizeLoginCountry(s.country);
+    if (c) known.add(c);
+  }
+  if (known.size === 0) return false;
+  return !known.has(current);
+}

@@ -12,6 +12,7 @@ import { useAccount, useChainId, useConnect, useSignMessage } from "wagmi";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
+import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 import { cn } from "@/lib/utils";
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
@@ -46,6 +47,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     const nonceResponse = await fetch(url.toString(), {
       method: "GET",
       credentials: "include",
+      headers: buildAuthClientHeaders(),
     });
 
     if (!nonceResponse.ok) {
@@ -95,9 +97,10 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     async (message: string, signature: string) => {
       toast.info(t("verifying_signature"));
 
-      const connectResponse = await fetch("https://api.aiagents-hub.vn/dashboard/auth/wallet/connect", {
+      const connectResponse = await fetch(`${AUTH_API_URL}/wallet/connect`, {
         method: "POST",
         headers: {
+          ...buildAuthClientHeaders(),
           "Content-Type": "application/json",
           Origin: window.location.origin,
         },

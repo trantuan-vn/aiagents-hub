@@ -2537,7 +2537,10 @@
       "revoked": "Đã thu hồi phiên",
       "revoked_description": "Phiên đã được thu hồi",
       "revoke_error": "Không thể thu hồi phiên",
-      "session_id_copied": "Đã sao chép ID phiên"
+      "session_id_copied": "Đã sao chép ID phiên",
+      "device_id": "Thiết bị",
+      "device_id_legacy": "Phiên cũ (chưa gắn mã thiết bị)",
+      "country": "Quốc gia"
     },
     "ekyc": {
       "title": "eKYC",
