@@ -103,6 +103,13 @@ export function getBillingFields(config: SystemConfigData): FieldDef[] {
       min: 0,
       max: 100,
     },
+    {
+      key: "SERVICE_FEE_MARKUP_PERCENT",
+      label: "Service fee markup on Cloudflare (%)",
+      value: b.SERVICE_FEE_MARKUP_PERCENT ?? 0,
+      min: 0,
+      max: 500,
+    },
   ];
 }
 

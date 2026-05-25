@@ -1604,6 +1604,16 @@
     "create_error": "Không thể tạo dịch vụ",
     "update_error": "Không thể cập nhật dịch vụ",
     "cancel_error": "Không thể hủy dịch vụ",
+    "approve_error": "Không thể duyệt dịch vụ",
+    "approve": "Duyệt",
+    "approve_service": "Duyệt dịch vụ",
+    "service_approved": "Đã duyệt dịch vụ",
+    "service_approved_description": "Dịch vụ đã được kích hoạt và có thể dùng trong workflow",
+    "scan_cloudflare_models": "Quét model CF & AI Gateway",
+    "scanning": "Đang quét…",
+    "scan_error": "Không thể quét model Cloudflare",
+    "scan_success": "Quét hoàn tất",
+    "scan_success_description": "Đã tạo hoặc đưa lại {created} dịch vụ chờ duyệt (bỏ qua {skipped} model đang active / {total} model quét được)",
     "loading": "Đang tải dịch vụ...",
     "service_created": "Đã tạo dịch vụ",
     "service_created_description": "Dịch vụ đã được đăng ký thành công",
@@ -1622,6 +1632,15 @@
     "cancel": "Hủy",
     "services": "Dịch vụ",
     "services_description": "Danh sách tất cả các dịch vụ đã đăng ký",
+    "search_placeholder": "Tìm theo tên, endpoint, model hoặc ID…",
+    "search_clear": "Xóa tìm kiếm",
+    "search_filter_all": "Tất cả",
+    "search_filter_active": "Đang hoạt động",
+    "search_filter_pending": "Chờ duyệt",
+    "search_filter_inactive": "Ngừng hoạt động",
+    "search_results_count": "Hiển thị {shown} / {total}",
+    "no_search_results": "Không có dịch vụ phù hợp",
+    "no_search_results_hint": "Thử từ khóa khác hoặc đặt lại bộ lọc",
     "no_services": "Không tìm thấy dịch vụ. Đăng ký dịch vụ đầu tiên để bắt đầu.",
     "cancel_service": "Hủy Dịch vụ",
     "cancel_confirm_title": "Hủy dịch vụ?",
@@ -1637,12 +1656,15 @@
       "active_services": "Dịch vụ Đang hoạt động",
       "active_services_description": "Dịch vụ hiện đang hoạt động",
       "with_model": "Có model",
-      "with_model_description": "Dịch vụ đã cấu hình model AI và giá theo token"
+      "with_model_description": "Dịch vụ đã cấu hình model AI và giá theo token",
+      "pending_services": "Chờ duyệt",
+      "pending_services_description": "Dịch vụ tạo từ quét Cloudflare, cần admin duyệt"
     },
     "status": {
       "active": "Đang hoạt động",
       "inactive": "Không hoạt động",
-      "expired": "Đã hết hạn"
+      "expired": "Đã hết hạn",
+      "pending": "Chờ duyệt"
     },
     "form": {
       "name": "Tên dịch vụ",
@@ -1961,7 +1983,7 @@
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline và retention D1 → R2",
     "billing": "Thanh toán",
-    "billing_desc": "Nạp ví: số tiền tối thiểu mỗi lệnh và % phí chia sẻ workflow (tỉ giá tại Quản lý tỉ giá)",
+    "billing_desc": "Nạp ví tối thiểu, % royalty workflow, và % thu thêm trên giá Cloudflare khi quét model (30 → phí 130%)",
     "fields": {
       "QUEUE_BATCH_SIZE": "Kích thước Batch Queue (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Ngưỡng Flush Queue",
@@ -1980,7 +2002,8 @@
       "D1_RETENTION_DAYS": "Số ngày lưu D1",
       "USD_VND_RATE": "Tỉ giá USD/VND (VND cho 1 USD)",
       "MIN_TOP_UP_VND": "Số tiền nạp tối thiểu (VND mỗi lệnh)",
-      "WORKFLOW_ROYALTY_PERCENT": "Phí chia sẻ workflow (%)"
+      "WORKFLOW_ROYALTY_PERCENT": "Phí chia sẻ workflow (%)",
+      "SERVICE_FEE_MARKUP_PERCENT": "% thu thêm phí service so với Cloudflare"
     }
   },
   "WorkflowsPage": {
@@ -2049,6 +2072,10 @@
     "node_transform": "Data transformation",
     "agent_service_endpoint": "Endpoint service",
     "agent_model_hint": "Model lấy từ service API đã đăng ký để tính chi phí.",
+    "service_select_placeholder": "Chọn service đã duyệt…",
+    "service_select_loading": "Đang tải danh sách service…",
+    "service_select_empty": "Chưa có service đã duyệt — quét Cloudflare và duyệt tại Quản lý dịch vụ",
+    "service_select_hint": "Chỉ hiển thị service đã được admin duyệt.",
     "agent_memory": "Vector memory",
     "agent_tools": "Tools",
     "execute": "Chạy",

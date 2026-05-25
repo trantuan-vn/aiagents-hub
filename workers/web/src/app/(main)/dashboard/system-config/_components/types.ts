@@ -29,6 +29,8 @@ export interface D1tor2CronConfig {
 export interface BillingConfig {
   MIN_TOP_UP_VND?: number;
   WORKFLOW_ROYALTY_PERCENT?: number;
+  /** Extra % on Cloudflare cost when scanning services (30 → feePercent 130). */
+  SERVICE_FEE_MARKUP_PERCENT?: number;
 }
 
 export interface SystemConfigData {

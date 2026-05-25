@@ -11,10 +11,10 @@ function applyModelPricingRefine<T extends { model?: string; priceInput?: number
   const model = data.model?.trim();
   if (!model) return;
   if (isCfModel(model)) {
-    if (data.priceInput === undefined || data.priceOutput === undefined) {
+    if (data.priceInput === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'priceInput and priceOutput are required for @cf models',
+        message: 'priceInput is required for @cf models (priceOutput may be 0 if unused)',
       });
     }
   } else if (isProxyModel(model)) {
@@ -55,6 +55,8 @@ export const ServiceObjectSchema = z.object({
     z.string().datetime().optional(),
   ),
   isActive: z.boolean().default(true),
+  /** pending = chờ admin duyệt; approved = có thể dùng trong workflow */
+  approvalStatus: z.enum(['pending', 'approved']).default('approved'),
   model: z.preprocess(
     (val) => (typeof val === 'string' && !val.trim() ? undefined : val),
     z.string().max(256).optional(),
@@ -103,9 +105,33 @@ export type Service = z.infer<typeof ServiceSchema>;
 export type ServicePricingUpdate = z.infer<typeof ServicePricingUpdateSchema>;
 export type ServiceUsage = z.infer<typeof ServiceUsageSchema>;
 
+export const PendingServiceFromModelSchema = z.object({
+  name: z.string().min(1).max(100),
+  endpoint: z.string().min(1),
+  model: z.string().max(256),
+  priceInput: priceField,
+  priceOutput: priceField,
+  priceInputCache: priceField,
+  approvalStatus: z.literal('pending'),
+  isActive: z.literal(false),
+  feePercent: z.number().min(0.01).max(1_000_000).default(100),
+});
+
+export type PendingServiceFromModel = z.infer<typeof PendingServiceFromModelSchema>;
+
+export interface ScanCloudflareModelsResult {
+  created: number;
+  skipped: number;
+  totalModels: number;
+}
+
 export interface IServiceInfrastructureService {
   registerService(request: Service): Promise<any>;
   getUserServices(): Promise<any[]>;
+  getAdminServices(): Promise<any[]>;
+  getApprovedActiveServices(): Promise<any[]>;
+  bulkRegisterPendingServices(requests: PendingServiceFromModel[]): Promise<{ created: number; skipped: number }>;
+  approveService(serviceId: number): Promise<any>;
   updateService(serviceId: number, data: Record<string, unknown>): Promise<any>;
   cancelService(serviceId: number): Promise<void>;
   getServiceUsage(serviceId: number, days?: number): Promise<any[]>;

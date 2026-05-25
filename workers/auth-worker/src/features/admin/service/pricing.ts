@@ -18,11 +18,24 @@ export function getServiceModel(service: Record<string, unknown>): string | unde
   return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
 }
 
+function parseUsdPriceField(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const n = Number(raw);
+  if (Number.isNaN(n) || n < 0) return undefined;
+  return n;
+}
+
 export function getServicePricing(service: Record<string, unknown>): ServicePricing | null {
-  const priceInput = Number(service.priceInput ?? service.price_input);
-  const priceOutput = Number(service.priceOutput ?? service.price_output);
-  if (Number.isNaN(priceInput) || Number.isNaN(priceOutput) || priceInput < 0 || priceOutput < 0) {
-    return null;
+  const priceInput = parseUsdPriceField(service.priceInput ?? service.price_input);
+  if (priceInput === undefined) return null;
+
+  const outputRaw = service.priceOutput ?? service.price_output;
+  let priceOutput: number;
+  if (outputRaw === undefined || outputRaw === null || outputRaw === '') {
+    priceOutput = 0;
+  } else {
+    priceOutput = Number(outputRaw);
+    if (Number.isNaN(priceOutput) || priceOutput < 0) return null;
   }
   const cacheRaw = service.priceInputCache ?? service.price_input_cache;
   const priceInputCache =
@@ -90,10 +103,9 @@ export function computeUsageChargeUsd(
 ): number {
   const usage = extractUsageFromAiResponse(response);
   const pricing = getServicePricing(service);
-  if (!usage || !pricing) {
-    if (usage && !pricing) {
-      console.warn('[pricing] AI usage received but service has no token pricing configured');
-    }
+  if (!usage) return 0;
+  if (!pricing) {
+    console.warn('[pricing] AI usage received but service has no valid priceInput configured');
     return 0;
   }
   const baseCost = Math.max(0, computeTokenCharge(pricing, usage));

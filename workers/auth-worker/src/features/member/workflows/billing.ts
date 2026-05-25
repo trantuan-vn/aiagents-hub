@@ -35,6 +35,13 @@ export async function resolveServiceByEndpoint(
   );
   const service = Array.isArray(rows) ? rows[0] : rows;
   if (!service) throw new Error(`Service not found for endpoint: ${endpoint}`);
+  const status =
+    (service as Record<string, unknown>).approvalStatus ??
+    (service as Record<string, unknown>).approval_status ??
+    'approved';
+  if (status !== 'approved') {
+    throw new Error(`Service is not approved yet: ${endpoint}`);
+  }
   return service;
 }
 

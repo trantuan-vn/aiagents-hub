@@ -56,9 +56,40 @@ export function createServiceRoutes(bindingName: string) {
     '/list',
     createRouteHandler(async (c: any, user: any) => {
       const serviceApp = createServiceApplicationService(c, bindingName);
-      const result = await serviceApp.getUserServices(user.identifier);
+      const result =
+        user.role === 'admin'
+          ? await serviceApp.getAdminServices(user.identifier)
+          : await serviceApp.getUserServices(user.identifier);
       return c.json(result);
     }, 'Failed to get services', false),
+  );
+
+  app.get(
+    '/list/approved',
+    createRouteHandler(async (c: any, user: any) => {
+      const serviceApp = createServiceApplicationService(c, bindingName);
+      const result = await serviceApp.getApprovedActiveServices(user.identifier);
+      return c.json(result);
+    }, 'Failed to get approved services', false),
+  );
+
+  app.post(
+    '/scan-cloudflare-models',
+    createRouteHandler(async (c: any, user: any) => {
+      const serviceApp = createServiceApplicationService(c, bindingName);
+      const result = await serviceApp.scanCloudflareModels(user.identifier);
+      return c.json(result);
+    }, 'Failed to scan Cloudflare AI models'),
+  );
+
+  app.post(
+    '/:serviceId/approve',
+    createRouteHandler(async (c: any, user: any) => {
+      const serviceId = parseServiceIdParam(c.req.param('serviceId'));
+      const serviceApp = createServiceApplicationService(c, bindingName);
+      const result = await serviceApp.approveService(user.identifier, serviceId);
+      return c.json(result);
+    }, 'Failed to approve service'),
   );
 
   app.get(

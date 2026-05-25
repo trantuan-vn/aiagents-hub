@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 import { NodePalette } from "./node-palette";
+import { ServiceEndpointSelect } from "./service-endpoint-select";
 
 interface SharePanelProps {
   isShared?: boolean;
@@ -57,12 +58,9 @@ interface ServiceEndpointPanelProps {
 }
 
 function ServiceEndpointPanel({ serviceEndpoint, onServiceEndpointChange }: ServiceEndpointPanelProps) {
-  const t = useTranslations("WorkflowEditorPage");
   return (
-    <div className="space-y-2 rounded-lg border p-3">
-      <Label>{t("agent_service_endpoint")}</Label>
-      <Input value={serviceEndpoint} onChange={(e) => onServiceEndpointChange(e.target.value)} placeholder="/api/..." />
-      <p className="text-muted-foreground text-xs">{t("agent_model_hint")}</p>
+    <div className="rounded-lg border p-3">
+      <ServiceEndpointSelect value={serviceEndpoint} onChange={onServiceEndpointChange} />
     </div>
   );
 }

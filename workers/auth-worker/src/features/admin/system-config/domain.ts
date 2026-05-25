@@ -39,6 +39,8 @@ export const BillingConfigSchema = z.object({
 	MIN_TOP_UP_VND: z.number().int().min(1).max(100000000).optional(),
 	/** % phí chia cho chủ workflow khi user khác dùng workflow sharing (mặc định 5) */
 	WORKFLOW_ROYALTY_PERCENT: z.number().min(0).max(100).optional(),
+	/** % thu nhập thêm trên giá Cloudflare khi quét sinh service (30 → feePercent 130 trên service) */
+	SERVICE_FEE_MARKUP_PERCENT: z.number().min(0).max(500).optional(),
 });
 export type BillingConfig = z.infer<typeof BillingConfigSchema>;
 
@@ -79,6 +81,7 @@ export const DEFAULT_D1TOR2_CONFIG: D1tor2CronConfig = {
 export const DEFAULT_BILLING_CONFIG: BillingConfig = {
 	MIN_TOP_UP_VND: 1000,
 	WORKFLOW_ROYALTY_PERCENT: 5,
+	SERVICE_FEE_MARKUP_PERCENT: 0,
 };
 
 export const KV_KEY = 'aiagents-hub-system-config';

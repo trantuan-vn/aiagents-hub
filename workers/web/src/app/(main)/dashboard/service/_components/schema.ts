@@ -59,10 +59,10 @@ function refineModelPricing(
   const priceInputCache = coercePrice(data.priceInputCache);
 
   if (isCfModel(model)) {
-    if (priceInput === undefined || priceOutput === undefined) {
+    if (priceInput === undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Input and output prices are required for @cf models",
+        message: "Input price is required for @cf models (output may be 0 if unused)",
         path: ["priceInput"],
       });
     }
@@ -119,6 +119,7 @@ const serviceObjectSchema = z.object({
     }, z.string().datetime().optional())
     .optional(),
   isActive: z.boolean().default(true),
+  approvalStatus: z.enum(["pending", "approved"]).default("approved").optional(),
   ...modelPricingFields,
   createdAt: z.string().datetime().optional(),
 });
@@ -131,6 +132,7 @@ export const createServiceSchema = z
     endpoint: endpointSchema,
     expiresAt: z.string().datetime().optional(),
     isActive: z.boolean(),
+    approvalStatus: z.enum(["pending", "approved"]).optional(),
     ...modelPricingFields,
   })
   .superRefine(refineModelPricing);

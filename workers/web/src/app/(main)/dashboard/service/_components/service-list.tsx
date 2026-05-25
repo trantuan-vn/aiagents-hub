@@ -13,14 +13,37 @@ import { ServiceItem } from "./service-list-item";
 
 interface ServiceListProps {
   services: Service[];
+  isFiltered?: boolean;
   onDelete: (serviceId: string | number) => Promise<void>;
   onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
+  onApprove?: (serviceId: string | number) => Promise<void>;
 }
 
-export function ServiceList({ services, onDelete, onUpdate }: ServiceListProps) {
+export function ServiceList({ services, isFiltered = false, onDelete, onUpdate, onApprove }: ServiceListProps) {
   const t = useTranslations("ServicePage");
   const { toast } = useToast();
   const [deletingServiceId, setDeletingServiceId] = useState<string | number | null>(null);
+  const [approvingServiceId, setApprovingServiceId] = useState<string | number | null>(null);
+
+  const handleApprove = async (serviceId: string | number): Promise<void> => {
+    if (!onApprove) return;
+    setApprovingServiceId(serviceId);
+    try {
+      await onApprove(serviceId);
+      toast({
+        title: t("service_approved"),
+        description: t("service_approved_description"),
+      });
+    } catch (error) {
+      toast({
+        title: t("error"),
+        description: error instanceof Error ? error.message : t("approve_error"),
+        variant: "destructive",
+      });
+    } finally {
+      setApprovingServiceId(null);
+    }
+  };
 
   const handleDelete = async (serviceId: string | number): Promise<void> => {
     setDeletingServiceId(serviceId);
@@ -57,7 +80,12 @@ export function ServiceList({ services, onDelete, onUpdate }: ServiceListProps) 
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Server className="text-muted-foreground mb-4 h-12 w-12" />
-          <p className="text-muted-foreground text-center">{t("no_services")}</p>
+          <p className="text-muted-foreground text-center font-medium">
+            {isFiltered ? t("no_search_results") : t("no_services")}
+          </p>
+          {isFiltered ? (
+            <p className="text-muted-foreground mt-1 max-w-sm text-center text-sm">{t("no_search_results_hint")}</p>
+          ) : null}
         </CardContent>
       </Card>
     );
@@ -78,8 +106,10 @@ export function ServiceList({ services, onDelete, onUpdate }: ServiceListProps) 
               key={service.id}
               service={service}
               deletingServiceId={deletingServiceId}
+              approvingServiceId={approvingServiceId}
               onDelete={handleDelete}
               onUpdate={onUpdate}
+              onApprove={onApprove ? handleApprove : undefined}
               formatDate={formatDate}
               t={t}
             />

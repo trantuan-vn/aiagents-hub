@@ -1604,6 +1604,16 @@
     "create_error": "Failed to create service",
     "update_error": "Failed to update service",
     "cancel_error": "Failed to cancel service",
+    "approve_error": "Failed to approve service",
+    "approve": "Approve",
+    "approve_service": "Approve service",
+    "service_approved": "Service approved",
+    "service_approved_description": "Service is active and available in workflows",
+    "scan_cloudflare_models": "Scan CF & AI Gateway models",
+    "scanning": "Scanning…",
+    "scan_error": "Failed to scan Cloudflare models",
+    "scan_success": "Scan complete",
+    "scan_success_description": "Created or re-queued {created} pending services (skipped {skipped} active of {total} models)",
     "loading": "Loading services...",
     "service_created": "Service created",
     "service_created_description": "Service has been registered successfully",
@@ -1622,6 +1632,15 @@
     "cancel": "Cancel",
     "services": "Services",
     "services_description": "List of all registered services",
+    "search_placeholder": "Search by name, endpoint, model, or ID…",
+    "search_clear": "Clear search",
+    "search_filter_all": "All",
+    "search_filter_active": "Active",
+    "search_filter_pending": "Pending",
+    "search_filter_inactive": "Inactive",
+    "search_results_count": "Showing {shown} of {total}",
+    "no_search_results": "No services match your search",
+    "no_search_results_hint": "Try another keyword or reset filters",
     "no_services": "No services found. Register your first service to get started.",
     "cancel_service": "Cancel Service",
     "cancel_confirm_title": "Cancel Service?",
@@ -1637,12 +1656,15 @@
       "active_services": "Active Services",
       "active_services_description": "Currently active services",
       "with_model": "With model",
-      "with_model_description": "Services with an AI model and token pricing configured"
+      "with_model_description": "Services with an AI model and token pricing configured",
+      "pending_services": "Pending approval",
+      "pending_services_description": "Services created from Cloudflare scan awaiting admin approval"
     },
     "status": {
       "active": "Active",
       "inactive": "Inactive",
-      "expired": "Expired"
+      "expired": "Expired",
+      "pending": "Pending"
     },
     "form": {
       "name": "Service Name",
@@ -1961,7 +1983,7 @@
     "d1tor2_worker": "D1tor2-Cron Worker",
     "d1tor2_worker_desc": "Pipeline and D1 → R2 retention",
     "billing": "Billing",
-    "billing_desc": "Wallet top-up minimum per order and workflow sharing royalty % (exchange rates under Exchange Rates)",
+    "billing_desc": "Wallet top-up minimum, workflow royalty, and extra % on Cloudflare cost when scanning models (30 → fee 130%)",
     "fields": {
       "QUEUE_BATCH_SIZE": "Queue Batch Size (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Queue Flush Threshold",
@@ -1980,7 +2002,8 @@
       "D1_RETENTION_DAYS": "D1 Retention Days",
       "USD_VND_RATE": "USD/VND rate (VND per 1 USD)",
       "MIN_TOP_UP_VND": "Minimum top-up amount (VND per order)",
-      "WORKFLOW_ROYALTY_PERCENT": "Workflow sharing royalty (%)"
+      "WORKFLOW_ROYALTY_PERCENT": "Workflow sharing royalty (%)",
+      "SERVICE_FEE_MARKUP_PERCENT": "Extra service fee vs Cloudflare (%)"
     }
   },
   "WorkflowsPage": {
@@ -2049,6 +2072,10 @@
     "node_transform": "Data transformation",
     "agent_service_endpoint": "Service endpoint",
     "agent_model_hint": "Model is resolved from your registered API service for cost tracking.",
+    "service_select_placeholder": "Select an approved service…",
+    "service_select_loading": "Loading services…",
+    "service_select_empty": "No approved services — scan Cloudflare models and approve them in Service Management",
+    "service_select_hint": "Only admin-approved services are listed.",
     "agent_memory": "Vector memory",
     "agent_tools": "Tools",
     "execute": "Execute",

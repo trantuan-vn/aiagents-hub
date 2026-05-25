@@ -14,6 +14,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+import { ServiceEndpointSelect } from "./service-endpoint-select";
+
 export interface WorkflowEditorSettingsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -115,14 +117,8 @@ export function WorkflowEditorSettingsSheet({
             <Label>{t("star_label")}</Label>
             <Input value={starLabel} onChange={(e) => onStarLabelChange(e.target.value)} />
           </div>
-          <div className="space-y-2 rounded-lg border p-3">
-            <Label>{te("agent_service_endpoint")}</Label>
-            <Input
-              value={serviceEndpoint}
-              onChange={(e) => onServiceEndpointChange(e.target.value)}
-              placeholder="/api/..."
-            />
-            <p className="text-muted-foreground text-xs">{te("agent_model_hint")}</p>
+          <div className="rounded-lg border p-3">
+            <ServiceEndpointSelect value={serviceEndpoint} onChange={onServiceEndpointChange} />
           </div>
         </div>
       </SheetContent>

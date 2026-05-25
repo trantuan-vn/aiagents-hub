@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, ExternalLink, Server, Trash2 } from "lucide-react";
+import { Calendar, CheckCircle2, ExternalLink, Server, Trash2 } from "lucide-react";
 
 import {
   AlertDialog,
@@ -23,7 +23,11 @@ import { ServicePricingLabel } from "./service-pricing-label";
 type TranslateFn = (key: string, params?: Record<string, string>) => string;
 
 function serviceVisualState(service: Service, t: TranslateFn) {
+  const approvalStatus = service.approvalStatus ?? "approved";
   const isExpired = Boolean(service.expiresAt && new Date(service.expiresAt) < new Date());
+  if (approvalStatus === "pending") {
+    return { badgeVariant: "outline" as const, statusLabel: t("status.pending") };
+  }
   if (!service.isActive) {
     return { badgeVariant: "secondary" as const, statusLabel: t("status.inactive") };
   }
@@ -77,21 +81,41 @@ function ServiceItemContent({
 function ServiceItemActions({
   service,
   deletingServiceId,
+  approvingServiceId,
   onDelete,
   onUpdate,
+  onApprove,
   t,
 }: {
   service: Service;
   deletingServiceId: string | number | null;
+  approvingServiceId: string | number | null;
   onDelete: (serviceId: string | number) => Promise<void>;
   onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
+  onApprove?: (serviceId: string | number) => Promise<void>;
   t: TranslateFn;
 }) {
   const serviceId = service.id;
   if (!serviceId) return null;
 
+  const isPending = (service.approvalStatus ?? "approved") === "pending";
+
   return (
     <div className="flex items-center gap-1">
+      {isPending && onApprove ? (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={approvingServiceId === serviceId}
+          title={t("approve_service")}
+          onClick={() => {
+            void onApprove(serviceId);
+          }}
+        >
+          <CheckCircle2 className="mr-1 h-4 w-4" />
+          {t("approve")}
+        </Button>
+      ) : null}
       <ServiceFormDialog mode="edit" service={service} onUpdate={onUpdate} />
       <AlertDialog>
         <AlertDialogTrigger asChild>
@@ -124,8 +148,10 @@ function ServiceItemActions({
 export interface ServiceItemProps {
   service: Service;
   deletingServiceId: string | number | null;
+  approvingServiceId?: string | number | null;
   onDelete: (serviceId: string | number) => Promise<void>;
   onUpdate: (serviceId: string | number, data: UpdateService) => Promise<Service>;
+  onApprove?: (serviceId: string | number) => Promise<void>;
   formatDate: (dateString: string | undefined) => string;
   t: TranslateFn;
 }
@@ -133,8 +159,10 @@ export interface ServiceItemProps {
 export function ServiceItem({
   service,
   deletingServiceId,
+  approvingServiceId = null,
   onDelete,
   onUpdate,
+  onApprove,
   formatDate,
   t,
 }: ServiceItemProps) {
@@ -144,8 +172,10 @@ export function ServiceItem({
       <ServiceItemActions
         service={service}
         deletingServiceId={deletingServiceId}
+        approvingServiceId={approvingServiceId}
         onDelete={onDelete}
         onUpdate={onUpdate}
+        onApprove={onApprove}
         t={t}
       />
     </div>
