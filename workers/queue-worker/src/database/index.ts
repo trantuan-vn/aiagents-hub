@@ -59,6 +59,9 @@ export interface DynamicOperation {
   params: any[];
 }
 
+/** SQLite / D1 default SQLITE_MAX_VARIABLE_NUMBER */
+const SQLITE_MAX_VARIABLES = 999;
+
 export class DynamicSchemaManager {
   static createInsertOperation(table: string, data: any): DynamicOperation {
     const fields = Object.keys(data);
@@ -765,12 +768,29 @@ export class D1DatabaseManager {
     const conflictFields = config?.options?.userScoped ? ['user_id', conflictField] : [conflictField];
 
     const filteredArray = dataArray.map(d => this.filterDataForTable(tableName, d));
-    const operation = DynamicSchemaManager.createBatchUpsertOperation(tableName, filteredArray, conflictFields);
-    if (operation.params.length === 0) return;
+    if (filteredArray.length === 0) return;
 
-    const result = await this.execD1SQL(operation.sql, operation.params);
-    if (!result.success) {
-      throw new Error(`Failed to batch upsert records into ${tableName}`);
+    const insertFieldCount = [
+      ...new Set(filteredArray.flatMap(d => Object.keys(d))),
+    ].filter(f => f !== 'globalId').length;
+    const maxRowsPerStatement = Math.max(
+      1,
+      Math.floor(SQLITE_MAX_VARIABLES / Math.max(insertFieldCount, 1)),
+    );
+
+    for (let i = 0; i < filteredArray.length; i += maxRowsPerStatement) {
+      const chunk = filteredArray.slice(i, i + maxRowsPerStatement);
+      const operation = DynamicSchemaManager.createBatchUpsertOperation(
+        tableName,
+        chunk,
+        conflictFields,
+      );
+      if (operation.params.length === 0) continue;
+
+      const result = await this.execD1SQL(operation.sql, operation.params);
+      if (!result.success) {
+        throw new Error(`Failed to batch upsert records into ${tableName}`);
+      }
     }
   }
 
