@@ -72,7 +72,6 @@ export function createAuthRoutes(bindingName: string) {
       try {
         if (requireOriginCheck) {
           const origin = c.req.header('origin') || c.req.header('referer');
-          console.log(`origin: ${origin}, frontend_url: ${c.env.FRONTEND_URL}`);
           if (!origin?.startsWith(c.env.FRONTEND_URL)) {
             throw new Error('Invalid origin');
           }

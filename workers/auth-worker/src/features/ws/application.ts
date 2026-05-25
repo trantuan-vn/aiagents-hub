@@ -41,10 +41,8 @@ export function createWebsocketApplicationService(c: Context, bindingName: strin
         },
         sendNotificationToUserUseCase: async (identifier: string, message: { title: string; body?: string; data?: Record<string, unknown> }) => {
             try {
-                console.log(`[WsApp] sendNotificationToUserUseCase ENTER: identifier=${identifier} bindingName=${bindingName} title=${message.title}`);
                 const userDOBinding = c.env[bindingName] as DurableObjectNamespace;
                 const userDoId = userDOBinding.idFromName(identifier).toString();
-                console.log(`[WsApp] sendNotificationToUserUseCase: userDoId=${userDoId} targetUsers=[${userDoId}]`);
                 const broadcastServiceDO = getIdFromName(c, "global", "BROADCAST_SERVICE_DO") as DurableObjectStub<BroadcastServiceDO>;
                 const response = await broadcastServiceDO.fetch("https://broadcast.service/dashboard/ws/broadcast", {
                     method: "POST",
@@ -56,12 +54,9 @@ export function createWebsocketApplicationService(c: Context, bindingName: strin
                         expiresIn: 60_000,
                     }),
                 });
-                console.log(`[WsApp] sendNotificationToUserUseCase: response status=${response.status} ok=${response.ok} identifier=${identifier}`);
                 if (!response.ok) {
                     const body = await response.text();
                     console.warn(`[WsApp] sendNotificationToUser failed for ${identifier}: ${response.status} ${body}`);
-                } else {
-                    console.log(`[WsApp] sendNotificationToUser success for ${identifier}`);
                 }
             } catch (e) {
                 console.warn(`[WsApp] sendNotificationToUser error for ${identifier}:`, e);
@@ -81,8 +76,6 @@ export function createWebsocketApplicationService(c: Context, bindingName: strin
                 if (!response.ok) {
                     const body = await response.text();
                     console.warn(`[WsApp] storePendingFirstLoginNotification failed for ${identifier}: ${response.status} ${body}`);
-                } else {
-                    console.log(`[WsApp] storePendingFirstLoginNotification stored for ${identifier}`);
                 }
             } catch (e) {
                 console.warn(`[WsApp] storePendingFirstLoginNotification error for ${identifier}:`, e);

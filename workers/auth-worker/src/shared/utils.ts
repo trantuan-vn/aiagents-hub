@@ -1,6 +1,9 @@
 import { Context } from 'hono'
 import CryptoJS from 'crypto-js';
 import { UserDO } from '../features/ws/infrastructure/UserDO';
+import { createLogger } from './logger';
+
+const log = createLogger('auth-worker', 'errors');
 
 export const handleError = async (c: Context, e: any, defaultMessage: string) => {
   try {
@@ -27,11 +30,11 @@ export const handleError = async (c: Context, e: any, defaultMessage: string) =>
       raw: typeof e === "object" ? e : String(e),
     };  
     
-    const errorLog = {
-      error: `${defaultMessage}: ${message}`,
-      details,
-    };
-    console.error("❌ [ErrorHandler]", JSON.stringify(errorLog, null, 2));
+    log.error('handler.request_error', {
+      message: `${defaultMessage}: ${message}`,
+      errorName: name,
+      ...(responseData ? { httpStatus: responseStatus } : {}),
+    });
 
     const errorResponse = { error: `${defaultMessage}: ${message}`};
 
@@ -63,7 +66,7 @@ export const handleError = async (c: Context, e: any, defaultMessage: string) =>
     
     return { errorResponse, status: 400 as const };
   } catch (error) {
-    console.error("❌ [ErrorHandler]", error);
+    log.error('handler.internal_failure', error instanceof Error ? error : { error: String(error) });
     return { errorResponse: { error: `${defaultMessage}`}, status: 400 as const };
   }
 };
@@ -93,17 +96,16 @@ export const handleErrorWithoutIp = async (e: any, defaultMessage: string) => {
       raw: typeof e === "object" ? e : String(e),
     };  
     
-    const errorLog = {
-      error: `${defaultMessage}: ${message}`,
-      details,
-    };
-    console.error("❌ [ErrorHandler]", JSON.stringify(errorLog, null, 2));
+    log.error('handler.error', {
+      message: `${defaultMessage}: ${message}`,
+      errorName: name,
+    });
 
     const errorResponse = { error: `${defaultMessage}`};
     
     return { errorResponse, status: 400 as const };
   } catch (error) {
-    console.error("❌ [ErrorHandler]", error);
+    log.error('handler.internal_failure', error instanceof Error ? error : { error: String(error) });
     return { errorResponse: { error: `${defaultMessage}`}, status: 400 as const };
   }
 };

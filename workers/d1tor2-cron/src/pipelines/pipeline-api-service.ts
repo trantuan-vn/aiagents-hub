@@ -159,12 +159,10 @@ export class CloudflarePipelineAPIService {
                 throw new Error(`No stream ID returned for ${streamName}`);
             }
 
-            console.log(`Created stream: ${streamName} with ID: ${streamId}`);
             return streamId;
         } catch (error: any) {
             // Nếu stream đã tồn tại, lấy stream ID
             if (error.message.includes('already exists') || error.message.includes('409')) {
-                console.log(`Stream ${streamName} already exists, retrieving info`);
                 const streamInfo = await this.getStreamInfo(streamName);
                 if (streamInfo.exists && streamInfo.streamId) {
                     return streamInfo.streamId;
@@ -213,11 +211,9 @@ export class CloudflarePipelineAPIService {
                 }),
             });
 
-            console.log(`Created sink: ${sinkName}`);
         } catch (error: any) {
             // Nếu sink đã tồn tại, bỏ qua
             if (error.message.includes('already exists') || error.message.includes('409')) {
-                console.log(`Sink ${sinkName} already exists`);
                 return;
             }
             throw error;
@@ -245,12 +241,10 @@ export class CloudflarePipelineAPIService {
                 }),
             });
 
-            console.log(`Created pipeline: ${pipelineName}`);
             
             // Lấy endpoint từ stream
             const streamInfo = await this.getStreamInfo(streamName);
             if (streamInfo.httpEndpoint) {
-                console.log(`Stream endpoint: ${streamInfo.httpEndpoint}`);
                 return streamInfo.httpEndpoint;
             }
             
@@ -258,7 +252,6 @@ export class CloudflarePipelineAPIService {
         } catch (error: any) {
             // Nếu pipeline đã tồn tại, lấy endpoint từ stream
             if (error.message.includes('already exists') || error.message.includes('409')) {
-                console.log(`Pipeline ${pipelineName} already exists`);
                 return this.getPipelineEndpoint(streamName);
             }
             throw error;
@@ -296,24 +289,19 @@ export class CloudflarePipelineAPIService {
         /*
         // do api phần này chưa hoàn chỉnh nên tạm bỏ qua
         const sinkName = `${pipelineName}_sink`;
-        console.log(`Ensuring pipeline exists for schema ${config.schemaName}, table: ${pipelineName}`);
 
         // Kiểm tra pipeline đã tồn tại chưa
         const pipelineExists = await this.pipelineExists(pipelineName);
         
         if (pipelineExists) {
-            console.log(`Pipeline ${pipelineName} already exists`);
         } else {
-            console.log(`Creating new pipeline infrastructure for ${pipelineName}`);
         }
 
         // 1. Đảm bảo sink tồn tại
         const sinkExists = await this.sinkExists(sinkName);
         if (!sinkExists) {
-            console.log(`Creating sink: ${sinkName}`);
             await this.createSink(sinkName, config.r2BucketName, config.namespace, config.tableName, config.pipelineSchema);
         } else {
-            console.log(`Sink ${sinkName} already exists`);
         }
 
         // 2. Đảm bảo stream tồn tại và lấy stream ID
@@ -321,22 +309,16 @@ export class CloudflarePipelineAPIService {
         let streamId = streamInfo.streamId;
 
         if (!streamInfo.exists) {
-            console.log(`Creating stream: ${streamName}`);
             streamId = await this.createStream(streamName, config.pipelineSchema);
         } else if (!streamId) {
-            console.log(`Stream ${streamName} exists but no ID found, retrieving...`);
             streamInfo = await this.getStreamInfo(streamName);
             streamId = streamInfo.streamId;
         }
 
         // 3. Đảm bảo pipeline tồn tại (chỉ tạo nếu chưa tồn tại)
         if (!pipelineExists) {
-            console.log(`Creating pipeline: ${pipelineName}`);
             await this.createPipeline(pipelineName, streamName, sinkName);
         }
-        console.log(`✓ Pipeline setup complete for ${config.schemaName}`);
-        console.log(`  Stream ID: ${streamId || 'unknown'}`);
-        console.log(`  Endpoint: ${endpoint}`);
         */
         // 4. Lấy endpoint cuối cùng
         const endpoint = await this.getPipelineEndpoint(streamName);

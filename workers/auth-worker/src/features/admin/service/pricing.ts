@@ -89,7 +89,6 @@ export function computeUsageChargeUsd(
   response: unknown,
 ): number {
   const usage = extractUsageFromAiResponse(response);
-  console.log('usage: ', JSON.stringify(usage));
   const pricing = getServicePricing(service);
   if (!usage || !pricing) {
     if (usage && !pricing) {

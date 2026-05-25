@@ -29,6 +29,7 @@ import { createAccessMiddleware } from './auth';
 import { ensureGateway, findExistingGatewayProcess, killGateway } from './gateway';
 import { publicRoutes, api, adminUi, debug, cdp } from './routes';
 import { redactSensitiveParams } from './utils/logging';
+import { createLogger } from './shared/logger';
 import { restoreIfNeeded, createSnapshot } from './persistence';
 import { handleScheduled } from './cron/handler';
 import loadingPageHtml from './assets/loading.html';
@@ -128,23 +129,14 @@ export function buildSandboxOptions(env: OpenClawEnv): SandboxOptions {
   return { sleepAfter };
 }
 
+const log = createLogger('moltbot-sandbox');
+
 // Main app
 const app = new Hono<AppEnv>();
 
 // =============================================================================
 // MIDDLEWARE: Applied to ALL routes
 // =============================================================================
-
-// Middleware: Log every request
-app.use('*', async (c, next) => {
-  const url = new URL(c.req.url);
-  const redactedSearch = redactSensitiveParams(url);
-  console.log(`[REQ] ${c.req.method} ${url.pathname}${redactedSearch}`);
-  console.log(`[REQ] Has ANTHROPIC_API_KEY: ${!!c.env.ANTHROPIC_API_KEY}`);
-  console.log(`[REQ] DEV_MODE: ${c.env.DEV_MODE}`);
-  console.log(`[REQ] DEBUG_ROUTES: ${c.env.DEBUG_ROUTES}`);
-  await next();
-});
 
 // Middleware: Initialize sandbox stub and restore backup if available.
 // Note: we intentionally do NOT call sandbox.start() here. The Sandbox SDK's
@@ -197,7 +189,7 @@ app.use('*', async (c, next) => {
 
   const missingVars = validateRequiredEnv(c.env);
   if (missingVars.length > 0) {
-    console.error('[CONFIG] Missing required environment variables:', missingVars.join(', '));
+    log.error('config.missing_secrets', { missing: missingVars });
 
     const acceptsHtml = c.req.header('Accept')?.includes('text/html');
     if (acceptsHtml) {
@@ -257,7 +249,6 @@ app.all('*', async (c) => {
   const request = c.req.raw;
   const url = new URL(request.url);
 
-  console.log('[PROXY] Handling request:', url.pathname);
 
   const isWebSocketRequest = request.headers.get('Upgrade')?.toLowerCase() === 'websocket';
   const acceptsHtml = request.headers.get('Accept')?.includes('text/html');
@@ -279,7 +270,6 @@ app.all('*', async (c) => {
       // Treat as not ready
     }
     if (!gatewayReady) {
-      console.log('[PROXY] Gateway not ready for HTML request, serving loading page');
       return c.html(loadingPageHtml);
     }
   }
@@ -310,9 +300,7 @@ app.all('*', async (c) => {
     const debugLogs = c.env.DEBUG_ROUTES === 'true';
     const redactedSearch = redactSensitiveParams(url);
 
-    console.log('[WS] Proxying WebSocket connection to gateway');
     if (debugLogs) {
-      console.log('[WS] URL:', url.pathname + redactedSearch);
     }
 
     // Inject gateway token into WebSocket request if not already present.
@@ -331,7 +319,7 @@ app.all('*', async (c) => {
       containerResponse = await sandbox.wsConnect(wsRequest, GATEWAY_PORT);
     } catch (err) {
       if (isGatewayCrashedError(err)) {
-        console.log('[WS] Gateway crashed, attempting restore + restart and retry...');
+        log.warn('gateway.crashed_recovering', { path: url.pathname });
         await killGateway(sandbox);
         try {
           await restoreIfNeeded(sandbox, c.env.BACKUP_BUCKET);
@@ -341,16 +329,16 @@ app.all('*', async (c) => {
         await ensureGateway(sandbox, c.env);
         try {
           containerResponse = await sandbox.wsConnect(wsRequest, GATEWAY_PORT);
+          log.info('gateway.recovered', { path: url.pathname });
         } catch (retryErr) {
-          console.error('[WS] Retry after restart also failed:', retryErr);
+          log.error('gateway.recovery_failed', retryErr instanceof Error ? retryErr : { error: String(retryErr) });
           return new Response('Gateway crashed and recovery failed', { status: 503 });
         }
       } else {
-        console.error('[WS] WebSocket proxy error:', err);
+        log.error('ws.proxy_failed', err instanceof Error ? err : { error: String(err) });
         return new Response('WebSocket proxy error', { status: 502 });
       }
     }
-    console.log('[WS] wsConnect response status:', containerResponse.status);
 
     // Get the container-side WebSocket
     const containerWs = containerResponse.webSocket;
@@ -360,7 +348,6 @@ app.all('*', async (c) => {
     }
 
     if (debugLogs) {
-      console.log('[WS] Got container WebSocket, setting up interception');
     }
 
     // Create a WebSocket pair for the client
@@ -371,35 +358,21 @@ app.all('*', async (c) => {
     containerWs.accept();
 
     if (debugLogs) {
-      console.log('[WS] Both WebSockets accepted');
-      console.log('[WS] containerWs.readyState:', containerWs.readyState);
-      console.log('[WS] serverWs.readyState:', serverWs.readyState);
     }
 
     // Relay messages from client to container
     serverWs.addEventListener('message', (event) => {
       if (debugLogs) {
-        console.log(
-          '[WS] Client -> Container:',
-          typeof event.data,
-          typeof event.data === 'string' ? event.data.slice(0, 200) : '(binary)',
-        );
       }
       if (containerWs.readyState === WebSocket.OPEN) {
         containerWs.send(event.data);
       } else if (debugLogs) {
-        console.log('[WS] Container not open, readyState:', containerWs.readyState);
       }
     });
 
     // Relay messages from container to client, with error transformation
     containerWs.addEventListener('message', (event) => {
       if (debugLogs) {
-        console.log(
-          '[WS] Container -> Client (raw):',
-          typeof event.data,
-          typeof event.data === 'string' ? event.data.slice(0, 500) : '(binary)',
-        );
       }
       let data = event.data;
 
@@ -408,21 +381,17 @@ app.all('*', async (c) => {
         try {
           const parsed = JSON.parse(data);
           if (debugLogs) {
-            console.log('[WS] Parsed JSON, has error.message:', !!parsed.error?.message);
           }
           if (parsed.error?.message) {
             if (debugLogs) {
-              console.log('[WS] Original error.message:', parsed.error.message);
             }
             parsed.error.message = transformErrorMessage(parsed.error.message, url.host);
             if (debugLogs) {
-              console.log('[WS] Transformed error.message:', parsed.error.message);
             }
             data = JSON.stringify(parsed);
           }
         } catch (e) {
           if (debugLogs) {
-            console.log('[WS] Not JSON or parse error:', e);
           }
         }
       }
@@ -430,21 +399,18 @@ app.all('*', async (c) => {
       if (serverWs.readyState === WebSocket.OPEN) {
         serverWs.send(data);
       } else if (debugLogs) {
-        console.log('[WS] Server not open, readyState:', serverWs.readyState);
       }
     });
 
     // Handle close events
     serverWs.addEventListener('close', (event) => {
       if (debugLogs) {
-        console.log('[WS] Client closed:', event.code, event.reason);
       }
       containerWs.close(event.code, event.reason);
     });
 
     containerWs.addEventListener('close', (event) => {
       if (debugLogs) {
-        console.log('[WS] Container closed:', event.code, event.reason);
       }
       // Transform the close reason (truncate to 123 bytes max for WebSocket spec)
       let reason = transformErrorMessage(event.reason, url.host);
@@ -452,7 +418,6 @@ app.all('*', async (c) => {
         reason = reason.slice(0, 120) + '...';
       }
       if (debugLogs) {
-        console.log('[WS] Transformed close reason:', reason);
       }
       serverWs.close(event.code, reason);
     });
@@ -469,7 +434,6 @@ app.all('*', async (c) => {
     });
 
     if (debugLogs) {
-      console.log('[WS] Returning intercepted WebSocket response');
     }
     return new Response(null, {
       status: 101,
@@ -477,14 +441,12 @@ app.all('*', async (c) => {
     });
   }
 
-  console.log('[HTTP] Proxying:', url.pathname + url.search);
 
   let httpResponse: Response;
   try {
     httpResponse = await sandbox.containerFetch(request, GATEWAY_PORT);
   } catch (err) {
     if (isGatewayCrashedError(err)) {
-      console.log('[HTTP] Gateway crashed, attempting restore + restart and retry...');
       await killGateway(sandbox);
       try {
         await restoreIfNeeded(sandbox, c.env.BACKUP_BUCKET);
@@ -501,7 +463,6 @@ app.all('*', async (c) => {
       }
     } else if (acceptsHtml) {
       // Gateway not ready for HTML request — show loading page
-      console.log('[HTTP] Gateway not ready, serving loading page');
       return c.html(loadingPageHtml);
     } else {
       console.error('[HTTP] Proxy error:', err);
@@ -511,7 +472,6 @@ app.all('*', async (c) => {
       );
     }
   }
-  console.log('[HTTP] Response status:', httpResponse.status);
 
   // For HTML requests, verify we got actual content from the gateway.
   // containerFetch can return a 200 with empty/streaming body if the gateway's
@@ -520,9 +480,6 @@ app.all('*', async (c) => {
   if (acceptsHtml) {
     const body = await httpResponse.text();
     if (!body || body.length < 50) {
-      console.log(
-        `[HTTP] Empty/short response (${body.length} bytes) for HTML request, serving loading page`,
-      );
       return c.html(loadingPageHtml);
     }
     const newHeaders = new Headers(httpResponse.headers);

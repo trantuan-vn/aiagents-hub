@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { createLogger } from '../../shared/logger';
 import { getIdFromName, isAdmin, getSessionIdHash } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
@@ -67,6 +68,8 @@ interface IApplicationService {
   verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }>;
 }
 
+const log = createLogger('auth-worker', 'auth');
+
 export function createApplicationService(c: Context, bindingName: string): IApplicationService {
   const getRepository = (identifier: string) => {
     const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
@@ -118,19 +121,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const versionApp = createVersionApplicationService(c, bindingName);
     await versionApp.upgradeVersion(user.identifier);
 
-    console.log(
-      '[NewSessionEmail]',
-      JSON.stringify({
-        step: 'createUserSession:before_decide',
-        identifier: user.identifier,
-        type,
-        sessionExisted,
-        deviceId: normalizedDeviceId,
-        country,
-        activeSessionsBeforeCreate: activeSessionsBeforeCreate.length,
-      }),
-    );
-
     const emailDecision = await decideNewSessionEmail(
       c.env.NONCE_KV,
       user.identifier,
@@ -145,38 +135,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const userEmail =
       user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
 
-    if (!emailDecision.send) {
-      console.log(
-        '[NewSessionEmail]',
-        JSON.stringify({
-          step: 'createUserSession:skipped',
-          identifier: user.identifier,
-          reason: 'decide_send_false',
-          emailDecision,
-        }),
-      );
-    } else if (!userEmail) {
-      console.log(
-        '[NewSessionEmail]',
-        JSON.stringify({
-          step: 'createUserSession:skipped',
-          identifier: user.identifier,
-          reason: 'no_user_email',
-          hasUserEmailField: !!user.email,
-          identifierIsEmail: validationUtils.isValidEmail(user.identifier),
-          emailDecision,
-        }),
-      );
-    } else {
-      console.log(
-        '[NewSessionEmail]',
-        JSON.stringify({
-          step: 'createUserSession:sending',
-          identifier: user.identifier,
-          to: userEmail,
-          cooldownKey: emailDecision.cooldownKey ?? null,
-        }),
-      );
+    if (emailDecision.send && userEmail) {
       try {
         await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
         if (emailDecision.cooldownKey) {
@@ -184,16 +143,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
             expirationTtl: AUTH_CONSTANTS.NEW_SESSION_EMAIL_COOLDOWN_SEC,
           });
         }
-        console.log(
-          '[NewSessionEmail]',
-          JSON.stringify({
-            step: 'createUserSession:sent',
-            identifier: user.identifier,
-            cooldownKey: emailDecision.cooldownKey ?? null,
-          }),
-        );
       } catch (e) {
-        console.warn('[NewSessionEmail] createUserSession:send_failed', {
+        log.warn('session.new_device_email_failed', {
           identifier: user.identifier,
           error: e instanceof Error ? e.message : String(e),
         });
@@ -201,6 +152,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     }
 
     await markKnownDevice(c.env.NONCE_KV, user.identifier, normalizedDeviceId);
+
+    log.info('session.created', {
+      identifier: user.identifier,
+      type,
+      sessionExisted,
+      newDeviceEmailSent: emailDecision.send && !!userEmail,
+    });
 
     return { sessionId };
   };
@@ -212,7 +170,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     }
 
     const existingUser = await repository.users.get();
-    console.log('[Auth] getOrCreateUser: identifier=', identifier, 'existingUser=', !!existingUser, 'isNewUser=', !existingUser);
 
     if (existingUser) {
       // Ensure existing users have referralCode (backfill)
@@ -229,10 +186,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     let referrerId: string | undefined;
     if (refCode && refCode.trim() && c.env.NONCE_KV) {
       referrerId = await resolveReferrerByCode(c.env.NONCE_KV, refCode) ?? undefined;
-      if (referrerId) {
-        console.log('[Auth] getOrCreateUser: linking to referrer', referrerId);
-      } else {
-        console.warn('[Auth] getOrCreateUser: ref code not found in KV, referrerId not set', { refCode: refCode.trim().toUpperCase() });
+      if (!referrerId) {
+        log.warn('user.referral_code_unknown', { refCode: refCode.trim().toUpperCase() });
       }
     }
 
@@ -262,13 +217,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     } else if (validationUtils.isValidPhone(identifier)) {
       Object.assign(baseUser, { phone: identifier });
     }
-    console.log(`[Auth] getOrCreateUser: baseUser=${JSON.stringify(baseUser)}`);
     const user = await repository.users.save(baseUser);
 
     // Index referral code in KV for lookup
     if (c.env.NONCE_KV) {
       await storeReferralCode(c.env.NONCE_KV, referralCode, user.identifier);
     }
+
+    log.info('user.created', {
+      identifier: user.identifier,
+      hasReferrer: !!referrerId,
+      role: baseUser.role,
+    });
 
     return { user, isNewUser: true };
   };
@@ -319,15 +279,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
-        console.log('[Auth] OAuth: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', normalizedId);
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedId, dId), { expirationTtl: 300 });
-        console.log(`[connectOAuthUseCase] PendingTotp:${sessionId} is set with expirationTtl(300)`);
+        log.info('auth.oauth_step_up', { method: 'totp', identifier: normalizedId, isNewUser });
         return { requiresTotp: true };
       }
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
-        console.log('[Auth] OAuth: requiresSms branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -360,6 +318,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
           { expirationTtl: 300 },
         );
         await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+        log.info('auth.oauth_step_up', { method: 'sms', identifier: normalizedId, isNewUser });
         return { requiresSms: true };
       }
 
@@ -368,10 +327,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
       const result = await createUserSession(repository, user, 'oauth', ipAddress, userAgent, country, dId);
-      console.log('[Auth] OAuth login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       // Notification gửi khi WS connect (đúng flow: login → token → client connect WS → gửi notification)
       if (isNewUser) {
-        console.log('[Auth] Storing pending 2FA notification for new user (OAuth):', identifier);
         const wsApp = createWebsocketApplicationService(c, bindingName);
         await wsApp.storePendingFirstLoginNotificationUseCase(identifier);
       }
@@ -410,7 +367,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Cả authenticator và SMS đều bật -> chọn authenticator
       if (totpStatus.enabled) {
-        console.log('[Auth] OTP: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'identifier=', normalizedId, 'sessionId=', sessionId, 'NONCE_KV=', !!c.env.NONCE_KV);
         if (!c.env.NONCE_KV) {
           console.error('[Auth] OTP: NONCE_KV binding is missing');
           throw new Error('NONCE_KV not configured');
@@ -421,7 +377,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
         try {
           await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedId, dId), { expirationTtl: 300 });
-          console.log(`PendingTotp:${sessionId} is set with expirationTtl(300)`);
         } catch (kvErr) {
           console.error('[Auth] OTP: NONCE_KV.put PendingTotp failed sessionId=', sessionId, 'normalizedId=', normalizedId, 'error=', kvErr);
           throw kvErr;
@@ -431,7 +386,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
-        console.log('[Auth] OTP: requiresSms branch (no session yet) isNewUser=', isNewUser, 'identifier=', identifier);
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -472,9 +426,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
       const result = await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, dId);
-      console.log('[Auth] OTP login: isNewUser=', isNewUser, 'identifier=', identifier, 'flow=normal');
       if (isNewUser) {
-        console.log('[Auth] Storing pending 2FA notification for new user (OTP):', identifier);
         const wsApp = createWebsocketApplicationService(c, bindingName);
         await wsApp.storePendingFirstLoginNotificationUseCase(identifier);
       }
@@ -484,9 +436,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       const pendingRaw = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
       const pending = parsePendingAuth(pendingRaw);
-      console.log(`[verifyTotpLoginUseCase] PendingTotp:${sessionId} parsed=`, !!pending);
       if (!pending) {
-        console.log('[Auth] verifyTotpLoginUseCase: PendingTotp missing for sessionId (có thể session hết hạn hoặc cookie không khớp)');
         throw new Error(ERROR_MESSAGES.AUTH.TOTP_SESSION_EXPIRED);
       }
       const { identifier } = pending;
@@ -503,8 +453,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const trimmedCode = code.replace(/\D/g, '').slice(0, 6);
       const valid = await verifyTotpCode(secret, trimmedCode);
       if (!valid) {
-        const serverStep = Math.floor(Date.now() / 1000 / 30);
-        console.log('[Auth] verifyTotpLoginUseCase: TOTP code mismatch identifier=', identifier, 'serverStep=', serverStep);
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
@@ -513,14 +461,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      console.log('[Auth] verifyTotpLoginUseCase: completing login (no isNewUser/notification here) identifier=', identifier);
       return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
     async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
       if (!raw) {
-        console.log('[Auth] verifySmsLoginUseCase: PendingSmsLogin missing for sessionId');
         throw new Error(ERROR_MESSAGES.AUTH.SMS_SESSION_EXPIRED);
       }
 
@@ -533,7 +479,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(parsed.identifier);
       const user = await repository.users.get();
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
-      console.log('[Auth] verifySmsLoginUseCase: completing login (no isNewUser/notification here) identifier=', parsed.identifier);
       return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
@@ -542,7 +487,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       if (!pending) {
         const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
         if (!raw) {
-          console.log('[Auth] verifyBackupCodeLoginUseCase: PendingTotp and PendingSmsLogin both missing');
           throw new Error(ERROR_MESSAGES.AUTH.TWO_FA_SESSION_EXPIRED);
         }
         const parsed = JSON.parse(raw) as { identifier: string; deviceId?: string };
@@ -605,14 +549,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 1. Authenticator ưu tiên trước SMS nếu bật cả hai
       if (totpStatus.enabled) {
-        console.log('[Auth] SIWE: requiresTotp branch (no session yet) isNewUser=', isNewUser, 'address=', normalizedAddr);
         await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, serializePendingAuth(normalizedAddr, dId), { expirationTtl: 300 });
         return { requiresTotp: true };
       }
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
-        console.log('[Auth] SIWE: requiresSms branch (no session yet) isNewUser=', isNewUser, 'address=', address);
         const userDO = getIdFromName(c, address, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
@@ -653,9 +595,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 3. Cả hai đều không bật -> đăng nhập bình thường
       const result = await createUserSession(repository, user, 'siwe', ipAddress, userAgent, country, dId);
-      console.log('[Auth] SIWE login: isNewUser=', isNewUser, 'address=', address, 'flow=normal');
       if (isNewUser) {
-        console.log('[Auth] Storing pending 2FA notification for new user (SIWE):', address);
         const wsApp = createWebsocketApplicationService(c, bindingName);
         await wsApp.storePendingFirstLoginNotificationUseCase(address);
       }
@@ -684,7 +624,6 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
-      console.log('[logoutUseCase] DEBUG: identifier=%s sessionId=%s', identifier, sessionId);
       const repository = getRepository(identifier);
       const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });
@@ -694,13 +633,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       // Đóng WebSocket để trigger webSocketClose → unregisterUser trên BroadcastServiceDO
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-        console.log('[logoutUseCase] DEBUG: calling UserDO closeConnectionsForSession sessionId=%s', sessionId);
-        const resp = await userDO.fetch('https://user.internal/', {
+        await userDO.fetch('https://user.internal/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'closeConnectionsForSession', sessionId }),
         });
-        console.log('[logoutUseCase] DEBUG: closeConnectionsForSession response status=%s ok=%s', resp.status, resp.ok);
       } catch (e) {
         console.warn('[logoutUseCase] closeConnectionsForSession failed:', e);
       }

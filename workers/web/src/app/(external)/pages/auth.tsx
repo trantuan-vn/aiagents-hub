@@ -24,7 +24,6 @@ const Auth = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Auth logic will be implemented with Supabase
-    console.log("Auth submitted:", { email, password, name, isSignUp });
   };
 
   return (

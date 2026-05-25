@@ -81,7 +81,6 @@ export function createPaymentRoutes(bindingName: string) {
   /** Casso bank webhook (signature HMAC SHA512, same response shape spirit as vnpay_ipn). */
   app.post('/casso_ipn', createRouteHandler(async (c: any) => {
     const body = await c.req.json();
-    console.log(`casso_ipn: ${JSON.stringify(body)}`);
     const paymentService = createPaymentApplicationService(c, bindingName);
     const result = await paymentService.processCassoIPNUseCase(body, c.req.raw.headers, c.env.NONCE_KV);
     return c.json({

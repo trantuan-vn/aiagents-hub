@@ -296,7 +296,6 @@ export function createVNPayService(
     }, 'payments');
 
     const paymentUrl = vnpUrl + '?' + querystring.stringify(sortedParams, { encode: false });
-    console.log(`${paymentUrl}`);
     return paymentUrl;
   };
 

@@ -1,4 +1,8 @@
 /// <reference path="../worker-configuration.d.ts" />
+import { createLogger } from './shared/logger';
+
+const log = createLogger('consumer-worker');
+
 /**
  * Consumer worker: consumes aiagents-hub-ws-broadcast-queue, parses by type (heartbeats, notifications, prices, etc.),
  * computes shards from targetUsers, and calls UserShardDO.handleFastBroadcast
@@ -43,7 +47,7 @@ function parseMessage(body: unknown): WsBroadcastMessage | null {
       raw = (body ?? {}) as Record<string, unknown>;
     }
     if (!raw || !Array.isArray(raw.targetUsers)) {
-      console.warn('[ConsumerWorker] Invalid message: targetUsers required', body);
+      log.warn('consumer.parse_invalid', { hasTargetUsers: Array.isArray((raw as any)?.targetUsers) });
       return null;
     }
     return {
@@ -54,7 +58,7 @@ function parseMessage(body: unknown): WsBroadcastMessage | null {
       expiresIn: raw.expiresIn as number | undefined,
     };
   } catch (e) {
-    console.error('[ConsumerWorker] Failed to parse message:', e);
+    log.error('consumer.parse_failed', e instanceof Error ? e : { error: String(e) });
     return null;
   }
 }
@@ -94,6 +98,9 @@ async function sendToShard(
 
 async function processWsBroadcastQueue(batch: MessageBatch, env: Env): Promise<void> {
   const shardCount = parseInt(env.SHARD_COUNT ?? String(DEFAULT_SHARD_COUNT), 10) || DEFAULT_SHARD_COUNT;
+  let processed = 0;
+  let skipped = 0;
+  let totalUsers = 0;
 
   for (const msg of batch.messages) {
     try {
@@ -105,7 +112,8 @@ async function processWsBroadcastQueue(batch: MessageBatch, env: Env): Promise<v
 
       const { type, targetUsers, message } = parsed;
       if (targetUsers.length === 0) {
-        console.warn('[ConsumerWorker] Skipping message with empty targetUsers:', type);
+        log.warn('consumer.empty_targets', { type });
+        skipped++;
         msg.ack();
         continue;
       }
@@ -122,22 +130,32 @@ async function processWsBroadcastQueue(batch: MessageBatch, env: Env): Promise<v
       );
 
       await Promise.allSettled(sendPromises);
+      processed++;
+      totalUsers += targetUsers.length;
       msg.ack();
-      console.log(`[ConsumerWorker] Processed ${type} for ${targetUsers.length} users across ${shardMap.size} shards`);
     } catch (e) {
-      console.error('[ConsumerWorker] Failed to process message:', e);
+      log.error('consumer.message_failed', e instanceof Error ? e : { error: String(e) });
       msg.retry();
     }
   }
+
+  log.info('consumer.batch_complete', {
+    queue: batch.queue,
+    messages: batch.messages.length,
+    processed,
+    skipped,
+    totalUsers,
+    shardCount,
+  });
 }
 
 async function processDlq(batch: MessageBatch): Promise<void> {
   for (const msg of batch.messages) {
     try {
-      console.error('[ConsumerWorker] DLQ message:', msg.id, msg.body);
+      log.error('consumer.dlq_entry', { messageId: msg.id, type: (msg.body as any)?.type });
       msg.ack();
     } catch (e) {
-      console.error('[ConsumerWorker] DLQ process error:', e);
+      log.error('consumer.dlq_process_failed', e instanceof Error ? e : { error: String(e) });
       msg.ack();
     }
   }
@@ -164,7 +182,6 @@ export default {
   },
 
   async queue(batch: MessageBatch, env: Env): Promise<void> {
-    console.log(`[ConsumerWorker] Processing ${batch.queue} with ${batch.messages.length} messages`);
 
     const handlers: Record<string, (batch: MessageBatch, env: Env) => Promise<void>> = {
       'aiagents-hub-ws-broadcast-queue': processWsBroadcastQueue,
@@ -175,7 +192,7 @@ export default {
     if (handler) {
       await handler(batch, env);
     } else {
-      console.warn(`[ConsumerWorker] Unknown queue: ${batch.queue}`);
+      log.warn('consumer.unknown_queue', { queue: batch.queue, messages: batch.messages.length });
       batch.messages.forEach((m) => m.ack());
     }
   },

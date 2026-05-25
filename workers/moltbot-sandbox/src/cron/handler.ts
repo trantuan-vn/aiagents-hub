@@ -3,6 +3,9 @@ import type { OpenClawEnv } from '../types';
 import { buildSandboxOptions } from '../index';
 import { ensureGateway } from '../gateway';
 import { shouldWakeContainer, DEFAULT_LEAD_TIME_MS, CRON_STORE_R2_KEY } from './wake';
+import { createLogger } from '../shared/logger';
+
+const log = createLogger('moltbot-sandbox', 'cron');
 
 /**
  * Handle Workers Cron Trigger: wake the container if OpenClaw has upcoming cron jobs.
@@ -19,7 +22,6 @@ import { shouldWakeContainer, DEFAULT_LEAD_TIME_MS, CRON_STORE_R2_KEY } from './
 export async function handleScheduled(env: OpenClawEnv): Promise<void> {
   const cronStoreObject = await env.BACKUP_BUCKET.get(CRON_STORE_R2_KEY);
   if (!cronStoreObject) {
-    console.log('[CRON] No cron store found in R2, skipping');
     return;
   }
 
@@ -30,14 +32,13 @@ export async function handleScheduled(env: OpenClawEnv): Promise<void> {
 
   const earliestRun = shouldWakeContainer(cronStoreJson, nowMs, leadTimeMs);
   if (!earliestRun) {
-    console.log('[CRON] No upcoming cron jobs within lead time, skipping wake');
     return;
   }
 
   const deltaMinutes = ((earliestRun - nowMs) / 60_000).toFixed(1);
-  console.log(`[CRON] Cron job due in ${deltaMinutes}m, waking container`);
+
+  log.info('cron.wake_container', { earliestRunInMinutes: deltaMinutes });
 
   const sandbox = getSandbox(env.Sandbox, 'openclaw', buildSandboxOptions(env));
   await ensureGateway(sandbox, env);
-  console.log('[CRON] Container woken successfully');
 }

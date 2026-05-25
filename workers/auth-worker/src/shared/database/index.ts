@@ -1050,7 +1050,6 @@ export class UserDODatabase {
       for (const [colName, sqlType] of Object.entries(expectedColumns)) {
         if (!existingColumns.has(colName)) {
           this.storage.sql.exec(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`);
-          console.log(`[UserDODatabase] Migration: added column "${colName}" to table "${name}"`);
         }
       }
 
@@ -1497,7 +1496,6 @@ export class UserDODatabase {
       if (!config) {
         throw new Error(`Table ${table} not registered`);
       }
-      console.log(`Parsing ${table} results: ${JSON.stringify(result)}`);
       return result.map(row => 
         DynamicDataBuilder.parseFromDatabase(row, config.schema)
       );

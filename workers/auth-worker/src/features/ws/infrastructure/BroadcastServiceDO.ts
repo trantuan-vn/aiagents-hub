@@ -25,19 +25,16 @@ export class BroadcastServiceDO extends DurableObject {
     this.storage = state.storage;
     this.env = env;
     this.database = new UserDODatabase(this.storage, this.currentUserId);
-    console.log("[BroadcastServiceDO] constructor", this.currentUserId);
   }
 
   private getInitializationPromise(): Promise<void> {
     if (!this.initializationPromise) {
-      console.log("[BroadcastServiceDO] getInitializationPromise: starting initializeTables");
       this.initializationPromise = this.initializeTables();
     }
     return this.initializationPromise;
   }
 
   private async initializeTables(): Promise<void> {
-    console.log("[BroadcastServiceDO] initializeTables: entering blockConcurrencyWhile");
     await this.state.blockConcurrencyWhile(async () => {
       this.table('service_configs', ServiceConfigSchema, {
         autoFields: { id: true, timestamps: true, user: true },
@@ -49,12 +46,9 @@ export class BroadcastServiceDO extends DurableObject {
       this.table('global_counters', GlobalCounterSchema, {
         autoFields: { id: true, timestamps: true, user: true },
       });
-      console.log("[BroadcastServiceDO] initializeTables: all tables created");
     });
     // Phase 2: bảng đã có sẵn, mới seed/load config
-    console.log("[BroadcastServiceDO] initializeTables: running initialize()");
     await this.initialize();
-    console.log("[BroadcastServiceDO] initializeTables: done");
   }
 
   // =============================================
@@ -90,7 +84,6 @@ export class BroadcastServiceDO extends DurableObject {
   // =============================================
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    console.log(`[BroadcastServiceDO] fetch: ${url.pathname}`);
 
     // Read request body IMMEDIATELY before any long-running work (e.g. getInitializationPromise).
     // If we delay, the client may disconnect and we get "Can't read from request stream because client disconnected".
@@ -103,7 +96,6 @@ export class BroadcastServiceDO extends DurableObject {
     }
 
     await this.getInitializationPromise();
-    console.log(`[BroadcastServiceDO] fetch: init done, handling ${url.pathname}`);
     try {
       
       if (url.hostname === 'broadcast.internal') {
@@ -173,7 +165,6 @@ export class BroadcastServiceDO extends DurableObject {
   // =============================================
   private async handleCreateBroadcast(body: unknown): Promise<Response> {
     const createData: CreateBroadcast = BroadcastValidator.validateCreateBroadcast(body);
-    console.log(`[BroadcastServiceDO] handleCreateBroadcast: targetUsersCount=${createData.targetUsers?.length ?? 'all'} priority=${createData.priority}`);
     
     let userShards: string[];
     if (createData.targetUsers?.length) {
@@ -189,7 +180,6 @@ export class BroadcastServiceDO extends DurableObject {
       // Fallback: nếu bảng trống (chưa có registerUser nào), iterate qua tất cả shards để đảm bảo không bỏ sót client.
       userShards = await this.getAllShards();
       if (userShards.length === 0) {
-        console.log('[BroadcastServiceDO] handleCreateBroadcast: getAllShards returned empty, falling back to all shards');
         userShards = this.getAllShardNames();
       }
     }
@@ -203,7 +193,6 @@ export class BroadcastServiceDO extends DurableObject {
     };
     
     // Fire-and-forget: gửi xong quên, không await
-    console.log(`[BroadcastServiceDO] handleCreateBroadcast: dispatching to ${userShards.length} shards`);
     for (const shardName of userShards) {
       this.ctx.waitUntil(this.sendToShard(shardName, 'broadcast', payload));
     }
@@ -305,7 +294,6 @@ export class BroadcastServiceDO extends DurableObject {
   }
 
   private async executeShardOperation(action: 'registerUser' | 'unregisterUser', userId: string, shardName: string, existingShard: any, totalUsersCounter: any) {
-    console.log(`[BroadcastServiceDO] executeShardOperation: ${action} ${userId} ${shardName}`);
     const shardDO = this.env.USER_SHARD_DO.get(this.env.USER_SHARD_DO.idFromName(shardName));
     // Gọi init qua fetch vì stub không chuyển method call (RPC) tới DO; gửi shardName trong body để shard tự set tên
     const response = await shardDO.fetch('https://shard.internal', {
@@ -313,7 +301,6 @@ export class BroadcastServiceDO extends DurableObject {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, userId, shardName })
     });
-    console.log(`[BroadcastServiceDO] executeShardOperation: response: ${response.status} ${response.statusText}`);
     if (!response.ok) {
       await this.database.dynamicMultiTableTransaction([
         {

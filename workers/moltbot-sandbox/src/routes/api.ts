@@ -259,7 +259,6 @@ adminApi.post('/gateway/restart', async (c) => {
   try {
     // Kill the gateway process (shared logic with crash retry)
     const existingProcess = await findExistingGatewayProcess(sandbox);
-    console.log('[Restart] Killing gateway, existing process:', existingProcess?.id ?? 'none');
     await killGateway(sandbox);
 
     // Signal that all Worker isolates need to re-restore from R2.

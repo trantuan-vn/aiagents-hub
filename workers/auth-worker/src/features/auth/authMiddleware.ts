@@ -199,20 +199,13 @@ export function corsMiddleware() {
   };
 }
 
-// Request logging middleware
+// Request logging middleware — chỉ log lỗi server (5xx)
 export function requestLoggingMiddleware() {
   return async (c: Context, next: Next) => {
-    const start = Date.now();
-    const method = c.req.method;
-    const path = c.req.path;
-    const ip = getClientIp(c);
-    
     await next();
-    
-    const duration = Date.now() - start;
-    const status = c.res.status;
-    
-    console.log(`${method} ${path} - ${status} - ${duration}ms - IP: ${ip}`);
+    if (c.res.status >= 500) {
+      console.error(`${c.req.method} ${c.req.path} - ${c.res.status} - IP: ${getClientIp(c)}`);
+    }
   };
 }
 

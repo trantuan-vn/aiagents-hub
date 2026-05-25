@@ -2,7 +2,10 @@ import { DurableObject } from 'cloudflare:workers';
 import { z } from 'zod';
 
 import { UserDODatabase, TableOptions } from '../../../shared/database/index.js';
+import { createLogger } from '../../../shared/logger.js';
 import { getIPAndUserAgent, handleErrorWithoutIp } from '../../../shared/utils.js';
+
+const doLog = createLogger('auth-worker', 'user-do');
 
 import { 
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
@@ -231,7 +234,6 @@ export class UserDO extends DurableObject {
   /** True if any queue table has pending records (in-memory state). Used to decide whether to keep alarm. */
   private hasPendingQueueWork(): boolean {
     for (const state of this.tableStates.values()) {
-      console.log(`[UserDO ${this.userId}] hasPendingQueueWork: ${state.tableName} - ${state.pendingCount}`);
       if (state.pendingCount > 0) return true;
     }
     return false;
@@ -669,7 +671,6 @@ export class UserDO extends DurableObject {
         pendingCount: 0,
         updatedAt: Date.now()
       };
-      console.log(`[UserDO ${this.userId}] Reset table state for ${tableName} to ${JSON.stringify(initialState)}`);
       this.tableStates.set(tableName, initialState);
       
       return this.jsonResponse({
@@ -741,10 +742,13 @@ export class UserDO extends DurableObject {
         pendingCount: await this.getPendingCount(tableName)
       });
 
-      console.log(`[UserDO ${this.userId}] Flushed ${pendingRecords.length} records from ${tableName}, up to id ${maxId}`);
 
     } catch (error) {
-      console.error(`[UserDO ${this.userId}] Failed to flush records from ${tableName}:`, error);
+      doLog.error('do.flush_failed', {
+        userId: this.userId,
+        table: tableName,
+        error: error instanceof Error ? error.message : String(error),
+      });
       const errMsg = error instanceof Error ? error.message : String(error);
       if (!errMsg.includes('no such column') && !errMsg.includes('SQLITE_ERROR')) {
         this.state.waitUntil(
@@ -820,7 +824,6 @@ export class UserDO extends DurableObject {
         params: [upToId]
       }]);
       
-      console.log(`[UserDO ${this.userId}] Deleted ${countToDelete} processed records from ${tableName}, up to id ${upToId}`);
     }
     
     return countToDelete;
@@ -843,7 +846,6 @@ export class UserDO extends DurableObject {
         params: [Date.now(), upToId]
       }]);
       
-      console.log(`[UserDO ${this.userId}] Marked ${countToMark} flushed records to processed in ${tableName}, up to id ${upToId}`);
     }
     
     return countToMark;
@@ -985,9 +987,7 @@ export class UserDO extends DurableObject {
 
       // Re-schedule alarm only when there is a reason to wake again (WS or pending queue). Otherwise DO goes idle.
       const hasWebSockets = this.state.getWebSockets().length > 0;
-      console.log(`[UserDO ${this.userId}] hasWebSockets: ${hasWebSockets}`);
       const hasPending = this.hasPendingQueueWork();
-      console.log(`[UserDO ${this.userId}] hasPending: ${hasPending}`);
       if (hasWebSockets || hasPending) {
         const config = await this.getAuthQueueConfig();
         await this.storage.setAlarm(Date.now() + config.RETRY_ALARM_INTERVAL);
@@ -1003,7 +1003,6 @@ export class UserDO extends DurableObject {
       if (await this.shouldFlushTable(tableName)) tablesToFlush.push(tableName);
     }
     const promises = tablesToFlush.map(tableName => {
-        console.log(`[UserDO ${this.userId}] Auto-flushing ${tableName}`);
         return this.flushPendingRecords(tableName);
       });
     
@@ -1039,7 +1038,6 @@ export class UserDO extends DurableObject {
               params: [cutoffId]
             }]);
             
-            console.log(`[UserDO ${this.userId}] Cleaned up ${countToDelete} old processed records from ${tableName}`);
             
             const state = this.tableStates.get(tableName);
             if (state && state.lastProcessedId <= cutoffId) {
@@ -1202,7 +1200,6 @@ export class UserDO extends DurableObject {
       const closedByLogout = (UserDO.LOGOUT_CLOSE_REASONS as readonly string[]).includes(reason);
       const remainingCount = this.state.getWebSockets().length;
       const isLastConnection = remainingCount <= 1;
-      console.log(`[UserDO ${this.userId}] webSocketClose DEBUG: code=${code} reason=${reason} wasClean=${wasClean} remaining=${remainingCount} isLastConnection=${isLastConnection} closedByLogout=${closedByLogout}`);
       this.sendFailureCount.delete(ws);
       this.sessions.delete(ws);
 
@@ -1218,7 +1215,6 @@ export class UserDO extends DurableObject {
           }
         }
         if (isLastConnection) {
-          console.log(`[UserDO ${this.userId}] webSocketClose: calling unregisterUser`);
           await this.unregisterUser();
         }
       }
@@ -1238,7 +1234,6 @@ export class UserDO extends DurableObject {
   // ========== MESSAGE & BROADCAST MANAGEMENT ==========
   private async sendMessage(ws: WebSocket, message: any): Promise<boolean> {
     const att = (ws.deserializeAttachment() as { sessionId?: string; connectionId?: string } | null) ?? {};
-    console.log(`[UserDO ${this.userId}] sendMessage: sessionId=${att.sessionId ?? '?'} connectionId=${att.connectionId ?? '?'} message=${JSON.stringify(message)}`);
     try {
       if (ws.readyState !== WebSocket.OPEN) {
         return false;
@@ -1313,7 +1308,6 @@ export class UserDO extends DurableObject {
 
   protected broadcast(event: string, data: any): void {
     const message = { event, data, timestamp: Date.now() };
-    console.log(`[UserDO] broadcast: sending to ${this.state.getWebSockets().length} websockets message=${JSON.stringify(message)}`);
     this.state.getWebSockets().forEach(ws => this.sendMessage(ws, message));
   }
 
@@ -1325,7 +1319,6 @@ export class UserDO extends DurableObject {
       const payload = JSON.parse(stored) as { title: string; body?: string; data?: Record<string, unknown> };
       await this.storage.delete('pending_first_login_notification');
       this.broadcast('broadcast', payload);
-      console.log(`[UserDO] sent pending_first_login_notification to userId=${this.userId}`);
     } catch (e) {
       handleErrorWithoutIp(e, 'sendPendingFirstLoginNotificationIfAny error');
     }
@@ -1379,16 +1372,13 @@ export class UserDO extends DurableObject {
     } else if (message.type === 'storePendingFirstLoginNotification') {
       const payload = message.message as { title: string; body?: string; data?: Record<string, unknown> };
       await this.storage.put('pending_first_login_notification', JSON.stringify(payload));
-      console.log(`[UserDO] stored pending_first_login_notification for userId=${this.userId}`);
     } else if (message.type === 'closeConnectionsForSession') {
       const { sessionId } = message;
       if (sessionId) {
         await this.closeWebSocketsForSession(sessionId);
-        console.log(`[UserDO] closed connections for sessionId userId=${this.userId}`);
       }
     } else if (message.type === 'closeAllConnections') {
       await this.closeAllWebSockets();
-      console.log(`[UserDO] closed all connections userId=${this.userId}`);
     }
 
     return this.jsonResponse({ success: true, status: 'processed' });
@@ -1417,7 +1407,6 @@ export class UserDO extends DurableObject {
     // Lấy connectionIds từ bảng connections (persisted) - đáng tin cậy hơn attachment sau hibernation
     const connections = await this.database.dynamicSelect('connections', { field: 'sessionId', operator: '=', value: sessionId });
     const targetConnectionIds = new Set(connections.map((c: { connectionId?: string }) => c.connectionId).filter(Boolean));
-    console.log('[UserDO closeWebSocketsForSession] userId=%s targetSessionId=%s socketCount=%d connectionIds=%d', this.userId, sessionId, sockets.length, targetConnectionIds.size);
 
     // Xoá connection records NGAY TẠI ĐÂY trước khi đóng WS (tránh race: webSocketClose có thể không có connectionId từ attachment sau hibernation)
     // Không phụ thuộc webSocketClose để xoá - giúp luôn xoá được dù queueStatus đang pending/flushed/processed
@@ -1449,10 +1438,8 @@ export class UserDO extends DurableObject {
     }
     // Đã đóng hết WS của user (chỉ có 1 session) → gọi unregisterUser ngay, không chờ webSocketClose
     if (closedCount > 0 && closedCount === sockets.length) {
-      console.log('[UserDO closeWebSocketsForSession] all sockets closed, calling unregisterUser');
       await this.unregisterUser();
     }
-    console.log('[UserDO closeWebSocketsForSession] userId=%s closedCount=%d deletedConnections=%d', this.userId, closedCount, connections.length);
   }
 
   private async closeAllWebSockets(): Promise<void> {
@@ -1468,7 +1455,6 @@ export class UserDO extends DurableObject {
       }
     }
     if (connections.length > 0) await this.updateTablePendingCount('connections');
-    console.log('[UserDO closeAllWebSockets] userId=%s deletedConnections=%d', this.userId, connections.length);
 
     const sockets = this.state.getWebSockets();
     for (const ws of sockets) {
@@ -1476,7 +1462,6 @@ export class UserDO extends DurableObject {
     }
     // Đóng hết WS → gọi unregisterUser ngay, không chờ từng webSocketClose
     if (sockets.length > 0) {
-      console.log('[UserDO closeAllWebSockets] all sockets closed, calling unregisterUser');
       await this.unregisterUser();
     }
   }

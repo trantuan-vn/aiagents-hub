@@ -196,7 +196,6 @@ export class UserShardDO extends DurableObject {
       ? await this.getSpecificUsers(targetUsers)
       : await this.getActiveUsers();
 
-    console.log(`[UserShardDO] processFastBroadcast: shardName=${this.shardName} targetMode=${targetUsers ? 'specific' : 'all'} userCount=${users.length}`);
     if (users.length === 0) return;
 
     const batches = this.createOptimizedBatches(users);
@@ -206,14 +205,12 @@ export class UserShardDO extends DurableObject {
   }
 
   private async getSpecificUsers(userIds: string[]): Promise<string[]> {
-    console.log(`[UserShardDO] getSpecificUsers: start shardName=${this.shardName} requestedCount=${userIds.length}`);
     const validUsers: string[] = [];
     for (const userId of userIds) {
       const user = await this.database.dynamicSelect("user_registrations", { field: 'userId', operator: '=', value: userId });
       const found = user.length > 0 && user[0].isActive;
       if (found) validUsers.push(userId);
     }
-    console.log(`[UserShardDO] getSpecificUsers: done shardName=${this.shardName} validCount=${validUsers.length} invalidCount=${userIds.length - validUsers.length}`);
     return validUsers;
   }
 

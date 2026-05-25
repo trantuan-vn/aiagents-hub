@@ -15,17 +15,14 @@ function requiresAdminAccess(pathname: string): boolean {
 }
 
 function handleUnauthenticatedDashboard(req: NextRequest, pathname: string): NextResponse {
-  console.log(`Redirecting to login page due to unauthenticated request to ${pathname}`);
   return NextResponse.redirect(new URL("/auth/v3/login", req.url));
 }
 
 function handleInsufficientPermissions(req: NextRequest, pathname: string): NextResponse {
-  console.log(`Redirecting to default dashboard due to insufficient permissions for ${pathname}`);
   return NextResponse.redirect(new URL("/dashboard/control/overview", req.url));
 }
 
 function handleAuthenticatedLogin(req: NextRequest): NextResponse {
-  console.log(`Redirecting to dashboard due to authenticated request to /auth/v3/login`);
   return NextResponse.redirect(new URL("/dashboard", req.url));
 }
 

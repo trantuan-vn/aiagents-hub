@@ -37,7 +37,6 @@ publicRoutes.get('/api/status', async (c) => {
 
   try {
     let process = await findExistingGatewayProcess(sandbox);
-    console.log('[api/status] existing process:', process?.id ?? 'none', process?.status ?? '');
     if (!process) {
       // Restore synchronously — restoreBackup is a fast RPC call (~1-3s).
       // This MUST happen before ensureGateway or the gateway starts without
@@ -56,7 +55,6 @@ publicRoutes.get('/api/status', async (c) => {
       // up to 180s and would exceed the 30s Worker CPU limit).
       // The loading page polls every 2s — subsequent polls will find
       // the process and check if the port is up.
-      console.log('[api/status] No process found, starting gateway...');
       try {
         await ensureGateway(sandbox, c.env, { waitForReady: false });
       } catch (err) {

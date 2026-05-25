@@ -2,6 +2,9 @@ import type { Sandbox, Process } from '@cloudflare/sandbox';
 import type { OpenClawEnv } from '../types';
 import { GATEWAY_PORT, STARTUP_TIMEOUT_MS } from '../config';
 import { buildEnvVars } from './env';
+import { createLogger } from '../shared/logger';
+
+const log = createLogger('moltbot-sandbox', 'gateway');
 
 /**
  * Force kill the gateway process and clean up lock files.
@@ -92,7 +95,6 @@ export async function findExistingGatewayProcess(sandbox: Sandbox): Promise<Proc
       }
     }
   } catch (e) {
-    console.log('Could not list processes:', e);
   }
   return null;
 }
@@ -121,29 +123,19 @@ export async function ensureGateway(
   // Check if gateway is already running or starting
   const existingProcess = await findExistingGatewayProcess(sandbox);
   if (existingProcess) {
-    console.log(
-      'Found existing gateway process:',
-      existingProcess.id,
-      'status:',
-      existingProcess.status,
-    );
 
     // Always use full startup timeout - a process can be "running" but not ready yet
     // (e.g., just started by another concurrent request). Using a shorter timeout
     // causes race conditions where we kill processes that are still initializing.
     try {
-      console.log('Waiting for gateway on port', GATEWAY_PORT, 'timeout:', STARTUP_TIMEOUT_MS);
       await existingProcess.waitForPort(GATEWAY_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS });
-      console.log('Gateway is reachable');
       return existingProcess;
       // eslint-disable-next-line no-unused-vars
     } catch (_e) {
-      // Timeout waiting for port - process is likely dead or stuck, kill and restart
-      console.log('Existing process not reachable after full timeout, killing and restarting...');
+      log.warn('gateway.port_wait_timeout', { action: 'restart' });
       try {
         await existingProcess.kill();
       } catch (killError) {
-        console.log('Failed to kill process:', killError);
       }
     }
   }
@@ -153,64 +145,48 @@ export async function ensureGateway(
   // Probe the port directly — if it's open, the gateway is up and we're done.
   try {
     if (await isGatewayPortOpen(sandbox)) {
-      console.log(
-        `Port ${GATEWAY_PORT} already open — gateway running but undetected by listProcesses(), skipping spawn`,
-      );
       return null;
     }
   } catch (e) {
-    console.log('Port probe failed, proceeding to start gateway:', e);
   }
 
   // Start a new OpenClaw gateway
-  console.log('Starting new OpenClaw gateway...');
   const envVars = buildEnvVars(env);
   const command = '/usr/local/bin/start-openclaw.sh';
 
-  console.log('Starting process with command:', command);
-  console.log('Environment vars being passed:', Object.keys(envVars));
 
   let process: Process;
   try {
     process = await sandbox.startProcess(command, {
       env: Object.keys(envVars).length > 0 ? envVars : undefined,
     });
-    console.log('Process started with id:', process.id, 'status:', process.status);
   } catch (startErr) {
-    console.error('Failed to start process:', startErr);
+    log.error('gateway.start_failed', startErr instanceof Error ? startErr : { error: String(startErr) });
     throw startErr;
   }
 
   if (waitForReady) {
     // Wait for the gateway to be ready
     try {
-      console.log('[Gateway] Waiting for OpenClaw gateway to be ready on port', GATEWAY_PORT);
       await process.waitForPort(GATEWAY_PORT, { mode: 'tcp', timeout: STARTUP_TIMEOUT_MS });
-      console.log('[Gateway] OpenClaw gateway is ready!');
-
-      const logs = await process.getLogs();
-      if (logs.stdout) console.log('[Gateway] stdout:', logs.stdout);
-      if (logs.stderr) console.log('[Gateway] stderr:', logs.stderr);
     } catch (e) {
-      console.error('[Gateway] waitForPort failed:', e);
+      log.error('gateway.wait_for_port_failed', e instanceof Error ? e : { error: String(e) });
       try {
         const logs = await process.getLogs();
-        console.error('[Gateway] startup failed. Stderr:', logs.stderr);
-        console.error('[Gateway] startup failed. Stdout:', logs.stdout);
+        log.error('gateway.startup_logs', {
+          stderrPreview: (logs.stderr || '').slice(0, 500),
+          stdoutPreview: (logs.stdout || '').slice(0, 500),
+        });
         throw new Error(`OpenClaw gateway failed to start. Stderr: ${logs.stderr || '(empty)'}`, {
           cause: e,
         });
       } catch (logErr) {
-        console.error('[Gateway] Failed to get logs:', logErr);
+        log.error('gateway.logs_unavailable', logErr instanceof Error ? logErr : { error: String(logErr) });
         throw e;
       }
     }
-  } else {
-    console.log('[Gateway] Process started (not waiting for ready):', process.id);
+    log.info('gateway.started', { waitForReady: true });
   }
-
-  // Verify gateway is actually responding
-  console.log('[Gateway] Verifying gateway health...');
 
   return process;
 }

@@ -90,30 +90,19 @@ export function requirePermissions(c: Context, permissions: string[]) {
     return token;
 }
 
-// Security monitoring middleware
+// Security monitoring middleware — chỉ log cảnh báo khi response lỗi
 export function securityLoggingMiddleware() {
   return async (c: Context, next: Next) => {
-    const startTime = Date.now();
-    
     await next();
-    
-    const processingTime = Date.now() - startTime;
+    if (c.res.status < 400) return;
     const tokenData = c.get('tokenData');
-
-    // Log security events
-    const logEntry = {
-      timestamp: new Date().toISOString(),
+    console.warn('[TokenAuth]', JSON.stringify({
       method: c.req.method,
       path: c.req.path,
       status: c.res.status,
-      processingTime,
       userId: tokenData?.id || 'anonymous',
       clientIP: getClientIp(c),
-      userAgent: c.req.header('user-agent'),
-      event: 'api_token_request'
-    };
-    
-    console.log(JSON.stringify(logEntry));
+    }));
   };
 }
 

@@ -4,6 +4,9 @@ import { convertUsdToVnd } from '../../admin/service/pricing';
 
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
 
+/** Legacy line-item tables (order_items / order_discounts) — kept for D1→R2 pipeline sync. */
+export const DiscountTypeSchema = z.enum(['SERVICE_PRICE', 'USER_PRICE', 'SERVICE_VOUCHER', 'USER_VOUCHER']);
+
 export const OrderSchema = z.object({
   orderCode: z.string(),
   /** USD — wallet credit after successful payment */
@@ -17,6 +20,34 @@ export const OrderSchema = z.object({
   appliedVoucherCode: z.string().optional(),
   notes: z.string().optional(),
   internalNotes: z.string().optional().nullable(),
+});
+
+export const OrderItemSchema = z.object({
+  orderId: z.number().int(),
+  /** 0 = wallet top-up line */
+  serviceId: z.number().int().min(0),
+  basePrice: z.number().min(0),
+  discountAmount: z.number().min(0).default(0),
+  finalAmount: z.number().min(0),
+  quantity: z.number().min(1),
+});
+
+export const OrderItemDiscountSchema = z.object({
+  orderItemId: z.number().int(),
+  discountType: DiscountTypeSchema,
+  discountAmount: z.number().min(0),
+  appliedPolicies: z
+    .array(
+      z.object({
+        policyId: z.number().int(),
+        policyName: z.string(),
+        discount: z.number(),
+        type: z.string(),
+      }),
+    )
+    .optional(),
+  appliedVoucherCode: z.string().optional(),
+  description: z.string().optional(),
 });
 
 /** Wallet top-up request (USD or legacy VND). */
@@ -59,7 +90,10 @@ export const UpdateOrderStatusSchema = z.object({
 });
 
 export type Order = z.infer<typeof OrderSchema>;
+export type OrderItem = z.infer<typeof OrderItemSchema>;
+export type OrderItemDiscount = z.infer<typeof OrderItemDiscountSchema>;
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
+export type DiscountType = z.infer<typeof DiscountTypeSchema>;
 export type CreateOrder = z.infer<typeof CreateOrderSchema>;
 export type UpdateOrderStatus = z.infer<typeof UpdateOrderStatusSchema>;
 

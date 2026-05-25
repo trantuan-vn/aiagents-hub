@@ -929,7 +929,6 @@ export class D1DatabaseManager {
     }
     const updatedCount = result.meta?.changes ?? 0;
     if (updatedCount > 0) {
-      console.log(`[D1] Updated ${updatedCount} connection(s) to inactive for ${sessionIds.length} inactive session(s) in user ${userId}`);
     }
     return updatedCount;
   }
@@ -1216,7 +1215,6 @@ export class D1DatabaseManager {
       for (const [colName, sqlType] of Object.entries(expectedColumns)) {
         if (!existingColumns.has(colName)) {
           await this.db.prepare(`ALTER TABLE "${name}" ADD COLUMN "${colName}" ${sqlType}`).run();
-          console.log(`[D1DatabaseManager] Migration: added column "${colName}" to table "${name}"`);
         }
       }
 

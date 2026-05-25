@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
+import { createLogger } from './shared/logger';
+
 import { createAuthMiddleware, createRateLimitMiddleware, securityHeadersMiddleware, createVersionCheckMiddleware } from './features/auth/authMiddleware';
 import { createTokenValidationMiddleware, securityLoggingMiddleware } from './features/member/token/authMiddleware';
 import { createAuthRoutes } from './features/auth/presentation';
@@ -103,6 +105,7 @@ function createRoutes(bindingName: string) {
 }
 
 const routeApp = createRoutes("USER_DO");
+const log = createLogger('auth-worker');
 
 // Warmup BroadcastServiceDO once per isolate so its tables are created on deploy.
 // UserDO tables are created when the first user connects; BroadcastServiceDO is a
@@ -114,18 +117,20 @@ let warmupPromise: Promise<void> | null = null;
 async function warmupBroadcastServiceDO(env: Env): Promise<void> {
   if (warmupPromise) return warmupPromise;
   warmupPromise = (async () => {
-    console.log("[auth-worker] BroadcastServiceDO warmup: triggering");
     try {
       const res = await env.BROADCAST_SERVICE_DO.get(
         env.BROADCAST_SERVICE_DO.idFromName("global")
       ).fetch("https://broadcast.service/dashboard/ws/health");
-      console.log("[auth-worker] BroadcastServiceDO warmup: done", res.status);
       if (res.status !== 200) {
         const text = await res.text();
-        console.warn("[auth-worker] BroadcastServiceDO warmup: non-200 response", text);
+        log.warn('warmup.broadcast_non_200', { status: res.status, bodyPreview: text.slice(0, 200) });
+      } else {
+        log.info('warmup.broadcast_ok');
       }
     } catch (err) {
-      console.warn("[auth-worker] BroadcastServiceDO warmup: failed", err);
+      log.warn('warmup.broadcast_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       warmupPromise = null;
       throw err;
     }

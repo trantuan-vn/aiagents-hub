@@ -1,4 +1,7 @@
 import { D1DatabaseManager } from "./database";
+import { createLogger } from "./shared/logger";
+
+const log = createLogger('queue-worker');
 
 // Cache database manager instance to avoid recreating it on every queue processing
 let databaseManager: D1DatabaseManager | null = null;
@@ -129,7 +132,6 @@ const cleanupProcessedRecords = async (
     }
 
     const result = await response.json() as any;
-    console.log(`[QueueWorker] Cleaned up records from ${userId}/${table}, method: ${cleanupMethod}, upToId: ${upToId}`);
 
     return {
       success: true,
@@ -138,7 +140,7 @@ const cleanupProcessedRecords = async (
       processedUpTo: result.data?.processedUpTo
     };
   } catch (error) {
-    console.error(`[QueueWorker] Failed to cleanup from UserDO ${userId}:`, error);
+    log.error('queue.cleanup_failed', { userId, table, error });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error)
@@ -181,7 +183,7 @@ const processChunk = async (
         try {
           await database.updateConnectionsBySessionIds(userId, inactiveSessionIds);
         } catch (err) {
-          console.error(`[QueueWorker] Failed to update connections for inactive sessions:`, err);
+          log.error('queue.sessions_connections_update_failed', { userId, error: err });
         }
       }
     }
@@ -191,18 +193,16 @@ const processChunk = async (
       try {
         // First mark as processed
         await cleanupProcessedRecords(userId, table, env, 'mark', maxId);        
-        console.log(`[QueueWorker] Cleaned up records up to id ${maxId} from ${userId}/${table}`);
       } catch (error) {
-        console.error(`[QueueWorker] Cleanup failed for ${userId}/${table}:`, error);
+        log.error('queue.cleanup_after_insert_failed', { userId, table, maxId, error });
         // Still ack since D1 insert succeeded
       }
     }
 
     // All successful, ack all messages
     ackAllMessages(chunk);
-    console.log(`[QueueWorker] Inserted ${chunk.length} records into D1 from ${userId}/${table}`);
   } catch (error) {
-    console.error(`[QueueWorker] Failed to process chunk from ${userId}/${table}:`, error);
+    log.error('queue.chunk_failed', { userId, table, recordCount: chunk.length, error });
     retryAllMessages(chunk);
   }
 };
@@ -228,7 +228,7 @@ const parseMessage = (message: Message): {
 		const dataArr = message.body as any[];
 		// Kiểm tra nếu không phải array
     if (!Array.isArray(dataArr)) {
-      console.warn('[QueueWorker] message.body is not an array:', message.body);
+      log.warn('queue.parse_invalid_body', { bodyType: typeof message.body });
       return null;
     }
 		let returnArr = [];
@@ -240,12 +240,12 @@ const parseMessage = (message: Message): {
 			const queueId = parsedBody.id || recordData.queueId;
 
 			if (!userId || userId === 'unknown') {
-				console.warn('[QueueWorker] Missing userId:', JSON.stringify(parsedBody));
+				log.warn('queue.parse_missing_user', { table });
 				return null;
 			}
 
 			if (!SYNC_TABLE_NAMES.includes(table)) {
-				console.warn(`[QueueWorker] Table ${table} is not a sync table`);
+				log.warn('queue.parse_unknown_table', { table });
 				return null;
 			}
 			returnArr.push({
@@ -259,7 +259,7 @@ const parseMessage = (message: Message): {
 
     return returnArr;
   } catch (error) {
-    console.error('[QueueWorker] Failed to parse message:', error);
+    log.error('queue.parse_failed', error instanceof Error ? error : { error: String(error) });
     return null;
   }
 };
@@ -321,33 +321,42 @@ const processInputQueue = async (batch: MessageBatch, env: Env): Promise<void> =
   const successful = results.filter(r => r.status === 'fulfilled').length;
   const failed = results.filter(r => r.status === 'rejected').length;
 
-  console.log(`[QueueWorker] Batch complete: ${successful} successful, ${failed} failed`);
+  log.info('queue.batch_complete', {
+    queue: batch.queue,
+    messages: batch.messages.length,
+    chunksOk: successful,
+    chunksFailed: failed,
+    userTableGroups: userTableGroups.size,
+  });
 
-  // Log errors
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      console.error(`[QueueWorker] Chunk ${index} failed:`, result.reason);
+      log.error('queue.chunk_rejected', { chunkIndex: index, reason: result.reason });
     }
   });
 };
 
 const processErrorQueue = async (batch: MessageBatch, env: Env): Promise<void> => {
-  console.log(`[QueueWorker] Processing ${batch.messages.length} DLQ messages`);
 
   for (const message of batch.messages) {
     try {
       const parsed = parseMessage(message);
       if (!parsed) {
-        console.error(`[QueueWorker] Failed to parse message: ${message.id}`);  
+        log.error('queue.dlq_parse_failed', { messageId: message.id });
         message.ack();
         continue;
       }
       for (const parsedItem of parsed) {
-        console.error(`[QueueWorker] DLQ Entry: ${JSON.stringify(parsedItem)}`);  
+        log.error('queue.dlq_entry', {
+          messageId: message.id,
+          userId: parsedItem.userId,
+          table: parsedItem.table,
+          queueId: parsedItem.queueId,
+        });
       }
       message.ack();
     } catch (error) {
-      console.error(`[QueueWorker] Failed to process DLQ message with id (${message.id}): ${error}`);       
+      log.error('queue.dlq_process_failed', { messageId: message.id, error });
       message.ack();
     }
   }
@@ -409,7 +418,6 @@ export default {
   },
 
   async queue(batch: MessageBatch, env: Env): Promise<void> {
-    console.log(`[QueueWorker] Processing ${batch.queue} with ${batch.messages.length} messages`);
 
     const queueHandlers: Record<string, (batch: MessageBatch, env: Env) => Promise<void>> = {
       'aiagents-hub-input-part-0': processInputQueue,
@@ -420,7 +428,7 @@ export default {
     if (handler) {
       await handler(batch, env);
     } else {
-      console.warn(`[QueueWorker] Unknown queue: ${batch.queue}`);
+      log.warn('queue.unknown_queue', { queue: batch.queue, messages: batch.messages.length });
       batch.messages.forEach(msg => msg.ack());
     }
   }

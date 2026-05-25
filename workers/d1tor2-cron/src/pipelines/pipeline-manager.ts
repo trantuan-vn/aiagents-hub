@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import { PIPELINE_CONFIGS, PipelineConfig, parseD1JsonFields } from './config';
 import { CloudflarePipelineAPIService } from './pipeline-api-service';
+import { createLogger } from '../shared/logger';
+
+const log = createLogger('d1tor2-cron', 'pipeline');
 
 export interface PipelineResult {
 	pipelineName: string;
@@ -111,7 +114,6 @@ export class PipelineManager {
 			const limit = type === 'pipeline' 
 				? this.d1tor2Config.PIPELINE_CONCURRENCY_LIMIT 
 				: this.d1tor2Config.BATCH_CONCURRENCY_LIMIT;
-			console.log(`  Using ${envKey} from system config: ${limit}`);
 			return Math.min(limit, 20);
 		}
 		
@@ -120,7 +122,6 @@ export class PipelineManager {
 		if (envValue !== undefined) {
 			const limit = parseInt(String(envValue), 10);
 			if (!isNaN(limit) && limit > 0) {
-				console.log(`  Using ${envKey} from env: ${limit}`);
 				return Math.min(limit, 20); // Cap at 20 để tránh quá tải
 			}
 		}
@@ -166,7 +167,6 @@ export class PipelineManager {
 		let successful = 0;
 		let failed = 0;
 
-		console.log(`Starting ${PIPELINE_CONFIGS.length} pipelines with concurrency limit of ${concurrencyLimit}...`);
 
 		// Queue để quản lý các pipelines đang được xử lý
 		const processingQueue: Array<{ promise: Promise<PipelineResult>; config: PipelineConfig }> = [];
@@ -180,12 +180,11 @@ export class PipelineManager {
 				// Tạo promise để xử lý pipeline này song song
 				const processPromise = this.runPipeline(config)
 					.then((result) => {
-						console.log(`✓ Pipeline ${config.schemaName} completed: ${result.recordsProcessed} records`);
 						return result;
 					})
 					.catch((error) => {
 						const errorMessage = error instanceof Error ? error.message : String(error);
-						console.error(`✗ Pipeline ${config.schemaName} failed:`, errorMessage);
+						log.error('pipeline.run_failed', { schema: config.schemaName, error: errorMessage });
 						return {
 							pipelineName: config.schemaName,
 							tableName: config.tableName,
@@ -241,7 +240,6 @@ export class PipelineManager {
 			}
 		}
 
-		console.log(`Completed all pipelines: ${successful} successful, ${failed} failed`);
 
 		return {
 			totalPipelines: PIPELINE_CONFIGS.length,
@@ -258,7 +256,6 @@ export class PipelineManager {
 	 */
 	async runPipeline(config: PipelineConfig): Promise<PipelineResult> {
 		const startTime = Date.now();
-		console.log(`Running pipeline: ${config.schemaName} (table: ${config.tableName})`);
 
 		try {
 			// 0. Đảm bảo pipeline, stream và sink đã được tạo
@@ -268,7 +265,6 @@ export class PipelineManager {
 			const targetDate = await this.findOldestDateWithData(config.tableName);
 			
 			if (!targetDate) {
-				console.log(`  No data found in ${config.tableName}, skipping...`);
 				return {
 					pipelineName: config.schemaName,
 					tableName: config.tableName,
@@ -278,14 +274,12 @@ export class PipelineManager {
 				};
 			}
 
-			console.log(`  Processing oldest date: ${targetDate.toISOString().split('T')[0]}`);
 
 			// 2. Xử lý dữ liệu theo batch: query 10k -> validate -> send -> delete -> lặp lại
 			// Thay vì query tất cả vào memory rồi mới đẩy, giờ sẽ xử lý từng batch để tối ưu memory
 			const recordsProcessed = await this.processDataInBatches(config, targetDate);
 
 			const duration = Date.now() - startTime;
-			console.log(`  Pipeline ${config.schemaName} completed in ${duration}ms`);
 
 			return {
 				pipelineName: config.schemaName,
@@ -325,7 +319,6 @@ export class PipelineManager {
 			if (endpoint) {
 				// Lưu endpoint vào cache
 				this.endpointCache.set(config.schemaName, endpoint);
-				console.log(`Pipeline cho schema ${config.schemaName} đã sẵn sàng với endpoint: ${endpoint}`);
 				return;
 			}
 			else {
@@ -367,7 +360,6 @@ export class PipelineManager {
 			cutoffDate.setHours(0, 0, 0, 0);
 			const cutoffTimestamp = Math.floor(cutoffDate.getTime());
 
-			console.log(`  Cutoff date (${retentionDays} days ago): ${cutoffDate.toISOString().split('T')[0]}`);
 
 			// Lấy created_at nhỏ nhất trong bảng, nhưng chỉ tìm các record trước cutoff
 			// Dùng quoted identifiers để tương thích với queue-worker (columns: "globalId", "created_at", ...)
@@ -376,7 +368,6 @@ export class PipelineManager {
 
 			if (!result || !(result as any).min_created_at) {
 				// Không có dữ liệu nào trước cutoff, đã đủ N ngày gần nhất
-				console.log(`  No data before cutoff date, keeping ${retentionDays} most recent days`);
 				return null;
 			}
 
@@ -414,7 +405,6 @@ export class PipelineManager {
 
 		const endTimestamp = Math.floor(endOfDay.getTime());
 
-		console.log(`  Processing data from ${config.tableName} for date ${targetDate.toISOString().split('T')[0]} (<= ${endTimestamp})...`);
 
 		try {
 			// Queue để quản lý các batch đang được xử lý (map promise với batch info)
@@ -446,7 +436,6 @@ export class PipelineManager {
 					// Tạo promise để xử lý batch này song song
 					const processPromise = this.processBatch(config, batch, currentOffset)
 						.then((processed) => {
-							console.log(`  Completed batch at offset ${currentOffset}: ${batchLength} records`);
 							return processed;
 						})
 						.catch((error) => {
@@ -491,7 +480,6 @@ export class PipelineManager {
 			// Chỉ dùng endTimestamp (không dùng startTimestamp) để ngày T+1 vẫn xử lý được nếu ngày T chưa đẩy xong
 			await this.deleteFlushedRecordsFromD1(config.tableName, endTimestamp);
 
-			console.log(`  Total records processed: ${totalProcessed}`);
 			return totalProcessed;
 		} catch (error) {
 			// Nếu bảng không tồn tại, trả về 0
@@ -513,11 +501,9 @@ export class PipelineManager {
 	  ): Promise<number> {
 		const batchSize = batch.length;
 	  
-		console.log(`Processing batch at offset ${offset}: ${batchSize} records...`);
 	  
 		// 1. Nếu batch rỗng → không làm gì cả, trả về sớm
 		if (batchSize === 0) {
-		  console.log('Batch is empty, skipping processing.');
 		  return 0;
 		}
 	  
@@ -528,7 +514,6 @@ export class PipelineManager {
 		  recordIds = batch
 			.map((record: any) => record.globalId);
 	  
-		  console.log(`Found ${recordIds.length} valid record IDs for flushedAt update.`);
 	  
 		  // 3. Validate và transform dữ liệu theo Zod schema
 		  const validatedRecords = this.validateRecords(batch, config.schema);
@@ -537,15 +522,12 @@ export class PipelineManager {
 		  if (validatedRecords.length != batchSize) {
 			throw new Error(`Invalid records: ${validatedRecords.length} of ${batchSize} records failed validation.`);
 		  } else {
-			console.log(`Sending ${validatedRecords.length} validated records to pipeline ${config.schemaName}...`);	  
 			// 4. Gửi đến Cloudflare Pipeline (sẽ throw error nếu fail)
 			const sentSuccessfully = await this.sendToPipeline(config, validatedRecords);
 			if (!sentSuccessfully) {
 				throw new Error(`Failed to send data to pipeline ${config.schemaName}.`);
 			}
-			console.log('Successfully sent data to pipeline.');
 			await this.updateBatchFromD1(config.tableName, recordIds);
-			console.log(`Updated flushedAt for ${recordIds.length} records in D1.`);
 
 		  }
 	  
@@ -574,7 +556,6 @@ export class PipelineManager {
 			const params = [flushedAt, ...recordIds];
 
 			await this.db.prepare(query).bind(...params).run();
-			console.log(`  Updated flushedAt for ${recordIds.length} records in ${tableName}`);
 		} catch (error) {
 			console.error(`Failed to update batch in D1: ${error}, tableName: ${tableName}, recordIds: ${recordIds.join(',')}`);
 			throw error;
@@ -590,7 +571,6 @@ export class PipelineManager {
 			const result = await this.db.prepare(query).bind(endTimestamp).run();
 			const deleted = result.meta?.changes ?? 0;
 			if (deleted > 0) {
-				console.log(`  Deleted ${deleted} flushed records from ${tableName}`);
 			}
 			return deleted;
 		} catch (error) {
@@ -660,7 +640,6 @@ export class PipelineManager {
 			);
 		}
 
-		console.log(`  Sent ${records.length} records to pipeline ${config.schemaName} (endpoint: ${endpoint})`);
 
 		return true
 	}

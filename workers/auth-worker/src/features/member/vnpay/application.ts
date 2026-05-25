@@ -1,4 +1,5 @@
 import { Context } from 'hono';
+import { createLogger } from '../../../shared/logger';
 import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createVNPayService, createCryptoService } from './infrastructure';
@@ -35,6 +36,8 @@ interface IPaymentApplicationService {
   refundTransactionUseCase(identifier: string, request: RefundRequest, ipAddr: string): Promise<RefundResult>;
 }
 
+const payLog = createLogger('auth-worker', 'payment');
+
 export function createPaymentApplicationService(c: Context, bindingName: string): IPaymentApplicationService {
   const cryptoService = createCryptoService();
 
@@ -61,7 +64,6 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
     },
 
     async processReturnUseCase(params: any): Promise<PaymentResult> {
-      console.log(`processReturnUseCase: ${JSON.stringify(params)}`);
       const { identifier, paymentId, orderId } = paymentUtils.parsePaymentReference(params.vnp_TxnRef);
       const isValid = validate(params);
       if (!isValid) {
@@ -83,7 +85,6 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
     },
 
     async processIPNUseCase(params: any): Promise<PaymentResult> {
-      console.log(`processReturnUseCase: ${JSON.stringify(params)}`);
       const { identifier, paymentId } = paymentUtils.parsePaymentReference(params.vnp_TxnRef);
       const isValid = validate(params);
       if (!isValid) {
@@ -192,6 +193,12 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
         const result = await vnpayService.processCassoIPN(paymentId, amount, reference, transfer.code);
         if (result.success) {
           await kv.delete(`casso_ref:${transfer.code}`);
+          payLog.info('payment.casso_ipn_ok', {
+            paymentId,
+            amount,
+            transferCode: transfer.code,
+            identifier,
+          });
         }
         return result;
       } catch (e) {

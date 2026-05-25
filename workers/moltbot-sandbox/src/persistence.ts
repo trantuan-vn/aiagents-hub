@@ -1,4 +1,7 @@
 import type { Sandbox } from '@cloudflare/sandbox';
+import { createLogger } from './shared/logger';
+
+const log = createLogger('moltbot-sandbox', 'persistence');
 
 const BACKUP_DIR = '/home/openclaw';
 const HANDLE_KEY = 'backup-handle.json';
@@ -55,13 +58,11 @@ export async function restoreIfNeeded(sandbox: Sandbox, bucket: R2Bucket): Promi
     // isolate signaled a restore is needed (e.g. after gateway restart).
     const marker = await bucket.head(RESTORE_NEEDED_KEY);
     if (!marker) return; // No restore signal — we're good
-    console.log('[persistence] Restore signal found in R2, re-restoring...');
     restored = false;
   }
 
   const handle = await getStoredHandle(bucket);
   if (!handle) {
-    console.log('[persistence] No backup handle found in R2, skipping restore');
     restored = true;
     return;
   }
@@ -73,21 +74,20 @@ export async function restoreIfNeeded(sandbox: Sandbox, bucket: R2Bucket): Promi
     // May not be mounted
   }
 
-  console.log(`[persistence] Restoring backup ${handle.id}...`);
   const t0 = Date.now();
   try {
     await sandbox.restoreBackup(handle);
     // Clear the restore signal and set the per-isolate flag
     await bucket.delete(RESTORE_NEEDED_KEY);
     restored = true;
-    console.log(`[persistence] Restore complete in ${Date.now() - t0}ms`);
+    log.info('persistence.restored', { backupId: handle.id, durationMs: Date.now() - t0 });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes('BACKUP_EXPIRED') || msg.includes('BACKUP_NOT_FOUND')) {
-      console.log(`[persistence] Backup ${handle.id} expired/gone, clearing handle`);
       await deleteHandle(bucket);
+      log.warn('persistence.backup_stale', { backupId: handle.id, reason: msg });
     } else {
-      console.error(`[persistence] Restore failed:`, err);
+      log.error('persistence.restore_failed', err instanceof Error ? err : { error: msg });
       throw err;
     }
   }
@@ -118,12 +118,10 @@ export async function createSnapshot(
   // Log directory contents before backup so we can verify what's captured
   try {
     const lsResult = await sandbox.exec(`ls ${BACKUP_DIR}/clawd/ 2>&1 || echo "(empty)"`);
-    console.log(`[persistence] Pre-backup ${BACKUP_DIR}/clawd/:`, lsResult.stdout?.trim());
   } catch {
     // non-fatal
   }
 
-  console.log('[persistence] Creating backup...');
   const t0 = Date.now();
   const handle = await sandbox.createBackup({
     dir: BACKUP_DIR,
@@ -131,7 +129,7 @@ export async function createSnapshot(
   });
 
   await storeHandle(bucket, handle);
-  console.log(`[persistence] Backup ${handle.id} created in ${Date.now() - t0}ms`);
+  log.info('persistence.snapshot_created', { backupId: handle.id, durationMs: Date.now() - t0 });
   return handle;
 }
 

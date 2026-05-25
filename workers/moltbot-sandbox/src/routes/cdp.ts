@@ -397,7 +397,6 @@ async function initCDPSession(ws: WebSocket, env: OpenClawEnv): Promise<void> {
       },
     });
 
-    console.log('[CDP] Session initialized, targetId:', targetId);
   } catch (err) {
     console.error('[CDP] Browser launch failed:', err);
     ws.close(1011, 'Browser launch failed');
@@ -416,7 +415,6 @@ async function initCDPSession(ws: WebSocket, env: OpenClawEnv): Promise<void> {
       return;
     }
 
-    console.log('[CDP] Request:', request.method, request.params);
 
     try {
       const result = await handleCDPMethod(session, request.method, request.params || {}, ws);
@@ -429,7 +427,6 @@ async function initCDPSession(ws: WebSocket, env: OpenClawEnv): Promise<void> {
 
   // Handle close
   ws.addEventListener('close', async () => {
-    console.log('[CDP] WebSocket closed, cleaning up');
     if (session) {
       try {
         await session.browser.close();

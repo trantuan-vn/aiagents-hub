@@ -6,6 +6,9 @@
  */
 
 import { PipelineManager } from './pipelines/pipeline-manager';
+import { createLogger } from './shared/logger';
+
+const log = createLogger('d1tor2-cron');
 
 // Cache pipeline manager instance to avoid recreating it on every request/cron trigger
 let pipelineManager: PipelineManager | null = null;
@@ -55,32 +58,30 @@ export default {
 	// Chạy hàng ngày để đẩy dữ liệu ngày xa nhất từ D1 sang R2, sau đó xóa khỏi D1
 	// Đảm bảo giữ lại D1_RETENTION_DAYS ngày gần nhất trong D1
 	async scheduled(event, env, ctx): Promise<void> {
-		const now = new Date();
-		console.log(`[${now.toISOString()}] Cron trigger fired: ${event.cron}`);
-
-		console.log(`Executing pipeline for oldest available date in each table...`);
-
+		const startedAt = Date.now();
+		log.info('cron.started', { cron: event.cron });
 		try {
 			const pipelineManager = await getPipelineManager(env.D1DB, env);
 			const stats = await pipelineManager.runAllPipelines();
 
-			console.log(`Pipeline execution completed:`);
-			console.log(`  Total pipelines: ${stats.totalPipelines}`);
-			console.log(`  Successful: ${stats.successful}`);
-			console.log(`  Failed: ${stats.failed}`);
-
-			// Log failed pipelines
 			const failedPipelines = stats.results.filter((r) => !r.success);
-			if (failedPipelines.length > 0) {
-				console.error('Failed pipelines:');
-				failedPipelines.forEach((result) => {
-					console.error(`  - ${result.pipelineName}: ${result.error}`);
+			for (const result of failedPipelines) {
+				log.error('cron.pipeline_failed', {
+					pipeline: result.pipelineName,
+					table: result.tableName,
+					error: result.error,
 				});
 			}
+
+			log.info('cron.completed', {
+				cron: event.cron,
+				total: stats.totalPipelines,
+				successful: stats.successful,
+				failed: stats.failed,
+				durationMs: Date.now() - startedAt,
+			});
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			console.error(`Pipeline execution failed: ${errorMessage}`);
-			// Re-throw để Cloudflare có thể retry nếu cần
+			log.error('cron.failed', error instanceof Error ? error : { error: String(error) });
 			throw error;
 		}
 	},

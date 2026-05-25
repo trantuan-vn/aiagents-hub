@@ -3,7 +3,6 @@ import { Session } from './domain';
 import {
   isNovelLoginCountry,
   newSessionDeviceFingerprint,
-  normalizeLoginCountry,
   uaFingerprintsMatch,
 } from './session-fingerprint';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
@@ -17,11 +16,6 @@ import CryptoJS from 'crypto-js';
 export const KNOWN_DEVICE_KV_PREFIX = 'KnownDevice:';
 export const PENDING_LOGIN_DEVICE_PREFIX = 'PendingLoginDevice:';
 
-const NEW_SESSION_EMAIL_LOG = '[NewSessionEmail]';
-
-function logNewSessionEmail(step: string, data: Record<string, unknown>): void {
-  console.log(NEW_SESSION_EMAIL_LOG, JSON.stringify({ step, ...data }));
-}
 /** Lưu thiết bị đã tin — vẫn nhận ra sau logout hết phiên */
 export const KNOWN_DEVICE_TTL_SEC = 365 * 24 * 60 * 60;
 export const PENDING_LOGIN_DEVICE_TTL_SEC = 15 * 60;
@@ -88,27 +82,9 @@ export async function isKnownDeviceId(
   activeSessions: Session[],
 ): Promise<boolean> {
   const sessionMatch = activeSessions.find((s) => s.isActive && s.deviceId === deviceId);
-  if (sessionMatch) {
-    logNewSessionEmail('isKnownDeviceId', {
-      known: true,
-      source: 'active_session',
-      deviceId,
-      matchedSessionId: sessionMatch.hashSessionId,
-      activeSessionCount: activeSessions.filter((s) => s.isActive).length,
-    });
-    return true;
-  }
+  if (sessionMatch) return true;
   const key = `${KNOWN_DEVICE_KV_PREFIX}${identifier}:${deviceId}`;
-  const kvHit = (await kv.get(key)) !== null;
-  logNewSessionEmail('isKnownDeviceId', {
-    known: kvHit,
-    source: kvHit ? 'kv' : 'none',
-    key,
-    deviceId,
-    activeSessionCount: activeSessions.filter((s) => s.isActive).length,
-    activeDeviceIds: activeSessions.filter((s) => s.isActive && s.deviceId).map((s) => s.deviceId),
-  });
-  return kvHit;
+  return (await kv.get(key)) !== null;
 }
 
 /** Login không gửi device_id trong khi account đã có phiên gắn device_id */
@@ -162,57 +138,23 @@ export async function decideNewSessionEmail(
   country: string | undefined,
   activeSessions: Session[],
 ): Promise<NewSessionEmailDecision> {
-  const activeCount = activeSessions.filter((s) => s.isActive).length;
-  const normalizedCountry = normalizeLoginCountry(country);
   const novelCountry = isNovelLoginCountry(country, activeSessions);
   const uaFp = newSessionDeviceFingerprint(ipAddress, userAgent);
 
-  logNewSessionEmail('decide:input', {
-    identifier,
-    sessionExisted,
-    deviceId,
-    country: normalizedCountry ?? country ?? null,
-    novelCountry,
-    uaFp,
-    activeSessionCount: activeCount,
-    activeSessionsSummary: activeSessions
-      .filter((s) => s.isActive)
-      .map((s) => ({
-        hashSessionId: s.hashSessionId,
-        deviceId: s.deviceId ?? null,
-        country: s.country ?? null,
-        uaFp: s.userAgent ? newSessionDeviceFingerprint(s.ipAddress ?? '', s.userAgent) : null,
-      })),
-  });
-
   if (sessionExisted) {
-    logNewSessionEmail('decide:result', { send: false, reason: 'session_existed_same_ip_ua_hash' });
     return { send: false };
   }
 
   if (deviceId) {
     const known = await isKnownDeviceId(kv, identifier, deviceId, activeSessions);
     if (known) {
-      logNewSessionEmail('decide:result', { send: false, reason: 'known_device_id' });
       return { send: false };
     }
     const cooldownKey = `NewSessionEmailCooldown:${identifier}:dev:${deviceId}`;
     const onCooldown = !!(await kv.get(cooldownKey));
     if (!novelCountry) {
-      const send = !onCooldown;
-      logNewSessionEmail('decide:result', {
-        send,
-        reason: onCooldown ? 'cooldown_device' : 'new_device_same_country',
-        cooldownKey,
-        onCooldown,
-      });
-      return { send, cooldownKey };
+      return { send: !onCooldown, cooldownKey };
     }
-    logNewSessionEmail('decide:result', {
-      send: true,
-      reason: 'novel_country_new_device',
-      cooldownKey,
-    });
     return { send: true, cooldownKey };
   }
 
@@ -220,21 +162,9 @@ export async function decideNewSessionEmail(
     if (!novelCountry) {
       const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
       const onCooldown = !!(await kv.get(cooldownKey));
-      const send = !onCooldown;
-      logNewSessionEmail('decide:result', {
-        send,
-        reason: onCooldown ? 'cooldown_ua_missing_device_id' : 'missing_device_id_new_ua',
-        cooldownKey,
-        onCooldown,
-      });
-      return { send, cooldownKey };
+      return { send: !onCooldown, cooldownKey };
     }
     const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-    logNewSessionEmail('decide:result', {
-      send: true,
-      reason: 'novel_country_missing_device_id',
-      cooldownKey,
-    });
     return { send: true, cooldownKey };
   }
 
@@ -242,38 +172,16 @@ export async function decideNewSessionEmail(
     (s) => s.isActive && s.userAgent && uaFingerprintsMatch(s.userAgent, userAgent),
   );
   if (hasSimilarUaActive && !novelCountry) {
-    logNewSessionEmail('decide:result', {
-      send: false,
-      reason: 'similar_ua_active_session',
-      hasSimilarUaActive,
-      uaFp,
-    });
     return { send: false };
   }
 
   if (!novelCountry) {
     const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
     const onCooldown = !!(await kv.get(cooldownKey));
-    const send = !onCooldown;
-    logNewSessionEmail('decide:result', {
-      send,
-      reason: onCooldown ? 'cooldown_ua' : 'new_ua_same_country',
-      cooldownKey,
-      onCooldown,
-      hasSimilarUaActive,
-      uaFp,
-    });
-    return { send, cooldownKey };
+    return { send: !onCooldown, cooldownKey };
   }
 
   const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-  logNewSessionEmail('decide:result', {
-    send: true,
-    reason: 'novel_country_no_device_id',
-    cooldownKey,
-    hasSimilarUaActive,
-    uaFp,
-  });
   return { send: true, cooldownKey };
 }
 
