@@ -72,9 +72,10 @@ export const OrderItemSchema = z.object({
 export const OrderSchema = z.object({
   id: z.number().int(),
   orderCode: z.string(),
+  /** USD credited to wallet after successful payment */
   subtotalAmount: z.number().min(0),
   discountAmount: z.number().min(0).default(0),
-  /** USD wallet credit */
+  /** USD payable at checkout (after voucher) */
   finalAmount: z.number().min(0),
   /** VND payable at checkout */
   payableAmountVnd: z.number().int().min(0).optional(),

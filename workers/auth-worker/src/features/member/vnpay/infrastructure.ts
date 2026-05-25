@@ -22,7 +22,7 @@ import { executeUtils } from '../../../shared/utils';
 import { convertVndToUsd } from '../../admin/service/pricing';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastructure';
-import { getOrderPayableVnd } from '../order/domain';
+import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd } from '../order/domain';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
 
@@ -35,8 +35,10 @@ export function createVNPayService(
     return getUsdVndRateFromEnv(walletOptions.env, walletOptions.bindingName);
   };
 
-  const walletCreditUsd = async (orderRow: { finalAmount?: number; currency?: string | null }): Promise<number> => {
-    const raw = Number(orderRow.finalAmount ?? 0) || 0;
+  const walletCreditUsd = async (
+    orderRow: Parameters<typeof getOrderWalletCreditUsd>[0] & { currency?: string | null },
+  ): Promise<number> => {
+    const raw = getOrderWalletCreditUsd(orderRow);
     if (raw <= 0) return 0;
     if ((orderRow.currency ?? 'VND').toUpperCase() === 'USD') return raw;
     const rate = await getRate();
@@ -109,7 +111,7 @@ export function createVNPayService(
       const credit = await walletCreditUsd(orderRow);
       const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
       const rate = await getRate();
-      const topUpVnd = getOrderPayableVnd(orderRow, rate);
+      const topUpVnd = getOrderWalletCreditVnd(orderRow, rate);
 
       operations.push({
         table: 'orders',

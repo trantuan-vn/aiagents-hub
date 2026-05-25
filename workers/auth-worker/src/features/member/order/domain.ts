@@ -120,6 +120,27 @@ export function mapOrderForMemberApi(row: Record<string, unknown>): Record<strin
   return mapped;
 }
 
+export function getOrderWalletCreditUsd(order: {
+  subtotalAmount?: number;
+  subtotal_amount?: number;
+  finalAmount?: number;
+  final_amount?: number;
+}): number {
+  const sub = order.subtotalAmount ?? order.subtotal_amount;
+  if (typeof sub === 'number' && sub > 0) return sub;
+  return Number(order.finalAmount ?? order.final_amount ?? 0) || 0;
+}
+
+export function getOrderWalletCreditVnd(
+  order: Parameters<typeof getOrderWalletCreditUsd>[0] & { currency?: string | null },
+  usdVndRate: number,
+): number {
+  const creditUsd = getOrderWalletCreditUsd(order);
+  const cur = (order.currency ?? 'USD').toUpperCase();
+  if (cur === 'USD') return Math.round(convertUsdToVnd(creditUsd, usdVndRate));
+  return Math.round(creditUsd);
+}
+
 export function getOrderPayableVnd(
   order: { finalAmount: number; payableAmountVnd?: number | null; currency?: string | null },
   usdVndRate: number,

@@ -115,7 +115,7 @@ export function PaymentDialog({
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{t("wallet_credit_usd")}</span>
-                <span className="text-sm font-bold">{formatPaymentCurrency(order.finalAmount)}</span>
+                <span className="text-sm font-bold">{formatPaymentCurrency(order.subtotalAmount)}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">{t("payable_vnd")}</span>
