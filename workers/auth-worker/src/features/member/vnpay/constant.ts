@@ -14,8 +14,13 @@ export const PAYMENT_ERROR_MESSAGES = {
   QUERY_FAILED: 'Transaction query failed',
   CASSO_TRANSFER_NOT_FOUND: 'Casso transfer reference not found',
   VIETQR_FAILED: 'Failed to generate VietQR',
-  INVALID_CASSO_PAYLOAD: 'Invalid Casso webhook payload'
+  INVALID_CASSO_PAYLOAD: 'Invalid Casso webhook payload',
+  ORDER_ALREADY_COMPLETED: 'Order already completed',
+  CASSO_WEBHOOK_ERROR: 'Casso webhook reported an error',
 } as const;
+
+/** Max Casso IPN audit entries kept on a payment record (support / disputes). */
+export const CASSO_IPN_LOG_MAX = 20;
 
 // VNPay Configuration Constants
 export const VNPAY_CONSTANTS = {

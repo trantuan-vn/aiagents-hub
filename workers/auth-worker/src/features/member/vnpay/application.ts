@@ -23,6 +23,7 @@ import { getCassoWebhookChecksumKey, getVietQrConfig } from './casso-config';
 import { verifyCassoWebhookSignature, extractCassoTransfer } from './casso-signature';
 import { processEarningsPayoutCassoIPN } from '../../admin/earnings-payout/service';
 import { PAYMENT_ERROR_MESSAGES } from './constant';
+import { appendCassoIpnLog } from './casso-ipn-log';
 
 interface IPaymentApplicationService {
   createPaymentUrlUseCase(identifier: string, request: CreatePayment, ipAddr: string): Promise<string>;
@@ -105,6 +106,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       const checksumKey = await getCassoWebhookChecksumKey(c.env);
       const headerSig = headers.get("X-Casso-Signature") ?? headers.get("x-casso-signature") ?? undefined;
       if (!verifyCassoWebhookSignature(headerSig, payload, checksumKey)) {
+        console.error('[CassoIPN] checksum failed', { hasSig: Boolean(headerSig) });
         return {
           success: false,
           code: "97",
@@ -114,7 +116,13 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
       const err = payload.error;
       if (typeof err === "number" && err !== 0) {
-        return { success: true, code: "00", message: "Ignored" };
+        const errMessage = `${PAYMENT_ERROR_MESSAGES.CASSO_WEBHOOK_ERROR} (code=${err})`;
+        console.error('[CassoIPN] Casso payload error', { err, payload });
+        return {
+          success: false,
+          code: "06",
+          message: errMessage,
+        };
       }
 
       const data = payload.data as Record<string, unknown> | undefined;
@@ -123,6 +131,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
       const reference = typeof data?.reference === "string" ? data.reference : "casso";
 
       if (typeof amount !== "number") {
+        console.error('[CassoIPN] missing amount', { description, reference });
         return {
           success: false,
           code: "01",
@@ -132,6 +141,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
       const transfer = extractCassoTransfer(description);
       if (!transfer) {
+        console.error('[CassoIPN] transfer code not found in description', { description, amount, reference });
         return {
           success: false,
           code: "01",
@@ -152,6 +162,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
       const mapping = await kv.get(`casso_ref:${transfer.code}`);
       if (!mapping) {
+        console.error('[CassoIPN] KV mapping missing', { transferCode: transfer.code, amount, reference });
         return {
           success: false,
           code: "01",
@@ -166,6 +177,7 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
         identifier = parsed.identifier;
         paymentId = parsed.paymentId;
       } catch {
+        console.error('[CassoIPN] invalid KV mapping', { transferCode: transfer.code, mapping });
         return {
           success: false,
           code: "01",
@@ -175,7 +187,26 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
 
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
       const vnpayService = createVNPayService(userDO, { env: c.env, bindingName });
-      return await vnpayService.processCassoIPN(paymentId, amount, reference);
+
+      try {
+        const result = await vnpayService.processCassoIPN(paymentId, amount, reference, transfer.code);
+        if (result.success) {
+          await kv.delete(`casso_ref:${transfer.code}`);
+        }
+        return result;
+      } catch (e) {
+        const message = e instanceof Error ? e.message : PAYMENT_ERROR_MESSAGES.INVALID_REQUEST;
+        await appendCassoIpnLog(userDO, paymentId, {
+          success: false,
+          code: "99",
+          message,
+          phase: "webhook",
+          creditedAmount: amount,
+          externalRef: reference,
+          transferCode: transfer.code,
+        });
+        throw e;
+      }
     },
 
     async createCassoQrUseCase(identifier: string, request: CassoQrRequest, kv: KVNamespace): Promise<{ qr: string }> {

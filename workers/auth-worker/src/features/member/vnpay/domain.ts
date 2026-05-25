@@ -107,7 +107,12 @@ export interface IVNPayService {
     kv: KVNamespace,
     vietqr: { accountNo: string; accountName: string; acqId: string },
   ): Promise<{ qr: string }>;
-  processCassoIPN(paymentId: number, creditedAmount: number, externalRef: string): Promise<PaymentResult>;
+  processCassoIPN(
+    paymentId: number,
+    creditedAmount: number,
+    externalRef: string,
+    transferCode?: string,
+  ): Promise<PaymentResult>;
   queryTransaction(request: PaymentQuery, ipAddr: string): Promise<QueryDRResult>;
   refundTransaction(identifier: string, request: RefundRequest, ipAddr: string): Promise<RefundResult>;
 }

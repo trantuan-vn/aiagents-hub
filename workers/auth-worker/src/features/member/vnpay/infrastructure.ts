@@ -23,6 +23,7 @@ import { convertVndToUsd } from '../../admin/service/pricing';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastructure';
 import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd } from '../order/domain';
+import { appendCassoIpnLog } from './casso-ipn-log';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
 
@@ -103,6 +104,9 @@ export function createVNPayService(
         where: { field: 'id', operator: '=', value: orderId },
       }, 'orders');
       const orderRow = orderRows[0];
+      if (orderRow.status === ORDER_STATUS.COMPLETED) {
+        throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_ALREADY_COMPLETED);
+      }
       const userRows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
       const dbUser = userRows[0];
       if (!dbUser?.id || !orderRow) {
@@ -131,7 +135,15 @@ export function createVNPayService(
       });
 
       await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
-      await recordTopUpAndUpgradeTier(userDO, topUpVnd, walletOptions?.env);
+      try {
+        await recordTopUpAndUpgradeTier(userDO, topUpVnd, walletOptions?.env);
+      } catch (tierErr) {
+        console.error('[Payment] recordTopUpAndUpgradeTier failed after wallet credit', {
+          paymentId,
+          orderId,
+          tierErr,
+        });
+      }
       return;
     }
 
@@ -342,6 +354,14 @@ export function createVNPayService(
     }
 
     const order = orders[0];
+    if (order.status === ORDER_STATUS.COMPLETED) {
+      return {
+        success: false,
+        code: '02',
+        message: PAYMENT_ERROR_MESSAGES.ORDER_ALREADY_COMPLETED,
+      };
+    }
+
     const rate = await getRate();
     const payableVnd = getOrderPayableVnd(order, rate);
     if (payableVnd !== Math.round(expectedAmount)) {
@@ -455,7 +475,25 @@ export function createVNPayService(
     paymentId: number,
     creditedAmount: number,
     externalRef: string,
+    transferCode?: string,
   ): Promise<PaymentResult> => {
+    const logCtx = {
+      phase: 'process' as const,
+      creditedAmount,
+      externalRef,
+      transferCode,
+    };
+
+    const fail = async (code: string, message: string): Promise<PaymentResult> => {
+      await appendCassoIpnLog(userDO, paymentId, {
+        success: false,
+        code,
+        message,
+        ...logCtx,
+      });
+      return { success: false, code, message };
+    };
+
     const payments = await executeUtils.executeDynamicAction(
       userDO,
       "select",
@@ -473,52 +511,64 @@ export function createVNPayService(
       };
     }
 
-    const payment = payments[0] as { status: string; orderId: number; gateway?: string; paymentDetails?: { vnp_Amount?: number } };
+    const payment = payments[0] as {
+      status: string;
+      orderId: number;
+      gateway?: string;
+      paymentDetails?: { vnp_Amount?: number; casso_transferCode?: string };
+    };
 
     if (payment.gateway !== "casso") {
-      return {
-        success: false,
-        code: "01",
-        message: PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND,
-      };
+      return fail("01", PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
 
     if (payment.status !== PAYMENT_STATUS.PENDING) {
-      return {
-        success: false,
-        code: "02",
-        message: PAYMENT_ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED,
-      };
+      return fail("02", PAYMENT_ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
     }
 
-    const expectedAmount = (payment.paymentDetails?.vnp_Amount ?? 0) / 100;
+    const expectedAmountVnd = Math.round((payment.paymentDetails?.vnp_Amount ?? 0) / 100);
+    const creditedVnd = Math.round(creditedAmount);
 
     const orders = await executeUtils.executeDynamicAction(userDO, "select", {
       where: { field: "id", operator: "=", value: payment.orderId },
     }, "orders");
 
     if (orders.length === 0) {
-      return {
-        success: false,
-        code: "01",
-        message: PAYMENT_ERROR_MESSAGES.PAYMENT_NOT_FOUND,
-      };
+      return fail("01", PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
-    const order = orders[0] as { id: number; finalAmount: number; payableAmountVnd?: number; currency?: string };
+    const order = orders[0] as {
+      id: number;
+      finalAmount: number;
+      payableAmountVnd?: number;
+      currency?: string;
+      status?: string;
+    };
+
+    if (order.status === ORDER_STATUS.COMPLETED) {
+      return fail("02", PAYMENT_ERROR_MESSAGES.ORDER_ALREADY_COMPLETED);
+    }
+
     const rate = await getRate();
-    const payableVnd = getOrderPayableVnd(order, rate);
-    if (payableVnd !== Math.round(expectedAmount) || Math.round(creditedAmount) !== payableVnd) {
-      return {
-        success: false,
-        code: "04",
-        message: PAYMENT_ERROR_MESSAGES.INVALID_AMOUNT,
-      };
+    const orderPayableVnd = getOrderPayableVnd(order, rate);
+
+    if (orderPayableVnd !== expectedAmountVnd) {
+      return fail(
+        "04",
+        `${PAYMENT_ERROR_MESSAGES.INVALID_AMOUNT} (order=${orderPayableVnd}, payment=${expectedAmountVnd})`,
+      );
+    }
+
+    if (creditedVnd !== expectedAmountVnd) {
+      return fail(
+        "04",
+        `${PAYMENT_ERROR_MESSAGES.INVALID_AMOUNT} (expected=${expectedAmountVnd}, credited=${creditedVnd})`,
+      );
     }
 
     const synthetic: VNPayReturn = {
       vnp_TmnCode: "CASSO",
-      vnp_Amount: String(creditedAmount * 100),
+      vnp_Amount: String(creditedVnd * 100),
       vnp_BankCode: "CASSO",
       vnp_BankTranNo: externalRef,
       vnp_CardType: undefined,
@@ -531,7 +581,25 @@ export function createVNPayService(
       vnp_SecureHash: "",
     };
 
-    await processPaymentTransaction(paymentId, order.id, synthetic);
+    try {
+      await processPaymentTransaction(paymentId, order.id, synthetic);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : PAYMENT_ERROR_MESSAGES.INVALID_REQUEST;
+      await appendCassoIpnLog(userDO, paymentId, {
+        success: false,
+        code: "99",
+        message,
+        ...logCtx,
+      });
+      throw e;
+    }
+
+    await appendCassoIpnLog(userDO, paymentId, {
+      success: true,
+      code: "00",
+      message: "Success",
+      ...logCtx,
+    });
 
     return {
       success: true,

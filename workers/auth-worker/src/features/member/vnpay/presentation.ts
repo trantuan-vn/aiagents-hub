@@ -19,6 +19,11 @@ export function createPaymentRoutes(bindingName: string) {
       } catch (e) {
         const { errorResponse, status } = await handleError(c, e, errorMessage);
         if (isErrorReturn) return c.json(errorResponse, status);
+        const message =
+          typeof errorResponse === 'object' && errorResponse !== null && 'error' in errorResponse
+            ? String((errorResponse as { error?: string }).error)
+            : errorMessage;
+        return c.json({ RspCode: '99', Message: message }, status);
       }
     };
   };
