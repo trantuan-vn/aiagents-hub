@@ -1254,11 +1254,30 @@ export class D1DatabaseManager {
           .run();
       }
 
-      // Thêm unique index cho conflictField nếu cột vừa được thêm
+      /**
+       * Đảm bảo index UNIQUE cho conflictField.
+       *
+       * CRITICAL: Với bảng userScoped (D1 tổng hợp dữ liệu nhiều user), unique constraint phải là
+       * (user_id, conflictField). Tuyệt đối không tạo UNIQUE(conflictField) vì sẽ gây lỗi
+       * kiểu: UNIQUE constraint failed: <table>.<field>
+       */
       if (options.conflictField && options.uniqueIndexes?.includes(options.conflictField)) {
-        const idxName = `uidx_${name}_${options.conflictField}`;
         try {
-          await this.db.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS "${idxName}" ON "${name}" ("${options.conflictField}")`).run();
+          if (options.userScoped) {
+            const idxName = `uidx_${name}_user_${options.conflictField}`;
+            await this.db
+              .prepare(
+                `CREATE UNIQUE INDEX IF NOT EXISTS "${idxName}" ON "${name}" ("user_id", "${options.conflictField}")`,
+              )
+              .run();
+          } else {
+            const idxName = `uidx_${name}_${options.conflictField}`;
+            await this.db
+              .prepare(
+                `CREATE UNIQUE INDEX IF NOT EXISTS "${idxName}" ON "${name}" ("${options.conflictField}")`,
+              )
+              .run();
+          }
         } catch {
           // Index có thể đã tồn tại, bỏ qua
         }
