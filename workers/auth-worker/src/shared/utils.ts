@@ -2,6 +2,8 @@ import { Context } from 'hono'
 import CryptoJS from 'crypto-js';
 import { UserDO } from '../features/ws/infrastructure/UserDO';
 import { createLogger } from './logger';
+import { recordIpAuthFailure } from './ip-rate-limit';
+import { isAdminIdentifier } from './admin-config';
 
 const log = createLogger('auth-worker', 'errors');
 
@@ -38,32 +40,11 @@ export const handleError = async (c: Context, e: any, defaultMessage: string) =>
 
     const errorResponse = { error: `${defaultMessage}: ${message}`};
 
-    const ip= getClientIp(c);
-    const ipData = await c.env.NONCE_KV.get(ip);
-    let failCount = 1;
-    let blockDuration = 5 * 60 * 1000; // 5 phút
-    
-    if (ipData) {
-      const data = JSON.parse(ipData);
-      failCount = data.failCount + 1;
-      
-      // Tăng thời gian chặn theo số lần
-      if (failCount >= 6) blockDuration = 15 * 60 * 1000; // 15 phút
-      if (failCount >= 10) blockDuration = 60 * 60 * 1000; // 1 giờ
-      if (failCount >= 15) blockDuration = 24 * 60 * 60 * 1000; // 24 giờ
-      
+    const ip = getClientIp(c);
+    if (ip) {
+      await recordIpAuthFailure(c.env, ip);
     }
-    
-    const blockData = {
-      failCount: failCount,
-      blockUntil: Date.now() + blockDuration,
-      lastAttempt: Date.now()
-    };
-    
-    await c.env.NONCE_KV.put(ip, JSON.stringify(blockData), {
-      expirationTtl: 24 * 60 * 60 // TTL 24 giờ
-    });  
-    
+
     return { errorResponse, status: 400 as const };
   } catch (error) {
     log.error('handler.internal_failure', error instanceof Error ? error : { error: String(error) });
@@ -142,8 +123,10 @@ export function getIdFromString(c: Context, id: string, bindingName: string): Du
   return binding.get(doID); // as unknown as T;
 }
 
-export function isAdmin(identifier: string) {
-  return identifier === 'tuanta2021@gmail.com';
+/** @deprecated Use isAdminIdentifier(env, identifier) */
+export function isAdmin(identifier: string, env?: Pick<Env, 'ADMIN_IDENTIFIERS'>) {
+  if (env) return isAdminIdentifier(env, identifier);
+  return identifier.trim().toLowerCase() === 'tuanta2021@gmail.com';
 }
 
 export function getIPAndUserAgent(request: Request) {

@@ -1,6 +1,6 @@
 import type { Context } from 'hono';
 import { UserDO } from '../../ws/infrastructure/UserDO';
-import { COMMISSION_ADMIN_IDENTIFIER } from '../admin-identifier';
+import { getPrimaryAdminIdentifier } from '../admin-identifier';
 import { DEFAULT_USD_VND_RATE } from './domain';
 import { createExchangeRateInfrastructure } from './infrastructure';
 
@@ -18,7 +18,7 @@ function adminExchangeRateStub(env: Env, bindingName: string): DurableObjectStub
   if (!binding) {
     throw new Error(`Durable Object binding '${bindingName}' not found`);
   }
-  return binding.get(binding.idFromName(COMMISSION_ADMIN_IDENTIFIER)) as DurableObjectStub<UserDO>;
+  return binding.get(binding.idFromName(getPrimaryAdminIdentifier(env))) as DurableObjectStub<UserDO>;
 }
 
 /** VND per 1 USD for a calendar day (exact match, else latest on/before, else default). */

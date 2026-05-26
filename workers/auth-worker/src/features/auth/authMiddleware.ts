@@ -7,7 +7,11 @@ import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { cookieUtils } from './utils';
 import { getClientIpAndUserAgentForSession, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
-import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { isDashboardPublicPath } from '../../shared/dashboard-public-paths';
+import { createIpRateLimitMiddleware, recordIpAuthFailure } from '../../shared/ip-rate-limit';
+import { ERROR_MESSAGES } from './constant';
+
+export { createIpRateLimitMiddleware };
 
 // Main authentication middleware factory
 export function createAuthMiddleware(bindingName: string) {
@@ -44,7 +48,13 @@ export function createAuthMiddleware(bindingName: string) {
       }
       cookieUtils.clearAuthCookies(c);
     }
-    
+
+    const path = c.req.path;
+    const method = c.req.method;
+    if (!isDashboardPublicPath(path, method) && !c.get('user')) {
+      return c.json({ error: ERROR_MESSAGES.AUTH.NOT_AUTHENTICATED }, 401);
+    }
+
     await next();
   };
 }
@@ -114,68 +124,12 @@ export function securityHeadersMiddleware() {
 
 
 
-// Xem xet sau de apply dan  
-// Rate limiting middleware factory
-export function createRateLimitMiddleware() {
-  return async (c: Context, next: Next) => {
-    try {
-      const ip = getClientIp(c);
-      if (!ip) {
-        return await next();
-      }
+/** @deprecated Use createIpRateLimitMiddleware */
+export const createRateLimitMiddleware = createIpRateLimitMiddleware;
 
-      const ipData = await c.env.NONCE_KV.get(`rate_limit:${ip}`);
-      
-      if (ipData) {
-        const data = JSON.parse(ipData);
-        const now = Date.now();
-        
-        // Check if IP is blocked
-        if (now < data.blockUntil && data.failCount >= AUTH_CONSTANTS.RATE_LIMIT_MAX) {
-          const remainingTime = Math.ceil((data.blockUntil - now) / 1000);
-          return c.json({ 
-            error: ERROR_MESSAGES.AUTH.RATE_LIMIT_EXCEEDED,
-            retryAfter: remainingTime 
-          }, 429);
-        }
-        
-        // Reset if block period has expired
-        if (now > data.blockUntil) {
-          await c.env.NONCE_KV.delete(`rate_limit:${ip}`);
-        }
-      }
-
-    } catch (error) {
-      handleErrorWithoutIp(error, "Rate limit middleware error");
-    }
-
-    await next();
-
-  };
-}
-
-// Update rate limit on failure
+/** Record auth failure against client IP (KV key rate_limit:${ip}). */
 export async function updateRateLimit(env: Env, ip: string): Promise<void> {
-  if (!ip) return;
-
-  const key = `rate_limit:${ip}`;
-  const now = Date.now();
-  const existingData = await env.NONCE_KV.get(key);
-  
-  let data: any = { failCount: 1, lastAttempt: now, blockUntil: now + AUTH_CONSTANTS.RATE_LIMIT_WINDOW };
-  
-  if (existingData) {
-    const existing = JSON.parse(existingData);
-    data = {
-      failCount: existing.failCount + 1,
-      lastAttempt: now,
-      blockUntil: now + AUTH_CONSTANTS.RATE_LIMIT_WINDOW
-    };
-  }
-  
-  await env.NONCE_KV.put(key, JSON.stringify(data), {
-    expirationTtl: Math.ceil(AUTH_CONSTANTS.RATE_LIMIT_WINDOW / 1000) * 2
-  });
+  await recordIpAuthFailure(env, ip);
 }
 
 // CORS middleware for auth endpoints

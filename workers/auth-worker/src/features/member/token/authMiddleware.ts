@@ -1,6 +1,8 @@
 import { Context, Next } from 'hono';
 import { createTokenApplicationService } from './application.js';
 import { handleError, getClientIp } from '../../../shared/utils';
+import { isApiPublicPath } from '../../../shared/api-public-paths';
+import { applyCorsHeadersIfAllowed } from '../../../shared/cors-headers';
 import { TOKEN_CONSTANTS, ERROR_MESSAGES } from './constant';
 import { 
   tokenValidationUtils, 
@@ -12,6 +14,11 @@ export function createTokenValidationMiddleware(bindingName: string) {
     try {
       // Luôn xóa token data cũ trước khi xác thực lại
       c.set('tokenData', undefined);
+
+      if (isApiPublicPath(c.req.path)) {
+        await next();
+        return;
+      }
       
       const clientId = c.req.header('X-Client-ID') || c.req.query('client_id');
       
@@ -23,45 +30,42 @@ export function createTokenValidationMiddleware(bindingName: string) {
         throw new Error(ERROR_MESSAGES.TOKEN.INVALID_CLIENT_ID);
       }
 
-      // Lấy token từ header Authorization Bearer
       const authHeader = c.req.header('Authorization');
-      
-      if (authHeader) {
-        // Input Validation - Protection against injection attacks
-        if (!tokenValidationUtils.isValidAuthHeader(authHeader)) {
-          throw new Error('Invalid authorization header format');
-        }
-
-        const token = authHeader.substring(7); // Lấy phần sau "Bearer "
-        // Token Length Validation - Prevention of DoS attacks
-        if (!token || token.length > TOKEN_CONSTANTS.MAX_TOKEN_LENGTH) {
-          throw new Error(ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
-        }
-
-        // Token Format Validation - Basic sanitization
-        if (!tokenValidationUtils.isValidTokenFormat(token)) {
-          throw new Error('Invalid token format');
-        }
-
-        const applicationService = createTokenApplicationService(c, bindingName);
-        
-        // Timeout Protection - Prevention of DoS attacks
-        const validationPromise = applicationService.validateApiTokenUseCase(clientId, token);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error(ERROR_MESSAGES.TOKEN.TOKEN_VALIDATION_TIMEOUT)), TOKEN_CONSTANTS.TOKEN_TIMEOUT_MS)
-        );
-
-        const validationResult = await Promise.race([validationPromise, timeoutPromise]) as any;
-        
-        if (!validationResult.isValid) {
-          throw new Error(validationResult.error || ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
-        }
-
-        // Token Data Sanitization
-        const sanitizedTokenData = securityUtils.sanitizeTokenData(validationResult.token);
-        c.set('tokenData', sanitizedTokenData);
+      if (!authHeader) {
+        throw new Error(ERROR_MESSAGES.TOKEN.MISSING_AUTHORIZATION);
       }
-      
+
+      if (!tokenValidationUtils.isValidAuthHeader(authHeader)) {
+        throw new Error('Invalid authorization header format');
+      }
+
+      const token = authHeader.substring(7);
+      if (!token || token.length > TOKEN_CONSTANTS.MAX_TOKEN_LENGTH) {
+        throw new Error(ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
+      }
+
+      if (!tokenValidationUtils.isValidTokenFormat(token)) {
+        throw new Error('Invalid token format');
+      }
+
+      const applicationService = createTokenApplicationService(c, bindingName);
+      const validationPromise = applicationService.validateApiTokenUseCase(clientId, token);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(ERROR_MESSAGES.TOKEN.TOKEN_VALIDATION_TIMEOUT)), TOKEN_CONSTANTS.TOKEN_TIMEOUT_MS),
+      );
+
+      const validationResult = await Promise.race([validationPromise, timeoutPromise]) as {
+        isValid: boolean;
+        error?: string;
+        token?: unknown;
+      };
+
+      if (!validationResult.isValid) {
+        throw new Error(validationResult.error || ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
+      }
+
+      c.set('tokenData', securityUtils.sanitizeTokenData(validationResult.token));
+
       await next();
     } catch (error) {
       const { errorResponse, status } = await handleError(c, error, 'Token validation failed');
@@ -106,24 +110,45 @@ export function securityLoggingMiddleware() {
   };
 }
 
-// Rate limiting middleware
+// Rate limiting middleware (per X-Client-ID)
 export function createTokenRateLimitMiddleware() {
   return async (c: Context, next: Next) => {
-    const clientId = c.req.header('X-Client-ID');
-    if (!clientId) return await next();
+    if (isApiPublicPath(c.req.path)) {
+      await next();
+      return;
+    }
+
+    const clientId = c.req.header('X-Client-ID') || c.req.query('client_id');
+    if (!clientId || !tokenValidationUtils.isValidClientId(clientId)) {
+      await next();
+      return;
+    }
 
     const key = `token_rate_limit:${clientId}`;
-    const data = await c.env.KV.get(key);
-    
-    if (data) {
-      const { count, resetTime } = JSON.parse(data);
-      if (Date.now() < resetTime && count >= TOKEN_CONSTANTS.RATE_LIMIT_MAX) {
-        return c.json({ 
-          error: ERROR_MESSAGES.TOKEN.RATE_LIMIT_EXCEEDED 
-        }, 429);
+    const now = Date.now();
+    const windowMs = TOKEN_CONSTANTS.RATE_LIMIT_WINDOW;
+    const max = TOKEN_CONSTANTS.RATE_LIMIT_MAX;
+
+    let count = 1;
+    let resetTime = now + windowMs;
+    const raw = await c.env.NONCE_KV.get(key);
+    if (raw) {
+      const data = JSON.parse(raw) as { count: number; resetTime: number };
+      if (now < data.resetTime) {
+        count = data.count + 1;
+        resetTime = data.resetTime;
       }
     }
-    
+
+    if (count > max && now < resetTime) {
+      applyCorsHeadersIfAllowed(c);
+      return c.json({ error: ERROR_MESSAGES.TOKEN.RATE_LIMIT_EXCEEDED }, 429);
+    }
+
+    await c.env.NONCE_KV.put(key, JSON.stringify({ count, resetTime }), {
+      expirationTtl: Math.max(60, Math.ceil((windowMs * 2) / 1000)),
+    });
+
     await next();
   };
 }

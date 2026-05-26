@@ -17,7 +17,7 @@ import {
   attachBeneficiaries,
   buildAccruingPayoutList,
   buildAggregatedPayoutList,
-  COMMISSION_ADMIN_IDENTIFIER,
+  getPrimaryAdminIdentifier,
   getUnpaidPayoutKeysForUser,
   syncAllPeriodPayoutRecords,
 } from './service';
@@ -32,7 +32,7 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       if (!db) throw new Error('D1 database binding not configured');
 
       const payoutInfra = createEarningsPayoutInfrastructure(
-        getIdFromName(c, COMMISSION_ADMIN_IDENTIFIER, bindingName) as DurableObjectStub<UserDO>,
+        getIdFromName(c, getPrimaryAdminIdentifier(c.env), bindingName) as DurableObjectStub<UserDO>,
       );
 
       const allRecords = await syncAllPeriodPayoutRecords(db, payoutInfra);
@@ -60,7 +60,7 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
 
       const adminStub = getIdFromName(
         c,
-        COMMISSION_ADMIN_IDENTIFIER,
+        getPrimaryAdminIdentifier(c.env),
         bindingName,
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);

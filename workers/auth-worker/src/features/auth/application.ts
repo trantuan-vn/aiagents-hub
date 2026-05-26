@@ -1,6 +1,7 @@
 import { Context } from 'hono';
 import { createLogger } from '../../shared/logger';
-import { getIdFromName, isAdmin, getSessionIdHash } from '../../shared/utils';
+import { getIdFromName, getSessionIdHash } from '../../shared/utils';
+import { isAdminIdentifier } from '../../shared/admin-config';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
 
@@ -195,7 +196,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     const baseUser = {
       identifier: validationUtils.normalizeIdentifier(identifier),
-      role: isAdmin(identifier) ? 'admin' : 'member',
+      role: isAdminIdentifier(c.env, identifier) ? 'admin' : 'member',
       referralCode,
       ...(referrerId && { referrerId }),
       ...additionalData

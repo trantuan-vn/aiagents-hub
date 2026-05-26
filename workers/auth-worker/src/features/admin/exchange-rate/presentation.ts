@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
-import { COMMISSION_ADMIN_IDENTIFIER } from '../admin-identifier';
+import { getPrimaryAdminIdentifier } from '../admin-identifier';
 import { UpsertExchangeRateSchema } from './domain';
 import { createExchangeRateInfrastructure } from './infrastructure';
 
@@ -14,7 +14,7 @@ export function createExchangeRateRoutes(bindingName: string) {
       requireAdmin(c);
       const adminStub = getIdFromName(
         c,
-        COMMISSION_ADMIN_IDENTIFIER,
+        getPrimaryAdminIdentifier(c.env),
         bindingName,
       ) as DurableObjectStub<UserDO>;
       const items = await createExchangeRateInfrastructure(adminStub).list();
@@ -32,7 +32,7 @@ export function createExchangeRateRoutes(bindingName: string) {
       const data = UpsertExchangeRateSchema.parse(body);
       const adminStub = getIdFromName(
         c,
-        COMMISSION_ADMIN_IDENTIFIER,
+        getPrimaryAdminIdentifier(c.env),
         bindingName,
       ) as DurableObjectStub<UserDO>;
       const saved = await createExchangeRateInfrastructure(adminStub).upsert(data);

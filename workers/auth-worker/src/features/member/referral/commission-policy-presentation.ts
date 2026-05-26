@@ -5,8 +5,7 @@ import { getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
 import { CommissionPolicySchema } from './domain';
-
-const COMMISSION_ADMIN_IDENTIFIER = 'tuanta2021@gmail.com';
+import { getPrimaryAdminIdentifier } from '../../admin/admin-identifier';
 
 export function createCommissionPolicyRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -27,7 +26,7 @@ export function createCommissionPolicyRoutes(bindingName: string) {
   };
 
   const getAdminInfra = (c: any) => {
-    const adminDO = getIdFromName(c, COMMISSION_ADMIN_IDENTIFIER, bindingName) as DurableObjectStub<UserDO>;
+    const adminDO = getIdFromName(c, getPrimaryAdminIdentifier(c.env), bindingName) as DurableObjectStub<UserDO>;
     return createCommissionPolicyInfrastructure(adminDO);
   };
 

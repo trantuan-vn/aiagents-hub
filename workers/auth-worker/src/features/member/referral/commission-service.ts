@@ -6,9 +6,7 @@ import { executeUtils, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { createCommissionPolicyInfrastructure } from './commission-policy-infrastructure';
 import { createCommissionInfrastructure } from './commission-infrastructure';
-
-/** Admin identifier for commission policy storage (policies are stored in admin's UserDO) */
-const COMMISSION_ADMIN_IDENTIFIER = 'tuanta2021@gmail.com';
+import { getPrimaryAdminIdentifier } from '../../admin/admin-identifier';
 
 async function getReferrerMembershipTier(
   c: Context,
@@ -34,7 +32,7 @@ export async function processCommissionOnOrder(
   orderRecord: { id: number; orderCode: string; finalAmount: number; currency: string }
 ): Promise<void> {
   if (!user.referrerId) return;
-  const adminDO = getIdFromName(c, COMMISSION_ADMIN_IDENTIFIER, bindingName) as DurableObjectStub<UserDO>;
+  const adminDO = getIdFromName(c, getPrimaryAdminIdentifier(c.env), bindingName) as DurableObjectStub<UserDO>;
   const policyInfra = createCommissionPolicyInfrastructure(adminDO);
 
   const policies = await policyInfra.list(50, 0, 'ACTIVE');

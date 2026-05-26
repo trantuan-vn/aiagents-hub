@@ -7,6 +7,7 @@ export const ERROR_MESSAGES = {
     INSUFFICIENT_PERMISSIONS: 'Insufficient permissions',
     RATE_LIMIT_EXCEEDED: 'Too many token requests',
     INVALID_CLIENT_ID: 'Invalid client ID',
+    MISSING_AUTHORIZATION: 'Authorization header required',
     TOKEN_VALIDATION_TIMEOUT: 'Token validation timeout'
   }
 } as const;

@@ -17,9 +17,9 @@ import { executeUtils } from '../../../shared/utils';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
 import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 
-import { COMMISSION_ADMIN_IDENTIFIER } from '../admin-identifier';
+import { getPrimaryAdminIdentifier } from '../admin-identifier';
 
-export { COMMISSION_ADMIN_IDENTIFIER };
+export { getPrimaryAdminIdentifier };
 
 export interface PayoutPeriodRow {
   period: string;
@@ -241,7 +241,7 @@ export async function processEarningsPayoutCassoIPN(
 
   const adminStub = getIdFromName(
     c,
-    COMMISSION_ADMIN_IDENTIFIER,
+    getPrimaryAdminIdentifier(c.env),
     bindingName,
   ) as DurableObjectStub<UserDO>;
   const payoutInfra = createEarningsPayoutInfrastructure(adminStub);

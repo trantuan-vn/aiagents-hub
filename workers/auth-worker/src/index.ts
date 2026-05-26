@@ -3,8 +3,8 @@ import { cors } from 'hono/cors';
 
 import { createLogger } from './shared/logger';
 
-import { createAuthMiddleware, createRateLimitMiddleware, securityHeadersMiddleware, createVersionCheckMiddleware } from './features/auth/authMiddleware';
-import { createTokenValidationMiddleware, securityLoggingMiddleware } from './features/member/token/authMiddleware';
+import { createAuthMiddleware, createIpRateLimitMiddleware, securityHeadersMiddleware, createVersionCheckMiddleware } from './features/auth/authMiddleware';
+import { createTokenValidationMiddleware, createTokenRateLimitMiddleware, securityLoggingMiddleware } from './features/member/token/authMiddleware';
 import { createAuthRoutes } from './features/auth/presentation';
 import { createTokenRoutes } from './features/member/token/presentation';
 import { createDashboardWebSocketRoutes, createApiWebSocketRoutes } from './features/ws/presentation';
@@ -35,9 +35,8 @@ export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
 // I. CREATE ROUTES 
 function createRoutes(bindingName: string) {
   const routes = new Hono<{ Bindings: Env }>();
-  // routes.use('*', createRateLimitMiddleware()); 
-  // Security headers
   routes.use('*', securityHeadersMiddleware());
+  routes.use('*', createIpRateLimitMiddleware());
   // CORS middleware (must come before auth middleware)
   routes.use('/*', cors({
       origin: [
@@ -93,8 +92,8 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/earnings-payouts', createAdminEarningsPayoutRoutes(bindingName));
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
-  // Security middleware
-  routes.use('/api/*', createTokenValidationMiddleware(bindingName));  
+  routes.use('/api/*', createTokenRateLimitMiddleware());
+  routes.use('/api/*', createTokenValidationMiddleware(bindingName));
   // routes.use('/api/*', createVersionCheckMiddleware(bindingName));
   routes.use('/api/*', securityLoggingMiddleware()); 
   // sub routes /api
