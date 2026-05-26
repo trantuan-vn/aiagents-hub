@@ -130,6 +130,7 @@ function CanvasInner({
           fitViewOptions={{ padding: 0.2 }}
           connectionRadius={28}
           proOptions={{ hideAttribution: true }}
+          panOnScroll
           {...interactionProps}
         >
           <WorkflowEdgeMarkers />
