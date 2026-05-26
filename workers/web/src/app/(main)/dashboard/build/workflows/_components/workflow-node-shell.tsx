@@ -14,11 +14,19 @@ interface WorkflowNodeShellProps {
   selected?: boolean;
   accent?: string;
   deactivated?: boolean;
+  pill?: boolean;
   children: ReactNode;
   footer?: ReactNode;
 }
 
-export function WorkflowNodeShell({ selected, accent, deactivated, children, footer }: WorkflowNodeShellProps) {
+export function WorkflowNodeShell({
+  selected,
+  accent,
+  deactivated,
+  pill,
+  children,
+  footer,
+}: WorkflowNodeShellProps) {
   const nodeId = useNodeId() ?? "";
   const [toolbarVisible, setToolbarVisible] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,7 +70,8 @@ export function WorkflowNodeShell({ selected, accent, deactivated, children, foo
   return (
     <div
       className={cn(
-        "group/node relative min-w-[200px] rounded-lg border bg-card px-3 py-2.5 text-sm shadow-md",
+        "group/node relative min-w-[200px] border bg-card text-sm shadow-md",
+        pill ? "rounded-full px-5 py-2.5" : "rounded-lg px-3 py-2.5",
         accent,
         selected && "ring-2 ring-primary",
         deactivated && "opacity-60",

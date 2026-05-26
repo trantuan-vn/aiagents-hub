@@ -12,13 +12,11 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import type { ConnectedNodeSide } from "./workflow-canvas-ui-context";
-import { isValidWorkflowConnection } from "./workflow-connection-utils";
+import { isResourceEdge, isValidWorkflowConnection } from "./workflow-connection-utils";
+import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "./workflow-create-connected-node";
 import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } from "./workflow-definition";
 import { normalizeWorkflowEdge } from "./workflow-edge-utils";
 import { layoutWorkflowNodes } from "./workflow-layout";
-
-const CONNECT_OFFSET_X = 280;
 
 export function useWorkflowCanvasState(
   initial: WorkflowDefinition | undefined,
@@ -205,7 +203,15 @@ export function useWorkflowCanvasState(
   const onConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) => {
-        const next = addEdge({ ...params, animated: true }, eds);
+        const resource = isResourceEdge(params);
+        const next = addEdge(
+          normalizeWorkflowEdge({
+            ...params,
+            animated: true,
+            style: resource ? { strokeDasharray: "6 4" } : undefined,
+          }),
+          eds,
+        );
         edgesRef.current = next;
         lastEmittedRef.current = persistedSignature(nodesRef.current, next);
         onChangeRef.current?.(toPersistedDefinition(nodesRef.current, next, viewportRef.current));
@@ -245,40 +251,14 @@ export function useWorkflowCanvasState(
   );
 
   const createConnectedNode = useCallback(
-    (args: { fromNodeId: string; side: ConnectedNodeSide; type: string; label: string }) => {
+    (args: CreateConnectedNodeArgs) => {
       if (readOnly) return;
-      const fromNode = nodesRef.current.find((n) => n.id === args.fromNodeId);
-      if (!fromNode) return;
-
-      const newId = `${args.type}-${Date.now()}`;
-      const newPosition =
-        args.side === "right"
-          ? { x: fromNode.position.x + CONNECT_OFFSET_X, y: fromNode.position.y }
-          : { x: fromNode.position.x - CONNECT_OFFSET_X, y: fromNode.position.y };
-
-      const extraData =
-        args.type === "agent" && serviceEndpoint
-          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
-          : undefined;
-
-      const newNode: Node = {
-        id: newId,
-        type: args.type,
-        position: newPosition,
-        data: { label: args.label, ...extraData },
-      };
-
-      const conn =
-        args.side === "right"
-          ? { source: args.fromNodeId, sourceHandle: "out" as const, target: newId, targetHandle: "in" as const }
-          : { source: newId, sourceHandle: "out" as const, target: args.fromNodeId, targetHandle: "in" as const };
-
-      const nextNodes = [...nodesRef.current, newNode];
-      const nextEdges = addEdge({ ...conn, animated: true }, edgesRef.current);
-      nodesRef.current = nextNodes;
-      edgesRef.current = nextEdges;
-      setNodes(nextNodes);
-      setEdges(nextEdges);
+      const result = applyCreateConnectedNode(nodesRef.current, edgesRef.current, args, serviceEndpoint);
+      if (!result) return;
+      nodesRef.current = result.nodes;
+      edgesRef.current = result.edges;
+      setNodes(result.nodes);
+      setEdges(result.edges);
       queueMicrotask(() => {
         lastEmittedRef.current = "";
         pushToParent();
@@ -287,7 +267,11 @@ export function useWorkflowCanvasState(
     [readOnly, serviceEndpoint, setNodes, setEdges, pushToParent],
   );
 
-  const isValidConnection = useCallback((connection: Connection | Edge) => isValidWorkflowConnection(connection), []);
+  const isValidConnection = useCallback(
+    (connection: Connection | Edge) =>
+      isValidWorkflowConnection(connection, edgesRef.current, nodesRef.current),
+    [],
+  );
 
   return {
     nodes,

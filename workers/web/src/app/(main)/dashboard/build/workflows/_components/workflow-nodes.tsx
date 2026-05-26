@@ -2,63 +2,114 @@
 
 import { memo } from "react";
 
-import { Position, type NodeProps } from "@xyflow/react";
-import { Bot, Database, GitBranch, Layers, Play, UserCheck, Wrench, Zap } from "lucide-react";
+import { Position, useStore, type NodeProps } from "@xyflow/react";
+import { AlertTriangle, Bot, Database, GitBranch, Layers, Play, Server, UserCheck, Wrench, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { ConnectionHandle } from "./connection-handle";
+import { edgeUsesHandle } from "./workflow-connection-utils";
 import { WorkflowNodeShell } from "./workflow-node-shell";
 import { StickyNoteNode } from "./workflow-sticky-note-node";
 
-function AgentNode({ data, selected }: NodeProps) {
+function useAgentMissingConfig(nodeId: string | undefined) {
+  const edges = useStore((s) => s.edges);
+  if (!nodeId) return { missingService: true, missingMemory: true };
+
+  const hasService = edges.some((e) => edgeUsesHandle(e, nodeId, "service", "target"));
+  const hasMemory = edges.some((e) => edgeUsesHandle(e, nodeId, "memory", "target"));
+
+  return { missingService: !hasService, missingMemory: !hasMemory };
+}
+
+function AgentNode({ id, data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");
-  const d = data as {
-    label?: string;
-    serviceEndpoint?: string;
-    memoryCollection?: string;
-    deactivated?: boolean;
-  };
+  const d = data as { label?: string; deactivated?: boolean };
+  const { missingService, missingMemory } = useAgentMissingConfig(id);
+  const showWarning = missingService || missingMemory;
 
   return (
-    <WorkflowNodeShell selected={selected} accent="border-violet-500/40" deactivated={d.deactivated}>
+    <WorkflowNodeShell
+      selected={selected}
+      accent="border-violet-500/50"
+      deactivated={d.deactivated}
+      pill
+      footer={
+        <div className="border-border/60 -mx-1 mt-2 flex justify-around border-t pt-2">
+          <ConnectionHandle
+            handleId="service"
+            type="target"
+            position={Position.Bottom}
+            accentClass="!bg-blue-500"
+            label={t("handle_service")}
+            shape="diamond"
+            allowedNodeTypes={["service_node"]}
+            required
+          />
+          <ConnectionHandle
+            handleId="memory"
+            type="target"
+            position={Position.Bottom}
+            accentClass="!bg-emerald-500"
+            label={t("handle_memory")}
+            shape="diamond"
+            allowedNodeTypes={["memory_node"]}
+          />
+          <ConnectionHandle
+            handleId="tools"
+            type="target"
+            position={Position.Bottom}
+            accentClass="!bg-amber-500"
+            label={t("handle_tools")}
+            shape="diamond"
+            allowedNodeTypes={["tool_node"]}
+            allowMultipleConnections
+          />
+        </div>
+      }
+    >
       <ConnectionHandle handleId="in" type="target" position={Position.Left} accentClass="!bg-violet-500" />
-      <div className="flex items-center gap-2 font-medium text-violet-700 dark:text-violet-300">
-        <Bot className="h-4 w-4" />
-        {d.label ?? "Agent"}
+      <div className="flex items-center justify-center gap-2 font-medium text-violet-700 dark:text-violet-300">
+        <Bot className="h-4 w-4 shrink-0" />
+        <span className="truncate">{d.label ?? "Agent"}</span>
+        {showWarning ? (
+          <AlertTriangle className="text-destructive h-4 w-4 shrink-0" aria-label={t("agent_config_warning")} />
+        ) : null}
       </div>
-      {d.serviceEndpoint ? <p className="text-muted-foreground mt-1 truncate text-xs">{d.serviceEndpoint}</p> : null}
-      {d.memoryCollection ? (
-        <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-xs">
-          <Database className="h-3 w-3" />
-          {d.memoryCollection}
-        </p>
-      ) : null}
       <ConnectionHandle handleId="out" type="source" position={Position.Right} accentClass="!bg-violet-500" />
-      <div className="border-border/60 mt-3 flex justify-around border-t pt-2">
-        <ConnectionHandle
-          handleId="service"
-          type="target"
-          position={Position.Bottom}
-          accentClass="!bg-blue-500"
-          label={t("handle_service")}
-          showAddNode={false}
-        />
-        <ConnectionHandle
-          handleId="memory"
-          type="target"
-          position={Position.Bottom}
-          accentClass="!bg-emerald-500"
-          label={t("handle_memory")}
-          showAddNode={false}
-        />
-        <ConnectionHandle
-          handleId="tools"
-          type="target"
-          position={Position.Bottom}
-          accentClass="!bg-amber-500"
-          label={t("handle_tools")}
-          showAddNode={false}
-        />
+    </WorkflowNodeShell>
+  );
+}
+
+function ResourceNode({
+  data,
+  selected,
+  icon: Icon,
+  accent,
+  handleAccent,
+  handleId,
+  defaultLabel,
+}: NodeProps & {
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  handleAccent: string;
+  handleId: "service" | "memory" | "tools";
+  defaultLabel: string;
+}) {
+  const d = data as { label?: string; deactivated?: boolean; catalogId?: string };
+
+  return (
+    <WorkflowNodeShell selected={selected} accent={accent} deactivated={d.deactivated} pill>
+      <ConnectionHandle
+        handleId={handleId}
+        type="source"
+        position={Position.Top}
+        accentClass={handleAccent}
+        shape="diamond"
+        showAddNode={false}
+      />
+      <div className="flex items-center justify-center gap-2 font-medium">
+        <Icon className="h-4 w-4 shrink-0 opacity-80" />
+        <span className="max-w-[160px] truncate">{d.label ?? defaultLabel}</span>
       </div>
     </WorkflowNodeShell>
   );
@@ -105,6 +156,42 @@ TriggerNode.displayName = "TriggerNode";
 
 export const AgentWorkflowNode = memo(AgentNode);
 AgentWorkflowNode.displayName = "AgentWorkflowNode";
+
+export const ServiceWorkflowNode = memo((props: NodeProps) => (
+  <ResourceNode
+    {...props}
+    icon={Server}
+    accent="border-blue-500/40"
+    handleAccent="!bg-blue-500"
+    handleId="service"
+    defaultLabel="Service"
+  />
+));
+ServiceWorkflowNode.displayName = "ServiceWorkflowNode";
+
+export const MemoryWorkflowNode = memo((props: NodeProps) => (
+  <ResourceNode
+    {...props}
+    icon={Database}
+    accent="border-emerald-500/40"
+    handleAccent="!bg-emerald-500"
+    handleId="memory"
+    defaultLabel="Memory"
+  />
+));
+MemoryWorkflowNode.displayName = "MemoryWorkflowNode";
+
+export const ToolWorkflowNode = memo((props: NodeProps) => (
+  <ResourceNode
+    {...props}
+    icon={Wrench}
+    accent="border-amber-500/40"
+    handleAccent="!bg-amber-500"
+    handleId="tools"
+    defaultLabel="Tool"
+  />
+));
+ToolWorkflowNode.displayName = "ToolWorkflowNode";
 
 export const HumanReviewNode = memo((props: NodeProps) => (
   <SimpleNode
@@ -168,6 +255,9 @@ TransformNode.displayName = "TransformNode";
 
 export const workflowNodeTypes = {
   agent: AgentWorkflowNode,
+  service_node: ServiceWorkflowNode,
+  memory_node: MemoryWorkflowNode,
+  tool_node: ToolWorkflowNode,
   trigger: TriggerNode,
   human_review: HumanReviewNode,
   flow: FlowNode,

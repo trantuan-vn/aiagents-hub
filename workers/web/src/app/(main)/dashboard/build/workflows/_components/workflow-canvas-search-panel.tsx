@@ -89,20 +89,34 @@ export function WorkflowCanvasSearchPanel({
 
           <CatalogSection title={te("search_section_tools")} icon={Wrench} empty={tools.length === 0}>
             {tools.map((item) => (
-              <CatalogItem key={item.id} title={ta(item.nameKey)} subtitle={ta(item.descKey)} />
+              <CatalogItem
+                key={item.id}
+                title={ta(item.nameKey)}
+                subtitle={ta(item.descKey)}
+                onClick={() => onPickNode("tool_node", ta(item.nameKey))}
+              />
             ))}
           </CatalogSection>
 
           <CatalogSection title={te("search_section_memory")} icon={Database} empty={memory.length === 0}>
             {memory.map((item) => (
-              <CatalogItem key={item.id} title={ta(item.nameKey)} subtitle={ta(item.descKey)} />
+              <CatalogItem
+                key={item.id}
+                title={ta(item.nameKey)}
+                subtitle={ta(item.descKey)}
+                onClick={() => onPickNode("memory_node", ta(item.nameKey))}
+              />
             ))}
           </CatalogSection>
 
           {showService ? (
             <CatalogSection title={te("search_section_services")} icon={Server} empty={!serviceEndpoint}>
               {serviceEndpoint ? (
-                <CatalogItem title={serviceEndpoint} subtitle={te("search_service_configured")} />
+                <CatalogItem
+                  title={serviceEndpoint}
+                  subtitle={te("search_service_configured")}
+                  onClick={() => onPickNode("service_node", serviceEndpoint)}
+                />
               ) : (
                 <p className="text-muted-foreground px-2 py-1 text-xs">{te("search_service_empty")}</p>
               )}

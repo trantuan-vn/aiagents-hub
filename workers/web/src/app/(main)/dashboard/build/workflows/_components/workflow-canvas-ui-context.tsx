@@ -2,15 +2,19 @@
 
 import { createContext, useContext } from "react";
 
-export type ConnectedNodeSide = "left" | "right";
+import type { WorkflowHandleId } from "./workflow-connection-utils";
+
+export type ConnectedNodeSide = "left" | "right" | "bottom";
 
 export interface WorkflowCanvasUiValue {
   readOnly: boolean;
   createConnectedNode?: (args: {
     fromNodeId: string;
-    side: ConnectedNodeSide;
+    side: ConnectedNodeSide | "resource";
     type: string;
     label: string;
+    resourceHandle?: WorkflowHandleId;
+    extraData?: Record<string, unknown>;
   }) => void;
   deleteEdge?: (edgeId: string) => void;
   deleteNode?: (nodeId: string) => void;

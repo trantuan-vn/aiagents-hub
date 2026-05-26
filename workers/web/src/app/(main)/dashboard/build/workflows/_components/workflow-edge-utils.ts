@@ -1,4 +1,6 @@
-import type { Edge } from "@xyflow/react";
+import type { Connection, Edge } from "@xyflow/react";
+
+import { isResourceEdge } from "./workflow-connection-utils";
 
 /** SVG marker id (see WorkflowEdgeMarkers) */
 export const WORKFLOW_EDGE_MARKER_ID = "workflow-arrow-closed";
@@ -17,12 +19,20 @@ export const WORKFLOW_EDGE_STYLE = {
   stroke: "var(--xy-edge-stroke-default, var(--border))",
 };
 
-export function normalizeWorkflowEdge(edge: Edge): Edge {
+export function normalizeWorkflowEdge(edge: Edge | Connection): Edge {
+  const e = edge as Edge;
+  const resource = isResourceEdge(edge);
+  const dash = e.style?.strokeDasharray ?? (resource ? "6 4" : undefined);
   return {
-    ...edge,
-    type: edge.type ?? "workflowDeletable",
-    animated: edge.animated ?? true,
+    ...e,
+    id: e.id ?? `${edge.source}-${edge.sourceHandle ?? "s"}-${edge.target}-${edge.targetHandle ?? "t"}`,
+    type: e.type ?? "workflowDeletable",
+    animated: e.animated ?? true,
     markerEnd: WORKFLOW_EDGE_MARKER_END,
-    style: { ...WORKFLOW_EDGE_STYLE, ...edge.style },
+    style: {
+      ...WORKFLOW_EDGE_STYLE,
+      ...(dash ? { strokeDasharray: dash } : {}),
+      ...e.style,
+    },
   };
 }

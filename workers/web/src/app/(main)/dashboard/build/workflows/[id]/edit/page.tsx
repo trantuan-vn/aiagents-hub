@@ -74,7 +74,9 @@ export default function EditWorkflowPage() {
       const extra =
         type === "agent" && serviceEndpoint
           ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
-          : undefined;
+          : type === "service_node" && serviceEndpoint
+            ? { serviceEndpoint, catalogId: serviceEndpoint }
+            : undefined;
       setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra)));
     },
     [definition, serviceEndpoint],

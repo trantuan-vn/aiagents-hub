@@ -6,8 +6,6 @@ drop table commissions;
 drop table connections;
 drop table earnings_payouts;
 drop table exchange_rates;
-drop table order_discounts;
-drop table order_items;
 drop table orders;
 drop table passkey_credentials;
 drop table payments;
