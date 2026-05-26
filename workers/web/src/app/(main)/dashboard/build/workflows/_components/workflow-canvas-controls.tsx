@@ -3,7 +3,7 @@
 import { useCallback, type ReactNode } from "react";
 
 import { Panel, useReactFlow } from "@xyflow/react";
-import { Expand, Sparkles, ZoomIn, ZoomOut } from "lucide-react";
+import { Expand, LayoutGrid, ZoomIn, ZoomOut } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -102,7 +102,7 @@ export function WorkflowCanvasControls({ readOnly, onTidy }: WorkflowCanvasContr
           <>
             <div className="bg-border h-6 w-px shrink-0" />
             <ControlButton label={t("canvas_tidy")} onClick={handleTidy}>
-              <Sparkles className={controlIconClass} aria-hidden />
+              <LayoutGrid className={controlIconClass} aria-hidden />
             </ControlButton>
           </>
         ) : null}
