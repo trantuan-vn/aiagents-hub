@@ -128,6 +128,7 @@ function CanvasInner({
           }}
           fitView={nodes.length > 0}
           fitViewOptions={{ padding: 0.2 }}
+          connectionRadius={28}
           proOptions={{ hideAttribution: true }}
           {...interactionProps}
         >

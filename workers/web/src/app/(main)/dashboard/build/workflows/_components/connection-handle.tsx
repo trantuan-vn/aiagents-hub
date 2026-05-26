@@ -1,12 +1,11 @@
 "use client";
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { Handle, Position, useNodeId, useStore, type Edge } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
@@ -51,86 +50,39 @@ function canShowConnectionPlus(
   return position !== Position.Bottom;
 }
 
-function ConnectionHandleRow({
-  position,
-  showPlus,
-  plusPopover,
-  handleEl,
-}: {
-  position: Position;
-  showPlus: boolean;
-  plusPopover: React.ReactNode;
-  handleEl: React.ReactNode;
-}) {
-  if (position === Position.Left) {
-    return (
-      <>
-        {showPlus ? plusPopover : null}
-        {handleEl}
-      </>
-    );
-  }
-  if (position === Position.Right) {
-    return (
-      <>
-        {handleEl}
-        {showPlus ? plusPopover : null}
-      </>
-    );
-  }
-  return handleEl;
-}
-
-function ConnectionHandlePlusMenu({
-  open,
-  onOpenChange,
+function ConnectionHandlePlusMenuContent({
   side,
   onPickType,
   t,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   side: ConnectedNodeSide;
   onPickType: (nodeType: string, nodeLabel: string) => void;
   t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
 }) {
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="secondary"
-          size="icon"
-          className="h-6 w-6 shrink-0 rounded-full border p-0 text-base font-semibold shadow-sm"
-          aria-label={t("connect_add_node")}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-64 p-0"
-        side={side}
-        align="center"
-        sideOffset={8}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <p className="text-muted-foreground border-b px-3 py-2 text-xs font-medium">{t("connect_add_node")}</p>
-        <div className="max-h-52 overflow-y-auto p-1">
-          {WORKFLOW_NODE_PALETTE.map(({ type: nodeType, icon: Icon, key }) => (
-            <button
-              key={nodeType}
-              type="button"
-              className="hover:bg-accent focus:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
-              onClick={() => onPickType(nodeType, t(key))}
-            >
-              <Icon className="h-4 w-4 shrink-0 opacity-80" />
-              {t(key)}
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <PopoverContent
+      className="z-[200] w-64 p-0"
+      side={side}
+      align="center"
+      sideOffset={8}
+      onOpenAutoFocus={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <p className="text-muted-foreground border-b px-3 py-2 text-xs font-medium">{t("connect_add_node")}</p>
+      <div className="max-h-52 overflow-y-auto p-1">
+        {WORKFLOW_NODE_PALETTE.map(({ type: nodeType, icon: Icon, key }) => (
+          <button
+            key={nodeType}
+            type="button"
+            className="hover:bg-accent focus:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
+            onClick={() => onPickType(nodeType, t(key))}
+          >
+            <Icon className="h-4 w-4 shrink-0 opacity-80" />
+            {t(key)}
+          </button>
+        ))}
+      </div>
+    </PopoverContent>
   );
 }
 
@@ -177,6 +129,96 @@ function useConnectionHandleModel({ handleId, type, position, showAddNode = true
   };
 }
 
+function getConnectionDotClassName(showPlus: boolean, accentClass?: string): string {
+  if (showPlus) {
+    return "!flex !h-6 !w-6 !cursor-crosshair !items-center !justify-center !rounded-full !border !bg-secondary !p-0 !shadow-sm hover:!bg-accent";
+  }
+  return cn("!size-3", accentClass ?? "!bg-muted-foreground");
+}
+
+/** Handle for drag-to-connect; inner PopoverTrigger button opens add-node menu on click. */
+function ConnectionHandleWithPlus({
+  handleId,
+  type,
+  position,
+  accentClass,
+  open,
+  setOpen,
+  side,
+  onPickType,
+  t,
+}: Pick<ConnectionHandleProps, "handleId" | "type" | "position" | "accentClass"> & {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  side: ConnectedNodeSide;
+  onPickType: (nodeType: string, nodeLabel: string) => void;
+  t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
+}) {
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <Handle
+        id={handleId}
+        type={type}
+        position={position}
+        className={cn(
+          "border-background !static shrink-0 !translate-x-0 !translate-y-0 !transform-none !border-2",
+          getConnectionDotClassName(true, accentClass),
+        )}
+      >
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="nodrag nopan text-foreground flex h-full w-full cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-none outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t("connect_add_node")}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Plus className="h-3.5 w-3.5 shrink-0" />
+          </button>
+        </PopoverTrigger>
+      </Handle>
+      <ConnectionHandlePlusMenuContent side={side} onPickType={onPickType} t={t} />
+    </Popover>
+  );
+}
+
+function ConnectionHandleDot({
+  handleId,
+  type,
+  position,
+  accentClass,
+}: Pick<ConnectionHandleProps, "handleId" | "type" | "position" | "accentClass">) {
+  return (
+    <Handle
+      id={handleId}
+      type={type}
+      position={position}
+      className={cn(
+        "border-background !static shrink-0 !translate-x-0 !translate-y-0 !transform-none !border-2",
+        getConnectionDotClassName(false, accentClass),
+      )}
+    />
+  );
+}
+
+function ConnectionHandleCluster({
+  label,
+  isSideHandle,
+  clusterClass,
+  children,
+}: {
+  label?: string;
+  isSideHandle: boolean;
+  clusterClass: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn(isSideHandle ? "pointer-events-none" : "pointer-events-auto", clusterClass)}>
+      {label ? <span className="text-muted-foreground text-[10px] leading-none">{label}</span> : null}
+      <div className={cn("flex items-center gap-1", isSideHandle && "pointer-events-auto")}>{children}</div>
+    </div>
+  );
+}
+
 function ConnectionHandleView({
   handleId,
   type,
@@ -187,29 +229,24 @@ function ConnectionHandleView({
 }: ConnectionHandleProps & { model: ReturnType<typeof useConnectionHandleModel> }) {
   const { t, open, setOpen, side, onPickType, showPlus, clusterClass, isSideHandle } = model;
 
-  const plusPopover = (
-    <ConnectionHandlePlusMenu open={open} onOpenChange={setOpen} side={side} onPickType={onPickType} t={t} />
-  );
-
-  const handleEl = (
-    <Handle
-      id={handleId}
-      type={type}
-      position={position}
-      className={cn(
-        "border-background !static !size-3 shrink-0 !translate-x-0 !translate-y-0 !transform-none !border-2",
-        accentClass ?? "!bg-muted-foreground",
-      )}
-    />
-  );
-
   return (
-    <div className={cn(isSideHandle ? "pointer-events-none" : "pointer-events-auto", clusterClass)}>
-      {label ? <span className="text-muted-foreground text-[10px] leading-none">{label}</span> : null}
-      <div className={cn("flex items-center gap-1", isSideHandle && "pointer-events-auto")}>
-        <ConnectionHandleRow position={position} showPlus={showPlus} plusPopover={plusPopover} handleEl={handleEl} />
-      </div>
-    </div>
+    <ConnectionHandleCluster label={label} isSideHandle={isSideHandle} clusterClass={clusterClass}>
+      {showPlus ? (
+        <ConnectionHandleWithPlus
+          handleId={handleId}
+          type={type}
+          position={position}
+          accentClass={accentClass}
+          open={open}
+          setOpen={setOpen}
+          side={side}
+          onPickType={onPickType}
+          t={t}
+        />
+      ) : (
+        <ConnectionHandleDot handleId={handleId} type={type} position={position} accentClass={accentClass} />
+      )}
+    </ConnectionHandleCluster>
   );
 }
 
