@@ -15,6 +15,7 @@ import {
 } from './d1';
 import { executeUtils } from '../../../shared/utils';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
+import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 
 import { COMMISSION_ADMIN_IDENTIFIER } from '../admin-identifier';
 
@@ -174,7 +175,10 @@ export async function attachBeneficiaries(
       let earningsPayoutCurrency: 'VND' | 'USD' = 'VND';
       try {
         const stub = binding.get(binding.idFromString(row.recipientUserId)) as DurableObjectStub<UserDO>;
-        const beneficiary = await createPayoutBeneficiaryInfrastructure(stub).get();
+        const beneficiary = await createPayoutBeneficiaryInfrastructure(
+          stub,
+          createPayoutEncryptionSecretGetter(c.env),
+        ).get();
         hasBeneficiary = !!beneficiary;
         const users = await executeUtils.executeDynamicAction(stub, 'select', {}, 'users');
         const u = Array.isArray(users) ? users[0] : users;

@@ -27,7 +27,7 @@ import {
 	WorkflowUserStarSchema,
 	WorkflowCommentSchema,
 	WorkflowRoyaltySchema,
-	PayoutBeneficiarySchema,
+	PayoutBeneficiaryRecordSchema,
 	EarningsPayoutSchema,
 	ExchangeRateSchema,
 } from '@auth-worker/features/ws/domain.js';
@@ -622,7 +622,7 @@ export class D1DatabaseManager {
       WorkflowUserStarSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
     );
-    await this.registerTable('payout_beneficiary', PayoutBeneficiarySchema, this.TABLE_CONFIGS.queueTable());
+    await this.registerTable('payout_beneficiary', PayoutBeneficiaryRecordSchema, this.TABLE_CONFIGS.queueTable());
     await this.registerTable(
       'earnings_payouts',
       EarningsPayoutSchema,

@@ -5,6 +5,7 @@ import { UserDO } from '../../ws/infrastructure/UserDO';
 import { convertUsdToVnd } from '../../admin/service/pricing';
 import { getUsdVndRateForDate, todayDateString } from '../exchange-rate/get-rate';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
+import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 import { generateVietQr } from '../../member/payout/vietqr';
 import { randomPayoutTransferCode, toPayoutAmountVnd } from './casso-payout';
 import {
@@ -85,7 +86,10 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
         throw new Error('VietQR payout requires user earnings payout currency to be VND');
       }
 
-      const beneficiary = await createPayoutBeneficiaryInfrastructure(userStub).get();
+      const beneficiary = await createPayoutBeneficiaryInfrastructure(
+        userStub,
+        createPayoutEncryptionSecretGetter(c.env),
+      ).get();
       if (!beneficiary) {
         throw new Error('User has not configured payout beneficiary account');
       }

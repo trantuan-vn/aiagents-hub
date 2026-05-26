@@ -12,3 +12,16 @@ export const PayoutBeneficiarySchema = z.object({
 export type PayoutBeneficiary = z.infer<typeof PayoutBeneficiarySchema>;
 
 export const PayoutBeneficiaryUpsertSchema = PayoutBeneficiarySchema;
+
+/** Persisted row: sensitive fields encrypted (see payout/crypto.ts). */
+export const PayoutBeneficiaryRecordSchema = z.object({
+  accountNoEncrypted: z.string().nullish(),
+  accountNameEncrypted: z.string().nullish(),
+  /** Legacy plaintext — cleared after migration on read/upsert */
+  accountNo: z.string().nullish(),
+  accountName: z.string().nullish(),
+  acqId: z.string().min(6).max(10),
+  bankName: z.string().max(100).nullish(),
+});
+
+export type PayoutBeneficiaryRecord = z.infer<typeof PayoutBeneficiaryRecordSchema>;
