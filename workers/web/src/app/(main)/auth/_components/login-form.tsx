@@ -14,16 +14,22 @@ import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import {
+  fetchCaptchaConfig,
+  isValidTurnstileSiteKey,
+  TurnstileField,
+} from "@/components/auth/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { formatAuthApiErrorMessage, getAuthApiErrorMessage } from "@/lib/auth-api-error";
+import { formatAuthApiErrorMessage } from "@/lib/auth-api-error";
 import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 
 type AuthOptionsJSON = Parameters<typeof startAuthentication>[0];
 
 const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
+const ENV_TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
 function authJsonHeaders(): Record<string, string> {
   return { ...buildAuthClientHeaders(), "Content-Type": "application/json" };
@@ -323,9 +329,37 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyStatus, setPasskeyStatus] = useState<{ enabled: boolean } | null>(null);
   const [usePasskeyMode, setUsePasskeyMode] = useState(false);
+  const envSiteKey = isValidTurnstileSiteKey(ENV_TURNSTILE_SITE_KEY) ? ENV_TURNSTILE_SITE_KEY : null;
+  const [captchaSiteKey, setCaptchaSiteKey] = useState<string | null>(envSiteKey);
+  const [captchaRequired, setCaptchaRequired] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
   const isMounted = useRef(true);
 
   const language = locale.startsWith("vi") ? "vi" : "en";
+
+  const resetCaptcha = useCallback(() => {
+    setTurnstileToken(null);
+    setCaptchaWidgetKey((k) => k + 1);
+  }, []);
+
+  const handleCaptchaError = useCallback(() => {
+    resetCaptcha();
+    toast.error(t("captcha_load_error"));
+  }, [resetCaptcha, t]);
+
+  useEffect(() => {
+    void fetchCaptchaConfig(AUTH_API_URL).then((cfg) => {
+      if (!isMounted.current) return;
+      if (cfg.enabled && cfg.siteKey) {
+        setCaptchaRequired(true);
+        setCaptchaSiteKey(cfg.siteKey);
+      } else {
+        setCaptchaRequired(false);
+        setCaptchaSiteKey(envSiteKey);
+      }
+    });
+  }, [envSiteKey]);
   const passkeySupported = typeof window !== "undefined" && typeof window.PublicKeyCredential !== "undefined";
 
   const FormSchema = z.object({
@@ -642,16 +676,35 @@ export function LoginForm() {
         toast.error(t("backup_code_verify_error"));
         return;
       }
+      if (captchaRequired && !turnstileToken) {
+        toast.error(t("captcha_required"));
+        return;
+      }
       setIsLoading(true);
       try {
+        const body: { identifier: string; code: string; turnstileToken?: string } = {
+          identifier: email,
+          code: normalized,
+        };
+        if (turnstileToken) body.turnstileToken = turnstileToken;
         const response = await fetch(`${AUTH_API_URL}/backup-code/recover`, {
           method: "POST",
           headers: authJsonHeaders(),
-          body: JSON.stringify({ identifier: email, code: normalized }),
+          body: JSON.stringify(body),
           credentials: "include",
         });
         if (!response.ok) {
-          const err = (await response.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+          const err = (await response.json().catch(() => ({}))) as {
+            error?: string;
+            retryAfter?: number;
+            requiresCaptcha?: boolean;
+            siteKey?: string | null;
+          };
+          if (err.requiresCaptcha) {
+            setCaptchaRequired(true);
+            if (err.siteKey) setCaptchaSiteKey(err.siteKey);
+            resetCaptcha();
+          }
           throw new Error(
             formatAuthApiErrorMessage(err, t("backup_code_verify_error"), t, response.status),
           );
@@ -666,19 +719,24 @@ export function LoginForm() {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [recoverBackupCode, form, router, t],
+    [recoverBackupCode, form, router, t, captchaRequired, turnstileToken, resetCaptcha],
   );
 
   const onSubmit = useCallback(
     async (data: z.infer<typeof FormSchema>) => {
       if (!isMounted.current) return;
+      if (captchaRequired && !turnstileToken) {
+        toast.error(t("captcha_required"));
+        return;
+      }
       setIsLoading(true);
       try {
-        const body: { identifier: string; language?: string; ref?: string } = {
+        const body: { identifier: string; language?: string; ref?: string; turnstileToken?: string } = {
           identifier: data.email.trim(),
           language,
         };
         if (refFromUrl) body.ref = refFromUrl;
+        if (turnstileToken) body.turnstileToken = turnstileToken;
         const res = await fetch(`${AUTH_API_URL}/otp/request`, {
           method: "POST",
           headers: authJsonHeaders(),
@@ -686,7 +744,18 @@ export function LoginForm() {
           credentials: "include",
         });
         if (!res.ok) {
-          throw new Error(await getAuthApiErrorMessage(res, t("otp_send_error"), t));
+          const errBody = (await res.json().catch(() => ({}))) as {
+            error?: string;
+            retryAfter?: number;
+            requiresCaptcha?: boolean;
+            siteKey?: string | null;
+          };
+          if (errBody.requiresCaptcha) {
+            setCaptchaRequired(true);
+            if (errBody.siteKey) setCaptchaSiteKey(errBody.siteKey);
+            resetCaptcha();
+          }
+          throw new Error(formatAuthApiErrorMessage(errBody, t("otp_send_error"), t, res.status));
         }
         if (isMounted.current) {
           setIdentifier(data.email.trim());
@@ -701,7 +770,7 @@ export function LoginForm() {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [language, refFromUrl, t],
+    [language, refFromUrl, t, captchaRequired, turnstileToken, resetCaptcha],
   );
 
   const handleBackupCodeChange = useCallback((value: string) => {
@@ -770,7 +839,26 @@ export function LoginForm() {
           </div>
         </div>
 
-        <Button type="submit" variant="outline" className="w-full" disabled={isLoading || !form.formState.isValid}>
+        {captchaRequired && captchaSiteKey && !showRecoverSection ? (
+          <TurnstileField
+            key={`otp-${captchaWidgetKey}`}
+            siteKey={captchaSiteKey}
+            onToken={(token) => setTurnstileToken(token)}
+            onExpire={resetCaptcha}
+            onError={handleCaptchaError}
+          />
+        ) : null}
+
+        <Button
+          type="submit"
+          variant="outline"
+          className="w-full"
+          disabled={
+            isLoading ||
+            !form.formState.isValid ||
+            (captchaRequired && !showRecoverSection && !turnstileToken)
+          }
+        >
           {isLoading && !usePasskeyMode ? t("sending_otp") : t("login_with_otp")}
         </Button>
 
@@ -778,7 +866,10 @@ export function LoginForm() {
           <button
             type="button"
             className="text-muted-foreground hover:text-foreground text-sm underline"
-            onClick={() => setShowRecoverSection(true)}
+            onClick={() => {
+              resetCaptcha();
+              setShowRecoverSection(true);
+            }}
           >
             {t("recover_with_backup_code")}
           </button>
@@ -811,6 +902,15 @@ export function LoginForm() {
                 disabled={isLoading}
               />
             </div>
+            {captchaRequired && captchaSiteKey ? (
+              <TurnstileField
+                key={`recover-${captchaWidgetKey}`}
+                siteKey={captchaSiteKey}
+                onToken={(token) => setTurnstileToken(token)}
+                onExpire={resetCaptcha}
+                onError={handleCaptchaError}
+              />
+            ) : null}
             <div className="flex gap-2">
               <Button
                 type="button"
@@ -819,6 +919,7 @@ export function LoginForm() {
                 onClick={() => {
                   setShowRecoverSection(false);
                   setRecoverBackupCode("");
+                  resetCaptcha();
                 }}
               >
                 {t("cancel")}
@@ -827,7 +928,10 @@ export function LoginForm() {
                 type="button"
                 size="sm"
                 disabled={
-                  isLoading || !form.watch("email")?.trim() || recoverBackupCode.replace(/\s|-/g, "").length !== 16
+                  isLoading ||
+                  !form.watch("email")?.trim() ||
+                  recoverBackupCode.replace(/\s|-/g, "").length !== 16 ||
+                  (captchaRequired && !turnstileToken)
                 }
                 onClick={() => handleRecoverWithBackupCode(form.getValues("email"))}
               >

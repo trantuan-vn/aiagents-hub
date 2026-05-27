@@ -16,7 +16,9 @@ export const ERROR_MESSAGES = {
     OAUTH_FAILED: 'OAuth authentication failed',
     OAUTH_STATE_INVALID: 'OAuth session expired or invalid. Please try again.',
     WALLET_CONNECTION_FAILED: 'Wallet connection failed',
-    SESSION_NOT_FOUND: 'Session not found'
+    SESSION_NOT_FOUND: 'Session not found',
+    CAPTCHA_REQUIRED: 'Captcha verification required',
+    INVALID_CAPTCHA: 'Captcha verification failed. Please try again.',
   }
 } as const;
 
@@ -34,6 +36,14 @@ export const AUTH_CONSTANTS = {
   OTP_REQUEST_COOLDOWN_SEC: 60,
   OTP_REQUEST_MAX_PER_IDENTIFIER_HOUR: 10,
   OTP_REQUEST_MAX_PER_IP_HOUR: 30,
+  /** Cross-session OTP verify failures per identifier before ops alert */
+  OTP_IDENTIFIER_VERIFY_FAIL_ALERT: 20,
+  /** Block OTP request for identifier after this many verify failures / hour */
+  OTP_IDENTIFIER_VERIFY_FAIL_BLOCK: 30,
+  /** Require Turnstile on OTP request after this many cross-session verify failures */
+  OTP_CAPTCHA_REQUIRED_AFTER_IDENTIFIER_FAILS: 5,
+  /** Require Turnstile after this many OTP requests for same identifier in one hour */
+  OTP_REQUEST_CAPTCHA_AFTER_HOURLY: 3,
   /** Backup code recovery (account takeover surface) */
   BACKUP_CODE_RECOVER_MAX_ATTEMPTS: 5,
   BACKUP_CODE_RECOVER_MAX_PER_IDENTIFIER_HOUR: 10,

@@ -2,6 +2,8 @@
 export type AuthApiErrorBody = {
   error?: string;
   retryAfter?: number;
+  requiresCaptcha?: boolean;
+  siteKey?: string | null;
 };
 
 type LoginFormTranslate = (

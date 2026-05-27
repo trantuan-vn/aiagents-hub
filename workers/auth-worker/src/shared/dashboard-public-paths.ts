@@ -4,6 +4,7 @@ export function isAuthBootstrapGet(method: string, path: string): boolean {
   if (/^\/dashboard\/auth\/oauth\/[^/]+\/url$/.test(path)) return true;
   if (path === '/dashboard/auth/wallet/nonce') return true;
   if (path === '/dashboard/auth/passkey/auth/status') return true;
+  if (path === '/dashboard/auth/captcha/config') return true;
   return false;
 }
 
@@ -14,6 +15,7 @@ export function isDashboardAuthLoginPath(path: string, method: string): boolean 
   if (path === '/dashboard/auth/wallet/nonce' && method === 'GET') return true;
   if (path === '/dashboard/auth/wallet/connect' && method === 'POST') return true;
   if (path === '/dashboard/auth/passkey/auth/status' && method === 'GET') return true;
+  if (path === '/dashboard/auth/captcha/config' && method === 'GET') return true;
   if (path === '/dashboard/auth/passkey/auth/options' && method === 'POST') return true;
   if (path === '/dashboard/auth/passkey/auth/verify' && method === 'POST') return true;
   if (path === '/dashboard/auth/otp/request' && method === 'POST') return true;

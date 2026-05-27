@@ -16,6 +16,8 @@ export const OTPRequestSchema = z.object({
   language: z.enum(['vi', 'en']).optional(),
   /** Referral code from ref= param - links new user to referrer */
   ref: z.string().min(1).max(64).optional(),
+  /** Cloudflare Turnstile token — required when captcha is enabled */
+  turnstileToken: z.string().min(1).max(2048).optional(),
 });
 
 export const OTPVerificationSchema = z.object({
@@ -47,6 +49,7 @@ export const BackupCodeVerifySchema = z.object({
 
 export const BackupCodeRecoverSchema = z.object({
   identifier: z.string().min(1, 'Identifier is required'),
+  turnstileToken: z.string().min(1).max(2048).optional(),
   code: z
     .string()
     .min(1, 'Backup code is required')

@@ -84,6 +84,8 @@
     "otp_invalid": "Please enter a valid 6-digit OTP",
     "otp_verify_error": "Invalid OTP. Please try again.",
     "otp_send_error": "Failed to send OTP. Please try again.",
+    "captcha_required": "Please complete the security check before continuing.",
+    "captcha_load_error": "Security check could not load. If you use localhost, add it in Cloudflare Turnstile widget hostnames, or use test keys for local dev.",
     "rate_limit_retry_after": "Try again in {seconds} seconds.",
     "rate_limit_generic": "Too many requests. Please wait a moment and try again.",
     "unexpected_error": "An unexpected error occurred",

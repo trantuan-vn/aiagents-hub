@@ -16,6 +16,7 @@ import { decryptField } from '../../shared/field-encryption';
 
 export const KNOWN_DEVICE_KV_PREFIX = 'KnownDevice:';
 export const PENDING_LOGIN_DEVICE_PREFIX = 'PendingLoginDevice:';
+export const PASSKEY_DEVICE_KV_PREFIX = 'PasskeyDevice:';
 
 /** Lưu thiết bị đã tin — vẫn nhận ra sau logout hết phiên */
 export const KNOWN_DEVICE_TTL_SEC = 365 * 24 * 60 * 60;
@@ -124,6 +125,133 @@ export async function forgetKnownDeviceIfUnused(
   }
 }
 
+function passkeyDeviceKvKey(identifier: string, credentialId: string): string {
+  return `${PASSKEY_DEVICE_KV_PREFIX}${identifier}:${credentialId}`;
+}
+
+export async function getPasskeyBoundDeviceId(
+  kv: KVNamespace,
+  identifier: string,
+  credentialId: string,
+): Promise<string | null> {
+  return normalizeDeviceId(await kv.get(passkeyDeviceKvKey(identifier, credentialId)));
+}
+
+/** Passkey login: enforce server-bound device_id; bind on first use. */
+export async function resolvePasskeyLoginDeviceId(
+  kv: KVNamespace,
+  identifier: string,
+  credentialId: string,
+  rawDeviceId: string | null | undefined,
+): Promise<string | null> {
+  const d = normalizeDeviceId(rawDeviceId);
+  const bound = await getPasskeyBoundDeviceId(kv, identifier, credentialId);
+  if (bound) {
+    if (!d || d !== bound) {
+      throw new Error('Device mismatch for passkey');
+    }
+    return d;
+  }
+  return d;
+}
+
+export async function bindPasskeyDeviceId(
+  kv: KVNamespace,
+  identifier: string,
+  credentialId: string,
+  deviceId: string | null | undefined,
+): Promise<void> {
+  const d = normalizeDeviceId(deviceId);
+  if (!d) return;
+  await kv.put(passkeyDeviceKvKey(identifier, credentialId), d, {
+    expirationTtl: KNOWN_DEVICE_TTL_SEC,
+  });
+  await markKnownDevice(kv, identifier, d);
+}
+
+/**
+ * Chỉ tin device_id client nếu đã ghi nhận server-side (KV hoặc phiên active).
+ * UUID tự khai báo không làm giảm step-up.
+ */
+export async function resolveTrustedLoginDeviceId(
+  kv: KVNamespace | undefined,
+  identifier: string,
+  rawDeviceId: string | null | undefined,
+  activeSessions: Session[],
+): Promise<string | null> {
+  const d = normalizeDeviceId(rawDeviceId);
+  if (!d || !kv) return null;
+  const known = await isKnownDeviceId(kv, identifier, d, activeSessions);
+  return known ? d : null;
+}
+
+async function resolveSmsPhoneFor2FA(
+  c: Context,
+  bindingName: string,
+  identifier: string,
+): Promise<string | null> {
+  const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+  const smsRepo = createSmsRepository(userDO);
+  let phone: string | null = null;
+  const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
+  if (encryptedPhone) {
+    const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+    if (encryptSecret) {
+      try {
+        phone = (await decryptField(encryptedPhone, encryptSecret)) || null;
+      } catch {
+        phone = null;
+      }
+    }
+  }
+  if (!phone && validationUtils.isValidPhone(identifier)) {
+    const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(identifier));
+    const storedHash = await smsRepo.getPhoneHash();
+    if (storedHash === identifierHash) {
+      phone = identifier.startsWith('+') ? identifier : `+${identifier}`;
+    }
+  }
+  return phone;
+}
+
+/**
+ * TOTP/SMS đã bật trên account — bắt buộc trước khi tạo session (OAuth, OTP, wallet, passkey).
+ */
+export async function applyEnabledSecondFactorStepUp(
+  c: Context,
+  bindingName: string,
+  identifier: string,
+  sessionId: string,
+  deviceIdForPending: string | null | undefined,
+): Promise<{ requiresTotp: true } | { requiresSms: true } | null> {
+  if (!c.env.NONCE_KV) return null;
+
+  const normalizedId = validationUtils.normalizeIdentifier(identifier);
+  const pendingPayload = serializePendingAuth(normalizedId, deviceIdForPending);
+  const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+  const smsApp = createAccountSmsApplication(c, bindingName);
+  const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
+  const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
+
+  if (totpStatus.enabled) {
+    await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, pendingPayload, { expirationTtl: 300 });
+    return { requiresTotp: true };
+  }
+
+  if (smsStatus.enabled) {
+    const phone = await resolveSmsPhoneFor2FA(c, bindingName, identifier);
+    if (!phone) {
+      throw new Error('Cannot send SMS 2FA: phone not available. Please re-enable SMS 2FA.');
+    }
+    const smsOtp = otpUtils.generateOTP(6);
+    await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, normalizeDeviceId(deviceIdForPending));
+    await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+    return { requiresSms: true };
+  }
+
+  return null;
+}
+
 export type NewSessionEmailDecision = {
   send: boolean;
   cooldownKey?: string;
@@ -187,7 +315,8 @@ export async function decideNewSessionEmail(
 }
 
 /**
- * Step-up 2FA khi đăng nhập từ device_id mới trong khi còn phiên active khác (passkey / sau khi chưa bật 2FA ở bước trước).
+ * Step-up 2FA khi thiết bị chưa tin (kể cả không còn phiên active khác).
+ * Chỉ chạy khi account chưa bật TOTP/SMS ở bước applyEnabledSecondFactorStepUp.
  */
 export async function evaluateNovelDeviceStepUp(
   c: Context,
@@ -195,28 +324,29 @@ export async function evaluateNovelDeviceStepUp(
   repository: { sessions: { listAll: (n: number) => Promise<Session[]> } },
   identifier: string,
   sessionId: string,
-  deviceId: string | null | undefined,
+  deviceIdForPending: string | null | undefined,
 ): Promise<{ requiresTotp: true } | { requiresSms: true } | null> {
   if (!c.env.NONCE_KV) return null;
 
   const activeSessions = await repository.sessions.listAll(50);
-  const otherActive = activeSessions.filter((s) => s.isActive);
-  if (otherActive.length === 0) return null;
+  const trusted = await resolveTrustedLoginDeviceId(
+    c.env.NONCE_KV,
+    identifier,
+    deviceIdForPending,
+    activeSessions,
+  );
+  const d = normalizeDeviceId(deviceIdForPending);
+  const missingDeviceWithRegistered = isLoginMissingDeviceIdWithRegisteredDevices(trusted, activeSessions);
 
-  const d = normalizeDeviceId(deviceId);
-  const missingDeviceWithRegistered = isLoginMissingDeviceIdWithRegisteredDevices(d, activeSessions);
-
-  if (d) {
-    const known = await isKnownDeviceId(c.env.NONCE_KV, identifier, d, activeSessions);
-    if (known) return null;
-  } else if (!missingDeviceWithRegistered) {
-    return null;
-  }
+  if (trusted) return null;
+  if (!d && !missingDeviceWithRegistered) return null;
 
   const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
   const smsApp = createAccountSmsApplication(c, bindingName);
   const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
   const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
+
+  if (!totpStatus.enabled && !smsStatus.enabled) return null;
 
   const pendingPayload = serializePendingAuth(identifier, d);
 
@@ -225,36 +355,12 @@ export async function evaluateNovelDeviceStepUp(
     return { requiresTotp: true };
   }
 
-  if (smsStatus.enabled) {
-    const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-    const smsRepo = createSmsRepository(userDO);
-    let phone: string | null = null;
-    const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
-    if (encryptedPhone) {
-      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-      if (encryptSecret) {
-        try {
-          phone = (await decryptField(encryptedPhone, encryptSecret)) || null;
-        } catch {
-          phone = null;
-        }
-      }
-    }
-    if (!phone && validationUtils.isValidPhone(identifier)) {
-      const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(identifier));
-      const storedHash = await smsRepo.getPhoneHash();
-      if (storedHash === identifierHash) {
-        phone = identifier.startsWith('+') ? identifier : `+${identifier}`;
-      }
-    }
-    if (!phone) return null;
+  const phone = await resolveSmsPhoneFor2FA(c, bindingName, identifier);
+  if (!phone) return null;
 
-    const smsOtp = otpUtils.generateOTP(6);
-    const normalizedId = validationUtils.normalizeIdentifier(identifier);
-    await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
-    await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
-    return { requiresSms: true };
-  }
-
-  return null;
+  const smsOtp = otpUtils.generateOTP(6);
+  const normalizedId = validationUtils.normalizeIdentifier(identifier);
+  await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
+  await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+  return { requiresSms: true };
 }

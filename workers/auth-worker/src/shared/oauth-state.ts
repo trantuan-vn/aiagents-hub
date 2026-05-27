@@ -31,18 +31,6 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
     .join('');
 }
 
-/** Legacy unsigned state (pre-HMAC deploy); reject once all in-flight OAuth complete. */
-function decodeLegacyOAuthState(state: string): OAuthStatePayload | null {
-  try {
-    const json = new TextDecoder().decode(base64UrlDecode(state));
-    const p = JSON.parse(json) as { s?: string; n?: string };
-    if (p?.s && p?.n) return { s: p.s, n: p.n };
-  } catch {
-    /* invalid */
-  }
-  return null;
-}
-
 export async function encodeOAuthState(
   sessionId: string,
   nonce: string,
@@ -78,6 +66,5 @@ export async function decodeOAuthState(
     return null;
   }
 
-  const legacy = decodeLegacyOAuthState(trimmed);
-  return legacy ? { sessionId: legacy.s, nonce: legacy.n } : null;
+  return null;
 }

@@ -27,7 +27,11 @@ import {
   recordOtpVerifyFailure,
 } from '../../shared/otp-rate-limit';
 import { oauthUtils, otpUtils, validationUtils } from './utils';
-import { timingSafeEqualString } from '../../shared/timing-safe';
+import {
+  hashPendingLoginOtp,
+  verifyPendingLoginOtp,
+  type PendingLoginOtpRecord,
+} from './pending-login-otp';
 import { encodeOAuthState, decodeOAuthState } from '../../shared/oauth-state';
 import { consumeSessionNonce, storeSessionNonce } from '../../shared/kv-nonce';
 
@@ -313,8 +317,10 @@ export function createOTPService(env: Env): IOTPService {
 
   const otpNonceKey = (sessionId: string) => `Nonce:${sessionId}`;
 
-  const failOtpVerify = async (sessionId: string): Promise<false> => {
-    await recordOtpVerifyFailure(env, sessionId);
+  const getOtpPepper = async (): Promise<string> => requireEncryptionSecret(env);
+
+  const failOtpVerify = async (sessionId: string, identifier?: string): Promise<false> => {
+    await recordOtpVerifyFailure(env, sessionId, identifier);
     const afterFail = await checkOtpVerifyBlocked(env, sessionId);
     if (afterFail.blocked) {
       throw new OtpRateLimitError(afterFail.retryAfter);
@@ -326,10 +332,12 @@ export function createOTPService(env: Env): IOTPService {
     async generateOTP(sessionId: string, identifier: string): Promise<string> {
       const normalizedId = validationUtils.normalizeIdentifier(identifier);
       const otp = otpUtils.generateOTP();
+      const pepper = await getOtpPepper();
+      const otpHash = await hashPendingLoginOtp(sessionId, normalizedId, otp, pepper);
       await clearOtpVerifyAttempts(env, sessionId);
       await env.NONCE_KV.put(
         otpNonceKey(sessionId),
-        JSON.stringify({ nonce: otp, identifier: normalizedId }),
+        JSON.stringify({ otpHash, identifier: normalizedId } satisfies PendingLoginOtpRecord),
         { expirationTtl: AUTH_CONSTANTS.OTP_EXPIRY },
       );
       return otp;
@@ -347,22 +355,22 @@ export function createOTPService(env: Env): IOTPService {
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
-      let nonceData: { nonce?: string; identifier?: string };
+      let nonceData: PendingLoginOtpRecord;
       try {
-        nonceData = JSON.parse(nonceStr) as { nonce?: string; identifier?: string };
+        nonceData = JSON.parse(nonceStr) as PendingLoginOtpRecord;
       } catch {
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
       const normalizedId = validationUtils.normalizeIdentifier(identifier);
       if (!nonceData.identifier || nonceData.identifier !== normalizedId) {
-        return await failOtpVerify(sessionId);
+        return await failOtpVerify(sessionId, normalizedId);
       }
 
-      const isValid =
-        nonceData.nonce != null && timingSafeEqualString(nonceData.nonce, otp);
+      const pepper = await getOtpPepper();
+      const isValid = await verifyPendingLoginOtp(sessionId, normalizedId, otp, nonceData, pepper);
       if (!isValid) {
-        return await failOtpVerify(sessionId);
+        return await failOtpVerify(sessionId, normalizedId);
       }
 
       await env.NONCE_KV.delete(nonceKey);

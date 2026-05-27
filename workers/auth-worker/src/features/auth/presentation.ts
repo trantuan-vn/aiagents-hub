@@ -13,6 +13,7 @@ import {
 } from '../../shared/utils';
 import { recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { OtpRateLimitError } from '../../shared/otp-rate-limit';
+import { CaptchaRequiredError, InvalidCaptchaError, getTurnstileSiteKey, isTurnstileEnabled } from '../../shared/turnstile';
 import { applyCorsHeadersIfAllowed } from '../../shared/cors-headers';
 import { assertAllowedFrontendOrigin } from '../../shared/frontend-origin';
 import { ERROR_MESSAGES } from './constant';
@@ -71,8 +72,21 @@ export function createAuthRoutes(bindingName: string) {
   /** Giữ preAuthSessionId để retry OTP/2FA cùng session KV (nonce, PendingTotp, …). */
   const shouldPreservePreAuthSessionOnError = (e: unknown): boolean => {
     if (e instanceof OtpRateLimitError) return true;
+    if (e instanceof CaptchaRequiredError || e instanceof InvalidCaptchaError) return true;
     const msg = e instanceof Error ? e.message : String(e);
     return msg === ERROR_MESSAGES.AUTH.INVALID_OTP;
+  };
+
+  const captchaErrorResponse = (c: any, e: CaptchaRequiredError | InvalidCaptchaError) => {
+    applyCorsHeadersIfAllowed(c);
+    return c.json(
+      {
+        error: e.message,
+        requiresCaptcha: true,
+        siteKey: e.siteKey ?? getTurnstileSiteKey(c.env),
+      },
+      400,
+    );
   };
 
   // Helper function để xử lý route chung
@@ -111,6 +125,9 @@ export function createAuthRoutes(bindingName: string) {
             { error: e.message, retryAfter: e.retryAfter },
             429,
           );
+        }
+        if (e instanceof CaptchaRequiredError || e instanceof InvalidCaptchaError) {
+          return captchaErrorResponse(c, e);
         }
 
         const ip = getClientIp(c);
@@ -211,9 +228,17 @@ export function createAuthRoutes(bindingName: string) {
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 
+  app.get('/captcha/config', createRouteHandler(async (c: any) => {
+    const enabled = await isTurnstileEnabled(c.env);
+    return c.json({
+      enabled,
+      siteKey: enabled ? getTurnstileSiteKey(c.env) : null,
+    });
+  }, 'Failed to load captcha config'));
+
   // II. OTP Routes
   app.post('/otp/request', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
-    const { identifier, language, ref } = await parseBody(c, OTPRequestSchema);
+    const { identifier, language, ref, turnstileToken } = await parseBody(c, OTPRequestSchema);
 
     if (ref && c.env.NONCE_KV) {
       const { storePendingRef } = await import('../member/referral/utils');
@@ -221,7 +246,13 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const applicationService = createApplicationService(c, bindingName);
-    await applicationService.getRequestOtpUseCase(identifier, sessionId, ipAddress, language);
+    await applicationService.getRequestOtpUseCase(
+      identifier,
+      sessionId,
+      ipAddress,
+      language,
+      turnstileToken,
+    );
 
     return c.json({ ok: true });
   }, "OTP request failed", true));
@@ -307,7 +338,7 @@ export function createAuthRoutes(bindingName: string) {
   }, "Backup code verification failed", true));
 
   app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
-    const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
+    const { identifier, code, turnstileToken } = await parseBody(c, BackupCodeRecoverSchema);
     const applicationService = createApplicationService(c, bindingName);
     const { sessionId: newSessionId } = await applicationService.recoverWithBackupCodeUseCase(
       identifier,
@@ -317,6 +348,7 @@ export function createAuthRoutes(bindingName: string) {
       userAgent,
       country,
       c.get('loginDeviceId') as string | undefined,
+      turnstileToken,
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
@@ -337,7 +369,7 @@ export function createAuthRoutes(bindingName: string) {
     const appService = getPasskeyAuthApp(c);
     const status = await appService.getPasskeyAuthStatusUseCase(identifier.trim());
     return c.json({ enabled: status.enabled });
-  }, "Passkey status failed"));
+  }, "Passkey status failed", true));
 
   app.post('/passkey/auth/options', createRouteHandler(async (c: any) => {
     const origin = c.req.header('origin') || c.env.FRONTEND_URL;
@@ -356,7 +388,7 @@ export function createAuthRoutes(bindingName: string) {
     if (!body?.response || !body?.challengeKey) throw new Error('response and challengeKey required');
     const appService = getPasskeyAuthApp(c);
     const applicationService = createApplicationService(c, bindingName);
-    const { identifier } = await appService.verifyAuthenticationUseCase(
+    const { identifier, credentialId } = await appService.verifyAuthenticationUseCase(
       body.response,
       typeof body.identifier === 'string' ? body.identifier.trim() || undefined : undefined,
       body.challengeKey,
@@ -369,6 +401,7 @@ export function createAuthRoutes(bindingName: string) {
       userAgent,
       country,
       c.get('loginDeviceId') as string | undefined,
+      credentialId,
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
@@ -398,7 +431,7 @@ export function createAuthRoutes(bindingName: string) {
     const nonce = await applicationService.generateNonceUseCase(sessionId);
 
     return c.json({ nonce });
-  }, "Nonce request failed"));
+  }, "Nonce request failed", true));
 
   app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { message, signature } = await parseBody(c, SIWEAuthSchema);
@@ -699,10 +732,12 @@ export function createAuthRoutes(bindingName: string) {
       const body = await c.req.json() as { response: unknown; challengeKey?: string };
       if (!body?.response || !body?.challengeKey) throw new Error('response and challengeKey required');
       const appService = getPasskeyApp(c);
+      const deviceId = normalizeDeviceId(getClientDeviceIdFromRequest(c.req.raw));
       await appService.verifyRegistrationUseCase(
         user.identifier,
         { response: body.response as any, challengeKey: body.challengeKey },
-        origin
+        origin,
+        deviceId,
       );
       return c.json({ ok: true });
     } catch (e) {

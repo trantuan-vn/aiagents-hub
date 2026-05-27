@@ -24,6 +24,7 @@ declare namespace Cloudflare {
 		ADMIN_IDENTIFIERS: "tuanta2021@gmail.com";
 		PRIMARY_ADMIN_IDENTIFIER: "tuanta2021@gmail.com";
 		INTERNAL_PROXY_SECRET: "";
+		TURNSTILE_SITE_KEY: "";
 		BROADCAST_SERVICE_DO: DurableObjectNamespace /* BroadcastServiceDO from auth-worker */;
 		USER_SHARD_DO: DurableObjectNamespace /* UserShardDO from auth-worker */;
 		USER_DO: DurableObjectNamespace /* UserDO from auth-worker */;
@@ -60,6 +61,7 @@ declare namespace Cloudflare {
 		VIETQR_ACCOUNT_NAME: SecretsStoreSecret;
 		VIETQR_ACQ_ID: SecretsStoreSecret;
 		CASSO_WEBHOOK_CHECKSUM_KEY: SecretsStoreSecret;
+		TURNSTILE_SECRET_KEY: SecretsStoreSecret;
 	}
 }
 interface Env extends Cloudflare.Env {}

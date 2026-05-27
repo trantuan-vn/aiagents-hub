@@ -1,5 +1,6 @@
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from '../features/auth/constant';
 import { validationUtils } from '../features/auth/utils';
+import { isIdentifierOtpAbuseBlocked } from './otp-abuse-monitor';
 
 const OTP_VERIFY_ATTEMPTS_PREFIX = 'OtpVerifyAttempts:';
 const OTP_REQUEST_ID_PREFIX = 'OtpRequestId:';
@@ -50,7 +51,11 @@ export async function checkOtpVerifyBlocked(
   return { blocked: true, retryAfter: AUTH_CONSTANTS.OTP_EXPIRY };
 }
 
-export async function recordOtpVerifyFailure(env: Env, sessionId: string): Promise<void> {
+export async function recordOtpVerifyFailure(
+  env: Env,
+  sessionId: string,
+  identifier?: string,
+): Promise<void> {
   const key = otpVerifyAttemptsKey(sessionId);
   const raw = await env.NONCE_KV.get(key);
   let count = 1;
@@ -65,6 +70,11 @@ export async function recordOtpVerifyFailure(env: Env, sessionId: string): Promi
   await env.NONCE_KV.put(key, JSON.stringify({ count }), {
     expirationTtl: AUTH_CONSTANTS.OTP_EXPIRY,
   });
+
+  if (identifier?.trim()) {
+    const { recordIdentifierOtpVerifyFailure } = await import('./otp-abuse-monitor');
+    await recordIdentifierOtpVerifyFailure(env, identifier);
+  }
 }
 
 type HourlyBucket = { count: number; windowStart: number };
@@ -124,12 +134,35 @@ async function incrementHourlyCap(env: Env, key: string): Promise<void> {
   });
 }
 
+export async function getOtpRequestCountThisHour(env: Env, identifier: string): Promise<number> {
+  const normId = normalizeRequestIdentifier(identifier);
+  const key = `${OTP_REQUEST_ID_HOUR_PREFIX}${normId}`;
+  const raw = await env.NONCE_KV.get(key);
+  if (!raw) return 0;
+
+  const now = Date.now();
+  const windowMs = 60 * 60 * 1000;
+  try {
+    const bucket = JSON.parse(raw) as { count?: number; windowStart?: number };
+    if (!bucket.windowStart || now - bucket.windowStart > windowMs) return 0;
+    return bucket.count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function checkOtpRequestAllowed(
   env: Env,
   ip: string,
   identifier: string,
 ): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
   const normId = normalizeRequestIdentifier(identifier);
+
+  const abuse = await isIdentifierOtpAbuseBlocked(env, normId);
+  if (abuse.blocked) {
+    return { allowed: false, retryAfter: abuse.retryAfter };
+  }
+
   const now = Date.now();
   const cooldownMs = AUTH_CONSTANTS.OTP_REQUEST_COOLDOWN_SEC * 1000;
 

@@ -29,6 +29,7 @@ export function resolveHttpStatus(message: string, isSafe: boolean): ContentfulS
   }
   if (message === auth.NOT_AUTHORIZED) return 403;
   if (message === auth.RATE_LIMIT_EXCEEDED) return 429;
+  if (message === auth.CAPTCHA_REQUIRED || message === auth.INVALID_CAPTCHA) return 400;
 
   const token = TOKEN_ERRORS.TOKEN;
   if (

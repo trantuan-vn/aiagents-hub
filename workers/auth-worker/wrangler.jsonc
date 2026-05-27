@@ -76,6 +76,7 @@
 		"RETRY_ALARM_INTERVAL": "60000",
 		"ADMIN_IDENTIFIERS": "tuanta2021@gmail.com",
 		"PRIMARY_ADMIN_IDENTIFIER": "tuanta2021@gmail.com",
+		"TURNSTILE_SITE_KEY": "0x4AAAAAADXOWPMRtW0XIcLk",
 	},
 	// ========== QUEUE CONFIGURATION ==========
 	"queues": {
@@ -251,6 +252,11 @@
 		"binding": "CASSO_WEBHOOK_CHECKSUM_KEY",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "CASSO_WEBHOOK_CHECKSUM_KEY"
+		},
+		{
+		"binding": "TURNSTILE_SECRET_KEY",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "TURNSTILE_SECRET_KEY"
 		}
 	],
   	"services": [

@@ -12,6 +12,7 @@ import {
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { getIdFromName } from '../../shared/utils';
+import { bindPasskeyDeviceId } from '../auth/device-trust';
 import { createPasskeyRepository } from './infrastructure';
 import type { PasskeyStatus, PasskeyCredentialListItem, IPasskeyRepository } from './domain';
 import type { UserDO } from '../ws/infrastructure/UserDO';
@@ -44,7 +45,12 @@ export interface PasskeyApplicationConfig {
 export interface IAccountPasskeyApplication {
   getPasskeyStatusUseCase(identifier: string): Promise<PasskeyStatus>;
   getRegistrationOptionsUseCase(identifier: string, userName: string, origin: string): Promise<{ options: Record<string, unknown>; challengeKey: string }>;
-  verifyRegistrationUseCase(identifier: string, body: { response: RegistrationResponseJSON; challengeKey: string }, origin: string): Promise<void>;
+  verifyRegistrationUseCase(
+    identifier: string,
+    body: { response: RegistrationResponseJSON; challengeKey: string },
+    origin: string,
+    deviceId?: string | null,
+  ): Promise<void>;
   listCredentialsUseCase(identifier: string): Promise<PasskeyCredentialListItem[]>;
   removeCredentialUseCase(identifier: string, credentialId: string): Promise<void>;
 }
@@ -104,7 +110,8 @@ export function createAccountPasskeyApplication(
     async verifyRegistrationUseCase(
       identifier: string,
       body: { response: RegistrationResponseJSON; challengeKey: string },
-      origin: string
+      origin: string,
+      deviceId?: string | null,
     ): Promise<void> {
       const storedChallenge = await c.env.NONCE_KV.get(body.challengeKey);
       if (!storedChallenge) throw new Error('Challenge expired or invalid');
@@ -136,6 +143,10 @@ export function createAccountPasskeyApplication(
 
       // Store credentialId -> identifier for passkey login lookup (discoverable credentials)
       await c.env.NONCE_KV.put(`${CREDENTIAL_LOOKUP_PREFIX}${credentialIdB64}`, identifier);
+
+      if (deviceId) {
+        await bindPasskeyDeviceId(c.env.NONCE_KV, identifier, credentialIdB64, deviceId);
+      }
     },
 
     async listCredentialsUseCase(identifier: string): Promise<PasskeyCredentialListItem[]> {
@@ -158,7 +169,7 @@ export interface IPasskeyAuthApplication {
     identifier: string | undefined,
     challengeKey: string,
     origin: string
-  ): Promise<{ identifier: string }>;
+  ): Promise<{ identifier: string; credentialId: string }>;
 }
 
 export function createPasskeyAuthApplication(
@@ -219,7 +230,7 @@ export function createPasskeyAuthApplication(
       identifier: string | undefined,
       challengeKey: string,
       origin: string
-    ): Promise<{ identifier: string }> {
+    ): Promise<{ identifier: string; credentialId: string }> {
       const res = response as { id?: string; response?: { userHandle?: ArrayBuffer } };
       const credentialId = res?.id;
       if (!credentialId) throw new Error('Invalid passkey response');
@@ -267,7 +278,7 @@ export function createPasskeyAuthApplication(
         counter: verification.authenticationInfo.newCounter,
       });
 
-      return { identifier: resolvedIdentifier };
+      return { identifier: resolvedIdentifier, credentialId };
     },
   };
 }
