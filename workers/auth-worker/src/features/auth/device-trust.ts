@@ -11,6 +11,7 @@ import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { validationUtils, hashPhone, otpUtils } from './utils';
 import { createOTPService } from './infrastructure';
+import { storePendingSmsLogin } from './pending-sms-login';
 import CryptoJS from 'crypto-js';
 
 export const KNOWN_DEVICE_KV_PREFIX = 'KnownDevice:';
@@ -240,11 +241,8 @@ export async function evaluateNovelDeviceStepUp(
     if (!phone) return null;
 
     const smsOtp = otpUtils.generateOTP(6);
-    await c.env.NONCE_KV.put(
-      `PendingSmsLogin:${sessionId}`,
-      JSON.stringify({ identifier, otp: smsOtp, deviceId: d }),
-      { expirationTtl: 300 },
-    );
+    const normalizedId = validationUtils.normalizeIdentifier(identifier);
+    await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
     await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
     return { requiresSms: true };
   }

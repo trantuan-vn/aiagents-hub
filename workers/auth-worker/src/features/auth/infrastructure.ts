@@ -26,7 +26,7 @@ import {
   OtpRateLimitError,
   recordOtpVerifyFailure,
 } from '../../shared/otp-rate-limit';
-import { oauthUtils, otpUtils } from './utils';
+import { oauthUtils, otpUtils, validationUtils } from './utils';
 
 import { executeUtils } from '../../shared/utils';
 
@@ -342,36 +342,60 @@ export function createOTPService(env: Env): IOTPService {
     }
   };
 
+  const otpNonceKey = (sessionId: string) => `Nonce:${sessionId}`;
+
+  const failOtpVerify = async (sessionId: string): Promise<false> => {
+    await recordOtpVerifyFailure(env, sessionId);
+    const afterFail = await checkOtpVerifyBlocked(env, sessionId);
+    if (afterFail.blocked) {
+      throw new OtpRateLimitError(afterFail.retryAfter);
+    }
+    return false;
+  };
+
   return {
-    async generateOTP(sessionId: string): Promise<string> {
+    async generateOTP(sessionId: string, identifier: string): Promise<string> {
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
       const otp = otpUtils.generateOTP();
       await clearOtpVerifyAttempts(env, sessionId);
-      await kvService.saveNonce(sessionId, otp, AUTH_CONSTANTS.OTP_EXPIRY);
+      await env.NONCE_KV.put(
+        otpNonceKey(sessionId),
+        JSON.stringify({ nonce: otp, identifier: normalizedId }),
+        { expirationTtl: AUTH_CONSTANTS.OTP_EXPIRY },
+      );
       return otp;
     },
 
-    async verifyOTP(otp: string, sessionId: string): Promise<boolean> {
+    async verifyOTP(otp: string, sessionId: string, identifier: string): Promise<boolean> {
       const blocked = await checkOtpVerifyBlocked(env, sessionId);
       if (blocked.blocked) {
         throw new OtpRateLimitError(blocked.retryAfter);
       }
 
-      const nonceKey = `Nonce:${sessionId}`;
+      const nonceKey = otpNonceKey(sessionId);
       const nonceStr = await env.NONCE_KV.get(nonceKey);
       if (!nonceStr) {
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
-      const isValid = await kvService.validateNonce(sessionId, otp);
-      if (!isValid) {
-        await recordOtpVerifyFailure(env, sessionId);
-        const afterFail = await checkOtpVerifyBlocked(env, sessionId);
-        if (afterFail.blocked) {
-          throw new OtpRateLimitError(afterFail.retryAfter);
-        }
-        return false;
+      let nonceData: { nonce?: string; identifier?: string };
+      try {
+        nonceData = JSON.parse(nonceStr) as { nonce?: string; identifier?: string };
+      } catch {
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      if (!nonceData.identifier || nonceData.identifier !== normalizedId) {
+        return await failOtpVerify(sessionId);
+      }
+
+      const isValid = nonceData.nonce === otp;
+      if (!isValid) {
+        return await failOtpVerify(sessionId);
+      }
+
+      await env.NONCE_KV.delete(nonceKey);
       await clearOtpVerifyAttempts(env, sessionId);
       return true;
     },

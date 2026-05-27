@@ -41,6 +41,12 @@ import {
   serializePendingAuth,
 } from './device-trust';
 import { ipFingerprintsMatch, normalizeLoginCountry, uaFingerprintsMatch } from './session-fingerprint';
+import {
+  parsePendingSmsLogin,
+  pendingSmsLoginKvKey,
+  storePendingSmsLogin,
+  verifyPendingSmsLoginCode,
+} from './pending-sms-login';
 
 interface IApplicationService {
   // I. OAUTH
@@ -323,11 +329,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(
-          `PendingSmsLogin:${sessionId}`,
-          JSON.stringify({ identifier, otp: smsOtp, deviceId: dId ?? undefined }),
-          { expirationTtl: 300 },
-        );
+        await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, dId);
         await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         log.info('auth.oauth_step_up', { method: 'sms', identifier: normalizedId, isNewUser });
         return { requiresSms: true };
@@ -358,9 +360,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         throw new OtpRateLimitError(allowed.retryAfter);
       }
 
-      const otpService = createOTPService(c.env);
-      const otp = await otpService.generateOTP(sessionId);
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
+      const otpService = createOTPService(c.env);
+      const otp = await otpService.generateOTP(sessionId, nIdentifier);
 
       if (validationUtils.isValidEmail(nIdentifier)) {
         await otpService.sendEmailOTP(nIdentifier, otp, language);
@@ -374,21 +376,21 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
       const otpService = createOTPService(c.env);
-      const isValid = await otpService.verifyOTP(otp, sessionId);
+      const isValid = await otpService.verifyOTP(otp, sessionId, normalizedId);
       if (!isValid) {
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
-      const repository = getRepository(identifier);
-      const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
-      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      const repository = getRepository(normalizedId);
+      const { user, isNewUser } = await getOrCreateUser(repository, normalizedId, {}, ref);
       const dId = normalizeDeviceId(deviceId);
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const smsApp = createAccountSmsApplication(c, bindingName);
-      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
-      const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
+      const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(normalizedId);
+      const smsStatus = await smsApp.getSmsStatusUseCase(normalizedId);
 
       // 1. Cả authenticator và SMS đều bật -> chọn authenticator
       if (totpStatus.enabled) {
@@ -411,7 +413,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       // 2. Chỉ SMS bật -> chọn SMS
       if (smsStatus.enabled) {
-        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        const userDO = getIdFromName(c, normalizedId, bindingName) as DurableObjectStub<UserDO>;
         const smsRepo = createSmsRepository(userDO);
         let phone: string | null = null;
 
@@ -424,11 +426,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
           }
         }
 
-        if (!phone && validationUtils.isValidPhone(identifier)) {
-          const identifierHash = await hashPhone(validationUtils.normalizeIdentifier(identifier));
+        if (!phone && validationUtils.isValidPhone(normalizedId)) {
+          const identifierHash = await hashPhone(normalizedId);
           const storedHash = await smsRepo.getPhoneHash();
           if (storedHash === identifierHash) {
-            phone = identifier.startsWith('+') ? identifier : `+${identifier}`;
+            phone = normalizedId.startsWith('+') ? normalizedId : `+${normalizedId}`;
           }
         }
 
@@ -437,11 +439,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(
-          `PendingSmsLogin:${sessionId}`,
-          JSON.stringify({ identifier, otp: smsOtp, deviceId: dId ?? undefined }),
-          { expirationTtl: 300 },
-        );
+        await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, dId);
         await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         return { requiresSms: true };
       }
@@ -453,7 +451,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const result = await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, dId);
       if (isNewUser) {
         const wsApp = createWebsocketApplicationService(c, bindingName);
-        await wsApp.storePendingFirstLoginNotificationUseCase(identifier);
+        await wsApp.storePendingFirstLoginNotificationUseCase(normalizedId);
       }
       return result;
     },
@@ -490,16 +488,21 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
-      const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
+      const raw = await c.env.NONCE_KV.get(pendingSmsLoginKvKey(sessionId));
       if (!raw) {
         throw new Error(ERROR_MESSAGES.AUTH.SMS_SESSION_EXPIRED);
       }
 
-      const parsed = JSON.parse(raw) as { identifier: string; otp: string; deviceId?: string };
-      if (parsed.otp !== code) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      const parsed = parsePendingSmsLogin(raw);
+      const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+      if (!encryptSecret) {
+        throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+      }
+      const valid = await verifyPendingSmsLoginCode(sessionId, code, parsed, encryptSecret);
+      if (!valid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       const resolvedDeviceId = normalizeDeviceId(deviceId) ?? normalizeDeviceId(parsed.deviceId) ?? null;
 
-      await c.env.NONCE_KV.delete(`PendingSmsLogin:${sessionId}`);
+      await c.env.NONCE_KV.delete(pendingSmsLoginKvKey(sessionId));
 
       const repository = getRepository(parsed.identifier);
       const user = await repository.users.get();
@@ -510,11 +513,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       let pending = parsePendingAuth(await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`));
       if (!pending) {
-        const raw = await c.env.NONCE_KV.get(`PendingSmsLogin:${sessionId}`);
+        const raw = await c.env.NONCE_KV.get(pendingSmsLoginKvKey(sessionId));
         if (!raw) {
           throw new Error(ERROR_MESSAGES.AUTH.TWO_FA_SESSION_EXPIRED);
         }
-        const parsed = JSON.parse(raw) as { identifier: string; deviceId?: string };
+        const parsed = parsePendingSmsLogin(raw);
         pending = { identifier: parsed.identifier, deviceId: normalizeDeviceId(parsed.deviceId) ?? undefined };
       }
       const { identifier } = pending;
@@ -527,7 +530,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
 
       await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
-      await c.env.NONCE_KV.delete(`PendingSmsLogin:${sessionId}`);
+      await c.env.NONCE_KV.delete(pendingSmsLoginKvKey(sessionId));
 
       const repository = getRepository(identifier);
       const user = await repository.users.get();
@@ -606,11 +609,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
 
         const smsOtp = otpUtils.generateOTP(6);
-        await c.env.NONCE_KV.put(
-          `PendingSmsLogin:${sessionId}`,
-          JSON.stringify({ identifier: address, otp: smsOtp, deviceId: dId ?? undefined }),
-          { expirationTtl: 300 },
-        );
+        await storePendingSmsLogin(c.env, sessionId, normalizedAddr, smsOtp, dId);
         await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
         return { requiresSms: true };
       }

@@ -14,6 +14,7 @@ import {
 import { recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { OtpRateLimitError } from '../../shared/otp-rate-limit';
 import { applyCorsHeadersIfAllowed } from '../../shared/cors-headers';
+import { assertAllowedFrontendOrigin } from '../../shared/frontend-origin';
 import { ERROR_MESSAGES } from './constant';
 import {
   consumePendingLoginDevice,
@@ -67,6 +68,13 @@ export function createAuthRoutes(bindingName: string) {
     return undefined;
   };
 
+  /** Giữ preAuthSessionId để retry OTP/2FA cùng session KV (nonce, PendingTotp, …). */
+  const shouldPreservePreAuthSessionOnError = (e: unknown): boolean => {
+    if (e instanceof OtpRateLimitError) return true;
+    const msg = e instanceof Error ? e.message : String(e);
+    return msg === ERROR_MESSAGES.AUTH.INVALID_OTP;
+  };
+
   // Helper function để xử lý route chung
   const createRouteHandler = (
     handler: Function, 
@@ -76,10 +84,11 @@ export function createAuthRoutes(bindingName: string) {
     return async (c: any) => {
       try {
         if (requireOriginCheck) {
-          const origin = c.req.header('origin') || c.req.header('referer');
-          if (!origin?.startsWith(c.env.FRONTEND_URL)) {
-            throw new Error('Invalid origin');
-          }
+          assertAllowedFrontendOrigin(
+            c.req.header('origin'),
+            c.req.header('referer'),
+            c.env.FRONTEND_URL,
+          );
         }
 
         const request = c.req.raw;
@@ -111,7 +120,9 @@ export function createAuthRoutes(bindingName: string) {
           await recordIpAuthFailure(c.env, ip);
         }
         const { errorResponse, status } = await handleError(c, e, errorMessage);
-        cookieUtils.clearAuthCookies(c);
+        if (!shouldPreservePreAuthSessionOnError(e)) {
+          cookieUtils.clearAuthCookies(c);
+        }
         return c.json(errorResponse, status);
       }
     };

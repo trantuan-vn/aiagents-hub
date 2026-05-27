@@ -1,4 +1,5 @@
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from '../features/auth/constant';
+import { validationUtils } from '../features/auth/utils';
 
 const OTP_VERIFY_ATTEMPTS_PREFIX = 'OtpVerifyAttempts:';
 const OTP_REQUEST_ID_PREFIX = 'OtpRequestId:';
@@ -21,7 +22,7 @@ function otpVerifyAttemptsKey(sessionId: string): string {
 }
 
 function normalizeRequestIdentifier(identifier: string): string {
-  return identifier.trim().toLowerCase();
+  return validationUtils.normalizeIdentifier(identifier.trim());
 }
 
 export async function clearOtpVerifyAttempts(env: Env, sessionId: string): Promise<void> {
