@@ -34,6 +34,9 @@ export const AUTH_CONSTANTS = {
   OTP_REQUEST_COOLDOWN_SEC: 60,
   OTP_REQUEST_MAX_PER_IDENTIFIER_HOUR: 10,
   OTP_REQUEST_MAX_PER_IP_HOUR: 30,
+  /** Backup code recovery (account takeover surface) */
+  BACKUP_CODE_RECOVER_MAX_ATTEMPTS: 5,
+  BACKUP_CODE_RECOVER_MAX_PER_IDENTIFIER_HOUR: 10,
   /** Wallet SIWE / DID challenge nonce */
   NONCE_EXPIRY: 5 * 60, // 5 minutes
   /** Tối thiểu giữa 2 email "đăng nhập từ thiết bị mới" cho cùng browser/OS (không theo IP — tránh spam khi mạng đổi) */

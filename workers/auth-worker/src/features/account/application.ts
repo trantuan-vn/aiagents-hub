@@ -1,5 +1,5 @@
-import CryptoJS from 'crypto-js';
 import { Context } from 'hono';
+import { encryptField } from '../../shared/field-encryption';
 import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { createAuthenticatorRepository, createSmsRepository } from './infrastructure';
@@ -176,7 +176,7 @@ export function createAccountSmsApplication(
       if (phone) {
         const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
         if (encryptSecret) {
-          encryptedPhone = CryptoJS.AES.encrypt(phone, encryptSecret).toString();
+          encryptedPhone = await encryptField(phone, encryptSecret);
         }
       }
       await smsRepo.confirmPendingSmsAsEnabled(encryptedPhone);

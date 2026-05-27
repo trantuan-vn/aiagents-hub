@@ -2,6 +2,7 @@
  * TOTP (RFC 6238) utilities using Web Crypto API.
  * Used for Authenticator app (e.g. Google Authenticator) setup and verification.
  */
+import { timingSafeEqualString } from '../../shared/timing-safe';
 
 const TOTP_STEP_SECONDS = 30;
 const TOTP_DIGITS = 6;
@@ -93,8 +94,8 @@ export async function getTotpCode(secretBase32: string, timeStep?: number): Prom
   return otp.toString().padStart(TOTP_DIGITS, '0');
 }
 
-/** Time step window for verification: ±4 = 4 minutes total to handle clock skew. */
-const TOTP_VERIFY_WINDOW = 4;
+/** Time step window for verification: ±2 steps (~60s each side) + rate limit on login. */
+const TOTP_VERIFY_WINDOW = 2;
 
 /**
  * Verify a 6-digit code against the secret.
@@ -106,7 +107,7 @@ export async function verifyTotpCode(secretBase32: string, code: string): Promis
   const baseStep = Math.floor(Math.floor(Date.now() / 1000) / TOTP_STEP_SECONDS);
   for (let delta = -TOTP_VERIFY_WINDOW; delta <= TOTP_VERIFY_WINDOW; delta++) {
     const expected = await getTotpCode(secretBase32, baseStep + delta);
-    if (expected === trimmedCode) return true;
+    if (timingSafeEqualString(expected, trimmedCode)) return true;
   }
   return false;
 }

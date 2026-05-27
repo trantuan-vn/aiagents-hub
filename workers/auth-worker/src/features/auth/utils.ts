@@ -1,6 +1,6 @@
 import jwt from '@tsndr/cloudflare-worker-jwt';
 import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts'; 
-import CryptoJS from 'crypto-js';
+import { encryptField } from '../../shared/field-encryption';
 import { Context } from 'hono'
 import { setCookie, deleteCookie, getCookie } from 'hono/cookie'
 import { generateSecureSessionId } from '../../shared/utils';
@@ -154,15 +154,12 @@ export const walletUtils = {
     const mnemonic = generateMnemonic(english, 256);
     const account = mnemonicToAccount(mnemonic);
     
-    const encryptedPrivateKey = CryptoJS.AES.encrypt(
+    const encryptedPrivateKey = await encryptField(
       account.getHdKey().privateExtendedKey,
-      encryptionSecret
-    ).toString();
+      encryptionSecret,
+    );
 
-    const encryptedMnemonic = CryptoJS.AES.encrypt(
-      mnemonic,
-      encryptionSecret
-    ).toString();
+    const encryptedMnemonic = await encryptField(mnemonic, encryptionSecret);
     
     return {
       address: account.address,

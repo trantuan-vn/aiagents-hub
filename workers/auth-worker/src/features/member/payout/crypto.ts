@@ -1,4 +1,4 @@
-import CryptoJS from 'crypto-js';
+import { decryptField, encryptField } from '../../../shared/field-encryption';
 
 export async function requireEncryptionSecret(
   getSecret: () => Promise<string | null>,
@@ -10,14 +10,16 @@ export async function requireEncryptionSecret(
   return secret;
 }
 
-export function encryptPayoutField(plaintext: string, secret: string): string {
-  return CryptoJS.AES.encrypt(plaintext, secret).toString();
+export async function encryptPayoutField(plaintext: string, secret: string): Promise<string> {
+  return encryptField(plaintext, secret);
 }
 
-export function decryptPayoutField(ciphertext: string, secret: string): string | null {
-  const bytes = CryptoJS.AES.decrypt(ciphertext, secret);
-  const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-  return decrypted || null;
+export async function decryptPayoutField(ciphertext: string, secret: string): Promise<string | null> {
+  try {
+    return await decryptField(ciphertext, secret);
+  } catch {
+    return null;
+  }
 }
 
 export function createPayoutEncryptionSecretGetter(env: Env): () => Promise<string> {

@@ -6,7 +6,13 @@ import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
 
 import { OAuthProvider, Session } from './domain';
-import CryptoJS from 'crypto-js';
+import { decryptField } from '../../shared/field-encryption';
+import {
+  assertBackupCodeRecoverAllowed,
+  checkBackupCodeRecoverAllowed,
+  clearBackupCodeRecoverAttempts,
+  recordBackupCodeRecoverFailure,
+} from '../../shared/backup-code-rate-limit';
 import { 
   validationUtils, 
   walletUtils, 
@@ -17,8 +23,11 @@ import {
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
 import {
   checkOtpRequestAllowed,
+  checkOtpVerifyBlocked,
+  clearOtpVerifyAttempts,
   OtpRateLimitError,
   recordOtpRequest,
+  recordOtpVerifyFailure,
 } from '../../shared/otp-rate-limit';
 import { createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
@@ -86,6 +95,14 @@ interface IApplicationService {
 }
 
 const log = createLogger('auth-worker', 'auth');
+
+async function decryptStoredPhone(encrypted: string, secret: string): Promise<string | null> {
+  try {
+    return await decryptField(encrypted, secret);
+  } catch {
+    return null;
+  }
+}
 
 export function createApplicationService(c: Context, bindingName: string): IApplicationService {
   const getRepository = (identifier: string) => {
@@ -311,8 +328,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         if (encryptedPhone) {
           const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
           if (encryptSecret) {
-            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
-            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+            phone = await decryptStoredPhone(encryptedPhone, encryptSecret);
           }
         }
 
@@ -421,8 +437,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         if (encryptedPhone) {
           const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
           if (encryptSecret) {
-            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
-            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+            phone = await decryptStoredPhone(encryptedPhone, encryptSecret);
           }
         }
 
@@ -457,6 +472,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
+      const blocked = await checkOtpVerifyBlocked(c.env, sessionId);
+      if (blocked.blocked) {
+        throw new OtpRateLimitError(blocked.retryAfter);
+      }
+
       const pendingRaw = await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`);
       const pending = parsePendingAuth(pendingRaw);
       if (!pending) {
@@ -476,9 +496,15 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const trimmedCode = code.replace(/\D/g, '').slice(0, 6);
       const valid = await verifyTotpCode(secret, trimmedCode);
       if (!valid) {
+        await recordOtpVerifyFailure(c.env, sessionId);
+        const afterFail = await checkOtpVerifyBlocked(c.env, sessionId);
+        if (afterFail.blocked) {
+          throw new OtpRateLimitError(afterFail.retryAfter);
+        }
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
 
+      await clearOtpVerifyAttempts(c.env, sessionId);
       await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
 
       const repository = getRepository(identifier);
@@ -488,6 +514,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
+      const blocked = await checkOtpVerifyBlocked(c.env, sessionId);
+      if (blocked.blocked) {
+        throw new OtpRateLimitError(blocked.retryAfter);
+      }
+
       const raw = await c.env.NONCE_KV.get(pendingSmsLoginKvKey(sessionId));
       if (!raw) {
         throw new Error(ERROR_MESSAGES.AUTH.SMS_SESSION_EXPIRED);
@@ -499,10 +530,18 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
       }
       const valid = await verifyPendingSmsLoginCode(sessionId, code, parsed, encryptSecret);
-      if (!valid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      if (!valid) {
+        await recordOtpVerifyFailure(c.env, sessionId);
+        const afterFail = await checkOtpVerifyBlocked(c.env, sessionId);
+        if (afterFail.blocked) {
+          throw new OtpRateLimitError(afterFail.retryAfter);
+        }
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      }
       const resolvedDeviceId = normalizeDeviceId(deviceId) ?? normalizeDeviceId(parsed.deviceId) ?? null;
 
       await c.env.NONCE_KV.delete(pendingSmsLoginKvKey(sessionId));
+      await clearOtpVerifyAttempts(c.env, sessionId);
 
       const repository = getRepository(parsed.identifier);
       const user = await repository.users.get();
@@ -511,6 +550,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async verifyBackupCodeLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
+      const blocked = await checkOtpVerifyBlocked(c.env, sessionId);
+      if (blocked.blocked) {
+        throw new OtpRateLimitError(blocked.retryAfter);
+      }
+
       let pending = parsePendingAuth(await c.env.NONCE_KV.get(`PendingTotp:${sessionId}`));
       if (!pending) {
         const raw = await c.env.NONCE_KV.get(pendingSmsLoginKvKey(sessionId));
@@ -527,8 +571,16 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const backupRepo = createBackupCodeRepository(userDO);
       const normalized = normalizeBackupCodeInput(code);
       const consumed = await backupRepo.consumeCode(normalized);
-      if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      if (!consumed) {
+        await recordOtpVerifyFailure(c.env, sessionId);
+        const afterFail = await checkOtpVerifyBlocked(c.env, sessionId);
+        if (afterFail.blocked) {
+          throw new OtpRateLimitError(afterFail.retryAfter);
+        }
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      }
 
+      await clearOtpVerifyAttempts(c.env, sessionId);
       await c.env.NONCE_KV.delete(`PendingTotp:${sessionId}`);
       await c.env.NONCE_KV.delete(pendingSmsLoginKvKey(sessionId));
 
@@ -540,16 +592,29 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
     async recoverWithBackupCodeUseCase(identifier: string, code: string, sessionId: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }> {
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
+      await assertBackupCodeRecoverAllowed(c.env, nIdentifier);
+
       const repository = getRepository(nIdentifier);
       const user = await repository.users.get();
-      if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
+      if (!user) {
+        await recordBackupCodeRecoverFailure(c.env, nIdentifier);
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      }
 
       const userDO = getIdFromName(c, nIdentifier, bindingName) as DurableObjectStub<UserDO>;
       const backupRepo = createBackupCodeRepository(userDO);
       const normalized = normalizeBackupCodeInput(code);
       const consumed = await backupRepo.consumeCode(normalized);
-      if (!consumed) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      if (!consumed) {
+        await recordBackupCodeRecoverFailure(c.env, nIdentifier);
+        const allowed = await checkBackupCodeRecoverAllowed(c.env, nIdentifier);
+        if (!allowed.allowed) {
+          throw new OtpRateLimitError(allowed.retryAfter);
+        }
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      }
 
+      await clearBackupCodeRecoverAttempts(c.env, nIdentifier);
       return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, normalizeDeviceId(deviceId));
     },
 
@@ -591,8 +656,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         if (encryptedPhone) {
           const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
           if (encryptSecret) {
-            const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
-            phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+            phone = await decryptStoredPhone(encryptedPhone, encryptSecret);
           }
         }
 

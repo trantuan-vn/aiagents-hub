@@ -12,7 +12,7 @@ import { UserDO } from '../ws/infrastructure/UserDO';
 import { validationUtils, hashPhone, otpUtils } from './utils';
 import { createOTPService } from './infrastructure';
 import { storePendingSmsLogin } from './pending-sms-login';
-import CryptoJS from 'crypto-js';
+import { decryptField } from '../../shared/field-encryption';
 
 export const KNOWN_DEVICE_KV_PREFIX = 'KnownDevice:';
 export const PENDING_LOGIN_DEVICE_PREFIX = 'PendingLoginDevice:';
@@ -197,15 +197,21 @@ export async function evaluateNovelDeviceStepUp(
   sessionId: string,
   deviceId: string | null | undefined,
 ): Promise<{ requiresTotp: true } | { requiresSms: true } | null> {
-  const d = normalizeDeviceId(deviceId);
-  if (!d || !c.env.NONCE_KV) return null;
+  if (!c.env.NONCE_KV) return null;
 
   const activeSessions = await repository.sessions.listAll(50);
-  const known = await isKnownDeviceId(c.env.NONCE_KV, identifier, d, activeSessions);
-  if (known) return null;
-
   const otherActive = activeSessions.filter((s) => s.isActive);
   if (otherActive.length === 0) return null;
+
+  const d = normalizeDeviceId(deviceId);
+  const missingDeviceWithRegistered = isLoginMissingDeviceIdWithRegisteredDevices(d, activeSessions);
+
+  if (d) {
+    const known = await isKnownDeviceId(c.env.NONCE_KV, identifier, d, activeSessions);
+    if (known) return null;
+  } else if (!missingDeviceWithRegistered) {
+    return null;
+  }
 
   const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
   const smsApp = createAccountSmsApplication(c, bindingName);
@@ -227,8 +233,11 @@ export async function evaluateNovelDeviceStepUp(
     if (encryptedPhone) {
       const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
       if (encryptSecret) {
-        const bytes = CryptoJS.AES.decrypt(encryptedPhone, encryptSecret);
-        phone = bytes.toString(CryptoJS.enc.Utf8) || null;
+        try {
+          phone = (await decryptField(encryptedPhone, encryptSecret)) || null;
+        } catch {
+          phone = null;
+        }
       }
     }
     if (!phone && validationUtils.isValidPhone(identifier)) {

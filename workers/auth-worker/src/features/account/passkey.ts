@@ -175,7 +175,9 @@ export function createPasskeyAuthApplication(
   return {
     async getPasskeyAuthStatusUseCase(identifier: string): Promise<PasskeyStatus> {
       try {
-        return await getRepo(identifier).getStatus();
+        const status = await getRepo(identifier).getStatus();
+        const enabled = status.enabled && status.credentialCount > 0;
+        return { enabled, credentialCount: enabled ? 1 : 0 };
       } catch {
         return { enabled: false, credentialCount: 0 };
       }

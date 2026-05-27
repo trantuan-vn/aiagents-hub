@@ -224,7 +224,7 @@ export function createAuthRoutes(bindingName: string) {
     await applicationService.getRequestOtpUseCase(identifier, sessionId, ipAddress, language);
 
     return c.json({ ok: true });
-  }, "OTP request failed"));
+  }, "OTP request failed", true));
 
   app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const body = await parseBody(c, OTPVerificationSchema);
@@ -259,7 +259,7 @@ export function createAuthRoutes(bindingName: string) {
     const { sessionId: newSessionId } = result as { sessionId: string };
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "OTP verification failed"));
+  }, "OTP verification failed", true));
 
   app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, TotpVerifySchema);
@@ -274,7 +274,7 @@ export function createAuthRoutes(bindingName: string) {
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "TOTP verification failed"));
+  }, "TOTP verification failed", true));
 
   app.post('/sms/verify-login', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, SmsVerifyLoginSchema);
@@ -289,7 +289,7 @@ export function createAuthRoutes(bindingName: string) {
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "SMS verification failed"));
+  }, "SMS verification failed", true));
 
   app.post('/backup-code/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, BackupCodeVerifySchema);
@@ -304,7 +304,7 @@ export function createAuthRoutes(bindingName: string) {
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "Backup code verification failed"));
+  }, "Backup code verification failed", true));
 
   app.post('/backup-code/recover', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { identifier, code } = await parseBody(c, BackupCodeRecoverSchema);
@@ -320,7 +320,7 @@ export function createAuthRoutes(bindingName: string) {
     );
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "Backup code recovery failed"));
+  }, "Backup code recovery failed", true));
 
   // IIb. Passkey Auth (login) – public, no auth required
   const getPasskeyAuthApp = (ctx: any) =>
@@ -336,7 +336,7 @@ export function createAuthRoutes(bindingName: string) {
     }
     const appService = getPasskeyAuthApp(c);
     const status = await appService.getPasskeyAuthStatusUseCase(identifier.trim());
-    return c.json(status);
+    return c.json({ enabled: status.enabled });
   }, "Passkey status failed"));
 
   app.post('/passkey/auth/options', createRouteHandler(async (c: any) => {
@@ -437,7 +437,7 @@ export function createAuthRoutes(bindingName: string) {
     const { sessionId: newSessionId } = result as { sessionId: string };
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
     return c.json({ ok: true });
-  }, "Wallet connection failed"));
+  }, "Wallet connection failed", true));
 
   // IV. Profile Routes
   app.post('/profile/logout', async (c) => {

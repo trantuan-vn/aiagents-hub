@@ -10,13 +10,13 @@ function rowHasBeneficiary(row: BeneficiaryRow | null): boolean {
   return !!(row.accountNoEncrypted || row.accountNo);
 }
 
-function toRecordPayload(
+async function toRecordPayload(
   data: PayoutBeneficiary,
   secret: string,
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   return {
-    accountNoEncrypted: encryptPayoutField(data.accountNo, secret),
-    accountNameEncrypted: encryptPayoutField(data.accountName, secret),
+    accountNoEncrypted: await encryptPayoutField(data.accountNo, secret),
+    accountNameEncrypted: await encryptPayoutField(data.accountName, secret),
     accountNo: null,
     accountName: null,
     acqId: data.acqId,
@@ -24,15 +24,15 @@ function toRecordPayload(
   };
 }
 
-function rowToBeneficiary(row: BeneficiaryRow, secret: string): PayoutBeneficiary | null {
+async function rowToBeneficiary(row: BeneficiaryRow, secret: string): Promise<PayoutBeneficiary | null> {
   let accountNo: string | null = null;
   let accountName: string | null = null;
 
   if (row.accountNoEncrypted) {
-    accountNo = decryptPayoutField(String(row.accountNoEncrypted), secret);
+    accountNo = await decryptPayoutField(String(row.accountNoEncrypted), secret);
   }
   if (row.accountNameEncrypted) {
-    accountName = decryptPayoutField(String(row.accountNameEncrypted), secret);
+    accountName = await decryptPayoutField(String(row.accountNameEncrypted), secret);
   }
 
   if (!accountNo && row.accountNo) {
@@ -58,7 +58,7 @@ export function createPayoutBeneficiaryInfrastructure(
 ) {
   const persist = async (data: PayoutBeneficiary, existingId?: unknown): Promise<PayoutBeneficiary> => {
     const secret = await getEncryptionSecret();
-    const record = toRecordPayload(data, secret);
+    const record = await toRecordPayload(data, secret);
     if (existingId != null) {
       await executeUtils.executeDynamicAction(
         userDO,
@@ -84,7 +84,7 @@ export function createPayoutBeneficiaryInfrastructure(
       if (!rowHasBeneficiary(row)) return null;
 
       const secret = await getEncryptionSecret();
-      const beneficiary = rowToBeneficiary(row!, secret);
+      const beneficiary = await rowToBeneficiary(row!, secret);
       if (!beneficiary) return null;
 
       if (row!.accountNo && !row!.accountNoEncrypted) {
