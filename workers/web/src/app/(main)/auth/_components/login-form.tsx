@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { formatAuthApiErrorMessage, getAuthApiErrorMessage } from "@/lib/auth-api-error";
 import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 
 type AuthOptionsJSON = Parameters<typeof startAuthentication>[0];
@@ -34,19 +35,6 @@ function debounce<T extends (...args: never[]) => void>(func: T, wait: number): 
     if (timeout) clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
-}
-
-interface ErrorResponse {
-  error?: string;
-}
-
-async function getErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const errorData: ErrorResponse = await response.json();
-    return errorData.error ?? fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 function OtpDialog({
@@ -363,10 +351,20 @@ export function LoginForm() {
   useEffect(() => {
     const requiresTotp = searchParams.get("requiresTotp");
     const requiresSms = searchParams.get("requiresSms");
+    const rateLimited = searchParams.get("rateLimited");
+    const retryAfterRaw = searchParams.get("retryAfter");
     if (requiresTotp === "1") {
       setShowTotpPopup(true);
     } else if (requiresSms === "1") {
       setShowSmsPopup(true);
+    }
+    if (rateLimited === "1") {
+      const seconds = retryAfterRaw ? Number(retryAfterRaw) : NaN;
+      if (Number.isFinite(seconds) && seconds > 0) {
+        toast.error(t("rate_limit_retry_after", { seconds: Math.ceil(seconds) }));
+      } else {
+        toast.error(t("rate_limit_generic"));
+      }
     }
   }, [searchParams]);
 
@@ -416,8 +414,8 @@ export function LoginForm() {
           body: JSON.stringify({ identifier: email }),
         });
         if (!optRes.ok) {
-          const err = (await optRes.json().catch(() => ({}))) as { error?: string };
-          throw new Error(err.error ?? t("passkey_error"));
+          const err = (await optRes.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+          throw new Error(formatAuthApiErrorMessage(err, t("passkey_error"), t, optRes.status));
         }
 
         const { options, challengeKey } = (await optRes.json()) as {
@@ -438,6 +436,7 @@ export function LoginForm() {
           requiresTotp?: boolean;
           requiresSms?: boolean;
           error?: string;
+          retryAfter?: number;
         };
 
         if (verifyData.requiresTotp) {
@@ -454,7 +453,9 @@ export function LoginForm() {
         }
 
         if (!verifyRes.ok) {
-          throw new Error(verifyData.error ?? t("passkey_error"));
+          throw new Error(
+            formatAuthApiErrorMessage(verifyData, t("passkey_error"), t, verifyRes.status),
+          );
         }
         if (!verifyData.ok) throw new Error(t("passkey_error"));
 
@@ -503,6 +504,7 @@ export function LoginForm() {
           requiresTotp?: boolean;
           requiresSms?: boolean;
           error?: string;
+          retryAfter?: number;
         };
 
         if (data.requiresTotp) {
@@ -518,8 +520,9 @@ export function LoginForm() {
           form.reset();
           router.push("/dashboard");
         } else {
-          const errMsg = data.error ?? (await getErrorMessage(response, t("unexpected_error")));
-          throw new Error(errMsg);
+          throw new Error(
+            formatAuthApiErrorMessage(data, t("otp_verify_error"), t, response.status),
+          );
         }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("otp_verify_error"));
@@ -545,8 +548,8 @@ export function LoginForm() {
           credentials: "include",
         });
         if (!response.ok) {
-          const err = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(err.error ?? t("sms_verify_error"));
+          const err = (await response.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+          throw new Error(formatAuthApiErrorMessage(err, t("sms_verify_error"), t, response.status));
         }
         setShowSmsPopup(false);
         form.reset();
@@ -575,8 +578,8 @@ export function LoginForm() {
           credentials: "include",
         });
         if (!response.ok) {
-          const err = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(err.error ?? t("totp_verify_error"));
+          const err = (await response.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+          throw new Error(formatAuthApiErrorMessage(err, t("totp_verify_error"), t, response.status));
         }
         setShowTotpPopup(false);
         form.reset();
@@ -605,8 +608,8 @@ export function LoginForm() {
         credentials: "include",
       });
       if (!response.ok) {
-        const err = (await response.json().catch(() => ({}))) as { error?: string };
-        throw new Error(err.error ?? t("backup_code_verify_error"));
+        const err = (await response.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+        throw new Error(formatAuthApiErrorMessage(err, t("backup_code_verify_error"), t, response.status));
       }
       setShowBackupCodePopup(false);
       setShowTotpPopup(false);
@@ -648,8 +651,10 @@ export function LoginForm() {
           credentials: "include",
         });
         if (!response.ok) {
-          const err = (await response.json().catch(() => ({}))) as { error?: string };
-          throw new Error(err.error ?? t("backup_code_verify_error"));
+          const err = (await response.json().catch(() => ({}))) as { error?: string; retryAfter?: number };
+          throw new Error(
+            formatAuthApiErrorMessage(err, t("backup_code_verify_error"), t, response.status),
+          );
         }
         setShowRecoverSection(false);
         setRecoverBackupCode("");
@@ -681,7 +686,7 @@ export function LoginForm() {
           credentials: "include",
         });
         if (!res.ok) {
-          throw new Error(await getErrorMessage(res, t("unexpected_error")));
+          throw new Error(await getAuthApiErrorMessage(res, t("otp_send_error"), t));
         }
         if (isMounted.current) {
           setIdentifier(data.email.trim());

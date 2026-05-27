@@ -28,6 +28,13 @@ export const AUTH_CONSTANTS = {
   ACCESS_TOKEN_EXPIRY: 15 * 60, // 15 minutes
   REFRESH_TOKEN_EXPIRY: 4 * 60 * 60, // 4 hours
   SESSION_EXPIRY: 4 * 60 * 60, // 4 hours
+  /** OTP email/SMS — short-lived */
+  OTP_EXPIRY: 60,
+  OTP_VERIFY_MAX_ATTEMPTS: 5,
+  OTP_REQUEST_COOLDOWN_SEC: 60,
+  OTP_REQUEST_MAX_PER_IDENTIFIER_HOUR: 10,
+  OTP_REQUEST_MAX_PER_IP_HOUR: 30,
+  /** Wallet SIWE / DID challenge nonce */
   NONCE_EXPIRY: 5 * 60, // 5 minutes
   /** Tối thiểu giữa 2 email "đăng nhập từ thiết bị mới" cho cùng browser/OS (không theo IP — tránh spam khi mạng đổi) */
   NEW_SESSION_EMAIL_COOLDOWN_SEC: 12 * 60 * 60, // 12 hours

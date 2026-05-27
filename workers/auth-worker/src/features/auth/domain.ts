@@ -251,7 +251,7 @@ export interface IOAuthService {
 }
 
 export interface IKvService {
-  saveNonce(sessionId: string, nonce: string): Promise<void>;
+  saveNonce(sessionId: string, nonce: string, expirationTtlSec?: number): Promise<void>;
   validateNonce(sessionId: string, nonce: string): Promise<boolean>;
 }
 

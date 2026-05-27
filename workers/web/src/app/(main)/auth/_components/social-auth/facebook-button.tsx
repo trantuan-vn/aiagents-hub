@@ -2,11 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 
+import { useTranslations } from "next-intl";
 import { siFacebook } from "simple-icons";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { SimpleIcon } from "@/components/simple-icon";
 import { Button } from "@/components/ui/button";
+import { getAuthApiErrorMessage } from "@/lib/auth-api-error";
 import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +22,7 @@ const FacebookOAuthSchema = z.object({
 export function FacebookButton({ className, ...props }: React.ComponentProps<typeof Button>) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("LoginForm");
   const ref = searchParams.get("ref");
 
   const handleFacebookLogin = async () => {
@@ -31,7 +35,7 @@ export function FacebookButton({ className, ...props }: React.ComponentProps<typ
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(await getAuthApiErrorMessage(response, t("unexpected_error"), t));
       }
 
       const data = await response.json();
@@ -39,7 +43,8 @@ export function FacebookButton({ className, ...props }: React.ComponentProps<typ
 
       router.push(validatedData.url);
     } catch (error) {
-      console.error("Failed to get Facebook OAuth URL:", error);
+      const msg = error instanceof Error ? error.message : t("unexpected_error");
+      toast.error(msg);
     }
   };
 

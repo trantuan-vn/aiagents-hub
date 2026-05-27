@@ -185,12 +185,14 @@ export async function hashPhone(phone: string): Promise<string> {
 export const otpUtils = {
   generateOTP(length = 6): string {
     const digits = '0123456789';
+    const buf = new Uint8Array(length);
+    crypto.getRandomValues(buf);
     let otp = '';
     for (let i = 0; i < length; i++) {
-      otp += digits[Math.floor(Math.random() * 10)];
+      otp += digits[buf[i] % 10];
     }
     return otp;
-  }
+  },
 };
 
 // V. Cookie Utilities

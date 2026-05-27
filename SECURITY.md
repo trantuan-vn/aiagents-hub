@@ -11,6 +11,7 @@ Please report security issues privately to the maintainers (do not open public G
 3. Store payment and OAuth secrets via Cloudflare secrets / Secrets Store (never commit values).
 4. Keep `ENVIRONMENT=production` and `DEBUG=false` on auth-worker.
 5. Do not enable `DEV_MODE` on moltbot-sandbox in production.
+6. OTP: 60s TTL, max 5 verify attempts per pre-auth session, cooldown on `/otp/request` (per identifier + IP hourly caps).
 
 ## Trusted proxy headers
 

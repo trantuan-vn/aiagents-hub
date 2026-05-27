@@ -84,6 +84,8 @@
     "otp_invalid": "Please enter a valid 6-digit OTP",
     "otp_verify_error": "Invalid OTP. Please try again.",
     "otp_send_error": "Failed to send OTP. Please try again.",
+    "rate_limit_retry_after": "Try again in {seconds} seconds.",
+    "rate_limit_generic": "Too many requests. Please wait a moment and try again.",
     "unexpected_error": "An unexpected error occurred",
     "use_backup_code": "Use backup code instead",
     "backup_code_dialog_title": "Recover with backup code",

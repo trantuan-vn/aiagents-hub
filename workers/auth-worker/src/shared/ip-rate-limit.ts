@@ -129,7 +129,13 @@ export async function checkIpBlocked(
     if (record.failCount < AUTH_CONSTANTS.RATE_LIMIT_MAX) {
       return { blocked: false };
     }
-  } else if (isIpCurrentlyBlocked(record, now)) {
+    if (isIpCurrentlyBlocked(record, now)) {
+      return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
+    }
+    return { blocked: false };
+  }
+
+  if (isIpCurrentlyBlocked(record, now)) {
     const authBlocked = record.failCount >= AUTH_CONSTANTS.RATE_LIMIT_MAX;
     const floodBlocked = (record.requestCount ?? 0) > IP_RATE_LIMIT.REQUEST_LIMIT_MAX;
     if (!authBlocked && !floodBlocked) {
@@ -224,6 +230,20 @@ export async function recordIpAuthFailure(env: Env, ip: string): Promise<void> {
 
 function rateLimitExceededResponse(c: Context, retryAfter: number) {
   applyCorsHeadersIfAllowed(c);
+  const path = c.req.path;
+  const accept = c.req.header('accept') || '';
+  const wantsHtml = accept.includes('text/html');
+  const isOAuthCallback = /^\/dashboard\/auth\/oauth\/[^/]+\/callback$/.test(path);
+
+  // If a browser is navigating back from an OAuth provider while rate-limited,
+  // returning JSON renders an ugly white page. Redirect back to login with params.
+  if (wantsHtml && isOAuthCallback) {
+    const redirectUrl = new URL(`${c.env.FRONTEND_URL}/auth/v3/login`);
+    redirectUrl.searchParams.set('rateLimited', '1');
+    redirectUrl.searchParams.set('retryAfter', String(retryAfter));
+    return c.redirect(redirectUrl.toString(), 302);
+  }
+
   return c.json(
     {
       error: ERROR_MESSAGES.AUTH.RATE_LIMIT_EXCEEDED,

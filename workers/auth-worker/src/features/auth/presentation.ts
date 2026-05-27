@@ -12,6 +12,9 @@ import {
   executeUtils,
 } from '../../shared/utils';
 import { recordIpAuthFailure } from '../../shared/ip-rate-limit';
+import { OtpRateLimitError } from '../../shared/otp-rate-limit';
+import { applyCorsHeadersIfAllowed } from '../../shared/cors-headers';
+import { ERROR_MESSAGES } from './constant';
 import {
   consumePendingLoginDevice,
   normalizeDeviceId,
@@ -93,8 +96,20 @@ export function createAuthRoutes(bindingName: string) {
         c.set('loginDeviceId', deviceId);
         return await handler(c, sessionId, ipAddress, userAgent, country);
       } catch (e) {
+        if (e instanceof OtpRateLimitError) {
+          applyCorsHeadersIfAllowed(c);
+          return c.json(
+            { error: e.message, retryAfter: e.retryAfter },
+            429,
+          );
+        }
+
         const ip = getClientIp(c);
-        if (ip) await recordIpAuthFailure(c.env, ip);
+        const errMsg = e instanceof Error ? e.message : String(e);
+        const isRateLimited = errMsg === ERROR_MESSAGES.AUTH.RATE_LIMIT_EXCEEDED;
+        if (ip && !isRateLimited) {
+          await recordIpAuthFailure(c.env, ip);
+        }
         const { errorResponse, status } = await handleError(c, e, errorMessage);
         cookieUtils.clearAuthCookies(c);
         return c.json(errorResponse, status);
@@ -195,7 +210,7 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const applicationService = createApplicationService(c, bindingName);
-    await applicationService.getRequestOtpUseCase(identifier, sessionId, language);
+    await applicationService.getRequestOtpUseCase(identifier, sessionId, ipAddress, language);
 
     return c.json({ ok: true });
   }, "OTP request failed"));

@@ -20,6 +20,12 @@ import {
   ISessionRepository
 } from './domain';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import {
+  checkOtpVerifyBlocked,
+  clearOtpVerifyAttempts,
+  OtpRateLimitError,
+  recordOtpVerifyFailure,
+} from '../../shared/otp-rate-limit';
 import { oauthUtils, otpUtils } from './utils';
 
 import { executeUtils } from '../../shared/utils';
@@ -158,10 +164,10 @@ export function createRepository(userDO: DurableObjectStub<UserDO>) {
 
 // KV Service Implementation
 export function createKvService(env: Env): IKvService {
-  const saveNonceData = async (key: string, nonce: string): Promise<void> => {
+  const saveNonceData = async (key: string, nonce: string, expirationTtlSec?: number): Promise<void> => {
     const nonceData = { nonce };
     await env.NONCE_KV.put(key, JSON.stringify(nonceData), {
-      expirationTtl: AUTH_CONSTANTS.NONCE_EXPIRY,
+      expirationTtl: expirationTtlSec ?? AUTH_CONSTANTS.NONCE_EXPIRY,
     });
   };
 
@@ -182,8 +188,8 @@ export function createKvService(env: Env): IKvService {
   };
 
   return {
-    async saveNonce(sessionId: string, nonce: string): Promise<void> {
-      await saveNonceData(`Nonce:${sessionId}`, nonce);
+    async saveNonce(sessionId: string, nonce: string, expirationTtlSec?: number): Promise<void> {
+      await saveNonceData(`Nonce:${sessionId}`, nonce, expirationTtlSec);
     },
 
     async validateNonce(sessionId: string, nonce: string): Promise<boolean> {
@@ -276,7 +282,7 @@ export function createOTPService(env: Env): IOTPService {
     if (!authToken) {
       throw new Error("AUTH_TOKEN is not defined in environment variables");
     }
-    const messageText = `Your OTP code is: ${otp}. This code will expire in 10 minutes.`;
+    const messageText = `Your OTP code is: ${otp}. This code will expire in 1 minute.`;
     
     // const payload = {
     //   from: '14157386102',
@@ -339,12 +345,35 @@ export function createOTPService(env: Env): IOTPService {
   return {
     async generateOTP(sessionId: string): Promise<string> {
       const otp = otpUtils.generateOTP();
-      await kvService.saveNonce(sessionId, otp);
+      await clearOtpVerifyAttempts(env, sessionId);
+      await kvService.saveNonce(sessionId, otp, AUTH_CONSTANTS.OTP_EXPIRY);
       return otp;
     },
 
     async verifyOTP(otp: string, sessionId: string): Promise<boolean> {
-      return await kvService.validateNonce(sessionId, otp);
+      const blocked = await checkOtpVerifyBlocked(env, sessionId);
+      if (blocked.blocked) {
+        throw new OtpRateLimitError(blocked.retryAfter);
+      }
+
+      const nonceKey = `Nonce:${sessionId}`;
+      const nonceStr = await env.NONCE_KV.get(nonceKey);
+      if (!nonceStr) {
+        throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+      }
+
+      const isValid = await kvService.validateNonce(sessionId, otp);
+      if (!isValid) {
+        await recordOtpVerifyFailure(env, sessionId);
+        const afterFail = await checkOtpVerifyBlocked(env, sessionId);
+        if (afterFail.blocked) {
+          throw new OtpRateLimitError(afterFail.retryAfter);
+        }
+        return false;
+      }
+
+      await clearOtpVerifyAttempts(env, sessionId);
+      return true;
     },
 
     async sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void> {

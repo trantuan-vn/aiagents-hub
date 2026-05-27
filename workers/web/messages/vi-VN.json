@@ -84,6 +84,8 @@
     "otp_invalid": "Vui lòng nhập mã OTP 6 chữ số hợp lệ",
     "otp_verify_error": "Mã OTP không hợp lệ. Vui lòng thử lại.",
     "otp_send_error": "Gửi OTP thất bại. Vui lòng thử lại.",
+    "rate_limit_retry_after": "Thử lại sau {seconds} giây.",
+    "rate_limit_generic": "Quá nhiều yêu cầu. Vui lòng đợi một lát rồi thử lại.",
     "unexpected_error": "Đã xảy ra lỗi không mong muốn",
     "use_backup_code": "Dùng mã dự phòng thay thế",
     "backup_code_dialog_title": "Khôi phục bằng mã dự phòng",

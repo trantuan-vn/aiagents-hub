@@ -15,6 +15,11 @@ import {
   otpUtils,
 } from './utils';
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
+import {
+  checkOtpRequestAllowed,
+  OtpRateLimitError,
+  recordOtpRequest,
+} from '../../shared/otp-rate-limit';
 import { createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createAuthenticatorRepository, createSmsRepository, createBackupCodeRepository } from '../account/infrastructure';
@@ -44,7 +49,12 @@ interface IApplicationService {
   connectOAuthUseCase(sessionId: string, identifier: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   
   // II. EMAIL/PHONE
-  getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void>;
+  getRequestOtpUseCase(
+    identifier: string,
+    sessionId: string,
+    ipAddress: string,
+    language?: 'vi' | 'en',
+  ): Promise<void>;
   verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
   verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
@@ -337,7 +347,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     // II. EMAIL/PHONE
-    async getRequestOtpUseCase(identifier: string, sessionId: string, language?: 'vi' | 'en'): Promise<void> {
+    async getRequestOtpUseCase(
+      identifier: string,
+      sessionId: string,
+      ipAddress: string,
+      language?: 'vi' | 'en',
+    ): Promise<void> {
+      const allowed = await checkOtpRequestAllowed(c.env, ipAddress, identifier);
+      if (!allowed.allowed) {
+        throw new OtpRateLimitError(allowed.retryAfter);
+      }
+
       const otpService = createOTPService(c.env);
       const otp = await otpService.generateOTP(sessionId);
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
@@ -346,7 +366,11 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         await otpService.sendEmailOTP(nIdentifier, otp, language);
       } else if (validationUtils.isValidPhone(nIdentifier)) {
         await otpService.sendSmsOTP(nIdentifier, otp);
+      } else {
+        throw new Error('Invalid identifier');
       }
+
+      await recordOtpRequest(c.env, ipAddress, identifier);
     },
 
     async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {
