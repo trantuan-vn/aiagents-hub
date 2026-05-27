@@ -27,9 +27,10 @@ export function createAuthMiddleware(bindingName: string) {
       }
 
       const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(c.req.raw, c.env);
+      const country = (c.req.raw as Request & { cf?: { country?: string } }).cf?.country;
 
       const applicationService = createApplicationService(c, bindingName);
-      const result = await applicationService.verifySessionUseCase(sessionId, ipAddress, userAgent);
+      const result = await applicationService.verifySessionUseCase(sessionId, ipAddress, userAgent, country);
       if (result.ok) {
         c.set('user', result.user);
       } else {
@@ -111,7 +112,7 @@ export function securityHeadersMiddleware() {
     // CSP header
     c.header(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
+      "default-src 'self'; script-src 'self' https:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:;"
     );
   };
 }

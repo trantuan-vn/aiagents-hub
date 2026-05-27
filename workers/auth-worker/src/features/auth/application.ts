@@ -53,7 +53,13 @@ import {
   parsePendingAuth,
   resolvePasskeyLoginDeviceId,
 } from './device-trust';
-import { ipFingerprintsMatch, normalizeLoginCountry, uaFingerprintsMatch } from './session-fingerprint';
+import {
+  ipFingerprintsMatch,
+  normalizeIpFingerprint,
+  normalizeLoginCountry,
+  normalizeUaFingerprint,
+  uaFingerprintsMatch,
+} from './session-fingerprint';
 import {
   parsePendingSmsLogin,
   pendingSmsLoginKvKey,
@@ -96,7 +102,12 @@ interface IApplicationService {
   logoutAllUseCase(identifier: string): Promise<void>;
   listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; deviceId?: string; country?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
-  verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }>;
+  verifySessionUseCase(
+    sessionId: string,
+    clientIp?: string,
+    clientUserAgent?: string,
+    clientCountry?: string,
+  ): Promise<{ ok: boolean; user: any }>;
 }
 
 const log = createLogger('auth-worker', 'auth');
@@ -117,6 +128,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
   };
 
   const SESSION_LOOKUP_PREFIX = 'SessionLookup:';
+  const REPLAY_TELEMETRY_PREFIX = 'ReplayTelemetry:';
 
   const createUserSession = async (
     repository: any,
@@ -715,7 +727,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async verifySessionUseCase(sessionId: string, clientIp?: string, clientUserAgent?: string): Promise<{ ok: boolean; user: any }> {
+    async verifySessionUseCase(
+      sessionId: string,
+      clientIp?: string,
+      clientUserAgent?: string,
+      clientCountry?: string,
+    ): Promise<{ ok: boolean; user: any }> {
       const identifier = await c.env.NONCE_KV.get(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
       if (!identifier) {
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
@@ -746,6 +763,42 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         await this.logoutAllUseCase(identifier);
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
+
+      const telemetryKey = `${REPLAY_TELEMETRY_PREFIX}${identifier}:${sessionId}`;
+      const currentIpFp = normalizeIpFingerprint(clientIp || session.ipAddress || '');
+      const currentUaFp = normalizeUaFingerprint(clientUserAgent || session.userAgent || '');
+      const currentCountry = normalizeLoginCountry(clientCountry) ?? normalizeLoginCountry(session.country) ?? 'XX';
+      const now = Date.now();
+      const previousRaw = await c.env.NONCE_KV.get(telemetryKey);
+      if (previousRaw) {
+        const previous = JSON.parse(previousRaw) as {
+          ts: number;
+          ipFp: string;
+          uaFp: string;
+          country: string;
+        };
+        const fingerprintChanged = previous.ipFp !== currentIpFp || previous.uaFp !== currentUaFp;
+        const countryChanged = previous.country !== 'XX' && currentCountry !== 'XX' && previous.country !== currentCountry;
+        const rapidCountrySwitch = countryChanged && now - previous.ts < 2 * 60 * 60 * 1000;
+        if (fingerprintChanged && rapidCountrySwitch) {
+          log.warn('session.replay_geo_velocity_detected', {
+            identifier,
+            sessionId,
+            previousCountry: previous.country,
+            currentCountry,
+            previousIpFp: previous.ipFp,
+            currentIpFp,
+            previousUaFp: previous.uaFp,
+            currentUaFp,
+            deltaMs: now - previous.ts,
+          });
+        }
+      }
+      await c.env.NONCE_KV.put(
+        telemetryKey,
+        JSON.stringify({ ts: now, ipFp: currentIpFp, uaFp: currentUaFp, country: currentCountry }),
+        { expirationTtl: 7 * 24 * 60 * 60 },
+      );
 
       return { ok: true, user };
     }

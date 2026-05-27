@@ -1,5 +1,6 @@
 import { Context } from 'hono';
 import { TOKEN_CONSTANTS, SECURITY_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { timingSafeEqualHex } from '../../../shared/timing-safe';
 
 // I. Token Validation Utilities
 export const tokenValidationUtils = {
@@ -107,6 +108,6 @@ export const tokenGenerationUtils = {
 
   async verifyToken(token: string, hash: string, secret: string): Promise<boolean> {
     const computed = await this.hashToken(token, secret);
-    return computed === hash;
+    return timingSafeEqualHex(computed, hash);
   }
 };

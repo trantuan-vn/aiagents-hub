@@ -30,35 +30,36 @@ export const jwtUtils = {
     payload?: JwtPayload;
     error?: string;
   }> {
+    const genericError = ERROR_MESSAGES.AUTH.INVALID_TOKEN;
     try {
       // Validate token format first
       if (!token || typeof token !== 'string') {
-        return { ok: false, error: "token is empty or not a string" };
+        return { ok: false, error: genericError };
       }      
       const jwtData = await jwt.verify(token, secret, { throwError: true });
       if (!jwtData) {
-        return { ok: false, error: "token verification is failed" };
+        return { ok: false, error: genericError };
       }
 
       const decoded = jwt.decode(token);
       if (!decoded?.payload) {
-        return { ok: false, error: "token payload is empty" };
+        return { ok: false, error: genericError };
       }
       // Validate JWT payload structure
       const payload = decoded.payload as JwtPayload;
       if (!payload.sub || !payload.exp || !payload.iat || !payload.type) {
-        return { ok: false, error: `one of those fields is missing: sub(${payload.sub}), exp(${payload.exp}), iat(${payload.iat}), type(${payload.type})` };
+        return { ok: false, error: genericError };
       }
       
       if (payload.exp < Math.floor(Date.now() / 1000)) {
-        return { ok: false, error: `token is expired: exp(${new Date(payload.exp * 1000).toISOString()})` };
+        return { ok: false, error: genericError };
       }
 
       return { ok: true, payload: decoded.payload as JwtPayload };
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : 'token verification failed'
+        error: genericError,
       };
     }
   },

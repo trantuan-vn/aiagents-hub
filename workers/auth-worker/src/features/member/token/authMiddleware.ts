@@ -36,7 +36,7 @@ export function createTokenValidationMiddleware(bindingName: string) {
       }
 
       if (!tokenValidationUtils.isValidAuthHeader(authHeader)) {
-        throw new Error('Invalid authorization header format');
+        throw new Error(ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
       }
 
       const token = authHeader.substring(7);
@@ -45,7 +45,7 @@ export function createTokenValidationMiddleware(bindingName: string) {
       }
 
       if (!tokenValidationUtils.isValidTokenFormat(token)) {
-        throw new Error('Invalid token format');
+        throw new Error(ERROR_MESSAGES.TOKEN.INVALID_TOKEN);
       }
 
       const applicationService = createTokenApplicationService(c, bindingName);
@@ -123,32 +123,59 @@ export function createTokenRateLimitMiddleware() {
       await next();
       return;
     }
+    const authHeader = c.req.header('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const clientIp = getClientIp(c) || 'unknown';
+    const methodPath = `${c.req.method}:${c.req.path}`;
 
-    const key = `token_rate_limit:${clientId}`;
     const now = Date.now();
     const windowMs = TOKEN_CONSTANTS.RATE_LIMIT_WINDOW;
     const max = TOKEN_CONSTANTS.RATE_LIMIT_MAX;
+    const tokenFingerprint = token ? await buildTokenFingerprint(token) : 'none';
+    const keys = [
+      `token_rate_limit:client:${clientId}`,
+      `token_rate_limit:ip:${clientIp}`,
+      `token_rate_limit:client_ip:${clientId}:${clientIp}`,
+      `token_rate_limit:client_token:${clientId}:${tokenFingerprint}`,
+      `token_rate_limit:route:${clientId}:${methodPath}`,
+    ];
 
-    let count = 1;
-    let resetTime = now + windowMs;
-    const raw = await c.env.NONCE_KV.get(key);
-    if (raw) {
-      const data = JSON.parse(raw) as { count: number; resetTime: number };
-      if (now < data.resetTime) {
-        count = data.count + 1;
-        resetTime = data.resetTime;
+    for (const key of keys) {
+      const nextState = await increaseRateLimitCounter(c.env.NONCE_KV, key, now, windowMs);
+      if (nextState.count > max && now < nextState.resetTime) {
+        applyCorsHeadersIfAllowed(c);
+        return c.json({ error: ERROR_MESSAGES.TOKEN.RATE_LIMIT_EXCEEDED }, 429);
       }
     }
 
-    if (count > max && now < resetTime) {
-      applyCorsHeadersIfAllowed(c);
-      return c.json({ error: ERROR_MESSAGES.TOKEN.RATE_LIMIT_EXCEEDED }, 429);
-    }
-
-    await c.env.NONCE_KV.put(key, JSON.stringify({ count, resetTime }), {
-      expirationTtl: Math.max(60, Math.ceil((windowMs * 2) / 1000)),
-    });
-
     await next();
   };
+}
+
+async function buildTokenFingerprint(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return hex.slice(0, 24);
+}
+
+async function increaseRateLimitCounter(
+  kv: KVNamespace,
+  key: string,
+  now: number,
+  windowMs: number,
+): Promise<{ count: number; resetTime: number }> {
+  let count = 1;
+  let resetTime = now + windowMs;
+  const raw = await kv.get(key);
+  if (raw) {
+    const data = JSON.parse(raw) as { count: number; resetTime: number };
+    if (now < data.resetTime) {
+      count = data.count + 1;
+      resetTime = data.resetTime;
+    }
+  }
+  await kv.put(key, JSON.stringify({ count, resetTime }), {
+    expirationTtl: Math.max(60, Math.ceil((windowMs * 2) / 1000)),
+  });
+  return { count, resetTime };
 }
