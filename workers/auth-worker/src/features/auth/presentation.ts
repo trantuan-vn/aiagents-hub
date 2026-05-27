@@ -80,7 +80,7 @@ export function createAuthRoutes(bindingName: string) {
         }
 
         const request = c.req.raw;
-        const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(request);
+        const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(request, c.env);
         if (!ipAddress || !userAgent) {
           throw new Error('Missing IP address or user agent');
         }

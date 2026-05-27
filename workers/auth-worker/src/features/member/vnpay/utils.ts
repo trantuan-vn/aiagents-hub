@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { timingSafeEqualHex } from '../../../shared/timing-safe';
 
 // Private helper functions
 export const paymentUtils = {
@@ -110,6 +111,6 @@ export const cryptoUtils = {
     const querystring = require('qs');
     const signData = querystring.stringify(sortedParams, { encode: false });
     const calculatedHash = this.createSHA512Signature(signData, secretKey);
-    return secureHash === calculatedHash;
+    return timingSafeEqualHex(secureHash, calculatedHash);
   }
 };

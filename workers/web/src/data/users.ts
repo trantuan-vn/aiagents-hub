@@ -1,3 +1,5 @@
+import { buildTrustedProxyHeaders } from "@/lib/trusted-proxy-headers";
+
 export interface User {
   id: string;
   identifier: string;
@@ -57,13 +59,11 @@ export function getClientUAFromHeaders(headers: Headers): string | undefined {
 }
 
 function buildProfileRequestHeaders(cookieHeader: string, opts?: { ip?: string; ua?: string }): Record<string, string> {
-  const headers: Record<string, string> = {
+  return {
     Cookie: cookieHeader,
     "Content-Type": "application/json",
+    ...buildTrustedProxyHeaders({ ip: opts?.ip, ua: opts?.ua }),
   };
-  if (opts?.ip) headers["X-Client-IP"] = opts.ip;
-  if (opts?.ua) headers["X-Client-UA"] = opts.ua;
-  return headers;
 }
 
 function getSetCookiesFromResponse(response: Response): string[] | undefined {

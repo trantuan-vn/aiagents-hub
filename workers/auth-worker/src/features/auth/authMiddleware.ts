@@ -26,7 +26,7 @@ export function createAuthMiddleware(bindingName: string) {
         throw new Error("sessionId not found");
       }
 
-      const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(c.req.raw);
+      const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(c.req.raw, c.env);
 
       const applicationService = createApplicationService(c, bindingName);
       const result = await applicationService.verifySessionUseCase(sessionId, ipAddress, userAgent);
@@ -36,7 +36,7 @@ export function createAuthMiddleware(bindingName: string) {
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
     } catch (error) {
-      handleErrorWithoutIp(error, "Auth middleware error");
+      handleErrorWithoutIp(error, 'Auth middleware error', c.env);
       // Logout session trên server trước khi xoá cookie (invalid session, revoke sessionId nếu còn)
       if (sessionId) {
         try {
@@ -89,7 +89,7 @@ export function createVersionCheckMiddleware(bindingName: string) {
         await syncUserMembershipTierOnAccess(userDO, c.env);
       }
     } catch (error) {
-      handleErrorWithoutIp(error, "Failed to upgrade version");      
+      handleErrorWithoutIp(error, 'Failed to upgrade version', c.env);      
     } 
     await next();   
   };

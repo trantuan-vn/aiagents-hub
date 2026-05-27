@@ -1,87 +1,68 @@
-import { Context } from 'hono'
+import { Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import CryptoJS from 'crypto-js';
 import { UserDO } from '../features/ws/infrastructure/UserDO';
 import { createLogger } from './logger';
 import { isAdminIdentifier } from './admin-config';
+import {
+  buildErrorLogFields,
+  extractErrorMessage,
+  isSafeClientMessage,
+  resolveClientErrorMessage,
+  resolveHttpStatus,
+} from './http-errors';
+
+export { getClientIpAndUserAgentForSession } from './trusted-proxy';
 
 const log = createLogger('auth-worker', 'errors');
 
-export const handleError = async (c: Context, e: any, defaultMessage: string) => {
+export const handleError = async (c: Context, e: unknown, defaultMessage: string) => {
   try {
-    // Tách các thông tin thường gặp trong Error object
-    const message = e?.message || String(e);
-    const stack = e?.stack;
-    const name = e?.name;
-    const cause = e?.cause;
+    const message = extractErrorMessage(e);
+    const safe = isSafeClientMessage(message);
+    const status = resolveHttpStatus(message, safe);
+    const clientMessage = resolveClientErrorMessage(defaultMessage, message, c.env);
 
-    // Nếu là lỗi từ Axios hoặc Fetch, có thể có response
-    const responseData = e?.response?.data;
-    const responseStatus = e?.response?.status;
-    const responseText = e?.response?.statusText;
-
-    // Gom toàn bộ thông tin chi tiết
-    const details = {
-      name,
-      message,
-      stack,
-      cause,
-      response: responseData
-        ? { status: responseStatus, statusText: responseText, data: responseData }
-        : undefined,
-      raw: typeof e === "object" ? e : String(e),
-    };  
-    
     log.error('handler.request_error', {
-      message: `${defaultMessage}: ${message}`,
-      errorName: name,
-      ...(responseData ? { httpStatus: responseStatus } : {}),
+      defaultMessage,
+      ...buildErrorLogFields(e),
+      clientStatus: status,
     });
 
-    const errorResponse = { error: `${defaultMessage}: ${message}` };
-
-    return { errorResponse, status: 400 as const };
+    return {
+      errorResponse: { error: clientMessage },
+      status: status as ContentfulStatusCode,
+    };
   } catch (error) {
     log.error('handler.internal_failure', error instanceof Error ? error : { error: String(error) });
-    return { errorResponse: { error: `${defaultMessage}`}, status: 400 as const };
+    return { errorResponse: { error: defaultMessage }, status: 500 as ContentfulStatusCode };
   }
 };
 
-export const handleErrorWithoutIp = async (e: any, defaultMessage: string) => {
+export const handleErrorWithoutIp = async (
+  e: unknown,
+  defaultMessage: string,
+  env?: Pick<Env, 'DEBUG' | 'ENVIRONMENT'>,
+) => {
   try {
-    // Tách các thông tin thường gặp trong Error object
-    const message = e?.message || String(e);
-    const stack = e?.stack;
-    const name = e?.name;
-    const cause = e?.cause;
+    const message = extractErrorMessage(e);
+    const safe = isSafeClientMessage(message);
+    const status = resolveHttpStatus(message, safe);
+    const clientMessage = resolveClientErrorMessage(defaultMessage, message, env);
 
-    // Nếu là lỗi từ Axios hoặc Fetch, có thể có response
-    const responseData = e?.response?.data;
-    const responseStatus = e?.response?.status;
-    const responseText = e?.response?.statusText;
-
-    // Gom toàn bộ thông tin chi tiết
-    const details = {
-      name,
-      message,
-      stack,
-      cause,
-      response: responseData
-        ? { status: responseStatus, statusText: responseText, data: responseData }
-        : undefined,
-      raw: typeof e === "object" ? e : String(e),
-    };  
-    
     log.error('handler.error', {
-      message: `${defaultMessage}: ${message}`,
-      errorName: name,
+      defaultMessage,
+      ...buildErrorLogFields(e),
+      clientStatus: status,
     });
 
-    const errorResponse = { error: `${defaultMessage}`};
-    
-    return { errorResponse, status: 400 as const };
+    return {
+      errorResponse: { error: clientMessage },
+      status: status as ContentfulStatusCode,
+    };
   } catch (error) {
     log.error('handler.internal_failure', error instanceof Error ? error : { error: String(error) });
-    return { errorResponse: { error: `${defaultMessage}`}, status: 400 as const };
+    return { errorResponse: { error: defaultMessage }, status: 500 as ContentfulStatusCode };
   }
 };
 
@@ -118,33 +99,17 @@ export function getIdFromString(c: Context, id: string, bindingName: string): Du
 }
 
 /** @deprecated Use isAdminIdentifier(env, identifier) */
-export function isAdmin(identifier: string, env?: Pick<Env, 'ADMIN_IDENTIFIERS'>) {
-  if (env) return isAdminIdentifier(env, identifier);
-  return identifier.trim().toLowerCase() === 'tuanta2021@gmail.com';
+export function isAdmin(
+  identifier: string,
+  env: Pick<Env, 'ADMIN_IDENTIFIERS' | 'ENVIRONMENT'> & Partial<Pick<Env, 'PRIMARY_ADMIN_IDENTIFIER'>>,
+) {
+  return isAdminIdentifier(env, identifier);
 }
 
 export function getIPAndUserAgent(request: Request) {
   const ipAddress = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Real-IP') || request.headers.get('X-Forwarded-For');
   const userAgent = request.headers.get('User-Agent') || 'apiToken';
   return { ipAddress, userAgent };
-}
-
-/**
- * IP/UA dùng khi tạo session (login) và khi verifySession — PHẢI cùng một quy tắc với authMiddleware.
- * Nếu không, iOS / Next.js proxy có thể gửi X-Client-* ở request sau nhưng login chỉ dùng CF-Connecting-IP → mismatch → "Session not found".
- * Chuỗi rỗng coi như không có (fallback về header gốc).
- */
-export function getClientIpAndUserAgentForSession(request: Request): {
-  ipAddress: string | undefined;
-  userAgent: string | undefined;
-} {
-  const xIp = request.headers.get('X-Client-IP')?.trim();
-  const xUa = request.headers.get('X-Client-UA')?.trim();
-  const { ipAddress: reqIp, userAgent: reqUa } = getIPAndUserAgent(request);
-  return {
-    ipAddress: xIp || reqIp || undefined,
-    userAgent: xUa || reqUa || undefined,
-  };
 }
 
 function readCookieValue(cookieHeader: string | null, name: string): string | undefined {

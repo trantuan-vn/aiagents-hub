@@ -23,6 +23,7 @@ declare namespace Cloudflare {
 		RETRY_ALARM_INTERVAL: "60000";
 		ADMIN_IDENTIFIERS: "tuanta2021@gmail.com";
 		PRIMARY_ADMIN_IDENTIFIER: "tuanta2021@gmail.com";
+		INTERNAL_PROXY_SECRET: "";
 		BROADCAST_SERVICE_DO: DurableObjectNamespace /* BroadcastServiceDO from auth-worker */;
 		USER_SHARD_DO: DurableObjectNamespace /* UserShardDO from auth-worker */;
 		USER_DO: DurableObjectNamespace /* UserDO from auth-worker */;
@@ -66,7 +67,7 @@ type StringifyValues<EnvType extends Record<string, unknown>> = {
 	[Binding in keyof EnvType]: EnvType[Binding] extends string ? EnvType[Binding] : string;
 };
 declare namespace NodeJS {
-	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ACCOUNT_ID" | "SMS_FROM_NUMBER" | "SIWE_DOMAIN" | "FRONTEND_URL" | "BASE_URL" | "DEBUG" | "ENVIRONMENT" | "QUEUE_BATCH_SIZE" | "QUEUE_FLUSH_THRESHOLD" | "QUEUE_FLUSH_INTERVAL" | "MAX_SEND_FAILURE_COUNT" | "RETRY_ALARM_INTERVAL" | "ADMIN_IDENTIFIERS" | "PRIMARY_ADMIN_IDENTIFIER">> {}
+	interface ProcessEnv extends StringifyValues<Pick<Cloudflare.Env, "ACCOUNT_ID" | "SMS_FROM_NUMBER" | "SIWE_DOMAIN" | "FRONTEND_URL" | "BASE_URL" | "DEBUG" | "ENVIRONMENT" | "QUEUE_BATCH_SIZE" | "QUEUE_FLUSH_THRESHOLD" | "QUEUE_FLUSH_INTERVAL" | "MAX_SEND_FAILURE_COUNT" | "RETRY_ALARM_INTERVAL" | "ADMIN_IDENTIFIERS" | "PRIMARY_ADMIN_IDENTIFIER" | "INTERNAL_PROXY_SECRET">> {}
 }
 declare module "*.md" {
 	const value: string;

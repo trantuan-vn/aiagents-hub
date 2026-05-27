@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { timingSafeEqualHex } from "../../../shared/timing-safe";
 
 /** Recursively sort object keys (Casso webhook v2 signature). */
 export function sortObjDataByKey(data: Record<string, unknown>): Record<string, unknown> {
@@ -37,7 +38,7 @@ export function verifyCassoWebhookSignature(
   const sortedDataByKey = sortObjDataByKey(webhookPayload);
   const messageToSign = `${timestampStr}.${JSON.stringify(sortedDataByKey)}`;
   const generatedSignature = crypto.createHmac("sha512", checksumKey).update(messageToSign).digest("hex");
-  return signature === generatedSignature;
+  return timingSafeEqualHex(signature, generatedSignature);
 }
 
 const INBOUND_TRANSFER_CODE_RE = /C[0-9A-F]{16}/i;

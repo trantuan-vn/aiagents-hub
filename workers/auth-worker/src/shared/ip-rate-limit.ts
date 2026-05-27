@@ -11,6 +11,8 @@ export const IP_RATE_LIMIT = {
   REQUEST_LIMIT_MAX: 600,
   REQUEST_WINDOW_MS: 60_000,
   REQUEST_BURST_BLOCK_MS: 5 * 60 * 1000,
+  /** Higher ceiling when session cookie present (still rate-limited). */
+  AUTHENTICATED_REQUEST_LIMIT_MAX: 6_000,
   /** Cap any IP block (flood or auth) — legacy bug could set 24h blocks. */
   MAX_BLOCK_MS: 15 * 60 * 1000,
   KV_TTL_SEC: 24 * 60 * 60,
@@ -148,7 +150,9 @@ export async function trackIpRequest(
   env: Env,
   ip: string,
   path: string,
+  options?: { requestLimitMax?: number },
 ): Promise<{ blocked: true; retryAfter: number } | null> {
+  const requestLimitMax = options?.requestLimitMax ?? IP_RATE_LIMIT.REQUEST_LIMIT_MAX;
   if (!ip || isAuthLoginPath(path)) return null;
 
   const now = Date.now();
@@ -177,7 +181,7 @@ export async function trackIpRequest(
     record.requestCount = (record.requestCount ?? 0) + 1;
   }
 
-  if ((record.requestCount ?? 0) > IP_RATE_LIMIT.REQUEST_LIMIT_MAX) {
+  if ((record.requestCount ?? 0) > requestLimitMax) {
     record.blockUntil = capBlockUntil(now + IP_RATE_LIMIT.REQUEST_BURST_BLOCK_MS, now);
     record.lastAttempt = now;
     await saveIpRateLimitRecord(env, ip, record);
@@ -254,22 +258,19 @@ export function createIpRateLimitMiddleware() {
 
     const authLoginPath = isAuthLoginPath(path);
 
-    // Authenticated dashboard: skip IP limits (session is the trust boundary).
-    if (
-      path.startsWith('/dashboard/') &&
-      !authLoginPath &&
-      getCookie(c, 'sessionId')
-    ) {
-      await next();
-      return;
-    }
+    const hasSessionCookie =
+      path.startsWith('/dashboard/') && !authLoginPath && !!getCookie(c, 'sessionId');
 
     const blocked = await checkIpBlocked(c.env, ip, { authLoginPath });
     if (blocked.blocked) {
       return rateLimitExceededResponse(c, blocked.retryAfter);
     }
 
-    const flood = await trackIpRequest(c.env, ip, path);
+    const flood = await trackIpRequest(c.env, ip, path, {
+      requestLimitMax: hasSessionCookie
+        ? IP_RATE_LIMIT.AUTHENTICATED_REQUEST_LIMIT_MAX
+        : undefined,
+    });
     if (flood) {
       return rateLimitExceededResponse(c, flood.retryAfter);
     }

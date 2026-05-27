@@ -75,7 +75,7 @@
 		"MAX_SEND_FAILURE_COUNT": "3",
 		"RETRY_ALARM_INTERVAL": "60000",
 		"ADMIN_IDENTIFIERS": "tuanta2021@gmail.com",
-		"PRIMARY_ADMIN_IDENTIFIER": "tuanta2021@gmail.com"
+		"PRIMARY_ADMIN_IDENTIFIER": "tuanta2021@gmail.com",
 	},
 	// ========== QUEUE CONFIGURATION ==========
 	"queues": {
