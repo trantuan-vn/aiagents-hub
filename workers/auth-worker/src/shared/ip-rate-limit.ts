@@ -1,4 +1,5 @@
 import type { Context, Next } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from '../features/auth/constant';
 import { getClientIp } from './utils';
 import { applyCorsHeadersIfAllowed } from './cors-headers';
@@ -10,6 +11,8 @@ export const IP_RATE_LIMIT = {
   REQUEST_LIMIT_MAX: 600,
   REQUEST_WINDOW_MS: 60_000,
   REQUEST_BURST_BLOCK_MS: 5 * 60 * 1000,
+  /** Cap any IP block (flood or auth) — legacy bug could set 24h blocks. */
+  MAX_BLOCK_MS: 15 * 60 * 1000,
   KV_TTL_SEC: 24 * 60 * 60,
 } as const;
 
@@ -34,10 +37,14 @@ export { isAuthBootstrapGet } from './dashboard-public-paths';
 
 function blockDurationForFailCount(failCount: number): number {
   let blockDuration = 5 * 60 * 1000;
-  if (failCount >= 6) blockDuration = 15 * 60 * 1000;
-  if (failCount >= 10) blockDuration = 60 * 60 * 1000;
-  if (failCount >= 15) blockDuration = 24 * 60 * 60 * 1000;
+  if (failCount >= 8) blockDuration = 10 * 60 * 1000;
+  if (failCount >= 12) blockDuration = IP_RATE_LIMIT.MAX_BLOCK_MS;
   return blockDuration;
+}
+
+function capBlockUntil(blockUntil: number, now: number): number {
+  if (blockUntil <= now) return blockUntil;
+  return Math.min(blockUntil, now + IP_RATE_LIMIT.MAX_BLOCK_MS);
 }
 
 function retryAfterSeconds(record: IpRateLimitRecord, now = Date.now()): number {
@@ -74,6 +81,35 @@ export async function getIpRateLimitRecord(env: Env, ip: string): Promise<IpRate
   }
 }
 
+/** Heal KV rows from the old handleError bug (24h blocks, inflated failCount). */
+async function getHealedIpRateLimitRecord(env: Env, ip: string): Promise<IpRateLimitRecord | null> {
+  const record = await getIpRateLimitRecord(env, ip);
+  if (!record) return null;
+
+  const now = Date.now();
+  if (record.blockUntil > 0 && now >= record.blockUntil) {
+    await env.NONCE_KV.delete(ipRateLimitKey(ip));
+    return null;
+  }
+
+  const remaining = record.blockUntil > 0 ? record.blockUntil - now : 0;
+  const needsHeal =
+    remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ||
+    record.failCount > AUTH_CONSTANTS.RATE_LIMIT_MAX * 4;
+
+  if (!needsHeal) return record;
+
+  const healed: IpRateLimitRecord = {
+    failCount: Math.min(record.failCount, AUTH_CONSTANTS.RATE_LIMIT_MAX - 1),
+    blockUntil: remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ? 0 : record.blockUntil,
+    lastAttempt: now,
+    windowStart: record.windowStart,
+    requestCount: record.requestCount,
+  };
+  await saveIpRateLimitRecord(env, ip, healed);
+  return healed;
+}
+
 export async function checkIpBlocked(
   env: Env,
   ip: string,
@@ -82,14 +118,9 @@ export async function checkIpBlocked(
   if (!ip) return { blocked: false };
 
   const now = Date.now();
-  const record = await getIpRateLimitRecord(env, ip);
+  const record = await getHealedIpRateLimitRecord(env, ip);
 
   if (!record) return { blocked: false };
-
-  if (now >= record.blockUntil) {
-    await env.NONCE_KV.delete(ipRateLimitKey(ip));
-    return { blocked: false };
-  }
 
   if (options?.authLoginPath) {
     // Chỉ chặn login khi đủ lỗi xác thực — không chặn vì flood từ dashboard/API khác.
@@ -97,6 +128,12 @@ export async function checkIpBlocked(
       return { blocked: false };
     }
   } else if (isIpCurrentlyBlocked(record, now)) {
+    const authBlocked = record.failCount >= AUTH_CONSTANTS.RATE_LIMIT_MAX;
+    const floodBlocked = (record.requestCount ?? 0) > IP_RATE_LIMIT.REQUEST_LIMIT_MAX;
+    if (!authBlocked && !floodBlocked) {
+      await env.NONCE_KV.delete(ipRateLimitKey(ip));
+      return { blocked: false };
+    }
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
   }
 
@@ -115,7 +152,7 @@ export async function trackIpRequest(
   if (!ip || isAuthLoginPath(path)) return null;
 
   const now = Date.now();
-  let record = await getIpRateLimitRecord(env, ip);
+  let record = await getHealedIpRateLimitRecord(env, ip);
 
   if (record && isIpCurrentlyBlocked(record, now)) {
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
@@ -141,7 +178,7 @@ export async function trackIpRequest(
   }
 
   if ((record.requestCount ?? 0) > IP_RATE_LIMIT.REQUEST_LIMIT_MAX) {
-    record.blockUntil = now + IP_RATE_LIMIT.REQUEST_BURST_BLOCK_MS;
+    record.blockUntil = capBlockUntil(now + IP_RATE_LIMIT.REQUEST_BURST_BLOCK_MS, now);
     record.lastAttempt = now;
     await saveIpRateLimitRecord(env, ip, record);
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
@@ -152,7 +189,7 @@ export async function trackIpRequest(
   return null;
 }
 
-/** Auth / validation failures — escalating block duration. */
+/** Auth / validation failures — escalating block only after repeated failures. */
 export async function recordIpAuthFailure(env: Env, ip: string): Promise<void> {
   if (!ip) return;
 
@@ -160,11 +197,14 @@ export async function recordIpAuthFailure(env: Env, ip: string): Promise<void> {
   const existing = await getIpRateLimitRecord(env, ip);
 
   const failCount = (existing?.failCount ?? 0) + 1;
-  let blockUntil = now + blockDurationForFailCount(failCount);
+  let blockUntil = existing?.blockUntil ?? 0;
 
   if (failCount >= AUTH_CONSTANTS.RATE_LIMIT_MAX) {
     const shortBlock = now + AUTH_CONSTANTS.RATE_LIMIT_WINDOW;
-    if (shortBlock > blockUntil) blockUntil = shortBlock;
+    blockUntil = Math.max(blockUntil, shortBlock);
+    const escalated = now + blockDurationForFailCount(failCount);
+    if (escalated > blockUntil) blockUntil = escalated;
+    blockUntil = capBlockUntil(blockUntil, now);
   }
 
   const record: IpRateLimitRecord = {
@@ -192,6 +232,12 @@ function rateLimitExceededResponse(c: Context, retryAfter: number) {
 /** Global per-IP flood + auth-failure blocks (all routes). */
 export function createIpRateLimitMiddleware() {
   return async (c: Context, next: Next) => {
+    // CORS preflight must return 2xx; counting OPTIONS breaks cross-origin fetch.
+    if (c.req.method === 'OPTIONS') {
+      await next();
+      return;
+    }
+
     const ip = getClientIp(c);
     if (!ip) {
       await next();
@@ -207,6 +253,17 @@ export function createIpRateLimitMiddleware() {
     }
 
     const authLoginPath = isAuthLoginPath(path);
+
+    // Authenticated dashboard: skip IP limits (session is the trust boundary).
+    if (
+      path.startsWith('/dashboard/') &&
+      !authLoginPath &&
+      getCookie(c, 'sessionId')
+    ) {
+      await next();
+      return;
+    }
+
     const blocked = await checkIpBlocked(c.env, ip, { authLoginPath });
     if (blocked.blocked) {
       return rateLimitExceededResponse(c, blocked.retryAfter);

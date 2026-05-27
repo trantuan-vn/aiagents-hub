@@ -2,7 +2,6 @@ import { Context } from 'hono'
 import CryptoJS from 'crypto-js';
 import { UserDO } from '../features/ws/infrastructure/UserDO';
 import { createLogger } from './logger';
-import { recordIpAuthFailure } from './ip-rate-limit';
 import { isAdminIdentifier } from './admin-config';
 
 const log = createLogger('auth-worker', 'errors');
@@ -38,12 +37,7 @@ export const handleError = async (c: Context, e: any, defaultMessage: string) =>
       ...(responseData ? { httpStatus: responseStatus } : {}),
     });
 
-    const errorResponse = { error: `${defaultMessage}: ${message}`};
-
-    const ip = getClientIp(c);
-    if (ip) {
-      await recordIpAuthFailure(c.env, ip);
-    }
+    const errorResponse = { error: `${defaultMessage}: ${message}` };
 
     return { errorResponse, status: 400 as const };
   } catch (error) {

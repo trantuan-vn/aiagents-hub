@@ -4,12 +4,14 @@ import {
   handleError,
   parseBody,
   getIPAndUserAgent,
+  getClientIp,
   getClientIpAndUserAgentForSession,
   getClientDeviceIdFromRequest,
   generateSecureSessionId,
   getIdFromName,
   executeUtils,
 } from '../../shared/utils';
+import { recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import {
   consumePendingLoginDevice,
   normalizeDeviceId,
@@ -91,6 +93,8 @@ export function createAuthRoutes(bindingName: string) {
         c.set('loginDeviceId', deviceId);
         return await handler(c, sessionId, ipAddress, userAgent, country);
       } catch (e) {
+        const ip = getClientIp(c);
+        if (ip) await recordIpAuthFailure(c.env, ip);
         const { errorResponse, status } = await handleError(c, e, errorMessage);
         cookieUtils.clearAuthCookies(c);
         return c.json(errorResponse, status);
