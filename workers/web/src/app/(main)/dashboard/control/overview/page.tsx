@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback } from "react";
 
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { ActivityCard } from "./_components/activity-card";
 import { ApiKeysCard } from "./_components/api-keys-card";
@@ -58,8 +60,11 @@ interface OverviewData {
   recentActivity: OverviewActivity[];
 }
 
+const ACCOUNT_REQUIRE_2FA_PATH = "/dashboard/control/account?require2fa=1";
+
 export default function OverviewPage() {
   const t = useTranslations("OverviewPage");
+  const router = useRouter();
   const { toast } = useToast();
   const [data, setData] = useState<OverviewData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,8 +81,12 @@ export default function OverviewPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
+        const errBody = await parseDashboardApiError(response);
+        if (errBody?.requiresStrongAuthSetup) {
+          router.replace(ACCOUNT_REQUIRE_2FA_PATH);
+          return;
+        }
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       const result: OverviewData = await response.json();
@@ -93,7 +102,7 @@ export default function OverviewPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [t, toast]);
+  }, [t, toast, router]);
 
   useEffect(() => {
     void fetchOverview();

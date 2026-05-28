@@ -129,6 +129,7 @@ export default function SmsPage() {
       toast({ title: t("disable_success") });
       setStep("idle");
       setDisableCode("");
+      void refreshUser();
       void fetchStatus();
     } catch (e) {
       toast({

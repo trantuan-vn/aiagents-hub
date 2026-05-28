@@ -145,6 +145,7 @@ export default function PasskeyPage() {
       );
       if (!res.ok) throw new Error(t("error_remove"));
       toast({ title: t("removed") });
+      void refreshUser();
       void fetchCredentials();
     } catch {
       toast({ title: t("error_remove"), variant: "destructive" });

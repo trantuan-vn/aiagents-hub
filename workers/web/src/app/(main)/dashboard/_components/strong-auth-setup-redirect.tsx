@@ -21,7 +21,6 @@ export function StrongAuthSetupRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!user?.requiresStrongAuthSetup) return;
     if (!pathname) return;
     if (pathname === STEP_UP_PATH || pathname.startsWith(`${STEP_UP_PATH}/`)) return;
     if (pathname === ACCOUNT_PATH || pathname.startsWith(`${ACCOUNT_PATH}/`)) return;
@@ -30,12 +29,12 @@ export function StrongAuthSetupRedirect() {
     void (async () => {
       const requiresSetup = await fetchRequiresStrongAuthSetup();
       if (cancelled) return;
-      if (requiresSetup === false) {
-        await refreshUser();
+      if (requiresSetup === true) {
+        router.replace(`${ACCOUNT_PATH}?require2fa=1`);
         return;
       }
-      if (requiresSetup === true || (requiresSetup === null && user.requiresStrongAuthSetup)) {
-        router.replace(`${ACCOUNT_PATH}?require2fa=1`);
+      if (requiresSetup === false && user?.requiresStrongAuthSetup) {
+        await refreshUser();
       }
     })();
 

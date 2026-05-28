@@ -128,6 +128,7 @@ export default function AuthenticatorPage() {
       toast({ title: t("disable_success") });
       setStep("idle");
       setDisableCode("");
+      void refreshUser();
       void fetchStatus();
     } catch (e) {
       toast({
