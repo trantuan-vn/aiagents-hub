@@ -60,6 +60,7 @@ import { createDocumentAIService } from '../member/ekyc/application';
 import { EKYC_SERVICES } from '../member/ekyc/constant';
 import { processFormData, processDocumentFormData, processFaceFormData, mergeImages, hashIdentifier, saveToEkycR2, getFromEkycR2 } from '../member/ekyc/utils';
 import { createOTPService } from './infrastructure';
+import { createWalletService } from './infrastructure';
 import { createAuthenticatorRepository, createSmsRepository } from '../account/infrastructure';
 import { verifyTotpCode } from '../account/totp';
 import { decryptField } from '../../shared/field-encryption';
@@ -67,6 +68,9 @@ import { decryptField } from '../../shared/field-encryption';
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
   const SENSITIVE_SMS_STEP_UP_PREFIX = 'SensitiveSmsStepUp:';
+  const STEP_UP_FACEBOOK_PENDING_PREFIX = 'StepUpFacebookPending:';
+  /** Keep SIWE statement fixed and ASCII for deterministic step-up audit. */
+  const STEP_UP_SIWE_STATEMENT = 'Step-up for sensitive action authorization.';
 
   const resolveLoginDeviceId = async (
     c: { env: Env },
@@ -107,6 +111,20 @@ export function createAuthRoutes(bindingName: string) {
     let out = '';
     for (let i = 0; i < 6; i += 1) out += String(buf[i] % 10);
     return out;
+  };
+
+  const resolveOtpStepUpIdentifier = (user: Record<string, unknown>, fallbackIdentifier: string): string => {
+    const email = String(user.email ?? '').trim();
+    if (validationUtils.isValidEmail(email)) return email;
+
+    const phone = String(user.phone ?? '').trim();
+    if (validationUtils.isValidPhone(phone)) return phone;
+
+    const fallback = fallbackIdentifier.trim();
+    if (validationUtils.isValidEmail(fallback) || validationUtils.isValidPhone(fallback)) {
+      return fallback;
+    }
+    return '';
   };
 
   // Helper function để xử lý route chung
@@ -240,6 +258,32 @@ export function createAuthRoutes(bindingName: string) {
     // Exchange code for tokens and connect user (sessionId lấy từ state, không dùng cookie)
     const { userInfo: validatedUserInfo, sessionId: oauthSessionId } = await applicationService.exchangeOAuthCodeUseCase(provider, state, code);
     const identifier = oauthUtils.normalizeOAuthIdentifier(provider, validatedUserInfo);
+    const pendingStepUpRaw =
+      provider === 'facebook'
+        ? await c.env.NONCE_KV.get(`${STEP_UP_FACEBOOK_PENDING_PREFIX}${oauthSessionId}`)
+        : null;
+    if (pendingStepUpRaw) {
+      let pendingStepUp: { identifier?: string; returnTo?: string } | null = null;
+      try {
+        pendingStepUp = JSON.parse(pendingStepUpRaw) as { identifier?: string; returnTo?: string };
+      } catch {
+        pendingStepUp = null;
+      }
+      await c.env.NONCE_KV.delete(`${STEP_UP_FACEBOOK_PENDING_PREFIX}${oauthSessionId}`);
+      const pendingIdentifier = String(pendingStepUp?.identifier ?? '').trim();
+      if (!pendingIdentifier) throw new Error('Facebook step-up session expired');
+      const expected = validationUtils.normalizeIdentifier(pendingIdentifier);
+      const actual = validationUtils.normalizeIdentifier(identifier);
+      if (expected !== actual) throw new Error('Facebook account mismatch for step-up');
+      await markSensitiveActionUnlocked(c.env.NONCE_KV, pendingIdentifier, 'facebook_oauth');
+      const rawReturnTo = String(pendingStepUp?.returnTo ?? '').trim();
+      const safeReturnTo = rawReturnTo.startsWith('/dashboard') ? rawReturnTo : '/dashboard';
+      return c.redirect(
+        `${c.env.FRONTEND_URL}/dashboard/step-up?returnTo=${encodeURIComponent(
+          safeReturnTo,
+        )}&stepUpOauth=success`,
+      );
+    }
 
     // Get referral code stored when user clicked OAuth (from link with ref=)
     let ref: string | undefined;
@@ -398,6 +442,10 @@ export function createAuthRoutes(bindingName: string) {
         const user = requireAuth(c);
         const identifier = String(user.identifier ?? '').trim();
         if (!identifier) throw new Error('Invalid user identifier');
+        const body = (await c.req.json().catch(() => ({}))) as {
+          turnstileToken?: string;
+          returnTo?: string;
+        };
         const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
 
         if (requiredMethod === 'passkey') {
@@ -433,8 +481,38 @@ export function createAuthRoutes(bindingName: string) {
 
         if (requiredMethod === 'otp_email') {
           if (!sessionId) throw new Error('sessionId not found');
+          const otpIdentifier = resolveOtpStepUpIdentifier(user, identifier);
+          if (!otpIdentifier) {
+            throw new Error('OTP verification is unavailable for this account');
+          }
           const appService = createApplicationService(c, bindingName);
-          await appService.getRequestOtpUseCase(identifier, sessionId, getClientIp(c), 'en');
+          await appService.getRequestOtpUseCase(
+            otpIdentifier,
+            sessionId,
+            getClientIp(c),
+            'en',
+            typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined,
+          );
+        }
+
+        if (requiredMethod === 'wallet_reauth') {
+          if (!sessionId) throw new Error('sessionId not found');
+          const nonce = await createWalletService(c.env).generateNonceAndStore(sessionId);
+          return c.json({ requiredMethod, nonce });
+        }
+
+        if (requiredMethod === 'facebook_oauth') {
+          if (!sessionId) throw new Error('sessionId not found');
+          const appService = createApplicationService(c, bindingName);
+          const authUrl = await appService.getAuthUrlUseCase('facebook', sessionId);
+          const rawReturnTo = String(body.returnTo ?? '').trim();
+          const safeReturnTo = rawReturnTo.startsWith('/dashboard') ? rawReturnTo : '/dashboard';
+          await c.env.NONCE_KV.put(
+            `${STEP_UP_FACEBOOK_PENDING_PREFIX}${sessionId}`,
+            JSON.stringify({ identifier, returnTo: safeReturnTo }),
+            { expirationTtl: 10 * 60 },
+          );
+          return c.json({ requiredMethod, authUrl });
         }
 
         return c.json({ requiredMethod, ok: true });
@@ -461,6 +539,8 @@ export function createAuthRoutes(bindingName: string) {
           code?: string;
           challengeKey?: string;
           response?: unknown;
+          message?: string;
+          signature?: string;
         };
         if (!body.method || body.method !== requiredMethod) {
           return c.json({ error: 'Step-up method mismatch', requiredMethod }, 400);
@@ -498,11 +578,38 @@ export function createAuthRoutes(bindingName: string) {
           const { otp } = JSON.parse(raw) as { otp?: string };
           if (!otp || otp !== code) throw new Error('Invalid verification code');
           await c.env.NONCE_KV.delete(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
+        } else if (requiredMethod === 'wallet_reauth') {
+          if (!sessionId) throw new Error('sessionId not found');
+          const message = String(body.message ?? '').trim();
+          const signature = String(body.signature ?? '').trim();
+          if (!message || !signature) throw new Error('message and signature required');
+          const fields = await createWalletService(c.env).verifySignature(
+            sessionId,
+            message,
+            signature,
+            c.env.SIWE_DOMAIN,
+            c.env.FRONTEND_URL,
+          );
+          if (String(fields.statement ?? '').trim() !== STEP_UP_SIWE_STATEMENT) {
+            throw new Error('Invalid step-up SIWE statement');
+          }
+          const signedAddress = String(fields.address ?? '').toLowerCase();
+          const userAddress = String(user.address ?? '').toLowerCase();
+          const userIdentifier = String(user.identifier ?? '').toLowerCase();
+          if (signedAddress !== userAddress && signedAddress !== userIdentifier) {
+            throw new Error('Wallet mismatch for step-up');
+          }
+        } else if (requiredMethod === 'facebook_oauth') {
+          throw new Error('Continue with Facebook to verify this step-up method');
         } else {
           if (!sessionId) throw new Error('sessionId not found');
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
-          const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, identifier);
+          const otpIdentifier = resolveOtpStepUpIdentifier(user, identifier);
+          if (!otpIdentifier) {
+            throw new Error('OTP verification is unavailable for this account');
+          }
+          const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, otpIdentifier);
           if (!isValid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
         }
 

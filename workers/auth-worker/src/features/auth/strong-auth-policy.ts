@@ -6,7 +6,21 @@ const STRONG_AUTH_SETUP_UNLOCK_PREFIX = 'StrongAuthSetupUnlock:';
 export const STRONG_AUTH_SETUP_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
 const SENSITIVE_ACTION_UNLOCK_PREFIX = 'SensitiveActionUnlock:';
 export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 5 * 60; // 5 minutes
-export type StepUpMethod = 'passkey' | 'authenticator' | 'sms' | 'otp_email';
+export type StepUpMethod =
+  | 'passkey'
+  | 'authenticator'
+  | 'sms'
+  | 'wallet_reauth'
+  | 'facebook_oauth'
+  | 'otp_email';
+
+function isWalletIdentifier(identifier: string): boolean {
+  return /^0x[a-fA-F0-9]{40}$/.test(identifier);
+}
+
+function isFacebookOAuthIdentifier(identifier: string): boolean {
+  return identifier.startsWith('fb_') && identifier.endsWith('@oauth.user');
+}
 
 export function strongAuthSetupUnlockKey(identifier: string): string {
   return `${STRONG_AUTH_SETUP_UNLOCK_PREFIX}${identifier}`;
@@ -101,6 +115,9 @@ export async function resolvePreferredStepUpMethod(
   const smsApp = createAccountSmsApplication(c, bindingName);
   const smsStatus = await smsApp.getSmsStatusUseCase(normalized);
   if (smsStatus.enabled) return 'sms';
+
+  if (isWalletIdentifier(normalized)) return 'wallet_reauth';
+  if (isFacebookOAuthIdentifier(normalized)) return 'facebook_oauth';
 
   return 'otp_email';
 }
