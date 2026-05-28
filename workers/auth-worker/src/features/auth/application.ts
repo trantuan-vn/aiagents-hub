@@ -1,6 +1,6 @@
 import { Context } from 'hono';
 import { createLogger } from '../../shared/logger';
-import { generateSecureSessionId, getIdFromName } from '../../shared/utils';
+import { getIdFromName, getSessionIdHash } from '../../shared/utils';
 import { isAdminIdentifier } from '../../shared/admin-config';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { SiweMessage } from 'siwe';
@@ -139,8 +139,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     country?: string,
     deviceId?: string | null,
   ) => {
+    const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+    if (!encryptSecret) {
+      throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+    }
     const expiry = await getAuthExpiryFromConfig(c.env);
-    const sessionId = generateSecureSessionId();
+    const sessionId = getSessionIdHash(ipAddress, userAgent, `${encryptSecret}|${user.identifier}`);
+    const sessionExisted = await repository.sessions.existsByHashSessionId(sessionId);
     const normalizedDeviceId = normalizeDeviceId(deviceId);
     const activeSessionsBeforeCreate = await repository.sessions.listAll(50);
 
@@ -169,7 +174,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const emailDecision = await decideNewSessionEmail(
       c.env.NONCE_KV,
       user.identifier,
-      false,
+      sessionExisted,
       normalizedDeviceId,
       ipAddress,
       userAgent,
@@ -201,6 +206,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     log.info('session.created', {
       identifier: user.identifier,
       type,
+      sessionExisted,
       newDeviceEmailSent: emailDecision.send && !!userEmail,
     });
 

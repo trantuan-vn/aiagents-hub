@@ -3,7 +3,7 @@ import { mnemonicToAccount, generateMnemonic, english } from 'viem/accounts';
 import { encryptField } from '../../shared/field-encryption';
 import { Context } from 'hono'
 import { setCookie, deleteCookie, getCookie } from 'hono/cookie'
-import { generateSecureSessionId } from '../../shared/utils';
+import { generateSecureSessionId, getSessionIdHash } from '../../shared/utils';
 
 import { 
   OAuthConfig, 
@@ -217,6 +217,7 @@ export const cookieUtils = {
     };
     deleteCookie(c, 'sessionId', cookieOptions);
     deleteCookie(c, 'preAuthSessionId', cookieOptions);
+    deleteCookie(c, 'preAuthNonce', cookieOptions);
     // Clear legacy cookies if present (backward compat)
     deleteCookie(c, 'token', cookieOptions);
     deleteCookie(c, 'refreshToken', cookieOptions);
@@ -232,11 +233,33 @@ export const cookieUtils = {
   /** TTL cho pre-auth session (10 phút) - đủ cho OTP, OAuth redirect, wallet connect */
   PRE_AUTH_SESSION_TTL: 600,
 
-  /** Lấy hoặc tạo pre-auth sessionId từ cookie. Dùng generateSecureSessionId thay vì hash - bảo mật hơn, không lộ pattern IP+UA. */
-  getOrCreatePreAuthSessionId(c: Context): string {
-    const existing = getCookie(c, 'preAuthSessionId');
-    if (existing && existing.length >= 32) return existing;
-    const sessionId = generateSecureSessionId();
+  /**
+   * Pre-auth sessionId: SHA256(IP|UA|secret|nonce).
+   * nonce ngẫu nhiên/cookie → tránh trùng NAT; vẫn ổn định trong một flow login.
+   * Nếu OAuth callback đã set preAuthSessionId (state) mà chưa có nonce → giữ nguyên cookie đó.
+   */
+  getOrCreatePreAuthSessionId(c: Context, ipAddress: string, userAgent: string, secret: string): string {
+    const existingSessionId = getCookie(c, 'preAuthSessionId');
+    let nonce = getCookie(c, 'preAuthNonce');
+
+    if (existingSessionId && existingSessionId.length >= 64) {
+      if (!nonce || nonce.length < 32) {
+        this.setCookieWithOption(c, 'preAuthSessionId', existingSessionId, this.PRE_AUTH_SESSION_TTL);
+        return existingSessionId;
+      }
+      const derived = getSessionIdHash(ipAddress, userAgent, `${secret}|${nonce}`);
+      if (derived === existingSessionId) {
+        this.setCookieWithOption(c, 'preAuthNonce', nonce, this.PRE_AUTH_SESSION_TTL);
+        this.setCookieWithOption(c, 'preAuthSessionId', existingSessionId, this.PRE_AUTH_SESSION_TTL);
+        return existingSessionId;
+      }
+    }
+
+    if (!nonce || nonce.length < 32) {
+      nonce = generateSecureSessionId();
+    }
+    const sessionId = getSessionIdHash(ipAddress, userAgent, `${secret}|${nonce}`);
+    this.setCookieWithOption(c, 'preAuthNonce', nonce, this.PRE_AUTH_SESSION_TTL);
     this.setCookieWithOption(c, 'preAuthSessionId', sessionId, this.PRE_AUTH_SESSION_TTL);
     return sessionId;
   },
@@ -244,6 +267,7 @@ export const cookieUtils = {
   clearPreAuthSessionId(c: Context) {
     const opts = { path: '/', domain: '.aiagents-hub.vn', secure: true, sameSite: 'lax' as const, httpOnly: true };
     deleteCookie(c, 'preAuthSessionId', opts);
+    deleteCookie(c, 'preAuthNonce', opts);
   },
 
   /** DID challenge: set khi lấy nonce, get khi link/unlink. */

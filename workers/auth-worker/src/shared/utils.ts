@@ -128,8 +128,7 @@ export function getClientDeviceIdFromRequest(request: Request): string | undefin
   return readCookieValue(request.headers.get('Cookie'), 'client_device_id');
 }
 
-/** Hash từ IP+UA+secret - dùng cho pre-login flow (OTP, OAuth state, wallet nonce) */
-/** Deterministic sessionId for pre-login flows (OTP, OAuth state, wallet nonce). */
+/** Deterministic sessionId hash (pre-auth: secret includes server secret + per-browser nonce). */
 export const getSessionIdHash = (ipAddress: string, userAgent: string, secret: string) => {
   const data = `${ipAddress}|${userAgent}|${secret}`;
   return CryptoJS.SHA256(data).toString(CryptoJS.enc.Hex);

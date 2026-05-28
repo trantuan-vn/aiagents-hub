@@ -111,7 +111,11 @@ export function createAuthRoutes(bindingName: string) {
           throw new Error('Missing IP address or user agent');
         }
         const country = (request as Request & { cf?: { country?: string } }).cf?.country ?? 'XX';
-        const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c);
+        const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+        if (!encryptSecret) {
+          throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+        }
+        const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c, ipAddress, userAgent, encryptSecret);
         const deviceId = await resolveLoginDeviceId(c, request, sessionId);
         if (deviceId && c.env.NONCE_KV) {
           await storePendingLoginDevice(c.env.NONCE_KV, sessionId, deviceId);
@@ -220,8 +224,7 @@ export function createAuthRoutes(bindingName: string) {
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
-      // Đồng bộ cookie với sessionId từ state - redirect từ Google có thể không gửi cookie,
-      // nên getOrCreatePreAuthSessionId đã tạo sessionId mới; PendingTotp dùng oauthSessionId.
+      // Đồng bộ cookie với sessionId từ OAuth state (PendingTotp/PendingSms dùng oauthSessionId).
       cookieUtils.setCookieWithOption(c, 'preAuthSessionId', oauthSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresTotp=1`);
     }
