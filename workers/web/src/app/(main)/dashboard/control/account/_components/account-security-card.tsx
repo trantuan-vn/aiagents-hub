@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { KeyRound, MessageSquare, ShieldCheck, Key, type LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -36,6 +38,9 @@ interface BackupCodesStatus {
 
 export function AccountSecurityCard() {
   const t = useTranslations("AccountPage.security");
+  const user = useDashboardUser();
+  const searchParams = useSearchParams();
+  const requiresSetupFlow = user?.requiresStrongAuthSetup === true || searchParams.get("require2fa") === "1";
   const [authenticatorStatus, setAuthenticatorStatus] = useState<AuthenticatorStatus | null>(null);
   const [smsStatus, setSmsStatus] = useState<SmsStatus | null>(null);
   const [passkeyStatus, setPasskeyStatus] = useState<PasskeyStatus | null>(null);
@@ -174,6 +179,7 @@ export function AccountSecurityCard() {
             method={m}
             showSeparator={i > 0}
             backupCodesRemaining={m.key === "backup_codes" ? backupCodesStatus?.remainingCount : undefined}
+            requiresStepUp={requiresSetupFlow}
             t={t}
           />
         ))}
@@ -197,18 +203,23 @@ function SecurityMethodRow({
   method: m,
   showSeparator,
   backupCodesRemaining,
+  requiresStepUp,
   t,
 }: {
   method: MethodItem;
   showSeparator: boolean;
   backupCodesRemaining: number | undefined;
+  requiresStepUp: boolean;
   t: (key: string, values?: { count?: number }) => string;
 }) {
   const Icon = m.icon;
   const actionLabel = m.showStatus && m.enabled ? t("manage") : t(m.actionKey);
+  const actionHref = requiresStepUp
+    ? `/dashboard/step-up?returnTo=${encodeURIComponent(m.href)}`
+    : m.href;
   const button = (
     <Button variant="outline" size="sm" className="shrink-0" asChild>
-      <Link href={m.href}>{actionLabel}</Link>
+      <Link href={actionHref}>{actionLabel}</Link>
     </Button>
   );
   const showRemaining =

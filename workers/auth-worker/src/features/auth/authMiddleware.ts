@@ -9,13 +9,11 @@ import { cookieUtils } from './utils';
 import { getClientIpAndUserAgentForSession, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
 import { isDashboardPublicPath } from '../../shared/dashboard-public-paths';
 import {
-  isStrongAuthReverifyAllowedPath,
   isStrongAuthSetupAllowedPath,
 } from '../../shared/strong-auth-setup-paths';
 import { createIpRateLimitMiddleware, recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { ERROR_MESSAGES } from './constant';
 import {
-  isStrongAuthSetupUnlocked,
   isSensitiveActionUnlocked,
   resolvePreferredStepUpMethod,
   requiresStrongAuthSetup,
@@ -86,20 +84,14 @@ export function createStrongAuthSetupGateMiddleware(bindingName: string) {
       return;
     }
 
-    const identifier = String(user.identifier ?? '').trim();
-    const kv = c.env.NONCE_KV;
-    const unlocked = kv ? await isStrongAuthSetupUnlocked(kv, identifier) : false;
-
-    const allowed = unlocked
-      ? isStrongAuthSetupAllowedPath(path, method)
-      : isStrongAuthReverifyAllowedPath(path, method);
+    const allowed = isStrongAuthSetupAllowedPath(path, method);
 
     if (!allowed) {
       return c.json(
         {
           error: ERROR_MESSAGES.AUTH.STRONG_AUTH_REQUIRED,
           requiresStrongAuthSetup: true,
-          setupUnlocked: unlocked,
+          setupUnlocked: true,
         },
         403,
       );

@@ -15,6 +15,9 @@ export function SensitiveStepUpRedirect() {
 
   useEffect(() => {
     if (!pathname) return;
+    // Accounts that are forced to setup strong auth must be able to access
+    // account security setup screens without being blocked by sensitive step-up.
+    if (user?.requiresStrongAuthSetup) return;
     if (!isSensitiveDashboardPath(pathname, user?.role)) return;
     if (typeof window === "undefined") return;
 

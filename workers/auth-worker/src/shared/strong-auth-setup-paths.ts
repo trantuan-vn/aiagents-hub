@@ -21,6 +21,9 @@ const REVERIFY_ALLOWED: Array<{ methods?: string[]; pattern: RegExp }> = [
 
 const SETUP_ALLOWED: Array<{ methods?: string[]; pattern: RegExp }> = [
   ...REVERIFY_ALLOWED,
+  // Step-up challenge flow (required before sensitive setup actions).
+  { methods: ['POST'], pattern: /^\/dashboard\/auth\/step-up\/request$/ },
+  { methods: ['POST'], pattern: /^\/dashboard\/auth\/step-up\/verify$/ },
   // Enable/setup endpoints (state-changing).
   { methods: ['POST'], pattern: /^\/dashboard\/auth\/authenticator\/setup$/ },
   { methods: ['POST'], pattern: /^\/dashboard\/auth\/authenticator\/verify$/ },
