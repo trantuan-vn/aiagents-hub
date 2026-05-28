@@ -18,7 +18,7 @@ import { createOTPService } from '../auth/infrastructure';
 import { validationUtils } from '../auth/utils';
 import { otpUtils } from '../auth/utils';
 
-const SMS_VERIFY_TTL = 600; // 10 minutes
+const SMS_VERIFY_TTL = 300; // 5 minutes
 
 const ERROR_MESSAGES = {
   USER_NOT_FOUND: 'User not found',
@@ -153,7 +153,7 @@ export function createAccountSmsApplication(
       await c.env.NONCE_KV.put(kvKey, JSON.stringify({ otp, phone }), { expirationTtl: SMS_VERIFY_TTL });
 
       const otpService = createOTPService(c.env);
-      await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp);
+      await otpService.sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp, SMS_VERIFY_TTL);
     },
 
     async verifySmsUseCase(identifier: string, input: VerifySmsInput): Promise<void> {

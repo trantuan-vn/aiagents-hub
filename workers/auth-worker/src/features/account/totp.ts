@@ -94,12 +94,12 @@ export async function getTotpCode(secretBase32: string, timeStep?: number): Prom
   return otp.toString().padStart(TOTP_DIGITS, '0');
 }
 
-/** Time step window for verification: ±2 steps (~60s each side) + rate limit on login. */
-const TOTP_VERIFY_WINDOW = 2;
+/** Time step window for verification: ±1 step (~30s each side) + rate limit on login. */
+const TOTP_VERIFY_WINDOW = 1;
 
 /**
  * Verify a 6-digit code against the secret.
- * Allows ±4 time steps (270s window) to tolerate clock skew between server and Authenticator app.
+ * Allows ±1 step (about 90s total window) to balance clock skew tolerance and brute-force surface.
  */
 export async function verifyTotpCode(secretBase32: string, code: string): Promise<boolean> {
   const trimmedCode = code.replace(/\D/g, '').slice(0, 6);

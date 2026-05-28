@@ -238,7 +238,7 @@ export interface IOTPService {
   generateOTP(sessionId: string, identifier: string): Promise<string>;
   verifyOTP(otp: string, sessionId: string, identifier: string): Promise<boolean>;
   sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void>;
-  sendSmsOTP(phone: string, otp: string): Promise<void>;
+  sendSmsOTP(phone: string, otp: string, expirySeconds?: number): Promise<void>;
   sendNewSessionNotification(email: string, ipAddress: string, userAgent: string, language?: 'vi' | 'en'): Promise<void>;
 }
 

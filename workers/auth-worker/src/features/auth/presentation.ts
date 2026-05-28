@@ -423,7 +423,7 @@ export function createAuthRoutes(bindingName: string) {
           if (!phone) throw new Error('SMS phone is unavailable');
 
           const otp = generateSixDigits();
-          await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp);
+          await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp, 300);
           await c.env.NONCE_KV.put(
             `${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`,
             JSON.stringify({ otp }),

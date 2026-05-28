@@ -247,7 +247,7 @@ export async function applyEnabledSecondFactorStepUp(
     const smsOtp = otpUtils.generateOTP(6);
     await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, normalizeDeviceId(deviceIdForPending));
     await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
-    await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+    await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp, 300);
     return { requiresSms: true };
   }
 
@@ -365,6 +365,6 @@ export async function evaluateNovelDeviceStepUp(
   const normalizedId = validationUtils.normalizeIdentifier(identifier);
   await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
   await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
-  await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
+  await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp, 300);
   return { requiresSms: true };
 }

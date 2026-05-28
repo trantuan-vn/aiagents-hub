@@ -5,7 +5,7 @@ import { createPasskeyAuthApplication } from '../account/passkey';
 const STRONG_AUTH_SETUP_UNLOCK_PREFIX = 'StrongAuthSetupUnlock:';
 export const STRONG_AUTH_SETUP_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
 const SENSITIVE_ACTION_UNLOCK_PREFIX = 'SensitiveActionUnlock:';
-export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
+export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 5 * 60; // 5 minutes
 export type StepUpMethod = 'passkey' | 'authenticator' | 'sms' | 'otp_email';
 
 export function strongAuthSetupUnlockKey(identifier: string): string {

@@ -245,7 +245,15 @@ export function createOTPService(env: Env): IOTPService {
     }
   };
 
-  const sendSMS = async (phone: string, otp: string): Promise<void> => {    
+  const formatOtpExpiryText = (expirySeconds: number): string => {
+    if (expirySeconds % 60 === 0) {
+      const minutes = Math.max(1, Math.floor(expirySeconds / 60));
+      return minutes === 1 ? '1 minute' : `${minutes} minutes`;
+    }
+    return `${Math.max(1, expirySeconds)} seconds`;
+  };
+
+  const sendSMS = async (phone: string, otp: string, expirySeconds = AUTH_CONSTANTS.OTP_EXPIRY): Promise<void> => {    
     // const apiKey= await env.VONAGE_API_KEY.get();
     // const apiSecret= await env.VONAGE_API_SECRET.get();
     // if (!apiKey || !apiSecret) {
@@ -255,7 +263,7 @@ export function createOTPService(env: Env): IOTPService {
     if (!authToken) {
       throw new Error("AUTH_TOKEN is not defined in environment variables");
     }
-    const messageText = `Your OTP code is: ${otp}. This code will expire in 1 minute.`;
+    const messageText = `Your OTP code is: ${otp}. This code will expire in ${formatOtpExpiryText(expirySeconds)}.`;
     
     // const payload = {
     //   from: '14157386102',
@@ -382,8 +390,8 @@ export function createOTPService(env: Env): IOTPService {
       await sendEmail(email, otp, language);
     },
 
-    async sendSmsOTP(phone: string, otp: string): Promise<void> {
-      await sendSMS(phone, otp);
+    async sendSmsOTP(phone: string, otp: string, expirySeconds?: number): Promise<void> {
+      await sendSMS(phone, otp, expirySeconds);
     },
 
     async sendNewSessionNotification(
