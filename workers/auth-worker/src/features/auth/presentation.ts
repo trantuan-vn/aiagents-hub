@@ -111,10 +111,26 @@ export function createAuthRoutes(bindingName: string) {
 
   // Helper function để xử lý route chung
   const createRouteHandler = (
-    handler: Function, 
+    handler: Function,
     errorMessage: string,
-    requireOriginCheck: boolean = false
+    optionsOrRequireOriginCheck:
+      | boolean
+      | {
+          requireOriginCheck?: boolean;
+          clearAuthCookiesOnError?: boolean;
+          usePreAuthSession?: boolean;
+          recordIpAuthFailureOnError?: boolean;
+        } = false,
   ) => {
+    const options =
+      typeof optionsOrRequireOriginCheck === 'boolean'
+        ? { requireOriginCheck: optionsOrRequireOriginCheck }
+        : optionsOrRequireOriginCheck;
+    const requireOriginCheck = options.requireOriginCheck ?? false;
+    const clearAuthCookiesOnError = options.clearAuthCookiesOnError ?? true;
+    const usePreAuthSession = options.usePreAuthSession ?? true;
+    const recordIpAuthFailureOnError = options.recordIpAuthFailureOnError ?? true;
+
     return async (c: any) => {
       try {
         if (requireOriginCheck) {
@@ -131,16 +147,22 @@ export function createAuthRoutes(bindingName: string) {
           throw new Error('Missing IP address or user agent');
         }
         const country = (request as Request & { cf?: { country?: string } }).cf?.country ?? 'XX';
-        const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
-        if (!encryptSecret) {
-          throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+        let sessionId: string;
+        if (usePreAuthSession) {
+          const encryptSecret = await c.env.ENCRYPTION_SECRET.get();
+          if (!encryptSecret) {
+            throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+          }
+          sessionId = await cookieUtils.getOrCreatePreAuthSessionId(c, ipAddress, userAgent, encryptSecret);
+          const deviceId = await resolveLoginDeviceId(c, request, sessionId);
+          if (deviceId && c.env.NONCE_KV) {
+            await storePendingLoginDevice(c.env.NONCE_KV, sessionId, deviceId);
+          }
+          c.set('loginDeviceId', deviceId);
+        } else {
+          sessionId = getCookie(c, 'sessionId') ?? '';
+          c.set('loginDeviceId', undefined);
         }
-        const sessionId = await cookieUtils.getOrCreatePreAuthSessionId(c, ipAddress, userAgent, encryptSecret);
-        const deviceId = await resolveLoginDeviceId(c, request, sessionId);
-        if (deviceId && c.env.NONCE_KV) {
-          await storePendingLoginDevice(c.env.NONCE_KV, sessionId, deviceId);
-        }
-        c.set('loginDeviceId', deviceId);
         return await handler(c, sessionId, ipAddress, userAgent, country);
       } catch (e) {
         if (e instanceof OtpRateLimitError) {
@@ -157,11 +179,11 @@ export function createAuthRoutes(bindingName: string) {
         const ip = getClientIp(c);
         const errMsg = e instanceof Error ? e.message : String(e);
         const isRateLimited = errMsg === ERROR_MESSAGES.AUTH.RATE_LIMIT_EXCEEDED;
-        if (ip && !isRateLimited) {
+        if (recordIpAuthFailureOnError && ip && !isRateLimited) {
           await recordIpAuthFailure(c.env, ip);
         }
         const { errorResponse, status } = await handleError(c, e, errorMessage);
-        if (!shouldPreservePreAuthSessionOnError(e)) {
+        if (clearAuthCookiesOnError && !shouldPreservePreAuthSessionOnError(e)) {
           cookieUtils.clearAuthCookies(c);
         }
         return c.json(errorResponse, status);
@@ -369,122 +391,132 @@ export function createAuthRoutes(bindingName: string) {
   }, "OTP verification failed", true));
 
   // IIc. Sensitive-action step-up (passkey > authenticator > sms > otp email)
-  app.post('/step-up/request', async (c) => {
-    try {
-      const user = requireAuth(c);
-      const identifier = String(user.identifier ?? '').trim();
-      if (!identifier) throw new Error('Invalid user identifier');
-      const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
+  app.post(
+    '/step-up/request',
+    createRouteHandler(
+      async (c: any, sessionId: string) => {
+        const user = requireAuth(c);
+        const identifier = String(user.identifier ?? '').trim();
+        if (!identifier) throw new Error('Invalid user identifier');
+        const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
 
-      if (requiredMethod === 'passkey') {
-        const origin = c.req.header('origin') || c.env.FRONTEND_URL;
-        if (!origin) throw new Error('Origin required');
-        const passkeyAuthApp = createPasskeyAuthApplication(c, bindingName, {
-          rpName: 'Unitoken',
-          getOrigin: () => c.req.header('origin') || c.env.FRONTEND_URL || '',
-        });
-        const { options, challengeKey } =
-          await passkeyAuthApp.getAuthenticationOptionsUseCase(identifier, origin);
-        return c.json({ requiredMethod, options, challengeKey });
-      }
+        if (requiredMethod === 'passkey') {
+          const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+          if (!origin) throw new Error('Origin required');
+          const passkeyAuthApp = createPasskeyAuthApplication(c, bindingName, {
+            rpName: 'Unitoken',
+            getOrigin: () => c.req.header('origin') || c.env.FRONTEND_URL || '',
+          });
+          const { options, challengeKey } =
+            await passkeyAuthApp.getAuthenticationOptionsUseCase(identifier, origin);
+          return c.json({ requiredMethod, options, challengeKey });
+        }
 
-      if (requiredMethod === 'sms') {
-        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-        const smsRepo = createSmsRepository(userDO);
-        const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
-        if (!encryptedPhone) throw new Error('SMS second factor is not available');
-        const secret = await c.env.ENCRYPTION_SECRET.get();
-        if (!secret) throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
-        const phone = await decryptField(encryptedPhone, secret);
-        if (!phone) throw new Error('SMS phone is unavailable');
+        if (requiredMethod === 'sms') {
+          const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+          const smsRepo = createSmsRepository(userDO);
+          const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
+          if (!encryptedPhone) throw new Error('SMS second factor is not available');
+          const secret = await c.env.ENCRYPTION_SECRET.get();
+          if (!secret) throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+          const phone = await decryptField(encryptedPhone, secret);
+          if (!phone) throw new Error('SMS phone is unavailable');
 
-        const otp = generateSixDigits();
-        await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp);
-        await c.env.NONCE_KV.put(
-          `${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`,
-          JSON.stringify({ otp }),
-          { expirationTtl: 300 },
-        );
-      }
+          const otp = generateSixDigits();
+          await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp);
+          await c.env.NONCE_KV.put(
+            `${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`,
+            JSON.stringify({ otp }),
+            { expirationTtl: 300 },
+          );
+        }
 
-      if (requiredMethod === 'otp_email') {
-        const sessionId = getCookie(c, 'sessionId');
-        if (!sessionId) throw new Error('sessionId not found');
-        const appService = createApplicationService(c, bindingName);
-        await appService.getRequestOtpUseCase(identifier, sessionId, getClientIp(c), 'en');
-      }
+        if (requiredMethod === 'otp_email') {
+          if (!sessionId) throw new Error('sessionId not found');
+          const appService = createApplicationService(c, bindingName);
+          await appService.getRequestOtpUseCase(identifier, sessionId, getClientIp(c), 'en');
+        }
 
-      return c.json({ requiredMethod, ok: true });
-    } catch (e) {
-      const { errorResponse, status } = await handleError(c, e, 'Failed to request step-up');
-      return c.json(errorResponse, status);
-    }
-  });
+        return c.json({ requiredMethod, ok: true });
+      },
+      'Failed to request step-up',
+      {
+        requireOriginCheck: true,
+        usePreAuthSession: false,
+        clearAuthCookiesOnError: false,
+      },
+    ),
+  );
 
-  app.post('/step-up/verify', async (c) => {
-    try {
-      const user = requireAuth(c);
-      const identifier = String(user.identifier ?? '').trim();
-      if (!identifier) throw new Error('Invalid user identifier');
-      const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
-      const body = (await c.req.json().catch(() => ({}))) as {
-        method?: StepUpMethod;
-        code?: string;
-        challengeKey?: string;
-        response?: unknown;
-      };
-      if (!body.method || body.method !== requiredMethod) {
-        return c.json({ error: 'Step-up method mismatch', requiredMethod }, 400);
-      }
+  app.post(
+    '/step-up/verify',
+    createRouteHandler(
+      async (c: any, sessionId: string) => {
+        const user = requireAuth(c);
+        const identifier = String(user.identifier ?? '').trim();
+        if (!identifier) throw new Error('Invalid user identifier');
+        const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
+        const body = (await c.req.json().catch(() => ({}))) as {
+          method?: StepUpMethod;
+          code?: string;
+          challengeKey?: string;
+          response?: unknown;
+        };
+        if (!body.method || body.method !== requiredMethod) {
+          return c.json({ error: 'Step-up method mismatch', requiredMethod }, 400);
+        }
 
-      if (requiredMethod === 'passkey') {
-        const origin = c.req.header('origin') || c.env.FRONTEND_URL;
-        if (!origin) throw new Error('Origin required');
-        if (!body.response || !body.challengeKey) throw new Error('response and challengeKey required');
-        const passkeyAuthApp = createPasskeyAuthApplication(c, bindingName, {
-          rpName: 'Unitoken',
-          getOrigin: () => c.req.header('origin') || c.env.FRONTEND_URL || '',
-        });
-        const result = await passkeyAuthApp.verifyAuthenticationUseCase(
-          body.response,
-          identifier,
-          body.challengeKey,
-          origin,
-        );
-        if (result.identifier !== identifier) throw new Error('Passkey verification user mismatch');
-      } else if (requiredMethod === 'authenticator') {
-        const code = String(body.code ?? '').trim();
-        if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
-        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
-        const authRepo = createAuthenticatorRepository(userDO);
-        const secret = await authRepo.getSecret();
-        if (!secret) throw new Error('Authenticator is not enabled');
-        const valid = await verifyTotpCode(secret, code);
-        if (!valid) throw new Error('Invalid verification code');
-      } else if (requiredMethod === 'sms') {
-        const code = String(body.code ?? '').trim();
-        if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
-        const raw = await c.env.NONCE_KV.get(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
-        if (!raw) throw new Error('SMS verification session expired');
-        const { otp } = JSON.parse(raw) as { otp?: string };
-        if (!otp || otp !== code) throw new Error('Invalid verification code');
-        await c.env.NONCE_KV.delete(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
-      } else {
-        const sessionId = getCookie(c, 'sessionId');
-        if (!sessionId) throw new Error('sessionId not found');
-        const code = String(body.code ?? '').trim();
-        if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
-        const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, identifier);
-        if (!isValid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
-      }
+        if (requiredMethod === 'passkey') {
+          const origin = c.req.header('origin') || c.env.FRONTEND_URL;
+          if (!origin) throw new Error('Origin required');
+          if (!body.response || !body.challengeKey) throw new Error('response and challengeKey required');
+          const passkeyAuthApp = createPasskeyAuthApplication(c, bindingName, {
+            rpName: 'Unitoken',
+            getOrigin: () => c.req.header('origin') || c.env.FRONTEND_URL || '',
+          });
+          const result = await passkeyAuthApp.verifyAuthenticationUseCase(
+            body.response,
+            identifier,
+            body.challengeKey,
+            origin,
+          );
+          if (result.identifier !== identifier) throw new Error('Passkey verification user mismatch');
+        } else if (requiredMethod === 'authenticator') {
+          const code = String(body.code ?? '').trim();
+          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
+          const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+          const authRepo = createAuthenticatorRepository(userDO);
+          const secret = await authRepo.getSecret();
+          if (!secret) throw new Error('Authenticator is not enabled');
+          const valid = await verifyTotpCode(secret, code);
+          if (!valid) throw new Error('Invalid verification code');
+        } else if (requiredMethod === 'sms') {
+          const code = String(body.code ?? '').trim();
+          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
+          const raw = await c.env.NONCE_KV.get(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
+          if (!raw) throw new Error('SMS verification session expired');
+          const { otp } = JSON.parse(raw) as { otp?: string };
+          if (!otp || otp !== code) throw new Error('Invalid verification code');
+          await c.env.NONCE_KV.delete(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
+        } else {
+          if (!sessionId) throw new Error('sessionId not found');
+          const code = String(body.code ?? '').trim();
+          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
+          const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, identifier);
+          if (!isValid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+        }
 
-      await markSensitiveActionUnlocked(c.env.NONCE_KV, identifier, requiredMethod);
-      return c.json({ ok: true, method: requiredMethod });
-    } catch (e) {
-      const { errorResponse, status } = await handleError(c, e, 'Failed to verify step-up');
-      return c.json(errorResponse, status);
-    }
-  });
+        await markSensitiveActionUnlocked(c.env.NONCE_KV, identifier, requiredMethod);
+        return c.json({ ok: true, method: requiredMethod });
+      },
+      'Failed to verify step-up',
+      {
+        requireOriginCheck: true,
+        usePreAuthSession: false,
+        clearAuthCookiesOnError: false,
+      },
+    ),
+  );
 
   app.post('/totp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const { code } = await parseBody(c, TotpVerifySchema);
