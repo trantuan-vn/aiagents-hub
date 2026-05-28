@@ -125,6 +125,15 @@ function requiresSensitiveStepUp(path: string, method: string): boolean {
   // Change payout beneficiary is a high-risk money-direction action.
   if (path === '/dashboard/payout/beneficiary' && upperMethod === 'PUT') return true;
 
+  // API key lock/management actions.
+  if (path.startsWith('/dashboard/token/')) {
+    return upperMethod !== 'GET';
+  }
+
+  // Websocket notify management (admin broadcast/queue push).
+  if (path === '/dashboard/ws/broadcast' && upperMethod === 'POST') return true;
+  if (path === '/dashboard/ws/queue/push' && upperMethod === 'POST') return true;
+
   // 2FA / login method management screens (state-changing actions).
   const isSecurityMethodPath =
     path.startsWith('/dashboard/auth/authenticator/') ||

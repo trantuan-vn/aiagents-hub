@@ -2,11 +2,14 @@ export const STEP_UP_SESSION_KEY = "dashboard_sensitive_step_up_allow_once";
 export const STEP_UP_ONCE_TTL_MS = 2 * 60 * 1000;
 
 const ACCOUNT_SECURITY_PREFIXES = [
+  "/dashboard/control/token",
   "/dashboard/control/account/authenticator",
   "/dashboard/control/account/passkey",
   "/dashboard/control/account/sms",
   "/dashboard/control/account/backup-codes",
   "/dashboard/control/account/payout-beneficiary",
+  "/dashboard/notify",
+  "/dashboard/control/notifications",
 ] as const;
 
 const ADMIN_MANAGEMENT_PREFIXES = [
