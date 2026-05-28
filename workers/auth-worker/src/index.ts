@@ -9,6 +9,7 @@ import {
   securityHeadersMiddleware,
   createVersionCheckMiddleware,
   createStrongAuthSetupGateMiddleware,
+  createSensitiveStepUpMiddleware,
 } from './features/auth/authMiddleware';
 import { createTokenValidationMiddleware, createTokenRateLimitMiddleware, securityLoggingMiddleware } from './features/member/token/authMiddleware';
 import { createAuthRoutes } from './features/auth/presentation';
@@ -73,6 +74,7 @@ function createRoutes(bindingName: string) {
   // Auth middleware
   routes.use('/dashboard/*', createAuthMiddleware(bindingName));
   routes.use('/dashboard/*', createStrongAuthSetupGateMiddleware(bindingName));
+  routes.use('/dashboard/*', createSensitiveStepUpMiddleware(bindingName));
   routes.use('/dashboard/*', createVersionCheckMiddleware(bindingName));      
   // sub routes /auth 
   routes.route('/dashboard/auth', createAuthRoutes(bindingName));  

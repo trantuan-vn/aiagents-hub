@@ -4,6 +4,9 @@ import { createPasskeyAuthApplication } from '../account/passkey';
 
 const STRONG_AUTH_SETUP_UNLOCK_PREFIX = 'StrongAuthSetupUnlock:';
 export const STRONG_AUTH_SETUP_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
+const SENSITIVE_ACTION_UNLOCK_PREFIX = 'SensitiveActionUnlock:';
+export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
+export type StepUpMethod = 'passkey' | 'authenticator' | 'sms' | 'otp_email';
 
 export function strongAuthSetupUnlockKey(identifier: string): string {
   return `${STRONG_AUTH_SETUP_UNLOCK_PREFIX}${identifier}`;
@@ -23,6 +26,28 @@ export async function markStrongAuthSetupUnlocked(
 ): Promise<void> {
   const key = strongAuthSetupUnlockKey(identifier);
   await kv.put(key, '1', { expirationTtl: STRONG_AUTH_SETUP_UNLOCK_TTL_SEC });
+}
+
+function sensitiveActionUnlockKey(identifier: string, method: StepUpMethod): string {
+  return `${SENSITIVE_ACTION_UNLOCK_PREFIX}${identifier}:${method}`;
+}
+
+export async function isSensitiveActionUnlocked(
+  kv: KVNamespace,
+  identifier: string,
+  method: StepUpMethod,
+): Promise<boolean> {
+  const key = sensitiveActionUnlockKey(identifier, method);
+  return (await kv.get(key)) !== null;
+}
+
+export async function markSensitiveActionUnlocked(
+  kv: KVNamespace,
+  identifier: string,
+  method: StepUpMethod,
+): Promise<void> {
+  const key = sensitiveActionUnlockKey(identifier, method);
+  await kv.put(key, '1', { expirationTtl: SENSITIVE_ACTION_UNLOCK_TTL_SEC });
 }
 
 /** Account có số dư hoặc đã nạp tier — cần TOTP, SMS 2FA hoặc passkey trước khi dùng dashboard. */
@@ -52,6 +77,32 @@ export async function userHasStrongSecondFactor(
   });
   const passkeyStatus = await passkeyApp.getPasskeyAuthStatusUseCase(identifier);
   return passkeyStatus.enabled;
+}
+
+export async function resolvePreferredStepUpMethod(
+  c: Context,
+  bindingName: string,
+  identifier: string,
+): Promise<StepUpMethod> {
+  const normalized = identifier.trim();
+  if (!normalized) return 'otp_email';
+
+  const passkeyApp = createPasskeyAuthApplication(c, bindingName, {
+    rpName: 'Unitoken',
+    getOrigin: () => c.env.FRONTEND_URL || '',
+  });
+  const passkeyStatus = await passkeyApp.getPasskeyAuthStatusUseCase(normalized);
+  if (passkeyStatus.enabled) return 'passkey';
+
+  const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
+  const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(normalized);
+  if (totpStatus.enabled) return 'authenticator';
+
+  const smsApp = createAccountSmsApplication(c, bindingName);
+  const smsStatus = await smsApp.getSmsStatusUseCase(normalized);
+  if (smsStatus.enabled) return 'sms';
+
+  return 'otp_email';
 }
 
 /** Đăng nhập được; API dashboard (trừ setup 2FA) bị chặn cho đến khi bật 2FA. */

@@ -16,6 +16,8 @@ import { createIpRateLimitMiddleware, recordIpAuthFailure } from '../../shared/i
 import { ERROR_MESSAGES } from './constant';
 import {
   isStrongAuthSetupUnlocked,
+  isSensitiveActionUnlocked,
+  resolvePreferredStepUpMethod,
   requiresStrongAuthSetup,
 } from './strong-auth-policy';
 
@@ -98,6 +100,74 @@ export function createStrongAuthSetupGateMiddleware(bindingName: string) {
           error: ERROR_MESSAGES.AUTH.STRONG_AUTH_REQUIRED,
           requiresStrongAuthSetup: true,
           setupUnlocked: unlocked,
+        },
+        403,
+      );
+    }
+
+    await next();
+  };
+}
+
+function requiresSensitiveStepUp(path: string, method: string): boolean {
+  const upperMethod = method.toUpperCase();
+  if (upperMethod === 'OPTIONS') return false;
+
+  // Allow step-up endpoints themselves, otherwise users would be blocked in a loop.
+  if (path === '/dashboard/auth/step-up/request' && upperMethod === 'POST') return false;
+  if (path === '/dashboard/auth/step-up/verify' && upperMethod === 'POST') return false;
+  if (path === '/dashboard/auth/otp/request' && upperMethod === 'POST') return false;
+  if (path === '/dashboard/auth/otp/verify' && upperMethod === 'POST') return false;
+
+  // Admin management APIs: always require fresh step-up.
+  if (path.startsWith('/dashboard/admin/')) return true;
+
+  // Change payout beneficiary is a high-risk money-direction action.
+  if (path === '/dashboard/payout/beneficiary' && upperMethod === 'PUT') return true;
+
+  // 2FA / login method management screens (state-changing actions).
+  const isSecurityMethodPath =
+    path.startsWith('/dashboard/auth/authenticator/') ||
+    path.startsWith('/dashboard/auth/sms/') ||
+    path.startsWith('/dashboard/auth/passkey/') ||
+    path.startsWith('/dashboard/auth/backup-codes/');
+  if (!isSecurityMethodPath) return false;
+  return upperMethod !== 'GET';
+}
+
+/** Sensitive actions require recent step-up with preferred method: passkey > authenticator > sms > otp email. */
+export function createSensitiveStepUpMiddleware(bindingName: string) {
+  return async (c: Context, next: Next) => {
+    const user = c.get('user') as Record<string, unknown> | undefined;
+    if (!user) {
+      await next();
+      return;
+    }
+
+    const path = c.req.path;
+    const method = c.req.method;
+    if (!requiresSensitiveStepUp(path, method)) {
+      await next();
+      return;
+    }
+
+    const identifier = String(user.identifier ?? '').trim();
+    if (!identifier) {
+      return c.json({ error: ERROR_MESSAGES.AUTH.NOT_AUTHENTICATED }, 401);
+    }
+    const kv = c.env.NONCE_KV;
+    if (!kv) {
+      return c.json({ error: 'Step-up verification is unavailable' }, 503);
+    }
+
+    const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
+    const unlocked = await isSensitiveActionUnlocked(kv, identifier, requiredMethod);
+    if (!unlocked) {
+      return c.json(
+        {
+          error: 'Sensitive action requires step-up verification',
+          stepUpRequired: true,
+          requiredMethod,
         },
         403,
       );
