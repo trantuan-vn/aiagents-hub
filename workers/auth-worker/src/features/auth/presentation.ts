@@ -430,25 +430,28 @@ export function createAuthRoutes(bindingName: string) {
     const applicationService = createApplicationService(c, bindingName);
     const nonce = await applicationService.generateNonceUseCase(sessionId);
 
-    return c.json({ nonce });
+    // Refresh pre-auth cookie and return session id so client can pin wallet connect to exact nonce session.
+    cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
+    return c.json({ nonce, preAuthSessionId: sessionId });
   }, "Nonce request failed", true));
 
   app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
-    const { message, signature } = await parseBody(c, SIWEAuthSchema);
+    const { message, signature, preAuthSessionId } = await parseBody(c, SIWEAuthSchema);
+    const effectiveSessionId = preAuthSessionId ?? sessionId;
 
     const applicationService = createApplicationService(c, bindingName);
-    const fields = await applicationService.verifySignatureUseCase(sessionId, message, signature);
+    const fields = await applicationService.verifySignatureUseCase(effectiveSessionId, message, signature);
     const address = fields.address.toLowerCase();
 
     // Get referral code stored when user requested nonce (from link with ref=)
     let ref: string | undefined;
     if (c.env.NONCE_KV) {
       const { getPendingRef } = await import('../member/referral/utils');
-      ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
+      ref = (await getPendingRef(c.env.NONCE_KV, effectiveSessionId)) ?? undefined;
     }
 
     const result = await applicationService.connectWalletUseCase(
-      sessionId,
+      effectiveSessionId,
       address,
       ipAddress,
       userAgent,
@@ -459,11 +462,11 @@ export function createAuthRoutes(bindingName: string) {
 
     if ('requiresTotp' in result && result.requiresTotp) {
       // Đồng bộ cookie để totp/verify dùng đúng sessionId (phòng popup/iframe có cookie khác)
-      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', effectiveSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresTotp: true });
     }
     if ('requiresSms' in result && result.requiresSms) {
-      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
+      cookieUtils.setCookieWithOption(c, 'preAuthSessionId', effectiveSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.json({ requiresSms: true });
     }
 

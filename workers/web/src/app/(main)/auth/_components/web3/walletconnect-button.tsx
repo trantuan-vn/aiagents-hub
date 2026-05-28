@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -27,6 +27,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   const { signMessageAsync } = useSignMessage();
   const chainId = useChainId() || 1;
   const [isSigning, setIsSigning] = useState(false);
+  const authInFlightRef = useRef(false);
 
   const NonceSchema = useMemo(
     () =>
@@ -35,6 +36,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
           .string()
           .min(1)
           .regex(/^[a-zA-Z0-9]+$/, t("nonce_validation_error")),
+        preAuthSessionId: z.string().length(64).regex(/^[a-f0-9]{64}$/).optional(),
       }),
     [t],
   );
@@ -58,7 +60,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     const data = await nonceResponse.json();
     const result = NonceSchema.parse(data);
 
-    return result.nonce;
+    return { nonce: result.nonce, preAuthSessionId: result.preAuthSessionId };
   }, [t, NonceSchema, ref]);
 
   const createAndSignMessage = useCallback(
@@ -94,7 +96,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   );
 
   const verifyAndConnect = useCallback(
-    async (message: string, signature: string) => {
+    async (message: string, signature: string, preAuthSessionId?: string) => {
       toast.info(t("verifying_signature"));
 
       const connectResponse = await fetch(`${AUTH_API_URL}/wallet/connect`, {
@@ -107,6 +109,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         body: JSON.stringify({
           message,
           signature,
+          preAuthSessionId,
         }),
         credentials: "include",
       });
@@ -163,16 +166,21 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   );
 
   const handlePostConnection = useCallback(async () => {
+    // Guard against duplicate triggers (e.g. repeated effects/re-renders),
+    // which can consume nonce once and make the second request fail.
+    if (authInFlightRef.current) return;
+    authInFlightRef.current = true;
     setIsSigning(true);
 
     try {
-      const nonce = await fetchNonce();
+      const { nonce, preAuthSessionId } = await fetchNonce();
       const { message, signature } = await createAndSignMessage(nonce);
-      await verifyAndConnect(message, signature);
+      await verifyAndConnect(message, signature, preAuthSessionId);
     } catch (error) {
       handleError(error);
     } finally {
       setIsSigning(false);
+      authInFlightRef.current = false;
     }
   }, [fetchNonce, createAndSignMessage, verifyAndConnect, handleError]);
 
