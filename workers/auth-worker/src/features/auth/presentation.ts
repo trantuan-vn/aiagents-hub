@@ -202,6 +202,13 @@ export function createAuthRoutes(bindingName: string) {
       ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
     }
 
+    // OAuth callback có thể quay về mà cookie preAuthSessionId bị lệch/mất.
+    // Ưu tiên deviceId đã resolve từ request hiện tại; nếu thiếu thì thử lấy theo oauthSessionId (state).
+    let loginDeviceId = c.get('loginDeviceId') as string | undefined;
+    if (!loginDeviceId && c.env.NONCE_KV) {
+      loginDeviceId = (await consumePendingLoginDevice(c.env.NONCE_KV, oauthSessionId)) ?? undefined;
+    }
+
     const result = await applicationService.connectOAuthUseCase(
       oauthSessionId,
       identifier,
@@ -209,7 +216,7 @@ export function createAuthRoutes(bindingName: string) {
       userAgent,
       country,
       ref,
-      c.get('loginDeviceId') as string | undefined,
+      loginDeviceId,
     );
 
     if ('requiresTotp' in result && result.requiresTotp) {
