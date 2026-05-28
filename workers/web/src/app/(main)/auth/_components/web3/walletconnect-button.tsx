@@ -36,7 +36,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
           .string()
           .min(1)
           .regex(/^[a-zA-Z0-9]+$/, t("nonce_validation_error")),
-        preAuthSessionId: z.string().length(64).regex(/^[a-f0-9]{64}$/).optional(),
       }),
     [t],
   );
@@ -60,7 +59,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     const data = await nonceResponse.json();
     const result = NonceSchema.parse(data);
 
-    return { nonce: result.nonce, preAuthSessionId: result.preAuthSessionId };
+    return { nonce: result.nonce };
   }, [t, NonceSchema, ref]);
 
   const createAndSignMessage = useCallback(
@@ -96,7 +95,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
   );
 
   const verifyAndConnect = useCallback(
-    async (message: string, signature: string, preAuthSessionId?: string) => {
+    async (message: string, signature: string) => {
       toast.info(t("verifying_signature"));
 
       const connectResponse = await fetch(`${AUTH_API_URL}/wallet/connect`, {
@@ -109,7 +108,6 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
         body: JSON.stringify({
           message,
           signature,
-          preAuthSessionId,
         }),
         credentials: "include",
       });
@@ -173,9 +171,9 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
     setIsSigning(true);
 
     try {
-      const { nonce, preAuthSessionId } = await fetchNonce();
+      const { nonce } = await fetchNonce();
       const { message, signature } = await createAndSignMessage(nonce);
-      await verifyAndConnect(message, signature, preAuthSessionId);
+      await verifyAndConnect(message, signature);
     } catch (error) {
       handleError(error);
     } finally {

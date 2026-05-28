@@ -787,7 +787,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         const countryChanged = previous.country !== 'XX' && currentCountry !== 'XX' && previous.country !== currentCountry;
         const rapidCountrySwitch = countryChanged && now - previous.ts < 2 * 60 * 60 * 1000;
         if (fingerprintChanged && rapidCountrySwitch) {
-          log.warn('session.replay_geo_velocity_detected', {
+          log.warn('session.replay_geo_velocity_revoked', {
             identifier,
             sessionId,
             previousCountry: previous.country,
@@ -798,6 +798,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
             currentUaFp,
             deltaMs: now - previous.ts,
           });
+          await this.logoutAllUseCase(identifier);
+          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
         }
       }
       await c.env.NONCE_KV.put(

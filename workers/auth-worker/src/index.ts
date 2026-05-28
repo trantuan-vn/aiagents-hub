@@ -3,7 +3,13 @@ import { cors } from 'hono/cors';
 
 import { createLogger } from './shared/logger';
 
-import { createAuthMiddleware, createIpRateLimitMiddleware, securityHeadersMiddleware, createVersionCheckMiddleware } from './features/auth/authMiddleware';
+import {
+  createAuthMiddleware,
+  createIpRateLimitMiddleware,
+  securityHeadersMiddleware,
+  createVersionCheckMiddleware,
+  createStrongAuthSetupGateMiddleware,
+} from './features/auth/authMiddleware';
 import { createTokenValidationMiddleware, createTokenRateLimitMiddleware, securityLoggingMiddleware } from './features/member/token/authMiddleware';
 import { createAuthRoutes } from './features/auth/presentation';
 import { createTokenRoutes } from './features/member/token/presentation';
@@ -65,7 +71,8 @@ function createRoutes(bindingName: string) {
 
   // I. DASHBOARD
   // Auth middleware
-  routes.use('/dashboard/*', createAuthMiddleware(bindingName));  
+  routes.use('/dashboard/*', createAuthMiddleware(bindingName));
+  routes.use('/dashboard/*', createStrongAuthSetupGateMiddleware(bindingName));
   routes.use('/dashboard/*', createVersionCheckMiddleware(bindingName));      
   // sub routes /auth 
   routes.route('/dashboard/auth', createAuthRoutes(bindingName));  

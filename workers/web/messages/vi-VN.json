@@ -2456,6 +2456,8 @@
     "security": {
       "title": "Xác thực hai lớp & phương thức đăng nhập",
       "description": "Authenticator, SMS, passkey và mã dự phòng",
+      "require2fa_title": "Bật xác thực hai lớp để tiếp tục",
+      "require2fa_description": "Tài khoản của bạn đang có số dư. Vì lý do bảo mật, hãy bật ứng dụng Authenticator, SMS 2FA hoặc passkey bên dưới trước khi sử dụng các tính năng khác trên dashboard.",
       "authenticator_title": "Ứng dụng Authenticator",
       "authenticator_desc": "Dùng app như Google Authenticator để nhận mã OTP",
       "sms_title": "SMS",

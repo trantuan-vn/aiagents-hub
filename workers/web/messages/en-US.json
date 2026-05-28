@@ -2456,6 +2456,8 @@
     "security": {
       "title": "Two-factor & sign-in methods",
       "description": "Authenticator, SMS, passkey and backup codes",
+      "require2fa_title": "Enable two-factor authentication to continue",
+      "require2fa_description": "Your account has a balance. For security, enable an authenticator app, SMS 2FA, or a passkey below before using the rest of the dashboard.",
       "authenticator_title": "Authenticator app",
       "authenticator_desc": "Use an app like Google Authenticator for one-time codes",
       "sms_title": "SMS",

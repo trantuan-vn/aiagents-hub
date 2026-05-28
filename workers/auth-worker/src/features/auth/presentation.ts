@@ -36,7 +36,9 @@ import {
   SIWEAuthSchema 
 } from './domain';
 // SIWEAuthSchema also used for DID link/unlink
-import { cookieUtils, oauthUtils } from './utils';
+import { cookieUtils, oauthUtils, markPreAuthSessionTrusted, validationUtils } from './utils';
+import { PASSKEY_STATUS_MIN_RESPONSE_MS } from './constant';
+import { markStrongAuthSetupUnlocked, requiresStrongAuthSetup } from './strong-auth-policy';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createAccountPasskeyApplication, createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountBackupCodeApplication } from '../account/backup-codes';
@@ -115,7 +117,7 @@ export function createAuthRoutes(bindingName: string) {
         if (!encryptSecret) {
           throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
         }
-        const sessionId = cookieUtils.getOrCreatePreAuthSessionId(c, ipAddress, userAgent, encryptSecret);
+        const sessionId = await cookieUtils.getOrCreatePreAuthSessionId(c, ipAddress, userAgent, encryptSecret);
         const deviceId = await resolveLoginDeviceId(c, request, sessionId);
         if (deviceId && c.env.NONCE_KV) {
           await storePendingLoginDevice(c.env.NONCE_KV, sessionId, deviceId);
@@ -203,7 +205,10 @@ export function createAuthRoutes(bindingName: string) {
     let ref: string | undefined;
     if (c.env.NONCE_KV) {
       const { getPendingRef } = await import('../member/referral/utils');
-      ref = (await getPendingRef(c.env.NONCE_KV, sessionId)) ?? undefined;
+      ref =
+        (await getPendingRef(c.env.NONCE_KV, oauthSessionId)) ??
+        (await getPendingRef(c.env.NONCE_KV, sessionId)) ??
+        undefined;
     }
 
     // OAuth callback có thể quay về mà cookie preAuthSessionId bị lệch/mất.
@@ -225,10 +230,12 @@ export function createAuthRoutes(bindingName: string) {
 
     if ('requiresTotp' in result && result.requiresTotp) {
       // Đồng bộ cookie với sessionId từ OAuth state (PendingTotp/PendingSms dùng oauthSessionId).
+      if (c.env.NONCE_KV) await markPreAuthSessionTrusted(c.env.NONCE_KV, oauthSessionId);
       cookieUtils.setCookieWithOption(c, 'preAuthSessionId', oauthSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresTotp=1`);
     }
     if ('requiresSms' in result && result.requiresSms) {
+      if (c.env.NONCE_KV) await markPreAuthSessionTrusted(c.env.NONCE_KV, oauthSessionId);
       cookieUtils.setCookieWithOption(c, 'preAuthSessionId', oauthSessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
       return c.redirect(`${c.env.FRONTEND_URL}/auth/v3/login?requiresSms=1`);
     }
@@ -248,7 +255,21 @@ export function createAuthRoutes(bindingName: string) {
 
   // II. OTP Routes
   app.post('/otp/request', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
-    const { identifier, language, ref, turnstileToken } = await parseBody(c, OTPRequestSchema);
+    const body = await parseBody(c, OTPRequestSchema);
+    let { identifier, language, ref, turnstileToken } = body;
+
+    // When user is locked (has balance but no 2FA yet), OTP re-verify must target the logged-in identifier.
+    const user = c.get('user') as Record<string, unknown> | undefined;
+    const locked = user ? await requiresStrongAuthSetup(c, bindingName, user) : false;
+    if (locked) {
+      const lockedIdentifier = String(user?.identifier ?? '').trim();
+      const reqNorm = validationUtils.normalizeIdentifier(identifier);
+      const lockedNorm = validationUtils.normalizeIdentifier(lockedIdentifier);
+      if (!lockedIdentifier || reqNorm !== lockedNorm) {
+        throw new Error('Invalid identifier');
+      }
+      identifier = lockedIdentifier;
+    }
 
     if (ref && c.env.NONCE_KV) {
       const { storePendingRef } = await import('../member/referral/utils');
@@ -269,7 +290,20 @@ export function createAuthRoutes(bindingName: string) {
 
   app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
     const body = await parseBody(c, OTPVerificationSchema);
-    const { identifier, otp } = body;
+    let { identifier, otp } = body;
+    const user = c.get('user') as Record<string, unknown> | undefined;
+    const locked = user ? await requiresStrongAuthSetup(c, bindingName, user) : false;
+    let lockedIdentifier: string | undefined;
+    if (locked) {
+      lockedIdentifier = String(user?.identifier ?? '').trim();
+      const reqNorm = validationUtils.normalizeIdentifier(identifier);
+      const lockedNorm = validationUtils.normalizeIdentifier(lockedIdentifier ?? '');
+      if (!lockedIdentifier || reqNorm !== lockedNorm) {
+        throw new Error('Invalid identifier');
+      }
+      identifier = lockedIdentifier;
+    }
+
     let ref = body.ref;
     if (!ref && c.env.NONCE_KV) {
       const { getPendingRef } = await import('../member/referral/utils');
@@ -299,6 +333,12 @@ export function createAuthRoutes(bindingName: string) {
 
     const { sessionId: newSessionId } = result as { sessionId: string };
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
+
+    // Unlock strong-auth setup for this identifier (short TTL).
+    if (locked && c.env.NONCE_KV && lockedIdentifier) {
+      await markStrongAuthSetupUnlocked(c.env.NONCE_KV, lockedIdentifier);
+    }
+
     return c.json({ ok: true });
   }, "OTP verification failed", true));
 
@@ -372,13 +412,29 @@ export function createAuthRoutes(bindingName: string) {
     });
 
   app.get('/passkey/auth/status', createRouteHandler(async (c: any) => {
+    const started = Date.now();
     const identifier = c.req.query('identifier');
+    const respond = async (enabled: boolean) => {
+      const elapsed = Date.now() - started;
+      if (elapsed < PASSKEY_STATUS_MIN_RESPONSE_MS) {
+        await new Promise((r) => setTimeout(r, PASSKEY_STATUS_MIN_RESPONSE_MS - elapsed));
+      }
+      return c.json({ enabled });
+    };
+
     if (!identifier || typeof identifier !== 'string') {
-      return c.json({ enabled: false, credentialCount: 0 });
+      return respond(false);
     }
-    const appService = getPasskeyAuthApp(c);
-    const status = await appService.getPasskeyAuthStatusUseCase(identifier.trim());
-    return c.json({ enabled: status.enabled });
+
+    const trimmed = identifier.trim();
+    const wellFormed =
+      validationUtils.isValidEmail(trimmed) || validationUtils.isValidPhone(trimmed);
+    if (!wellFormed) {
+      return respond(false);
+    }
+
+    // Không lộ account có passkey: mọi identifier hợp lệ đều được thử WebAuthn phía client.
+    return respond(true);
   }, "Passkey status failed", true));
 
   app.post('/passkey/auth/options', createRouteHandler(async (c: any) => {
@@ -440,14 +496,13 @@ export function createAuthRoutes(bindingName: string) {
     const applicationService = createApplicationService(c, bindingName);
     const nonce = await applicationService.generateNonceUseCase(sessionId);
 
-    // Refresh pre-auth cookie and return session id so client can pin wallet connect to exact nonce session.
     cookieUtils.setCookieWithOption(c, 'preAuthSessionId', sessionId, cookieUtils.PRE_AUTH_SESSION_TTL);
-    return c.json({ nonce, preAuthSessionId: sessionId });
+    return c.json({ nonce });
   }, "Nonce request failed", true));
 
   app.post('/wallet/connect', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
-    const { message, signature, preAuthSessionId } = await parseBody(c, SIWEAuthSchema);
-    const effectiveSessionId = preAuthSessionId ?? sessionId;
+    const { message, signature } = await parseBody(c, SIWEAuthSchema);
+    const effectiveSessionId = sessionId;
 
     const applicationService = createApplicationService(c, bindingName);
     const fields = await applicationService.verifySignatureUseCase(effectiveSessionId, message, signature);
@@ -550,6 +605,7 @@ export function createAuthRoutes(bindingName: string) {
       const rawCurrency = user.earningsPayoutCurrency ?? user.earnings_payout_currency;
       const earningsPayoutCurrency = rawCurrency === 'USD' ? 'USD' : 'VND';
       const membershipTier = user.membershipTier ?? user.membership_tier ?? 'member';
+      const needsStrongAuthSetup = await requiresStrongAuthSetup(c, bindingName, user);
       return c.json({
         id: user.id,
         identifier: user.identifier,
@@ -561,6 +617,7 @@ export function createAuthRoutes(bindingName: string) {
         walletBalance: Math.max(0, walletBalance),
         walletCurrency: 'USD',
         earningsPayoutCurrency,
+        requiresStrongAuthSetup: needsStrongAuthSetup,
       });
     } catch (e) {
       const { errorResponse } = await handleError(c, e, "Get user info failed");

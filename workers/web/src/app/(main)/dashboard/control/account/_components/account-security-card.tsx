@@ -120,6 +120,16 @@ export function AccountSecurityCard() {
 
   const methods = [
     {
+      key: "passkey",
+      icon: ShieldCheck,
+      titleKey: "passkey_title",
+      descKey: "passkey_desc",
+      actionKey: "add",
+      href: "/dashboard/control/account/passkey",
+      showStatus: true,
+      enabled: passkeyStatus?.enabled ?? false,
+    },
+    {
       key: "authenticator",
       icon: KeyRound,
       titleKey: "authenticator_title",
@@ -138,16 +148,6 @@ export function AccountSecurityCard() {
       href: "/dashboard/control/account/sms",
       showStatus: true,
       enabled: smsStatus?.enabled ?? false,
-    },
-    {
-      key: "passkey",
-      icon: ShieldCheck,
-      titleKey: "passkey_title",
-      descKey: "passkey_desc",
-      actionKey: "add",
-      href: "/dashboard/control/account/passkey",
-      showStatus: true,
-      enabled: passkeyStatus?.enabled ?? false,
     },
     {
       key: "backup_codes",

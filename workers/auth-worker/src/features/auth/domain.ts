@@ -68,7 +68,6 @@ export type BackupCodeRecover = z.infer<typeof BackupCodeRecoverSchema>;
 export const SIWEAuthSchema = z.object({
   message: z.string().min(1, 'Message is required'),
   signature: z.string().min(1, 'Signature is required'),
-  preAuthSessionId: z.string().length(64).regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 export type SIWEAuth = z.infer<typeof SIWEAuthSchema>;

@@ -19,8 +19,13 @@ export const ERROR_MESSAGES = {
     SESSION_NOT_FOUND: 'Session not found',
     CAPTCHA_REQUIRED: 'Captcha verification required',
     INVALID_CAPTCHA: 'Captcha verification failed. Please try again.',
+    STRONG_AUTH_REQUIRED:
+      'This account has a balance. Enable authenticator, SMS 2FA, or passkey in account security settings to continue.',
   }
 } as const;
+
+/** Chống enumeration trên GET passkey/auth/status */
+export const PASSKEY_STATUS_MIN_RESPONSE_MS = 300;
 
 // Authentication Constants
 export const AUTH_CONSTANTS = {

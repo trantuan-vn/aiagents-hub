@@ -9,7 +9,7 @@ import { createAccountAuthenticatorApplication, createAccountSmsApplication } fr
 import { createSmsRepository } from '../account/infrastructure';
 import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
-import { validationUtils, hashPhone, otpUtils } from './utils';
+import { validationUtils, hashPhone, otpUtils, markPreAuthSessionTrusted } from './utils';
 import { createOTPService } from './infrastructure';
 import { storePendingSmsLogin } from './pending-sms-login';
 import { decryptField } from '../../shared/field-encryption';
@@ -235,6 +235,7 @@ export async function applyEnabledSecondFactorStepUp(
 
   if (totpStatus.enabled) {
     await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, pendingPayload, { expirationTtl: 300 });
+    await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
     return { requiresTotp: true };
   }
 
@@ -245,6 +246,7 @@ export async function applyEnabledSecondFactorStepUp(
     }
     const smsOtp = otpUtils.generateOTP(6);
     await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, normalizeDeviceId(deviceIdForPending));
+    await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
     await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
     return { requiresSms: true };
   }
@@ -352,6 +354,7 @@ export async function evaluateNovelDeviceStepUp(
 
   if (totpStatus.enabled) {
     await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, pendingPayload, { expirationTtl: 300 });
+    await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
     return { requiresTotp: true };
   }
 
@@ -361,6 +364,7 @@ export async function evaluateNovelDeviceStepUp(
   const smsOtp = otpUtils.generateOTP(6);
   const normalizedId = validationUtils.normalizeIdentifier(identifier);
   await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
+  await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
   await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp);
   return { requiresSms: true };
 }

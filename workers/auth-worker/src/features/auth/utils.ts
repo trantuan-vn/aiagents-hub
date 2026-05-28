@@ -170,6 +170,20 @@ export const walletUtils = {
   }
 };
 
+const PRE_AUTH_TRUSTED_PREFIX = 'PreAuthTrusted:';
+const PRE_AUTH_SESSION_TTL_SEC = 600;
+
+/** OAuth 2FA redirect: sessionId từ state, cookie có thể mất nonce — tin qua KV TTL ngắn. */
+export async function markPreAuthSessionTrusted(kv: KVNamespace, sessionId: string): Promise<void> {
+  await kv.put(`${PRE_AUTH_TRUSTED_PREFIX}${sessionId}`, '1', {
+    expirationTtl: PRE_AUTH_SESSION_TTL_SEC,
+  });
+}
+
+async function isPreAuthSessionTrusted(kv: KVNamespace, sessionId: string): Promise<boolean> {
+  return (await kv.get(`${PRE_AUTH_TRUSTED_PREFIX}${sessionId}`)) !== null;
+}
+
 // IIIb. Phone hash (for SMS 2FA login matching)
 export async function hashPhone(phone: string): Promise<string> {
   const normalized = phone.replace(/\D/g, '').trim();
@@ -235,21 +249,28 @@ export const cookieUtils = {
 
   /**
    * Pre-auth sessionId: SHA256(IP|UA|secret|nonce).
-   * nonce ngẫu nhiên/cookie → tránh trùng NAT; vẫn ổn định trong một flow login.
-   * Nếu OAuth callback đã set preAuthSessionId (state) mà chưa có nonce → giữ nguyên cookie đó.
+   * Bắt buộc nonce hợp lệ — trừ sessionId đã mark trusted server-side (OAuth 2FA redirect).
    */
-  getOrCreatePreAuthSessionId(c: Context, ipAddress: string, userAgent: string, secret: string): string {
+  async getOrCreatePreAuthSessionId(
+    c: Context,
+    ipAddress: string,
+    userAgent: string,
+    secret: string,
+  ): Promise<string> {
     const existingSessionId = getCookie(c, 'preAuthSessionId');
     let nonce = getCookie(c, 'preAuthNonce');
+    const kv = c.env.NONCE_KV;
 
     if (existingSessionId && existingSessionId.length >= 64) {
-      if (!nonce || nonce.length < 32) {
-        this.setCookieWithOption(c, 'preAuthSessionId', existingSessionId, this.PRE_AUTH_SESSION_TTL);
-        return existingSessionId;
-      }
-      const derived = getSessionIdHash(ipAddress, userAgent, `${secret}|${nonce}`);
-      if (derived === existingSessionId) {
-        this.setCookieWithOption(c, 'preAuthNonce', nonce, this.PRE_AUTH_SESSION_TTL);
+      if (nonce && nonce.length >= 32) {
+        const derived = getSessionIdHash(ipAddress, userAgent, `${secret}|${nonce}`);
+        if (derived === existingSessionId) {
+          this.setCookieWithOption(c, 'preAuthNonce', nonce, this.PRE_AUTH_SESSION_TTL);
+          this.setCookieWithOption(c, 'preAuthSessionId', existingSessionId, this.PRE_AUTH_SESSION_TTL);
+          return existingSessionId;
+        }
+      } else if (kv && (await isPreAuthSessionTrusted(kv, existingSessionId))) {
+        await markPreAuthSessionTrusted(kv, existingSessionId);
         this.setCookieWithOption(c, 'preAuthSessionId', existingSessionId, this.PRE_AUTH_SESSION_TTL);
         return existingSessionId;
       }

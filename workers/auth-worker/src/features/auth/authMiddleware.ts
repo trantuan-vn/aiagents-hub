@@ -8,8 +8,16 @@ import { UserDO } from '../ws/infrastructure/UserDO';
 import { cookieUtils } from './utils';
 import { getClientIpAndUserAgentForSession, getClientIp, handleError, handleErrorWithoutIp } from '../../shared/utils';
 import { isDashboardPublicPath } from '../../shared/dashboard-public-paths';
+import {
+  isStrongAuthReverifyAllowedPath,
+  isStrongAuthSetupAllowedPath,
+} from '../../shared/strong-auth-setup-paths';
 import { createIpRateLimitMiddleware, recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { ERROR_MESSAGES } from './constant';
+import {
+  isStrongAuthSetupUnlocked,
+  requiresStrongAuthSetup,
+} from './strong-auth-policy';
 
 export { createIpRateLimitMiddleware };
 
@@ -54,6 +62,45 @@ export function createAuthMiddleware(bindingName: string) {
     const method = c.req.method;
     if (!isDashboardPublicPath(path, method) && !c.get('user')) {
       return c.json({ error: ERROR_MESSAGES.AUTH.NOT_AUTHENTICATED }, 401);
+    }
+
+    await next();
+  };
+}
+
+/** Có số dư nhưng chưa 2FA: chỉ cho API setup bảo mật + profile/me. */
+export function createStrongAuthSetupGateMiddleware(bindingName: string) {
+  return async (c: Context, next: Next) => {
+    const user = c.get('user') as Record<string, unknown> | undefined;
+    if (!user) {
+      await next();
+      return;
+    }
+
+    const path = c.req.path;
+    const method = c.req.method;
+    if (!(await requiresStrongAuthSetup(c, bindingName, user))) {
+      await next();
+      return;
+    }
+
+    const identifier = String(user.identifier ?? '').trim();
+    const kv = c.env.NONCE_KV;
+    const unlocked = kv ? await isStrongAuthSetupUnlocked(kv, identifier) : false;
+
+    const allowed = unlocked
+      ? isStrongAuthSetupAllowedPath(path, method)
+      : isStrongAuthReverifyAllowedPath(path, method);
+
+    if (!allowed) {
+      return c.json(
+        {
+          error: ERROR_MESSAGES.AUTH.STRONG_AUTH_REQUIRED,
+          requiresStrongAuthSetup: true,
+          setupUnlocked: unlocked,
+        },
+        403,
+      );
     }
 
     await next();

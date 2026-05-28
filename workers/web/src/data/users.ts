@@ -4,6 +4,8 @@ export interface User {
   id: string;
   identifier: string;
   role?: "member" | "admin";
+  /** Có số dư nhưng chưa bật TOTP / SMS 2FA / passkey — dashboard bị giới hạn đến khi setup. */
+  requiresStrongAuthSetup?: boolean;
 }
 
 interface UserProfileResponse {
@@ -11,6 +13,7 @@ interface UserProfileResponse {
   identifier?: string;
   address?: string;
   role?: "member" | "admin";
+  requiresStrongAuthSetup?: boolean;
 }
 
 function buildCookieHeader(
@@ -31,6 +34,7 @@ function parseUserProfile(data: UserProfileResponse): User | null {
       id: data.id,
       identifier: data.identifier,
       role: data.role ?? "member",
+      requiresStrongAuthSetup: Boolean(data.requiresStrongAuthSetup),
     };
   }
   return null;
