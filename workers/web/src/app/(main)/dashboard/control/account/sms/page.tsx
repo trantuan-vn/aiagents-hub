@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRefreshDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { useToast } from "@/hooks/use-toast";
 
 import { type SmsStep, renderSmsStepContent } from "./_components/sms-step-content";
@@ -18,6 +19,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hu
 export default function SmsPage() {
   const t = useTranslations("AccountPage.sms");
   const { toast } = useToast();
+  const refreshUser = useRefreshDashboardUser();
   const [step, setStep] = useState<SmsStep>("idle");
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,6 +99,7 @@ export default function SmsPage() {
       }
       setStep("success");
       setCode("");
+      void refreshUser();
       void fetchStatus();
     } catch (e) {
       toast({

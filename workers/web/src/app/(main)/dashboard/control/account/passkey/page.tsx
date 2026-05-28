@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRefreshDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
@@ -38,6 +39,7 @@ interface PasskeyCredentialItem {
 export default function PasskeyPage() {
   const t = useTranslations("AccountPage.passkey");
   const { toast } = useToast();
+  const refreshUser = useRefreshDashboardUser();
   const [loading, setLoading] = useState(true);
   const [credentials, setCredentials] = useState<PasskeyCredentialItem[]>([]);
   const [adding, setAdding] = useState(false);
@@ -123,6 +125,7 @@ export default function PasskeyPage() {
       const credential = await startRegistration(options);
       await verifyRegistration(credential, challengeKey);
       toast({ title: t("add_success") });
+      void refreshUser();
       void fetchCredentials();
     } catch (e) {
       const msg = e instanceof Error ? e.message : t("error_verify");
@@ -130,7 +133,7 @@ export default function PasskeyPage() {
     } finally {
       setAdding(false);
     }
-  }, [adding, t, toast, fetchRegistrationOptions, verifyRegistration, fetchCredentials]);
+  }, [adding, t, toast, fetchRegistrationOptions, verifyRegistration, fetchCredentials, refreshUser]);
 
   const handleRemove = async (credentialId: string) => {
     if (removingId) return;

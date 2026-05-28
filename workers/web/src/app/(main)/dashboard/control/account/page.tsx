@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
-import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
+import {
+  useDashboardUser,
+  useRefreshDashboardUser,
+} from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { AccountSecurityCard } from "./_components/account-security-card";
@@ -19,13 +22,16 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hu
 export default function AccountPage() {
   const t = useTranslations("AccountPage");
   const user = useDashboardUser();
+  const refreshUser = useRefreshDashboardUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const require2faInUrl = searchParams.get("require2fa") === "1";
   const [resolvedStrongAuthSetup, setResolvedStrongAuthSetup] = useState<boolean | null>(null);
   const effectiveRequiresStrongAuthSetup = resolvedStrongAuthSetup ?? user?.requiresStrongAuthSetup;
+  // Keep locked while ?require2fa=1 is resolving; do not re-lock after API confirms setup is done.
   const lockedFor2fa =
-    effectiveRequiresStrongAuthSetup === true || require2faInUrl;
+    effectiveRequiresStrongAuthSetup === true ||
+    (require2faInUrl && resolvedStrongAuthSetup === null);
 
   useEffect(() => {
     // Once user has enabled a strong second factor, clear stale require2fa hint.
@@ -35,10 +41,8 @@ export default function AccountPage() {
   }, [effectiveRequiresStrongAuthSetup, require2faInUrl, router]);
 
   useEffect(() => {
-    if (!require2faInUrl) {
-      setResolvedStrongAuthSetup(null);
-      return;
-    }
+    const shouldVerifyProfile = require2faInUrl || user?.requiresStrongAuthSetup === true;
+    if (!shouldVerifyProfile || resolvedStrongAuthSetup !== null) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -52,6 +56,10 @@ export default function AccountPage() {
         if (cancelled) return;
         if (typeof data.requiresStrongAuthSetup === "boolean") {
           setResolvedStrongAuthSetup(data.requiresStrongAuthSetup);
+          if (data.requiresStrongAuthSetup === false) {
+            await refreshUser();
+            router.refresh();
+          }
         }
       } catch {
         // Keep fallback behavior from context state.
@@ -60,7 +68,7 @@ export default function AccountPage() {
     return () => {
       cancelled = true;
     };
-  }, [require2faInUrl]);
+  }, [require2faInUrl, user?.requiresStrongAuthSetup, resolvedStrongAuthSetup, router, refreshUser]);
 
   return (
     <div className="flex flex-col gap-6 md:gap-8">
