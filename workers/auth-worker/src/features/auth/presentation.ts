@@ -13,10 +13,21 @@ import {
 } from '../../shared/utils';
 import { recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { OtpRateLimitError } from '../../shared/otp-rate-limit';
+import {
+  assertStepUpVerifyNotBlocked,
+  clearStepUpVerifyAttempts,
+  failStepUpVerify,
+} from '../../shared/step-up-verify-rate-limit';
+import {
+  hashSensitiveSmsStepUpOtp,
+  sensitiveSmsStepUpKvKey,
+  verifySensitiveSmsStepUpOtp,
+  type SensitiveSmsStepUpOtpRecord,
+} from './sensitive-sms-step-up-otp';
 import { CaptchaRequiredError, InvalidCaptchaError, getTurnstileSiteKey, isTurnstileEnabled } from '../../shared/turnstile';
 import { applyCorsHeadersIfAllowed } from '../../shared/cors-headers';
 import { assertAllowedFrontendOrigin } from '../../shared/frontend-origin';
-import { ERROR_MESSAGES } from './constant';
+import { AUTH_CONSTANTS, ERROR_MESSAGES, PASSKEY_STATUS_MIN_RESPONSE_MS } from './constant';
 import {
   consumePendingLoginDevice,
   normalizeDeviceId,
@@ -37,7 +48,6 @@ import {
 } from './domain';
 // SIWEAuthSchema also used for DID link/unlink
 import { cookieUtils, oauthUtils, markPreAuthSessionTrusted, validationUtils } from './utils';
-import { PASSKEY_STATUS_MIN_RESPONSE_MS } from './constant';
 import { markStrongAuthSetupUnlocked, requiresStrongAuthSetup } from './strong-auth-policy';
 import {
   markSensitiveActionUnlocked,
@@ -67,7 +77,6 @@ import { decryptField } from '../../shared/field-encryption';
 
 export function createAuthRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
-  const SENSITIVE_SMS_STEP_UP_PREFIX = 'SensitiveSmsStepUp:';
   const STEP_UP_FACEBOOK_PENDING_PREFIX = 'StepUpFacebookPending:';
   /** Keep SIWE statement fixed and ASCII for deterministic step-up audit. */
   const STEP_UP_SIWE_STATEMENT = 'Step-up for sensitive action authorization.';
@@ -471,11 +480,18 @@ export function createAuthRoutes(bindingName: string) {
           if (!phone) throw new Error('SMS phone is unavailable');
 
           const otp = generateSixDigits();
-          await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, otp, 300);
+          await createOTPService(c.env).sendSmsOTP(
+            phone.startsWith('+') ? phone : `+${phone}`,
+            otp,
+            AUTH_CONSTANTS.STEP_UP_SMS_OTP_TTL_SEC,
+          );
+          const otpHash = await hashSensitiveSmsStepUpOtp(identifier, otp, secret);
+          const normId = validationUtils.normalizeIdentifier(identifier);
+          await clearStepUpVerifyAttempts(c.env, normId);
           await c.env.NONCE_KV.put(
-            `${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`,
-            JSON.stringify({ otp }),
-            { expirationTtl: 300 },
+            sensitiveSmsStepUpKvKey(normId),
+            JSON.stringify({ otpHash } satisfies SensitiveSmsStepUpOtpRecord),
+            { expirationTtl: AUTH_CONSTANTS.STEP_UP_SMS_OTP_TTL_SEC },
           );
         }
 
@@ -533,6 +549,8 @@ export function createAuthRoutes(bindingName: string) {
         const user = requireAuth(c);
         const identifier = String(user.identifier ?? '').trim();
         if (!identifier) throw new Error('Invalid user identifier');
+        const normId = validationUtils.normalizeIdentifier(identifier);
+        await assertStepUpVerifyNotBlocked(c.env, normId);
         const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
         const body = (await c.req.json().catch(() => ({}))) as {
           method?: StepUpMethod;
@@ -560,24 +578,46 @@ export function createAuthRoutes(bindingName: string) {
             body.challengeKey,
             origin,
           );
-          if (result.identifier !== identifier) throw new Error('Passkey verification user mismatch');
+          if (result.identifier !== identifier) {
+            await failStepUpVerify(c.env, normId, 'Passkey verification user mismatch');
+          }
         } else if (requiredMethod === 'authenticator') {
           const code = String(body.code ?? '').trim();
-          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
+          if (!/^\d{6}$/.test(code)) {
+            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+          }
           const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
           const authRepo = createAuthenticatorRepository(userDO);
           const secret = await authRepo.getSecret();
           if (!secret) throw new Error('Authenticator is not enabled');
           const valid = await verifyTotpCode(secret, code);
-          if (!valid) throw new Error('Invalid verification code');
+          if (!valid) {
+            await failStepUpVerify(c.env, normId);
+          }
         } else if (requiredMethod === 'sms') {
           const code = String(body.code ?? '').trim();
-          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
-          const raw = await c.env.NONCE_KV.get(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
+          if (!/^\d{6}$/.test(code)) {
+            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+          }
+          const kvKey = sensitiveSmsStepUpKvKey(normId);
+          const raw = await c.env.NONCE_KV.get(kvKey);
           if (!raw) throw new Error('SMS verification session expired');
-          const { otp } = JSON.parse(raw) as { otp?: string };
-          if (!otp || otp !== code) throw new Error('Invalid verification code');
-          await c.env.NONCE_KV.delete(`${SENSITIVE_SMS_STEP_UP_PREFIX}${identifier}`);
+          let stored: SensitiveSmsStepUpOtpRecord | null = null;
+          try {
+            stored = JSON.parse(raw) as SensitiveSmsStepUpOtpRecord;
+          } catch {
+            stored = null;
+          }
+          if (!stored || (!stored.otpHash && !stored.otp)) {
+            await failStepUpVerify(c.env, normId, 'SMS verification session expired');
+          }
+          const pepper = await c.env.ENCRYPTION_SECRET.get();
+          if (!pepper) throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
+          const valid = await verifySensitiveSmsStepUpOtp(normId, code, stored!, pepper);
+          if (!valid) {
+            await failStepUpVerify(c.env, normId);
+          }
+          await c.env.NONCE_KV.delete(kvKey);
         } else if (requiredMethod === 'wallet_reauth') {
           if (!sessionId) throw new Error('sessionId not found');
           const message = String(body.message ?? '').trim();
@@ -591,28 +631,33 @@ export function createAuthRoutes(bindingName: string) {
             c.env.FRONTEND_URL,
           );
           if (String(fields.statement ?? '').trim() !== STEP_UP_SIWE_STATEMENT) {
-            throw new Error('Invalid step-up SIWE statement');
+            await failStepUpVerify(c.env, normId, 'Invalid step-up SIWE statement');
           }
           const signedAddress = String(fields.address ?? '').toLowerCase();
           const userAddress = String(user.address ?? '').toLowerCase();
           const userIdentifier = String(user.identifier ?? '').toLowerCase();
           if (signedAddress !== userAddress && signedAddress !== userIdentifier) {
-            throw new Error('Wallet mismatch for step-up');
+            await failStepUpVerify(c.env, normId, 'Wallet mismatch for step-up');
           }
         } else if (requiredMethod === 'facebook_oauth') {
           throw new Error('Continue with Facebook to verify this step-up method');
         } else {
           if (!sessionId) throw new Error('sessionId not found');
           const code = String(body.code ?? '').trim();
-          if (!/^\d{6}$/.test(code)) throw new Error('Code must be 6 digits');
+          if (!/^\d{6}$/.test(code)) {
+            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+          }
           const otpIdentifier = resolveOtpStepUpIdentifier(user, identifier);
           if (!otpIdentifier) {
             throw new Error('OTP verification is unavailable for this account');
           }
           const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, otpIdentifier);
-          if (!isValid) throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
+          if (!isValid) {
+            await failStepUpVerify(c.env, normId, ERROR_MESSAGES.AUTH.INVALID_OTP);
+          }
         }
 
+        await clearStepUpVerifyAttempts(c.env, normId);
         await markSensitiveActionUnlocked(c.env.NONCE_KV, identifier, requiredMethod);
         return c.json({ ok: true, method: requiredMethod });
       },
