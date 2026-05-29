@@ -17,7 +17,6 @@ const ADMIN_MANAGEMENT_PREFIXES = [
   "/dashboard/voucher",
   "/dashboard/version",
   "/dashboard/system-config",
-  "/dashboard/exchange-rates",
   "/dashboard/commission-policy",
   "/dashboard/default",
   "/dashboard/crm",

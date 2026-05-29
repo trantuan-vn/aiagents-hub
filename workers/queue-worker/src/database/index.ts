@@ -29,7 +29,6 @@ import {
 	WorkflowRoyaltySchema,
 	PayoutBeneficiaryRecordSchema,
 	EarningsPayoutSchema,
-	ExchangeRateSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -627,11 +626,6 @@ export class D1DatabaseManager {
       'earnings_payouts',
       EarningsPayoutSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
-    );
-    await this.registerTable(
-      'exchange_rates',
-      ExchangeRateSchema,
-      this.TABLE_CONFIGS.queueTableWithUniqueIndex('rateDate'),
     );
 
     // Queue tables (xoá khỏi DO sau cleanup): queue flow

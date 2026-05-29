@@ -3,7 +3,7 @@ import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError, getIdFromName, executeUtils } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { convertUsdToVnd } from '../../admin/service/pricing';
-import { getUsdVndRateForDate, todayDateString } from '../exchange-rate/get-rate';
+import { getUsdTransferRate, todayDateString } from '../exchange-rate/get-rate';
 import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
 import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 import { generateVietQr } from '../../member/payout/vietqr';
@@ -94,7 +94,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
         throw new Error('User has not configured payout beneficiary account');
       }
 
-      const usdVndRate = await getUsdVndRateForDate(c, bindingName, todayDateString());
+      // admin trả USD cho user → dùng tỷ giá mua chuyển khoản (transfer)
+      const usdVndRate = await getUsdTransferRate(c.env, todayDateString());
       const totalAmountVnd = toPayoutAmountVnd(convertUsdToVnd(totalAmountUsd, usdVndRate));
 
       const transferCode = randomPayoutTransferCode();

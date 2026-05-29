@@ -17,7 +17,7 @@ import {
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
   CommissionPolicyObjectSchema, CommissionSchema,
   AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
-  PayoutBeneficiaryRecordSchema, EarningsPayoutSchema, ExchangeRateSchema,
+  PayoutBeneficiaryRecordSchema, EarningsPayoutSchema,
 } from '../domain.js';
 
 const MAX_SEND_FAILURE_COUNT = 3;
@@ -67,7 +67,6 @@ export class UserDO extends DurableObject {
     "agent_workflows",
     "payout_beneficiary",
     "earnings_payouts",
-    "exchange_rates",
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -159,11 +158,6 @@ export class UserDO extends DurableObject {
         'earnings_payouts',
         extendWithQueue(EarningsPayoutSchema),
         this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
-      );
-      this.table(
-        'exchange_rates',
-        extendWithQueue(ExchangeRateSchema),
-        this.TABLE_CONFIGS.queueTableWithUniqueIndex('rateDate'),
       );
 
       // Initialize states only; do not set alarm here so DO can idle when there is no fetch/WS/queue work
