@@ -10,12 +10,12 @@ export const BANK_CODES = [
 export const IS_VNPAY_PAYMENT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_VNPAY_BILLING === "true";
 
 export const PAYMENT_TABS_LIST_CLASS =
-  "border-border bg-muted/40 grid h-auto w-full grid-cols-2 gap-1 rounded-lg border p-1";
+  "border-border bg-muted/40 grid h-auto w-full grid-cols-3 gap-1 rounded-lg border p-1";
 
 export const PAYMENT_TAB_TRIGGER_CLASS =
   "border-border/70 data-[state=active]:border-primary data-[state=active]:bg-background bg-background/60 rounded-md border data-[state=active]:shadow-sm";
 
-export type PaymentMethodTab = "vnpay" | "casso";
+export type PaymentMethodTab = "vnpay" | "casso" | "paypal";
 
 /** Wallet credit (USD). */
 export function formatPaymentCurrency(amount: number): string {

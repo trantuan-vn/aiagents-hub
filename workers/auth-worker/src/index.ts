@@ -18,6 +18,7 @@ import { createDashboardWebSocketRoutes, createApiWebSocketRoutes } from './feat
 import { createEkycRoutes } from './features/member/ekyc/presentation';
 import { createOrderRoutes } from './features/member/order/presentation';
 import { createPaymentRoutes } from './features/member/vnpay/presentation';
+import { createPaypalRoutes } from './features/member/paypal/presentation';
 import { createAssistantRoutes } from './features/assistant/presentation';
 import { createWorkflowRoutes } from './features/member/workflows/presentation';
 import { createServiceRoutes } from './features/admin/service/presentation';
@@ -84,6 +85,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/assistant', createAssistantRoutes(bindingName));
   routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
+  routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/membership-tier', createMembershipTierRoutes(bindingName));

@@ -113,6 +113,69 @@ export async function requestVnpayPaymentUrl(
   throw new Error(invalidUrlFallback);
 }
 
+export async function fetchPaypalConfig(): Promise<{ clientId: string; enabled: boolean }> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/dashboard/paypal/config`, {
+      method: "GET",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+    });
+    if (!response.ok) return { clientId: "", enabled: false };
+    const json: unknown = await response.json();
+    if (json && typeof json === "object") {
+      const o = json as { clientId?: unknown; enabled?: unknown };
+      const clientId = typeof o.clientId === "string" ? o.clientId : "";
+      return { clientId, enabled: clientId.length > 0 && o.enabled === true };
+    }
+    return { clientId: "", enabled: false };
+  } catch {
+    return { clientId: "", enabled: false };
+  }
+}
+
+export async function createPaypalOrder(orderId: number, paymentErrorFallback: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/paypal/create_order`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId }),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || paymentErrorFallback);
+  }
+  const result: unknown = await response.json();
+  if (
+    result &&
+    typeof result === "object" &&
+    "paypalOrderId" in result &&
+    typeof (result as { paypalOrderId: unknown }).paypalOrderId === "string"
+  ) {
+    return (result as { paypalOrderId: string }).paypalOrderId;
+  }
+  throw new Error(paymentErrorFallback);
+}
+
+export async function capturePaypalOrder(
+  orderId: number,
+  paypalOrderId: string,
+  paymentErrorFallback: string,
+): Promise<{ success: boolean; orderId: number; creditedUsd: number }> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/paypal/capture_order`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ orderId, paypalOrderId }),
+  });
+  if (!response.ok) {
+    throw new Error((await response.text()) || paymentErrorFallback);
+  }
+  const result: unknown = await response.json();
+  if (result && typeof result === "object" && "success" in result) {
+    return result as { success: boolean; orderId: number; creditedUsd: number };
+  }
+  throw new Error(paymentErrorFallback);
+}
+
 export async function requestCassoQr(
   orderId: number,
   amount: number,

@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { formatUsd } from "@/lib/utils";
 
+import { type PaymentMethodTab } from "./payment-dialog-constants";
 import { PaymentDialog } from "./payment-dialog";
 import { formatOrderDate, type Order, OrderStatus } from "./schema";
 
@@ -31,6 +32,12 @@ interface OrderListProps {
   onCancel: (orderId: number) => Promise<void>;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
   onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
+  /** Optional: only used in non-readOnly mode where the PayPal pay button is shown. */
+  onPaypalCreateOrder?: (orderId: number) => Promise<string>;
+  onPaypalCapture?: (orderId: number, paypalOrderId: string) => Promise<void>;
+  /** Runtime PayPal config (fetched from the backend). */
+  paypalClientId?: string;
+  paypalEnabled?: boolean;
   onPaidDone?: () => void;
   /** Read-only mode: không hiển thị nút thanh toán và hủy (dùng cho tab History) */
   readOnly?: boolean;
@@ -42,12 +49,19 @@ export function OrderList({
   onCancel,
   onPayment,
   onCassoQr,
+  onPaypalCreateOrder = async () => {
+    throw new Error("PayPal is not available");
+  },
+  onPaypalCapture = async () => {},
+  paypalClientId = "",
+  paypalEnabled = false,
   onPaidDone,
   readOnly = false,
 }: OrderListProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>("casso");
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
 
   const getStatusBadgeVariant = (status: OrderStatus): "default" | "secondary" | "destructive" | "outline" => {
@@ -167,14 +181,36 @@ export function OrderList({
                 <div className="flex flex-wrap items-center gap-2">
                   {!readOnly && canPay(order.status) && (
                     <>
-                      <Button size="sm" onClick={() => setSelectedOrder(order)} className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setPaymentTab("casso");
+                          setSelectedOrder(order);
+                        }}
+                        className="flex items-center gap-1"
+                      >
                         <CreditCard className="h-4 w-4" />
                         {t("pay_with_vnd")}
                       </Button>
-                      <Button size="sm" variant="outline" disabled className="flex items-center gap-1">
-                        <CreditCard className="h-4 w-4" />
-                        {t("pay_with_usd_coming_soon")}
-                      </Button>
+                      {paypalEnabled ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setPaymentTab("paypal");
+                            setSelectedOrder(order);
+                          }}
+                          className="flex items-center gap-1"
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          {t("pay_with_paypal")}
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" disabled className="flex items-center gap-1">
+                          <CreditCard className="h-4 w-4" />
+                          {t("pay_with_usd_coming_soon")}
+                        </Button>
+                      )}
                     </>
                   )}
                   {!readOnly && canCancel(order.status) && (
@@ -215,8 +251,13 @@ export function OrderList({
           order={selectedOrder}
           usdVndRate={usdVndRate}
           open={!!selectedOrder}
+          initialTab={paymentTab}
           onOpenChange={(open) => !open && setSelectedOrder(null)}
           onCassoQr={onCassoQr}
+          onPaypalCreateOrder={onPaypalCreateOrder}
+          onPaypalCapture={onPaypalCapture}
+          paypalClientId={paypalClientId}
+          paypalEnabled={paypalEnabled}
           onPaidDone={onPaidDone}
           onPayment={async (orderId, amount, bankCode, language) => {
             await onPayment(orderId, amount, bankCode, language);

@@ -13,6 +13,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 import {
+  capturePaypalOrder,
+  createPaypalOrder,
+  fetchPaypalConfig,
   FALLBACK_USD_VND,
   fetchMemberBillingParams,
   fetchOrdersList,
@@ -52,6 +55,10 @@ export default function BillingPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [paypalConfig, setPaypalConfig] = useState<{ clientId: string; enabled: boolean }>({
+    clientId: "",
+    enabled: false,
+  });
 
   const fetchHistory = async (
     offset = 0,
@@ -99,6 +106,10 @@ export default function BillingPage() {
     refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, page, limit]);
+
+  useEffect(() => {
+    void fetchPaypalConfig().then(setPaypalConfig);
+  }, []);
 
   // Mở dialog nạp tiền khi điều hướng từ overview (?topup=1)
   useEffect(() => {
@@ -187,6 +198,13 @@ export default function BillingPage() {
   const handleCassoQr = (orderId: number, amount: number): Promise<{ qr: string }> =>
     requestCassoQr(orderId, amount, t("payment_error"), t("casso_qr_error"));
 
+  const handlePaypalCreateOrder = (orderId: number): Promise<string> =>
+    createPaypalOrder(orderId, t("paypal_error"));
+
+  const handlePaypalCapture = async (orderId: number, paypalOrderId: string): Promise<void> => {
+    await capturePaypalOrder(orderId, paypalOrderId, t("paypal_error"));
+  };
+
   const handleBillingRefresh = (): void => {
     void fetchOrders();
     void fetchWalletBalance().then(setWalletBalanceUsd);
@@ -266,6 +284,10 @@ export default function BillingPage() {
               onCancel={handleCancelOrder}
               onPayment={handlePayment}
               onCassoQr={handleCassoQr}
+              onPaypalCreateOrder={handlePaypalCreateOrder}
+              onPaypalCapture={handlePaypalCapture}
+              paypalClientId={paypalConfig.clientId}
+              paypalEnabled={paypalConfig.enabled}
               onPaidDone={handleBillingRefresh}
             />
           )}

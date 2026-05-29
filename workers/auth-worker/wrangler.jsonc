@@ -257,6 +257,16 @@
 		"binding": "TURNSTILE_SECRET_KEY",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "TURNSTILE_SECRET_KEY"
+		},
+		{
+		"binding": "PAYPAL_CLIENT_ID",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "PAYPAL_CLIENT_ID"
+		},
+		{
+		"binding": "PAYPAL_CLIENT_SECRET",
+		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
+		"secret_name": "PAYPAL_CLIENT_SECRET"
 		}
 	],
   	"services": [

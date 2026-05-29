@@ -62,6 +62,8 @@ declare namespace Cloudflare {
 		VIETQR_ACQ_ID: SecretsStoreSecret;
 		CASSO_WEBHOOK_CHECKSUM_KEY: SecretsStoreSecret;
 		TURNSTILE_SECRET_KEY: SecretsStoreSecret;
+		PAYPAL_CLIENT_ID: SecretsStoreSecret;
+		PAYPAL_CLIENT_SECRET: SecretsStoreSecret;
 	}
 }
 interface Env extends Cloudflare.Env {}

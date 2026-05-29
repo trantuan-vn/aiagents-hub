@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { PaymentCassoPanel } from "./payment-casso-panel";
 import { formatPaymentCurrency, formatVndCheckoutAmount, type PaymentMethodTab } from "./payment-dialog-constants";
 import { PaymentMethodTabs } from "./payment-method-tabs";
+import { PaymentPaypalPanel } from "./payment-paypal-panel";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
 import { CreatePaymentSchema, getOrderPayableVnd, type CreatePayment, type Order } from "./schema";
 import { useCassoQr } from "./use-casso-qr";
@@ -24,7 +25,12 @@ interface PaymentDialogProps {
   onOpenChange: (open: boolean) => void;
   onPayment: (orderId: number, amount: number, bankCode: string, language: string) => Promise<void>;
   onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
+  onPaypalCreateOrder: (orderId: number) => Promise<string>;
+  onPaypalCapture: (orderId: number, paypalOrderId: string) => Promise<void>;
+  paypalClientId: string;
+  paypalEnabled: boolean;
   onPaidDone?: () => void;
+  initialTab?: PaymentMethodTab;
 }
 
 export function PaymentDialog({
@@ -34,12 +40,17 @@ export function PaymentDialog({
   onOpenChange,
   onPayment,
   onCassoQr,
+  onPaypalCreateOrder,
+  onPaypalCapture,
+  paypalClientId,
+  paypalEnabled,
   onPaidDone,
+  initialTab = "casso",
 }: PaymentDialogProps) {
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>("casso");
+  const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>(initialTab);
 
   const payableVnd = getOrderPayableVnd(order, usdVndRate);
 
@@ -86,7 +97,7 @@ export function PaymentDialog({
       open={open}
       onOpenChange={(next) => {
         if (!next) {
-          setPaymentTab("casso");
+          setPaymentTab(initialTab);
         }
         onOpenChange(next);
       }}
@@ -126,8 +137,10 @@ export function PaymentDialog({
             <PaymentMethodTabs
               value={paymentTab}
               onValueChange={setPaymentTab}
+              paypalEnabled={paypalEnabled}
               cassoLabel={t("tab_casso")}
               vnpayLabel={t("tab_vnpay")}
+              paypalLabel={t("tab_paypal")}
               cassoPanel={
                 <PaymentCassoPanel
                   hint={t("casso_qr_hint")}
@@ -153,6 +166,32 @@ export function PaymentDialog({
                   bankCodeDescription={t("bank_code_description")}
                   languageLabel={t("language")}
                   languageDescription={t("language_description")}
+                  onCancel={() => onOpenChange(false)}
+                />
+              }
+              paypalPanel={
+                <PaymentPaypalPanel
+                  active={paymentTab === "paypal"}
+                  clientId={paypalClientId}
+                  hint={t("paypal_hint")}
+                  amountLabel={t("paypal_amount", { amount: formatPaymentCurrency(order.finalAmount) })}
+                  loadingLabel={t("processing")}
+                  errorLabel={t("paypal_error")}
+                  unavailableLabel={t("paypal_unavailable")}
+                  processingLabel={t("processing")}
+                  cancelLabel={t("cancel")}
+                  onCreateOrder={() => onPaypalCreateOrder(order.id)}
+                  onApprove={async (paypalOrderId) => {
+                    await onPaypalCapture(order.id, paypalOrderId);
+                    toast({
+                      title: t("payment_success"),
+                      description: t("payment_success_description"),
+                    });
+                    handlePaidDone();
+                  }}
+                  onError={(message) => {
+                    toast({ title: t("error"), description: message || t("paypal_error"), variant: "destructive" });
+                  }}
                   onCancel={() => onOpenChange(false)}
                 />
               }
