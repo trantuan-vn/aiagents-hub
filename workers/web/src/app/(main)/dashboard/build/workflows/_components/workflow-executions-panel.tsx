@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn, formatUsd } from "@/lib/utils";
 
 import {
+  autofixWorkflow,
   listWorkflowExecutions,
   resumeWorkflowExecution,
   type WorkflowExecutionRecord,
@@ -20,6 +21,7 @@ import {
 
 interface WorkflowExecutionsPanelProps {
   workflowId: number;
+  onApplyDefinition?: (definitionJson: string) => void;
 }
 
 const STATUS_VARIANTS: Record<WorkflowExecutionStatus, string> = {
@@ -43,13 +45,14 @@ function formatOutput(output: unknown): string {
   return JSON.stringify(output, null, 2);
 }
 
-export function WorkflowExecutionsPanel({ workflowId }: WorkflowExecutionsPanelProps) {
+export function WorkflowExecutionsPanel({ workflowId, onApplyDefinition }: WorkflowExecutionsPanelProps) {
   const t = useTranslations("WorkflowEditorPage");
   const [executions, setExecutions] = useState<WorkflowExecutionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [resuming, setResuming] = useState(false);
+  const [fixing, setFixing] = useState(false);
 
   const statusLabel = (status: WorkflowExecutionStatus) =>
     t(`executions_status_${status}` as Parameters<typeof t>[0]);
@@ -73,6 +76,20 @@ export function WorkflowExecutionsPanel({ workflowId }: WorkflowExecutionsPanelP
   }, [load]);
 
   const selected = executions.find((e) => e.executionKey === selectedKey) ?? null;
+
+  const onAutofix = async () => {
+    if (!selected || !onApplyDefinition) return;
+    setFixing(true);
+    try {
+      const fixed = await autofixWorkflow(workflowId, { error: selected.error });
+      onApplyDefinition(JSON.stringify(fixed.definition));
+      toast.success(fixed.notes || t("ai_autofix_done"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("ai_build_error"));
+    } finally {
+      setFixing(false);
+    }
+  };
 
   const onResume = async (decision: "approve" | "reject") => {
     if (!selected) return;
@@ -187,7 +204,15 @@ export function WorkflowExecutionsPanel({ workflowId }: WorkflowExecutionsPanelP
 
               {selected.error ? (
                 <div>
-                  <p className="mb-1 text-xs font-medium">{t("executions_detail_error")}</p>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium">{t("executions_detail_error")}</p>
+                    {onApplyDefinition && selected.status === "failed" ? (
+                      <Button size="sm" variant="outline" onClick={() => void onAutofix()} disabled={fixing}>
+                        <Wand2 className={cn("size-3.5", fixing && "animate-pulse")} />
+                        {fixing ? t("ai_autofix_running") : t("ai_autofix")}
+                      </Button>
+                    ) : null}
+                  </div>
                   <pre className="rounded-md border border-red-500/30 bg-red-500/5 p-3 text-xs break-words whitespace-pre-wrap text-red-600 dark:text-red-400">
                     {selected.error}
                   </pre>

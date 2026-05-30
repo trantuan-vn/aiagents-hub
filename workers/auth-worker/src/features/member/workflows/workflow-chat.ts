@@ -1,8 +1,9 @@
-import { convertToModelMessages, streamText, type UIMessage } from 'ai';
+import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
 import { getIdFromName } from '../../../shared/utils.js';
 import { UserDO } from '../../ws/infrastructure/UserDO.js';
+import { buildAgentToolset, buildMemoryTool, retrieveMemory } from './agent-runtime.js';
 import {
   billAgentUsage,
   ensureWalletBalance,
@@ -60,30 +61,48 @@ export async function createWorkflowChatStreamResponse(
 
   const wfName = String(resolved.workflow.name ?? 'Workflow');
   const wfDesc = String(resolved.workflow.description ?? '');
+  const latestUser = extractLatestUserText(uiMessages);
+
+  // Real tool-calling: expose http_request nodes flagged asTool + a RAG tool.
+  const memoryCollection = String(data.memoryCollection ?? '').trim();
+  const httpTools = buildAgentToolset({ env: c.env, userDO }, resolved.definition);
+  const memoryTools = memoryCollection ? buildMemoryTool(c.env, memoryCollection) : {};
+  const tools = { ...httpTools, ...memoryTools };
+  const toolNames = Object.keys(tools);
+
+  // RAG grounding: pre-fetch a few relevant snippets for the latest message.
+  const ragSnippets = memoryCollection
+    ? await retrieveMemory(c.env, memoryCollection, latestUser, 4)
+    : [];
+
   const systemPrompt = [
     `You are the conversational agent for the "${wfName}" workflow.`,
     wfDesc ? `Workflow description: ${wfDesc}` : '',
     String(data.systemPrompt ?? data.prompt ?? ''),
     'Answer in the same language the user uses unless they ask otherwise.',
     'Stay within the scope of this workflow. Be concise and helpful.',
-    data.memoryCollection
-      ? `Long-term memory is stored in vector collection "${data.memoryCollection}".`
+    toolNames.length
+      ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
-    Array.isArray(data.tools) && data.tools.length
-      ? `Configured tools: ${JSON.stringify(data.tools)}`
+    memoryCollection
+      ? 'Use the retrieve_memory tool to ground answers in stored knowledge when relevant.'
+      : '',
+    ragSnippets.length
+      ? `Relevant context from memory:\n${ragSnippets.map((s, i) => `[${i + 1}] ${s}`).join('\n')}`
       : '',
   ]
     .filter(Boolean)
     .join('\n\n');
 
   const modelMessages = await convertToModelMessages(uiMessages);
-  const latestUser = extractLatestUserText(uiMessages);
 
   const result = streamText({
     model: workersAI(modelId as never),
     system: systemPrompt,
     messages: modelMessages,
     maxOutputTokens: Number(data.maxTokens ?? 1024) || 1024,
+    tools: toolNames.length ? tools : undefined,
+    stopWhen: toolNames.length ? stepCountIs(5) : undefined,
     onFinish: async ({ usage }) => {
       try {
         const aiResponse = usage ? { usage } : { response: latestUser };

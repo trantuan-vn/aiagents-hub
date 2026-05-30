@@ -16,6 +16,7 @@ interface WorkflowEditorShellWorkspaceProps {
   onOpenSettings?: () => void;
   onAddNode: (type: string, label: string) => void;
   onAddStickyNote: () => void;
+  onApplyDefinition?: (definitionJson: string) => void;
   children: ReactNode;
 }
 
@@ -30,6 +31,7 @@ export function WorkflowEditorShellWorkspace({
   onOpenSettings,
   onAddNode,
   onAddStickyNote,
+  onApplyDefinition,
   children,
 }: WorkflowEditorShellWorkspaceProps) {
   return (
@@ -56,6 +58,7 @@ export function WorkflowEditorShellWorkspace({
           open={aiOpen}
           onOpenChange={onAiOpenChange}
           onOpenSettings={onOpenSettings}
+          onApplyDefinition={onApplyDefinition}
         />
       ) : null}
     </div>

@@ -23,6 +23,7 @@ export function WorkflowEditorHeaderTabs({
     { id: "editor", label: te("tab_editor") },
     { id: "executions", label: te("tab_executions") },
     { id: "triggers", label: te("tab_triggers"), disabled: readOnly },
+    { id: "versions", label: te("tab_versions"), disabled: readOnly },
     { id: "evaluations", label: te("tab_evaluations"), disabled: readOnly },
   ];
 

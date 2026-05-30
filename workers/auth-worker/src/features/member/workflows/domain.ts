@@ -107,6 +107,24 @@ export const WorkflowExecutionSchema = z.object({
   finishedAt: z.number().optional(),
 });
 
+/**
+ * Immutable snapshot of a workflow definition, captured on publish or manual
+ * save-point. Enables version history + restore in the marketplace.
+ */
+export const WorkflowVersionSchema = z.object({
+  /** Stable public id (uuid), unique per user. */
+  versionKey: z.string().min(1).max(80),
+  workflowId: z.number().int(),
+  /** Monotonic version number per workflow (1, 2, 3, …). */
+  version: z.number().int().min(1),
+  label: z.string().max(120).optional(),
+  note: z.string().max(1000).optional(),
+  /** JSON string snapshot of the WorkflowDefinition at this version. */
+  definition: z.string().default('{"nodes":[],"edges":[]}'),
+  /** 'manual' | 'publish' — why the snapshot was taken. */
+  reason: z.string().max(40).default('manual'),
+});
+
 /** Royalty paid to workflow owner when others use their shared workflow. */
 export const WorkflowRoyaltySchema = z.object({
   workflowId: z.number().int(),
@@ -152,3 +170,4 @@ export type WorkflowComment = z.infer<typeof WorkflowCommentSchema>;
 export type WorkflowRoyalty = z.infer<typeof WorkflowRoyaltySchema>;
 export type WorkflowExecution = z.infer<typeof WorkflowExecutionSchema>;
 export type WorkflowExecutionStatus = z.infer<typeof WorkflowExecutionStatusSchema>;
+export type WorkflowVersion = z.infer<typeof WorkflowVersionSchema>;

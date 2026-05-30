@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { WorkflowBuildPanel } from "./workflow-build-panel";
 import { WorkflowChat } from "./workflow-chat";
 
 interface WorkflowEditorAiSidebarProps {
@@ -17,6 +18,7 @@ interface WorkflowEditorAiSidebarProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenSettings?: () => void;
+  onApplyDefinition?: (definitionJson: string) => void;
   className?: string;
 }
 
@@ -27,6 +29,7 @@ export function WorkflowEditorAiSidebar({
   open,
   onOpenChange,
   onOpenSettings,
+  onApplyDefinition,
   className,
 }: WorkflowEditorAiSidebarProps) {
   const t = useTranslations("WorkflowEditorPage");
@@ -80,13 +83,17 @@ export function WorkflowEditorAiSidebar({
         </Button>
       </div>
       <div className="flex min-h-0 flex-1 flex-col p-3">
-        <WorkflowChat
-          workflowId={workflowId}
-          workflowName={workflowName}
-          ownerId={ownerId}
-          variant="sidebar"
-          mode={mode}
-        />
+        {mode === "build" && onApplyDefinition ? (
+          <WorkflowBuildPanel workflowId={workflowId} onApplyDefinition={onApplyDefinition} />
+        ) : (
+          <WorkflowChat
+            workflowId={workflowId}
+            workflowName={workflowName}
+            ownerId={ownerId}
+            variant="sidebar"
+            mode={mode}
+          />
+        )}
       </div>
     </aside>
   );

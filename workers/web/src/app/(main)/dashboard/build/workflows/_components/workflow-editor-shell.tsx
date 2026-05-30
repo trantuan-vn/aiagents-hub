@@ -11,6 +11,7 @@ import { resolveWorkflowEditorShellProps, type WorkflowEditorShellProps } from "
 import { WorkflowEditorShellWorkspace } from "./workflow-editor-shell-workspace";
 import { WorkflowExecutionsPanel } from "./workflow-executions-panel";
 import { WorkflowTriggersPanel } from "./workflow-triggers-panel";
+import { WorkflowVersionsPanel } from "./workflow-versions-panel";
 
 export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const {
@@ -25,6 +26,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     headerMeta,
     backHref,
     backLabel,
+    onApplyDefinition,
   } = props;
 
   const [activeTab, setActiveTab] = useState<WorkflowEditorTab>("editor");
@@ -64,11 +66,15 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
 
       {activeTab === "executions" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <WorkflowExecutionsPanel workflowId={workflowId} />
+          <WorkflowExecutionsPanel workflowId={workflowId} onApplyDefinition={onApplyDefinition} />
         </div>
       ) : activeTab === "triggers" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <WorkflowTriggersPanel workflowId={workflowId} />
+        </div>
+      ) : activeTab === "versions" ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <WorkflowVersionsPanel workflowId={workflowId} onApplyDefinition={onApplyDefinition} />
         </div>
       ) : (
         <WorkflowEditorShellWorkspace
@@ -82,6 +88,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
           onOpenSettings={openSettings}
           onAddNode={onAddNode}
           onAddStickyNote={onAddStickyNote}
+          onApplyDefinition={onApplyDefinition}
         >
           {children}
         </WorkflowEditorShellWorkspace>

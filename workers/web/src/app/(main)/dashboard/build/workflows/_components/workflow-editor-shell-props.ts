@@ -16,6 +16,8 @@ interface WorkflowEditorShellBaseProps {
   headerMeta?: ReactNode;
   backHref?: string;
   backLabel?: string;
+  /** Replace the canvas definition (text-to-workflow / restore / auto-fix). */
+  onApplyDefinition?: (definitionJson: string) => void;
 }
 
 export interface WorkflowEditorShellEditProps extends WorkflowEditorShellBaseProps {

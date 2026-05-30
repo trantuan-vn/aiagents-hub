@@ -351,3 +351,60 @@ export function getWorkflowEarningsMonthlySummary() {
     "/dashboard/build/workflows/earnings/monthly-summary",
   );
 }
+
+// --- AI authoring: text-to-workflow + auto-fix ---
+export interface GeneratedWorkflow {
+  definition: {
+    nodes: { id: string; type: string; position: { x: number; y: number }; data: Record<string, unknown> }[];
+    edges: { id: string; source: string; target: string; sourceHandle?: string; targetHandle?: string }[];
+    viewport?: { x: number; y: number; zoom: number };
+  };
+  notes: string;
+}
+
+export function generateWorkflow(prompt: string) {
+  return apiFetch<GeneratedWorkflow>("/dashboard/build/workflows/generate", {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+export function autofixWorkflow(id: number, body: { definition?: unknown; error?: string }) {
+  return apiFetch<GeneratedWorkflow>(`/dashboard/build/workflows/${id}/autofix`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+// --- Version history ---
+export interface WorkflowVersionRecord {
+  id: number;
+  versionKey: string;
+  workflowId: number;
+  version: number;
+  label?: string;
+  note?: string;
+  definition: string;
+  reason: string;
+  createdAt?: number;
+}
+
+export function listWorkflowVersions(id: number) {
+  return apiFetch<{ versions: WorkflowVersionRecord[] }>(
+    `/dashboard/build/workflows/${id}/versions`,
+  );
+}
+
+export function snapshotWorkflowVersion(id: number, body: { definition?: string; label?: string; note?: string }) {
+  return apiFetch<{ version: WorkflowVersionRecord }>(`/dashboard/build/workflows/${id}/versions`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function restoreWorkflowVersion(id: number, versionKey: string) {
+  return apiFetch<{ workflow: AgentWorkflow; restoredVersion: number }>(
+    `/dashboard/build/workflows/${id}/versions/${versionKey}/restore`,
+    { method: "POST" },
+  );
+}

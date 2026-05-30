@@ -122,6 +122,10 @@ export default function EditWorkflowPage() {
         onExecute={() => setExecuteOpen(true)}
         onAddNode={handleAddNode}
         onAddStickyNote={handleAddStickyNote}
+        onApplyDefinition={(json) => {
+          setDefinition(json);
+          setServiceEndpoint(readServiceEndpointFromDefinition(json));
+        }}
         settings={{
           name,
           onNameChange: setName,

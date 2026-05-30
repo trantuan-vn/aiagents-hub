@@ -20,6 +20,8 @@ import {
   updateTrigger,
 } from './triggers.js';
 import { WORKFLOW_INTEGRATIONS } from './integrations.js';
+import { getVersionByKey, listVersions, snapshotVersion } from './version-store.js';
+import { autofixWorkflowDefinition, generateWorkflowDefinition } from './ai-authoring.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -455,7 +457,8 @@ export function createWorkflowRoutes(bindingName: string) {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const body = UpdateWorkflowSchema.parse(await c.req.json());
-      if (body.isShared === true) {
+      const publishing = body.isShared === true;
+      if (publishing) {
         body.status = 'published';
       }
       const userDO = getUserDO(c, user.identifier);
@@ -465,8 +468,123 @@ export function createWorkflowRoutes(bindingName: string) {
         { id, ...body },
         'agent_workflows',
       );
+      // Capture an immutable version snapshot when publishing.
+      if (publishing) {
+        try {
+          const def =
+            typeof body.definition === 'string'
+              ? body.definition
+              : ((updated as { definition?: string })?.definition ?? '{"nodes":[],"edges":[]}');
+          await snapshotVersion(userDO, { workflowId: id, definition: def, reason: 'publish' });
+        } catch (e) {
+          console.error('[workflows] publish snapshot failed:', e);
+        }
+      }
       return c.json({ workflow: updated });
     }, 'Failed to update workflow'),
+  );
+
+  // --- AI authoring: text-to-workflow + auto-fix ---
+  app.post(
+    '/generate',
+    createRouteHandler(async (c: any, _user: any) => {
+      const body = (await c.req.json().catch(() => ({}))) as { prompt?: string };
+      const prompt = String(body.prompt ?? '').trim();
+      if (!prompt) return c.json({ error: 'prompt is required' }, 400);
+      const result = await generateWorkflowDefinition(c.env, prompt);
+      return c.json(result);
+    }, 'Failed to generate workflow'),
+  );
+
+  app.post(
+    '/:id/autofix',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const body = (await c.req.json().catch(() => ({}))) as {
+        definition?: unknown;
+        error?: string;
+      };
+      let definition = body.definition;
+      if (!definition) {
+        const userDO = getUserDO(c, user.identifier);
+        const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+          where: { field: 'id', operator: '=', value: id },
+        }, 'agent_workflows');
+        const wf = Array.isArray(rows) ? rows[0] : rows;
+        const defStr = (wf as { definition?: string })?.definition ?? '';
+        try {
+          definition = defStr ? JSON.parse(defStr) : { nodes: [], edges: [] };
+        } catch {
+          definition = { nodes: [], edges: [] };
+        }
+      }
+      const result = await autofixWorkflowDefinition(c.env, definition, body.error);
+      return c.json(result);
+    }, 'Failed to auto-fix workflow'),
+  );
+
+  // --- Version history ---
+  app.get(
+    '/:id/versions',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const userDO = getUserDO(c, user.identifier);
+      const versions = await listVersions(userDO, id);
+      return c.json({ versions });
+    }, 'Failed to list workflow versions'),
+  );
+
+  app.post(
+    '/:id/versions',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const body = (await c.req.json().catch(() => ({}))) as {
+        definition?: string;
+        label?: string;
+        note?: string;
+      };
+      const userDO = getUserDO(c, user.identifier);
+      let definition = body.definition;
+      if (typeof definition !== 'string') {
+        const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+          where: { field: 'id', operator: '=', value: id },
+        }, 'agent_workflows');
+        const wf = Array.isArray(rows) ? rows[0] : rows;
+        definition = (wf as { definition?: string })?.definition ?? '{"nodes":[],"edges":[]}';
+      }
+      const version = await snapshotVersion(userDO, {
+        workflowId: id,
+        definition,
+        label: body.label,
+        note: body.note,
+        reason: 'manual',
+      });
+      return c.json({ version }, 201);
+    }, 'Failed to snapshot workflow version'),
+  );
+
+  app.post(
+    '/:id/versions/:versionKey/restore',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      const versionKey = c.req.param('versionKey');
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const userDO = getUserDO(c, user.identifier);
+      const version = await getVersionByKey(userDO, versionKey);
+      if (!version || version.workflowId !== id) {
+        return c.json({ error: 'Version not found' }, 404);
+      }
+      const updated = await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        { id, definition: version.definition },
+        'agent_workflows',
+      );
+      return c.json({ workflow: updated, restoredVersion: version.version });
+    }, 'Failed to restore workflow version'),
   );
 
   app.delete(
