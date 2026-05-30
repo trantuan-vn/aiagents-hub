@@ -9,7 +9,8 @@ import {
   WorkflowCommentSchema,
   WorkflowUserStarSchema,
 } from './domain';
-import { executeWorkflowGraph } from './executor.js';
+import { executeWorkflowGraph, resumeWorkflowExecution } from './executor.js';
+import { getExecutionByKey, listExecutions } from './execution-store.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -30,6 +31,30 @@ const ExecuteBodySchema = z.object({
   variables: z.record(z.unknown()).optional(),
   autoApproveHumanReview: z.boolean().optional(),
 });
+
+const ResumeBodySchema = z.object({
+  decision: z.enum(['approve', 'reject']).default('approve'),
+  note: z.string().max(2000).optional(),
+});
+
+function parseExecutionRow(row: any) {
+  if (!row) return row;
+  const safeParse = (v: unknown) => {
+    if (typeof v !== 'string') return v;
+    try {
+      return JSON.parse(v);
+    } catch {
+      return v;
+    }
+  };
+  return {
+    ...row,
+    output: safeParse(row.output),
+    // `state` is the internal engine snapshot; expose only the step trace.
+    steps: safeParse(row.state)?.engine?.steps ?? [],
+    state: undefined,
+  };
+}
 
 export function createWorkflowRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -219,6 +244,47 @@ export function createWorkflowRoutes(bindingName: string) {
       const result = await runExecute(c, user, id, ownerId);
       return c.json(result);
     }, 'Failed to execute workflow'),
+  );
+
+  // --- Execution history & durable resume ---
+  app.get(
+    '/:id/executions',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
+      const userDO = getUserDO(c, user.identifier);
+      const rows = await listExecutions(userDO, id, limit);
+      return c.json({ executions: rows.map(parseExecutionRow) });
+    }, 'Failed to list executions'),
+  );
+
+  app.get(
+    '/executions/:executionKey',
+    createRouteHandler(async (c: any, user: any) => {
+      const executionKey = c.req.param('executionKey');
+      const userDO = getUserDO(c, user.identifier);
+      const row = await getExecutionByKey(userDO, executionKey);
+      if (!row) return c.json({ error: 'Execution not found' }, 404);
+      return c.json({ execution: parseExecutionRow(row) });
+    }, 'Failed to get execution'),
+  );
+
+  app.post(
+    '/executions/:executionKey/resume',
+    createRouteHandler(async (c: any, user: any) => {
+      const executionKey = c.req.param('executionKey');
+      const body = ResumeBodySchema.parse(await c.req.json().catch(() => ({})));
+      const result = await resumeWorkflowExecution({
+        c,
+        bindingName,
+        user,
+        executionKey,
+        approved: body.decision === 'approve',
+        note: body.note,
+      });
+      return c.json(result);
+    }, 'Failed to resume execution'),
   );
 
   app.get(

@@ -9,6 +9,7 @@ import { WorkflowEditorLogsPanel } from "./workflow-editor-logs-panel";
 import { WorkflowEditorSettingsSheet } from "./workflow-editor-settings-sheet";
 import { resolveWorkflowEditorShellProps, type WorkflowEditorShellProps } from "./workflow-editor-shell-props";
 import { WorkflowEditorShellWorkspace } from "./workflow-editor-shell-workspace";
+import { WorkflowExecutionsPanel } from "./workflow-executions-panel";
 
 export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const {
@@ -60,20 +61,26 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         headerMeta={headerMeta}
       />
 
-      <WorkflowEditorShellWorkspace
-        workflowId={workflowId}
-        workflowName={workflowName}
-        ownerId={ownerId}
-        serviceEndpoint={serviceEndpoint}
-        readOnly={readOnly}
-        aiOpen={aiOpen}
-        onAiOpenChange={setAiOpen}
-        onOpenSettings={openSettings}
-        onAddNode={onAddNode}
-        onAddStickyNote={onAddStickyNote}
-      >
-        {children}
-      </WorkflowEditorShellWorkspace>
+      {activeTab === "executions" ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <WorkflowExecutionsPanel workflowId={workflowId} />
+        </div>
+      ) : (
+        <WorkflowEditorShellWorkspace
+          workflowId={workflowId}
+          workflowName={workflowName}
+          ownerId={ownerId}
+          serviceEndpoint={serviceEndpoint}
+          readOnly={readOnly}
+          aiOpen={aiOpen}
+          onAiOpenChange={setAiOpen}
+          onOpenSettings={openSettings}
+          onAddNode={onAddNode}
+          onAddStickyNote={onAddStickyNote}
+        >
+          {children}
+        </WorkflowEditorShellWorkspace>
+      )}
 
       <WorkflowEditorLogsPanel open={logsOpen} onOpenChange={setLogsOpen} />
 

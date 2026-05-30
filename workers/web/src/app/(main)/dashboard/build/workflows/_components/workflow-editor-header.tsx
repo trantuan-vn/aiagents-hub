@@ -54,12 +54,7 @@ export function WorkflowEditorHeader({
         backLabel={breadcrumb}
         headerMeta={headerMeta}
       />
-      <WorkflowEditorHeaderTabs
-        activeTab={activeTab}
-        readOnly={readOnly}
-        onTabChange={onTabChange}
-        onExecute={onExecute}
-      />
+      <WorkflowEditorHeaderTabs activeTab={activeTab} readOnly={readOnly} onTabChange={onTabChange} />
       {readOnly ? (
         <WorkflowEditorHeaderViewActions chatHref={chatHref} onExecute={onExecute} />
       ) : (

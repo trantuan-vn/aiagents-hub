@@ -19,7 +19,11 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { formatUsd } from "@/lib/utils";
 
-import { executeWorkflow, type WorkflowExecutionResult } from "../_lib/api";
+import {
+  executeWorkflow,
+  resumeWorkflowExecution,
+  type WorkflowExecutionResult,
+} from "../_lib/api";
 
 interface WorkflowExecuteDialogProps {
   workflowId: number;
@@ -46,22 +50,46 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
   const [input, setInput] = useState("");
   const [autoApprove, setAutoApprove] = useState(false);
   const [running, setRunning] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
   const [result, setResult] = useState<WorkflowExecutionResult | null>(null);
+
+  const reportResult = (res: WorkflowExecutionResult) => {
+    setResult(res);
+    if (res.status === "completed") toast.success(t("completed"));
+    else if (res.status === "pending_human") toast.message(t("pending_human"));
+    else if (res.status === "cancelled") toast.message(t("cancelled"));
+    else toast.error(t("failed"));
+  };
 
   const onRun = async () => {
     if (!workflowId) return;
     setRunning(true);
     setResult(null);
+    setReviewNote("");
     try {
       const res = await executeWorkflow(workflowId, {
         input: input.trim() || undefined,
         autoApproveHumanReview: autoApprove,
         ownerId,
       });
-      setResult(res);
-      if (res.status === "completed") toast.success(t("completed"));
-      else if (res.status === "pending_human") toast.message(t("pending_human"));
-      else toast.error(t("failed"));
+      reportResult(res);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("failed"));
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const onResume = async (decision: "approve" | "reject") => {
+    if (!result?.executionKey) return;
+    setRunning(true);
+    try {
+      const res = await resumeWorkflowExecution(result.executionKey, {
+        decision,
+        note: reviewNote.trim() || undefined,
+      });
+      setReviewNote("");
+      reportResult(res);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("failed"));
     } finally {
@@ -107,6 +135,31 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
                     {JSON.stringify(result.steps, null, 2)}
                   </pre>
                 </details>
+              </div>
+            </div>
+          ) : null}
+
+          {result?.status === "pending_human" ? (
+            <div className="space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3">
+              <Label>{t("review_title")}</Label>
+              <Textarea
+                value={reviewNote}
+                onChange={(e) => setReviewNote(e.target.value)}
+                placeholder={t("review_note_placeholder")}
+                rows={2}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => void onResume("approve")} disabled={running}>
+                  {running ? t("resuming") : t("approve")}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void onResume("reject")}
+                  disabled={running}
+                >
+                  {t("reject")}
+                </Button>
               </div>
             </div>
           ) : null}

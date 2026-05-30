@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useState } from "react";
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { ArrowLeft, MessageSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SMS_2FA_ENABLED } from "@/lib/feature-flags";
 import { useRefreshDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 import { useToast } from "@/hooks/use-toast";
 
@@ -17,6 +19,9 @@ import { type SmsStep, renderSmsStepContent } from "./_components/sms-step-conte
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 export default function SmsPage() {
+  // SMS 2FA tạm ẩn cho đến khi mua dịch vụ gửi SMS (xem SMS_2FA_ENABLED).
+  if (!SMS_2FA_ENABLED) redirect("/dashboard/control/account");
+
   const t = useTranslations("AccountPage.sms");
   const { toast } = useToast();
   const refreshUser = useRefreshDashboardUser();

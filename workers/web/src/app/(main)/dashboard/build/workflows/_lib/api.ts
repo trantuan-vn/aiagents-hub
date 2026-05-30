@@ -77,15 +77,43 @@ export interface ExecutionStepLog {
   error?: string;
   costVnd?: number;
   durationMs?: number;
+  attempts?: number;
 }
 
+export type WorkflowExecutionStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "pending_human"
+  | "cancelled";
+
 export interface WorkflowExecutionResult {
-  status: "completed" | "failed" | "pending_human";
+  status: WorkflowExecutionStatus;
+  executionKey: string;
   workflowId: number;
   workflowOwnerId: string;
   output?: unknown;
   steps: ExecutionStepLog[];
   totalCostVnd: number;
+  pendingNodeId?: string;
+}
+
+export interface WorkflowExecutionRecord {
+  id: number;
+  executionKey: string;
+  workflowId: number;
+  workflowOwnerId: string;
+  workflowName?: string;
+  status: WorkflowExecutionStatus;
+  input?: string;
+  output?: unknown;
+  error?: string;
+  totalCostVnd: number;
+  stepCount: number;
+  steps: ExecutionStepLog[];
+  pendingNodeId?: string;
+  startedAt: number;
+  finishedAt?: number;
 }
 
 export function executeWorkflow(
@@ -109,6 +137,28 @@ export function executeWorkflow(
       autoApproveHumanReview: options?.autoApproveHumanReview,
     }),
   });
+}
+
+export function listWorkflowExecutions(id: number, limit = 50) {
+  return apiFetch<{ executions: WorkflowExecutionRecord[] }>(
+    `/dashboard/build/workflows/${id}/executions?limit=${limit}`,
+  );
+}
+
+export function getWorkflowExecution(executionKey: string) {
+  return apiFetch<{ execution: WorkflowExecutionRecord }>(
+    `/dashboard/build/workflows/executions/${executionKey}`,
+  );
+}
+
+export function resumeWorkflowExecution(
+  executionKey: string,
+  body: { decision: "approve" | "reject"; note?: string },
+) {
+  return apiFetch<WorkflowExecutionResult>(
+    `/dashboard/build/workflows/executions/${executionKey}/resume`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
 }
 
 export function workflowChatApiUrl(workflowId: number, ownerId?: string) {

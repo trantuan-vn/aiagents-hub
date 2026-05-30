@@ -10,14 +10,12 @@ interface WorkflowEditorHeaderTabsProps {
   activeTab: WorkflowEditorTab;
   readOnly: boolean;
   onTabChange: (tab: WorkflowEditorTab) => void;
-  onExecute: () => void;
 }
 
 export function WorkflowEditorHeaderTabs({
   activeTab,
   readOnly,
   onTabChange,
-  onExecute,
 }: WorkflowEditorHeaderTabsProps) {
   const te = useTranslations("WorkflowEditorPage");
 
@@ -41,13 +39,7 @@ export function WorkflowEditorHeaderTabs({
               : "text-muted-foreground hover:text-foreground",
             tab.disabled && "pointer-events-none opacity-40",
           )}
-          onClick={() => {
-            if (tab.id === "executions") {
-              onExecute();
-              return;
-            }
-            onTabChange(tab.id);
-          }}
+          onClick={() => onTabChange(tab.id)}
         >
           {tab.label}
         </button>

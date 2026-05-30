@@ -10,6 +10,7 @@ enabled = true
 NEXT_PUBLIC_DEBUG = "true"
 # Must match auth-worker TURNSTILE_SITE_KEY (Cloudflare Turnstile widget hostnames: aiagents-hub.vn + www)
 NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAADXOWPMRtW0XIcLk"
+NEXT_PUBLIC_SMS_2FA_ENABLED = false
 
 [limits]
 cpu_ms = 300000

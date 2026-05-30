@@ -69,6 +69,42 @@ export const WorkflowCommentSchema = z.object({
   authorDisplayName: z.string().max(200).optional(),
 });
 
+/** Status of a single durable workflow execution. */
+export const WorkflowExecutionStatusSchema = z.enum([
+  'running',
+  'completed',
+  'failed',
+  'pending_human',
+  'cancelled',
+]);
+
+/**
+ * Durable record of one workflow run. `state` holds the serialized engine
+ * snapshot (node outputs, cursor, steps, definition) so a paused or failed run
+ * can be resumed / replayed without recomputing prior nodes.
+ */
+export const WorkflowExecutionSchema = z.object({
+  /** Stable public id (uuid) used to fetch/resume the run. Unique per user. */
+  executionKey: z.string().min(1).max(80),
+  workflowId: z.number().int(),
+  workflowOwnerId: z.string(),
+  workflowName: z.string().max(200).optional(),
+  status: WorkflowExecutionStatusSchema.default('running'),
+  /** Triggering input text. */
+  input: z.string().optional(),
+  /** JSON string of the final (or latest) output. */
+  output: z.string().optional(),
+  error: z.string().max(2000).optional(),
+  totalCostVnd: z.number().min(0).default(0),
+  stepCount: z.number().int().min(0).default(0),
+  /** JSON string of the serialized engine state for durable resume/replay. */
+  state: z.string().default('{}'),
+  /** Node currently awaiting a human decision (when status = pending_human). */
+  pendingNodeId: z.string().optional(),
+  startedAt: z.number().default(Date.now),
+  finishedAt: z.number().optional(),
+});
+
 /** Royalty paid to workflow owner when others use their shared workflow. */
 export const WorkflowRoyaltySchema = z.object({
   workflowId: z.number().int(),
@@ -85,3 +121,5 @@ export type AgentWorkflow = z.infer<typeof AgentWorkflowSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type WorkflowComment = z.infer<typeof WorkflowCommentSchema>;
 export type WorkflowRoyalty = z.infer<typeof WorkflowRoyaltySchema>;
+export type WorkflowExecution = z.infer<typeof WorkflowExecutionSchema>;
+export type WorkflowExecutionStatus = z.infer<typeof WorkflowExecutionStatusSchema>;

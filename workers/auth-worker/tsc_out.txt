@@ -1,0 +1,19 @@
+src/features/admin/voucher/application.ts(1,10): error TS2300: Duplicate identifier 'Context'.
+src/features/admin/voucher/application.ts(2,10): error TS2300: Duplicate identifier 'getIdFromName'.
+src/features/admin/voucher/application.ts(3,10): error TS2300: Duplicate identifier 'UserDO'.
+src/features/admin/voucher/application.ts(4,10): error TS2300: Duplicate identifier 'createVoucherInfrastructureService'.
+src/features/admin/voucher/application.ts(5,10): error TS2300: Duplicate identifier 'ApplyVoucher'.
+src/features/admin/voucher/application.ts(5,24): error TS2300: Duplicate identifier 'ValidateVoucherRequest'.
+src/features/admin/voucher/application.ts(5,48): error TS2300: Duplicate identifier 'Voucher'.
+src/features/admin/voucher/application.ts(7,10): error TS2300: Duplicate identifier 'Context'.
+src/features/admin/voucher/application.ts(8,10): error TS2300: Duplicate identifier 'getIdFromName'.
+src/features/admin/voucher/application.ts(9,10): error TS2300: Duplicate identifier 'UserDO'.
+src/features/admin/voucher/application.ts(10,10): error TS2300: Duplicate identifier 'createVoucherInfrastructureService'.
+src/features/admin/voucher/application.ts(11,10): error TS2300: Duplicate identifier 'ApplyVoucher'.
+src/features/admin/voucher/application.ts(11,24): error TS2300: Duplicate identifier 'ValidateVoucherRequest'.
+src/features/admin/voucher/application.ts(11,48): error TS2300: Duplicate identifier 'Voucher'.
+src/features/assistant/tools/refund-payment-tool.ts(18,87): error TS2345: Argument of type '{ paymentId: number; transactionType: string; reason: string; }' is not assignable to parameter of type '{ status: "pending" | "completed" | "failed" | "processing"; paymentId: number; transactionType: string; reason: string; refundDetails?: Record<string, any> | undefined; }'.
+  Property 'status' is missing in type '{ paymentId: number; transactionType: string; reason: string; }' but required in type '{ status: "pending" | "completed" | "failed" | "processing"; paymentId: number; transactionType: string; reason: string; refundDetails?: Record<string, any> | undefined; }'.
+src/features/auth/infrastructure.ts(394,33): error TS2345: Argument of type 'number | undefined' is not assignable to parameter of type '60 | undefined'.
+  Type 'number' is not assignable to type '60'.
+src/features/member/workflows/workflow-context.ts(42,23): error TS2347: Untyped function calls may not accept type arguments.

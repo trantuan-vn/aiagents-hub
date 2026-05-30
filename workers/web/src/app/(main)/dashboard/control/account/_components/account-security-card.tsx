@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { SMS_2FA_ENABLED } from "@/lib/feature-flags";
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
@@ -118,7 +119,7 @@ export function AccountSecurityCard() {
 
   useEffect(() => {
     void fetchAuthenticatorStatus();
-    void fetchSmsStatus();
+    if (SMS_2FA_ENABLED) void fetchSmsStatus();
     void fetchPasskeyStatus();
     void fetchBackupCodesStatus();
   }, [fetchAuthenticatorStatus, fetchSmsStatus, fetchPasskeyStatus, fetchBackupCodesStatus]);
@@ -144,16 +145,21 @@ export function AccountSecurityCard() {
       showStatus: true,
       enabled: authenticatorStatus?.enabled ?? false,
     },
-    {
-      key: "sms",
-      icon: MessageSquare,
-      titleKey: "sms_title",
-      descKey: "sms_desc",
-      actionKey: "enable",
-      href: "/dashboard/control/account/sms",
-      showStatus: true,
-      enabled: smsStatus?.enabled ?? false,
-    },
+    // SMS 2FA tạm ẩn cho đến khi mua dịch vụ gửi SMS (xem SMS_2FA_ENABLED).
+    ...(SMS_2FA_ENABLED
+      ? [
+          {
+            key: "sms",
+            icon: MessageSquare,
+            titleKey: "sms_title",
+            descKey: "sms_desc",
+            actionKey: "enable",
+            href: "/dashboard/control/account/sms",
+            showStatus: true,
+            enabled: smsStatus?.enabled ?? false,
+          },
+        ]
+      : []),
     {
       key: "backup_codes",
       icon: Key,
