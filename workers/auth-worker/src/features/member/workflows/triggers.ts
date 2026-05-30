@@ -4,7 +4,14 @@ import type { ResolvedWorkflow } from './workflow-context.js';
 import { parseWorkflowDefinition } from './workflow-context.js';
 import { executeWorkflowGraph } from './executor.js';
 
-export type TriggerType = 'cron' | 'webhook';
+/** Channel types align with OpenClaw multi-channel support (Telegram/Slack/Discord). */
+export type TriggerType = 'cron' | 'webhook' | 'telegram' | 'slack' | 'discord';
+
+const CHANNEL_TYPES: TriggerType[] = ['webhook', 'telegram', 'slack', 'discord'];
+
+export function isChannelTriggerType(type: string): type is 'telegram' | 'slack' | 'discord' {
+  return type === 'telegram' || type === 'slack' || type === 'discord';
+}
 
 export interface WorkflowTriggerRow {
   triggerId: string;
@@ -119,7 +126,9 @@ export async function createTrigger(
   await ensureTriggerTable(db);
   const now = Date.now();
   const triggerId = crypto.randomUUID();
-  const webhookToken = input.type === 'webhook' ? crypto.randomUUID().replace(/-/g, '') : null;
+  const webhookToken = CHANNEL_TYPES.includes(input.type)
+    ? crypto.randomUUID().replace(/-/g, '')
+    : null;
   await db
     .prepare(
       `INSERT INTO workflow_triggers
@@ -224,13 +233,23 @@ export async function findWebhookTrigger(
   ownerId: string,
   token: string,
 ): Promise<WorkflowTriggerRow | null> {
+  return findChannelTrigger(db, ownerId, 'webhook', token);
+}
+
+/** Resolve an enabled trigger by owner, channel type, and URL token. */
+export async function findChannelTrigger(
+  db: D1Database,
+  ownerId: string,
+  channel: TriggerType,
+  token: string,
+): Promise<WorkflowTriggerRow | null> {
   await ensureTriggerTable(db);
   return db
     .prepare(
       `SELECT * FROM workflow_triggers
-       WHERE ownerId = ? AND webhookToken = ? AND type = 'webhook' AND enabled = 1 LIMIT 1`,
+       WHERE ownerId = ? AND webhookToken = ? AND type = ? AND enabled = 1 LIMIT 1`,
     )
-    .bind(ownerId, token)
+    .bind(ownerId, token, channel)
     .first<WorkflowTriggerRow>();
 }
 

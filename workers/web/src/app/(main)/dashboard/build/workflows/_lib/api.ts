@@ -145,10 +145,78 @@ export function listWorkflowExecutions(id: number, limit = 50) {
   );
 }
 
-export function getWorkflowExecution(executionKey: string) {
-  return apiFetch<{ execution: WorkflowExecutionRecord }>(
-    `/dashboard/build/workflows/executions/${executionKey}`,
+export interface WorkflowExecutionStats {
+  total: number;
+  completed: number;
+  failed: number;
+  running: number;
+  pendingHuman: number;
+  cancelled: number;
+  successRate: number;
+  avgCostVnd: number;
+  avgDurationMs: number;
+  lastRunAt: number | null;
+}
+
+export interface StepTimelineEntry {
+  nodeId: string;
+  nodeType: string;
+  status: string;
+  durationMs: number;
+  costVnd: number;
+  error?: string;
+  offsetMs: number;
+}
+
+export interface WorkflowExecutionObservability {
+  executionKey: string;
+  workflowId: number;
+  status: string;
+  startedAt: number;
+  finishedAt?: number;
+  totalDurationMs: number;
+  totalCostVnd: number;
+  stepCount: number;
+  steps: ExecutionStepLog[];
+  timeline: StepTimelineEntry[];
+  error?: string;
+}
+
+export function getWorkflowExecutionStats(workflowId: number, limit = 50) {
+  return apiFetch<{ stats: WorkflowExecutionStats }>(
+    `/dashboard/build/workflows/${workflowId}/executions/stats?limit=${limit}`,
   );
+}
+
+export function getWorkflowExecution(executionKey: string) {
+  return apiFetch<{
+    execution: WorkflowExecutionRecord;
+    observability: WorkflowExecutionObservability;
+  }>(`/dashboard/build/workflows/executions/${executionKey}`);
+}
+
+export interface WorkflowCollabState {
+  workflowId: number;
+  definition: string;
+  updatedAt: number;
+  editorId: string;
+  editorName?: string;
+}
+
+export function getWorkflowCollab(workflowId: number) {
+  return apiFetch<{ state: WorkflowCollabState | null }>(
+    `/dashboard/build/workflows/${workflowId}/collab`,
+  );
+}
+
+export function publishWorkflowCollab(
+  workflowId: number,
+  body: { definition: string; editorId: string; editorName?: string },
+) {
+  return apiFetch<{ state: WorkflowCollabState }>(`/dashboard/build/workflows/${workflowId}/collab`, {
+    method: "PUT",
+    body: JSON.stringify(body),
+  });
 }
 
 export function resumeWorkflowExecution(
@@ -162,7 +230,7 @@ export function resumeWorkflowExecution(
 }
 
 // --- Triggers (cron + webhook) ---
-export type WorkflowTriggerType = "cron" | "webhook";
+export type WorkflowTriggerType = "cron" | "webhook" | "telegram" | "slack" | "discord";
 
 export interface WorkflowTrigger {
   triggerId: string;

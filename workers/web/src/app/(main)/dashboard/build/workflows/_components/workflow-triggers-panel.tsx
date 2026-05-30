@@ -73,7 +73,7 @@ export function WorkflowTriggersPanel({ workflowId }: WorkflowTriggersPanelProps
     void load();
   }, [load]);
 
-  const addTrigger = async (type: "cron" | "webhook") => {
+  const addTrigger = async (type: WorkflowTrigger["type"]) => {
     setBusy(true);
     try {
       await createWorkflowTrigger(workflowId, {
@@ -195,6 +195,18 @@ export function WorkflowTriggersPanel({ workflowId }: WorkflowTriggersPanelProps
               {t("triggers_add_webhook")}
             </Button>
           </div>
+          <p className="text-muted-foreground text-[11px] leading-relaxed">{t("triggers_channels_hint")}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void addTrigger("telegram")}>
+              {t("triggers_add_telegram")}
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void addTrigger("slack")}>
+              {t("triggers_add_slack")}
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void addTrigger("discord")}>
+              {t("triggers_add_discord")}
+            </Button>
+          </div>
         </div>
 
         {/* List */}
@@ -217,7 +229,7 @@ export function WorkflowTriggersPanel({ workflowId }: WorkflowTriggersPanelProps
                         </code>
                       ) : null}
                     </div>
-                    {trg.type === "webhook" && trg.webhookUrl ? (
+                    {trg.webhookUrl ? (
                       <div className="flex items-center gap-1">
                         <code className="text-muted-foreground max-w-[22rem] truncate font-mono text-[11px]">
                           {trg.webhookUrl}
@@ -225,7 +237,10 @@ export function WorkflowTriggersPanel({ workflowId }: WorkflowTriggersPanelProps
                         <button
                           type="button"
                           className="text-muted-foreground hover:text-foreground"
-                          onClick={() => void copyUrl(trg.webhookUrl)}
+                          onClick={() => {
+                            void copyUrl(trg.webhookUrl);
+                            if (trg.type !== "webhook") toast.success(t("triggers_channel_copied"));
+                          }}
                           title={t("triggers_copy_url")}
                         >
                           <Copy className="size-3" />

@@ -198,7 +198,17 @@ function createConnectionManager(options: UseWsOptions = {}) {
     };
   }
 
-  return { subscribe, disconnect };
+  function send(payload: unknown): boolean {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    try {
+      ws.send(JSON.stringify(payload));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return { subscribe, disconnect, send };
 }
 
 const defaultManager = createConnectionManager();
@@ -206,6 +216,11 @@ const defaultManager = createConnectionManager();
 /** Ngắt kết nối WebSocket chủ động. Dùng khi logout để đảm bảo không còn kết nối với server. */
 export function disconnectWs(): void {
   defaultManager.disconnect();
+}
+
+/** Send a message on the shared app WebSocket (when connected). */
+export function sendWsMessage(payload: unknown): boolean {
+  return defaultManager.send(payload);
 }
 
 /**

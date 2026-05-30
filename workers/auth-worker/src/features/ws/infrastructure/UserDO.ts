@@ -315,7 +315,9 @@ export class UserDO extends DurableObject {
         '/queue/health': () => this.handleQueueHealth(),
         '/queue/cleanup': (req) => this.handleQueueCleanup(req),
         '/queue/table-state-reset': (req) => this.handleTableStateReset(req),
-        '/debug/id-counters': async () => this.handleDebugIdCounters()
+        '/debug/id-counters': async () => this.handleDebugIdCounters(),
+        '/workflow/collab/get': (req) => this.handleWorkflowCollabGet(req),
+        '/workflow/collab/publish': (req) => this.handleWorkflowCollabPublish(req),
       };
 
       const handler = routeHandlers[url.pathname];
@@ -1188,7 +1190,20 @@ export class UserDO extends DurableObject {
           await this.handleUnsubscribe(message.channel);
           await this.sendMessage(ws, { type: 'unsubscribed', channel: message.channel });
         }
-      }
+      },
+      workflow_collab: async () => {
+        if (message.workflowId == null || !message.definition || !message.editorId) {
+          await this.sendMessage(ws, { type: 'error', message: 'workflow_collab requires workflowId, definition, editorId' });
+          return;
+        }
+        const state = await this.publishWorkflowCollab({
+          workflowId: message.workflowId,
+          definition: message.definition,
+          editorId: message.editorId,
+          editorName: message.editorName,
+        });
+        await this.sendMessage(ws, { type: 'workflow_collab_ack', data: state });
+      },
     };
 
     const handler = handlers[message.type];
@@ -1334,6 +1349,65 @@ export class UserDO extends DurableObject {
       activeConnections: webSockets.length, 
       timestamp: Date.now()
     });
+  }
+
+  // ========== WORKFLOW CANVAS COLLABORATION ==========
+  private collabStorageKey(workflowId: number): string {
+    return `workflow_collab:${workflowId}`;
+  }
+
+  async publishWorkflowCollab(input: {
+    workflowId: number;
+    definition: string;
+    editorId: string;
+    editorName?: string;
+  }): Promise<{
+    workflowId: number;
+    definition: string;
+    updatedAt: number;
+    editorId: string;
+    editorName?: string;
+  }> {
+    const state = {
+      workflowId: input.workflowId,
+      definition: input.definition,
+      updatedAt: Date.now(),
+      editorId: input.editorId,
+      editorName: input.editorName,
+    };
+    await this.storage.put(this.collabStorageKey(input.workflowId), state);
+    this.broadcast('workflow_collab', state);
+    return state;
+  }
+
+  private async handleWorkflowCollabGet(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    const workflowId = parseInt(url.searchParams.get('workflowId') ?? '', 10);
+    if (isNaN(workflowId)) {
+      return this.jsonResponse({ error: 'workflowId required' }, 400);
+    }
+    const state = await this.storage.get<{
+      workflowId: number;
+      definition: string;
+      updatedAt: number;
+      editorId: string;
+      editorName?: string;
+    }>(this.collabStorageKey(workflowId));
+    return this.jsonResponse({ state: state ?? null });
+  }
+
+  private async handleWorkflowCollabPublish(request: Request): Promise<Response> {
+    const body = (await request.json()) as {
+      workflowId: number;
+      definition: string;
+      editorId: string;
+      editorName?: string;
+    };
+    if (!body.workflowId || !body.definition || !body.editorId) {
+      return this.jsonResponse({ error: 'workflowId, definition, editorId required' }, 400);
+    }
+    const state = await this.publishWorkflowCollab(body);
+    return this.jsonResponse({ state });
   }
 
   // ========== SUBSCRIPTION MANAGEMENT ==========

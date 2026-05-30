@@ -13,9 +13,11 @@ import { cn, formatUsd } from "@/lib/utils";
 
 import {
   autofixWorkflow,
+  getWorkflowExecutionStats,
   listWorkflowExecutions,
   resumeWorkflowExecution,
   type WorkflowExecutionRecord,
+  type WorkflowExecutionStats,
   type WorkflowExecutionStatus,
 } from "../_lib/api";
 
@@ -31,6 +33,16 @@ const STATUS_VARIANTS: Record<WorkflowExecutionStatus, string> = {
   pending_human: "bg-amber-500/15 text-amber-600 dark:text-amber-400",
   cancelled: "bg-muted text-muted-foreground",
 };
+
+function buildTimeline(steps: WorkflowExecutionRecord["steps"]) {
+  let offset = 0;
+  return steps.map((s) => {
+    const durationMs = s.durationMs ?? 0;
+    const entry = { ...s, offsetMs: offset, durationMs };
+    offset += durationMs;
+    return entry;
+  });
+}
 
 function formatOutput(output: unknown): string {
   if (output == null) return "—";
@@ -53,6 +65,7 @@ export function WorkflowExecutionsPanel({ workflowId, onApplyDefinition }: Workf
   const [reviewNote, setReviewNote] = useState("");
   const [resuming, setResuming] = useState(false);
   const [fixing, setFixing] = useState(false);
+  const [stats, setStats] = useState<WorkflowExecutionStats | null>(null);
 
   const statusLabel = (status: WorkflowExecutionStatus) =>
     t(`executions_status_${status}` as Parameters<typeof t>[0]);
@@ -61,8 +74,12 @@ export function WorkflowExecutionsPanel({ workflowId, onApplyDefinition }: Workf
     if (!workflowId || isNaN(workflowId)) return;
     setLoading(true);
     try {
-      const { executions: rows } = await listWorkflowExecutions(workflowId);
+      const [{ executions: rows }, statsRes] = await Promise.all([
+        listWorkflowExecutions(workflowId),
+        getWorkflowExecutionStats(workflowId).catch(() => ({ stats: null })),
+      ]);
       setExecutions(rows);
+      setStats(statsRes.stats);
       setSelectedKey((prev) => prev ?? rows[0]?.executionKey ?? null);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to load executions");
@@ -120,6 +137,29 @@ export function WorkflowExecutionsPanel({ workflowId, onApplyDefinition }: Workf
           {t("executions_refresh")}
         </Button>
       </div>
+
+      {stats && stats.total > 0 ? (
+        <div className="grid shrink-0 grid-cols-2 gap-2 border-b px-4 py-3 sm:grid-cols-4">
+          <div className="bg-muted/40 rounded-md border px-3 py-2">
+            <p className="text-muted-foreground text-[10px]">{t("obs_total_runs")}</p>
+            <p className="text-sm font-semibold tabular-nums">{stats.total}</p>
+          </div>
+          <div className="bg-muted/40 rounded-md border px-3 py-2">
+            <p className="text-muted-foreground text-[10px]">{t("obs_success_rate")}</p>
+            <p className="text-sm font-semibold tabular-nums">{stats.successRate}%</p>
+          </div>
+          <div className="bg-muted/40 rounded-md border px-3 py-2">
+            <p className="text-muted-foreground text-[10px]">{t("obs_avg_duration")}</p>
+            <p className="text-sm font-semibold tabular-nums">
+              {stats.avgDurationMs > 0 ? t("obs_ms", { ms: stats.avgDurationMs }) : "—"}
+            </p>
+          </div>
+          <div className="bg-muted/40 rounded-md border px-3 py-2">
+            <p className="text-muted-foreground text-[10px]">{t("obs_avg_cost")}</p>
+            <p className="text-sm font-semibold tabular-nums">{formatUsd(stats.avgCostVnd)}</p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Run list */}
@@ -225,6 +265,53 @@ export function WorkflowExecutionsPanel({ workflowId, onApplyDefinition }: Workf
                   {formatOutput(selected.output)}
                 </pre>
               </div>
+
+              {selected.steps.length > 0 ? (
+                <div>
+                  <p className="mb-2 text-xs font-medium">{t("obs_timeline")}</p>
+                  {(() => {
+                    const timeline = buildTimeline(selected.steps);
+                    const totalMs = timeline.reduce((s, x) => s + x.durationMs, 0) || 1;
+                    const wallMs =
+                      selected.finishedAt && selected.startedAt
+                        ? selected.finishedAt - selected.startedAt
+                        : totalMs;
+                    return (
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground text-[11px]">
+                          {t("obs_wall_duration")}: {t("obs_ms", { ms: wallMs })}
+                        </p>
+                        <ul className="space-y-1.5">
+                          {timeline.map((step) => (
+                            <li key={`${step.nodeId}-${step.offsetMs}`} className="flex items-center gap-2 text-[11px]">
+                              <span className="w-24 shrink-0 truncate font-mono">{step.nodeId}</span>
+                              <span className="text-muted-foreground w-16 shrink-0">{step.nodeType}</span>
+                              <div className="bg-muted h-2 min-w-0 flex-1 overflow-hidden rounded-full">
+                                <div
+                                  className={cn(
+                                    "h-full rounded-full",
+                                    step.status === "error"
+                                      ? "bg-red-500"
+                                      : step.status === "success"
+                                        ? "bg-emerald-500"
+                                        : "bg-amber-500",
+                                  )}
+                                  style={{ width: `${Math.max(4, (step.durationMs / totalMs) * 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-muted-foreground w-14 shrink-0 text-right tabular-nums">
+                                {step.durationMs}ms
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">{t("obs_no_timeline")}</p>
+              )}
 
               <details>
                 <summary className="cursor-pointer text-xs font-medium">

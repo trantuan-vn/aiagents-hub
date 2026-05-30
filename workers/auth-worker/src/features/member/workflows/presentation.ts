@@ -22,6 +22,12 @@ import {
 import { WORKFLOW_INTEGRATIONS } from './integrations.js';
 import { getVersionByKey, listVersions, snapshotVersion } from './version-store.js';
 import { autofixWorkflowDefinition, generateWorkflowDefinition } from './ai-authoring.js';
+import { getCollabState, publishCollabState } from './workflow-collab.js';
+import {
+  buildExecutionObservability,
+  computeExecutionStats,
+} from './execution-observability.js';
+import { isChannelTriggerType } from './triggers.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -50,7 +56,7 @@ const ResumeBodySchema = z.object({
 
 const CreateTriggerSchema = z
   .object({
-    type: z.enum(['cron', 'webhook']),
+    type: z.enum(['cron', 'webhook', 'telegram', 'slack', 'discord']),
     cronExpr: z.string().min(1).max(120).optional(),
     input: z.string().max(10000).optional(),
     enabled: z.boolean().optional(),
@@ -309,8 +315,60 @@ export function createWorkflowRoutes(bindingName: string) {
       const userDO = getUserDO(c, user.identifier);
       const row = await getExecutionByKey(userDO, executionKey);
       if (!row) return c.json({ error: 'Execution not found' }, 404);
-      return c.json({ execution: parseExecutionRow(row) });
+      const parsed = parseExecutionRow(row);
+      return c.json({
+        execution: parsed,
+        observability: buildExecutionObservability(row, parsed.steps),
+      });
     }, 'Failed to get execution'),
+  );
+
+  app.get(
+    '/:id/executions/stats',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const limit = Math.min(200, parseInt(c.req.query('limit') || '50', 10));
+      const userDO = getUserDO(c, user.identifier);
+      const rows = await listExecutions(userDO, id, limit);
+      return c.json({ stats: computeExecutionStats(rows) });
+    }, 'Failed to get execution stats'),
+  );
+
+  // --- Realtime canvas collaboration ---
+  app.get(
+    '/:id/collab',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const userDO = getUserDO(c, user.identifier);
+      const state = await getCollabState(userDO, id);
+      return c.json({ state });
+    }, 'Failed to get collab state'),
+  );
+
+  app.put(
+    '/:id/collab',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const body = (await c.req.json()) as {
+        definition: string;
+        editorId: string;
+        editorName?: string;
+      };
+      if (!body.definition || !body.editorId) {
+        return c.json({ error: 'definition and editorId required' }, 400);
+      }
+      const userDO = getUserDO(c, user.identifier);
+      const state = await publishCollabState(userDO, {
+        workflowId: id,
+        definition: body.definition,
+        editorId: body.editorId,
+        editorName: body.editorName,
+      });
+      return c.json({ state });
+    }, 'Failed to publish collab state'),
   );
 
   app.post(
@@ -369,12 +427,19 @@ export function createWorkflowRoutes(bindingName: string) {
     }, 'Failed to delete credential'),
   );
 
-  // --- Triggers (cron + webhook) ---
-  const buildWebhookUrl = (c: any, ownerId: string, token: string | null) => {
+  // --- Triggers (cron + webhook + OpenClaw channels) ---
+  const buildTriggerUrl = (c: any, ownerId: string, type: string, token: string | null) => {
     if (!token) return undefined;
     const base = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
-    return `${base}/hooks/workflows/${ownerId}/${token}`;
+    if (type === 'webhook') return `${base}/hooks/workflows/${ownerId}/${token}`;
+    if (isChannelTriggerType(type)) return `${base}/hooks/channels/${type}/${ownerId}/${token}`;
+    return undefined;
   };
+
+  const enrichTrigger = (c: any, ownerId: string, t: { type: string; webhookToken: string | null }) => ({
+    ...t,
+    webhookUrl: buildTriggerUrl(c, ownerId, t.type, t.webhookToken),
+  });
 
   app.get(
     '/:id/triggers',
@@ -386,7 +451,7 @@ export function createWorkflowRoutes(bindingName: string) {
       const ownerId = getUserId(c, user.identifier);
       const rows = await listTriggers(db, ownerId, id);
       return c.json({
-        triggers: rows.map((t) => ({ ...t, webhookUrl: buildWebhookUrl(c, ownerId, t.webhookToken) })),
+        triggers: rows.map((t) => enrichTrigger(c, ownerId, t)),
       });
     }, 'Failed to list triggers'),
   );
@@ -402,7 +467,7 @@ export function createWorkflowRoutes(bindingName: string) {
       const ownerId = getUserId(c, user.identifier);
       const trigger = await createTrigger(db, { ownerId, workflowId: id, ...body });
       return c.json(
-        { trigger: { ...trigger, webhookUrl: buildWebhookUrl(c, ownerId, trigger.webhookToken) } },
+        { trigger: enrichTrigger(c, ownerId, trigger) },
         201,
       );
     }, 'Failed to create trigger'),
@@ -419,7 +484,7 @@ export function createWorkflowRoutes(bindingName: string) {
       const trigger = await updateTrigger(db, ownerId, triggerId, body);
       if (!trigger) return c.json({ error: 'Trigger not found' }, 404);
       return c.json({
-        trigger: { ...trigger, webhookUrl: buildWebhookUrl(c, ownerId, trigger.webhookToken) },
+        trigger: enrichTrigger(c, ownerId, trigger),
       });
     }, 'Failed to update trigger'),
   );

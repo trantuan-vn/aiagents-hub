@@ -4,9 +4,13 @@ export * from './schemas'
 
 // Schema for WebSocket message validation
 export const WebSocketMessageSchema = z.object({
-  type: z.enum(['ping', 'subscribe', 'unsubscribe']),
+  type: z.enum(['ping', 'subscribe', 'unsubscribe', 'workflow_collab']),
   channel: z.string().optional(),
-  data: z.any().optional()
+  data: z.any().optional(),
+  workflowId: z.number().int().optional(),
+  definition: z.string().optional(),
+  editorId: z.string().max(80).optional(),
+  editorName: z.string().max(120).optional(),
 });
 
 export * from '../auth/domain';

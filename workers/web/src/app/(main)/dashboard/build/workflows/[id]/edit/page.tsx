@@ -12,6 +12,7 @@ import { normalizeWorkflowEdge } from "../../_components/workflow-edge-utils";
 import { WorkflowEditor } from "../../_components/workflow-editor";
 import { WorkflowEditorShell } from "../../_components/workflow-editor-shell";
 import { WorkflowExecuteDialog } from "../../_components/workflow-execute-dialog";
+import { useWorkflowCollab } from "../../_components/use-workflow-collab";
 import { getWorkflow, updateWorkflow } from "../../_lib/api";
 import { mergeAgentServiceEndpoint, readServiceEndpointFromDefinition } from "../../_lib/definition-utils";
 
@@ -85,6 +86,16 @@ export default function EditWorkflowPage() {
   const handleAddStickyNote = useCallback(() => {
     setDefinition(JSON.stringify(addStickyNoteToDefinition(parseDef(definition))));
   }, [definition]);
+
+  useWorkflowCollab({
+    workflowId: id,
+    definition,
+    enabled: !loading && !!id,
+    onRemoteDefinition: (json) => {
+      setDefinition(json);
+      setServiceEndpoint(readServiceEndpointFromDefinition(json));
+    },
+  });
 
   const onSave = async () => {
     setSaving(true);
