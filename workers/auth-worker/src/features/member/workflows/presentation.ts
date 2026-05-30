@@ -8,9 +8,18 @@ import {
   AgentWorkflowSchema,
   WorkflowCommentSchema,
   WorkflowUserStarSchema,
+  WorkflowCredentialTypeSchema,
 } from './domain';
 import { executeWorkflowGraph, resumeWorkflowExecution } from './executor.js';
 import { getExecutionByKey, listExecutions } from './execution-store.js';
+import { createCredential, deleteCredential, listCredentials } from './credentials.js';
+import {
+  createTrigger,
+  deleteTrigger,
+  listTriggers,
+  updateTrigger,
+} from './triggers.js';
+import { WORKFLOW_INTEGRATIONS } from './integrations.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -35,6 +44,38 @@ const ExecuteBodySchema = z.object({
 const ResumeBodySchema = z.object({
   decision: z.enum(['approve', 'reject']).default('approve'),
   note: z.string().max(2000).optional(),
+});
+
+const CreateTriggerSchema = z
+  .object({
+    type: z.enum(['cron', 'webhook']),
+    cronExpr: z.string().min(1).max(120).optional(),
+    input: z.string().max(10000).optional(),
+    enabled: z.boolean().optional(),
+    autoApproveHumanReview: z.boolean().optional(),
+  })
+  .refine((d) => d.type !== 'cron' || !!d.cronExpr, {
+    message: 'cronExpr is required for cron triggers',
+  });
+
+const UpdateTriggerSchema = z.object({
+  enabled: z.boolean().optional(),
+  cronExpr: z.string().min(1).max(120).optional(),
+  input: z.string().max(10000).optional(),
+  autoApproveHumanReview: z.boolean().optional(),
+});
+
+const CreateCredentialSchema = z.object({
+  name: z.string().min(1).max(120),
+  type: WorkflowCredentialTypeSchema,
+  secret: z.string().max(8000).optional().default(''),
+  meta: z
+    .object({
+      headerName: z.string().max(120).optional(),
+      paramName: z.string().max(120).optional(),
+      username: z.string().max(200).optional(),
+    })
+    .optional(),
 });
 
 function parseExecutionRow(row: any) {
@@ -285,6 +326,112 @@ export function createWorkflowRoutes(bindingName: string) {
       });
       return c.json(result);
     }, 'Failed to resume execution'),
+  );
+
+  // --- Integration presets catalog ---
+  app.get(
+    '/integrations',
+    createRouteHandler(async (c: any) => {
+      return c.json({ integrations: WORKFLOW_INTEGRATIONS });
+    }, 'Failed to list integrations'),
+  );
+
+  // --- Credential vault (secrets stored encrypted, never returned) ---
+  app.get(
+    '/credentials',
+    createRouteHandler(async (c: any, user: any) => {
+      const userDO = getUserDO(c, user.identifier);
+      const credentials = await listCredentials(userDO);
+      return c.json({ credentials });
+    }, 'Failed to list credentials'),
+  );
+
+  app.post(
+    '/credentials',
+    createRouteHandler(async (c: any, user: any) => {
+      const body = CreateCredentialSchema.parse(await c.req.json());
+      const userDO = getUserDO(c, user.identifier);
+      const credential = await createCredential(userDO, c.env, body);
+      return c.json({ credential }, 201);
+    }, 'Failed to create credential'),
+  );
+
+  app.delete(
+    '/credentials/:id',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid credential id');
+      const userDO = getUserDO(c, user.identifier);
+      await deleteCredential(userDO, id);
+      return c.json({ success: true });
+    }, 'Failed to delete credential'),
+  );
+
+  // --- Triggers (cron + webhook) ---
+  const buildWebhookUrl = (c: any, ownerId: string, token: string | null) => {
+    if (!token) return undefined;
+    const base = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
+    return `${base}/hooks/workflows/${ownerId}/${token}`;
+  };
+
+  app.get(
+    '/:id/triggers',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const ownerId = getUserId(c, user.identifier);
+      const rows = await listTriggers(db, ownerId, id);
+      return c.json({
+        triggers: rows.map((t) => ({ ...t, webhookUrl: buildWebhookUrl(c, ownerId, t.webhookToken) })),
+      });
+    }, 'Failed to list triggers'),
+  );
+
+  app.post(
+    '/:id/triggers',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const body = CreateTriggerSchema.parse(await c.req.json());
+      const ownerId = getUserId(c, user.identifier);
+      const trigger = await createTrigger(db, { ownerId, workflowId: id, ...body });
+      return c.json(
+        { trigger: { ...trigger, webhookUrl: buildWebhookUrl(c, ownerId, trigger.webhookToken) } },
+        201,
+      );
+    }, 'Failed to create trigger'),
+  );
+
+  app.put(
+    '/triggers/:triggerId',
+    createRouteHandler(async (c: any, user: any) => {
+      const triggerId = c.req.param('triggerId');
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const body = UpdateTriggerSchema.parse(await c.req.json());
+      const ownerId = getUserId(c, user.identifier);
+      const trigger = await updateTrigger(db, ownerId, triggerId, body);
+      if (!trigger) return c.json({ error: 'Trigger not found' }, 404);
+      return c.json({
+        trigger: { ...trigger, webhookUrl: buildWebhookUrl(c, ownerId, trigger.webhookToken) },
+      });
+    }, 'Failed to update trigger'),
+  );
+
+  app.delete(
+    '/triggers/:triggerId',
+    createRouteHandler(async (c: any, user: any) => {
+      const triggerId = c.req.param('triggerId');
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const ownerId = getUserId(c, user.identifier);
+      await deleteTrigger(db, ownerId, triggerId);
+      return c.json({ success: true });
+    }, 'Failed to delete trigger'),
   );
 
   app.get(

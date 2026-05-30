@@ -8,7 +8,7 @@ import { WorkflowEditorHeaderEditActions, WorkflowEditorHeaderViewActions } from
 import { WorkflowEditorHeaderLeft } from "./workflow-editor-header-left";
 import { WorkflowEditorHeaderTabs } from "./workflow-editor-header-tabs";
 
-export type WorkflowEditorTab = "editor" | "executions" | "evaluations";
+export type WorkflowEditorTab = "editor" | "executions" | "triggers" | "evaluations";
 
 interface WorkflowEditorHeaderProps {
   workflowName: string;

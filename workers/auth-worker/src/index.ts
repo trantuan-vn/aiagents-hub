@@ -21,6 +21,8 @@ import { createPaymentRoutes } from './features/member/vnpay/presentation';
 import { createPaypalRoutes } from './features/member/paypal/presentation';
 import { createAssistantRoutes } from './features/assistant/presentation';
 import { createWorkflowRoutes } from './features/member/workflows/presentation';
+import { createWorkflowHookRoutes } from './features/member/workflows/hooks-presentation';
+import { runDueCronTriggers } from './features/member/workflows/triggers';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -109,6 +111,9 @@ function createRoutes(bindingName: string) {
   routes.route('/api/ekyc', createEkycRoutes(bindingName));
   routes.route('/api/ws', createApiWebSocketRoutes(bindingName));
 
+  // III. PUBLIC WEBHOOKS (no auth; authorized by per-trigger token in the URL)
+  routes.route('/hooks', createWorkflowHookRoutes(bindingName));
+
   return routes;
 }
 
@@ -151,5 +156,15 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
-  }
+  },
+  // Cron trigger (every minute): run workflow cron triggers that are due now.
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      runDueCronTriggers(env, "USER_DO").catch((err) => {
+        log.warn('cron.workflow_triggers_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }),
+    );
+  },
 } satisfies ExportedHandler<Env, Error>;

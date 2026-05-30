@@ -161,6 +161,119 @@ export function resumeWorkflowExecution(
   );
 }
 
+// --- Triggers (cron + webhook) ---
+export type WorkflowTriggerType = "cron" | "webhook";
+
+export interface WorkflowTrigger {
+  triggerId: string;
+  ownerId: string;
+  workflowId: number;
+  type: WorkflowTriggerType;
+  enabled: number;
+  cronExpr: string | null;
+  webhookToken: string | null;
+  webhookUrl?: string;
+  input: string | null;
+  autoApproveHumanReview: number;
+  lastRunMinute: string | null;
+  lastRunAt: number | null;
+  lastStatus: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export function listWorkflowTriggers(workflowId: number) {
+  return apiFetch<{ triggers: WorkflowTrigger[] }>(
+    `/dashboard/build/workflows/${workflowId}/triggers`,
+  );
+}
+
+export function createWorkflowTrigger(
+  workflowId: number,
+  body: {
+    type: WorkflowTriggerType;
+    cronExpr?: string;
+    input?: string;
+    enabled?: boolean;
+    autoApproveHumanReview?: boolean;
+  },
+) {
+  return apiFetch<{ trigger: WorkflowTrigger }>(
+    `/dashboard/build/workflows/${workflowId}/triggers`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export function updateWorkflowTrigger(
+  triggerId: string,
+  body: { enabled?: boolean; cronExpr?: string; input?: string; autoApproveHumanReview?: boolean },
+) {
+  return apiFetch<{ trigger: WorkflowTrigger }>(
+    `/dashboard/build/workflows/triggers/${triggerId}`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
+}
+
+export function deleteWorkflowTrigger(triggerId: string) {
+  return apiFetch<{ success: boolean }>(`/dashboard/build/workflows/triggers/${triggerId}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Credential vault ---
+export type WorkflowCredentialType = "bearer" | "header" | "basic" | "query" | "none";
+
+export interface WorkflowCredential {
+  id: number;
+  credentialKey: string;
+  name: string;
+  type: WorkflowCredentialType;
+  meta: { headerName?: string; paramName?: string; username?: string };
+  created_at?: number;
+  updated_at?: number;
+}
+
+export function listWorkflowCredentials() {
+  return apiFetch<{ credentials: WorkflowCredential[] }>(
+    "/dashboard/build/workflows/credentials",
+  );
+}
+
+export function createWorkflowCredential(body: {
+  name: string;
+  type: WorkflowCredentialType;
+  secret?: string;
+  meta?: { headerName?: string; paramName?: string; username?: string };
+}) {
+  return apiFetch<{ credential: WorkflowCredential }>(
+    "/dashboard/build/workflows/credentials",
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export function deleteWorkflowCredential(id: number) {
+  return apiFetch<{ success: boolean }>(`/dashboard/build/workflows/credentials/${id}`, {
+    method: "DELETE",
+  });
+}
+
+// --- Integration presets ---
+export interface IntegrationPreset {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  docsUrl: string;
+  credentialType: WorkflowCredentialType;
+  node: { method: string; url: string; headers?: Record<string, string>; body?: unknown; jsonResponse?: boolean };
+}
+
+export function listWorkflowIntegrations() {
+  return apiFetch<{ integrations: IntegrationPreset[] }>(
+    "/dashboard/build/workflows/integrations",
+  );
+}
+
 export function workflowChatApiUrl(workflowId: number, ownerId?: string) {
   const q = ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : "";
   if (ownerId) {

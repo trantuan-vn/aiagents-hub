@@ -9,6 +9,8 @@ export const WorkflowNodeTypeSchema = z.enum([
   'core',
   'action_in_app',
   'data_transformation',
+  'http_request',
+  'code',
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
@@ -116,6 +118,33 @@ export const WorkflowRoyaltySchema = z.object({
   royaltyAmountUsd: z.number().min(0),
   currency: z.string().default('USD'),
 });
+
+/**
+ * How a stored credential is applied to an outbound HTTP request.
+ * The secret material itself is stored encrypted (`secretEnc`); only
+ * non-sensitive routing metadata lives in `meta`.
+ */
+export const WorkflowCredentialTypeSchema = z.enum([
+  'bearer',
+  'header',
+  'basic',
+  'query',
+  'none',
+]);
+
+export const WorkflowCredentialSchema = z.object({
+  /** Stable public id (uuid), unique per user. */
+  credentialKey: z.string().min(1).max(80),
+  name: z.string().min(1).max(120),
+  type: WorkflowCredentialTypeSchema.default('bearer'),
+  /** Encrypted JSON blob holding the secret (token/password/value). */
+  secretEnc: z.string().default(''),
+  /** JSON string of non-secret metadata (headerName, paramName, username). */
+  meta: z.string().default('{}'),
+});
+
+export type WorkflowCredential = z.infer<typeof WorkflowCredentialSchema>;
+export type WorkflowCredentialType = z.infer<typeof WorkflowCredentialTypeSchema>;
 
 export type AgentWorkflow = z.infer<typeof AgentWorkflowSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;

@@ -57,6 +57,10 @@
 	"observability": {
 		"enabled": true
 	},
+	// Runs every minute; the scheduled handler fans out to due workflow cron triggers.
+	"triggers": {
+		"crons": ["* * * * *"]
+	},
 	"images": {
 		"binding": "IMAGES" // i.e. available in your Worker on env.IMAGES
 	},

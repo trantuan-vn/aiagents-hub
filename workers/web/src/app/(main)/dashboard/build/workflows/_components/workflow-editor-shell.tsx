@@ -10,6 +10,7 @@ import { WorkflowEditorSettingsSheet } from "./workflow-editor-settings-sheet";
 import { resolveWorkflowEditorShellProps, type WorkflowEditorShellProps } from "./workflow-editor-shell-props";
 import { WorkflowEditorShellWorkspace } from "./workflow-editor-shell-workspace";
 import { WorkflowExecutionsPanel } from "./workflow-executions-panel";
+import { WorkflowTriggersPanel } from "./workflow-triggers-panel";
 
 export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const {
@@ -64,6 +65,10 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
       {activeTab === "executions" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <WorkflowExecutionsPanel workflowId={workflowId} />
+        </div>
+      ) : activeTab === "triggers" ? (
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <WorkflowTriggersPanel workflowId={workflowId} />
         </div>
       ) : (
         <WorkflowEditorShellWorkspace

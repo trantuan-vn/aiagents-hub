@@ -17,6 +17,8 @@ import {
   getExecutionByKey,
   updateExecution,
 } from './execution-store.js';
+import { resolveCredential } from './credentials.js';
+import { runCodeNode, runHttpRequest } from './node-runtime.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -54,6 +56,11 @@ export interface ExecuteWorkflowParams {
   variables?: Record<string, unknown>;
   autoApproveHumanReview?: boolean;
   requestMeta?: { userAgent?: string; ipAddress?: string };
+  /**
+   * When set, the run executes against the Durable Object addressed by this id
+   * string (used by triggers, where no authenticated identifier is available).
+   */
+  runnerDoIdString?: string;
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -178,6 +185,23 @@ async function queryVectorMemory(
   }
 }
 
+/**
+ * Resolve the runner Durable Object. Interactive runs address it by identifier;
+ * trigger runs (no identifier) address it directly by DO id string.
+ */
+function resolveRunnerDO(
+  c: any,
+  bindingName: string,
+  identifier: string,
+  runnerDoIdString?: string,
+): DurableObjectStub<UserDO> {
+  if (runnerDoIdString) {
+    const binding = c.env[bindingName] as DurableObjectNamespace;
+    return binding.get(binding.idFromString(runnerDoIdString)) as DurableObjectStub<UserDO>;
+  }
+  return getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
@@ -228,10 +252,33 @@ async function executeNodeLogic(
   onCost: (vnd: number) => void,
 ): Promise<NodeOutput> {
   const data = (node.data ?? {}) as Record<string, unknown>;
+  const scope: Record<string, unknown> = {
+    ...nodeInput,
+    input: ctx.input ?? '',
+    variables: ctx.runContext.variables ?? {},
+  };
 
   switch (node.type) {
     case 'trigger':
       return { ...ctx.runContext, triggeredAt: Date.now(), text: ctx.input ?? '' };
+
+    case 'http_request': {
+      const credentialKey = String(data.credentialId ?? data.credentialKey ?? '');
+      const credential = credentialKey
+        ? await resolveCredential(ctx.userDO, ctx.c.env, credentialKey)
+        : null;
+      const result = await runHttpRequest(data, scope, credential);
+      if (!result.ok && data.failOnError !== false) {
+        throw new Error(`HTTP request failed with status ${result.status}`);
+      }
+      const text =
+        result.text ??
+        (typeof result.body === 'string' ? result.body : JSON.stringify(result.body));
+      return { status: result.status, ok: result.ok, headers: result.headers, data: result.body, text };
+    }
+
+    case 'code':
+      return { ...runCodeNode(data, scope) };
 
     case 'agent': {
       const endpoint = String(data.serviceEndpoint ?? data.endpoint ?? '').trim();
@@ -487,7 +534,7 @@ export async function executeWorkflowGraph(
 ): Promise<WorkflowExecutionResult> {
   const { c, bindingName, user, resolved, input, variables = {}, autoApproveHumanReview } = params;
   const { definition } = resolved;
-  const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+  const userDO = resolveRunnerDO(c, bindingName, user.identifier, params.runnerDoIdString);
   const executionKey = crypto.randomUUID();
 
   if (!definition.nodes.length) {

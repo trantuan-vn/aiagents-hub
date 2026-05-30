@@ -22,6 +22,7 @@ export function WorkflowEditorHeaderTabs({
   const tabs: { id: WorkflowEditorTab; label: string; disabled?: boolean }[] = [
     { id: "editor", label: te("tab_editor") },
     { id: "executions", label: te("tab_executions") },
+    { id: "triggers", label: te("tab_triggers"), disabled: readOnly },
     { id: "evaluations", label: te("tab_evaluations"), disabled: readOnly },
   ];
 

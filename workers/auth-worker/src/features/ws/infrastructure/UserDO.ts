@@ -17,7 +17,7 @@ import {
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
   CommissionPolicyObjectSchema, CommissionSchema,
   AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
-  WorkflowExecutionSchema,
+  WorkflowExecutionSchema, WorkflowCredentialSchema,
   PayoutBeneficiaryRecordSchema, EarningsPayoutSchema,
 } from '../domain.js';
 
@@ -157,6 +157,9 @@ export class UserDO extends DurableObject {
       // Durable workflow run history. Kept DO-local (not queue-synced) so paused
       // runs retain their engine state for resume/replay.
       this.table('workflow_executions', WorkflowExecutionSchema, this.TABLE_CONFIGS.withUniqueIndex('executionKey'));
+      // Credential vault. Kept DO-local (never queue-synced) so encrypted secrets
+      // never leave the user's Durable Object.
+      this.table('workflow_credentials', WorkflowCredentialSchema, this.TABLE_CONFIGS.withUniqueIndex('credentialKey'));
       this.table('payout_beneficiary', extendWithQueue(PayoutBeneficiaryRecordSchema), this.TABLE_CONFIGS.queueTable());
       this.table(
         'earnings_payouts',
