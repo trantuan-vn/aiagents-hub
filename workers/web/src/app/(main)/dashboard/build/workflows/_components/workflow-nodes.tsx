@@ -207,7 +207,7 @@ HumanReviewNode.displayName = "HumanReviewNode";
 
 export const FlowNode = memo((props: NodeProps) => (
   <SimpleNode
-    label="Flow"
+    label={String((props.data as { label?: string }).label ?? "Flow")}
     icon={GitBranch}
     accent="border-sky-500/40"
     selected={props.selected}

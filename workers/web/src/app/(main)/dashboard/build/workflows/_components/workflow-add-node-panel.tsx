@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  GitBranch,
   Search,
   Server,
 } from "lucide-react";
@@ -30,6 +31,20 @@ import {
   type HumanReviewChannelItem,
 } from "./workflow-human-review-catalog";
 import { WORKFLOW_FLOW_NODE_PALETTE } from "./workflow-node-palette";
+import {
+  WORKFLOW_FLOW_OTHER,
+  WORKFLOW_FLOW_POPULAR,
+  type WorkflowFlowCatalogItem,
+} from "./workflow-flow-catalog";
+import {
+  WORKFLOW_TRIGGER_APP_EVENTS,
+  WORKFLOW_TRIGGER_CATALOG,
+  WORKFLOW_TRIGGER_OTHER,
+  type WorkflowTriggerAppEventItem,
+  type WorkflowTriggerCatalogItem,
+  type WorkflowTriggerKindId,
+  type WorkflowTriggerOtherItem,
+} from "./workflow-trigger-catalog";
 
 const FLOW_NODE_TYPES = new Set<string>(WORKFLOW_FLOW_NODE_PALETTE.map((item) => item.type));
 
@@ -47,7 +62,17 @@ interface WorkflowAddNodePanelProps {
   variant?: "full" | "connect";
 }
 
-type PanelView = "categories" | "ai" | "memory" | "tools" | "services" | "human_review";
+type PanelView =
+  | "categories"
+  | "ai"
+  | "memory"
+  | "tools"
+  | "services"
+  | "human_review"
+  | "flow"
+  | "triggers"
+  | "trigger_app_event"
+  | "trigger_other";
 
 export function WorkflowAddNodePanel({
   onPick,
@@ -60,6 +85,8 @@ export function WorkflowAddNodePanel({
   const [query, setQuery] = useState("");
   const [view, setView] = useState<PanelView>("categories");
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
+  const [flowPopularExpanded, setFlowPopularExpanded] = useState(true);
+  const [flowOtherExpanded, setFlowOtherExpanded] = useState(true);
   const { services, loading: servicesLoading } = useApprovedServices();
 
   const q = query.trim().toLowerCase();
@@ -133,6 +160,46 @@ export function WorkflowAddNodePanel({
     });
   }, [q, t]);
 
+  const filteredTriggers = useMemo(() => {
+    return WORKFLOW_TRIGGER_CATALOG.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTriggerApps = useMemo(() => {
+    return WORKFLOW_TRIGGER_APP_EVENTS.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTriggerOther = useMemo(() => {
+    return WORKFLOW_TRIGGER_OTHER.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredFlowPopular = useMemo(() => {
+    return WORKFLOW_FLOW_POPULAR.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredFlowOther = useMemo(() => {
+    return WORKFLOW_FLOW_OTHER.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
   const showTrigger =
     variant === "full" &&
     !allowedNodeTypes?.length &&
@@ -144,17 +211,27 @@ export function WorkflowAddNodePanel({
   const title =
     variant === "connect"
       ? t("connect_add_node")
-      : activeView === "ai"
-        ? t("add_category_ai")
-        : activeView === "services"
-          ? t("add_ai_services_title")
-          : activeView === "memory"
-            ? t("search_section_memory")
-            : activeView === "tools"
-              ? t("search_section_tools")
-              : activeView === "human_review"
-                ? t("add_category_human_review")
-                : t("what_happens_next");
+      : activeView === "triggers"
+        ? t("what_triggers_workflow")
+        : activeView === "trigger_app_event"
+          ? t("trigger_kind_app_event")
+          : activeView === "trigger_other"
+            ? t("trigger_kind_other")
+            : activeView === "ai"
+              ? t("add_category_ai")
+              : activeView === "services"
+                ? t("add_ai_services_title")
+                : activeView === "memory"
+                  ? t("search_section_memory")
+                  : activeView === "tools"
+                    ? t("search_section_tools")
+                    : activeView === "human_review"
+                      ? t("add_category_human_review")
+                      : activeView === "flow"
+                        ? t("add_category_flow")
+                        : t("what_happens_next");
+
+  const showTriggerSubtitle = activeView === "triggers";
 
   const pickCategory = (category: WorkflowAddNodeCategory) => {
     if (category.id === "ai") {
@@ -165,7 +242,19 @@ export function WorkflowAddNodePanel({
       setView("human_review");
       return;
     }
+    if (category.id === "flow") {
+      setView("flow");
+      return;
+    }
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
+  };
+
+  const pickFlowItem = (item: WorkflowFlowCatalogItem) => {
+    onPick({
+      type: "flow",
+      label: t(item.nameKey),
+      extra: { flowKind: item.id },
+    });
   };
 
   const pickHumanReviewChannel = (channel: HumanReviewChannelItem) => {
@@ -174,6 +263,34 @@ export function WorkflowAddNodePanel({
       label: t(channel.nameKey),
       extra: { channel: channel.id, reviewMode: "send_and_wait" },
     });
+  };
+
+  const pickTrigger = (kind: WorkflowTriggerKindId, label: string, extra?: Record<string, unknown>) => {
+    onPick({
+      type: WORKFLOW_ADD_TRIGGER.nodeType,
+      label,
+      extra: { triggerKind: kind, ...extra },
+    });
+  };
+
+  const pickTriggerCatalogItem = (item: WorkflowTriggerCatalogItem) => {
+    if (item.id === "app_event") {
+      setView("trigger_app_event");
+      return;
+    }
+    if (item.id === "other") {
+      setView("trigger_other");
+      return;
+    }
+    pickTrigger(item.id, t(item.nameKey));
+  };
+
+  const pickTriggerApp = (app: WorkflowTriggerAppEventItem) => {
+    pickTrigger("app_event", t(app.nameKey), { channel: app.id });
+  };
+
+  const pickTriggerOtherItem = (item: WorkflowTriggerOtherItem) => {
+    pickTrigger("other", t(item.nameKey), { otherKind: item.id });
   };
 
   const pickAgent = () => {
@@ -190,15 +307,28 @@ export function WorkflowAddNodePanel({
 
   const goBack = () => {
     if (resourceOnly) return;
+    if (activeView === "trigger_app_event" || activeView === "trigger_other") {
+      setView("triggers");
+      setQuery("");
+      return;
+    }
     setView("categories");
     setQuery("");
     setSendWaitExpanded(true);
+    setFlowPopularExpanded(true);
+    setFlowOtherExpanded(true);
   };
 
   const showBack = activeView !== "categories" && !resourceOnly;
 
   const HeaderIcon =
-    activeView === "human_review" ? CheckCircle2 : activeView === "ai" ? Bot : null;
+    activeView === "human_review"
+      ? CheckCircle2
+      : activeView === "flow"
+        ? GitBranch
+        : activeView === "ai"
+          ? Bot
+          : null;
 
   return (
     <div className={cn("flex w-[min(100vw-2rem,380px)] flex-col", className)}>
@@ -215,7 +345,12 @@ export function WorkflowAddNodePanel({
             </button>
           ) : null}
           {HeaderIcon ? <HeaderIcon className="text-muted-foreground size-4 shrink-0" aria-hidden /> : null}
-          <h2 className="text-sm font-semibold">{title}</h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold">{title}</h2>
+            {showTriggerSubtitle ? (
+              <p className="text-muted-foreground mt-0.5 text-xs leading-snug">{t("trigger_starts_workflow")}</p>
+            ) : null}
+          </div>
         </div>
         <div className="relative">
           <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
@@ -239,7 +374,7 @@ export function WorkflowAddNodePanel({
                 title={t(category.titleKey)}
                 description={t(category.descKey)}
                 highlighted={index === 0 && category.id === "ai"}
-                hasSubmenu={category.id === "ai" || category.id === "human_review"}
+                hasSubmenu={category.id === "ai" || category.id === "human_review" || category.id === "flow"}
                 onClick={() => pickCategory(category)}
               />
             ))}
@@ -251,9 +386,8 @@ export function WorkflowAddNodePanel({
                   icon={WORKFLOW_ADD_TRIGGER.icon}
                   title={t(WORKFLOW_ADD_TRIGGER.titleKey)}
                   description={t(WORKFLOW_ADD_TRIGGER.descKey)}
-                  onClick={() =>
-                    onPick({ type: WORKFLOW_ADD_TRIGGER.nodeType, label: t(WORKFLOW_ADD_TRIGGER.nodeKey) })
-                  }
+                  hasSubmenu
+                  onClick={() => setView("triggers")}
                 />
               </>
             ) : null}
@@ -356,6 +490,95 @@ export function WorkflowAddNodePanel({
             ) : null}
           </div>
         ) : null}
+
+        {activeView === "flow" ? (
+          <div className="p-1">
+            <FlowSection
+              title={t("flow_section_popular")}
+              expanded={flowPopularExpanded}
+              onToggle={() => setFlowPopularExpanded((v) => !v)}
+            >
+              {filteredFlowPopular.map((item, index) => (
+                <FlowItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  highlighted={index === 0}
+                  onClick={() => pickFlowItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("flow_section_other")}
+              expanded={flowOtherExpanded}
+              onToggle={() => setFlowOtherExpanded((v) => !v)}
+            >
+              {filteredFlowOther.map((item) => (
+                <FlowItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  onClick={() => pickFlowItem(item)}
+                />
+              ))}
+            </FlowSection>
+            {filteredFlowPopular.length === 0 && filteredFlowOther.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "triggers" ? (
+          <div className="p-1">
+            {filteredTriggers.map((item) => (
+              <CategoryRow
+                key={item.id}
+                icon={item.icon}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                hasSubmenu={item.hasSubmenu}
+                onClick={() => pickTriggerCatalogItem(item)}
+              />
+            ))}
+            {filteredTriggers.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "trigger_app_event" ? (
+          <div className="p-1">
+            {filteredTriggerApps.map((app) => (
+              <PickRow
+                key={app.id}
+                title={t(app.nameKey)}
+                description={t(app.descKey)}
+                onClick={() => pickTriggerApp(app)}
+              />
+            ))}
+            {filteredTriggerApps.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "trigger_other" ? (
+          <div className="p-1">
+            {filteredTriggerOther.map((item) => (
+              <PickRow
+                key={item.id}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                onClick={() => pickTriggerOtherItem(item)}
+              />
+            ))}
+            {filteredTriggerOther.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
       </ScrollArea>
     </div>
   );
@@ -423,6 +646,64 @@ function ChannelIcon({ channel }: { channel: HumanReviewChannelItem }) {
   const Icon = channel.lucideIcon;
   if (!Icon) return null;
   return <Icon className="text-muted-foreground size-5 shrink-0" aria-hidden />;
+}
+
+function FlowSection({
+  title,
+  expanded,
+  onToggle,
+  children,
+}: {
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="text-muted-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs font-medium tracking-wide uppercase"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        {title}
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", expanded && "rotate-180")} aria-hidden />
+      </button>
+      {expanded ? <div className="pb-1">{children}</div> : null}
+    </>
+  );
+}
+
+function FlowItemRow({
+  icon: Icon,
+  title,
+  description,
+  highlighted,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  highlighted?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+    </button>
+  );
 }
 
 function PickRow({
