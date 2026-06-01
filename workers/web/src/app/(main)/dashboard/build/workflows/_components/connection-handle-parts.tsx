@@ -11,7 +11,6 @@ import { cn } from "@/lib/utils";
 import { useWorkflowCanvasUi, type ConnectedNodeSide } from "./workflow-canvas-ui-context";
 import { edgeUsesHandle, type WorkflowHandleId } from "./workflow-connection-utils";
 import type { WorkflowAddNodePick } from "./workflow-add-node-panel";
-import { useWorkflowAddNodeDrawer } from "./workflow-add-node-drawer-context";
 
 export function useHandleConnectionState(
   nodeId: string | null,
@@ -85,9 +84,7 @@ export function ConnectionHandleWithPlus({
   t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
   allowedNodeTypes?: string[];
 }) {
-  const ui = useWorkflowCanvasUi();
-  const drawer = useWorkflowAddNodeDrawer();
-  const openDrawer = ui?.openAddNodeDrawer ?? drawer?.open;
+  const openDrawer = useWorkflowCanvasUi()?.openAddNodeDrawer;
 
   return (
     <Handle
@@ -103,7 +100,7 @@ export function ConnectionHandleWithPlus({
         type="button"
         className="nodrag nopan text-foreground focus-visible:ring-ring flex h-full w-full cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-none outline-none focus-visible:ring-2"
         aria-label={t("connect_add_node")}
-        aria-expanded={drawer?.isOpen ?? false}
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           openDrawer?.({

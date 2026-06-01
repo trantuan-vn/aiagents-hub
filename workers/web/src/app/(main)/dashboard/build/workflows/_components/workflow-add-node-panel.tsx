@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   BadgeCheck,
@@ -112,6 +112,8 @@ interface WorkflowAddNodePanelProps {
   variant?: "full" | "connect";
   /** Fill parent height (right slide drawer) */
   fillHeight?: boolean;
+  /** Increment when drawer opens to reset navigation without remounting. */
+  resetOnOpenGeneration?: number;
 }
 
 type PanelView =
@@ -138,6 +140,7 @@ export function WorkflowAddNodePanel({
   className,
   variant = "full",
   fillHeight = false,
+  resetOnOpenGeneration = 0,
 }: WorkflowAddNodePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
   const [query, setQuery] = useState("");
@@ -155,6 +158,13 @@ export function WorkflowAddNodePanel({
   const [transformCombineExpanded, setTransformCombineExpanded] = useState(false);
   const [transformConvertExpanded, setTransformConvertExpanded] = useState(true);
   const [transformOtherExpanded, setTransformOtherExpanded] = useState(true);
+
+  useEffect(() => {
+    if (resetOnOpenGeneration <= 0) return;
+    setQuery("");
+    setView("categories");
+    setSelectedActionApp(null);
+  }, [resetOnOpenGeneration]);
   const { services, loading: servicesLoading } = useApprovedServices();
   const { integrations, loading: integrationsLoading } = useWorkflowIntegrations();
 

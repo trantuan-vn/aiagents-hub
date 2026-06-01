@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, type MutableRefObject } from "react";
+import { memo, useCallback, useMemo, useRef, type MutableRefObject } from "react";
 
 import { Background, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -12,11 +12,11 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { useWorkflowCanvasState } from "./use-workflow-canvas-state";
 import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
 import { WorkflowCanvasMinimap } from "./workflow-canvas-minimap";
-import { WorkflowAddNodeDrawer } from "./workflow-add-node-drawer";
-import { WorkflowAddNodeDrawerProvider, useWorkflowAddNodeDrawer } from "./workflow-add-node-drawer-context";
+import { useWorkflowAddNodeDrawerActions } from "./workflow-add-node-drawer-context";
 import { WorkflowCanvasSideToolbar } from "./workflow-canvas-side-toolbar";
+import { WorkflowCanvasInitialFit } from "./workflow-canvas-initial-fit";
 import { WorkflowCanvasTidyBridge } from "./workflow-canvas-ui-bridge";
-import { WorkflowCanvasUiContext } from "./workflow-canvas-ui-context";
+import { useWorkflowCanvasUi, WorkflowCanvasUiContext } from "./workflow-canvas-ui-context";
 import { toPersistedDefinition, type WorkflowDefinition } from "./workflow-definition";
 import { WorkflowDeletableEdge } from "./workflow-deletable-edge";
 import { WorkflowEdgeMarkers } from "./workflow-edge-markers";
@@ -78,20 +78,33 @@ function CanvasInner({
     isValidConnection,
   } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint);
 
-  const interactionProps = readOnly
-    ? READONLY_FLOW_PROPS
-    : {
-        onNodesChange,
-        onEdgesChange,
-        onConnect,
-        onNodeDragStop,
-        onNodesDelete,
-        onEdgesDelete,
-        nodesDraggable: true,
-        nodesConnectable: true,
-        elementsSelectable: true,
-        isValidConnection,
-      };
+  const interactionProps = useMemo(
+    () =>
+      readOnly
+        ? READONLY_FLOW_PROPS
+        : {
+            onNodesChange,
+            onEdgesChange,
+            onConnect,
+            onNodeDragStop,
+            onNodesDelete,
+            onEdgesDelete,
+            nodesDraggable: true,
+            nodesConnectable: true,
+            elementsSelectable: true,
+            isValidConnection,
+          },
+    [
+      readOnly,
+      onNodesChange,
+      onEdgesChange,
+      onConnect,
+      onNodeDragStop,
+      onNodesDelete,
+      onEdgesDelete,
+      isValidConnection,
+    ],
+  );
 
   const tidyWithFitRef = useRef<(() => void) | undefined>(undefined);
   const onTidyWithFitReady = useCallback((fn: (() => void) | undefined) => {
@@ -99,25 +112,23 @@ function CanvasInner({
   }, []);
 
   return (
-    <WorkflowAddNodeDrawerProvider>
-      <CanvasInnerWithDrawerUi
-        className={className}
-        themeMode={themeMode}
-        nodes={nodes}
-        edges={edges}
-        interactionProps={interactionProps}
-        readOnly={readOnly}
-        tidyLayout={tidyLayout}
-        onTidyWithFitReady={onTidyWithFitReady}
-        onExecute={onExecute}
-        createConnectedNode={createConnectedNode}
-        deleteEdgeById={deleteEdgeById}
-        deleteNodeById={deleteNodeById}
-        toggleNodeActive={toggleNodeActive}
-        onNodeMenuAction={onNodeMenuAction}
-        tidyWithFitRef={tidyWithFitRef}
-      />
-    </WorkflowAddNodeDrawerProvider>
+    <CanvasInnerWithDrawerUi
+      className={className}
+      themeMode={themeMode}
+      nodes={nodes}
+      edges={edges}
+      interactionProps={interactionProps}
+      readOnly={readOnly}
+      tidyLayout={tidyLayout}
+      onTidyWithFitReady={onTidyWithFitReady}
+      onExecute={onExecute}
+      createConnectedNode={createConnectedNode}
+      deleteEdgeById={deleteEdgeById}
+      deleteNodeById={deleteNodeById}
+      toggleNodeActive={toggleNodeActive}
+      onNodeMenuAction={onNodeMenuAction}
+      tidyWithFitRef={tidyWithFitRef}
+    />
   );
 }
 
@@ -154,7 +165,7 @@ function CanvasInnerWithDrawerUi({
   onNodeMenuAction: ReturnType<typeof useWorkflowCanvasState>["onNodeMenuAction"];
   tidyWithFitRef: MutableRefObject<(() => void) | undefined>;
 }) {
-  const drawer = useWorkflowAddNodeDrawer();
+  const { open, close } = useWorkflowAddNodeDrawerActions();
 
   const uiValue = useMemo(
     () => ({
@@ -166,7 +177,8 @@ function CanvasInnerWithDrawerUi({
       runNode: readOnly ? undefined : (nodeId: string) => onNodeMenuAction(nodeId, "execute_step"),
       onNodeMenuAction: readOnly ? undefined : onNodeMenuAction,
       tidyLayout: readOnly ? undefined : () => tidyWithFitRef.current?.(),
-      openAddNodeDrawer: readOnly ? undefined : drawer?.open,
+      openAddNodeDrawer: readOnly ? undefined : open,
+      closeAddNodeDrawer: readOnly ? undefined : close,
     }),
     [
       readOnly,
@@ -175,7 +187,8 @@ function CanvasInnerWithDrawerUi({
       deleteNodeById,
       toggleNodeActive,
       onNodeMenuAction,
-      drawer?.open,
+      open,
+      close,
       tidyWithFitRef,
     ],
   );
@@ -197,7 +210,7 @@ function CanvasInnerWithDrawerUi({
   );
 }
 
-function CanvasSurface({
+const CanvasSurface = memo(function CanvasSurface({
   className,
   themeMode,
   nodes,
@@ -218,12 +231,15 @@ function CanvasSurface({
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   onExecute?: () => void;
 }) {
-  const drawer = useWorkflowAddNodeDrawer();
+  const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
+  const onPaneClick = useCallback(() => {
+    closeAddNodeDrawer?.();
+  }, [closeAddNodeDrawer]);
 
   return (
     <div
       className={cn(
-        "workflow-canvas-surface dark:bg-muted/15 relative h-full w-full overflow-hidden bg-[#f9f9f9]",
+        "workflow-canvas-surface dark:bg-muted/15 relative isolate h-full w-full overflow-hidden bg-[#f9f9f9] [transform:translateZ(0)]",
         className,
       )}
     >
@@ -240,14 +256,13 @@ function CanvasSurface({
           markerEnd: WORKFLOW_EDGE_MARKER_END,
           style: WORKFLOW_EDGE_STYLE,
         }}
-        fitView={nodes.length > 0}
-        fitViewOptions={{ padding: 0.2 }}
         connectionRadius={28}
         proOptions={{ hideAttribution: true }}
         panOnScroll
-        onPaneClick={() => drawer?.close()}
+        onPaneClick={onPaneClick}
         {...interactionProps}
       >
+        <WorkflowCanvasInitialFit enabled={nodes.length > 0} />
         <WorkflowEdgeMarkers />
         <Background gap={20} size={1} />
         <WorkflowCanvasTidyBridge
@@ -259,10 +274,9 @@ function CanvasSurface({
         <WorkflowCanvasSideToolbar />
         <WorkflowCanvasMinimap />
       </ReactFlow>
-      <WorkflowAddNodeDrawer />
     </div>
   );
-}
+});
 
 export function WorkflowCanvas(props: WorkflowCanvasProps) {
   return (

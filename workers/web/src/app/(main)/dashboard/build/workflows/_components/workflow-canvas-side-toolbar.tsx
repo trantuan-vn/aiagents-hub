@@ -11,7 +11,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 
 import { WorkflowCanvasSearchPanel } from "./workflow-canvas-search-panel";
-import { useWorkflowAddNodeDrawer } from "./workflow-add-node-drawer-context";
 import { useWorkflowCanvasUi } from "./workflow-canvas-ui-context";
 import { useWorkflowEditorActions } from "./workflow-editor-actions-context";
 
@@ -36,11 +35,12 @@ function ToolbarButton({
         <button
           type="button"
           className={cn(
-            "text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
+            "nodrag nopan text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
             active && "bg-muted text-foreground",
             className,
           )}
           aria-label={label}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={onClick}
         >
           {children}
@@ -48,6 +48,33 @@ function ToolbarButton({
       </TooltipTrigger>
       <TooltipContent side="left">{label}</TooltipContent>
     </Tooltip>
+  );
+}
+
+function WorkflowCanvasAddNodeButton({
+  onAddNode,
+}: {
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
+}) {
+  const t = useTranslations("WorkflowEditorPage");
+  const openDrawer = useWorkflowCanvasUi()?.openAddNodeDrawer;
+
+  return (
+    <button
+      type="button"
+      className="nodrag nopan text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors"
+      aria-label={t("add_node")}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        openDrawer?.({
+          variant: "full",
+          onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
+        });
+      }}
+    >
+      <Plus className={iconClass} aria-hidden />
+    </button>
   );
 }
 
@@ -59,76 +86,58 @@ export function WorkflowCanvasSideToolbar() {
   if (!actions || actions.readOnly) return null;
 
   const { onAddNode, onAddStickyNote, aiOpen, onToggleAi, serviceEndpoint } = actions;
-  const ui = useWorkflowCanvasUi();
-  const drawer = useWorkflowAddNodeDrawer();
-  const openDrawer = ui?.openAddNodeDrawer ?? drawer?.open;
 
   return (
-    <Panel position="top-right" className="!m-3 !p-0">
+    <Panel position="top-right" className="nodrag nopan !m-3 !p-0">
       <div
-        className="bg-card/95 border-border flex flex-col overflow-hidden rounded-lg border shadow-sm backdrop-blur-sm"
+        className="nodrag nopan bg-card/95 border-border flex flex-col overflow-hidden rounded-lg border shadow-sm backdrop-blur-sm"
         role="toolbar"
         aria-label={t("canvas_toolbar")}
       >
         <>
-            <button
-              type="button"
-              className={cn(
-                "text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
-                drawer?.isOpen && "bg-muted text-foreground",
-              )}
-              aria-label={t("add_node")}
-              aria-expanded={drawer?.isOpen ?? false}
-              onClick={() =>
-                openDrawer?.({
-                  variant: "full",
-                  onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
-                })
-              }
-            >
-              <Plus className={iconClass} aria-hidden />
-            </button>
+          <WorkflowCanvasAddNodeButton onAddNode={onAddNode} />
 
-            <div className="bg-border h-px w-full" />
+          <div className="bg-border h-px w-full" />
 
-            <Popover open={searchOpen} onOpenChange={setSearchOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
-                    searchOpen && "bg-muted text-foreground",
-                  )}
-                  aria-label={t("search_components")}
-                >
-                  <Search className={iconClass} aria-hidden />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="left" align="start" className="w-auto p-0">
-                <WorkflowCanvasSearchPanel
-                  serviceEndpoint={serviceEndpoint}
-                  onPickNode={(type, label, extra) => {
-                    onAddNode(type, label, extra);
-                    setSearchOpen(false);
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+          <Popover open={searchOpen} onOpenChange={setSearchOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "nodrag nopan text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
+                  searchOpen && "bg-muted text-foreground",
+                )}
+                aria-label={t("search_components")}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <Search className={iconClass} aria-hidden />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="left" align="start" className="w-auto p-0">
+              <WorkflowCanvasSearchPanel
+                serviceEndpoint={serviceEndpoint}
+                onPickNode={(type, label, extra) => {
+                  onAddNode(type, label, extra);
+                  setSearchOpen(false);
+                }}
+              />
+            </PopoverContent>
+          </Popover>
 
-            <ToolbarButton label={t("add_sticky_note")} onClick={onAddStickyNote}>
-              <StickyNote className={iconClass} aria-hidden />
-            </ToolbarButton>
+          <ToolbarButton label={t("add_sticky_note")} onClick={onAddStickyNote}>
+            <StickyNote className={iconClass} aria-hidden />
+          </ToolbarButton>
 
-            <div className="bg-border h-px w-full" />
+          <div className="bg-border h-px w-full" />
 
-            <ToolbarButton
-              label={t("ai_title")}
-              onClick={onToggleAi}
-              active={aiOpen}
-              className={aiOpen ? "text-violet-600 dark:text-violet-400" : undefined}
-            >
-              <Sparkles className={iconClass} aria-hidden />
-            </ToolbarButton>
+          <ToolbarButton
+            label={t("ai_title")}
+            onClick={onToggleAi}
+            active={aiOpen}
+            className={aiOpen ? "text-violet-600 dark:text-violet-400" : undefined}
+          >
+            <Sparkles className={iconClass} aria-hidden />
+          </ToolbarButton>
         </>
       </div>
     </Panel>
