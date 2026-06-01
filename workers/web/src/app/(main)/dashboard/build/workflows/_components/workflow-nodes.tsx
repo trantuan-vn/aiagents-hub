@@ -231,7 +231,7 @@ CoreNode.displayName = "CoreNode";
 
 export const ActionNode = memo((props: NodeProps) => (
   <SimpleNode
-    label="Action in app"
+    label={String((props.data as { label?: string }).label ?? "Action in app")}
     icon={Zap}
     accent="border-pink-500/40"
     selected={props.selected}

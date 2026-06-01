@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import {
+  BadgeCheck,
   Bot,
   Briefcase,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   GitBranch,
+  Globe,
   Pencil,
   Search,
   Server,
@@ -23,6 +25,21 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
 import { useApprovedServices } from "./use-approved-services";
+import { useWorkflowIntegrations } from "./use-workflow-integrations";
+import { ActionAppIcon } from "./workflow-action-app-icon";
+import {
+  WorkflowActionAppDetailHeader,
+  WorkflowActionAppDetailPanel,
+} from "./workflow-action-app-detail-panel";
+import {
+  getActionAppDescription,
+  getActionAppTitle,
+  isCatalogActionApp,
+  resolveActionAppDetail,
+  WORKFLOW_ACTION_APP_CATALOG,
+  type WorkflowActionAppCatalogItem,
+  type WorkflowActionAppRuntimeItem,
+} from "./workflow-action-app-catalog";
 import {
   WORKFLOW_ADD_NODE_CATEGORIES,
   WORKFLOW_ADD_TRIGGER,
@@ -81,6 +98,8 @@ interface WorkflowAddNodePanelProps {
 type PanelView =
   | "categories"
   | "ai"
+  | "action_in_app"
+  | "action_in_app_detail"
   | "memory"
   | "tools"
   | "services"
@@ -102,6 +121,7 @@ export function WorkflowAddNodePanel({
   const ta = useTranslations("WorkflowAdminPage");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<PanelView>("categories");
+  const [selectedActionApp, setSelectedActionApp] = useState<WorkflowActionAppRuntimeItem | null>(null);
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
   const [flowPopularExpanded, setFlowPopularExpanded] = useState(true);
   const [flowOtherExpanded, setFlowOtherExpanded] = useState(true);
@@ -113,8 +133,25 @@ export function WorkflowAddNodePanel({
   const [transformConvertExpanded, setTransformConvertExpanded] = useState(true);
   const [transformOtherExpanded, setTransformOtherExpanded] = useState(true);
   const { services, loading: servicesLoading } = useApprovedServices();
+  const { integrations, loading: integrationsLoading } = useWorkflowIntegrations();
 
   const q = query.trim().toLowerCase();
+
+  const actionApps = useMemo((): WorkflowActionAppRuntimeItem[] => {
+    const catalogIds = new Set(WORKFLOW_ACTION_APP_CATALOG.map((a) => a.id));
+    const fromApi = integrations
+      .filter((i) => !catalogIds.has(i.id))
+      .map(
+        (i): WorkflowActionAppRuntimeItem => ({
+          id: i.id,
+          name: i.name,
+          description: i.description,
+          verified: true,
+          hasSubmenu: true,
+        }),
+      );
+    return [...WORKFLOW_ACTION_APP_CATALOG, ...fromApi];
+  }, [integrations]);
 
   const resourceOnly = useMemo(() => {
     if (!allowedNodeTypes?.length) return null;
@@ -281,6 +318,16 @@ export function WorkflowAddNodePanel({
     });
   }, [q, t]);
 
+  const filteredActionApps = useMemo(() => {
+    return actionApps.filter((item) => {
+      const name = (isCatalogActionApp(item) ? t(item.nameKey) : item.name).toLowerCase();
+      const desc = (
+        isCatalogActionApp(item) ? (item.descKey ? t(item.descKey) : "") : item.description
+      ).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [actionApps, q, t]);
+
   const showTrigger =
     variant === "full" &&
     !allowedNodeTypes?.length &&
@@ -300,7 +347,11 @@ export function WorkflowAddNodePanel({
             ? t("trigger_kind_other")
             : activeView === "ai"
               ? t("add_category_ai")
-              : activeView === "services"
+              : activeView === "action_in_app"
+                ? t("add_category_action_in_app")
+                : activeView === "action_in_app_detail"
+                  ? t("action_app_node_details")
+                  : activeView === "services"
                 ? t("add_ai_services_title")
                 : activeView === "memory"
                   ? t("search_section_memory")
@@ -339,8 +390,40 @@ export function WorkflowAddNodePanel({
       setView("data_transformation");
       return;
     }
+    if (category.id === "action_in_app") {
+      setView("action_in_app");
+      return;
+    }
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
   };
+
+  const pickActionApp = (
+    item: WorkflowActionAppRuntimeItem,
+    actionId?: string,
+    actionLabel?: string,
+  ) => {
+    const label = actionLabel ?? getActionAppTitle(item, t);
+    onPick({
+      type: "action_in_app",
+      label,
+      extra: { integrationId: item.id, action: actionId ?? item.id },
+    });
+  };
+
+  const openActionApp = (item: WorkflowActionAppRuntimeItem) => {
+    if (item.hasSubmenu !== false) {
+      setSelectedActionApp(item);
+      setView("action_in_app_detail");
+      setQuery("");
+      return;
+    }
+    pickActionApp(item);
+  };
+
+  const selectedActionIntegration = useMemo(() => {
+    if (!selectedActionApp) return undefined;
+    return integrations.find((i) => i.id === selectedActionApp.id);
+  }, [integrations, selectedActionApp]);
 
   const pickTransformItem = (item: WorkflowTransformCatalogItem) => {
     onPick({
@@ -416,6 +499,12 @@ export function WorkflowAddNodePanel({
 
   const goBack = () => {
     if (resourceOnly) return;
+    if (activeView === "action_in_app_detail") {
+      setSelectedActionApp(null);
+      setView("action_in_app");
+      setQuery("");
+      return;
+    }
     if (activeView === "trigger_app_event" || activeView === "trigger_other") {
       setView("triggers");
       setQuery("");
@@ -448,7 +537,15 @@ export function WorkflowAddNodePanel({
             ? Pencil
             : activeView === "ai"
               ? Bot
-              : null;
+              : activeView === "action_in_app"
+                ? Globe
+                : null;
+
+  const hideSearch = activeView === "action_in_app_detail";
+
+  const detailDocsUrl = selectedActionApp
+    ? resolveActionAppDetail(selectedActionApp, selectedActionIntegration).docsUrl
+    : undefined;
 
   return (
     <div className={cn("flex w-[min(100vw-2rem,380px)] flex-col", className)}>
@@ -471,17 +568,22 @@ export function WorkflowAddNodePanel({
               <p className="text-muted-foreground mt-0.5 text-xs leading-snug">{t("trigger_starts_workflow")}</p>
             ) : null}
           </div>
+          {activeView === "action_in_app_detail" ? (
+            <WorkflowActionAppDetailHeader docsUrl={detailDocsUrl} />
+          ) : null}
         </div>
-        <div className="relative">
-          <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
-          <Input
-            className="h-9 border-violet-500/40 pl-9 text-sm focus-visible:ring-violet-500/30"
-            placeholder={t("add_node_search_placeholder")}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-        </div>
+        {!hideSearch ? (
+          <div className="relative">
+            <Search className="text-muted-foreground absolute top-2.5 left-2.5 size-4" />
+            <Input
+              className="h-9 border-violet-500/40 pl-9 text-sm focus-visible:ring-violet-500/30"
+              placeholder={t("add_node_search_placeholder")}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+          </div>
+        ) : null}
       </div>
 
       <ScrollArea className="max-h-[min(60vh,440px)]">
@@ -496,6 +598,7 @@ export function WorkflowAddNodePanel({
                 highlighted={index === 0 && category.id === "ai"}
                 hasSubmenu={
                   category.id === "ai" ||
+                  category.id === "action_in_app" ||
                   category.id === "human_review" ||
                   category.id === "flow" ||
                   category.id === "core" ||
@@ -522,6 +625,37 @@ export function WorkflowAddNodePanel({
               <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
             ) : null}
           </div>
+        ) : null}
+
+        {activeView === "action_in_app" ? (
+          <div className="p-1">
+            {integrationsLoading ? (
+              <p className="text-muted-foreground px-3 py-4 text-sm">{t("action_app_loading")}</p>
+            ) : filteredActionApps.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : (
+              filteredActionApps.map((app) => (
+                <ActionAppRow
+                  key={app.id}
+                  item={app}
+                  title={getActionAppTitle(app, t)}
+                  description={getActionAppDescription(app, t)}
+                  verified={app.verified}
+                  hasSubmenu={app.hasSubmenu}
+                  verifiedLabel={t("action_app_verified")}
+                  onClick={() => openActionApp(app)}
+                />
+              ))
+            )}
+          </div>
+        ) : null}
+
+        {activeView === "action_in_app_detail" && selectedActionApp ? (
+          <WorkflowActionAppDetailPanel
+            item={selectedActionApp}
+            integration={selectedActionIntegration}
+            onPickAction={(actionId, actionLabel) => pickActionApp(selectedActionApp, actionId, actionLabel)}
+          />
         ) : null}
 
         {activeView === "ai" ? (
@@ -1033,6 +1167,48 @@ function CoreItemRow({
           {isTrigger ? <Zap className="size-3.5 shrink-0 text-orange-500" aria-hidden /> : null}
         </span>
         <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+      {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
+    </button>
+  );
+}
+
+function ActionAppRow({
+  item,
+  title,
+  description,
+  verified,
+  hasSubmenu,
+  verifiedLabel,
+  onClick,
+}: {
+  item: WorkflowActionAppRuntimeItem;
+  title: string;
+  description?: string;
+  verified?: boolean;
+  hasSubmenu?: boolean;
+  verifiedLabel: string;
+  onClick: () => void;
+}) {
+  const catalogItem = isCatalogActionApp(item) ? (item as WorkflowActionAppCatalogItem) : null;
+
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      onClick={onClick}
+    >
+      <ActionAppIcon item={catalogItem} className="mt-0.5 size-5" />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold">{title}</span>
+          {verified ? (
+            <BadgeCheck className="size-3.5 shrink-0 fill-foreground text-background" aria-label={verifiedLabel} />
+          ) : null}
+        </span>
+        {description ? (
+          <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+        ) : null}
       </span>
       {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
     </button>
