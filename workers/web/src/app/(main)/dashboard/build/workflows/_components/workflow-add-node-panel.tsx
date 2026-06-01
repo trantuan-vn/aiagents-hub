@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import {
   BadgeCheck,
   Bot,
+  Brain,
   Briefcase,
   CheckCircle2,
   ChevronDown,
@@ -45,7 +46,12 @@ import {
   WORKFLOW_ADD_TRIGGER,
   type WorkflowAddNodeCategory,
 } from "./workflow-add-node-catalog";
-import { WORKFLOW_MEMORY_CATALOG, WORKFLOW_TOOL_CATALOG } from "./workflow-component-catalog";
+import { WORKFLOW_TOOL_CATALOG } from "./workflow-component-catalog";
+import {
+  WORKFLOW_AGENT_MEMORY_BEGINNERS,
+  WORKFLOW_AGENT_MEMORY_OTHER,
+  type WorkflowAgentMemoryItem,
+} from "./workflow-memory-catalog";
 import {
   HUMAN_REVIEW_SEND_WAIT_CHANNELS,
   type HumanReviewChannelItem,
@@ -123,6 +129,8 @@ export function WorkflowAddNodePanel({
   const [view, setView] = useState<PanelView>("categories");
   const [selectedActionApp, setSelectedActionApp] = useState<WorkflowActionAppRuntimeItem | null>(null);
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
+  const [memoryBeginnersExpanded, setMemoryBeginnersExpanded] = useState(true);
+  const [memoryOtherExpanded, setMemoryOtherExpanded] = useState(true);
   const [flowPopularExpanded, setFlowPopularExpanded] = useState(true);
   const [flowOtherExpanded, setFlowOtherExpanded] = useState(true);
   const [corePopularExpanded, setCorePopularExpanded] = useState(true);
@@ -198,13 +206,26 @@ export function WorkflowAddNodePanel({
     });
   }, [services, q]);
 
-  const filteredMemory = useMemo(() => {
-    return WORKFLOW_MEMORY_CATALOG.filter((item) => {
-      const name = ta(item.nameKey).toLowerCase();
-      const desc = ta(item.descKey).toLowerCase();
-      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
-    });
-  }, [q, ta]);
+  const filterAgentMemory = useMemo(() => {
+    return (items: WorkflowAgentMemoryItem[]) =>
+      items.filter((item) => {
+        const name = t(item.nameKey).toLowerCase();
+        const desc = t(item.descKey).toLowerCase();
+        return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+      });
+  }, [q, t]);
+
+  const filteredMemoryBeginners = useMemo(
+    () => filterAgentMemory(WORKFLOW_AGENT_MEMORY_BEGINNERS),
+    [filterAgentMemory],
+  );
+
+  const filteredMemoryOther = useMemo(
+    () => filterAgentMemory(WORKFLOW_AGENT_MEMORY_OTHER),
+    [filterAgentMemory],
+  );
+
+  const memoryHasResults = filteredMemoryBeginners.length > 0 || filteredMemoryOther.length > 0;
 
   const filteredTools = useMemo(() => {
     return WORKFLOW_TOOL_CATALOG.filter((item) => {
@@ -497,6 +518,14 @@ export function WorkflowAddNodePanel({
     });
   };
 
+  const pickMemory = (item: WorkflowAgentMemoryItem) => {
+    onPick({
+      type: "memory_node",
+      label: t(item.nameKey),
+      extra: { catalogId: item.id, memoryKind: item.id },
+    });
+  };
+
   const goBack = () => {
     if (resourceOnly) return;
     if (activeView === "action_in_app_detail") {
@@ -522,6 +551,8 @@ export function WorkflowAddNodePanel({
     setTransformCombineExpanded(false);
     setTransformConvertExpanded(true);
     setTransformOtherExpanded(true);
+    setMemoryBeginnersExpanded(true);
+    setMemoryOtherExpanded(true);
   };
 
   const showBack = activeView !== "categories" && !resourceOnly;
@@ -539,7 +570,9 @@ export function WorkflowAddNodePanel({
               ? Bot
               : activeView === "action_in_app"
                 ? Globe
-                : null;
+                : activeView === "memory"
+                  ? Brain
+                  : null;
 
   const hideSearch = activeView === "action_in_app_detail";
 
@@ -697,15 +730,48 @@ export function WorkflowAddNodePanel({
         ) : null}
 
         {activeView === "memory" ? (
-          <div className="p-1">
-            {filteredMemory.map((item) => (
-              <PickRow
-                key={item.id}
-                title={ta(item.nameKey)}
-                description={ta(item.descKey)}
-                onClick={() => onPick({ type: "memory_node", label: ta(item.nameKey) })}
-              />
-            ))}
+          <div className="pb-1">
+            <div
+              className="mx-2 mt-2 rounded-md border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100"
+              role="note"
+            >
+              {t("memory_connect_intro")}
+            </div>
+            <div className="p-1">
+              <MemorySection
+                title={t("memory_section_beginners")}
+                expanded={memoryBeginnersExpanded}
+                onToggle={() => setMemoryBeginnersExpanded((v) => !v)}
+              >
+                {filteredMemoryBeginners.map((item) => (
+                  <MemoryItemRow
+                    key={item.id}
+                    item={item}
+                    title={t(item.nameKey)}
+                    description={t(item.descKey)}
+                    onClick={() => pickMemory(item)}
+                  />
+                ))}
+              </MemorySection>
+              <MemorySection
+                title={t("memory_section_other")}
+                expanded={memoryOtherExpanded}
+                onToggle={() => setMemoryOtherExpanded((v) => !v)}
+              >
+                {filteredMemoryOther.map((item) => (
+                  <MemoryItemRow
+                    key={item.id}
+                    item={item}
+                    title={t(item.nameKey)}
+                    description={t(item.descKey)}
+                    onClick={() => pickMemory(item)}
+                  />
+                ))}
+              </MemorySection>
+              {!memoryHasResults ? (
+                <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -1040,6 +1106,78 @@ function ChannelIcon({ channel }: { channel: HumanReviewChannelItem }) {
   const Icon = channel.lucideIcon;
   if (!Icon) return null;
   return <Icon className="text-muted-foreground size-5 shrink-0" aria-hidden />;
+}
+
+function MemorySection({
+  title,
+  expanded,
+  onToggle,
+  children,
+}: {
+  title: string;
+  expanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        className="text-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm font-semibold"
+        onClick={onToggle}
+        aria-expanded={expanded}
+      >
+        {title}
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", expanded && "rotate-180")} aria-hidden />
+      </button>
+      {expanded ? <div className="pb-1">{children}</div> : null}
+    </>
+  );
+}
+
+function MemoryItemRow({
+  item,
+  title,
+  description,
+  onClick,
+}: {
+  item: WorkflowAgentMemoryItem;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      onClick={onClick}
+    >
+      <MemoryItemIcon item={item} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function MemoryItemIcon({ item }: { item: WorkflowAgentMemoryItem }) {
+  if (item.customIcon === "xata") {
+    return (
+      <span
+        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[#9f8fef] text-[10px] font-bold text-white"
+        aria-hidden
+      >
+        X
+      </span>
+    );
+  }
+  if (item.brandIcon) {
+    return <BrandIcon icon={item.brandIcon} className="mt-0.5 size-5 shrink-0" />;
+  }
+  const Icon = item.lucideIcon;
+  if (!Icon) return null;
+  return <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden />;
 }
 
 function FlowSection({
