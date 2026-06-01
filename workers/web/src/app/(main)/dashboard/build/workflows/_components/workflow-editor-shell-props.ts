@@ -25,13 +25,13 @@ export interface WorkflowEditorShellEditProps extends WorkflowEditorShellBasePro
   settings: WorkflowEditorShellSettings;
   saving: boolean;
   onSave: () => void;
-  onAddNode: (type: string, label: string) => void;
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
 }
 
 export interface WorkflowEditorShellViewProps extends WorkflowEditorShellBaseProps {
   readOnly: true;
-  onAddNode?: (type: string, label: string) => void;
+  onAddNode?: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote?: () => void;
 }
 
@@ -45,7 +45,7 @@ export interface ResolvedWorkflowEditorShellProps {
   editSettings: WorkflowEditorShellSettings | null;
   saving: boolean;
   onSave?: () => void;
-  onAddNode: (type: string, label: string) => void;
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
   status: "draft" | "published";
 }

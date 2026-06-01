@@ -14,7 +14,7 @@ import {
 import { WORKFLOW_NODE_PALETTE } from "./workflow-node-palette";
 
 interface NodePaletteProps {
-  onAdd: (type: string, label: string) => void;
+  onAdd: (type: string, label: string, extra?: Record<string, unknown>) => void;
   compact?: boolean;
 }
 

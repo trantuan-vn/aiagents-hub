@@ -70,14 +70,19 @@ export default function EditWorkflowPage() {
   }, [load]);
 
   const handleAddNode = useCallback(
-    (type: string, label: string) => {
+    (type: string, label: string, pickExtra?: Record<string, unknown>) => {
       const def = parseDef(definition);
       const extra =
-        type === "agent" && serviceEndpoint
-          ? { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] }
+        pickExtra ??
+        (type === "agent"
+          ? {
+              ...(serviceEndpoint ? { serviceEndpoint } : {}),
+              memoryCollection: "vectorize-default",
+              tools: [],
+            }
           : type === "service_node" && serviceEndpoint
             ? { serviceEndpoint, catalogId: serviceEndpoint }
-            : undefined;
+            : undefined);
       setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra)));
     },
     [definition, serviceEndpoint],

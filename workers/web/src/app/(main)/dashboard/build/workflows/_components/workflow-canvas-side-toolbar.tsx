@@ -6,19 +6,13 @@ import { Panel } from "@xyflow/react";
 import { Plus, Search, Sparkles, StickyNote } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+import { WorkflowAddNodePanel } from "./workflow-add-node-panel";
 import { WorkflowCanvasSearchPanel } from "./workflow-canvas-search-panel";
 import { useWorkflowEditorActions } from "./workflow-editor-actions-context";
-import { WORKFLOW_NODE_PALETTE } from "./workflow-node-palette";
 
 const iconClass = "size-[15px] shrink-0 stroke-[1.75]";
 
@@ -64,6 +58,7 @@ export function WorkflowCanvasSideToolbar() {
   if (!actions || actions.readOnly) return null;
 
   const { onAddNode, onAddStickyNote, aiOpen, onToggleAi, serviceEndpoint } = actions;
+  const [addNodeOpen, setAddNodeOpen] = useState(false);
 
   return (
     <Panel position="top-right" className="!m-3 !p-0">
@@ -73,8 +68,8 @@ export function WorkflowCanvasSideToolbar() {
         aria-label={t("canvas_toolbar")}
       >
         <>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+            <Popover open={addNodeOpen} onOpenChange={setAddNodeOpen}>
+              <PopoverTrigger asChild>
                 <button
                   type="button"
                   className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors"
@@ -82,16 +77,17 @@ export function WorkflowCanvasSideToolbar() {
                 >
                   <Plus className={iconClass} aria-hidden />
                 </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="left" align="start" className="w-52">
-                {WORKFLOW_NODE_PALETTE.map(({ type, icon: Icon, key }) => (
-                  <DropdownMenuItem key={type} onClick={() => onAddNode(type, t(key))}>
-                    <Icon className="mr-2 size-4" />
-                    {t(key)}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+              </PopoverTrigger>
+              <PopoverContent side="left" align="start" className="w-auto p-0">
+                <WorkflowAddNodePanel
+                  key={addNodeOpen ? "open" : "closed"}
+                  onPick={({ type, label, extra }) => {
+                    onAddNode(type, label, extra);
+                    setAddNodeOpen(false);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
 
             <div className="bg-border h-px w-full" />
 
@@ -111,8 +107,8 @@ export function WorkflowCanvasSideToolbar() {
               <PopoverContent side="left" align="start" className="w-auto p-0">
                 <WorkflowCanvasSearchPanel
                   serviceEndpoint={serviceEndpoint}
-                  onPickNode={(type, label) => {
-                    onAddNode(type, label);
+                  onPickNode={(type, label, extra) => {
+                    onAddNode(type, label, extra);
                     setSearchOpen(false);
                   }}
                 />

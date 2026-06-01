@@ -74,7 +74,7 @@ export interface WorkflowEditorSidebarProps {
   onStarLabelChange?: (s: string) => void;
   serviceEndpoint: string;
   onServiceEndpointChange?: (s: string) => void;
-  onAddNode: (type: string, label: string) => void;
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
 }
 
 export function WorkflowEditorSidebar(props: WorkflowEditorSidebarProps) {

@@ -54,8 +54,8 @@ function useConnectionHandleModel({
   );
   const side = position === Position.Bottom ? "bottom" : getConnectedSide(position);
 
-  const onPickType = useCallback(
-    (nodeType: string, nodeLabel: string) => {
+  const onPick = useCallback(
+    ({ type: nodeType, label: nodeLabel, extra }: { type: string; label: string; extra?: Record<string, unknown> }) => {
       if (!nodeId || !createConnectedNode) return;
       if (position === Position.Bottom) {
         createConnectedNode({
@@ -64,9 +64,16 @@ function useConnectionHandleModel({
           type: nodeType,
           label: nodeLabel,
           resourceHandle: handleId,
+          extraData: extra,
         });
       } else {
-        createConnectedNode({ fromNodeId: nodeId, side, type: nodeType, label: nodeLabel });
+        createConnectedNode({
+          fromNodeId: nodeId,
+          side,
+          type: nodeType,
+          label: nodeLabel,
+          extraData: extra,
+        });
       }
       setOpen(false);
     },
@@ -86,7 +93,7 @@ function useConnectionHandleModel({
     open,
     setOpen,
     side,
-    onPickType,
+    onPick,
     showPlus,
     clusterClass: getHandleClusterClass(position),
     isSideHandle: position === Position.Left || position === Position.Right,
@@ -104,7 +111,7 @@ function ConnectionHandleView({
   required,
   model,
 }: ConnectionHandleProps & { model: ReturnType<typeof useConnectionHandleModel> }) {
-  const { t, open, setOpen, side, onPickType, showPlus, clusterClass, isSideHandle, allowedNodeTypes } = model;
+  const { t, open, setOpen, side, onPick, showPlus, clusterClass, isSideHandle, allowedNodeTypes } = model;
 
   return (
     <ConnectionHandleCluster
@@ -123,7 +130,7 @@ function ConnectionHandleView({
           open={open}
           setOpen={setOpen}
           side={side}
-          onPickType={onPickType}
+          onPick={onPick}
           t={t}
           allowedNodeTypes={allowedNodeTypes}
         />

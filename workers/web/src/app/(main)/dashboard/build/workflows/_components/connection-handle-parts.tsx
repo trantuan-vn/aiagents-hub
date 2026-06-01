@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 import { type ConnectedNodeSide } from "./workflow-canvas-ui-context";
 import { edgeUsesHandle, type WorkflowHandleId } from "./workflow-connection-utils";
-import { WORKFLOW_FLOW_NODE_PALETTE, WORKFLOW_NODE_PALETTE } from "./workflow-node-palette";
+import { WorkflowAddNodePanel, type WorkflowAddNodePick } from "./workflow-add-node-panel";
 
 export function useHandleConnectionState(
   nodeId: string | null,
@@ -68,41 +68,27 @@ export function getConnectionDotClassName(
 
 export function ConnectionHandlePlusMenuContent({
   side,
-  onPickType,
-  t,
+  onPick,
   allowedNodeTypes,
 }: {
   side: ConnectedNodeSide;
-  onPickType: (nodeType: string, nodeLabel: string) => void;
-  t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
+  onPick: (pick: WorkflowAddNodePick) => void;
   allowedNodeTypes?: string[];
 }) {
-  const basePalette = allowedNodeTypes ? WORKFLOW_NODE_PALETTE : WORKFLOW_FLOW_NODE_PALETTE;
-  const items = basePalette.filter((item) => !allowedNodeTypes || allowedNodeTypes.includes(item.type));
-
   return (
     <PopoverContent
-      className="z-[200] w-64 p-0"
+      className="z-[200] w-auto p-0"
       side={side}
       align="center"
       sideOffset={8}
       onOpenAutoFocus={(e) => e.preventDefault()}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <p className="text-muted-foreground border-b px-3 py-2 text-xs font-medium">{t("connect_add_node")}</p>
-      <div className="max-h-52 overflow-y-auto p-1">
-        {items.map(({ type: nodeType, icon: Icon, key }) => (
-          <button
-            key={nodeType}
-            type="button"
-            className="hover:bg-accent focus:bg-accent flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
-            onClick={() => onPickType(nodeType, t(key))}
-          >
-            <Icon className="h-4 w-4 shrink-0 opacity-80" />
-            {t(key)}
-          </button>
-        ))}
-      </div>
+      <WorkflowAddNodePanel
+        variant="connect"
+        allowedNodeTypes={allowedNodeTypes}
+        onPick={onPick}
+      />
     </PopoverContent>
   );
 }
@@ -116,7 +102,7 @@ export function ConnectionHandleWithPlus({
   open,
   setOpen,
   side,
-  onPickType,
+  onPick,
   t,
   allowedNodeTypes,
 }: {
@@ -128,7 +114,7 @@ export function ConnectionHandleWithPlus({
   open: boolean;
   setOpen: (open: boolean) => void;
   side: ConnectedNodeSide | "bottom";
-  onPickType: (nodeType: string, nodeLabel: string) => void;
+  onPick: (pick: WorkflowAddNodePick) => void;
   t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
   allowedNodeTypes?: string[];
 }) {
@@ -158,8 +144,7 @@ export function ConnectionHandleWithPlus({
       </Handle>
       <ConnectionHandlePlusMenuContent
         side={popoverSide as ConnectedNodeSide}
-        onPickType={onPickType}
-        t={t}
+        onPick={onPick}
         allowedNodeTypes={allowedNodeTypes}
       />
     </Popover>

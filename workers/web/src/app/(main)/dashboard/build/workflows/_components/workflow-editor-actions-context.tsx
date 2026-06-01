@@ -3,7 +3,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 
 export interface WorkflowEditorActionsValue {
-  onAddNode: (type: string, label: string) => void;
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
   aiOpen: boolean;
   onToggleAi: () => void;

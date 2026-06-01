@@ -14,7 +14,7 @@ interface WorkflowEditorShellWorkspaceProps {
   aiOpen: boolean;
   onAiOpenChange: (open: boolean) => void;
   onOpenSettings?: () => void;
-  onAddNode: (type: string, label: string) => void;
+  onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
   onApplyDefinition?: (definitionJson: string) => void;
   children: ReactNode;

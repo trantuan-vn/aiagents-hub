@@ -17,7 +17,7 @@ import {
 
 interface WorkflowCanvasSearchPanelProps {
   serviceEndpoint?: string;
-  onPickNode: (type: string, label: string) => void;
+  onPickNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   className?: string;
 }
 

@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import { useTranslations } from "next-intl";
 
 import { Label } from "@/components/ui/label";
@@ -13,9 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import type { Service } from "../../../service/_components/schema";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
+import { useApprovedServices } from "./use-approved-services";
 
 interface ServiceEndpointSelectProps {
   value: string;
@@ -25,32 +21,7 @@ interface ServiceEndpointSelectProps {
 
 export function ServiceEndpointSelect({ value, onChange, id }: ServiceEndpointSelectProps) {
   const t = useTranslations("WorkflowEditorPage");
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/service/list/approved`, {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (!res.ok) throw new Error(await res.text());
-        const data: Service[] = await res.json();
-        if (!cancelled) setServices(data);
-      } catch {
-        if (!cancelled) setServices([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { services, loading } = useApprovedServices();
 
   const placeholder = loading
     ? t("service_select_loading")
