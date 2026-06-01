@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback } from "react";
 
 import { Position, useNodeId, useStore } from "@xyflow/react";
 import { useTranslations } from "next-intl";
@@ -43,7 +43,6 @@ function useConnectionHandleModel({
   const readOnly = ui?.readOnly ?? true;
   const createConnectedNode = ui?.createConnectedNode;
   const t = useTranslations("WorkflowEditorPage");
-  const [open, setOpen] = useState(false);
   const edges = useStore((s) => s.edges);
   const hasConnection = useHandleConnectionState(
     nodeId ?? null,
@@ -75,7 +74,6 @@ function useConnectionHandleModel({
           extraData: extra,
         });
       }
-      setOpen(false);
     },
     [createConnectedNode, handleId, nodeId, position, side],
   );
@@ -90,9 +88,6 @@ function useConnectionHandleModel({
 
   return {
     t,
-    open,
-    setOpen,
-    side,
     onPick,
     showPlus,
     clusterClass: getHandleClusterClass(position),
@@ -111,7 +106,7 @@ function ConnectionHandleView({
   required,
   model,
 }: ConnectionHandleProps & { model: ReturnType<typeof useConnectionHandleModel> }) {
-  const { t, open, setOpen, side, onPick, showPlus, clusterClass, isSideHandle, allowedNodeTypes } = model;
+  const { t, onPick, showPlus, clusterClass, isSideHandle, allowedNodeTypes } = model;
 
   return (
     <ConnectionHandleCluster
@@ -127,9 +122,6 @@ function ConnectionHandleView({
           position={position}
           accentClass={accentClass}
           shape={shape}
-          open={open}
-          setOpen={setOpen}
-          side={side}
           onPick={onPick}
           t={t}
           allowedNodeTypes={allowedNodeTypes}

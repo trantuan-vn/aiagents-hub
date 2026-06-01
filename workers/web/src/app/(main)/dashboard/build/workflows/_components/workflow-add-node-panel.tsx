@@ -110,6 +110,8 @@ interface WorkflowAddNodePanelProps {
   className?: string;
   /** Full canvas toolbar vs connection-handle plus */
   variant?: "full" | "connect";
+  /** Fill parent height (right slide drawer) */
+  fillHeight?: boolean;
 }
 
 type PanelView =
@@ -135,6 +137,7 @@ export function WorkflowAddNodePanel({
   allowedNodeTypes,
   className,
   variant = "full",
+  fillHeight = false,
 }: WorkflowAddNodePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
   const [query, setQuery] = useState("");
@@ -697,7 +700,13 @@ export function WorkflowAddNodePanel({
     : undefined;
 
   return (
-    <div className={cn("flex w-[min(100vw-2rem,380px)] flex-col", className)}>
+    <div
+      className={cn(
+        "flex flex-col",
+        fillHeight ? "h-full w-full" : "w-[min(100vw-2rem,380px)]",
+        className,
+      )}
+    >
       <div className="border-border border-b px-3 py-2.5">
         <div className="mb-2 flex items-center gap-1">
           {showBack ? (
@@ -735,7 +744,7 @@ export function WorkflowAddNodePanel({
         ) : null}
       </div>
 
-      <ScrollArea className="max-h-[min(60vh,440px)]">
+      <ScrollArea className={fillHeight ? "min-h-0 flex-1" : "max-h-[min(60vh,440px)]"}>
         {activeView === "categories" ? (
           <div className="p-1">
             {filteredCategories.map((category, index) => (

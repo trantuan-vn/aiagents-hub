@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 
 import type { WorkflowHandleId } from "./workflow-connection-utils";
+import type { WorkflowAddNodeDrawerOpenOptions } from "./workflow-add-node-drawer-context";
 
 export type ConnectedNodeSide = "left" | "right" | "bottom";
 
@@ -22,6 +23,7 @@ export interface WorkflowCanvasUiValue {
   runNode?: (nodeId: string) => void;
   onNodeMenuAction?: (nodeId: string, action: string) => void;
   tidyLayout?: () => void;
+  openAddNodeDrawer?: (options: WorkflowAddNodeDrawerOpenOptions) => void;
 }
 
 export const WorkflowCanvasUiContext = createContext<WorkflowCanvasUiValue | null>(null);

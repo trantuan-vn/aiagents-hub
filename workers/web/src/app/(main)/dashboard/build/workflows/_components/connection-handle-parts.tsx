@@ -6,12 +6,12 @@ import { Handle, Position, type Edge } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-import { type ConnectedNodeSide } from "./workflow-canvas-ui-context";
+import { useWorkflowCanvasUi, type ConnectedNodeSide } from "./workflow-canvas-ui-context";
 import { edgeUsesHandle, type WorkflowHandleId } from "./workflow-connection-utils";
-import { WorkflowAddNodePanel, type WorkflowAddNodePick } from "./workflow-add-node-panel";
+import type { WorkflowAddNodePick } from "./workflow-add-node-panel";
+import { useWorkflowAddNodeDrawer } from "./workflow-add-node-drawer-context";
 
 export function useHandleConnectionState(
   nodeId: string | null,
@@ -66,42 +66,12 @@ export function getConnectionDotClassName(
   return cn("!size-3", accentClass ?? "!bg-muted-foreground");
 }
 
-export function ConnectionHandlePlusMenuContent({
-  side,
-  onPick,
-  allowedNodeTypes,
-}: {
-  side: ConnectedNodeSide;
-  onPick: (pick: WorkflowAddNodePick) => void;
-  allowedNodeTypes?: string[];
-}) {
-  return (
-    <PopoverContent
-      className="z-[200] w-auto p-0"
-      side={side}
-      align="center"
-      sideOffset={8}
-      onOpenAutoFocus={(e) => e.preventDefault()}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <WorkflowAddNodePanel
-        variant="connect"
-        allowedNodeTypes={allowedNodeTypes}
-        onPick={onPick}
-      />
-    </PopoverContent>
-  );
-}
-
 export function ConnectionHandleWithPlus({
   handleId,
   type,
   position,
   accentClass,
   shape,
-  open,
-  setOpen,
-  side,
   onPick,
   t,
   allowedNodeTypes,
@@ -111,43 +81,41 @@ export function ConnectionHandleWithPlus({
   position: Position;
   accentClass?: string;
   shape?: "circle" | "diamond";
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  side: ConnectedNodeSide | "bottom";
   onPick: (pick: WorkflowAddNodePick) => void;
   t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
   allowedNodeTypes?: string[];
 }) {
-  const popoverSide = side === "bottom" ? "bottom" : side;
+  const ui = useWorkflowCanvasUi();
+  const drawer = useWorkflowAddNodeDrawer();
+  const openDrawer = ui?.openAddNodeDrawer ?? drawer?.open;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <Handle
-        id={handleId}
-        type={type}
-        position={position}
-        className={cn(
-          "border-background !static shrink-0 !translate-x-0 !translate-y-0 !transform-none !border-2",
-          getConnectionDotClassName(true, accentClass, shape),
-        )}
+    <Handle
+      id={handleId}
+      type={type}
+      position={position}
+      className={cn(
+        "border-background !static shrink-0 !translate-x-0 !translate-y-0 !transform-none !border-2",
+        getConnectionDotClassName(true, accentClass, shape),
+      )}
+    >
+      <button
+        type="button"
+        className="nodrag nopan text-foreground focus-visible:ring-ring flex h-full w-full cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-none outline-none focus-visible:ring-2"
+        aria-label={t("connect_add_node")}
+        aria-expanded={drawer?.isOpen ?? false}
+        onClick={(e) => {
+          e.stopPropagation();
+          openDrawer?.({
+            variant: "connect",
+            allowedNodeTypes,
+            onPick,
+          });
+        }}
       >
-        <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="nodrag nopan text-foreground focus-visible:ring-ring flex h-full w-full cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 shadow-none outline-none focus-visible:ring-2"
-            aria-label={t("connect_add_node")}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Plus className="h-3.5 w-3.5 shrink-0" />
-          </button>
-        </PopoverTrigger>
-      </Handle>
-      <ConnectionHandlePlusMenuContent
-        side={popoverSide as ConnectedNodeSide}
-        onPick={onPick}
-        allowedNodeTypes={allowedNodeTypes}
-      />
-    </Popover>
+        <Plus className="h-3.5 w-3.5 shrink-0" />
+      </button>
+    </Handle>
   );
 }
 

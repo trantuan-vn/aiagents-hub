@@ -10,8 +10,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
-import { WorkflowAddNodePanel } from "./workflow-add-node-panel";
 import { WorkflowCanvasSearchPanel } from "./workflow-canvas-search-panel";
+import { useWorkflowAddNodeDrawer } from "./workflow-add-node-drawer-context";
+import { useWorkflowCanvasUi } from "./workflow-canvas-ui-context";
 import { useWorkflowEditorActions } from "./workflow-editor-actions-context";
 
 const iconClass = "size-[15px] shrink-0 stroke-[1.75]";
@@ -58,7 +59,9 @@ export function WorkflowCanvasSideToolbar() {
   if (!actions || actions.readOnly) return null;
 
   const { onAddNode, onAddStickyNote, aiOpen, onToggleAi, serviceEndpoint } = actions;
-  const [addNodeOpen, setAddNodeOpen] = useState(false);
+  const ui = useWorkflowCanvasUi();
+  const drawer = useWorkflowAddNodeDrawer();
+  const openDrawer = ui?.openAddNodeDrawer ?? drawer?.open;
 
   return (
     <Panel position="top-right" className="!m-3 !p-0">
@@ -68,26 +71,23 @@ export function WorkflowCanvasSideToolbar() {
         aria-label={t("canvas_toolbar")}
       >
         <>
-            <Popover open={addNodeOpen} onOpenChange={setAddNodeOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors"
-                  aria-label={t("add_node")}
-                >
-                  <Plus className={iconClass} aria-hidden />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="left" align="start" className="w-auto p-0">
-                <WorkflowAddNodePanel
-                  key={addNodeOpen ? "open" : "closed"}
-                  onPick={({ type, label, extra }) => {
-                    onAddNode(type, label, extra);
-                    setAddNodeOpen(false);
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
+            <button
+              type="button"
+              className={cn(
+                "text-muted-foreground hover:bg-muted hover:text-foreground flex size-8 items-center justify-center transition-colors",
+                drawer?.isOpen && "bg-muted text-foreground",
+              )}
+              aria-label={t("add_node")}
+              aria-expanded={drawer?.isOpen ?? false}
+              onClick={() =>
+                openDrawer?.({
+                  variant: "full",
+                  onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
+                })
+              }
+            >
+              <Plus className={iconClass} aria-hidden />
+            </button>
 
             <div className="bg-border h-px w-full" />
 

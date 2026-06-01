@@ -37,14 +37,15 @@ export function createServiceInfrastructureService(
       const rows = await executeUtils.executeDynamicAction(
         userDO,
         'select',
-        {
-          where: { field: 'isActive', operator: '=', value: 1 },
-          orderBy: { field: 'createdAt', direction: 'DESC' },
-        },
+        { orderBy: { field: 'createdAt', direction: 'DESC' } },
         'services',
       );
       const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-      return list.filter((r) => isApprovedService(r as Record<string, unknown>));
+      return list.filter(
+        (r) =>
+          isApprovedService(r as Record<string, unknown>) &&
+          isServiceActive(r as Record<string, unknown>),
+      );
     },
 
     async getAdminServices(): Promise<any[]> {
@@ -60,14 +61,15 @@ export function createServiceInfrastructureService(
       const rows = await executeUtils.executeDynamicAction(
         userDO,
         'select',
-        {
-          where: { field: 'isActive', operator: '=', value: 1 },
-          orderBy: { field: 'createdAt', direction: 'DESC' },
-        },
+        { orderBy: { field: 'createdAt', direction: 'DESC' } },
         'services',
       );
       const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
-      return list.filter((r) => isApprovedService(r as Record<string, unknown>));
+      return list.filter(
+        (r) =>
+          isApprovedService(r as Record<string, unknown>) &&
+          isServiceActive(r as Record<string, unknown>),
+      );
     },
 
     async bulkRegisterPendingServices(
