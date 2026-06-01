@@ -2,9 +2,18 @@
 
 import { useMemo, useState } from "react";
 
-import { Bot, ChevronLeft, ChevronRight, Search, Server } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Server,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { SimpleIcon as BrandIcon } from "@/components/simple-icon";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -16,6 +25,10 @@ import {
   type WorkflowAddNodeCategory,
 } from "./workflow-add-node-catalog";
 import { WORKFLOW_MEMORY_CATALOG, WORKFLOW_TOOL_CATALOG } from "./workflow-component-catalog";
+import {
+  HUMAN_REVIEW_SEND_WAIT_CHANNELS,
+  type HumanReviewChannelItem,
+} from "./workflow-human-review-catalog";
 import { WORKFLOW_FLOW_NODE_PALETTE } from "./workflow-node-palette";
 
 const FLOW_NODE_TYPES = new Set<string>(WORKFLOW_FLOW_NODE_PALETTE.map((item) => item.type));
@@ -34,7 +47,7 @@ interface WorkflowAddNodePanelProps {
   variant?: "full" | "connect";
 }
 
-type PanelView = "categories" | "ai" | "memory" | "tools" | "services";
+type PanelView = "categories" | "ai" | "memory" | "tools" | "services" | "human_review";
 
 export function WorkflowAddNodePanel({
   onPick,
@@ -46,6 +59,7 @@ export function WorkflowAddNodePanel({
   const ta = useTranslations("WorkflowAdminPage");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<PanelView>("categories");
+  const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
   const { services, loading: servicesLoading } = useApprovedServices();
 
   const q = query.trim().toLowerCase();
@@ -111,6 +125,14 @@ export function WorkflowAddNodePanel({
     });
   }, [q, ta]);
 
+  const filteredHumanReviewChannels = useMemo(() => {
+    return HUMAN_REVIEW_SEND_WAIT_CHANNELS.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const section = t("human_review_section_send_wait").toLowerCase();
+      return !q || name.includes(q) || section.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
   const showTrigger =
     variant === "full" &&
     !allowedNodeTypes?.length &&
@@ -130,14 +152,28 @@ export function WorkflowAddNodePanel({
             ? t("search_section_memory")
             : activeView === "tools"
               ? t("search_section_tools")
-              : t("what_happens_next");
+              : activeView === "human_review"
+                ? t("add_category_human_review")
+                : t("what_happens_next");
 
   const pickCategory = (category: WorkflowAddNodeCategory) => {
     if (category.id === "ai") {
       setView("ai");
       return;
     }
+    if (category.id === "human_review") {
+      setView("human_review");
+      return;
+    }
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
+  };
+
+  const pickHumanReviewChannel = (channel: HumanReviewChannelItem) => {
+    onPick({
+      type: "human_review",
+      label: t(channel.nameKey),
+      extra: { channel: channel.id, reviewMode: "send_and_wait" },
+    });
   };
 
   const pickAgent = () => {
@@ -156,9 +192,13 @@ export function WorkflowAddNodePanel({
     if (resourceOnly) return;
     setView("categories");
     setQuery("");
+    setSendWaitExpanded(true);
   };
 
   const showBack = activeView !== "categories" && !resourceOnly;
+
+  const HeaderIcon =
+    activeView === "human_review" ? CheckCircle2 : activeView === "ai" ? Bot : null;
 
   return (
     <div className={cn("flex w-[min(100vw-2rem,380px)] flex-col", className)}>
@@ -174,6 +214,7 @@ export function WorkflowAddNodePanel({
               <ChevronLeft className="size-4" />
             </button>
           ) : null}
+          {HeaderIcon ? <HeaderIcon className="text-muted-foreground size-4 shrink-0" aria-hidden /> : null}
           <h2 className="text-sm font-semibold">{title}</h2>
         </div>
         <div className="relative">
@@ -198,7 +239,7 @@ export function WorkflowAddNodePanel({
                 title={t(category.titleKey)}
                 description={t(category.descKey)}
                 highlighted={index === 0 && category.id === "ai"}
-                hasSubmenu={category.id === "ai"}
+                hasSubmenu={category.id === "ai" || category.id === "human_review"}
                 onClick={() => pickCategory(category)}
               />
             ))}
@@ -286,6 +327,35 @@ export function WorkflowAddNodePanel({
             ))}
           </div>
         ) : null}
+
+        {activeView === "human_review" ? (
+          <div className="p-1">
+            <button
+              type="button"
+              className="text-muted-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs font-medium tracking-wide uppercase"
+              onClick={() => setSendWaitExpanded((v) => !v)}
+              aria-expanded={sendWaitExpanded}
+            >
+              {t("human_review_section_send_wait")}
+              <ChevronDown className="size-4 shrink-0" aria-hidden />
+            </button>
+            {sendWaitExpanded ? (
+              <div className="pb-1">
+                {filteredHumanReviewChannels.map((channel) => (
+                  <HumanReviewChannelRow
+                    key={channel.id}
+                    channel={channel}
+                    title={t(channel.nameKey)}
+                    onClick={() => pickHumanReviewChannel(channel)}
+                  />
+                ))}
+                {filteredHumanReviewChannels.length === 0 ? (
+                  <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </ScrollArea>
     </div>
   );
@@ -323,6 +393,36 @@ function CategoryRow({
       {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
     </button>
   );
+}
+
+function HumanReviewChannelRow({
+  channel,
+  title,
+  onClick,
+}: {
+  channel: HumanReviewChannelItem;
+  title: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors"
+      onClick={onClick}
+    >
+      <ChannelIcon channel={channel} />
+      <span className="text-sm font-medium">{title}</span>
+    </button>
+  );
+}
+
+function ChannelIcon({ channel }: { channel: HumanReviewChannelItem }) {
+  if (channel.brandIcon) {
+    return <BrandIcon icon={channel.brandIcon} className="size-5 shrink-0" />;
+  }
+  const Icon = channel.lucideIcon;
+  if (!Icon) return null;
+  return <Icon className="text-muted-foreground size-5 shrink-0" aria-hidden />;
 }
 
 function PickRow({

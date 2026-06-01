@@ -195,7 +195,7 @@ ToolWorkflowNode.displayName = "ToolWorkflowNode";
 
 export const HumanReviewNode = memo((props: NodeProps) => (
   <SimpleNode
-    label="Human review"
+    label={String((props.data as { label?: string }).label ?? "Human review")}
     icon={UserCheck}
     accent="border-orange-500/40"
     selected={props.selected}
