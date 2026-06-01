@@ -4,13 +4,16 @@ import { useMemo, useState } from "react";
 
 import {
   Bot,
+  Briefcase,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   GitBranch,
+  Pencil,
   Search,
   Server,
+  Zap,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -32,10 +35,23 @@ import {
 } from "./workflow-human-review-catalog";
 import { WORKFLOW_FLOW_NODE_PALETTE } from "./workflow-node-palette";
 import {
+  WORKFLOW_CORE_OTHER,
+  WORKFLOW_CORE_POPULAR,
+  type WorkflowCoreCatalogItem,
+} from "./workflow-core-catalog";
+import {
   WORKFLOW_FLOW_OTHER,
   WORKFLOW_FLOW_POPULAR,
   type WorkflowFlowCatalogItem,
 } from "./workflow-flow-catalog";
+import {
+  WORKFLOW_TRANSFORM_ADD_REMOVE,
+  WORKFLOW_TRANSFORM_COMBINE,
+  WORKFLOW_TRANSFORM_CONVERT,
+  WORKFLOW_TRANSFORM_OTHER,
+  WORKFLOW_TRANSFORM_POPULAR,
+  type WorkflowTransformCatalogItem,
+} from "./workflow-transform-catalog";
 import {
   WORKFLOW_TRIGGER_APP_EVENTS,
   WORKFLOW_TRIGGER_CATALOG,
@@ -70,6 +86,8 @@ type PanelView =
   | "services"
   | "human_review"
   | "flow"
+  | "core"
+  | "data_transformation"
   | "triggers"
   | "trigger_app_event"
   | "trigger_other";
@@ -87,6 +105,13 @@ export function WorkflowAddNodePanel({
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
   const [flowPopularExpanded, setFlowPopularExpanded] = useState(true);
   const [flowOtherExpanded, setFlowOtherExpanded] = useState(true);
+  const [corePopularExpanded, setCorePopularExpanded] = useState(true);
+  const [coreOtherExpanded, setCoreOtherExpanded] = useState(true);
+  const [transformPopularExpanded, setTransformPopularExpanded] = useState(true);
+  const [transformAddRemoveExpanded, setTransformAddRemoveExpanded] = useState(true);
+  const [transformCombineExpanded, setTransformCombineExpanded] = useState(false);
+  const [transformConvertExpanded, setTransformConvertExpanded] = useState(true);
+  const [transformOtherExpanded, setTransformOtherExpanded] = useState(true);
   const { services, loading: servicesLoading } = useApprovedServices();
 
   const q = query.trim().toLowerCase();
@@ -200,6 +225,62 @@ export function WorkflowAddNodePanel({
     });
   }, [q, t]);
 
+  const filteredCorePopular = useMemo(() => {
+    return WORKFLOW_CORE_POPULAR.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredCoreOther = useMemo(() => {
+    return WORKFLOW_CORE_OTHER.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTransformPopular = useMemo(() => {
+    return WORKFLOW_TRANSFORM_POPULAR.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTransformAddRemove = useMemo(() => {
+    return WORKFLOW_TRANSFORM_ADD_REMOVE.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTransformCombine = useMemo(() => {
+    return WORKFLOW_TRANSFORM_COMBINE.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTransformConvert = useMemo(() => {
+    return WORKFLOW_TRANSFORM_CONVERT.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
+  const filteredTransformOther = useMemo(() => {
+    return WORKFLOW_TRANSFORM_OTHER.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.replace(/_/g, " ").includes(q);
+    });
+  }, [q, t]);
+
   const showTrigger =
     variant === "full" &&
     !allowedNodeTypes?.length &&
@@ -229,7 +310,11 @@ export function WorkflowAddNodePanel({
                       ? t("add_category_human_review")
                       : activeView === "flow"
                         ? t("add_category_flow")
-                        : t("what_happens_next");
+                        : activeView === "core"
+                        ? t("add_category_core")
+                        : activeView === "data_transformation"
+                          ? t("add_category_data_transformation")
+                          : t("what_happens_next");
 
   const showTriggerSubtitle = activeView === "triggers";
 
@@ -246,7 +331,31 @@ export function WorkflowAddNodePanel({
       setView("flow");
       return;
     }
+    if (category.id === "core") {
+      setView("core");
+      return;
+    }
+    if (category.id === "data_transformation") {
+      setView("data_transformation");
+      return;
+    }
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
+  };
+
+  const pickTransformItem = (item: WorkflowTransformCatalogItem) => {
+    onPick({
+      type: "data_transformation",
+      label: t(item.nameKey),
+      extra: { transformKind: item.id },
+    });
+  };
+
+  const pickCoreItem = (item: WorkflowCoreCatalogItem) => {
+    onPick({
+      type: "core",
+      label: t(item.nameKey),
+      extra: { coreKind: item.id },
+    });
   };
 
   const pickFlowItem = (item: WorkflowFlowCatalogItem) => {
@@ -317,6 +426,13 @@ export function WorkflowAddNodePanel({
     setSendWaitExpanded(true);
     setFlowPopularExpanded(true);
     setFlowOtherExpanded(true);
+    setCorePopularExpanded(true);
+    setCoreOtherExpanded(true);
+    setTransformPopularExpanded(true);
+    setTransformAddRemoveExpanded(true);
+    setTransformCombineExpanded(false);
+    setTransformConvertExpanded(true);
+    setTransformOtherExpanded(true);
   };
 
   const showBack = activeView !== "categories" && !resourceOnly;
@@ -326,9 +442,13 @@ export function WorkflowAddNodePanel({
       ? CheckCircle2
       : activeView === "flow"
         ? GitBranch
-        : activeView === "ai"
-          ? Bot
-          : null;
+        : activeView === "core"
+          ? Briefcase
+          : activeView === "data_transformation"
+            ? Pencil
+            : activeView === "ai"
+              ? Bot
+              : null;
 
   return (
     <div className={cn("flex w-[min(100vw-2rem,380px)] flex-col", className)}>
@@ -374,7 +494,13 @@ export function WorkflowAddNodePanel({
                 title={t(category.titleKey)}
                 description={t(category.descKey)}
                 highlighted={index === 0 && category.id === "ai"}
-                hasSubmenu={category.id === "ai" || category.id === "human_review" || category.id === "flow"}
+                hasSubmenu={
+                  category.id === "ai" ||
+                  category.id === "human_review" ||
+                  category.id === "flow" ||
+                  category.id === "core" ||
+                  category.id === "data_transformation"
+                }
                 onClick={() => pickCategory(category)}
               />
             ))}
@@ -525,6 +651,140 @@ export function WorkflowAddNodePanel({
               ))}
             </FlowSection>
             {filteredFlowPopular.length === 0 && filteredFlowOther.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "core" ? (
+          <div className="p-1">
+            <FlowSection
+              title={t("flow_section_popular")}
+              expanded={corePopularExpanded}
+              onToggle={() => setCorePopularExpanded((v) => !v)}
+            >
+              {filteredCorePopular.map((item, index) => (
+                <CoreItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  highlighted={index === 0}
+                  hasSubmenu={item.hasSubmenu}
+                  isTrigger={item.isTrigger}
+                  onClick={() => pickCoreItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("flow_section_other")}
+              expanded={coreOtherExpanded}
+              onToggle={() => setCoreOtherExpanded((v) => !v)}
+            >
+              {filteredCoreOther.map((item) => (
+                <CoreItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  hasSubmenu={item.hasSubmenu}
+                  isTrigger={item.isTrigger}
+                  onClick={() => pickCoreItem(item)}
+                />
+              ))}
+            </FlowSection>
+            {filteredCorePopular.length === 0 && filteredCoreOther.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "data_transformation" ? (
+          <div className="p-1">
+            <FlowSection
+              title={t("transform_section_popular")}
+              expanded={transformPopularExpanded}
+              onToggle={() => setTransformPopularExpanded((v) => !v)}
+            >
+              {filteredTransformPopular.map((item, index) => (
+                <TransformItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  highlighted={index === 0}
+                  hasSubmenu={item.hasSubmenu}
+                  onClick={() => pickTransformItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("transform_section_add_remove")}
+              expanded={transformAddRemoveExpanded}
+              onToggle={() => setTransformAddRemoveExpanded((v) => !v)}
+            >
+              {filteredTransformAddRemove.map((item) => (
+                <TransformItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  hasSubmenu={item.hasSubmenu}
+                  onClick={() => pickTransformItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("transform_section_combine")}
+              expanded={transformCombineExpanded}
+              onToggle={() => setTransformCombineExpanded((v) => !v)}
+            >
+              {filteredTransformCombine.map((item) => (
+                <TransformItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  onClick={() => pickTransformItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("transform_section_convert")}
+              expanded={transformConvertExpanded}
+              onToggle={() => setTransformConvertExpanded((v) => !v)}
+            >
+              {filteredTransformConvert.map((item) => (
+                <TransformItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  hasSubmenu={item.hasSubmenu}
+                  onClick={() => pickTransformItem(item)}
+                />
+              ))}
+            </FlowSection>
+            <FlowSection
+              title={t("transform_section_other")}
+              expanded={transformOtherExpanded}
+              onToggle={() => setTransformOtherExpanded((v) => !v)}
+            >
+              {filteredTransformOther.map((item) => (
+                <TransformItemRow
+                  key={item.id}
+                  icon={item.icon}
+                  title={t(item.nameKey)}
+                  description={t(item.descKey)}
+                  onClick={() => pickTransformItem(item)}
+                />
+              ))}
+            </FlowSection>
+            {filteredTransformPopular.length === 0 &&
+            filteredTransformAddRemove.length === 0 &&
+            filteredTransformCombine.length === 0 &&
+            filteredTransformConvert.length === 0 &&
+            filteredTransformOther.length === 0 ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
             ) : null}
           </div>
@@ -702,6 +962,79 @@ function FlowItemRow({
         <span className="block text-sm font-semibold">{title}</span>
         <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
       </span>
+    </button>
+  );
+}
+
+function TransformItemRow({
+  icon: Icon,
+  title,
+  description,
+  highlighted,
+  hasSubmenu,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  highlighted?: boolean;
+  hasSubmenu?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+      {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
+    </button>
+  );
+}
+
+function CoreItemRow({
+  icon: Icon,
+  title,
+  description,
+  highlighted,
+  hasSubmenu,
+  isTrigger,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  highlighted?: boolean;
+  hasSubmenu?: boolean;
+  isTrigger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5">
+          <span className="text-sm font-semibold">{title}</span>
+          {isTrigger ? <Zap className="size-3.5 shrink-0 text-orange-500" aria-hidden /> : null}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+      {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
     </button>
   );
 }

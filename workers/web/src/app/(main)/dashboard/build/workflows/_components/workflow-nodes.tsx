@@ -219,7 +219,7 @@ FlowNode.displayName = "FlowNode";
 
 export const CoreNode = memo((props: NodeProps) => (
   <SimpleNode
-    label="Core"
+    label={String((props.data as { label?: string }).label ?? "Core")}
     icon={Layers}
     accent="border-emerald-500/40"
     selected={props.selected}
@@ -243,7 +243,7 @@ ActionNode.displayName = "ActionNode";
 
 export const TransformNode = memo((props: NodeProps) => (
   <SimpleNode
-    label="Data transform"
+    label={String((props.data as { label?: string }).label ?? "Data transformation")}
     icon={Wrench}
     accent="border-slate-500/40"
     selected={props.selected}
