@@ -112,7 +112,16 @@ function requiresSensitiveStepUp(path: string, method: string): boolean {
   if (path === '/dashboard/auth/otp/verify' && upperMethod === 'POST') return false;
 
   // Admin management APIs: always require fresh step-up.
-  if (path.startsWith('/dashboard/admin/')) return true;
+  if (path.startsWith('/dashboard/admin/')) {
+    // Read-only catalog for workflow editor (+ service on AI nodes) — no secrets.
+    if (
+      path === '/dashboard/admin/service/list/approved' &&
+      upperMethod === 'GET'
+    ) {
+      return false;
+    }
+    return true;
+  }
 
   // Change payout beneficiary is a high-risk money-direction action.
   if (path === '/dashboard/payout/beneficiary' && upperMethod === 'PUT') return true;

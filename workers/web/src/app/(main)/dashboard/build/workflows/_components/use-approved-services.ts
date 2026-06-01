@@ -17,7 +17,7 @@ export function useApprovedServices() {
     (async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/admin/service/list`, {
+        const res = await fetch(`${API_BASE_URL}/dashboard/admin/service/list/approved`, {
           method: "GET",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
