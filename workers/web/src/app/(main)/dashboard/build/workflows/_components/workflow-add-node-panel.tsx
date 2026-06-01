@@ -16,6 +16,7 @@ import {
   Pencil,
   Search,
   Server,
+  Wrench,
   Zap,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -46,12 +47,22 @@ import {
   WORKFLOW_ADD_TRIGGER,
   type WorkflowAddNodeCategory,
 } from "./workflow-add-node-catalog";
-import { WORKFLOW_TOOL_CATALOG } from "./workflow-component-catalog";
 import {
   WORKFLOW_AGENT_MEMORY_BEGINNERS,
   WORKFLOW_AGENT_MEMORY_OTHER,
   type WorkflowAgentMemoryItem,
 } from "./workflow-memory-catalog";
+import {
+  WORKFLOW_AGENT_MCP_SERVERS,
+  WORKFLOW_AGENT_TOOL_CATEGORIES,
+  WORKFLOW_AGENT_TOOL_RECOMMENDED,
+  WORKFLOW_AGENT_VECTOR_STORES,
+  type WorkflowAgentMcpServerItem,
+  type WorkflowAgentRecommendedTool,
+  type WorkflowAgentToolCategory,
+  type WorkflowAgentToolCategoryId,
+  type WorkflowAgentVectorStoreItem,
+} from "./workflow-tool-catalog";
 import {
   HUMAN_REVIEW_SEND_WAIT_CHANNELS,
   type HumanReviewChannelItem,
@@ -108,6 +119,8 @@ type PanelView =
   | "action_in_app_detail"
   | "memory"
   | "tools"
+  | "tools_mcp"
+  | "tools_vector_stores"
   | "services"
   | "human_review"
   | "flow"
@@ -124,7 +137,6 @@ export function WorkflowAddNodePanel({
   variant = "full",
 }: WorkflowAddNodePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
-  const ta = useTranslations("WorkflowAdminPage");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<PanelView>("categories");
   const [selectedActionApp, setSelectedActionApp] = useState<WorkflowActionAppRuntimeItem | null>(null);
@@ -170,6 +182,7 @@ export function WorkflowAddNodePanel({
   }, [allowedNodeTypes]);
 
   const activeView = view === "categories" && resourceOnly ? resourceOnly : view;
+  const fromAgentTools = resourceOnly === "tools";
 
   const categories = useMemo(() => {
     let list = WORKFLOW_ADD_NODE_CATEGORIES;
@@ -227,13 +240,40 @@ export function WorkflowAddNodePanel({
 
   const memoryHasResults = filteredMemoryBeginners.length > 0 || filteredMemoryOther.length > 0;
 
-  const filteredTools = useMemo(() => {
-    return WORKFLOW_TOOL_CATALOG.filter((item) => {
-      const name = ta(item.nameKey).toLowerCase();
-      const desc = ta(item.descKey).toLowerCase();
+  const filteredRecommendedTools = useMemo(() => {
+    return WORKFLOW_AGENT_TOOL_RECOMMENDED.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
       return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
     });
-  }, [q, ta]);
+  }, [q, t]);
+
+  const filteredToolCategories = useMemo(() => {
+    return WORKFLOW_AGENT_TOOL_CATEGORIES.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const filteredMcpServers = useMemo(() => {
+    return WORKFLOW_AGENT_MCP_SERVERS.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const filteredVectorStores = useMemo(() => {
+    return WORKFLOW_AGENT_VECTOR_STORES.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const toolsHasResults =
+    filteredRecommendedTools.length > 0 || filteredToolCategories.length > 0;
 
   const filteredHumanReviewChannels = useMemo(() => {
     return HUMAN_REVIEW_SEND_WAIT_CHANNELS.filter((item) => {
@@ -378,7 +418,11 @@ export function WorkflowAddNodePanel({
                   ? t("search_section_memory")
                   : activeView === "tools"
                     ? t("search_section_tools")
-                    : activeView === "human_review"
+                    : activeView === "tools_mcp"
+                      ? t("tool_category_mcp")
+                      : activeView === "tools_vector_stores"
+                        ? t("tool_category_vector_stores")
+                        : activeView === "human_review"
                       ? t("add_category_human_review")
                       : activeView === "flow"
                         ? t("add_category_flow")
@@ -418,12 +462,27 @@ export function WorkflowAddNodePanel({
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
   };
 
+  const pickAgentTool = (label: string, toolKind: string, extra?: Record<string, unknown>) => {
+    onPick({
+      type: "tool_node",
+      label,
+      extra: { toolKind, catalogId: toolKind, ...extra },
+    });
+  };
+
   const pickActionApp = (
     item: WorkflowActionAppRuntimeItem,
     actionId?: string,
     actionLabel?: string,
   ) => {
     const label = actionLabel ?? getActionAppTitle(item, t);
+    if (fromAgentTools) {
+      pickAgentTool(label, "action_in_app", {
+        integrationId: item.id,
+        action: actionId ?? item.id,
+      });
+      return;
+    }
     onPick({
       type: "action_in_app",
       label,
@@ -471,11 +530,49 @@ export function WorkflowAddNodePanel({
   };
 
   const pickHumanReviewChannel = (channel: HumanReviewChannelItem) => {
+    const label = t(channel.nameKey);
+    if (fromAgentTools) {
+      pickAgentTool(label, "human_review", {
+        channel: channel.id,
+        reviewMode: "send_and_wait",
+      });
+      return;
+    }
     onPick({
       type: "human_review",
-      label: t(channel.nameKey),
+      label,
       extra: { channel: channel.id, reviewMode: "send_and_wait" },
     });
+  };
+
+  const pickRecommendedTool = (item: WorkflowAgentRecommendedTool) => {
+    pickAgentTool(t(item.nameKey), item.id);
+  };
+
+  const pickMcpServer = (item: WorkflowAgentMcpServerItem) => {
+    pickAgentTool(t(item.nameKey), "mcp", { mcpTransport: item.id });
+  };
+
+  const pickVectorStore = (item: WorkflowAgentVectorStoreItem) => {
+    pickAgentTool(t(item.nameKey), "vector_store", { vectorStoreId: item.id });
+  };
+
+  const openToolCategory = (categoryId: WorkflowAgentToolCategoryId) => {
+    if (categoryId === "action_in_app") {
+      setView("action_in_app");
+      return;
+    }
+    if (categoryId === "human_review") {
+      setView("human_review");
+      return;
+    }
+    if (categoryId === "mcp") {
+      setView("tools_mcp");
+      return;
+    }
+    if (categoryId === "vector_stores") {
+      setView("tools_vector_stores");
+    }
   };
 
   const pickTrigger = (kind: WorkflowTriggerKindId, label: string, extra?: Record<string, unknown>) => {
@@ -527,11 +624,25 @@ export function WorkflowAddNodePanel({
   };
 
   const goBack = () => {
-    if (resourceOnly) return;
+    if (resourceOnly && !fromAgentTools) return;
     if (activeView === "action_in_app_detail") {
       setSelectedActionApp(null);
       setView("action_in_app");
       setQuery("");
+      return;
+    }
+    if (fromAgentTools) {
+      if (
+        activeView === "action_in_app" ||
+        activeView === "human_review" ||
+        activeView === "tools_mcp" ||
+        activeView === "tools_vector_stores"
+      ) {
+        setView("tools");
+        setQuery("");
+        setSendWaitExpanded(true);
+        return;
+      }
       return;
     }
     if (activeView === "trigger_app_event" || activeView === "trigger_other") {
@@ -555,7 +666,8 @@ export function WorkflowAddNodePanel({
     setMemoryOtherExpanded(true);
   };
 
-  const showBack = activeView !== "categories" && !resourceOnly;
+  const showBack =
+    activeView !== "categories" && (!resourceOnly || fromAgentTools);
 
   const HeaderIcon =
     activeView === "human_review"
@@ -572,7 +684,11 @@ export function WorkflowAddNodePanel({
                 ? Globe
                 : activeView === "memory"
                   ? Brain
-                  : null;
+                  : activeView === "tools" ||
+                      activeView === "tools_mcp" ||
+                      activeView === "tools_vector_stores"
+                    ? Wrench
+                    : null;
 
   const hideSearch = activeView === "action_in_app_detail";
 
@@ -777,14 +893,66 @@ export function WorkflowAddNodePanel({
 
         {activeView === "tools" ? (
           <div className="p-1">
-            {filteredTools.map((item) => (
-              <PickRow
+            {filteredRecommendedTools.map((item, index) => (
+              <ToolRecommendedRow
                 key={item.id}
-                title={ta(item.nameKey)}
-                description={ta(item.descKey)}
-                onClick={() => onPick({ type: "tool_node", label: ta(item.nameKey) })}
+                icon={item.icon}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                highlighted={index === 0}
+                onClick={() => pickRecommendedTool(item)}
               />
             ))}
+            {filteredRecommendedTools.length > 0 && filteredToolCategories.length > 0 ? (
+              <div className="bg-border my-1 h-px" />
+            ) : null}
+            {filteredToolCategories.map((category) => (
+              <ToolCategoryRow
+                key={category.id}
+                category={category}
+                title={t(category.nameKey)}
+                description={t(category.descKey)}
+                badgeNewLabel={t("badge_new")}
+                onClick={() => openToolCategory(category.id)}
+              />
+            ))}
+            {!toolsHasResults ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "tools_mcp" ? (
+          <div className="p-1">
+            {filteredMcpServers.map((item) => (
+              <PickRow
+                key={item.id}
+                icon={item.icon}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                onClick={() => pickMcpServer(item)}
+              />
+            ))}
+            {filteredMcpServers.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "tools_vector_stores" ? (
+          <div className="p-1">
+            {filteredVectorStores.map((item) => (
+              <VectorStoreItemRow
+                key={item.id}
+                item={item}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                onClick={() => pickVectorStore(item)}
+              />
+            ))}
+            {filteredVectorStores.length === 0 ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
           </div>
         ) : null}
 
@@ -1351,6 +1519,109 @@ function ActionAppRow({
       {hasSubmenu ? <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" /> : null}
     </button>
   );
+}
+
+function ToolRecommendedRow({
+  icon: Icon,
+  title,
+  description,
+  highlighted,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  highlighted?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+      )}
+      onClick={onClick}
+    >
+      <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function ToolCategoryRow({
+  category,
+  title,
+  description,
+  badgeNewLabel,
+  onClick,
+}: {
+  category: WorkflowAgentToolCategory;
+  title: string;
+  description: string;
+  badgeNewLabel: string;
+  onClick: () => void;
+}) {
+  const Icon = category.icon;
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      onClick={onClick}
+    >
+      <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-semibold">{title}</span>
+          {category.badgeNew ? (
+            <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+              {badgeNewLabel}
+            </span>
+          ) : null}
+        </span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+      <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" />
+    </button>
+  );
+}
+
+function VectorStoreItemRow({
+  item,
+  title,
+  description,
+  onClick,
+}: {
+  item: WorkflowAgentVectorStoreItem;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      onClick={onClick}
+    >
+      <VectorStoreItemIcon item={item} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function VectorStoreItemIcon({ item }: { item: WorkflowAgentVectorStoreItem }) {
+  if (item.brandIcon) {
+    return <BrandIcon icon={item.brandIcon} className="mt-0.5 size-5 shrink-0" />;
+  }
+  const Icon = item.lucideIcon;
+  if (!Icon) return null;
+  return <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden />;
 }
 
 function PickRow({
