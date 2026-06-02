@@ -11,6 +11,10 @@ export const WorkflowNodeTypeSchema = z.enum([
   'data_transformation',
   'http_request',
   'code',
+  'service_node',
+  'memory_node',
+  'tool_node',
+  'sticky_note',
 ]);
 
 export const WorkflowDefinitionSchema = z.object({

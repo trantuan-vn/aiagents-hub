@@ -1,16 +1,12 @@
 import { addEdge, type Connection, type Edge, type Node } from "@xyflow/react";
 
 import type { ConnectedNodeSide } from "./workflow-canvas-ui-context";
-import { type WorkflowHandleId } from "./workflow-connection-utils";
+import { isResourceEdge, type WorkflowHandleId } from "./workflow-connection-utils";
 import { normalizeWorkflowEdge } from "./workflow-edge-utils";
+import { WORKFLOW_CONNECT_OFFSET_X } from "./workflow-placement-constants";
+import { computeNewResourceNodePosition } from "./workflow-resource-layout";
 
-const CONNECT_OFFSET_X = 280;
-const RESOURCE_OFFSET_Y = 130;
-const RESOURCE_HANDLE_OFFSET_X: Record<string, number> = {
-  service: -110,
-  memory: 0,
-  tools: 110,
-};
+const RESOURCE_NODE_TYPES = new Set(["service_node", "memory_node", "tool_node"]);
 
 export type CreateConnectedNodeArgs = {
   fromNodeId: string;
@@ -36,15 +32,27 @@ function buildExtraData(
   return undefined;
 }
 
+function existingResourcesForAgent(nodes: Node[], edges: Edge[], agentId: string): Node[] {
+  const resourceIds = new Set(
+    edges.filter((edge) => isResourceEdge(edge) && edge.target === agentId).map((edge) => edge.source),
+  );
+  return nodes.filter((node) => resourceIds.has(node.id) && RESOURCE_NODE_TYPES.has(node.type ?? ""));
+}
+
 function buildResourcePlacement(
   fromNode: Node,
   handle: WorkflowHandleId,
+  nodes: Node[],
+  edges: Edge[],
+  newId: string,
+  newType: string,
 ): { position: { x: number; y: number }; connection: Connection } {
+  const newNode: Node = { id: newId, type: newType, position: { x: 0, y: 0 }, data: {} };
+  const siblings = existingResourcesForAgent(nodes, edges, fromNode.id);
+  const position = computeNewResourceNodePosition(fromNode, siblings, newNode);
+
   return {
-    position: {
-      x: fromNode.position.x + (RESOURCE_HANDLE_OFFSET_X[handle] ?? 0),
-      y: fromNode.position.y + RESOURCE_OFFSET_Y,
-    },
+    position,
     connection: {
       source: "",
       sourceHandle: handle,
@@ -61,8 +69,8 @@ function buildFlowPlacement(
 ): { position: { x: number; y: number }; connection: Connection } {
   const position =
     side === "right"
-      ? { x: fromNode.position.x + CONNECT_OFFSET_X, y: fromNode.position.y }
-      : { x: fromNode.position.x - CONNECT_OFFSET_X, y: fromNode.position.y };
+      ? { x: fromNode.position.x + WORKFLOW_CONNECT_OFFSET_X, y: fromNode.position.y }
+      : { x: fromNode.position.x - WORKFLOW_CONNECT_OFFSET_X, y: fromNode.position.y };
   const connection: Connection =
     side === "right"
       ? { source: fromNode.id, sourceHandle: "out", target: newId, targetHandle: "in" }
@@ -84,7 +92,7 @@ export function applyCreateConnectedNode(
   let conn: Connection;
 
   if (args.side === "resource" && args.resourceHandle) {
-    const resource = buildResourcePlacement(fromNode, args.resourceHandle);
+    const resource = buildResourcePlacement(fromNode, args.resourceHandle, nodes, edges, newId, args.type);
     position = resource.position;
     conn = { ...resource.connection, source: newId };
   } else if (args.side === "left" || args.side === "right") {

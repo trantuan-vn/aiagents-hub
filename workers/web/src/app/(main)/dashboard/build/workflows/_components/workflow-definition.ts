@@ -16,7 +16,10 @@ export function toPersistedDefinition(
     nodes: nodes.map((n) => ({
       id: n.id,
       type: n.type,
-      position: n.position,
+      position: {
+        x: Math.round(n.position.x),
+        y: Math.round(n.position.y),
+      },
       data: n.data,
     })),
     edges: edges.map((e) => ({
