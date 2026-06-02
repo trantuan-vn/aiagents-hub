@@ -11,6 +11,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { useWorkflowCanvasState } from "./use-workflow-canvas-state";
 import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
+import { WorkflowCanvasEmptyState } from "./workflow-canvas-empty-state";
 import { WorkflowCanvasMinimap } from "./workflow-canvas-minimap";
 import { useWorkflowAddNodeDrawerActions } from "./workflow-add-node-drawer-context";
 import { WorkflowCanvasSideToolbar } from "./workflow-canvas-side-toolbar";
@@ -274,6 +275,7 @@ const CanvasSurface = memo(function CanvasSurface({
         <WorkflowCanvasSideToolbar />
         <WorkflowCanvasMinimap />
       </ReactFlow>
+      {!readOnly && nodes.length === 0 ? <WorkflowCanvasEmptyState /> : null}
     </div>
   );
 });

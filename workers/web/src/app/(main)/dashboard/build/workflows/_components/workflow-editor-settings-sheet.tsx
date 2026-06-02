@@ -14,8 +14,6 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
-import { ServiceEndpointSelect } from "./service-endpoint-select";
-
 export interface WorkflowEditorSettingsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,16 +21,13 @@ export interface WorkflowEditorSettingsSheetProps {
   onNameChange: (v: string) => void;
   description: string;
   onDescriptionChange: (v: string) => void;
-  status: "draft" | "published";
-  onStatusChange: (v: "draft" | "published") => void;
   isShared: boolean;
   onSharedChange: (v: boolean) => void;
   starCount: number;
   onStarCountChange: (n: number) => void;
   starLabel: string;
   onStarLabelChange: (s: string) => void;
-  serviceEndpoint: string;
-  onServiceEndpointChange: (s: string) => void;
+  descriptionInputRef?: React.RefObject<HTMLTextAreaElement>;
 }
 
 export function WorkflowEditorSettingsSheet({
@@ -42,16 +37,13 @@ export function WorkflowEditorSettingsSheet({
   onNameChange,
   description,
   onDescriptionChange,
-  status,
-  onStatusChange,
   isShared,
   onSharedChange,
   starCount,
   onStarCountChange,
   starLabel,
   onStarLabelChange,
-  serviceEndpoint,
-  onServiceEndpointChange,
+  descriptionInputRef,
 }: WorkflowEditorSettingsSheetProps) {
   const t = useTranslations("WorkflowsPage");
   const te = useTranslations("WorkflowEditorPage");
@@ -71,37 +63,17 @@ export function WorkflowEditorSettingsSheet({
           <div className="space-y-2">
             <Label htmlFor="wf-desc">{t("description_field")}</Label>
             <Textarea
+              ref={descriptionInputRef}
               id="wf-desc"
               value={description}
               onChange={(e) => onDescriptionChange(e.target.value)}
-              rows={3}
+              rows={4}
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="wf-status">
-              {t("status_draft")} / {t("status_published")}
-            </Label>
-            <select
-              id="wf-status"
-              className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-              value={status}
-              onChange={(e) => onStatusChange(e.target.value as "draft" | "published")}
-            >
-              <option value="draft">{t("status_draft")}</option>
-              <option value="published">{t("status_published")}</option>
-            </select>
           </div>
           <div className="space-y-2 rounded-lg border p-3">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="wf-share">{t("share_toggle")}</Label>
-              <Switch
-                id="wf-share"
-                checked={isShared}
-                onCheckedChange={(v) => {
-                  onSharedChange(v);
-                  if (v) onStatusChange("published");
-                }}
-              />
+              <Switch id="wf-share" checked={isShared} onCheckedChange={onSharedChange} />
             </div>
             <p className="text-muted-foreground text-xs">{t("share_hint")}</p>
           </div>
@@ -116,9 +88,6 @@ export function WorkflowEditorSettingsSheet({
             />
             <Label>{t("star_label")}</Label>
             <Input value={starLabel} onChange={(e) => onStarLabelChange(e.target.value)} />
-          </div>
-          <div className="rounded-lg border p-3">
-            <ServiceEndpointSelect value={serviceEndpoint} onChange={onServiceEndpointChange} />
           </div>
         </div>
       </SheetContent>

@@ -41,7 +41,7 @@ export async function resolveWorkflow(
     if (!db) throw new Error('D1 database binding not configured');
     const row = await db
       .prepare(
-        `SELECT id, user_id, name, description, slug, definition, isShared, status
+        `SELECT id, user_id, name, description, tags, definition, isShared, status
          FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`,
       )
       .bind(ownerIdParam, workflowId)

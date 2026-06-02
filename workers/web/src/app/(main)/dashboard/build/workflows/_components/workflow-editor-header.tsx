@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -8,10 +8,14 @@ import { WorkflowEditorHeaderEditActions, WorkflowEditorHeaderViewActions } from
 import { WorkflowEditorHeaderLeft } from "./workflow-editor-header-left";
 import { WorkflowEditorHeaderTabs } from "./workflow-editor-header-tabs";
 
-export type WorkflowEditorTab = "editor" | "executions" | "triggers" | "versions" | "evaluations";
+export type WorkflowEditorTab = "editor" | "executions" | "triggers" | "evaluations";
 
 interface WorkflowEditorHeaderProps {
   workflowName: string;
+  onWorkflowNameChange?: (name: string) => void;
+  tags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+  nameInputRef?: RefObject<HTMLInputElement>;
   status?: "draft" | "published";
   activeTab: WorkflowEditorTab;
   onTabChange: (tab: WorkflowEditorTab) => void;
@@ -22,12 +26,26 @@ interface WorkflowEditorHeaderProps {
   chatHref?: string;
   headerMeta?: ReactNode;
   saving?: boolean;
-  onSave?: () => void;
+  publishing?: boolean;
+  onPublish?: () => void;
+  onOpenHistory?: () => void;
+  onEditName?: () => void;
+  onEditNote?: () => void;
+  onDuplicate?: () => void;
+  onDownload?: () => void;
+  onShare?: () => void;
+  onFavorite?: () => void;
+  onImportFile?: (file: File) => void;
   onOpenSettings?: () => void;
+  onDelete?: () => void;
 }
 
 export function WorkflowEditorHeader({
   workflowName,
+  onWorkflowNameChange,
+  tags,
+  onTagsChange,
+  nameInputRef,
   status = "published",
   activeTab,
   onTabChange,
@@ -38,21 +56,38 @@ export function WorkflowEditorHeader({
   chatHref,
   headerMeta,
   saving = false,
-  onSave,
+  publishing = false,
+  onPublish,
+  onOpenHistory,
+  onEditName,
+  onEditNote,
+  onDuplicate,
+  onDownload,
+  onShare,
+  onFavorite,
+  onImportFile,
   onOpenSettings,
+  onDelete,
 }: WorkflowEditorHeaderProps) {
   const te = useTranslations("WorkflowEditorPage");
   const tv = useTranslations("WorkflowViewPage");
   const breadcrumb = backLabel ?? (readOnly ? tv("back") : te("breadcrumb_workflows"));
 
+  const noop = () => undefined;
+  const noopFile = () => undefined;
+
   return (
     <header className="border-border bg-background flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <WorkflowEditorHeaderLeft
         workflowName={workflowName}
+        onWorkflowNameChange={onWorkflowNameChange}
+        tags={tags}
+        onTagsChange={onTagsChange}
         readOnly={readOnly}
         backHref={backHref}
         backLabel={breadcrumb}
         headerMeta={headerMeta}
+        nameInputRef={nameInputRef}
       />
       <WorkflowEditorHeaderTabs activeTab={activeTab} readOnly={readOnly} onTabChange={onTabChange} />
       {readOnly ? (
@@ -61,9 +96,19 @@ export function WorkflowEditorHeader({
         <WorkflowEditorHeaderEditActions
           status={status}
           saving={saving}
-          onSave={onSave}
+          publishing={publishing}
+          onPublish={onPublish ?? noop}
           onExecute={onExecute}
-          onOpenSettings={onOpenSettings}
+          onOpenHistory={onOpenHistory ?? noop}
+          onEditName={onEditName ?? noop}
+          onEditNote={onEditNote ?? noop}
+          onDuplicate={onDuplicate ?? noop}
+          onDownload={onDownload ?? noop}
+          onShare={onShare ?? noop}
+          onFavorite={onFavorite ?? noop}
+          onImportFile={onImportFile ?? noopFile}
+          onOpenSettings={onOpenSettings ?? noop}
+          onDelete={onDelete ?? noop}
         />
       )}
     </header>

@@ -14,13 +14,10 @@ import { WorkflowEditor } from "../../_components/workflow-editor";
 import { WorkflowEditorShell } from "../../_components/workflow-editor-shell";
 import { WorkflowExecuteDialog } from "../../_components/workflow-execute-dialog";
 import { getSharedWorkflow, type AgentWorkflow } from "../../_lib/api";
-import { readServiceEndpointFromDefinition } from "../../_lib/definition-utils";
-
 interface ViewWorkflowState {
   name: string;
   description: string;
   definition: string;
-  serviceEndpoint: string;
   starLabel: string;
   communityStarAvg: number;
   communityStarCount: number;
@@ -33,7 +30,6 @@ function buildViewStateFromWorkflow(workflow: AgentWorkflow): ViewWorkflowState 
     name: workflow.name,
     description: workflow.description ?? "",
     definition: def,
-    serviceEndpoint: readServiceEndpointFromDefinition(def),
     starLabel: workflow.starLabel ?? "",
     communityStarAvg: workflow.communityStarAvg ?? 0,
     communityStarCount: workflow.communityStarCount ?? 0,
@@ -45,7 +41,6 @@ const EMPTY_VIEW_STATE: ViewWorkflowState = {
   name: "",
   description: "",
   definition: '{"nodes":[],"edges":[]}',
-  serviceEndpoint: "",
   starLabel: "",
   communityStarAvg: 0,
   communityStarCount: 0,
@@ -113,7 +108,6 @@ export default function ViewSharedWorkflowPage() {
         readOnly
         workflowId={id}
         workflowName={view.name}
-        serviceEndpoint={view.serviceEndpoint}
         headerMeta={headerMeta}
         backHref="/dashboard/build/workflows"
         backLabel={tv("back")}
@@ -122,7 +116,6 @@ export default function ViewSharedWorkflowPage() {
         <WorkflowEditor
           definitionJson={view.definition}
           readOnly
-          serviceEndpoint={view.serviceEndpoint}
           onExecute={() => setExecuteOpen(true)}
         />
       </WorkflowEditorShell>

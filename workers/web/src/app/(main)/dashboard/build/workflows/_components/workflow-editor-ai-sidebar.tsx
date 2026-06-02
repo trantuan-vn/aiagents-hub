@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { Settings2, Sparkles, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -17,6 +15,8 @@ interface WorkflowEditorAiSidebarProps {
   ownerId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode: "ask" | "build";
+  onModeChange: (mode: "ask" | "build") => void;
   onOpenSettings?: () => void;
   onApplyDefinition?: (definitionJson: string) => void;
   className?: string;
@@ -28,12 +28,13 @@ export function WorkflowEditorAiSidebar({
   ownerId,
   open,
   onOpenChange,
+  mode,
+  onModeChange,
   onOpenSettings,
   onApplyDefinition,
   className,
 }: WorkflowEditorAiSidebarProps) {
   const t = useTranslations("WorkflowEditorPage");
-  const [mode, setMode] = useState<"ask" | "build">("ask");
 
   if (!open) return null;
 
@@ -56,7 +57,7 @@ export function WorkflowEditorAiSidebar({
               "rounded px-2 py-0.5 font-medium transition-colors",
               mode === "ask" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
-            onClick={() => setMode("ask")}
+            onClick={() => onModeChange("ask")}
           >
             {t("ai_tab_ask")}
           </button>
@@ -66,7 +67,7 @@ export function WorkflowEditorAiSidebar({
               "rounded px-2 py-0.5 font-medium transition-colors",
               mode === "build" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
             )}
-            onClick={() => setMode("build")}
+            onClick={() => onModeChange("build")}
           >
             {t("ai_tab_build")}
           </button>

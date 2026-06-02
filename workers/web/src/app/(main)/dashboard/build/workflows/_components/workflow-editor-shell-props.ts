@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import type { WorkflowEditorSettingsSheetProps } from "./workflow-editor-settings-sheet";
 
@@ -7,7 +7,11 @@ export type WorkflowEditorShellSettings = Omit<WorkflowEditorSettingsSheetProps,
 interface WorkflowEditorShellBaseProps {
   workflowId: number;
   workflowName: string;
-  serviceEndpoint?: string;
+  onWorkflowNameChange?: (name: string) => void;
+  workflowTags?: string[];
+  onWorkflowTagsChange?: (tags: string[]) => void;
+  nameInputRef?: RefObject<HTMLInputElement>;
+  descriptionInputRef?: RefObject<HTMLTextAreaElement>;
   onExecute: () => void;
   children: ReactNode;
   readOnly?: boolean;
@@ -16,15 +20,24 @@ interface WorkflowEditorShellBaseProps {
   headerMeta?: ReactNode;
   backHref?: string;
   backLabel?: string;
-  /** Replace the canvas definition (text-to-workflow / restore / auto-fix). */
   onApplyDefinition?: (definitionJson: string) => void;
+  saving?: boolean;
+  publishing?: boolean;
+  onPublish?: () => void;
+  onDuplicate?: () => void;
+  onDownload?: () => void;
+  onShare?: () => void;
+  onFavorite?: () => void;
+  onImportDefinition?: (definitionJson: string) => void;
+  onDelete?: () => void;
+  onEditName?: () => void;
+  onEditNote?: () => void;
 }
 
 export interface WorkflowEditorShellEditProps extends WorkflowEditorShellBaseProps {
   readOnly?: false;
+  status: "draft" | "published";
   settings: WorkflowEditorShellSettings;
-  saving: boolean;
-  onSave: () => void;
   onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
 }
@@ -43,11 +56,9 @@ const noop = () => {
 
 export interface ResolvedWorkflowEditorShellProps {
   editSettings: WorkflowEditorShellSettings | null;
-  saving: boolean;
-  onSave?: () => void;
+  status: "draft" | "published";
   onAddNode: (type: string, label: string, extra?: Record<string, unknown>) => void;
   onAddStickyNote: () => void;
-  status: "draft" | "published";
 }
 
 export function resolveWorkflowEditorShellProps(
@@ -57,8 +68,6 @@ export function resolveWorkflowEditorShellProps(
   if (readOnly) {
     return {
       editSettings: null,
-      saving: false,
-      onSave: undefined,
       onAddNode: props.onAddNode ?? noop,
       onAddStickyNote: props.onAddStickyNote ?? noop,
       status: "published",
@@ -68,10 +77,8 @@ export function resolveWorkflowEditorShellProps(
   const editProps = props as WorkflowEditorShellEditProps;
   return {
     editSettings: editProps.settings,
-    saving: editProps.saving,
-    onSave: editProps.onSave,
     onAddNode: editProps.onAddNode,
     onAddStickyNote: editProps.onAddStickyNote,
-    status: editProps.settings.status,
+    status: editProps.status,
   };
 }

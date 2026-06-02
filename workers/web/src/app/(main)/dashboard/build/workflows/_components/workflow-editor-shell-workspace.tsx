@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { WorkflowAddNodeDrawer } from "./workflow-add-node-drawer";
 import { WorkflowEditorActionsProvider } from "./workflow-editor-actions-context";
@@ -11,7 +11,6 @@ interface WorkflowEditorShellWorkspaceProps {
   workflowId: number;
   workflowName: string;
   ownerId?: string;
-  serviceEndpoint: string;
   readOnly: boolean;
   aiOpen: boolean;
   onAiOpenChange: (open: boolean) => void;
@@ -26,7 +25,6 @@ export function WorkflowEditorShellWorkspace({
   workflowId,
   workflowName,
   ownerId,
-  serviceEndpoint,
   readOnly,
   aiOpen,
   onAiOpenChange,
@@ -36,16 +34,21 @@ export function WorkflowEditorShellWorkspace({
   onApplyDefinition,
   children,
 }: WorkflowEditorShellWorkspaceProps) {
+  const [aiMode, setAiMode] = useState<"ask" | "build">("ask");
+
   const actionsValue = useMemo(
     () => ({
       onAddNode,
       onAddStickyNote,
       aiOpen,
       onToggleAi: () => onAiOpenChange(!aiOpen),
-      serviceEndpoint,
+      onOpenAiBuild: () => {
+        setAiMode("build");
+        onAiOpenChange(true);
+      },
       readOnly,
     }),
-    [onAddNode, onAddStickyNote, aiOpen, onAiOpenChange, serviceEndpoint, readOnly],
+    [onAddNode, onAddStickyNote, aiOpen, onAiOpenChange, readOnly],
   );
 
   useEffect(() => {
@@ -65,6 +68,8 @@ export function WorkflowEditorShellWorkspace({
           ownerId={ownerId}
           open={aiOpen}
           onOpenChange={onAiOpenChange}
+          mode={aiMode}
+          onModeChange={setAiMode}
           onOpenSettings={onOpenSettings}
           onApplyDefinition={onApplyDefinition}
         />

@@ -12,7 +12,7 @@ export interface SharedWorkflowRow {
   user_id?: string;
   name?: string;
   description?: string;
-  slug?: string;
+  tags?: string;
   definition?: string;
   isShared?: boolean | number;
   starCount?: number;
@@ -77,7 +77,7 @@ export async function listSharedWorkflowsFromD1(
   }
 
   const whereClause = conditions.join(' AND ');
-  const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.slug, w.isShared, w.starCount, w.starLabel,
+  const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.isShared, w.starCount, w.starLabel,
       w.usageCount, w.totalEarningsUsd, w.status, w.created_at,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
       COALESCE(star_stats.rater_count, 0) AS communityStarCount

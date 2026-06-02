@@ -7,6 +7,7 @@ export interface WorkflowEditorActionsValue {
   onAddStickyNote: () => void;
   aiOpen: boolean;
   onToggleAi: () => void;
+  onOpenAiBuild?: () => void;
   serviceEndpoint?: string;
   readOnly?: boolean;
 }

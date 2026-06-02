@@ -615,7 +615,7 @@ export class D1DatabaseManager {
     await this.registerTable('connections', ConnectionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('connectionId'));
     await this.registerTable('subscriptions', SubscriptionSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('channel'));
     await this.registerTable('commission_policies', CommissionPolicySchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));
-    await this.registerTable('agent_workflows', AgentWorkflowSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('slug'));
+    await this.registerTable('agent_workflows', AgentWorkflowSchema, this.TABLE_CONFIGS.queueTable());
     await this.registerTable(
       'workflow_user_stars',
       WorkflowUserStarSchema,

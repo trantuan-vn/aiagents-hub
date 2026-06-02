@@ -39,8 +39,8 @@ export const WorkflowDefinitionSchema = z.object({
 export const AgentWorkflowSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(4000).optional(),
-  /** Unique per user (slug for URLs). */
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
+  /** JSON string array of tag labels, e.g. `["sales","onboarding"]`. */
+  tags: z.string().max(2000).default('[]'),
   /** JSON string of WorkflowDefinition */
   definition: z.string().default('{"nodes":[],"edges":[]}'),
   isShared: z.boolean().default(false),

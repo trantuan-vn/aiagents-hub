@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 
-import { ChevronDown, History, MoreHorizontal, Play, Settings2 } from "lucide-react";
+import { History, MoreHorizontal, Play } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+
+import { WorkflowEditorHeaderMoreMenu } from "./workflow-editor-header-more-menu";
 
 const executeButtonClass = "h-8 gap-1 bg-[#ff6f00] text-white hover:bg-[#e66300]";
 
@@ -41,24 +37,47 @@ export function WorkflowEditorHeaderViewActions({ chatHref, onExecute }: Workflo
 
 interface WorkflowEditorHeaderEditActionsProps {
   status: "draft" | "published";
-  saving: boolean;
-  onSave?: () => void;
+  saving?: boolean;
+  publishing?: boolean;
+  onPublish: () => void;
   onExecute: () => void;
-  onOpenSettings?: () => void;
+  onOpenHistory: () => void;
+  onEditName: () => void;
+  onEditNote: () => void;
+  onDuplicate: () => void;
+  onDownload: () => void;
+  onShare: () => void;
+  onFavorite: () => void;
+  onImportFile: (file: File) => void;
+  onOpenSettings: () => void;
+  onDelete: () => void;
 }
 
 export function WorkflowEditorHeaderEditActions({
   status,
-  saving,
-  onSave,
+  saving = false,
+  publishing = false,
+  onPublish,
   onExecute,
+  onOpenHistory,
+  onEditName,
+  onEditNote,
+  onDuplicate,
+  onDownload,
+  onShare,
+  onFavorite,
+  onImportFile,
   onOpenSettings,
+  onDelete,
 }: WorkflowEditorHeaderEditActionsProps) {
   const t = useTranslations("WorkflowsPage");
   const te = useTranslations("WorkflowEditorPage");
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
+      {saving ? (
+        <span className="text-muted-foreground hidden text-[10px] sm:inline">{te("saving")}</span>
+      ) : null}
       <span
         className={cn(
           "hidden rounded-full px-2 py-0.5 text-[10px] font-medium sm:inline",
@@ -69,37 +88,33 @@ export function WorkflowEditorHeaderEditActions({
       >
         {status === "published" ? t("status_published") : t("status_draft")}
       </span>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="sm" className={executeButtonClass}>
-            {te("publish")}
-            <ChevronDown className="size-3.5 opacity-80" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => void onSave?.()} disabled={saving}>
-            {saving ? te("saving") : te("save")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onExecute}>{te("execute")}</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Button variant="outline" size="icon" className="size-8" type="button" aria-label={te("history")}>
+      <Button
+        size="sm"
+        variant={status === "published" ? "outline" : "default"}
+        className={cn(status !== "published" && "bg-[#ff6f00] text-white hover:bg-[#e66300]")}
+        onClick={onPublish}
+        disabled={publishing || status === "published"}
+      >
+        {publishing ? te("publishing") : te("publish")}
+      </Button>
+      <Button variant="outline" size="icon" className="size-8" type="button" aria-label={te("history")} onClick={onOpenHistory}>
         <History className="size-3.5" />
       </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="size-8">
-            <MoreHorizontal className="size-3.5" />
-            <span className="sr-only">{te("more_menu")}</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onOpenSettings}>
-            <Settings2 className="mr-2 size-3.5" />
-            {te("settings_title")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <WorkflowEditorHeaderMoreMenu
+        onEditName={onEditName}
+        onEditNote={onEditNote}
+        onDuplicate={onDuplicate}
+        onDownload={onDownload}
+        onShare={onShare}
+        onFavorite={onFavorite}
+        onImportFile={onImportFile}
+        onOpenSettings={onOpenSettings}
+        onDelete={onDelete}
+      />
+      <Button size="sm" className={executeButtonClass} onClick={onExecute}>
+        <Play className="size-3.5 fill-current" />
+        {te("execute")}
+      </Button>
     </div>
   );
 }

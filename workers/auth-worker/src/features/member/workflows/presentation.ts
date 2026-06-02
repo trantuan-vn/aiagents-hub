@@ -204,7 +204,10 @@ export function createWorkflowRoutes(bindingName: string) {
       const created = await executeUtils.executeDynamicAction(
         userDO,
         'insert',
-        body,
+        {
+          ...body,
+          tags: body.tags ?? '[]',
+        },
         'agent_workflows',
       );
       return c.json({ workflow: created }, 201);
@@ -522,19 +525,25 @@ export function createWorkflowRoutes(bindingName: string) {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const body = UpdateWorkflowSchema.parse(await c.req.json());
-      const publishing = body.isShared === true;
-      if (publishing) {
+      if (body.isShared === true) {
         body.status = 'published';
       }
       const userDO = getUserDO(c, user.identifier);
+      const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'id', operator: '=', value: id },
+      }, 'agent_workflows');
+      const existing = Array.isArray(rows) ? rows[0] : rows;
       const updated = await executeUtils.executeDynamicAction(
         userDO,
         'update',
         { id, ...body },
         'agent_workflows',
       );
-      // Capture an immutable version snapshot when publishing.
-      if (publishing) {
+      const wasPublished = (existing as { status?: string })?.status === 'published';
+      const nowPublished =
+        body.status === 'published' ||
+        (updated as { status?: string })?.status === 'published';
+      if (nowPublished && !wasPublished) {
         try {
           const def =
             typeof body.definition === 'string'
@@ -698,7 +707,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, slug, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at
+      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first();
       if (!result) return c.json({ error: 'Not found' }, 404);

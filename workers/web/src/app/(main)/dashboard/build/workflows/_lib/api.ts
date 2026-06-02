@@ -17,7 +17,8 @@ export interface AgentWorkflow {
   id?: number;
   name: string;
   description?: string;
-  slug: string;
+  /** JSON string array of tag labels. */
+  tags?: string;
   definition: string;
   isShared?: boolean;
   starCount?: number;
