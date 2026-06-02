@@ -34,6 +34,7 @@ const workflowEdgeTypes = {
 interface WorkflowCanvasProps {
   initial?: WorkflowDefinition;
   onChange?: (def: WorkflowDefinition) => void;
+  definitionSyncKey?: number;
   readOnly?: boolean;
   serviceEndpoint?: string;
   onExecute?: () => void;
@@ -55,6 +56,7 @@ const READONLY_FLOW_PROPS = {
 function CanvasInner({
   initial,
   onChange,
+  definitionSyncKey,
   readOnly,
   serviceEndpoint,
   onExecute,
@@ -73,11 +75,12 @@ function CanvasInner({
     createConnectedNode,
     deleteEdgeById,
     deleteNodeById,
+    patchNodeDataById,
     toggleNodeActive,
     onNodeMenuAction,
     tidyLayout,
     isValidConnection,
-  } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint);
+  } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint, definitionSyncKey);
 
   const interactionProps = useMemo(
     () =>
@@ -126,6 +129,7 @@ function CanvasInner({
       createConnectedNode={createConnectedNode}
       deleteEdgeById={deleteEdgeById}
       deleteNodeById={deleteNodeById}
+      patchNodeDataById={patchNodeDataById}
       toggleNodeActive={toggleNodeActive}
       onNodeMenuAction={onNodeMenuAction}
       tidyWithFitRef={tidyWithFitRef}
@@ -146,6 +150,7 @@ function CanvasInnerWithDrawerUi({
   createConnectedNode,
   deleteEdgeById,
   deleteNodeById,
+  patchNodeDataById,
   toggleNodeActive,
   onNodeMenuAction,
   tidyWithFitRef,
@@ -162,6 +167,7 @@ function CanvasInnerWithDrawerUi({
   createConnectedNode: ReturnType<typeof useWorkflowCanvasState>["createConnectedNode"];
   deleteEdgeById: ReturnType<typeof useWorkflowCanvasState>["deleteEdgeById"];
   deleteNodeById: ReturnType<typeof useWorkflowCanvasState>["deleteNodeById"];
+  patchNodeDataById: ReturnType<typeof useWorkflowCanvasState>["patchNodeDataById"];
   toggleNodeActive: ReturnType<typeof useWorkflowCanvasState>["toggleNodeActive"];
   onNodeMenuAction: ReturnType<typeof useWorkflowCanvasState>["onNodeMenuAction"];
   tidyWithFitRef: MutableRefObject<(() => void) | undefined>;
@@ -174,6 +180,7 @@ function CanvasInnerWithDrawerUi({
       createConnectedNode: readOnly ? undefined : createConnectedNode,
       deleteEdge: readOnly ? undefined : deleteEdgeById,
       deleteNode: readOnly ? undefined : deleteNodeById,
+      patchNodeData: readOnly ? undefined : patchNodeDataById,
       toggleNodeActive: readOnly ? undefined : toggleNodeActive,
       runNode: readOnly ? undefined : (nodeId: string) => onNodeMenuAction(nodeId, "execute_step"),
       onNodeMenuAction: readOnly ? undefined : onNodeMenuAction,
@@ -186,6 +193,7 @@ function CanvasInnerWithDrawerUi({
       createConnectedNode,
       deleteEdgeById,
       deleteNodeById,
+      patchNodeDataById,
       toggleNodeActive,
       onNodeMenuAction,
       open,

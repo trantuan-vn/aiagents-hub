@@ -19,6 +19,7 @@ export interface WorkflowCanvasUiValue {
   }) => void;
   deleteEdge?: (edgeId: string) => void;
   deleteNode?: (nodeId: string) => void;
+  patchNodeData?: (nodeId: string, patch: Record<string, unknown>) => void;
   toggleNodeActive?: (nodeId: string) => void;
   runNode?: (nodeId: string) => void;
   onNodeMenuAction?: (nodeId: string, action: string) => void;

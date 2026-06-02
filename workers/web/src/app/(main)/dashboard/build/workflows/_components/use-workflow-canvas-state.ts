@@ -18,11 +18,20 @@ import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } fr
 import { normalizeWorkflowEdge } from "./workflow-edge-utils";
 import { layoutWorkflowNodes } from "./workflow-layout";
 
+function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
+  return changes.some((c) => {
+    if (c.type === "select") return false;
+    if (c.type === "position") return "dragging" in c && c.dragging === false;
+    return c.type === "add" || c.type === "remove" || c.type === "replace" || c.type === "dimensions";
+  });
+}
+
 export function useWorkflowCanvasState(
   initial: WorkflowDefinition | undefined,
   onChange?: (def: WorkflowDefinition) => void,
   readOnly?: boolean,
   serviceEndpoint?: string,
+  externalSyncKey?: number,
 ) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initial?.nodes ?? []);
   const [edges, setEdges, onEdgesChange] = useEdgesState((initial?.edges ?? []).map(normalizeWorkflowEdge));
@@ -38,6 +47,7 @@ export function useWorkflowCanvasState(
   const edgesRef = useRef(edges);
   edgesRef.current = edges;
   const deletedEdgeIdsRef = useRef(new Set<string>());
+  const externalSyncKeyRef = useRef(externalSyncKey ?? 0);
 
   const pushToParent = useCallback(() => {
     if (readOnly) return;
@@ -48,6 +58,22 @@ export function useWorkflowCanvasState(
     lastEmittedRef.current = sig;
     onChangeRef.current?.(toPersistedDefinition(n, e, viewportRef.current));
   }, [readOnly]);
+
+  // Parent-driven replace (undo/redo, import, version restore, collab).
+  useEffect(() => {
+    if (externalSyncKey === undefined) return;
+    if (externalSyncKey === externalSyncKeyRef.current) return;
+    externalSyncKeyRef.current = externalSyncKey;
+
+    const extNodes = initial?.nodes ?? [];
+    const extEdges = (initial?.edges ?? []).map(normalizeWorkflowEdge);
+    nodesRef.current = extNodes;
+    edgesRef.current = extEdges;
+    deletedEdgeIdsRef.current.clear();
+    lastEmittedRef.current = persistedSignature(extNodes, extEdges);
+    setNodes(extNodes);
+    setEdges(extEdges);
+  }, [externalSyncKey, initial, setNodes, setEdges]);
 
   // Merge nodes/edges added via palette (parent JSON) without resetting positions while dragging.
   useEffect(() => {
@@ -147,6 +173,22 @@ export function useWorkflowCanvasState(
     [readOnly, setNodes],
   );
 
+  const patchNodeDataById = useCallback(
+    (nodeId: string, patch: Record<string, unknown>) => {
+      if (readOnly) return;
+      setNodes((nds) => {
+        const nextNodes = nds.map((n) =>
+          n.id === nodeId ? { ...n, data: { ...(n.data as Record<string, unknown>), ...patch } } : n,
+        );
+        nodesRef.current = nextNodes;
+        lastEmittedRef.current = persistedSignature(nextNodes, edgesRef.current);
+        onChangeRef.current?.(toPersistedDefinition(nextNodes, edgesRef.current, viewportRef.current));
+        return nextNodes;
+      });
+    },
+    [readOnly, setNodes],
+  );
+
   const duplicateNodeById = useCallback(
     (nodeId: string) => {
       if (readOnly) return;
@@ -236,14 +278,7 @@ export function useWorkflowCanvasState(
     (changes: NodeChange[]) => {
       onNodesChange(changes);
       if (readOnly) return;
-      const shouldPersist = changes.some(
-        (c) =>
-          c.type === "add" ||
-          c.type === "remove" ||
-          c.type === "replace" ||
-          (c.type === "position" && "dragging" in c && c.dragging === false),
-      );
-      if (shouldPersist) {
+      if (shouldPersistNodeChanges(changes)) {
         queueMicrotask(() => pushToParent());
       }
     },
@@ -285,6 +320,7 @@ export function useWorkflowCanvasState(
     createConnectedNode,
     deleteEdgeById,
     deleteNodeById,
+    patchNodeDataById,
     toggleNodeActive,
     onNodeMenuAction,
     tidyLayout,

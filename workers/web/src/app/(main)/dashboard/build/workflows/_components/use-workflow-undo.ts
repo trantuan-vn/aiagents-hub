@@ -72,7 +72,7 @@ export function useWorkflowUndoKeyboard(
       if (e.key === "z" && !e.shiftKey) {
         e.preventDefault();
         onUndo();
-      } else if (e.key === "z" && e.shiftKey) {
+      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
         e.preventDefault();
         onRedo();
       }

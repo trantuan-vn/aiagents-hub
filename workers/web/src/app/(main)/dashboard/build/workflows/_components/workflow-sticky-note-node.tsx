@@ -2,28 +2,29 @@
 
 import { memo, useCallback } from "react";
 
-import { useNodeId, useReactFlow, type NodeProps } from "@xyflow/react";
+import { useNodeId, type NodeProps } from "@xyflow/react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
 import { useWorkflowEditorActions } from "./workflow-editor-actions-context";
+import { useWorkflowCanvasUi } from "./workflow-canvas-ui-context";
 
 function StickyNoteNodeInner({ data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");
   const actions = useWorkflowEditorActions();
   const readOnly = actions?.readOnly ?? false;
   const nodeId = useNodeId();
-  const { updateNodeData } = useReactFlow();
+  const canvasUi = useWorkflowCanvasUi();
   const d = data as { text?: string };
   const text = d.text ?? "";
 
   const onTextChange = useCallback(
     (value: string) => {
       if (!nodeId) return;
-      updateNodeData(nodeId, { text: value });
+      canvasUi?.patchNodeData?.(nodeId, { text: value });
     },
-    [nodeId, updateNodeData],
+    [nodeId, canvasUi],
   );
 
   return (

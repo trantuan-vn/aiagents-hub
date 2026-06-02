@@ -7,6 +7,7 @@ import { normalizeWorkflowEdge } from "./workflow-edge-utils";
 
 interface WorkflowEditorProps {
   definitionJson: string;
+  definitionSyncKey?: number;
   onDefinitionChange?: (json: string) => void;
   readOnly?: boolean;
   serviceEndpoint?: string;
@@ -27,6 +28,7 @@ function parseDef(json: string): WorkflowDefinition {
 
 export function WorkflowEditor({
   definitionJson,
+  definitionSyncKey,
   onDefinitionChange,
   readOnly = false,
   serviceEndpoint = "",
@@ -46,6 +48,7 @@ export function WorkflowEditor({
     <WorkflowCanvas
       className={className}
       initial={definition}
+      definitionSyncKey={definitionSyncKey}
       onChange={readOnly ? undefined : sync}
       readOnly={readOnly}
       serviceEndpoint={serviceEndpoint}

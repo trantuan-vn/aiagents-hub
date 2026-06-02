@@ -71,6 +71,7 @@ export default function EditWorkflowPage() {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [executeOpen, setExecuteOpen] = useState(false);
+  const [definitionSyncKey, setDefinitionSyncKey] = useState(0);
 
   const hydratedRef = useRef(false);
   const saveGenRef = useRef(0);
@@ -90,17 +91,27 @@ export default function EditWorkflowPage() {
       }),
     [name, description, tags, definition, isShared, starCount, starLabel, status],
   );
+  const currentSnapshotRef = useRef(currentSnapshot);
+  currentSnapshotRef.current = currentSnapshot;
 
-  const applySnapshot = useCallback((snap: WorkflowSnapshot) => {
-    setName(snap.name);
-    setDescription(snap.description);
-    setTags(snap.tags);
-    setDefinition(snap.definition);
-    setIsShared(snap.isShared);
-    setStarCount(snap.starCount);
-    setStarLabel(snap.starLabel);
-    setStatus(snap.status);
+  const bumpDefinitionSync = useCallback(() => {
+    setDefinitionSyncKey((k) => k + 1);
   }, []);
+
+  const applySnapshot = useCallback(
+    (snap: WorkflowSnapshot) => {
+      setName(snap.name);
+      setDescription(snap.description);
+      setTags(snap.tags);
+      setDefinition(snap.definition);
+      setIsShared(snap.isShared);
+      setStarCount(snap.starCount);
+      setStarLabel(snap.starLabel);
+      setStatus(snap.status);
+      bumpDefinitionSync();
+    },
+    [bumpDefinitionSync],
+  );
 
   const load = useCallback(async () => {
     if (!id || isNaN(id)) return;
@@ -170,7 +181,7 @@ export default function EditWorkflowPage() {
 
   const recordAndSet = useCallback(
     <K extends keyof WorkflowSnapshot>(key: K, value: WorkflowSnapshot[K]) => {
-      record(currentSnapshot);
+      record(currentSnapshotRef.current);
       if (key === "name") setName(value as string);
       else if (key === "description") setDescription(value as string);
       else if (key === "tags") setTags(value as string[]);
@@ -180,7 +191,7 @@ export default function EditWorkflowPage() {
       else if (key === "starLabel") setStarLabel(value as string);
       else if (key === "status") setStatus(value as "draft" | "published");
     },
-    [currentSnapshot, record],
+    [record],
   );
 
   useWorkflowUndoKeyboard(!loading, () => {
@@ -191,7 +202,7 @@ export default function EditWorkflowPage() {
 
   const handleAddNode = useCallback(
     (type: string, label: string, pickExtra?: Record<string, unknown>) => {
-      record(currentSnapshot);
+      record(currentSnapshotRef.current);
       const def = parseDef(definition);
       const extra =
         pickExtra ??
@@ -200,29 +211,30 @@ export default function EditWorkflowPage() {
           : undefined);
       setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra)));
     },
-    [definition, currentSnapshot, record],
+    [definition, record],
   );
 
   const handleAddStickyNote = useCallback(() => {
-    record(currentSnapshot);
+    record(currentSnapshotRef.current);
     setDefinition(JSON.stringify(addStickyNoteToDefinition(parseDef(definition))));
-  }, [definition, currentSnapshot, record]);
+  }, [definition, record]);
 
   useWorkflowCollab({
     workflowId: id,
     definition,
     enabled: !loading && !!id,
     onRemoteDefinition: (json) => {
-      record(currentSnapshot);
+      record(currentSnapshotRef.current);
       setDefinition(json);
+      bumpDefinitionSync();
     },
   });
 
   const onPublish = async () => {
     if (status === "published") return;
     setPublishing(true);
-    record(currentSnapshot);
-    const next = { ...currentSnapshot, status: "published" as const };
+    record(currentSnapshotRef.current);
+    const next = { ...currentSnapshotRef.current, status: "published" as const };
     applySnapshot(next);
     try {
       await persist(next);
@@ -264,7 +276,7 @@ export default function EditWorkflowPage() {
   };
 
   const onShare = () => {
-    record(currentSnapshot);
+    record(currentSnapshotRef.current);
     setIsShared((v) => !v);
     toast.success(isShared ? te("unshared_toast") : te("shared_toast"));
   };
@@ -307,16 +319,18 @@ export default function EditWorkflowPage() {
         onFavorite={onFavorite}
         onDelete={() => void onDelete()}
         onImportDefinition={(json) => {
-          record(currentSnapshot);
+          record(currentSnapshotRef.current);
           setDefinition(json);
+          bumpDefinitionSync();
           toast.success(te("import_done"));
         }}
         onExecute={() => setExecuteOpen(true)}
         onAddNode={handleAddNode}
         onAddStickyNote={handleAddStickyNote}
         onApplyDefinition={(json) => {
-          record(currentSnapshot);
+          record(currentSnapshotRef.current);
           setDefinition(json);
+          bumpDefinitionSync();
         }}
         settings={{
           name,
@@ -336,6 +350,7 @@ export default function EditWorkflowPage() {
       >
         <WorkflowEditor
           definitionJson={definition}
+          definitionSyncKey={definitionSyncKey}
           onDefinitionChange={(json) => recordAndSet("definition", json)}
           onExecute={() => setExecuteOpen(true)}
         />
