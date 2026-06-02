@@ -625,13 +625,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         );
       }
 
-      const account2fa = await applyEnabledSecondFactorStepUp(
-        c, bindingName, identifier, sessionId, dForPending,
-      );
-      if (account2fa) return account2fa;
-
-      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dForPending);
-      if (stepUp) return stepUp;
+      // Passkey verify already proves possession + device unlock; no TOTP/SMS or novel-device step-up.
 
       if (passkeyCredentialId && dForPending && c.env.NONCE_KV) {
         await bindPasskeyDeviceId(c.env.NONCE_KV, normalizedId, passkeyCredentialId, dForPending);

@@ -215,7 +215,7 @@ async function resolveSmsPhoneFor2FA(
 }
 
 /**
- * TOTP/SMS đã bật trên account — bắt buộc trước khi tạo session (OAuth, OTP, wallet, passkey).
+ * TOTP/SMS đã bật trên account — bắt buộc trước khi tạo session (OAuth, OTP, wallet). Passkey login bỏ qua.
  */
 export async function applyEnabledSecondFactorStepUp(
   c: Context,
@@ -318,7 +318,7 @@ export async function decideNewSessionEmail(
 
 /**
  * Step-up 2FA khi thiết bị chưa tin (kể cả không còn phiên active khác).
- * Chỉ chạy khi account chưa bật TOTP/SMS ở bước applyEnabledSecondFactorStepUp.
+ * Step-up thiết bị lạ (OTP, OAuth, wallet). Passkey login không gọi hàm này.
  */
 export async function evaluateNovelDeviceStepUp(
   c: Context,
