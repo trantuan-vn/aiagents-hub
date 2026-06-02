@@ -36,10 +36,13 @@ export function WorkflowEditorHeaderLeft({
   nameInputRef,
 }: WorkflowEditorHeaderLeftProps) {
   const te = useTranslations("WorkflowEditorPage");
+  const untitledLabel = te("untitled");
   const [tagDraft, setTagDraft] = useState("");
   const [addingTag, setAddingTag] = useState(false);
   const localNameRef = useRef<HTMLInputElement>(null) as React.RefObject<HTMLInputElement>;
   const nameRef = nameInputRef ?? localNameRef;
+  const nameValue = workflowName || untitledLabel;
+  const nameInputWidthCh = Math.min(Math.max(nameValue.length + 1, 6), 28);
 
   const commitTag = useCallback(() => {
     const label = tagDraft.trim();
@@ -57,14 +60,15 @@ export function WorkflowEditorHeaderLeft({
       </Button>
       <span className="text-muted-foreground shrink-0 text-xs">/</span>
       {readOnly ? (
-        <span className="truncate text-sm font-medium">{workflowName || te("untitled")}</span>
+        <span className="truncate text-sm font-medium">{nameValue}</span>
       ) : (
         <Input
           ref={nameRef}
           value={workflowName}
           onChange={(e) => onWorkflowNameChange?.(e.target.value)}
-          placeholder={te("untitled")}
-          className="h-8 max-w-[min(100%,220px)] min-w-[120px] border-0 bg-transparent px-1 text-sm font-medium shadow-none focus-visible:ring-1"
+          placeholder={untitledLabel}
+          style={{ width: `${nameInputWidthCh}ch` }}
+          className="h-8 w-auto max-w-[220px] min-w-[6ch] shrink-0 border-0 bg-transparent px-0 text-sm font-medium shadow-none focus-visible:ring-1"
         />
       )}
       {readOnly ? (
