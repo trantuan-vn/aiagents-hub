@@ -7,29 +7,18 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { WorkflowBuildPanel } from "./workflow-build-panel";
-import { WorkflowChat } from "./workflow-chat";
 
 interface WorkflowEditorAiSidebarProps {
-  workflowId: number;
-  workflowName: string;
-  ownerId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: "ask" | "build";
-  onModeChange: (mode: "ask" | "build") => void;
   onOpenSettings?: () => void;
-  onApplyDefinition?: (definitionJson: string) => void;
+  onApplyDefinition: (definitionJson: string) => void;
   className?: string;
 }
 
 export function WorkflowEditorAiSidebar({
-  workflowId,
-  workflowName,
-  ownerId,
   open,
   onOpenChange,
-  mode,
-  onModeChange,
   onOpenSettings,
   onApplyDefinition,
   className,
@@ -41,60 +30,36 @@ export function WorkflowEditorAiSidebar({
   return (
     <aside
       className={cn(
-        "border-border bg-background isolate flex w-[min(100%,380px)] shrink-0 flex-col border-l",
+        "border-border bg-background isolate flex w-[min(100%,400px)] shrink-0 flex-col border-l shadow-sm",
         className,
       )}
     >
-      <div className="border-border flex h-11 shrink-0 items-center gap-2 border-b px-3">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Sparkles className="text-violet-600 size-4 shrink-0 dark:text-violet-400" aria-hidden />
-          <span className="truncate text-sm font-semibold">{t("ai_title")}</span>
+      <header className="border-border flex shrink-0 items-start gap-3 border-b px-4 py-3.5">
+        <div
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400"
+          aria-hidden
+        >
+          <Sparkles className="size-4" />
         </div>
-        <div className="bg-muted flex rounded-md p-0.5 text-xs">
-          <button
-            type="button"
-            className={cn(
-              "rounded px-2 py-0.5 font-medium transition-colors",
-              mode === "ask" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => onModeChange("ask")}
-          >
-            {t("ai_tab_ask")}
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "rounded px-2 py-0.5 font-medium transition-colors",
-              mode === "build" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => onModeChange("build")}
-          >
-            {t("ai_tab_build")}
-          </button>
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h2 className="text-foreground text-sm font-semibold leading-none tracking-tight">{t("ai_title")}</h2>
+          <p className="text-muted-foreground mt-1 text-xs leading-relaxed">{t("ai_subtitle")}</p>
         </div>
-        {onOpenSettings ? (
-          <Button type="button" variant="ghost" size="icon" className="size-7" onClick={onOpenSettings}>
-            <Settings2 className="size-3.5" />
-            <span className="sr-only">{t("settings_title")}</span>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {onOpenSettings ? (
+            <Button type="button" variant="ghost" size="icon" className="size-8" onClick={onOpenSettings}>
+              <Settings2 className="size-4" />
+              <span className="sr-only">{t("settings_title")}</span>
+            </Button>
+          ) : null}
+          <Button type="button" variant="ghost" size="icon" className="size-8" onClick={() => onOpenChange(false)}>
+            <X className="size-4" />
+            <span className="sr-only">{t("ai_close")}</span>
           </Button>
-        ) : null}
-        <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => onOpenChange(false)}>
-          <X className="size-3.5" />
-          <span className="sr-only">{t("ai_close")}</span>
-        </Button>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col p-3">
-        {mode === "build" && onApplyDefinition ? (
-          <WorkflowBuildPanel workflowId={workflowId} onApplyDefinition={onApplyDefinition} />
-        ) : (
-          <WorkflowChat
-            workflowId={workflowId}
-            workflowName={workflowName}
-            ownerId={ownerId}
-            variant="sidebar"
-            mode={mode}
-          />
-        )}
+        </div>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4">
+        <WorkflowBuildPanel onApplyDefinition={onApplyDefinition} />
       </div>
     </aside>
   );

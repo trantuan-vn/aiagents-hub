@@ -45,7 +45,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   } = props;
 
   const [activeTab, setActiveTab] = useState<WorkflowEditorTab>("editor");
-  const [aiOpen, setAiOpen] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -137,9 +137,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         </div>
       ) : (
         <WorkflowEditorShellWorkspace
-          workflowId={workflowId}
-          workflowName={workflowName}
-          ownerId={ownerId}
           readOnly={readOnly}
           aiOpen={aiOpen}
           onAiOpenChange={setAiOpen}
