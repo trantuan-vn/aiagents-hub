@@ -19,7 +19,6 @@ interface WorkflowEditorHeaderProps {
   status?: "draft" | "published";
   activeTab: WorkflowEditorTab;
   onTabChange: (tab: WorkflowEditorTab) => void;
-  onExecute: () => void;
   readOnly?: boolean;
   backHref?: string;
   backLabel?: string;
@@ -49,7 +48,6 @@ export function WorkflowEditorHeader({
   status = "published",
   activeTab,
   onTabChange,
-  onExecute,
   readOnly = false,
   backHref = "/dashboard/build/workflows",
   backLabel,
@@ -91,14 +89,13 @@ export function WorkflowEditorHeader({
       />
       <WorkflowEditorHeaderTabs activeTab={activeTab} readOnly={readOnly} onTabChange={onTabChange} />
       {readOnly ? (
-        <WorkflowEditorHeaderViewActions chatHref={chatHref} onExecute={onExecute} />
+        <WorkflowEditorHeaderViewActions chatHref={chatHref} />
       ) : (
         <WorkflowEditorHeaderEditActions
           status={status}
           saving={saving}
           publishing={publishing}
           onPublish={onPublish ?? noop}
-          onExecute={onExecute}
           onOpenHistory={onOpenHistory ?? noop}
           onEditName={onEditName ?? noop}
           onEditNote={onEditNote ?? noop}

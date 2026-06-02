@@ -22,7 +22,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     onWorkflowTagsChange,
     nameInputRef,
     descriptionInputRef,
-    onExecute,
     children,
     readOnly = false,
     ownerId,
@@ -109,7 +108,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         saving={saving}
         publishing={publishing}
         onPublish={onPublish}
-        onExecute={onExecute}
         onOpenHistory={() => setHistoryOpen(true)}
         onEditName={focusName}
         onEditNote={focusNote}

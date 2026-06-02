@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { History, MoreHorizontal, Play } from "lucide-react";
+import { History, MoreHorizontal } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,11 @@ import { cn } from "@/lib/utils";
 
 import { WorkflowEditorHeaderMoreMenu } from "./workflow-editor-header-more-menu";
 
-const executeButtonClass = "h-8 gap-1 bg-[#ff6f00] text-white hover:bg-[#e66300]";
-
 interface WorkflowEditorHeaderViewActionsProps {
   chatHref?: string;
-  onExecute: () => void;
 }
 
-export function WorkflowEditorHeaderViewActions({ chatHref, onExecute }: WorkflowEditorHeaderViewActionsProps) {
+export function WorkflowEditorHeaderViewActions({ chatHref }: WorkflowEditorHeaderViewActionsProps) {
   const tv = useTranslations("WorkflowViewPage");
 
   return (
@@ -27,10 +24,6 @@ export function WorkflowEditorHeaderViewActions({ chatHref, onExecute }: Workflo
           <Link href={chatHref}>{tv("chat")}</Link>
         </Button>
       ) : null}
-      <Button size="sm" className={executeButtonClass} onClick={onExecute}>
-        <Play className="size-3.5 fill-current" />
-        {tv("execute")}
-      </Button>
     </div>
   );
 }
@@ -40,7 +33,6 @@ interface WorkflowEditorHeaderEditActionsProps {
   saving?: boolean;
   publishing?: boolean;
   onPublish: () => void;
-  onExecute: () => void;
   onOpenHistory: () => void;
   onEditName: () => void;
   onEditNote: () => void;
@@ -58,7 +50,6 @@ export function WorkflowEditorHeaderEditActions({
   saving = false,
   publishing = false,
   onPublish,
-  onExecute,
   onOpenHistory,
   onEditName,
   onEditNote,
@@ -111,10 +102,6 @@ export function WorkflowEditorHeaderEditActions({
         onOpenSettings={onOpenSettings}
         onDelete={onDelete}
       />
-      <Button size="sm" className={executeButtonClass} onClick={onExecute}>
-        <Play className="size-3.5 fill-current" />
-        {te("execute")}
-      </Button>
     </div>
   );
 }
