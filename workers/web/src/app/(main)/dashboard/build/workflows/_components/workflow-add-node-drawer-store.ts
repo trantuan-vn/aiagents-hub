@@ -1,8 +1,12 @@
+import type { WorkflowEvaluationActionId } from "./workflow-evaluation-node-catalog";
 import type { WorkflowAddNodePick } from "./workflow-add-node-panel";
+import type { WorkflowAddNodePanelView } from "./workflow-add-node-panel";
 
 export type WorkflowAddNodeDrawerOpenOptions = {
   variant?: "full" | "connect";
   allowedNodeTypes?: string[];
+  initialView?: WorkflowAddNodePanelView;
+  highlightEvaluationAction?: WorkflowEvaluationActionId;
   onPick: (pick: WorkflowAddNodePick) => void;
 };
 

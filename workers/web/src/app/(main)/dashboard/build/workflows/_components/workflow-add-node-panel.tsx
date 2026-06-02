@@ -7,6 +7,7 @@ import {
   Bot,
   Brain,
   Briefcase,
+  CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
@@ -87,6 +88,11 @@ import {
   type WorkflowTransformCatalogItem,
 } from "./workflow-transform-catalog";
 import {
+  WORKFLOW_EVALUATION_ACTIONS,
+  WORKFLOW_EVALUATION_TRIGGER,
+  type WorkflowEvaluationActionId,
+} from "./workflow-evaluation-node-catalog";
+import {
   WORKFLOW_TRIGGER_APP_EVENTS,
   WORKFLOW_TRIGGER_CATALOG,
   WORKFLOW_TRIGGER_OTHER,
@@ -114,9 +120,13 @@ interface WorkflowAddNodePanelProps {
   fillHeight?: boolean;
   /** Increment when drawer opens to reset navigation without remounting. */
   resetOnOpenGeneration?: number;
+  /** Optional initial view when opening the panel. */
+  initialView?: WorkflowAddNodePanelView;
+  /** Highlight a row in the evaluation node picker. */
+  highlightEvaluationAction?: WorkflowEvaluationActionId;
 }
 
-type PanelView =
+export type WorkflowAddNodePanelView =
   | "categories"
   | "ai"
   | "action_in_app"
@@ -130,6 +140,7 @@ type PanelView =
   | "flow"
   | "core"
   | "data_transformation"
+  | "evaluation"
   | "triggers"
   | "trigger_app_event"
   | "trigger_other";
@@ -141,10 +152,12 @@ export function WorkflowAddNodePanel({
   variant = "full",
   fillHeight = false,
   resetOnOpenGeneration = 0,
+  initialView,
+  highlightEvaluationAction,
 }: WorkflowAddNodePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<PanelView>("categories");
+  const [view, setView] = useState<WorkflowAddNodePanelView>(initialView ?? "categories");
   const [selectedActionApp, setSelectedActionApp] = useState<WorkflowActionAppRuntimeItem | null>(null);
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
   const [memoryBeginnersExpanded, setMemoryBeginnersExpanded] = useState(true);
@@ -162,9 +175,9 @@ export function WorkflowAddNodePanel({
   useEffect(() => {
     if (resetOnOpenGeneration <= 0) return;
     setQuery("");
-    setView("categories");
+    setView(initialView ?? "categories");
     setSelectedActionApp(null);
-  }, [resetOnOpenGeneration]);
+  }, [initialView, resetOnOpenGeneration]);
   const { services, loading: servicesLoading } = useApprovedServices();
   const { integrations, loading: integrationsLoading } = useWorkflowIntegrations();
 
@@ -442,8 +455,10 @@ export function WorkflowAddNodePanel({
                         : activeView === "core"
                         ? t("add_category_core")
                         : activeView === "data_transformation"
-                          ? t("add_category_data_transformation")
-                          : t("what_happens_next");
+        ? t("add_category_data_transformation")
+        : activeView === "evaluation"
+          ? "Evaluation"
+          : t("what_happens_next");
 
   const showTriggerSubtitle = activeView === "triggers";
 
@@ -616,6 +631,15 @@ export function WorkflowAddNodePanel({
     pickTrigger("other", t(item.nameKey), { otherKind: item.id });
   };
 
+  const pickEvaluationAction = (action: WorkflowEvaluationActionId) => {
+    const item = WORKFLOW_EVALUATION_ACTIONS.find((entry) => entry.id === action);
+    onPick({
+      type: "core",
+      label: item?.label ?? action,
+      extra: { coreKind: "execution_data", evaluationAction: action },
+    });
+  };
+
   const pickAgent = () => {
     onPick({ type: "agent", label: t("node_agent") });
   };
@@ -680,10 +704,14 @@ export function WorkflowAddNodePanel({
   };
 
   const showBack =
-    activeView !== "categories" && (!resourceOnly || fromAgentTools);
+    activeView !== "categories" &&
+    activeView !== "evaluation" &&
+    (!resourceOnly || fromAgentTools);
 
   const HeaderIcon =
-    activeView === "human_review"
+    activeView === "evaluation"
+      ? CheckCheck
+      : activeView === "human_review"
       ? CheckCircle2
       : activeView === "flow"
         ? GitBranch
@@ -703,7 +731,7 @@ export function WorkflowAddNodePanel({
                     ? Wrench
                     : null;
 
-  const hideSearch = activeView === "action_in_app_detail";
+  const hideSearch = activeView === "action_in_app_detail" || activeView === "evaluation";
 
   const detailDocsUrl = selectedActionApp
     ? resolveActionAppDetail(selectedActionApp, selectedActionIntegration).docsUrl
@@ -1174,6 +1202,45 @@ export function WorkflowAddNodePanel({
             filteredTransformOther.length === 0 ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
             ) : null}
+          </div>
+        ) : null}
+
+        {activeView === "evaluation" ? (
+          <div className="pb-1">
+            <EvaluationCatalogSection title="Actions (4)" defaultExpanded>
+              {WORKFLOW_EVALUATION_ACTIONS.map((item) => (
+                <EvaluationCatalogRow
+                  key={item.id}
+                  label={item.label}
+                  highlighted={highlightEvaluationAction === item.id}
+                  emphasized={item.id === "set_inputs"}
+                  onClick={() => pickEvaluationAction(item.id)}
+                />
+              ))}
+            </EvaluationCatalogSection>
+
+            <EvaluationCatalogSection
+              title="Triggers (1)"
+              defaultExpanded
+              titleExtra={
+                <>
+                  <Zap className="size-3.5 text-orange-500" aria-hidden />
+                  <span className="text-muted-foreground inline-flex size-4 items-center justify-center rounded-full border text-[10px] font-semibold">
+                    ?
+                  </span>
+                </>
+              }
+            >
+              <EvaluationCatalogRow
+                label={WORKFLOW_EVALUATION_TRIGGER.label}
+                showTriggerBadge
+                onClick={() =>
+                  pickTrigger("evaluation", WORKFLOW_EVALUATION_TRIGGER.label, {
+                    event: WORKFLOW_EVALUATION_TRIGGER.id,
+                  })
+                }
+              />
+            </EvaluationCatalogSection>
           </div>
         ) : null}
 
@@ -1664,6 +1731,70 @@ function PickRow({
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-medium">{title}</span>
         <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function EvaluationCatalogSection({
+  title,
+  defaultExpanded = true,
+  titleExtra,
+  children,
+}: {
+  title: string;
+  defaultExpanded?: boolean;
+  titleExtra?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  return (
+    <div className="px-1">
+      <button
+        type="button"
+        className="text-muted-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-xs font-medium tracking-wide uppercase"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+      >
+        <span className="flex items-center gap-1.5">
+          <span>{title}</span>
+          {titleExtra}
+        </span>
+        <ChevronDown className={cn("size-4 shrink-0 transition-transform", expanded && "rotate-180")} aria-hidden />
+      </button>
+      {expanded ? <div className="pb-1">{children}</div> : null}
+    </div>
+  );
+}
+
+function EvaluationCatalogRow({
+  label,
+  highlighted = false,
+  emphasized = false,
+  showTriggerBadge = false,
+  onClick,
+}: {
+  label: string;
+  highlighted?: boolean;
+  emphasized?: boolean;
+  showTriggerBadge?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        emphasized && "bg-muted/50",
+        highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+      )}
+      onClick={onClick}
+    >
+      <CheckCheck className="text-muted-foreground size-5 shrink-0" aria-hidden />
+      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+        <span>{label}</span>
+        {showTriggerBadge ? <Zap className="size-3.5 shrink-0 text-orange-500" aria-hidden /> : null}
       </span>
     </button>
   );

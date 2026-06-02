@@ -11,10 +11,14 @@ import {
 } from "./workflow-add-node-drawer-context";
 
 /** Warm-mount panel after idle so the first + click does not mount a heavy tree on the critical path. */
-function useWarmAddNodePanel() {
-  const [ready, setReady] = useState(false);
+function useWarmAddNodePanel(forceReady: boolean) {
+  const [ready, setReady] = useState(forceReady);
 
   useEffect(() => {
+    if (forceReady) {
+      setReady(true);
+      return;
+    }
     const warm = () => setReady(true);
     if (typeof requestIdleCallback !== "undefined") {
       const id = requestIdleCallback(warm);
@@ -22,7 +26,7 @@ function useWarmAddNodePanel() {
     }
     const timer = window.setTimeout(warm, 300);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [forceReady]);
 
   return ready;
 }
@@ -30,7 +34,7 @@ function useWarmAddNodePanel() {
 export function WorkflowAddNodeDrawer() {
   const { isOpen, openGeneration, config } = useWorkflowAddNodeDrawerState();
   const { close } = useWorkflowAddNodeDrawerActions();
-  const panelReady = useWarmAddNodePanel();
+  const panelReady = useWarmAddNodePanel(isOpen);
 
   return (
     <aside
@@ -47,6 +51,8 @@ export function WorkflowAddNodeDrawer() {
           fillHeight
           variant={config?.variant ?? "full"}
           allowedNodeTypes={config?.allowedNodeTypes}
+          initialView={config?.initialView}
+          highlightEvaluationAction={config?.highlightEvaluationAction}
           resetOnOpenGeneration={openGeneration}
           className={cn(!isOpen && "pointer-events-none select-none opacity-0")}
           onPick={(pick) => {
