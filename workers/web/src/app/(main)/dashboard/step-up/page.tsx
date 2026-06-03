@@ -13,11 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import {
-  fetchCaptchaConfig,
-  isValidTurnstileSiteKey,
-  TurnstileField,
-} from "@/components/auth/turnstile-field";
+import { HumanChallengeTurnstile, useHumanChallenge } from "@/hooks/use-human-challenge";
 
 import { STEP_UP_SESSION_KEY } from "../_components/sensitive-step-up";
 
@@ -55,12 +51,11 @@ export default function StepUpPage() {
   const [walletNonce, setWalletNonce] = useState<string | null>(null);
   const [facebookAuthUrl, setFacebookAuthUrl] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  const [captchaEnabled, setCaptchaEnabled] = useState(false);
-  const [captchaConfigLoaded, setCaptchaConfigLoaded] = useState(false);
-  const [captchaRequired, setCaptchaRequired] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState("");
-  const [turnstileRenderKey, setTurnstileRenderKey] = useState(0);
+  const captcha = useHumanChallenge({
+    authApiUrl: AUTH_API_URL,
+    scope: "session",
+    envFallbackSiteKey: ENV_TURNSTILE_SITE_KEY,
+  });
   const didAutoRequestRef = useRef(false);
   const pendingWalletVerifyRef = useRef(false);
   const walletVerifyInFlightRef = useRef(false);
@@ -83,15 +78,16 @@ export default function StepUpPage() {
     router.replace(returnTo);
   }, [returnTo, router, searchParams, t, toast]);
 
-  const requestStepUp = useCallback(async (token?: string) => {
+  const requestStepUp = useCallback(async () => {
     setRequesting(true);
     try {
+      const turnstileToken = captcha.turnstileTokenForBody();
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/step-up/request`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...(token ? { turnstileToken: token } : {}),
+          ...(turnstileToken ? { turnstileToken } : {}),
           returnTo,
         }),
       });
@@ -106,14 +102,9 @@ export default function StepUpPage() {
         error?: string;
       };
       if (!res.ok || !data.requiredMethod) {
+        captcha.applyCaptchaError(data);
         if (data.requiresCaptcha) {
           setRequiredMethod((prev) => prev ?? "otp_email");
-          setCaptchaRequired(true);
-          setTurnstileToken("");
-          setTurnstileRenderKey((v) => v + 1);
-          if (typeof data.siteKey === "string" && isValidTurnstileSiteKey(data.siteKey)) {
-            setTurnstileSiteKey(data.siteKey);
-          }
         }
         throw new Error(data.error ?? t("failed_to_request_verification"));
       }
@@ -125,15 +116,9 @@ export default function StepUpPage() {
       setCode("");
       if (data.requiredMethod === "otp_email") {
         toast({ title: t("email_otp_sent") });
+        await captcha.onRequestSuccess();
       } else if (data.requiredMethod === "sms") {
         toast({ title: t("sms_otp_sent") });
-      }
-      if (data.requiredMethod !== "otp_email") {
-        setCaptchaRequired(false);
-      } else if (captchaEnabled) {
-        // Turnstile token is single-use; force a fresh challenge for next resend.
-        setTurnstileToken("");
-        setTurnstileRenderKey((v) => v + 1);
       }
     } catch (e) {
       toast({
@@ -145,10 +130,10 @@ export default function StepUpPage() {
       setRequesting(false);
       setLoading(false);
     }
-  }, [captchaEnabled, returnTo, t, toast]);
+  }, [captcha, returnTo, t, toast]);
 
   const requestStepUpFromUser = useCallback(async () => {
-    if (requiredMethod === "otp_email" && captchaRequired && !turnstileToken) {
+    if (requiredMethod === "otp_email" && captcha.needsTokenBeforeSubmit) {
       toast({
         title: t("captcha_required"),
         description: t("complete_captcha_to_continue"),
@@ -156,37 +141,23 @@ export default function StepUpPage() {
       });
       return;
     }
-    await requestStepUp(turnstileToken || undefined);
-  }, [captchaRequired, requestStepUp, requiredMethod, t, toast, turnstileToken]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchCaptchaConfig(AUTH_API_URL).then(({ enabled, siteKey }) => {
-      if (cancelled) return;
-      const fallback = isValidTurnstileSiteKey(ENV_TURNSTILE_SITE_KEY) ? ENV_TURNSTILE_SITE_KEY : null;
-      setCaptchaEnabled(enabled);
-      setTurnstileSiteKey(siteKey ?? fallback);
-      setCaptchaConfigLoaded(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    await requestStepUp();
+  }, [captcha.needsTokenBeforeSubmit, requestStepUp, requiredMethod, t, toast]);
 
   useEffect(() => {
     if (didAutoRequestRef.current) return;
-    if (!captchaConfigLoaded) return;
-    if (captchaEnabled && !turnstileToken) return;
+    if (!captcha.configLoaded) return;
+    if (captcha.needsTokenBeforeSubmit) return;
     didAutoRequestRef.current = true;
     let cancelled = false;
     void (async () => {
       if (cancelled) return;
-      await requestStepUp(captchaEnabled ? turnstileToken || undefined : undefined);
+      await requestStepUp();
     })();
     return () => {
       cancelled = true;
     };
-  }, [captchaConfigLoaded, captchaEnabled, requestStepUp, turnstileToken]);
+  }, [captcha.configLoaded, captcha.needsTokenBeforeSubmit, requestStepUp]);
 
   const verifyWalletStepUp = useCallback(async () => {
     if (!walletNonce) throw new Error(t("wallet_challenge_missing"));
@@ -384,15 +355,7 @@ export default function StepUpPage() {
             </Button>
           ) : null}
 
-          {(captchaRequired || captchaEnabled) && turnstileSiteKey ? (
-            <TurnstileField
-              key={turnstileRenderKey}
-              siteKey={turnstileSiteKey}
-              onToken={(token) => setTurnstileToken(token)}
-              onExpire={() => setTurnstileToken("")}
-              onError={() => setTurnstileToken("")}
-            />
-          ) : null}
+          <HumanChallengeTurnstile challenge={captcha} keyPrefix="step-up-" />
 
           {!loading &&
           requiredMethod &&

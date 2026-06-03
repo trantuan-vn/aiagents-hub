@@ -127,18 +127,37 @@ export function TurnstileField({ siteKey, onToken, onExpire, onError }: Turnstil
   return <div ref={containerRef} className="flex min-h-[65px] justify-center" aria-label="Captcha" />;
 }
 
+export type CaptchaConfig = {
+  enabled: boolean;
+  siteKey: string | null;
+  satisfied?: boolean;
+  satisfiedPreauth?: boolean;
+  satisfiedSession?: boolean;
+};
+
 export async function fetchCaptchaConfig(
   authApiUrl: string,
-): Promise<{ enabled: boolean; siteKey: string | null }> {
+  options?: { scope?: "preauth" | "session" },
+): Promise<CaptchaConfig> {
   try {
-    const res = await fetch(`${authApiUrl}/captcha/config`, { credentials: "include" });
+    const qs = options?.scope ? `?scope=${options.scope}` : "";
+    const res = await fetch(`${authApiUrl}/captcha/config${qs}`, { credentials: "include" });
     if (!res.ok) return { enabled: false, siteKey: null };
-    const data: { enabled?: boolean; siteKey?: string | null } = await res.json();
+    const data: {
+      enabled?: boolean;
+      siteKey?: string | null;
+      satisfied?: boolean;
+      satisfiedPreauth?: boolean;
+      satisfiedSession?: boolean;
+    } = await res.json();
     const siteKey = data.siteKey ?? null;
     const enabled = Boolean(data.enabled) && isValidTurnstileSiteKey(siteKey);
     return {
       enabled,
       siteKey: enabled ? siteKey : null,
+      satisfied: Boolean(data.satisfied),
+      satisfiedPreauth: Boolean(data.satisfiedPreauth),
+      satisfiedSession: Boolean(data.satisfiedSession),
     };
   } catch {
     return { enabled: false, siteKey: null };

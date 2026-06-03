@@ -52,6 +52,10 @@ export const AUTH_CONSTANTS = {
   OTP_CAPTCHA_REQUIRED_AFTER_IDENTIFIER_FAILS: 5,
   /** Require Turnstile after this many OTP requests for same identifier in one hour */
   OTP_REQUEST_CAPTCHA_AFTER_HOURLY: 3,
+  /** After a successful Turnstile verify, skip re-challenge for this scope+session (seconds) */
+  CAPTCHA_SATISFIED_TTL_SEC: 30 * 60,
+  /** Clear captcha satisfaction after this many OTP/step-up verify failures in one session */
+  CAPTCHA_CLEAR_AFTER_OTP_VERIFY_FAILS: 2,
   /** Backup code recovery (account takeover surface) */
   BACKUP_CODE_RECOVER_MAX_ATTEMPTS: 5,
   BACKUP_CODE_RECOVER_MAX_PER_IDENTIFIER_HOUR: 10,

@@ -1,17 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import {
-  fetchCaptchaConfig,
-  isValidTurnstileSiteKey,
-  TurnstileField,
-} from "@/components/auth/turnstile-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { HumanChallengeTurnstile, useHumanChallenge } from "@/hooks/use-human-challenge";
 
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
@@ -28,28 +24,17 @@ export function StrongAuthReverify() {
   const [sending, setSending] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
-  const [captchaEnabled, setCaptchaEnabled] = useState(false);
-  const [captchaRequired, setCaptchaRequired] = useState(false);
-  const [turnstileSiteKey, setTurnstileSiteKey] = useState<string | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState<string>("");
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchCaptchaConfig(AUTH_API_URL).then(({ enabled, siteKey }) => {
-      if (cancelled) return;
-      const fallback = isValidTurnstileSiteKey(ENV_TURNSTILE_SITE_KEY) ? ENV_TURNSTILE_SITE_KEY : null;
-      setCaptchaEnabled(enabled);
-      setTurnstileSiteKey(siteKey ?? fallback);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const captcha = useHumanChallenge({
+    authApiUrl: AUTH_API_URL,
+    scope: "preauth",
+    envFallbackSiteKey: ENV_TURNSTILE_SITE_KEY,
+  });
 
   const sendOtp = useCallback(async () => {
     if (!user?.identifier) return;
     if (sending) return;
-    if (captchaRequired && !turnstileToken) {
+    if (captcha.needsTokenBeforeSubmit) {
       toast({
         title: "Captcha required",
         description: "Please complete captcha to continue.",
@@ -61,6 +46,7 @@ export function StrongAuthReverify() {
     setSending(true);
     setOtpSent(false);
     try {
+      const turnstileToken = captcha.turnstileTokenForBody();
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/otp/request`, {
         method: "POST",
         credentials: "include",
@@ -80,13 +66,8 @@ export function StrongAuthReverify() {
       };
 
       if (!res.ok) {
+        captcha.applyCaptchaError(data);
         if (data.requiresCaptcha) {
-          setCaptchaRequired(true);
-          setTurnstileToken("");
-          const captchaSiteKey = data.siteKey;
-          if (typeof captchaSiteKey === "string" && isValidTurnstileSiteKey(captchaSiteKey)) {
-            setTurnstileSiteKey(captchaSiteKey);
-          }
           toast({
             title: "Captcha required",
             description: data.error ?? "Please complete captcha to continue.",
@@ -97,10 +78,10 @@ export function StrongAuthReverify() {
         throw new Error(data.error ?? "Failed to send OTP");
       }
 
+      await captcha.onRequestSuccess();
       toast({ title: "Verification code sent" });
       setOtpSent(true);
       setCode("");
-      setCaptchaRequired(false);
     } catch (e) {
       toast({
         title: "Failed to send code",
@@ -110,7 +91,7 @@ export function StrongAuthReverify() {
     } finally {
       setSending(false);
     }
-  }, [sending, toast, user?.identifier, captchaRequired, turnstileToken]);
+  }, [captcha, sending, toast, user?.identifier]);
 
   const verify = useCallback(async () => {
     if (!user?.identifier) return;
@@ -151,14 +132,7 @@ export function StrongAuthReverify() {
       <div className="text-sm text-muted-foreground">
         Send a verification code to unlock security setup.
       </div>
-      {(captchaRequired || captchaEnabled) && turnstileSiteKey ? (
-        <TurnstileField
-          siteKey={turnstileSiteKey}
-          onToken={(token) => setTurnstileToken(token)}
-          onExpire={() => setTurnstileToken("")}
-          onError={() => setTurnstileToken("")}
-        />
-      ) : null}
+      <HumanChallengeTurnstile challenge={captcha} keyPrefix="strong-auth-" />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Button onClick={() => void sendOtp()} disabled={sending} className="sm:w-52">
           {sending ? "Sending..." : "Send code"}
@@ -183,4 +157,3 @@ export function StrongAuthReverify() {
     </div>
   );
 }
-

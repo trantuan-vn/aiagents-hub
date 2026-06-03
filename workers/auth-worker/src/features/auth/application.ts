@@ -28,8 +28,11 @@ import {
   recordOtpRequest,
   recordOtpVerifyFailure,
 } from '../../shared/otp-rate-limit';
-import { assertOtpRequestCaptcha } from '../../shared/otp-captcha-gate';
-import { assertTurnstileToken } from '../../shared/turnstile';
+import {
+  assertHumanChallenge,
+  clearCaptchaSatisfied,
+  type HumanChallengeScope,
+} from '../../shared/human-challenge';
 import { clearIdentifierOtpVerifyFailures } from '../../shared/otp-abuse-monitor';
 import { createPasskeyAuthApplication } from '../account/passkey';
 import { createAccountAuthenticatorApplication } from '../account/application';
@@ -80,6 +83,7 @@ interface IApplicationService {
     ipAddress: string,
     language?: 'vi' | 'en',
     turnstileToken?: string,
+    captchaScope?: HumanChallengeScope,
   ): Promise<void>;
   verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
@@ -353,10 +357,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       ipAddress: string,
       language?: 'vi' | 'en',
       turnstileToken?: string,
+      captchaScope: HumanChallengeScope = 'preauth',
     ): Promise<void> {
       const hourlyCount = await getOtpRequestCountThisHour(c.env, identifier);
-      await assertOtpRequestCaptcha(c.env, identifier, ipAddress, turnstileToken, {
+      await assertHumanChallenge(c.env, {
+        scope: captchaScope,
+        sessionId,
+        identifier,
+        ip: ipAddress,
+        turnstileToken,
         otpRequestsThisHour: hourlyCount,
+        reason: 'otp_request',
       });
 
       const allowed = await checkOtpRequestAllowed(c.env, ipAddress, identifier);
@@ -541,7 +552,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       turnstileToken?: string,
     ): Promise<{ sessionId: string }> {
       const nIdentifier = validationUtils.normalizeIdentifier(identifier);
-      await assertTurnstileToken(c.env, turnstileToken, ipAddress);
+      await assertHumanChallenge(c.env, {
+        scope: 'preauth',
+        sessionId,
+        identifier: nIdentifier,
+        ip: ipAddress,
+        turnstileToken,
+        reason: 'backup_recover',
+      });
       await assertBackupCodeRecoverAllowed(c.env, nIdentifier);
 
       const repository = getRepository(nIdentifier);
@@ -643,6 +661,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     },
 
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
+      await clearCaptchaSatisfied(c.env, 'session', sessionId);
       const repository = getRepository(identifier);
       const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });

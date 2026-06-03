@@ -71,6 +71,9 @@ export async function recordOtpVerifyFailure(
     expirationTtl: AUTH_CONSTANTS.OTP_EXPIRY,
   });
 
+  const { invalidateCaptchaSatisfactionOnVerifyFailure } = await import('./human-challenge');
+  await invalidateCaptchaSatisfactionOnVerifyFailure(env, 'preauth', sessionId, count);
+
   if (identifier?.trim()) {
     const { recordIdentifierOtpVerifyFailure } = await import('./otp-abuse-monitor');
     await recordIdentifierOtpVerifyFailure(env, identifier);

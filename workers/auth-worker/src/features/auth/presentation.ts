@@ -24,6 +24,7 @@ import {
   verifySensitiveSmsStepUpOtp,
   type SensitiveSmsStepUpOtpRecord,
 } from './sensitive-sms-step-up-otp';
+import { isCaptchaSatisfied } from '../../shared/human-challenge';
 import { CaptchaRequiredError, InvalidCaptchaError, getTurnstileSiteKey, isTurnstileEnabled } from '../../shared/turnstile';
 import { applyCorsHeadersIfAllowed } from '../../shared/cors-headers';
 import { assertAllowedFrontendOrigin } from '../../shared/frontend-origin';
@@ -340,9 +341,25 @@ export function createAuthRoutes(bindingName: string) {
 
   app.get('/captcha/config', createRouteHandler(async (c: any) => {
     const enabled = await isTurnstileEnabled(c.env);
+    const preAuthSessionId = getCookie(c, 'preAuthSessionId') ?? '';
+    const authSessionId = getCookie(c, 'sessionId') ?? '';
+    const satisfiedPreauth =
+      enabled && preAuthSessionId
+        ? await isCaptchaSatisfied(c.env, 'preauth', preAuthSessionId)
+        : false;
+    const satisfiedSession =
+      enabled && authSessionId
+        ? await isCaptchaSatisfied(c.env, 'session', authSessionId)
+        : false;
+    const scope = c.req.query('scope');
+    const satisfied =
+      scope === 'session' ? satisfiedSession : scope === 'preauth' ? satisfiedPreauth : satisfiedPreauth;
     return c.json({
       enabled,
       siteKey: enabled ? getTurnstileSiteKey(c.env) : null,
+      satisfied,
+      satisfiedPreauth,
+      satisfiedSession,
     });
   }, 'Failed to load captcha config'));
 
@@ -376,6 +393,7 @@ export function createAuthRoutes(bindingName: string) {
       ipAddress,
       language,
       turnstileToken,
+      'preauth',
     );
 
     return c.json({ ok: true });
@@ -508,6 +526,7 @@ export function createAuthRoutes(bindingName: string) {
             getClientIp(c),
             'en',
             typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined,
+            'session',
           );
         }
 
@@ -579,12 +598,12 @@ export function createAuthRoutes(bindingName: string) {
             origin,
           );
           if (result.identifier !== identifier) {
-            await failStepUpVerify(c.env, normId, 'Passkey verification user mismatch');
+            await failStepUpVerify(c.env, normId, sessionId, 'Passkey verification user mismatch');
           }
         } else if (requiredMethod === 'authenticator') {
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) {
-            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+            await failStepUpVerify(c.env, normId, sessionId, 'Code must be 6 digits');
           }
           const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
           const authRepo = createAuthenticatorRepository(userDO);
@@ -592,12 +611,12 @@ export function createAuthRoutes(bindingName: string) {
           if (!secret) throw new Error('Authenticator is not enabled');
           const valid = await verifyTotpCode(secret, code);
           if (!valid) {
-            await failStepUpVerify(c.env, normId);
+            await failStepUpVerify(c.env, normId, sessionId);
           }
         } else if (requiredMethod === 'sms') {
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) {
-            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+            await failStepUpVerify(c.env, normId, sessionId, 'Code must be 6 digits');
           }
           const kvKey = sensitiveSmsStepUpKvKey(normId);
           const raw = await c.env.NONCE_KV.get(kvKey);
@@ -609,13 +628,13 @@ export function createAuthRoutes(bindingName: string) {
             stored = null;
           }
           if (!stored || (!stored.otpHash && !stored.otp)) {
-            await failStepUpVerify(c.env, normId, 'SMS verification session expired');
+            await failStepUpVerify(c.env, normId, sessionId, 'SMS verification session expired');
           }
           const pepper = await c.env.ENCRYPTION_SECRET.get();
           if (!pepper) throw new Error('ENCRYPTION_SECRET is not defined in environment variables');
           const valid = await verifySensitiveSmsStepUpOtp(normId, code, stored!, pepper);
           if (!valid) {
-            await failStepUpVerify(c.env, normId);
+            await failStepUpVerify(c.env, normId, sessionId);
           }
           await c.env.NONCE_KV.delete(kvKey);
         } else if (requiredMethod === 'wallet_reauth') {
@@ -631,13 +650,13 @@ export function createAuthRoutes(bindingName: string) {
             c.env.FRONTEND_URL,
           );
           if (String(fields.statement ?? '').trim() !== STEP_UP_SIWE_STATEMENT) {
-            await failStepUpVerify(c.env, normId, 'Invalid step-up SIWE statement');
+            await failStepUpVerify(c.env, normId, sessionId, 'Invalid step-up SIWE statement');
           }
           const signedAddress = String(fields.address ?? '').toLowerCase();
           const userAddress = String(user.address ?? '').toLowerCase();
           const userIdentifier = String(user.identifier ?? '').toLowerCase();
           if (signedAddress !== userAddress && signedAddress !== userIdentifier) {
-            await failStepUpVerify(c.env, normId, 'Wallet mismatch for step-up');
+            await failStepUpVerify(c.env, normId, sessionId, 'Wallet mismatch for step-up');
           }
         } else if (requiredMethod === 'facebook_oauth') {
           throw new Error('Continue with Facebook to verify this step-up method');
@@ -645,7 +664,7 @@ export function createAuthRoutes(bindingName: string) {
           if (!sessionId) throw new Error('sessionId not found');
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) {
-            await failStepUpVerify(c.env, normId, 'Code must be 6 digits');
+            await failStepUpVerify(c.env, normId, sessionId, 'Code must be 6 digits');
           }
           const otpIdentifier = resolveOtpStepUpIdentifier(user, identifier);
           if (!otpIdentifier) {
@@ -653,7 +672,7 @@ export function createAuthRoutes(bindingName: string) {
           }
           const isValid = await createOTPService(c.env).verifyOTP(code, sessionId, otpIdentifier);
           if (!isValid) {
-            await failStepUpVerify(c.env, normId, ERROR_MESSAGES.AUTH.INVALID_OTP);
+            await failStepUpVerify(c.env, normId, sessionId, ERROR_MESSAGES.AUTH.INVALID_OTP);
           }
         }
 
