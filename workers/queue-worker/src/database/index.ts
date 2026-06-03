@@ -754,8 +754,30 @@ export class D1DatabaseManager {
     }
   }
 
+  /** Dedupe sync rows by conflict key; keep the row with the highest queueId. */
+  private dedupeSyncRecords(
+    records: Record<string, unknown>[],
+    conflictFields: string[],
+  ): Record<string, unknown>[] {
+    const map = new Map<string, Record<string, unknown>>();
+    for (const record of records) {
+      const key = conflictFields.map(f => String(record[f] ?? '')).join('\0');
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, record);
+        continue;
+      }
+      const existingQueueId = Number(existing.queueId ?? 0);
+      const newQueueId = Number(record.queueId ?? 0);
+      if (newQueueId >= existingQueueId) {
+        map.set(key, record);
+      }
+    }
+    return [...map.values()];
+  }
+
   /** Batch upsert cho bảng có conflictField - dùng ON CONFLICT DO UPDATE */
-  async batchUpsertRecords(tableName: string, dataArray: any[]): Promise<void> {
+  async batchUpsertRecords(tableName: string, dataArray: any[], userId?: string): Promise<void> {
     if (dataArray.length === 0) return;
 
     const config = this.tableConfigs.get(tableName);
@@ -765,7 +787,17 @@ export class D1DatabaseManager {
     }
     const conflictFields = config?.options?.userScoped ? ['user_id', conflictField] : [conflictField];
 
-    const filteredArray = dataArray.map(d => this.filterDataForTable(tableName, d));
+    let filteredArray = dataArray.map(d => this.filterDataForTable(tableName, d));
+    if (filteredArray.length === 0) return;
+
+    if (config?.options?.userScoped && userId) {
+      filteredArray = filteredArray.map(d => ({
+        ...d,
+        user_id: d.user_id ?? userId,
+      }));
+    }
+
+    filteredArray = this.dedupeSyncRecords(filteredArray, conflictFields);
     if (filteredArray.length === 0) return;
 
     const insertFieldCount = [
@@ -795,12 +827,12 @@ export class D1DatabaseManager {
   /**
    * Insert hoặc upsert dựa trên table config - tối ưu cho sync từ DO sang D1
    */
-  async batchInsertOrUpsertRecords(tableName: string, dataArray: any[]): Promise<void> {
+  async batchInsertOrUpsertRecords(tableName: string, dataArray: any[], userId?: string): Promise<void> {
     if (dataArray.length === 0) return;
 
     const config = this.tableConfigs.get(tableName);
     if (config?.options?.conflictField) {
-      await this.batchUpsertRecords(tableName, dataArray);
+      await this.batchUpsertRecords(tableName, dataArray, userId);
     } else {
       await this.batchInsertRecords(tableName, dataArray);
     }

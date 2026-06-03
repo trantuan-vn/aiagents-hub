@@ -167,7 +167,7 @@ const processChunk = async (
     const dataArray = chunk.map(item => item.recordData);
     
     // Batch insert all records into D1 (preserves id from message)
-    await database.batchInsertOrUpsertRecords(table, dataArray);
+    await database.batchInsertOrUpsertRecords(table, dataArray, userId);
 
     // Khi cập nhật sessions: nếu session có isActive = false (hết hiệu lực) thì cập nhật connections liên quan thành hết hiệu lực
     if (table === 'sessions') {
