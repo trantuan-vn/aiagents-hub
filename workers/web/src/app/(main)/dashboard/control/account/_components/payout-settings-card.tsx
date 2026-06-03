@@ -29,12 +29,24 @@ type BeneficiaryPayload = {
     accountName?: string;
     bankName?: string;
   } | null;
+  paypal?: {
+    paypalEmail?: string;
+    maskedEmail?: string;
+  } | null;
 };
 
-function parseBeneficiaryState(data: BeneficiaryPayload): {
+function parseBeneficiaryState(
+  data: BeneficiaryPayload,
+  currency: "VND" | "USD",
+): {
   configured: boolean;
   summary: string | null;
 } {
+  if (currency === "USD") {
+    const email = data.paypal?.maskedEmail ?? data.paypal?.paypalEmail;
+    if (!email) return { configured: false, summary: null };
+    return { configured: true, summary: `PayPal · ${email}` };
+  }
   const accountNo = data.beneficiary?.accountNo;
   if (!accountNo) {
     return { configured: false, summary: null };
@@ -69,17 +81,22 @@ export function PayoutSettingsCard() {
         fetch(`${API_BASE_URL}/dashboard/auth/profile/me`, { credentials: "include" }),
       ]);
 
+      const profile: { earningsPayoutCurrency?: string } | null = profileRes.ok
+        ? await profileRes.json()
+        : null;
+      const profileCurrency = profile?.earningsPayoutCurrency === "USD" ? "USD" : "VND";
+
       if (beneficiaryRes.ok) {
         const data: BeneficiaryPayload = await beneficiaryRes.json();
-        const { configured: isConfigured, summary: beneficiarySummary } = parseBeneficiaryState(data);
+        const { configured: isConfigured, summary: beneficiarySummary } = parseBeneficiaryState(
+          data,
+          profileCurrency,
+        );
         setConfigured(isConfigured);
         setSummary(beneficiarySummary);
       }
 
-      if (profileRes.ok) {
-        const profile: { earningsPayoutCurrency?: string } = await profileRes.json();
-        setCurrency(profile.earningsPayoutCurrency === "USD" ? "USD" : "VND");
-      }
+      setCurrency(profileCurrency);
     } catch {
       setConfigured(false);
     } finally {
@@ -102,6 +119,7 @@ export function PayoutSettingsCard() {
       });
       if (!res.ok) throw new Error(await res.text());
       setCurrency(value);
+      void load();
       toast({ title: tPreferences("saved") });
     } catch (e) {
       toast({

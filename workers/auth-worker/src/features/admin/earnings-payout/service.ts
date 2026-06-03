@@ -14,7 +14,7 @@ import {
   mergePeriodEarnings,
 } from './d1';
 import { executeUtils } from '../../../shared/utils';
-import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
+import { createPayoutBeneficiaryInfrastructure, maskPaypalEmail } from '../../member/payout/beneficiary-infrastructure';
 import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 
 import { getPrimaryAdminIdentifier } from '../admin-identifier';
@@ -40,6 +40,8 @@ export interface AggregatedPayoutItem {
   hasBeneficiary: boolean;
   /** User preference for bank payout (VietQR when VND) */
   earningsPayoutCurrency: 'VND' | 'USD';
+  /** Masked bank or PayPal email for admin review */
+  beneficiaryHint?: string;
   periods: PayoutPeriodRow[];
 }
 
@@ -172,22 +174,38 @@ export async function attachBeneficiaries(
   return Promise.all(
     items.map(async (row) => {
       let hasBeneficiary = false;
+      let beneficiaryHint: string | undefined;
       let earningsPayoutCurrency: 'VND' | 'USD' = 'VND';
       try {
         const stub = binding.get(binding.idFromString(row.recipientUserId)) as DurableObjectStub<UserDO>;
-        const beneficiary = await createPayoutBeneficiaryInfrastructure(
+        const infra = createPayoutBeneficiaryInfrastructure(
           stub,
           createPayoutEncryptionSecretGetter(c.env),
-        ).get();
-        hasBeneficiary = !!beneficiary;
+        );
         const users = await executeUtils.executeDynamicAction(stub, 'select', {}, 'users');
         const u = Array.isArray(users) ? users[0] : users;
         const raw = u?.earningsPayoutCurrency ?? u?.earnings_payout_currency;
         earningsPayoutCurrency = raw === 'USD' ? 'USD' : 'VND';
+
+        if (earningsPayoutCurrency === 'USD') {
+          const paypal = await infra.getPaypal();
+          hasBeneficiary = !!paypal;
+          if (paypal) beneficiaryHint = maskPaypalEmail(paypal.paypalEmail);
+        } else {
+          const beneficiary = await infra.get();
+          hasBeneficiary = !!beneficiary;
+          if (beneficiary) {
+            const masked =
+              beneficiary.accountNo.length > 4
+                ? `****${beneficiary.accountNo.slice(-4)}`
+                : beneficiary.accountNo;
+            beneficiaryHint = `${beneficiary.bankName ? `${beneficiary.bankName} · ` : ''}${masked}`;
+          }
+        }
       } catch {
         hasBeneficiary = false;
       }
-      return { ...row, hasBeneficiary, earningsPayoutCurrency };
+      return { ...row, hasBeneficiary, earningsPayoutCurrency, beneficiaryHint };
     }),
   );
 }

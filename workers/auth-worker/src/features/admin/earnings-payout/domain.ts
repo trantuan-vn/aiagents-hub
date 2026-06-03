@@ -42,3 +42,7 @@ export type EarningsPayout = z.infer<typeof EarningsPayoutSchema>;
 export const GeneratePayoutQrSchema = z.object({
   recipientUserId: z.string().min(1),
 });
+
+export const SendPaypalPayoutSchema = z.object({
+  recipientUserId: z.string().min(1),
+});

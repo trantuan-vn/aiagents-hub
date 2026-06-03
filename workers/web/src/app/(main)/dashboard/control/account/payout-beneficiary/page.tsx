@@ -20,13 +20,18 @@ import { fetchVietQrBanks, findBankByBin, type VietQrBank } from "@/lib/vietqr-b
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
-const formSchema = z.object({
+const bankFormSchema = z.object({
   bankBin: z.string().min(6, "Select a bank"),
   accountNo: z.string().min(8).max(20),
   accountName: z.string().min(1).max(100),
 });
 
-type BeneficiaryForm = z.infer<typeof formSchema>;
+const paypalFormSchema = z.object({
+  paypalEmail: z.string().email().max(254),
+});
+
+type BankForm = z.infer<typeof bankFormSchema>;
+type PaypalForm = z.infer<typeof paypalFormSchema>;
 
 export default function PayoutBeneficiaryPage() {
   const t = useTranslations("AccountPage.payout_beneficiary");
@@ -36,13 +41,19 @@ export default function PayoutBeneficiaryPage() {
   const [banksError, setBanksError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [payoutCurrency, setPayoutCurrency] = useState<"VND" | "USD">("VND");
 
-  const form = useForm<BeneficiaryForm>({
-    resolver: zodResolver(formSchema),
+  const bankForm = useForm<BankForm>({
+    resolver: zodResolver(bankFormSchema),
     defaultValues: { bankBin: "", accountNo: "", accountName: "" },
   });
 
-  const selectedBin = form.watch("bankBin");
+  const paypalForm = useForm<PaypalForm>({
+    resolver: zodResolver(paypalFormSchema),
+    defaultValues: { paypalEmail: "" },
+  });
+
+  const selectedBin = bankForm.watch("bankBin");
   const selectedBank = findBankByBin(banks, selectedBin);
 
   const loadBanks = useCallback(async () => {
@@ -61,22 +72,37 @@ export default function PayoutBeneficiaryPage() {
     }
   }, [t]);
 
-  const loadBeneficiary = useCallback(
+  const loadProfileAndBeneficiary = useCallback(
     async (bankList: VietQrBank[]) => {
       try {
-        const res = await fetch(`${API_BASE_URL}/dashboard/payout/beneficiary`, {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        });
-        if (!res.ok) return;
+        const [beneficiaryRes, profileRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/dashboard/payout/beneficiary`, {
+            method: "GET",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+          }),
+          fetch(`${API_BASE_URL}/dashboard/auth/profile/me`, { credentials: "include" }),
+        ]);
+
+        if (profileRes.ok) {
+          const profile: { earningsPayoutCurrency?: string } = await profileRes.json();
+          setPayoutCurrency(profile.earningsPayoutCurrency === "USD" ? "USD" : "VND");
+        }
+
+        if (!beneficiaryRes.ok) return;
         const data: {
           beneficiary?: { accountNo?: string; accountName?: string; acqId?: string } | null;
-        } = await res.json();
+          paypal?: { paypalEmail?: string } | null;
+        } = await beneficiaryRes.json();
+
+        if (data.paypal?.paypalEmail) {
+          paypalForm.reset({ paypalEmail: data.paypal.paypalEmail });
+        }
+
         if (!data.beneficiary?.accountNo) return;
         const bin = data.beneficiary.acqId ?? "";
         const matched = findBankByBin(bankList, bin);
-        form.reset({
+        bankForm.reset({
           bankBin: matched?.bin ?? bin,
           accountNo: data.beneficiary.accountNo,
           accountName: data.beneficiary.accountName ?? "",
@@ -85,18 +111,18 @@ export default function PayoutBeneficiaryPage() {
         /* ignore */
       }
     },
-    [form],
+    [bankForm, paypalForm],
   );
 
   useEffect(() => {
     void (async () => {
       const list = await loadBanks();
-      await loadBeneficiary(list);
+      await loadProfileAndBeneficiary(list);
       setProfileLoading(false);
     })();
-  }, [loadBanks, loadBeneficiary]);
+  }, [loadBanks, loadProfileAndBeneficiary]);
 
-  const onSubmit = async (values: BeneficiaryForm) => {
+  const onSubmitBank = async (values: BankForm) => {
     const bank = findBankByBin(banks, values.bankBin);
     if (!bank) {
       toast({ title: t("error"), description: t("bank_required"), variant: "destructive" });
@@ -131,7 +157,33 @@ export default function PayoutBeneficiaryPage() {
     }
   };
 
+  const onSubmitPaypal = async (values: PaypalForm) => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/payout/beneficiary/paypal`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paypalEmail: values.paypalEmail.trim() }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        throw new Error(err || t("save_error"));
+      }
+      toast({ title: t("saved"), description: t("paypal_saved_description") });
+    } catch (e) {
+      toast({
+        title: t("error"),
+        description: e instanceof Error ? e.message : t("save_error"),
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const pageLoading = banksLoading || profileLoading;
+  const isUsd = payoutCurrency === "USD";
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-6">
@@ -146,9 +198,9 @@ export default function PayoutBeneficiaryPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Landmark className="h-5 w-5" />
-            {t("register_title")}
+            {isUsd ? t("register_paypal_title") : t("register_title")}
           </CardTitle>
-          <CardDescription>{t("register_description")}</CardDescription>
+          <CardDescription>{isUsd ? t("register_paypal_description") : t("register_description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {pageLoading ? (
@@ -156,6 +208,28 @@ export default function PayoutBeneficiaryPage() {
               <Loader2 className="h-5 w-5 animate-spin" />
               {t("loading")}
             </div>
+          ) : isUsd ? (
+            <Form {...paypalForm}>
+              <form onSubmit={(e) => void paypalForm.handleSubmit(onSubmitPaypal)(e)} className="space-y-5">
+                <FormField
+                  control={paypalForm.control}
+                  name="paypalEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t("paypal_email")}</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="email" placeholder="you@example.com" autoComplete="email" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <p className="text-muted-foreground text-xs">{t("paypal_hint")}</p>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? t("saving") : t("save")}
+                </Button>
+              </form>
+            </Form>
           ) : banksError ? (
             <div className="space-y-4">
               <p className="text-destructive text-sm">{banksError}</p>
@@ -164,10 +238,10 @@ export default function PayoutBeneficiaryPage() {
               </Button>
             </div>
           ) : (
-            <Form {...form}>
-              <form onSubmit={(e) => void form.handleSubmit(onSubmit)(e)} className="space-y-5">
+            <Form {...bankForm}>
+              <form onSubmit={(e) => void bankForm.handleSubmit(onSubmitBank)(e)} className="space-y-5">
                 <FormField
-                  control={form.control}
+                  control={bankForm.control}
                   name="bankBin"
                   render={({ field }) => (
                     <FormItem>
@@ -214,7 +288,7 @@ export default function PayoutBeneficiaryPage() {
                 )}
 
                 <FormField
-                  control={form.control}
+                  control={bankForm.control}
                   name="accountNo"
                   render={({ field }) => (
                     <FormItem>
@@ -228,7 +302,7 @@ export default function PayoutBeneficiaryPage() {
                 />
 
                 <FormField
-                  control={form.control}
+                  control={bankForm.control}
                   name="accountName"
                   render={({ field }) => (
                     <FormItem>

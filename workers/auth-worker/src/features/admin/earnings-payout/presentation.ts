@@ -11,7 +11,8 @@ import { randomPayoutTransferCode, toPayoutAmountVnd } from './casso-payout';
 import {
   createEarningsPayoutInfrastructure,
 } from './infrastructure';
-import { GeneratePayoutQrSchema } from './domain';
+import { GeneratePayoutQrSchema, SendPaypalPayoutSchema } from './domain';
+import { sendPaypalPayout } from './paypal-payout';
 import { currentPeriod } from './d1';
 import {
   attachBeneficiaries,
@@ -133,6 +134,78 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to generate payout QR');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/paypal', async (c) => {
+    try {
+      requireAdmin(c);
+      const body = await c.req.json();
+      const { recipientUserId } = SendPaypalPayoutSchema.parse(body);
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+
+      const adminStub = getIdFromName(
+        c,
+        getPrimaryAdminIdentifier(c.env),
+        bindingName,
+      ) as DurableObjectStub<UserDO>;
+      const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
+
+      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+        db,
+        payoutInfra,
+        recipientUserId,
+      );
+      if (keys.length === 0 || totalAmountUsd <= 0) {
+        throw new Error(
+          'No unpaid earnings for closed periods for this user (current month cannot be paid yet)',
+        );
+      }
+
+      const binding = c.env[bindingName as keyof Env] as DurableObjectNamespace;
+      const userStub = binding.get(binding.idFromString(recipientUserId)) as DurableObjectStub<UserDO>;
+      const users = await executeUtils.executeDynamicAction(userStub, 'select', {}, 'users');
+      const u = Array.isArray(users) ? users[0] : users;
+      const payoutCurrency =
+        (u?.earningsPayoutCurrency ?? u?.earnings_payout_currency) === 'USD' ? 'USD' : 'VND';
+      if (payoutCurrency !== 'USD') {
+        throw new Error('PayPal payout requires user earnings payout currency to be USD');
+      }
+
+      const paypalBeneficiary = await createPayoutBeneficiaryInfrastructure(
+        userStub,
+        createPayoutEncryptionSecretGetter(c.env),
+      ).getPaypal();
+      if (!paypalBeneficiary) {
+        throw new Error('User has not configured PayPal payout email');
+      }
+
+      const batchId = `ep_${recipientUserId}_${keys.sort().join('_')}`.slice(0, 127);
+      const payoutResult = await sendPaypalPayout(c.env, {
+        recipientEmail: paypalBeneficiary.paypalEmail,
+        amountUsd: totalAmountUsd,
+        batchId,
+        note: `Earnings payout ${identifier}`,
+      });
+
+      const note = `PayPal ${payoutResult.payoutBatchId}`;
+      await payoutInfra.markPaidBatch(keys, note);
+
+      return c.json({
+        success: true,
+        amountUsd: totalAmountUsd,
+        paypalEmail: paypalBeneficiary.paypalEmail,
+        payoutBatchId: payoutResult.payoutBatchId,
+        batchStatus: payoutResult.batchStatus,
+        recipientUserId,
+        recipientIdentifier: identifier,
+        payoutKeys: keys,
+        earningsPayoutCurrency: payoutCurrency,
+      });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to send PayPal payout');
       return c.json(errorResponse, status);
     }
   });

@@ -1,16 +1,26 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
-import { PayoutBeneficiary, PayoutBeneficiaryUpsertSchema } from './domain';
+import {
+  PayoutBeneficiary,
+  PayoutBeneficiaryUpsertSchema,
+  PaypalPayoutBeneficiary,
+  PaypalPayoutBeneficiaryUpsertSchema,
+} from './domain';
 import { decryptPayoutField, encryptPayoutField } from './crypto';
 
 type BeneficiaryRow = Record<string, unknown>;
 
-function rowHasBeneficiary(row: BeneficiaryRow | null): boolean {
+function rowHasBankBeneficiary(row: BeneficiaryRow | null): boolean {
   if (!row) return false;
   return !!(row.accountNoEncrypted || row.accountNo);
 }
 
-async function toRecordPayload(
+function rowHasPaypalBeneficiary(row: BeneficiaryRow | null): boolean {
+  if (!row) return false;
+  return !!(row.paypalEmailEncrypted || row.paypalEmail);
+}
+
+async function toBankRecordPayload(
   data: PayoutBeneficiary,
   secret: string,
 ): Promise<Record<string, unknown>> {
@@ -24,7 +34,7 @@ async function toRecordPayload(
   };
 }
 
-async function rowToBeneficiary(row: BeneficiaryRow, secret: string): Promise<PayoutBeneficiary | null> {
+async function rowToBankBeneficiary(row: BeneficiaryRow, secret: string): Promise<PayoutBeneficiary | null> {
   let accountNo: string | null = null;
   let accountName: string | null = null;
 
@@ -42,7 +52,7 @@ async function rowToBeneficiary(row: BeneficiaryRow, secret: string): Promise<Pa
     accountName = String(row.accountName);
   }
 
-  if (!accountNo) return null;
+  if (!accountNo || !row.acqId) return null;
 
   return {
     accountNo,
@@ -52,13 +62,42 @@ async function rowToBeneficiary(row: BeneficiaryRow, secret: string): Promise<Pa
   };
 }
 
+async function rowToPaypalBeneficiary(
+  row: BeneficiaryRow,
+  secret: string,
+): Promise<PaypalPayoutBeneficiary | null> {
+  let paypalEmail: string | null = null;
+
+  if (row.paypalEmailEncrypted) {
+    paypalEmail = await decryptPayoutField(String(row.paypalEmailEncrypted), secret);
+  }
+  if (!paypalEmail && row.paypalEmail) {
+    paypalEmail = String(row.paypalEmail);
+  }
+
+  if (!paypalEmail) return null;
+  return { paypalEmail };
+}
+
+export function maskPaypalEmail(email: string): string {
+  const [local, domain] = email.split('@');
+  if (!local || !domain) return '***';
+  const visible = local.length <= 2 ? local[0] ?? '*' : `${local.slice(0, 2)}***`;
+  return `${visible}@${domain}`;
+}
+
 export function createPayoutBeneficiaryInfrastructure(
   userDO: DurableObjectStub<UserDO>,
   getEncryptionSecret: () => Promise<string>,
 ) {
-  const persist = async (data: PayoutBeneficiary, existingId?: unknown): Promise<PayoutBeneficiary> => {
+  const getRow = async (): Promise<BeneficiaryRow | null> => {
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, 'payout_beneficiary');
+    return Array.isArray(rows) && rows.length > 0 ? (rows[0] as BeneficiaryRow) : null;
+  };
+
+  const persistBank = async (data: PayoutBeneficiary, existingId?: unknown): Promise<PayoutBeneficiary> => {
     const secret = await getEncryptionSecret();
-    const record = await toRecordPayload(data, secret);
+    const record = await toBankRecordPayload(data, secret);
     if (existingId != null) {
       await executeUtils.executeDynamicAction(
         userDO,
@@ -77,18 +116,45 @@ export function createPayoutBeneficiaryInfrastructure(
     return data;
   };
 
+  const persistPaypal = async (
+    data: PaypalPayoutBeneficiary,
+    existingId?: unknown,
+  ): Promise<PaypalPayoutBeneficiary> => {
+    const secret = await getEncryptionSecret();
+    const record = {
+      paypalEmailEncrypted: await encryptPayoutField(data.paypalEmail.trim().toLowerCase(), secret),
+      paypalEmail: null,
+    };
+    if (existingId != null) {
+      await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        { id: existingId, ...record, queueStatus: 'pending' },
+        'payout_beneficiary',
+      );
+    } else {
+      await executeUtils.executeDynamicAction(
+        userDO,
+        'insert',
+        { ...record, queueStatus: 'pending' },
+        'payout_beneficiary',
+      );
+    }
+    return { paypalEmail: data.paypalEmail.trim().toLowerCase() };
+  };
+
   return {
+    /** Bank beneficiary (VietQR). */
     get: async (): Promise<PayoutBeneficiary | null> => {
-      const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, 'payout_beneficiary');
-      const row = Array.isArray(rows) && rows.length > 0 ? (rows[0] as BeneficiaryRow) : null;
-      if (!rowHasBeneficiary(row)) return null;
+      const row = await getRow();
+      if (!rowHasBankBeneficiary(row)) return null;
 
       const secret = await getEncryptionSecret();
-      const beneficiary = await rowToBeneficiary(row!, secret);
+      const beneficiary = await rowToBankBeneficiary(row!, secret);
       if (!beneficiary) return null;
 
       if (row!.accountNo && !row!.accountNoEncrypted) {
-        await persist(beneficiary, row!.id);
+        await persistBank(beneficiary, row!.id);
       }
 
       return beneficiary;
@@ -96,9 +162,39 @@ export function createPayoutBeneficiaryInfrastructure(
 
     upsert: async (input: PayoutBeneficiary): Promise<PayoutBeneficiary> => {
       const data = PayoutBeneficiaryUpsertSchema.parse(input);
-      const rows = await executeUtils.executeDynamicAction(userDO, 'select', { limit: 1 }, 'payout_beneficiary');
-      const existing = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-      return persist(data, existing?.id);
+      const existing = await getRow();
+      return persistBank(data, existing?.id);
+    },
+
+    getPaypal: async (): Promise<PaypalPayoutBeneficiary | null> => {
+      const row = await getRow();
+      if (!rowHasPaypalBeneficiary(row)) return null;
+
+      const secret = await getEncryptionSecret();
+      const beneficiary = await rowToPaypalBeneficiary(row!, secret);
+      if (!beneficiary) return null;
+
+      if (row!.paypalEmail && !row!.paypalEmailEncrypted) {
+        await persistPaypal(beneficiary, row!.id);
+      }
+
+      return beneficiary;
+    },
+
+    upsertPaypal: async (input: PaypalPayoutBeneficiary): Promise<PaypalPayoutBeneficiary> => {
+      const data = PaypalPayoutBeneficiaryUpsertSchema.parse(input);
+      const existing = await getRow();
+      return persistPaypal(data, existing?.id);
+    },
+
+    hasBank: async (): Promise<boolean> => {
+      const row = await getRow();
+      return rowHasBankBeneficiary(row);
+    },
+
+    hasPaypal: async (): Promise<boolean> => {
+      const row = await getRow();
+      return rowHasPaypalBeneficiary(row);
     },
   };
 }

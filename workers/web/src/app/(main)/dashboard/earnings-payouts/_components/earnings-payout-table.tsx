@@ -27,6 +27,7 @@ export interface PayoutItem {
   bankStatus: "paid" | "unpaid";
   hasBeneficiary: boolean;
   earningsPayoutCurrency: "VND" | "USD";
+  beneficiaryHint?: string;
   periods: PayoutPeriodRow[];
 }
 
@@ -46,7 +47,7 @@ interface TableLabels {
   bank_paid: string;
   bank_unpaid: string;
   show_qr: string;
-  pay_usd_coming_soon: string;
+  pay_usd: string;
   payout_currency: string;
   accruing_status?: string;
 }
@@ -56,22 +57,30 @@ interface EarningsPayoutTableProps {
   variant?: EarningsPayoutTableVariant;
   labels: TableLabels;
   onShowQr?: (item: PayoutItem) => void;
+  onPayUsd?: (item: PayoutItem) => void;
 }
 
 function canShowVietQr(item: PayoutItem): boolean {
   return item.earningsPayoutCurrency === "VND" && item.hasBeneficiary && item.bankStatus !== "paid";
 }
 
+function canShowPaypal(item: PayoutItem): boolean {
+  return item.earningsPayoutCurrency === "USD" && item.hasBeneficiary && item.bankStatus !== "paid";
+}
+
 function PayoutActionsCell({
   item,
   labels,
   onShowQr,
+  onPayUsd,
 }: {
   item: PayoutItem;
   labels: TableLabels;
   onShowQr?: (item: PayoutItem) => void;
+  onPayUsd?: (item: PayoutItem) => void;
 }) {
   const vietQrEnabled = canShowVietQr(item);
+  const paypalEnabled = canShowPaypal(item);
   return (
     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
       <div className="flex flex-wrap justify-end gap-2">
@@ -79,9 +88,9 @@ function PayoutActionsCell({
           <QrCode className="mr-1 h-4 w-4" />
           {labels.show_qr}
         </Button>
-        <Button size="sm" variant="outline" disabled>
+        <Button size="sm" variant="outline" disabled={!paypalEnabled} onClick={() => onPayUsd?.(item)}>
           <DollarSign className="mr-1 h-4 w-4" />
-          {labels.pay_usd_coming_soon}
+          {labels.pay_usd}
         </Button>
       </div>
     </TableCell>
@@ -105,14 +114,25 @@ function PayoutCurrencyCell({ currency }: { currency: "VND" | "USD" }) {
   );
 }
 
-function BeneficiaryCell({ hasBeneficiary, labels }: { hasBeneficiary: boolean; labels: TableLabels }) {
+function BeneficiaryCell({
+  hasBeneficiary,
+  hint,
+  labels,
+}: {
+  hasBeneficiary: boolean;
+  hint?: string;
+  labels: TableLabels;
+}) {
   return (
     <TableCell onClick={(e) => e.stopPropagation()}>
-      {hasBeneficiary ? (
-        <Badge variant="secondary">{labels.configured}</Badge>
-      ) : (
-        <Badge variant="outline">{labels.missing}</Badge>
-      )}
+      <div className="flex flex-col gap-1">
+        {hasBeneficiary ? (
+          <Badge variant="secondary">{labels.configured}</Badge>
+        ) : (
+          <Badge variant="outline">{labels.missing}</Badge>
+        )}
+        {hint && <span className="text-muted-foreground font-mono text-xs">{hint}</span>}
+      </div>
     </TableCell>
   );
 }
@@ -144,6 +164,7 @@ function PayoutItemRows({
   labels,
   onToggle,
   onShowQr,
+  onPayUsd,
 }: {
   item: PayoutItem;
   isAccruing: boolean;
@@ -151,6 +172,7 @@ function PayoutItemRows({
   labels: TableLabels;
   onToggle: () => void;
   onShowQr?: (item: PayoutItem) => void;
+  onPayUsd?: (item: PayoutItem) => void;
 }) {
   return (
     <Fragment>
@@ -161,9 +183,13 @@ function PayoutItemRows({
         <TableCell className="text-right">{formatUsd(item.workflowRoyaltyAmountUsd)}</TableCell>
         <TableCell className="text-right font-medium">{formatUsd(item.totalAmountUsd)}</TableCell>
         {!isAccruing && <PayoutCurrencyCell currency={item.earningsPayoutCurrency} />}
-        {!isAccruing && <BeneficiaryCell hasBeneficiary={item.hasBeneficiary} labels={labels} />}
+        {!isAccruing && (
+          <BeneficiaryCell hasBeneficiary={item.hasBeneficiary} hint={item.beneficiaryHint} labels={labels} />
+        )}
         <PayoutStatusCell isAccruing={isAccruing} bankStatus={item.bankStatus} labels={labels} />
-        {!isAccruing && <PayoutActionsCell item={item} labels={labels} onShowQr={onShowQr} />}
+        {!isAccruing && (
+          <PayoutActionsCell item={item} labels={labels} onShowQr={onShowQr} onPayUsd={onPayUsd} />
+        )}
       </TableRow>
       {isOpen
         ? item.periods.map((p) => (
@@ -203,7 +229,13 @@ function PayoutPeriodRow({
   );
 }
 
-export function EarningsPayoutTable({ items, variant = "payable", labels, onShowQr }: EarningsPayoutTableProps) {
+export function EarningsPayoutTable({
+  items,
+  variant = "payable",
+  labels,
+  onShowQr,
+  onPayUsd,
+}: EarningsPayoutTableProps) {
   const isAccruing = variant === "accruing";
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -243,6 +275,7 @@ export function EarningsPayoutTable({ items, variant = "payable", labels, onShow
               toggle(item.recipientUserId);
             }}
             onShowQr={onShowQr}
+            onPayUsd={onPayUsd}
           />
         ))}
       </TableBody>

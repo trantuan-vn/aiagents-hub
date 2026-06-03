@@ -5,13 +5,26 @@ import { Button } from "@/components/ui/button";
 import { useRequireAdmin } from "../_hooks/use-require-admin";
 
 import { EarningsPayoutQrDialog } from "./_components/earnings-payout-qr-dialog";
+import { EarningsPaypalPayoutDialog } from "./_components/earnings-paypal-payout-dialog";
 import { PayoutListCard } from "./_components/payout-list-card";
 import { useEarningsPayoutsPage } from "./_components/use-earnings-payouts-page";
 
 export default function EarningsPayoutsPage() {
   const isAdmin = useRequireAdmin();
-  const { t, items, accruingItems, isLoading, tableLabels, accruingTableLabels, accruingTitle, fetchList, openQr, qr } =
-    useEarningsPayoutsPage(isAdmin);
+  const {
+    t,
+    items,
+    accruingItems,
+    isLoading,
+    tableLabels,
+    accruingTableLabels,
+    accruingTitle,
+    fetchList,
+    openQr,
+    openPaypal,
+    qr,
+    paypal,
+  } = useEarningsPayoutsPage(isAdmin);
 
   if (!isAdmin) return null;
 
@@ -35,6 +48,7 @@ export default function EarningsPayoutsPage() {
         items={items}
         labels={tableLabels}
         onShowQr={(item) => void openQr(item)}
+        onPayUsd={openPaypal}
       />
 
       <PayoutListCard
@@ -61,6 +75,22 @@ export default function EarningsPayoutsPage() {
         cancelLabel={t("cancel")}
         paidLabel={t("confirm_paid")}
         onPaid={qr.onPaid}
+      />
+
+      <EarningsPaypalPayoutDialog
+        open={paypal.open}
+        onOpenChange={paypal.setOpen}
+        selectedItem={paypal.selectedItem}
+        loading={paypal.loading}
+        error={paypal.error}
+        success={paypal.success}
+        title={t("paypal_dialog_title")}
+        hint={t("paypal_dialog_hint")}
+        confirmLabel={t("paypal_confirm")}
+        cancelLabel={t("cancel")}
+        sendingLabel={t("paypal_sending")}
+        successLabel={t("paypal_success")}
+        onConfirm={paypal.onConfirm}
       />
     </div>
   );
