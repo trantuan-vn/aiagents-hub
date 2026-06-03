@@ -8,6 +8,7 @@ import {
   buildErrorLogFields,
   extractErrorMessage,
   isSafeClientMessage,
+  logHandlerFailure,
   resolveClientErrorMessage,
   resolveHttpStatus,
 } from './http-errors';
@@ -20,10 +21,10 @@ export const handleError = async (c: Context, e: unknown, defaultMessage: string
   try {
     const message = extractErrorMessage(e);
     const safe = isSafeClientMessage(message);
-    const status = resolveHttpStatus(message, safe);
+    const status = resolveHttpStatus(message, safe, e);
     const clientMessage = resolveClientErrorMessage(defaultMessage, message, c.env);
 
-    log.error('handler.request_error', {
+    logHandlerFailure(log, 'handler.request_error', e, {
       defaultMessage,
       ...buildErrorLogFields(e),
       clientStatus: status,
@@ -47,10 +48,10 @@ export const handleErrorWithoutIp = async (
   try {
     const message = extractErrorMessage(e);
     const safe = isSafeClientMessage(message);
-    const status = resolveHttpStatus(message, safe);
+    const status = resolveHttpStatus(message, safe, e);
     const clientMessage = resolveClientErrorMessage(defaultMessage, message, env);
 
-    log.error('handler.error', {
+    logHandlerFailure(log, 'handler.error', e, {
       defaultMessage,
       ...buildErrorLogFields(e),
       clientStatus: status,
