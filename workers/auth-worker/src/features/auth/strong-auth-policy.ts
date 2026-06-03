@@ -93,33 +93,57 @@ export async function userHasStrongSecondFactor(
   return passkeyStatus.enabled;
 }
 
-export async function resolvePreferredStepUpMethod(
+export async function resolveAvailableStepUpMethods(
   c: Context,
   bindingName: string,
   identifier: string,
-): Promise<StepUpMethod> {
+): Promise<StepUpMethod[]> {
   const normalized = identifier.trim();
-  if (!normalized) return 'otp_email';
+  if (!normalized) return ['otp_email'];
+
+  const methods: StepUpMethod[] = [];
 
   const passkeyApp = createPasskeyAuthApplication(c, bindingName, {
     rpName: 'Unitoken',
     getOrigin: () => c.env.FRONTEND_URL || '',
   });
   const passkeyStatus = await passkeyApp.getPasskeyAuthStatusUseCase(normalized);
-  if (passkeyStatus.enabled) return 'passkey';
+  if (passkeyStatus.enabled) methods.push('passkey');
 
   const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
   const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(normalized);
-  if (totpStatus.enabled) return 'authenticator';
+  if (totpStatus.enabled) methods.push('authenticator');
 
   const smsApp = createAccountSmsApplication(c, bindingName);
   const smsStatus = await smsApp.getSmsStatusUseCase(normalized);
-  if (smsStatus.enabled) return 'sms';
+  if (smsStatus.enabled) methods.push('sms');
 
-  if (isWalletIdentifier(normalized)) return 'wallet_reauth';
-  if (isFacebookOAuthIdentifier(normalized)) return 'facebook_oauth';
+  if (isWalletIdentifier(normalized)) methods.push('wallet_reauth');
+  if (isFacebookOAuthIdentifier(normalized)) methods.push('facebook_oauth');
 
-  return 'otp_email';
+  if (methods.length === 0) methods.push('otp_email');
+
+  return methods;
+}
+
+export async function resolvePreferredStepUpMethod(
+  c: Context,
+  bindingName: string,
+  identifier: string,
+): Promise<StepUpMethod> {
+  const methods = await resolveAvailableStepUpMethods(c, bindingName, identifier);
+  return methods[0] ?? 'otp_email';
+}
+
+export async function isSensitiveActionUnlockedForAny(
+  kv: KVNamespace,
+  identifier: string,
+  methods: StepUpMethod[],
+): Promise<boolean> {
+  for (const method of methods) {
+    if (await isSensitiveActionUnlocked(kv, identifier, method)) return true;
+  }
+  return false;
 }
 
 /** Đăng nhập được; API dashboard (trừ setup 2FA) bị chặn cho đến khi bật 2FA. */

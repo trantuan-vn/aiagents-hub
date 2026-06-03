@@ -2,6 +2,7 @@ export type DashboardApiErrorBody = {
   error?: string;
   requiresStrongAuthSetup?: boolean;
   stepUpRequired?: boolean;
+  availableMethods?: string[];
 };
 
 /** Parse dashboard API error body without surfacing raw JSON to users. */

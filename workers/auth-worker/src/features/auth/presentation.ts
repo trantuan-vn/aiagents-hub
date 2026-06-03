@@ -52,7 +52,7 @@ import { cookieUtils, oauthUtils, markPreAuthSessionTrusted, validationUtils } f
 import { markStrongAuthSetupUnlocked, requiresStrongAuthSetup } from './strong-auth-policy';
 import {
   markSensitiveActionUnlocked,
-  resolvePreferredStepUpMethod,
+  resolveAvailableStepUpMethods,
   type StepUpMethod,
 } from './strong-auth-policy';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
@@ -461,7 +461,7 @@ export function createAuthRoutes(bindingName: string) {
     return c.json({ ok: true });
   }, "OTP verification failed", true));
 
-  // IIc. Sensitive-action step-up (passkey > authenticator > sms > otp email)
+  // IIc. Sensitive-action step-up (user may choose any enabled method)
   app.post(
     '/step-up/request',
     createRouteHandler(
@@ -472,10 +472,18 @@ export function createAuthRoutes(bindingName: string) {
         const body = (await c.req.json().catch(() => ({}))) as {
           turnstileToken?: string;
           returnTo?: string;
+          method?: StepUpMethod;
         };
-        const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
+        const availableMethods = await resolveAvailableStepUpMethods(c, bindingName, identifier);
+        const requestedMethod = body.method;
+        if (!requestedMethod) {
+          return c.json({ availableMethods, ok: true });
+        }
+        if (!availableMethods.includes(requestedMethod)) {
+          return c.json({ error: 'Step-up method not available', availableMethods }, 400);
+        }
 
-        if (requiredMethod === 'passkey') {
+        if (requestedMethod === 'passkey') {
           const origin = c.req.header('origin') || c.env.FRONTEND_URL;
           if (!origin) throw new Error('Origin required');
           const passkeyAuthApp = createPasskeyAuthApplication(c, bindingName, {
@@ -484,10 +492,15 @@ export function createAuthRoutes(bindingName: string) {
           });
           const { options, challengeKey } =
             await passkeyAuthApp.getAuthenticationOptionsUseCase(identifier, origin);
-          return c.json({ requiredMethod, options, challengeKey });
+          return c.json({
+            availableMethods,
+            requiredMethod: requestedMethod,
+            options,
+            challengeKey,
+          });
         }
 
-        if (requiredMethod === 'sms') {
+        if (requestedMethod === 'sms') {
           const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
           const smsRepo = createSmsRepository(userDO);
           const encryptedPhone = await smsRepo.getSmsPhoneEncrypted();
@@ -513,7 +526,7 @@ export function createAuthRoutes(bindingName: string) {
           );
         }
 
-        if (requiredMethod === 'otp_email') {
+        if (requestedMethod === 'otp_email') {
           if (!sessionId) throw new Error('sessionId not found');
           const otpIdentifier = resolveOtpStepUpIdentifier(user, identifier);
           if (!otpIdentifier) {
@@ -530,13 +543,13 @@ export function createAuthRoutes(bindingName: string) {
           );
         }
 
-        if (requiredMethod === 'wallet_reauth') {
+        if (requestedMethod === 'wallet_reauth') {
           if (!sessionId) throw new Error('sessionId not found');
           const nonce = await createWalletService(c.env).generateNonceAndStore(sessionId);
-          return c.json({ requiredMethod, nonce });
+          return c.json({ availableMethods, requiredMethod: requestedMethod, nonce });
         }
 
-        if (requiredMethod === 'facebook_oauth') {
+        if (requestedMethod === 'facebook_oauth') {
           if (!sessionId) throw new Error('sessionId not found');
           const appService = createApplicationService(c, bindingName);
           const authUrl = await appService.getAuthUrlUseCase('facebook', sessionId);
@@ -547,10 +560,10 @@ export function createAuthRoutes(bindingName: string) {
             JSON.stringify({ identifier, returnTo: safeReturnTo }),
             { expirationTtl: 10 * 60 },
           );
-          return c.json({ requiredMethod, authUrl });
+          return c.json({ availableMethods, requiredMethod: requestedMethod, authUrl });
         }
 
-        return c.json({ requiredMethod, ok: true });
+        return c.json({ availableMethods, requiredMethod: requestedMethod, ok: true });
       },
       'Failed to request step-up',
       {
@@ -570,7 +583,7 @@ export function createAuthRoutes(bindingName: string) {
         if (!identifier) throw new Error('Invalid user identifier');
         const normId = validationUtils.normalizeIdentifier(identifier);
         await assertStepUpVerifyNotBlocked(c.env, normId);
-        const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
+        const availableMethods = await resolveAvailableStepUpMethods(c, bindingName, identifier);
         const body = (await c.req.json().catch(() => ({}))) as {
           method?: StepUpMethod;
           code?: string;
@@ -579,11 +592,12 @@ export function createAuthRoutes(bindingName: string) {
           message?: string;
           signature?: string;
         };
-        if (!body.method || body.method !== requiredMethod) {
-          return c.json({ error: 'Step-up method mismatch', requiredMethod }, 400);
+        const verifyMethod = body.method;
+        if (!verifyMethod || !availableMethods.includes(verifyMethod)) {
+          return c.json({ error: 'Step-up method not available', availableMethods }, 400);
         }
 
-        if (requiredMethod === 'passkey') {
+        if (verifyMethod === 'passkey') {
           const origin = c.req.header('origin') || c.env.FRONTEND_URL;
           if (!origin) throw new Error('Origin required');
           if (!body.response || !body.challengeKey) throw new Error('response and challengeKey required');
@@ -600,7 +614,7 @@ export function createAuthRoutes(bindingName: string) {
           if (result.identifier !== identifier) {
             await failStepUpVerify(c.env, normId, sessionId, 'Passkey verification user mismatch');
           }
-        } else if (requiredMethod === 'authenticator') {
+        } else if (verifyMethod === 'authenticator') {
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) {
             await failStepUpVerify(c.env, normId, sessionId, 'Code must be 6 digits');
@@ -613,7 +627,7 @@ export function createAuthRoutes(bindingName: string) {
           if (!valid) {
             await failStepUpVerify(c.env, normId, sessionId);
           }
-        } else if (requiredMethod === 'sms') {
+        } else if (verifyMethod === 'sms') {
           const code = String(body.code ?? '').trim();
           if (!/^\d{6}$/.test(code)) {
             await failStepUpVerify(c.env, normId, sessionId, 'Code must be 6 digits');
@@ -637,7 +651,7 @@ export function createAuthRoutes(bindingName: string) {
             await failStepUpVerify(c.env, normId, sessionId);
           }
           await c.env.NONCE_KV.delete(kvKey);
-        } else if (requiredMethod === 'wallet_reauth') {
+        } else if (verifyMethod === 'wallet_reauth') {
           if (!sessionId) throw new Error('sessionId not found');
           const message = String(body.message ?? '').trim();
           const signature = String(body.signature ?? '').trim();
@@ -658,7 +672,7 @@ export function createAuthRoutes(bindingName: string) {
           if (signedAddress !== userAddress && signedAddress !== userIdentifier) {
             await failStepUpVerify(c.env, normId, sessionId, 'Wallet mismatch for step-up');
           }
-        } else if (requiredMethod === 'facebook_oauth') {
+        } else if (verifyMethod === 'facebook_oauth') {
           throw new Error('Continue with Facebook to verify this step-up method');
         } else {
           if (!sessionId) throw new Error('sessionId not found');
@@ -677,8 +691,8 @@ export function createAuthRoutes(bindingName: string) {
         }
 
         await clearStepUpVerifyAttempts(c.env, normId);
-        await markSensitiveActionUnlocked(c.env.NONCE_KV, identifier, requiredMethod);
-        return c.json({ ok: true, method: requiredMethod });
+        await markSensitiveActionUnlocked(c.env.NONCE_KV, identifier, verifyMethod);
+        return c.json({ ok: true, method: verifyMethod });
       },
       'Failed to verify step-up',
       {

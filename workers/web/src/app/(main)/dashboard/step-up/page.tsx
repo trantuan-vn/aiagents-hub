@@ -45,7 +45,8 @@ export default function StepUpPage() {
   const [loading, setLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [requiredMethod, setRequiredMethod] = useState<StepUpMethod | null>(null);
+  const [availableMethods, setAvailableMethods] = useState<StepUpMethod[]>([]);
+  const [activeMethod, setActiveMethod] = useState<StepUpMethod | null>(null);
   const [challengeKey, setChallengeKey] = useState<string | null>(null);
   const [passkeyOptions, setPasskeyOptions] = useState<AuthOptionsJSON | null>(null);
   const [walletNonce, setWalletNonce] = useState<string | null>(null);
@@ -56,7 +57,7 @@ export default function StepUpPage() {
     scope: "session",
     envFallbackSiteKey: ENV_TURNSTILE_SITE_KEY,
   });
-  const didAutoRequestRef = useRef(false);
+  const didAutoLoadRef = useRef(false);
   const pendingWalletVerifyRef = useRef(false);
   const walletVerifyInFlightRef = useRef(false);
 
@@ -78,86 +79,161 @@ export default function StepUpPage() {
     router.replace(returnTo);
   }, [returnTo, router, searchParams, t, toast]);
 
-  const requestStepUp = useCallback(async () => {
-    setRequesting(true);
-    try {
-      const turnstileToken = captcha.turnstileTokenForBody();
-      const res = await fetch(`${API_BASE_URL}/dashboard/auth/step-up/request`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(turnstileToken ? { turnstileToken } : {}),
-          returnTo,
-        }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        requiredMethod?: StepUpMethod;
-        options?: AuthOptionsJSON;
-        challengeKey?: string;
-        nonce?: string;
-        authUrl?: string;
-        requiresCaptcha?: boolean;
-        siteKey?: string | null;
-        error?: string;
-      };
-      if (!res.ok || !data.requiredMethod) {
-        captcha.applyCaptchaError(data);
-        if (data.requiresCaptcha) {
-          setRequiredMethod((prev) => prev ?? "otp_email");
-        }
-        throw new Error(data.error ?? t("failed_to_request_verification"));
-      }
-      setRequiredMethod(data.requiredMethod);
-      setPasskeyOptions(data.options ?? null);
-      setChallengeKey(data.challengeKey ?? null);
-      setWalletNonce(data.nonce ?? null);
-      setFacebookAuthUrl(data.authUrl ?? null);
-      setCode("");
-      if (data.requiredMethod === "otp_email") {
-        toast({ title: t("email_otp_sent") });
-        await captcha.onRequestSuccess();
-      } else if (data.requiredMethod === "sms") {
-        toast({ title: t("sms_otp_sent") });
-      }
-    } catch (e) {
-      toast({
-        title: t("cannot_start_verification"),
-        description: e instanceof Error ? e.message : t("please_try_again"),
-        variant: "destructive",
-      });
-    } finally {
-      setRequesting(false);
-      setLoading(false);
-    }
-  }, [captcha, returnTo, t, toast]);
+  const methodLabel = useCallback(
+    (method: StepUpMethod) => {
+      if (method === "passkey") return t("method_passkey");
+      if (method === "authenticator") return t("method_authenticator");
+      if (method === "sms") return t("method_sms");
+      if (method === "otp_email") return t("method_otp_email");
+      if (method === "wallet_reauth") return t("method_wallet_signature");
+      if (method === "facebook_oauth") return t("method_facebook_reauth");
+      return t("method_verification");
+    },
+    [t],
+  );
 
-  const requestStepUpFromUser = useCallback(async () => {
-    if (requiredMethod === "otp_email" && captcha.needsTokenBeforeSubmit) {
-      toast({
-        title: t("captcha_required"),
-        description: t("complete_captcha_to_continue"),
-        variant: "destructive",
-      });
-      return;
+  const resetChallenge = useCallback(() => {
+    setActiveMethod(null);
+    setPasskeyOptions(null);
+    setChallengeKey(null);
+    setWalletNonce(null);
+    setFacebookAuthUrl(null);
+    setCode("");
+  }, []);
+
+  const loadAvailableMethods = useCallback(async () => {
+    const res = await fetch(`${API_BASE_URL}/dashboard/auth/step-up/request`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ returnTo }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      availableMethods?: StepUpMethod[];
+      error?: string;
+    };
+    if (!res.ok || !data.availableMethods?.length) {
+      throw new Error(data.error ?? t("failed_to_request_verification"));
     }
-    await requestStepUp();
-  }, [captcha.needsTokenBeforeSubmit, requestStepUp, requiredMethod, t, toast]);
+    setAvailableMethods(data.availableMethods);
+    return data.availableMethods;
+  }, [returnTo, t]);
+
+  const requestStepUp = useCallback(
+    async (method: StepUpMethod) => {
+      setRequesting(true);
+      try {
+        const turnstileToken = captcha.turnstileTokenForBody();
+        const res = await fetch(`${API_BASE_URL}/dashboard/auth/step-up/request`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            method,
+            ...(turnstileToken ? { turnstileToken } : {}),
+            returnTo,
+          }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          availableMethods?: StepUpMethod[];
+          requiredMethod?: StepUpMethod;
+          options?: AuthOptionsJSON;
+          challengeKey?: string;
+          nonce?: string;
+          authUrl?: string;
+          requiresCaptcha?: boolean;
+          siteKey?: string | null;
+          error?: string;
+        };
+        if (!res.ok || !data.requiredMethod) {
+          captcha.applyCaptchaError(data);
+          if (data.requiresCaptcha) {
+            setActiveMethod((prev) => prev ?? method);
+          }
+          throw new Error(data.error ?? t("failed_to_request_verification"));
+        }
+        if (data.availableMethods?.length) {
+          setAvailableMethods(data.availableMethods);
+        }
+        setActiveMethod(data.requiredMethod);
+        setPasskeyOptions(data.options ?? null);
+        setChallengeKey(data.challengeKey ?? null);
+        setWalletNonce(data.nonce ?? null);
+        setFacebookAuthUrl(data.authUrl ?? null);
+        setCode("");
+        if (data.requiredMethod === "otp_email") {
+          toast({ title: t("email_otp_sent") });
+          await captcha.onRequestSuccess();
+        } else if (data.requiredMethod === "sms") {
+          toast({ title: t("sms_otp_sent") });
+        }
+      } catch (e) {
+        toast({
+          title: t("cannot_start_verification"),
+          description: e instanceof Error ? e.message : t("please_try_again"),
+          variant: "destructive",
+        });
+      } finally {
+        setRequesting(false);
+        setLoading(false);
+      }
+    },
+    [captcha, returnTo, t, toast],
+  );
+
+  const requestStepUpFromUser = useCallback(
+    async (method: StepUpMethod) => {
+      if (method === "otp_email" && captcha.needsTokenBeforeSubmit) {
+        toast({
+          title: t("captcha_required"),
+          description: t("complete_captcha_to_continue"),
+          variant: "destructive",
+        });
+        return;
+      }
+      await requestStepUp(method);
+    },
+    [captcha.needsTokenBeforeSubmit, requestStepUp, t, toast],
+  );
+
+  const selectMethod = useCallback(
+    async (method: StepUpMethod) => {
+      if (requesting) return;
+      resetChallenge();
+      await requestStepUpFromUser(method);
+    },
+    [requestStepUpFromUser, requesting, resetChallenge],
+  );
 
   useEffect(() => {
-    if (didAutoRequestRef.current) return;
+    if (didAutoLoadRef.current) return;
     if (!captcha.configLoaded) return;
     if (captcha.needsTokenBeforeSubmit) return;
-    didAutoRequestRef.current = true;
+    didAutoLoadRef.current = true;
     let cancelled = false;
     void (async () => {
-      if (cancelled) return;
-      await requestStepUp();
+      try {
+        const methods = await loadAvailableMethods();
+        if (cancelled) return;
+        if (methods.length === 1) {
+          await requestStepUp(methods[0]!);
+        } else {
+          setLoading(false);
+        }
+      } catch (e) {
+        if (cancelled) return;
+        toast({
+          title: t("cannot_start_verification"),
+          description: e instanceof Error ? e.message : t("please_try_again"),
+          variant: "destructive",
+        });
+        setLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [captcha.configLoaded, captcha.needsTokenBeforeSubmit, requestStepUp]);
+  }, [captcha.configLoaded, captcha.needsTokenBeforeSubmit, loadAvailableMethods, requestStepUp, t, toast]);
 
   const verifyWalletStepUp = useCallback(async () => {
     if (!walletNonce) throw new Error(t("wallet_challenge_missing"));
@@ -229,7 +305,7 @@ export default function StepUpPage() {
   }, [address, connect, connectors, isConnected, t, toast, verifyWalletStepUp]);
 
   useEffect(() => {
-    if (!pendingWalletVerifyRef.current || !isConnected || !address || requiredMethod !== "wallet_reauth") return;
+    if (!pendingWalletVerifyRef.current || !isConnected || !address || activeMethod !== "wallet_reauth") return;
     pendingWalletVerifyRef.current = false;
     void verifyWalletStepUp().catch((e) => {
       toast({
@@ -238,22 +314,22 @@ export default function StepUpPage() {
         variant: "destructive",
       });
     });
-  }, [address, isConnected, requiredMethod, t, toast, verifyWalletStepUp]);
+  }, [activeMethod, address, isConnected, t, toast, verifyWalletStepUp]);
 
   const verify = useCallback(async () => {
-    if (!requiredMethod || verifying) return;
+    if (!activeMethod || verifying) return;
     setVerifying(true);
     try {
-      let body: Record<string, unknown> = { method: requiredMethod };
+      let body: Record<string, unknown> = { method: activeMethod };
 
-      if (requiredMethod === "passkey") {
+      if (activeMethod === "passkey") {
         if (!passkeyOptions || !challengeKey) throw new Error(t("passkey_challenge_missing"));
         const response = await startAuthentication(passkeyOptions);
         body = { ...body, response, challengeKey };
-      } else if (requiredMethod === "wallet_reauth") {
+      } else if (activeMethod === "wallet_reauth") {
         await handleWalletReauth();
         return;
-      } else if (requiredMethod === "facebook_oauth") {
+      } else if (activeMethod === "facebook_oauth") {
         if (!facebookAuthUrl) throw new Error(t("facebook_reauth_url_missing"));
         window.location.href = facebookAuthUrl;
         return;
@@ -292,50 +368,80 @@ export default function StepUpPage() {
       setVerifying(false);
     }
   }, [
+    activeMethod,
     challengeKey,
     code,
     facebookAuthUrl,
     passkeyOptions,
-    requiredMethod,
     returnTo,
     router,
+    t,
     toast,
     verifying,
     handleWalletReauth,
   ]);
 
-  const methodLabel = useMemo(() => {
-    if (requiredMethod === "passkey") return t("method_passkey");
-    if (requiredMethod === "authenticator") return t("method_authenticator");
-    if (requiredMethod === "sms") return t("method_sms");
-    if (requiredMethod === "otp_email") return t("method_otp_email");
-    if (requiredMethod === "wallet_reauth") return t("method_wallet_signature");
-    if (requiredMethod === "facebook_oauth") return t("method_facebook_reauth");
-    return t("method_verification");
-  }, [requiredMethod, t]);
+  const showMethodPicker = !loading && availableMethods.length > 1 && !activeMethod;
+  const activeMethodLabel = activeMethod ? methodLabel(activeMethod) : null;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-4 py-8">
       <Card>
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
-          <CardDescription>
-            {t("description")}
-          </CardDescription>
+          <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Alert>
-            <AlertTitle>{t("required_method")}</AlertTitle>
-            <AlertDescription>{requiredMethod ? methodLabel : t("loading")}</AlertDescription>
-          </Alert>
+          {showMethodPicker ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t("choose_method")}</p>
+              <div className="flex flex-col gap-2">
+                {availableMethods.map((method) => (
+                  <Button
+                    key={method}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => void selectMethod(method)}
+                    disabled={requesting}
+                  >
+                    {methodLabel(method)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
-          {!loading && requiredMethod === "passkey" ? (
+          {activeMethod ? (
+            <Alert>
+              <AlertTitle>{t("active_method")}</AlertTitle>
+              <AlertDescription>{activeMethodLabel}</AlertDescription>
+            </Alert>
+          ) : !showMethodPicker ? (
+            <Alert>
+              <AlertTitle>{t("required_method")}</AlertTitle>
+              <AlertDescription>{loading ? t("loading") : t("method_verification")}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          {availableMethods.length > 1 && activeMethod ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => resetChallenge()}
+              disabled={requesting || verifying}
+            >
+              {t("change_method")}
+            </Button>
+          ) : null}
+
+          {!loading && activeMethod === "passkey" ? (
             <Button className="w-full" onClick={() => void verify()} disabled={verifying || requesting}>
               {verifying ? t("verifying") : t("verify_with_passkey")}
             </Button>
           ) : null}
 
-          {!loading && requiredMethod === "wallet_reauth" ? (
+          {!loading && activeMethod === "wallet_reauth" ? (
             <Button
               className="w-full"
               onClick={() => void verify()}
@@ -349,7 +455,7 @@ export default function StepUpPage() {
             </Button>
           ) : null}
 
-          {!loading && requiredMethod === "facebook_oauth" ? (
+          {!loading && activeMethod === "facebook_oauth" ? (
             <Button className="w-full" onClick={() => void verify()} disabled={verifying || requesting}>
               {t("continue_with_facebook")}
             </Button>
@@ -358,10 +464,10 @@ export default function StepUpPage() {
           <HumanChallengeTurnstile challenge={captcha} keyPrefix="step-up-" />
 
           {!loading &&
-          requiredMethod &&
-          requiredMethod !== "passkey" &&
-          requiredMethod !== "wallet_reauth" &&
-          requiredMethod !== "facebook_oauth" ? (
+          activeMethod &&
+          activeMethod !== "passkey" &&
+          activeMethod !== "wallet_reauth" &&
+          activeMethod !== "facebook_oauth" ? (
             <div className="space-y-3">
               <Input
                 inputMode="numeric"
@@ -375,10 +481,10 @@ export default function StepUpPage() {
                 <Button className="flex-1" onClick={() => void verify()} disabled={verifying || requesting}>
                   {verifying ? t("verifying") : t("verify")}
                 </Button>
-                {(requiredMethod === "sms" || requiredMethod === "otp_email") && (
+                {(activeMethod === "sms" || activeMethod === "otp_email") && (
                   <Button
                     variant="outline"
-                    onClick={() => void requestStepUpFromUser()}
+                    onClick={() => void requestStepUpFromUser(activeMethod)}
                     disabled={requesting || verifying}
                   >
                     {requesting ? t("sending") : t("resend")}
@@ -388,8 +494,8 @@ export default function StepUpPage() {
             </div>
           ) : null}
 
-          {!loading && !requiredMethod ? (
-            <Button variant="outline" onClick={() => void requestStepUpFromUser()} disabled={requesting}>
+          {!loading && !availableMethods.length ? (
+            <Button variant="outline" onClick={() => void loadAvailableMethods()} disabled={requesting}>
               {t("retry")}
             </Button>
           ) : null}

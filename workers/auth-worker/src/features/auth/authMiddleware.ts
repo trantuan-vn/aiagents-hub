@@ -14,8 +14,8 @@ import {
 import { createIpRateLimitMiddleware, recordIpAuthFailure } from '../../shared/ip-rate-limit';
 import { ERROR_MESSAGES } from './constant';
 import {
-  isSensitiveActionUnlocked,
-  resolvePreferredStepUpMethod,
+  isSensitiveActionUnlockedForAny,
+  resolveAvailableStepUpMethods,
   requiresStrongAuthSetup,
 } from './strong-auth-policy';
 
@@ -145,7 +145,7 @@ function requiresSensitiveStepUp(path: string, method: string): boolean {
   return upperMethod !== 'GET';
 }
 
-/** Sensitive actions require recent step-up with preferred method: passkey > authenticator > sms > otp email. */
+/** Sensitive actions require recent step-up with any enabled verification method. */
 export function createSensitiveStepUpMiddleware(bindingName: string) {
   return async (c: Context, next: Next) => {
     const user = c.get('user') as Record<string, unknown> | undefined;
@@ -170,14 +170,15 @@ export function createSensitiveStepUpMiddleware(bindingName: string) {
       return c.json({ error: 'Step-up verification is unavailable' }, 503);
     }
 
-    const requiredMethod = await resolvePreferredStepUpMethod(c, bindingName, identifier);
-    const unlocked = await isSensitiveActionUnlocked(kv, identifier, requiredMethod);
+    const availableMethods = await resolveAvailableStepUpMethods(c, bindingName, identifier);
+    const unlocked = await isSensitiveActionUnlockedForAny(kv, identifier, availableMethods);
     if (!unlocked) {
       return c.json(
         {
           error: 'Sensitive action requires step-up verification',
           stepUpRequired: true,
-          requiredMethod,
+          availableMethods,
+          requiredMethod: availableMethods[0] ?? 'otp_email',
         },
         403,
       );
