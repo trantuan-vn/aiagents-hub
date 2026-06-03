@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { useRequireAdmin } from "../../_hooks/use-require-admin";
 import type { CreateService, Service, UpdateService } from "../../service/_components/schema";
@@ -36,7 +37,7 @@ export function ServiceManagementPage() {
   );
   const isListFiltered = searchQuery.trim().length > 0 || statusFilter !== "all";
 
-  const fetchServices = async (): Promise<void> => {
+  const fetchServices = async (signal?: AbortSignal): Promise<void> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -44,16 +45,19 @@ export function ServiceManagementPage() {
         method: "GET",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        signal,
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
+        const errBody = await parseDashboardApiError(response);
+        if (errBody?.stepUpRequired) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       const data: Service[] = await response.json();
       setServices(data);
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       const errorMessage = err instanceof Error ? err.message : t("fetch_error");
       setError(errorMessage);
       toast({
@@ -62,13 +66,15 @@ export function ServiceManagementPage() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     if (!isAdmin) return;
-    void fetchServices();
+    const controller = new AbortController();
+    void fetchServices(controller.signal);
+    return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin]);
 
