@@ -21,6 +21,7 @@ export default function EarningsPayoutsPage() {
     accruingTitle,
     fetchList,
     openQr,
+    openPaypalQr,
     openPaypal,
     qr,
     paypal,
@@ -48,6 +49,7 @@ export default function EarningsPayoutsPage() {
         items={items}
         labels={tableLabels}
         onShowQr={(item) => void openQr(item)}
+        onShowPaypalQr={(item) => void openPaypalQr(item)}
         onPayUsd={openPaypal}
       />
 
@@ -70,10 +72,11 @@ export default function EarningsPayoutsPage() {
         qrLoading={qr.loading}
         qrError={qr.error}
         qrSrc={qr.src}
-        title={t("qr_dialog_title")}
-        hint={t("qr_hint")}
+        title={qr.mode === "paypal" ? t("paypal_qr_dialog_title") : t("qr_dialog_title")}
+        hint={qr.mode === "paypal" ? t("paypal_qr_hint") : t("qr_hint")}
         cancelLabel={t("cancel")}
-        paidLabel={t("confirm_paid")}
+        paidLabel={qr.mode === "paypal" ? t("confirm_paid_paypal") : t("confirm_paid")}
+        markingPaid={qr.markingPaid}
         onPaid={qr.onPaid}
       />
 

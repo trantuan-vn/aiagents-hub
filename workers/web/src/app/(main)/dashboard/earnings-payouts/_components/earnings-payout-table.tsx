@@ -2,7 +2,9 @@
 
 import { Fragment, useState } from "react";
 
-import { CheckCircle2, ChevronDown, ChevronRight, Clock, DollarSign, QrCode } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, Clock, DollarSign, QrCode, Wallet } from "lucide-react";
+
+import { PAYPAL_API_PAYOUT_ENABLED } from "./paypal-api-payout-enabled";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,7 +49,9 @@ interface TableLabels {
   bank_paid: string;
   bank_unpaid: string;
   show_qr: string;
+  show_paypal_qr: string;
   pay_usd: string;
+  pay_usd_disabled_hint?: string;
   payout_currency: string;
   accruing_status?: string;
 }
@@ -57,6 +61,7 @@ interface EarningsPayoutTableProps {
   variant?: EarningsPayoutTableVariant;
   labels: TableLabels;
   onShowQr?: (item: PayoutItem) => void;
+  onShowPaypalQr?: (item: PayoutItem) => void;
   onPayUsd?: (item: PayoutItem) => void;
 }
 
@@ -64,23 +69,30 @@ function canShowVietQr(item: PayoutItem): boolean {
   return item.earningsPayoutCurrency === "VND" && item.hasBeneficiary && item.bankStatus !== "paid";
 }
 
-function canShowPaypal(item: PayoutItem): boolean {
+function canShowPaypalQr(item: PayoutItem): boolean {
   return item.earningsPayoutCurrency === "USD" && item.hasBeneficiary && item.bankStatus !== "paid";
+}
+
+function canShowPaypalApi(item: PayoutItem): boolean {
+  return PAYPAL_API_PAYOUT_ENABLED && canShowPaypalQr(item);
 }
 
 function PayoutActionsCell({
   item,
   labels,
   onShowQr,
+  onShowPaypalQr,
   onPayUsd,
 }: {
   item: PayoutItem;
   labels: TableLabels;
   onShowQr?: (item: PayoutItem) => void;
+  onShowPaypalQr?: (item: PayoutItem) => void;
   onPayUsd?: (item: PayoutItem) => void;
 }) {
   const vietQrEnabled = canShowVietQr(item);
-  const paypalEnabled = canShowPaypal(item);
+  const paypalQrEnabled = canShowPaypalQr(item);
+  const paypalApiEnabled = canShowPaypalApi(item);
   return (
     <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
       <div className="flex flex-wrap justify-end gap-2">
@@ -88,7 +100,17 @@ function PayoutActionsCell({
           <QrCode className="mr-1 h-4 w-4" />
           {labels.show_qr}
         </Button>
-        <Button size="sm" variant="outline" disabled={!paypalEnabled} onClick={() => onPayUsd?.(item)}>
+        <Button size="sm" variant="outline" disabled={!paypalQrEnabled} onClick={() => onShowPaypalQr?.(item)}>
+          <Wallet className="mr-1 h-4 w-4" />
+          {labels.show_paypal_qr}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={!paypalApiEnabled}
+          title={!PAYPAL_API_PAYOUT_ENABLED ? labels.pay_usd_disabled_hint : undefined}
+          onClick={() => onPayUsd?.(item)}
+        >
           <DollarSign className="mr-1 h-4 w-4" />
           {labels.pay_usd}
         </Button>
@@ -164,6 +186,7 @@ function PayoutItemRows({
   labels,
   onToggle,
   onShowQr,
+  onShowPaypalQr,
   onPayUsd,
 }: {
   item: PayoutItem;
@@ -172,6 +195,7 @@ function PayoutItemRows({
   labels: TableLabels;
   onToggle: () => void;
   onShowQr?: (item: PayoutItem) => void;
+  onShowPaypalQr?: (item: PayoutItem) => void;
   onPayUsd?: (item: PayoutItem) => void;
 }) {
   return (
@@ -188,7 +212,13 @@ function PayoutItemRows({
         )}
         <PayoutStatusCell isAccruing={isAccruing} bankStatus={item.bankStatus} labels={labels} />
         {!isAccruing && (
-          <PayoutActionsCell item={item} labels={labels} onShowQr={onShowQr} onPayUsd={onPayUsd} />
+          <PayoutActionsCell
+            item={item}
+            labels={labels}
+            onShowQr={onShowQr}
+            onShowPaypalQr={onShowPaypalQr}
+            onPayUsd={onPayUsd}
+          />
         )}
       </TableRow>
       {isOpen
@@ -234,6 +264,7 @@ export function EarningsPayoutTable({
   variant = "payable",
   labels,
   onShowQr,
+  onShowPaypalQr,
   onPayUsd,
 }: EarningsPayoutTableProps) {
   const isAccruing = variant === "accruing";
@@ -275,6 +306,7 @@ export function EarningsPayoutTable({
               toggle(item.recipientUserId);
             }}
             onShowQr={onShowQr}
+            onShowPaypalQr={onShowPaypalQr}
             onPayUsd={onPayUsd}
           />
         ))}

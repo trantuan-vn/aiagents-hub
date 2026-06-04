@@ -4,15 +4,19 @@ import { handleError, getIdFromName, executeUtils } from '../../../shared/utils'
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { convertUsdToVnd } from '../../admin/service/pricing';
 import { getUsdTransferRate, todayDateString } from '../exchange-rate/get-rate';
-import { createPayoutBeneficiaryInfrastructure } from '../../member/payout/beneficiary-infrastructure';
+import {
+  createPayoutBeneficiaryInfrastructure,
+  maskPaypalEmail,
+} from '../../member/payout/beneficiary-infrastructure';
 import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
 import { generateVietQr } from '../../member/payout/vietqr';
 import { randomPayoutTransferCode, toPayoutAmountVnd } from './casso-payout';
 import {
   createEarningsPayoutInfrastructure,
 } from './infrastructure';
-import { GeneratePayoutQrSchema, SendPaypalPayoutSchema } from './domain';
+import { GeneratePayoutQrSchema, MarkPaypalQrPaidSchema, SendPaypalPayoutSchema } from './domain';
 import { sendPaypalPayout } from './paypal-payout';
+import { paypalQrKeyToDataUrl } from '../../member/payout/r2';
 import { currentPeriod } from './d1';
 import {
   attachBeneficiaries,
@@ -134,6 +138,115 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       });
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to generate payout QR');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/paypal-qr', async (c) => {
+    try {
+      requireAdmin(c);
+      const body = await c.req.json();
+      const { recipientUserId } = GeneratePayoutQrSchema.parse(body);
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+
+      const adminStub = getIdFromName(
+        c,
+        getPrimaryAdminIdentifier(c.env),
+        bindingName,
+      ) as DurableObjectStub<UserDO>;
+      const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
+
+      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+        db,
+        payoutInfra,
+        recipientUserId,
+      );
+      if (keys.length === 0 || totalAmountUsd <= 0) {
+        throw new Error(
+          'No unpaid earnings for closed periods for this user (current month cannot be paid yet)',
+        );
+      }
+
+      const binding = c.env[bindingName as keyof Env] as DurableObjectNamespace;
+      const userStub = binding.get(binding.idFromString(recipientUserId)) as DurableObjectStub<UserDO>;
+      const users = await executeUtils.executeDynamicAction(userStub, 'select', {}, 'users');
+      const u = Array.isArray(users) ? users[0] : users;
+      const payoutCurrency =
+        (u?.earningsPayoutCurrency ?? u?.earnings_payout_currency) === 'USD' ? 'USD' : 'VND';
+      if (payoutCurrency !== 'USD') {
+        throw new Error('PayPal QR payout requires user earnings payout currency to be USD');
+      }
+
+      const beneficiaryInfra = createPayoutBeneficiaryInfrastructure(
+        userStub,
+        createPayoutEncryptionSecretGetter(c.env),
+      );
+      const paypal = await beneficiaryInfra.getPaypal();
+      if (!paypal) {
+        throw new Error('User has not configured PayPal payout email');
+      }
+      const qrKey = await beneficiaryInfra.getPaypalQrImageKey();
+      if (!qrKey) {
+        throw new Error('User has not uploaded PayPal receive-money QR image');
+      }
+      const qr = await paypalQrKeyToDataUrl(c.env, qrKey);
+      if (!qr) {
+        throw new Error('PayPal QR image not found in storage');
+      }
+
+      return c.json({
+        qr,
+        amountUsd: totalAmountUsd,
+        paypalEmail: paypal.paypalEmail,
+        maskedEmail: maskPaypalEmail(paypal.paypalEmail),
+        recipientUserId,
+        recipientIdentifier: identifier,
+        payoutKeys: keys,
+        earningsPayoutCurrency: payoutCurrency,
+      });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load PayPal QR');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/mark-paid', async (c) => {
+    try {
+      requireAdmin(c);
+      const body = await c.req.json();
+      const { recipientUserId } = MarkPaypalQrPaidSchema.parse(body);
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+
+      const adminStub = getIdFromName(
+        c,
+        getPrimaryAdminIdentifier(c.env),
+        bindingName,
+      ) as DurableObjectStub<UserDO>;
+      const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
+
+      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+        db,
+        payoutInfra,
+        recipientUserId,
+      );
+      if (keys.length === 0 || totalAmountUsd <= 0) {
+        throw new Error('No unpaid earnings to mark as paid for this user');
+      }
+
+      const note = `Manual PayPal QR ${identifier}`;
+      await payoutInfra.markPaidBatch(keys, note);
+
+      return c.json({
+        success: true,
+        amountUsd: totalAmountUsd,
+        recipientUserId,
+        recipientIdentifier: identifier,
+        payoutKeys: keys,
+      });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to mark payout as paid');
       return c.json(errorResponse, status);
     }
   });

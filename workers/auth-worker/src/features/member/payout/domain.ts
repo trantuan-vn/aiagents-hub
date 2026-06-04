@@ -34,6 +34,8 @@ export const PayoutBeneficiaryRecordSchema = z.object({
   paypalEmailEncrypted: z.string().nullish(),
   /** Legacy plaintext — cleared after migration on read/upsert */
   paypalEmail: z.string().nullish(),
+  /** R2 key for PayPal receive-money QR image (see payout/r2.ts) */
+  paypalQrImageKey: z.string().max(500).nullish(),
 });
 
 export type PayoutBeneficiaryRecord = z.infer<typeof PayoutBeneficiaryRecordSchema>;

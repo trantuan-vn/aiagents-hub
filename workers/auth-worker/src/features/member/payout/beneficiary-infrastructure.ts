@@ -20,6 +20,11 @@ function rowHasPaypalBeneficiary(row: BeneficiaryRow | null): boolean {
   return !!(row.paypalEmailEncrypted || row.paypalEmail);
 }
 
+function rowHasPaypalQr(row: BeneficiaryRow | null): boolean {
+  if (!row) return false;
+  return !!row.paypalQrImageKey;
+}
+
 async function toBankRecordPayload(
   data: PayoutBeneficiary,
   secret: string,
@@ -119,12 +124,16 @@ export function createPayoutBeneficiaryInfrastructure(
   const persistPaypal = async (
     data: PaypalPayoutBeneficiary,
     existingId?: unknown,
+    paypalQrImageKey?: string | null,
   ): Promise<PaypalPayoutBeneficiary> => {
     const secret = await getEncryptionSecret();
-    const record = {
+    const record: Record<string, unknown> = {
       paypalEmailEncrypted: await encryptPayoutField(data.paypalEmail.trim().toLowerCase(), secret),
       paypalEmail: null,
     };
+    if (paypalQrImageKey !== undefined) {
+      record.paypalQrImageKey = paypalQrImageKey;
+    }
     if (existingId != null) {
       await executeUtils.executeDynamicAction(
         userDO,
@@ -181,10 +190,19 @@ export function createPayoutBeneficiaryInfrastructure(
       return beneficiary;
     },
 
-    upsertPaypal: async (input: PaypalPayoutBeneficiary): Promise<PaypalPayoutBeneficiary> => {
+    upsertPaypal: async (
+      input: PaypalPayoutBeneficiary,
+      paypalQrImageKey?: string | null,
+    ): Promise<PaypalPayoutBeneficiary> => {
       const data = PaypalPayoutBeneficiaryUpsertSchema.parse(input);
       const existing = await getRow();
-      return persistPaypal(data, existing?.id);
+      return persistPaypal(data, existing?.id, paypalQrImageKey);
+    },
+
+    getPaypalQrImageKey: async (): Promise<string | null> => {
+      const row = await getRow();
+      if (!row?.paypalQrImageKey) return null;
+      return String(row.paypalQrImageKey);
     },
 
     hasBank: async (): Promise<boolean> => {
@@ -194,7 +212,7 @@ export function createPayoutBeneficiaryInfrastructure(
 
     hasPaypal: async (): Promise<boolean> => {
       const row = await getRow();
-      return rowHasPaypalBeneficiary(row);
+      return rowHasPaypalBeneficiary(row) && rowHasPaypalQr(row);
     },
   };
 }

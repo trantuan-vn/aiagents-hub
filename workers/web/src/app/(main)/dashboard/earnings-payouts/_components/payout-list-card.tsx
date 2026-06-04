@@ -20,6 +20,7 @@ interface PayoutListCardProps {
   labels: TableLabels;
   variant?: EarningsPayoutTableVariant;
   onShowQr?: (item: PayoutItem) => void;
+  onShowPaypalQr?: (item: PayoutItem) => void;
   onPayUsd?: (item: PayoutItem) => void;
   minHeight?: "default" | "compact";
 }
@@ -34,6 +35,7 @@ export function PayoutListCard({
   labels,
   variant = "payable",
   onShowQr,
+  onShowPaypalQr,
   onPayUsd,
   minHeight = "default",
 }: PayoutListCardProps) {
@@ -54,7 +56,14 @@ export function PayoutListCard({
         ) : null}
         {!isLoading && items.length === 0 ? <p className="text-muted-foreground text-sm">{emptyLabel}</p> : null}
         {!isLoading && items.length > 0 ? (
-          <EarningsPayoutTable items={items} variant={variant} labels={labels} onShowQr={onShowQr} onPayUsd={onPayUsd} />
+          <EarningsPayoutTable
+            items={items}
+            variant={variant}
+            labels={labels}
+            onShowQr={onShowQr}
+            onShowPaypalQr={onShowPaypalQr}
+            onPayUsd={onPayUsd}
+          />
         ) : null}
       </CardContent>
     </Card>

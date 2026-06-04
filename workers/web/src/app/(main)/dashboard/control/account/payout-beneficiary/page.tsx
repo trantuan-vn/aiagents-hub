@@ -5,7 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Landmark, Loader2 } from "lucide-react";
+import Image from "next/image";
+
+import { ArrowLeft, ImagePlus, Landmark, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -42,6 +44,9 @@ export default function PayoutBeneficiaryPage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [payoutCurrency, setPayoutCurrency] = useState<"VND" | "USD">("VND");
+  const [paypalQrFile, setPaypalQrFile] = useState<File | null>(null);
+  const [paypalQrPreview, setPaypalQrPreview] = useState<string | null>(null);
+  const [existingPaypalQr, setExistingPaypalQr] = useState(false);
 
   const bankForm = useForm<BankForm>({
     resolver: zodResolver(bankFormSchema),
@@ -92,11 +97,25 @@ export default function PayoutBeneficiaryPage() {
         if (!beneficiaryRes.ok) return;
         const data: {
           beneficiary?: { accountNo?: string; accountName?: string; acqId?: string } | null;
-          paypal?: { paypalEmail?: string } | null;
+          paypal?: { paypalEmail?: string; hasPaypalQr?: boolean } | null;
         } = await beneficiaryRes.json();
 
         if (data.paypal?.paypalEmail) {
           paypalForm.reset({ paypalEmail: data.paypal.paypalEmail });
+        }
+        if (data.paypal?.hasPaypalQr) {
+          setExistingPaypalQr(true);
+          try {
+            const qrRes = await fetch(`${API_BASE_URL}/dashboard/payout/beneficiary/paypal/qr`, {
+              credentials: "include",
+            });
+            if (qrRes.ok) {
+              const qrData: { qr?: string | null } = await qrRes.json();
+              if (qrData.qr) setPaypalQrPreview(qrData.qr);
+            }
+          } catch {
+            /* ignore */
+          }
         }
 
         if (!data.beneficiary?.accountNo) return;
@@ -157,19 +176,45 @@ export default function PayoutBeneficiaryPage() {
     }
   };
 
+  const onPaypalQrSelect = (file: File | null) => {
+    setPaypalQrFile(file);
+    if (paypalQrPreview?.startsWith("blob:")) URL.revokeObjectURL(paypalQrPreview);
+    if (!file) {
+      if (!existingPaypalQr) setPaypalQrPreview(null);
+      return;
+    }
+    if (!file.type.match(/^image\/(jpeg|png)$/)) {
+      toast({ title: t("error"), description: t("paypal_qr_invalid_type"), variant: "destructive" });
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: t("error"), description: t("paypal_qr_too_large"), variant: "destructive" });
+      return;
+    }
+    setPaypalQrPreview(URL.createObjectURL(file));
+  };
+
   const onSubmitPaypal = async (values: PaypalForm) => {
+    if (!paypalQrFile && !existingPaypalQr) {
+      toast({ title: t("error"), description: t("paypal_qr_required"), variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     try {
+      const form = new FormData();
+      form.append("paypalEmail", values.paypalEmail.trim());
+      if (paypalQrFile) form.append("paypalQrImage", paypalQrFile);
       const res = await fetch(`${API_BASE_URL}/dashboard/payout/beneficiary/paypal`, {
         method: "PUT",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paypalEmail: values.paypalEmail.trim() }),
+        body: form,
       });
       if (!res.ok) {
         const err = await res.text();
         throw new Error(err || t("save_error"));
       }
+      setExistingPaypalQr(true);
+      setPaypalQrFile(null);
       toast({ title: t("saved"), description: t("paypal_saved_description") });
     } catch (e) {
       toast({
@@ -224,6 +269,56 @@ export default function PayoutBeneficiaryPage() {
                     </FormItem>
                   )}
                 />
+                <FormItem>
+                  <FormLabel>{t("paypal_qr_image")}</FormLabel>
+                  <div className="space-y-3">
+                    {paypalQrPreview ? (
+                      <div className="relative inline-block">
+                        <Image
+                          src={paypalQrPreview}
+                          alt=""
+                          width={200}
+                          height={200}
+                          unoptimized
+                          className="border-input max-h-[200px] rounded-lg border object-contain"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-7 w-7 rounded-full"
+                          onClick={() => {
+                            onPaypalQrSelect(null);
+                            setExistingPaypalQr(false);
+                            setPaypalQrPreview(null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : null}
+                    <div>
+                      <Input
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        className="hidden"
+                        id="paypal-qr-upload"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null;
+                          onPaypalQrSelect(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" asChild>
+                        <label htmlFor="paypal-qr-upload" className="cursor-pointer">
+                          <ImagePlus className="mr-2 h-4 w-4" />
+                          {paypalQrPreview ? t("paypal_qr_change") : t("paypal_qr_upload")}
+                        </label>
+                      </Button>
+                    </div>
+                    <p className="text-muted-foreground text-xs">{t("paypal_qr_hint")}</p>
+                  </div>
+                </FormItem>
                 <p className="text-muted-foreground text-xs">{t("paypal_hint")}</p>
                 <Button type="submit" disabled={isSaving}>
                   {isSaving ? t("saving") : t("save")}

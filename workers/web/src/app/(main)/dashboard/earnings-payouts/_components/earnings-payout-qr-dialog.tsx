@@ -28,6 +28,7 @@ interface EarningsPayoutQrDialogProps {
   hint: string;
   cancelLabel: string;
   paidLabel: string;
+  markingPaid?: boolean;
   onPaid: () => void;
 }
 
@@ -71,6 +72,7 @@ export function EarningsPayoutQrDialog({
   hint,
   cancelLabel,
   paidLabel,
+  markingPaid = false,
   onPaid,
 }: EarningsPayoutQrDialogProps) {
   const description = selectedItem
@@ -89,7 +91,13 @@ export function EarningsPayoutQrDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
-          <Button type="button" disabled={qrLoading || !!qrError || !qrSrc} onClick={onPaid}>
+          <Button
+            type="button"
+            className="gap-2"
+            disabled={qrLoading || markingPaid || !!qrError || !qrSrc}
+            onClick={onPaid}
+          >
+            {markingPaid ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             {paidLabel}
           </Button>
         </DialogFooter>

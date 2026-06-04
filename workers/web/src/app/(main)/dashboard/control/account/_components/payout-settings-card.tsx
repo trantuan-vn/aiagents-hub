@@ -32,6 +32,7 @@ type BeneficiaryPayload = {
   paypal?: {
     paypalEmail?: string;
     maskedEmail?: string;
+    hasPaypalQr?: boolean;
   } | null;
 };
 
@@ -44,7 +45,7 @@ function parseBeneficiaryState(
 } {
   if (currency === "USD") {
     const email = data.paypal?.maskedEmail ?? data.paypal?.paypalEmail;
-    if (!email) return { configured: false, summary: null };
+    if (!email || !data.paypal?.hasPaypalQr) return { configured: false, summary: null };
     return { configured: true, summary: `PayPal · ${email}` };
   }
   const accountNo = data.beneficiary?.accountNo;

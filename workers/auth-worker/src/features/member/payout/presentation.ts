@@ -11,6 +11,7 @@ import {
   maskPaypalEmail,
 } from './beneficiary-infrastructure';
 import { createPayoutEncryptionSecretGetter } from './crypto';
+import { paypalQrKeyToDataUrl, savePaypalQrToR2 } from './r2';
 
 export function createPayoutBeneficiaryRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -23,11 +24,19 @@ export function createPayoutBeneficiaryRoutes(bindingName: string) {
         userDO,
         createPayoutEncryptionSecretGetter(c.env),
       );
-      const [beneficiary, paypal] = await Promise.all([infra.get(), infra.getPaypal()]);
+      const [beneficiary, paypal, hasPaypalQr] = await Promise.all([
+        infra.get(),
+        infra.getPaypal(),
+        infra.getPaypalQrImageKey().then((k) => !!k),
+      ]);
       return c.json({
         beneficiary,
         paypal: paypal
-          ? { paypalEmail: paypal.paypalEmail, maskedEmail: maskPaypalEmail(paypal.paypalEmail) }
+          ? {
+              paypalEmail: paypal.paypalEmail,
+              maskedEmail: maskPaypalEmail(paypal.paypalEmail),
+              hasPaypalQr,
+            }
           : null,
       });
     } catch (e) {
@@ -53,21 +62,60 @@ export function createPayoutBeneficiaryRoutes(bindingName: string) {
     }
   });
 
-  app.put('/beneficiary/paypal', async (c) => {
+  app.get('/beneficiary/paypal/qr', async (c) => {
     try {
       const user = requireAuth(c);
-      const body = await c.req.json();
-      const data = PaypalPayoutBeneficiaryUpsertSchema.parse(body);
       const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
       const infra = createPayoutBeneficiaryInfrastructure(
         userDO,
         createPayoutEncryptionSecretGetter(c.env),
       );
-      const paypal = await infra.upsertPaypal(data);
+      const key = await infra.getPaypalQrImageKey();
+      if (!key) return c.json({ qr: null });
+      const qr = await paypalQrKeyToDataUrl(c.env, key);
+      return c.json({ qr });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load PayPal QR image');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.put('/beneficiary/paypal', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+      const infra = createPayoutBeneficiaryInfrastructure(
+        userDO,
+        createPayoutEncryptionSecretGetter(c.env),
+      );
+
+      const contentType = c.req.header('content-type') ?? '';
+      let data: { paypalEmail: string };
+      let qrImageKey: string | undefined;
+
+      if (contentType.includes('multipart/form-data')) {
+        const formData = await c.req.formData();
+        const email = String(formData.get('paypalEmail') ?? '').trim();
+        data = PaypalPayoutBeneficiaryUpsertSchema.parse({ paypalEmail: email });
+        const image = formData.get('paypalQrImage');
+        if (image instanceof File && image.size > 0) {
+          qrImageKey = await savePaypalQrToR2(c.env, user.identifier, image);
+        }
+      } else {
+        const body = await c.req.json();
+        data = PaypalPayoutBeneficiaryUpsertSchema.parse(body);
+      }
+
+      const paypal = await infra.upsertPaypal(
+        data,
+        qrImageKey !== undefined ? qrImageKey : undefined,
+      );
+      const hasPaypalQr = !!(qrImageKey ?? (await infra.getPaypalQrImageKey()));
       return c.json({
         paypal: {
           paypalEmail: paypal.paypalEmail,
           maskedEmail: maskPaypalEmail(paypal.paypalEmail),
+          hasPaypalQr,
         },
       });
     } catch (e) {

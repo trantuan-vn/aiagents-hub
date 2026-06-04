@@ -21,6 +21,8 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
   const [qrSrc, setQrSrc] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [qrMarkingPaid, setQrMarkingPaid] = useState(false);
+  const [qrMode, setQrMode] = useState<"vietqr" | "paypal">("vietqr");
   const [selectedItem, setSelectedItem] = useState<PayoutItem | null>(null);
   const [paypalOpen, setPaypalOpen] = useState(false);
   const [paypalLoading, setPaypalLoading] = useState(false);
@@ -42,7 +44,9 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
       bank_paid: t("bank_paid"),
       bank_unpaid: t("bank_unpaid"),
       show_qr: t("show_qr"),
+      show_paypal_qr: t("show_paypal_qr"),
       pay_usd: t("pay_usd"),
+      pay_usd_disabled_hint: t("pay_usd_disabled_hint"),
       payout_currency: t("payout_currency"),
       accruing_status: t("accruing_status"),
     }),
@@ -86,14 +90,19 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
     if (isAdmin) void fetchList();
   }, [fetchList, isAdmin]);
 
-  const openQr = async (item: PayoutItem) => {
+  const openQr = async (item: PayoutItem, mode: "vietqr" | "paypal" = "vietqr") => {
     setSelectedItem(item);
+    setQrMode(mode);
     setQrOpen(true);
     setQrLoading(true);
     setQrError(null);
     setQrSrc(null);
+    const endpoint =
+      mode === "paypal"
+        ? `${API_BASE_URL}/dashboard/admin/earnings-payouts/paypal-qr`
+        : `${API_BASE_URL}/dashboard/admin/earnings-payouts/qr`;
     try {
-      const res = await fetch(`${API_BASE_URL}/dashboard/admin/earnings-payouts/qr`, {
+      const res = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -149,9 +158,34 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
     }
   };
 
-  const handleQrPaid = () => {
-    setQrOpen(false);
-    void fetchList();
+  const handleQrPaid = async () => {
+    if (!selectedItem) return;
+    if (qrMode === "vietqr") {
+      setQrOpen(false);
+      void fetchList();
+      return;
+    }
+    setQrMarkingPaid(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/admin/earnings-payouts/mark-paid`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientUserId: selectedItem.recipientUserId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: t("mark_paid_success") });
+      setQrOpen(false);
+      void fetchList();
+    } catch (e) {
+      toast({
+        title: t("error"),
+        description: e instanceof Error ? e.message : t("mark_paid_error"),
+        variant: "destructive",
+      });
+    } finally {
+      setQrMarkingPaid(false);
+    }
   };
 
   const handlePaypalClose = (open: boolean) => {
@@ -175,7 +209,8 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
     accruingTableLabels,
     accruingTitle,
     fetchList,
-    openQr,
+    openQr: (item: PayoutItem) => void openQr(item, "vietqr"),
+    openPaypalQr: (item: PayoutItem) => void openQr(item, "paypal"),
     openPaypal,
     qr: {
       open: qrOpen,
@@ -183,8 +218,10 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
       src: qrSrc,
       loading: qrLoading,
       error: qrError,
+      mode: qrMode,
+      markingPaid: qrMarkingPaid,
       selectedItem,
-      onPaid: handleQrPaid,
+      onPaid: () => void handleQrPaid(),
     },
     paypal: {
       open: paypalOpen,

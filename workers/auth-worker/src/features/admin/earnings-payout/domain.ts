@@ -46,3 +46,7 @@ export const GeneratePayoutQrSchema = z.object({
 export const SendPaypalPayoutSchema = z.object({
   recipientUserId: z.string().min(1),
 });
+
+export const MarkPaypalQrPaidSchema = z.object({
+  recipientUserId: z.string().min(1),
+});
