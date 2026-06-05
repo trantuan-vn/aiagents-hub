@@ -26,6 +26,7 @@ export interface WorkflowCanvasUiValue {
   tidyLayout?: () => void;
   openAddNodeDrawer?: (options: WorkflowAddNodeDrawerOpenOptions) => void;
   closeAddNodeDrawer?: () => void;
+  openNodeConfig?: (nodeId: string) => void;
 }
 
 export const WorkflowCanvasUiContext = createContext<WorkflowCanvasUiValue | null>(null);

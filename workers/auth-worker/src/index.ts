@@ -24,6 +24,7 @@ import { createWorkflowRoutes } from './features/member/workflows/presentation';
 import { createWorkflowHookRoutes } from './features/member/workflows/hooks-presentation';
 import { runDueCronTriggers } from './features/member/workflows/triggers';
 import { createServiceRoutes } from './features/admin/service/presentation';
+import { createWorkflowNodeRoutes } from './features/admin/workflow-nodes/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
 import { createSystemConfigRoutes } from './features/admin/system-config/presentation';
@@ -88,6 +89,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));
+  routes.route('/dashboard/admin/workflow-nodes', createWorkflowNodeRoutes(bindingName));
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/membership-tier', createMembershipTierRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));

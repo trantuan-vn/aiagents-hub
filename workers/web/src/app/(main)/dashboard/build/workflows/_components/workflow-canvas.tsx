@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef, type MutableRefObject } from "react";
+import { memo, useCallback, useMemo, useRef, useState, type MutableRefObject } from "react";
 
 import { Background, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -22,6 +22,7 @@ import { toPersistedDefinition, type WorkflowDefinition } from "./workflow-defin
 import { WorkflowDeletableEdge } from "./workflow-deletable-edge";
 import { WorkflowEdgeMarkers } from "./workflow-edge-markers";
 import { WORKFLOW_EDGE_MARKER_END, WORKFLOW_EDGE_STYLE } from "./workflow-edge-utils";
+import { WorkflowNodeConfigPanel } from "./panels/node-config/workflow-node-config-panel";
 import { workflowNodeTypes } from "./workflow-nodes";
 
 export type { WorkflowDefinition };
@@ -173,6 +174,20 @@ function CanvasInnerWithDrawerUi({
   tidyWithFitRef: MutableRefObject<(() => void) | undefined>;
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
+  const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+
+  const onMenuActionWrapped = useCallback(
+    (nodeId: string, action: string) => {
+      if (action === "open") {
+        setConfigNodeId(nodeId);
+        return;
+      }
+      onNodeMenuAction(nodeId, action);
+    },
+    [onNodeMenuAction],
+  );
+
+  const configNode = configNodeId ? nodes.find((n) => n.id === configNodeId) : undefined;
 
   const uiValue = useMemo(
     () => ({
@@ -182,11 +197,12 @@ function CanvasInnerWithDrawerUi({
       deleteNode: readOnly ? undefined : deleteNodeById,
       patchNodeData: readOnly ? undefined : patchNodeDataById,
       toggleNodeActive: readOnly ? undefined : toggleNodeActive,
-      runNode: readOnly ? undefined : (nodeId: string) => onNodeMenuAction(nodeId, "execute_step"),
-      onNodeMenuAction: readOnly ? undefined : onNodeMenuAction,
+      runNode: readOnly ? undefined : (nodeId: string) => onMenuActionWrapped(nodeId, "execute_step"),
+      onNodeMenuAction: readOnly ? undefined : onMenuActionWrapped,
       tidyLayout: readOnly ? undefined : () => tidyWithFitRef.current?.(),
       openAddNodeDrawer: readOnly ? undefined : open,
       closeAddNodeDrawer: readOnly ? undefined : close,
+      openNodeConfig: readOnly ? undefined : (nodeId: string) => setConfigNodeId(nodeId),
     }),
     [
       readOnly,
@@ -195,7 +211,7 @@ function CanvasInnerWithDrawerUi({
       deleteNodeById,
       patchNodeDataById,
       toggleNodeActive,
-      onNodeMenuAction,
+      onMenuActionWrapped,
       open,
       close,
       tidyWithFitRef,
@@ -214,7 +230,16 @@ function CanvasInnerWithDrawerUi({
         tidyLayout={tidyLayout}
         onTidyWithFitReady={onTidyWithFitReady}
         onExecute={onExecute}
+        onNodeDoubleClick={readOnly ? undefined : (_, node) => setConfigNodeId(node.id)}
       />
+      {configNode && !readOnly ? (
+        <WorkflowNodeConfigPanel
+          node={configNode}
+          onClose={() => setConfigNodeId(null)}
+          onPatchData={patchNodeDataById}
+          onExecuteStep={(nodeId) => onMenuActionWrapped(nodeId, "execute_step")}
+        />
+      ) : null}
     </WorkflowCanvasUiContext.Provider>
   );
 }
@@ -229,6 +254,7 @@ const CanvasSurface = memo(function CanvasSurface({
   tidyLayout,
   onTidyWithFitReady,
   onExecute,
+  onNodeDoubleClick,
 }: {
   className?: string;
   themeMode: "light" | "dark" | "system";
@@ -239,6 +265,7 @@ const CanvasSurface = memo(function CanvasSurface({
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   onExecute?: () => void;
+  onNodeDoubleClick?: (event: React.MouseEvent, node: Node) => void;
 }) {
   const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
   const onPaneClick = useCallback(() => {
@@ -269,6 +296,7 @@ const CanvasSurface = memo(function CanvasSurface({
         proOptions={{ hideAttribution: true }}
         panOnScroll
         onPaneClick={onPaneClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         {...interactionProps}
       >
         <WorkflowCanvasInitialFit enabled={nodes.length > 0} />
