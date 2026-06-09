@@ -11,6 +11,7 @@ interface WorkflowEditorProps {
   onDefinitionChange?: (json: string) => void;
   readOnly?: boolean;
   serviceEndpoint?: string;
+  workflowId?: number;
   onExecute?: () => void;
   className?: string;
 }
@@ -32,6 +33,7 @@ export function WorkflowEditor({
   onDefinitionChange,
   readOnly = false,
   serviceEndpoint = "",
+  workflowId,
   onExecute,
   className,
 }: WorkflowEditorProps) {
@@ -52,6 +54,7 @@ export function WorkflowEditor({
       onChange={readOnly ? undefined : sync}
       readOnly={readOnly}
       serviceEndpoint={serviceEndpoint}
+      workflowId={workflowId}
       onExecute={onExecute}
     />
   );

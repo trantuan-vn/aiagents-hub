@@ -38,6 +38,7 @@ interface WorkflowCanvasProps {
   definitionSyncKey?: number;
   readOnly?: boolean;
   serviceEndpoint?: string;
+  workflowId?: number;
   onExecute?: () => void;
   className?: string;
 }
@@ -60,6 +61,7 @@ function CanvasInner({
   definitionSyncKey,
   readOnly,
   serviceEndpoint,
+  workflowId,
   onExecute,
   className,
 }: WorkflowCanvasProps) {
@@ -124,6 +126,7 @@ function CanvasInner({
       edges={edges}
       interactionProps={interactionProps}
       readOnly={readOnly}
+      workflowId={workflowId}
       tidyLayout={tidyLayout}
       onTidyWithFitReady={onTidyWithFitReady}
       onExecute={onExecute}
@@ -145,6 +148,7 @@ function CanvasInnerWithDrawerUi({
   edges,
   interactionProps,
   readOnly,
+  workflowId,
   tidyLayout,
   onTidyWithFitReady,
   onExecute,
@@ -162,6 +166,7 @@ function CanvasInnerWithDrawerUi({
   edges: Edge[];
   interactionProps: Record<string, unknown>;
   readOnly?: boolean;
+  workflowId?: number;
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   onExecute?: () => void;
@@ -235,6 +240,7 @@ function CanvasInnerWithDrawerUi({
       {configNode && !readOnly ? (
         <WorkflowNodeConfigPanel
           node={configNode}
+          workflowId={workflowId}
           onClose={() => setConfigNodeId(null)}
           onPatchData={patchNodeDataById}
           onExecuteStep={(nodeId) => onMenuActionWrapped(nodeId, "execute_step")}
@@ -324,6 +330,19 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
 }
 
+function webhookNodeDefaults(id: string, extra?: Record<string, unknown>): Record<string, unknown> {
+  const isWebhook = extra?.coreKind === "webhook" || extra?.triggerKind === "webhook";
+  if (!isWebhook) return {};
+  const path = id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 36);
+  return {
+    httpMethod: "GET",
+    webhookPath: path || id,
+    webhookAuth: "none",
+    webhookRespond: "immediately",
+    webhookTriggerMode: "workflow_active",
+  };
+}
+
 export function addNodeToDefinition(
   def: WorkflowDefinition,
   type: string,
@@ -335,7 +354,7 @@ export function addNodeToDefinition(
     id,
     type,
     position: { x: 120 + def.nodes.length * 40, y: 80 + def.nodes.length * 30 },
-    data: { label, ...extraData },
+    data: { label, ...webhookNodeDefaults(id, extraData), ...extraData },
   };
   return { ...def, nodes: [...def.nodes, node] };
 }

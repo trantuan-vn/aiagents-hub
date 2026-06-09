@@ -14,6 +14,8 @@ export type CreateConnectedNodeArgs = {
   type: string;
   label: string;
   resourceHandle?: WorkflowHandleId;
+  /** Source handle when connecting from a branch output (true/false/case_N). */
+  sourceHandle?: WorkflowHandleId;
   extraData?: Record<string, unknown>;
 };
 
@@ -27,7 +29,7 @@ function buildExtraData(
     return { serviceEndpoint, memoryCollection: "vectorize-default", tools: [] };
   }
   if (type === "service_node" && serviceEndpoint) {
-    return { serviceEndpoint, catalogId: serviceEndpoint };
+    return { endpoint: serviceEndpoint, serviceEndpoint, catalogId: serviceEndpoint };
   }
   return undefined;
 }
@@ -66,6 +68,7 @@ function buildFlowPlacement(
   fromNode: Node,
   side: ConnectedNodeSide,
   newId: string,
+  sourceHandle: WorkflowHandleId = "out",
 ): { position: { x: number; y: number }; connection: Connection } {
   const position =
     side === "right"
@@ -73,7 +76,7 @@ function buildFlowPlacement(
       : { x: fromNode.position.x - WORKFLOW_CONNECT_OFFSET_X, y: fromNode.position.y };
   const connection: Connection =
     side === "right"
-      ? { source: fromNode.id, sourceHandle: "out", target: newId, targetHandle: "in" }
+      ? { source: fromNode.id, sourceHandle, target: newId, targetHandle: "in" }
       : { source: newId, sourceHandle: "out", target: fromNode.id, targetHandle: "in" };
   return { position, connection };
 }
@@ -96,7 +99,7 @@ export function applyCreateConnectedNode(
     position = resource.position;
     conn = { ...resource.connection, source: newId };
   } else if (args.side === "left" || args.side === "right") {
-    const flow = buildFlowPlacement(fromNode, args.side, newId);
+    const flow = buildFlowPlacement(fromNode, args.side, newId, args.sourceHandle ?? "out");
     position = flow.position;
     conn = flow.connection;
   } else {

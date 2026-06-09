@@ -114,6 +114,7 @@ export default function ViewSharedWorkflowPage() {
         onExecute={() => setExecuteOpen(true)}
       >
         <WorkflowEditor
+          workflowId={id}
           definitionJson={view.definition}
           readOnly
           onExecute={() => setExecuteOpen(true)}

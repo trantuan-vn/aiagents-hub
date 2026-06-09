@@ -1,8 +1,24 @@
 import type { Connection, Edge, Node } from "@xyflow/react";
 
-export type WorkflowHandleId = "in" | "out" | "service" | "memory" | "tools";
+export type WorkflowHandleId =
+  | "in"
+  | "out"
+  | "service"
+  | "memory"
+  | "tools"
+  | "true"
+  | "false"
+  | "default"
+  | `case_${number}`;
 
 const RESOURCE_HANDLES = new Set<WorkflowHandleId>(["service", "memory", "tools"]);
+
+const BRANCH_SOURCE_HANDLES = new Set<string>(["out", "true", "false", "default"]);
+
+function isBranchSourceHandle(handle: string): boolean {
+  if (BRANCH_SOURCE_HANDLES.has(handle)) return true;
+  return /^case_\d+$/.test(handle);
+}
 
 const SINGLE_CONNECTION_HANDLES = new Set<WorkflowHandleId>(["service", "memory"]);
 
@@ -70,6 +86,10 @@ function parseWorkflowConnectionHandles(
   const targetHandle = connection.targetHandle ?? null;
   if (!sourceHandle || !targetHandle) return null;
   if (sourceHandle === "out" && targetHandle === "in") return { kind: "flow" };
+  if (sourceHandle === "true" && targetHandle === "in") return { kind: "flow" };
+  if (sourceHandle === "false" && targetHandle === "in") return { kind: "flow" };
+  if (sourceHandle === "default" && targetHandle === "in") return { kind: "flow" };
+  if (/^case_\d+$/.test(sourceHandle) && targetHandle === "in") return { kind: "flow" };
   if (sourceHandle !== targetHandle) return null;
   if (!RESOURCE_HANDLES.has(sourceHandle as WorkflowHandleId)) return null;
   return { kind: "resource", handle: sourceHandle as WorkflowHandleId };
@@ -108,6 +128,14 @@ export function isValidWorkflowConnection(
   if (!parsed) return false;
   if (parsed.kind === "flow") return true;
   return isValidResourceWorkflowConnection(connection, parsed.handle, edges, nodes);
+}
+
+/** Data-flow edge (main or branch), excluding resource wiring. */
+export function isDataFlowEdge(edge: Pick<Edge, "sourceHandle" | "targetHandle">): boolean {
+  const targetHandle = edge.targetHandle ?? "in";
+  if (targetHandle !== "in") return false;
+  const sourceHandle = edge.sourceHandle ?? "out";
+  return isBranchSourceHandle(sourceHandle);
 }
 
 function handleMatchesId(

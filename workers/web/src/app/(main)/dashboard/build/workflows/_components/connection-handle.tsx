@@ -28,6 +28,8 @@ interface ConnectionHandleProps {
   allowedNodeTypes?: string[];
   allowMultipleConnections?: boolean;
   required?: boolean;
+  /** Override React Flow handle anchor (e.g. split true/false vertically). */
+  handleStyle?: React.CSSProperties;
 }
 
 function useConnectionHandleModel({
@@ -71,6 +73,7 @@ function useConnectionHandleModel({
           side,
           type: nodeType,
           label: nodeLabel,
+          sourceHandle: handleId === "in" ? undefined : handleId,
           extraData: extra,
         });
       }

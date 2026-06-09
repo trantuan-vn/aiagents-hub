@@ -349,6 +349,7 @@ export default function EditWorkflowPage() {
         }}
       >
         <WorkflowEditor
+          workflowId={id}
           definitionJson={definition}
           definitionSyncKey={definitionSyncKey}
           onDefinitionChange={(json) => recordAndSet("definition", json)}

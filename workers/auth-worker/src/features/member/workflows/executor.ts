@@ -18,6 +18,21 @@ import {
   updateExecution,
 } from './execution-store.js';
 import { resolveCredential } from './credentials.js';
+import {
+  activeHandlesForNode,
+  isEdgeActiveForBranches,
+} from './flow-helpers.js';
+import {
+  gatherMainFlowInputs,
+  getIncomingDataFlowEdges,
+  getOutgoingDataFlowEdges,
+  getWorkflowEntryNodeIds,
+  isMergeFlowNode,
+  isNonExecutableNodeType,
+  mergeMode,
+  mergeParentsReady,
+  resolveAgentResources,
+} from './graph-helpers.js';
 import { runCodeNode, runHttpRequest } from './node-runtime.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
@@ -76,13 +91,20 @@ interface EngineMeta {
 
 /** Serializable engine snapshot persisted between requests for durable resume. */
 interface EngineState {
-  order: string[];
-  cursor: number;
+  /** Nodes ready to run (graph traversal). */
+  queue: string[];
+  /** Completed node ids. */
+  visited: string[];
+  /** Nodes skipped (inactive branch). */
+  skipped: string[];
   outputs: Record<string, NodeOutput>;
   steps: ExecutionStepLog[];
   runContext: NodeOutput;
   totalCostVnd: number;
   finalOutput?: unknown;
+  /** @deprecated legacy linear runs — migrated on resume */
+  order?: string[];
+  cursor?: number;
 }
 
 interface PersistedState {
@@ -102,62 +124,8 @@ export interface HumanDecision {
 }
 
 // ---------------------------------------------------------------------------
-// Graph helpers
+// Graph helpers — main-flow vs resource edges (see graph-helpers.ts)
 // ---------------------------------------------------------------------------
-
-function topologicalOrder(definition: WorkflowDefinition): string[] {
-  const { nodes, edges } = definition;
-  const ids = nodes.map((n) => n.id);
-  const inDegree = new Map<string, number>();
-  const adj = new Map<string, string[]>();
-
-  for (const id of ids) {
-    inDegree.set(id, 0);
-    adj.set(id, []);
-  }
-  for (const e of edges) {
-    if (!adj.has(e.source) || !inDegree.has(e.target)) continue;
-    adj.get(e.source)!.push(e.target);
-    inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
-  }
-
-  const queue = ids.filter((id) => (inDegree.get(id) ?? 0) === 0);
-  const order: string[] = [];
-  while (queue.length) {
-    const id = queue.shift()!;
-    order.push(id);
-    for (const next of adj.get(id) ?? []) {
-      const d = (inDegree.get(next) ?? 1) - 1;
-      inDegree.set(next, d);
-      if (d === 0) queue.push(next);
-    }
-  }
-
-  if (order.length < ids.length) {
-    for (const id of ids) {
-      if (!order.includes(id)) order.push(id);
-    }
-  }
-  return order;
-}
-
-function gatherInputs(
-  nodeId: string,
-  edges: WorkflowDefinition['edges'],
-  outputs: Record<string, NodeOutput>,
-): NodeOutput {
-  const parents = edges.filter((e) => e.target === nodeId).map((e) => e.source);
-  if (!parents.length) return {};
-  const merged: NodeOutput = { parents: {} as Record<string, NodeOutput> };
-  const parentMap = merged.parents as Record<string, NodeOutput>;
-  for (const p of parents) {
-    parentMap[p] = outputs[p] ?? {};
-  }
-  const last = outputs[parents[parents.length - 1]];
-  if (last?.text) merged.text = last.text;
-  if (last?.data) merged.data = last.data;
-  return merged;
-}
 
 async function queryVectorMemory(
   env: Env,
@@ -243,6 +211,8 @@ interface NodeContext {
   input?: string;
   requestMeta?: { userAgent?: string; ipAddress?: string };
   runContext: NodeOutput;
+  definition: WorkflowDefinition;
+  outputs: Record<string, NodeOutput>;
 }
 
 async function executeNodeLogic(
@@ -260,7 +230,7 @@ async function executeNodeLogic(
 
   switch (node.type) {
     case 'trigger':
-      return { ...ctx.runContext, triggeredAt: Date.now(), text: ctx.input ?? '' };
+      return { ...ctx.runContext, triggeredAt: Date.now(), text: ctx.input ?? '', data: nodeInput.data };
 
     case 'http_request': {
       const credentialKey = String(data.credentialId ?? data.credentialKey ?? '');
@@ -277,30 +247,50 @@ async function executeNodeLogic(
       return { status: result.status, ok: result.ok, headers: result.headers, data: result.body, text };
     }
 
-    case 'code':
-      return { ...runCodeNode(data, scope) };
+    case 'code': {
+      const codeData = {
+        ...data,
+        template: data.template ?? data.code ?? data.expression ?? '',
+      };
+      return { ...runCodeNode(codeData, scope) };
+    }
 
     case 'agent': {
-      const endpoint = String(data.serviceEndpoint ?? data.endpoint ?? '').trim();
-      if (!endpoint) throw new Error('Agent node missing serviceEndpoint');
+      const linked = resolveAgentResources(ctx.definition, node.id);
+      const endpoint = String(
+        linked.serviceEndpoint ?? data.serviceEndpoint ?? data.endpoint ?? '',
+      ).trim();
+      if (!endpoint) throw new Error('Agent node missing serviceEndpoint (connect a service node or pick a service)');
 
       await ensureWalletBalance(ctx.userDO);
       const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
       const modelId = getModelForService(service);
 
+      const promptSource = String(data.promptSource ?? 'define_below');
       const userText =
-        String(nodeInput.text ?? ctx.input ?? '') || JSON.stringify(nodeInput);
+        promptSource === 'from_input'
+          ? String(nodeInput.text ?? ctx.input ?? '') || JSON.stringify(nodeInput)
+          : String(data.prompt ?? nodeInput.text ?? ctx.input ?? '') || JSON.stringify(nodeInput);
 
-      const memorySnippets = data.memoryCollection
-        ? await queryVectorMemory(ctx.c.env, String(data.memoryCollection), userText)
-        : [];
+      const memoryCollection = String(
+        data.memoryCollection ?? linked.memoryCollection ?? '',
+      ).trim();
+      const memorySnippets =
+        memoryCollection && linked.memoryKind !== 'r2' && linked.memoryKind !== 'd1'
+          ? await queryVectorMemory(ctx.c.env, memoryCollection, userText)
+          : [];
+
+      const toolList =
+        Array.isArray(data.tools) && data.tools.length
+          ? (data.tools as unknown[])
+          : linked.tools;
 
       const systemParts = [
-        String(data.systemPrompt ?? data.prompt ?? ''),
+        String(data.systemPrompt ?? ''),
         ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
         memorySnippets.length ? `Relevant memory:\n${memorySnippets.join('\n')}` : '',
-        Array.isArray(data.tools) && data.tools.length
-          ? `Available tools (configure in service): ${JSON.stringify(data.tools)}`
+        toolList.length
+          ? `Available tools (configure in service): ${JSON.stringify(toolList)}`
           : '',
       ].filter(Boolean);
 
@@ -331,8 +321,22 @@ async function executeNodeLogic(
       return { text, raw: aiResponse, endpoint };
     }
 
-    case 'flow':
-      return { ...nodeInput, passthrough: true };
+    case 'flow': {
+      const flowKind = String(data.flowKind ?? 'if');
+      if (flowKind === 'merge') {
+        const merged = gatherMainFlowInputs(node.id, ctx.definition.edges, ctx.outputs);
+        return { ...merged, merged: true, flowKind: 'merge' };
+      }
+      const branches = activeHandlesForNode(node, nodeInput, scope);
+      const conditionResult = flowKind === 'if' ? branches.has('true') : undefined;
+      return {
+        ...nodeInput,
+        flowKind,
+        conditionResult,
+        activeBranches: [...branches],
+        filtered: flowKind === 'filter' ? branches.has('out') : undefined,
+      };
+    }
 
     case 'core': {
       const op = String(data.operation ?? 'identity');
@@ -348,8 +352,9 @@ async function executeNodeLogic(
     case 'action_in_app':
       return {
         ...nodeInput,
-        action: String(data.action ?? 'noop'),
-        result: `Action "${data.action ?? 'noop'}" recorded (extensible)`,
+        action: String(data.actionId ?? data.action ?? 'noop'),
+        integrationId: data.integrationId,
+        result: `Action "${data.actionId ?? data.action ?? 'noop'}" recorded (extensible)`,
       };
 
     case 'data_transformation': {
@@ -388,6 +393,80 @@ interface RunEngineResult {
   pendingNodeId?: string;
 }
 
+function migrateEngineState(engine: EngineState, definition: WorkflowDefinition): void {
+  engine.visited = engine.visited ?? engine.steps?.map((s) => s.nodeId) ?? [];
+  engine.skipped = engine.skipped ?? [];
+  if (engine.queue?.length) return;
+  if (engine.order?.length && engine.cursor != null) {
+    const remaining = engine.order.slice(engine.cursor);
+    engine.queue = remaining.filter((id) => !engine.visited.includes(id));
+    return;
+  }
+  engine.queue = getWorkflowEntryNodeIds(definition);
+  engine.visited = engine.visited ?? [];
+  engine.skipped = engine.skipped ?? [];
+}
+
+function enqueueNode(engine: EngineState, nodeId: string): void {
+  if (engine.visited.includes(nodeId)) return;
+  if (engine.skipped.includes(nodeId)) return;
+  if (engine.queue.includes(nodeId)) return;
+  engine.queue.push(nodeId);
+}
+
+function mergeCanRun(
+  nodeId: string,
+  definition: WorkflowDefinition,
+  engine: EngineState,
+): boolean {
+  const parents = getIncomingDataFlowEdges(definition, nodeId).map((e) => e.source);
+  if (!parents.length) return true;
+  return parents.every(
+    (p) => engine.outputs[p] !== undefined || engine.skipped.includes(p),
+  );
+}
+
+function scheduleDownstream(
+  definition: WorkflowDefinition,
+  sourceNode: WorkflowDefinition['nodes'][number],
+  sourceOutput: NodeOutput,
+  scope: Record<string, unknown>,
+  engine: EngineState,
+  nodeById: Map<string, WorkflowDefinition['nodes'][number]>,
+): void {
+  const activeHandles = activeHandlesForNode(sourceNode, sourceOutput, {
+    ...scope,
+    ...sourceOutput,
+  });
+
+  const outgoing = getOutgoingDataFlowEdges(definition, sourceNode.id);
+
+  for (const edge of outgoing) {
+    const handle = edge.sourceHandle ?? 'out';
+    const active = isEdgeActiveForBranches(handle, activeHandles, sourceNode.type);
+
+    if (!active) {
+      continue;
+    }
+
+    const target = nodeById.get(edge.target);
+    if (!target || isNonExecutableNodeType(target.type)) continue;
+
+    if (isMergeFlowNode(target)) {
+      const mode = mergeMode(target);
+      if (mode === 'wait_all') {
+        if (mergeCanRun(target.id, definition, engine)) {
+          enqueueNode(engine, target.id);
+        }
+      } else {
+        enqueueNode(engine, target.id);
+      }
+    } else {
+      enqueueNode(engine, target.id);
+    }
+  }
+}
+
 /**
  * Core loop. Advances `persisted.engine` from its current cursor until the
  * workflow completes, fails, or pauses for human review. Mutates the engine
@@ -417,17 +496,32 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     input: persisted.input,
     requestMeta: persisted.requestMeta,
     runContext: engine.runContext,
+    definition,
+    outputs: engine.outputs,
   };
 
-  while (engine.cursor < engine.order.length) {
-    const nodeId = engine.order[engine.cursor];
+  migrateEngineState(engine, definition);
+
+  while (engine.queue.length > 0) {
+    const nodeId = engine.queue.shift()!;
+    if (engine.visited.includes(nodeId) || engine.skipped.includes(nodeId)) continue;
+
     const node = nodeById.get(nodeId);
-    if (!node) {
-      engine.cursor += 1;
+    if (!node || isNonExecutableNodeType(node.type)) {
+      engine.visited.push(nodeId);
       continue;
     }
 
-    const nodeInput = gatherInputs(nodeId, definition.edges, engine.outputs);
+    if (isMergeFlowNode(node) && mergeMode(node) === 'wait_all' && !mergeCanRun(nodeId, definition, engine)) {
+      if (engine.queue.length === 0) {
+        engine.skipped.push(nodeId);
+        continue;
+      }
+      engine.queue.push(nodeId);
+      continue;
+    }
+
+    const nodeInput = gatherMainFlowInputs(nodeId, definition.edges, engine.outputs);
     const started = Date.now();
     const log: ExecutionStepLog = {
       nodeId,
@@ -474,7 +568,11 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
-      engine.cursor += 1;
+      engine.visited.push(nodeId);
+      scheduleDownstream(definition, node, out, {
+        input: persisted.input ?? '',
+        variables: engine.runContext.variables ?? {},
+      }, engine, nodeById);
       continue;
     }
 
@@ -493,7 +591,11 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
-      engine.cursor += 1;
+      engine.visited.push(nodeId);
+      scheduleDownstream(definition, node, out, {
+        input: persisted.input ?? '',
+        variables: engine.runContext.variables ?? {},
+      }, engine, nodeById);
     } catch (e) {
       log.status = 'error';
       log.error = e instanceof Error ? e.message : String(e);
@@ -565,8 +667,9 @@ export async function executeWorkflowGraph(
     autoApproveHumanReview: autoApproveHumanReview ?? false,
     requestMeta: params.requestMeta,
     engine: {
-      order: topologicalOrder(definition),
-      cursor: 0,
+      queue: getWorkflowEntryNodeIds(definition),
+      visited: [],
+      skipped: [],
       outputs: {},
       steps: [],
       runContext: {
