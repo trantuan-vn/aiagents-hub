@@ -6,7 +6,6 @@ import type { Node } from "@xyflow/react";
 import {
   ChevronDown,
   Copy,
-  ExternalLink,
   MoreVertical,
   Pencil,
   Webhook,
@@ -27,6 +26,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { listWorkflowTriggers } from "../../../_lib/api";
+
+import { WebhookEditOutputPanel } from "./webhook-edit-output-panel";
+import { WebhookListeningPanel } from "./webhook-listening-panel";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
@@ -126,6 +128,7 @@ export function WebhookNodeConfigPanel({
   const [urlsOpen, setUrlsOpen] = useState(true);
   const [productionUrl, setProductionUrl] = useState<string | undefined>();
   const [listening, setListening] = useState(false);
+  const [editingOutput, setEditingOutput] = useState(false);
 
   useEffect(() => {
     if (!workflowId || isNaN(workflowId)) return;
@@ -185,14 +188,24 @@ export function WebhookNodeConfigPanel({
     }
   };
 
-  const listenForTest = () => {
-    setListening(true);
-    toast.message(t("webhook_listening"));
-    window.setTimeout(() => setListening(false), 30_000);
-  };
+  const listenForTest = () => setListening(true);
+  const stopListening = () => setListening(false);
 
-  const output = nodeData._output as Record<string, unknown> | undefined;
-  const hasOutput = output && Object.keys(output).length > 0;
+  const outputPinned = !!nodeData._outputPinned;
+  const output = nodeData._output;
+  const hasOutput =
+    outputPinned &&
+    output != null &&
+    (Array.isArray(output) ? output.length > 0 : typeof output === "object" && Object.keys(output as object).length > 0);
+
+  const openEditOutput = () => setEditingOutput(true);
+
+  const cancelEditOutput = () => {
+    setEditingOutput(false);
+    if (!outputPinned) {
+      patch({ _output: undefined, _outputPinned: false });
+    }
+  };
 
   return (
     <div className="bg-background absolute inset-0 z-50 flex flex-col">
@@ -204,22 +217,6 @@ export function WebhookNodeConfigPanel({
           <h2 className="text-sm font-semibold">{String(nodeData.label ?? te("core_kind_webhook"))}</h2>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground h-8 gap-1.5 text-xs"
-            asChild
-          >
-            <a
-              href="https://docs.n8n.io/integrations/builtin/core-nodes/n8n-nodes-base.webhook/"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t("webhook_docs")}
-              <ExternalLink className="size-3" />
-            </a>
-          </Button>
           <Button type="button" variant="ghost" size="icon" className="size-8" onClick={onClose} aria-label={t("close")}>
             <span className="sr-only">{t("close")}</span>
             <span className="text-lg leading-none">&times;</span>
@@ -230,34 +227,36 @@ export function WebhookNodeConfigPanel({
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
         {/* Left — listen / preview */}
         <div className="flex min-h-0 flex-col border-r">
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-            <p className="text-sm font-medium">{t("webhook_pull_events")}</p>
-            <Button
-              type="button"
-              className={cn(ORANGE, "text-white", listening && "opacity-80")}
-              onClick={listenForTest}
-            >
-              <Zap className="mr-2 size-4" />
-              {listening ? t("webhook_listening") : t("webhook_listen_test")}
-            </Button>
-          </div>
-          <div className="border-t p-4">
-            <p className="text-muted-foreground mb-3 text-[11px] leading-relaxed">
-              {t("webhook_production_hint")}
-            </p>
-            <div className="space-y-1.5">
-              <Label className="text-xs">{t("webhook_trigger_when")}</Label>
-              <Select value={triggerMode} onValueChange={(v) => patch({ webhookTriggerMode: v })}>
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="workflow_active">{t("webhook_trigger_workflow_active")}</SelectItem>
-                  <SelectItem value="always">{t("webhook_trigger_always")}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {listening ? (
+            <WebhookListeningPanel httpMethod={httpMethod} testUrl={testUrl} onStop={stopListening} />
+          ) : (
+            <>
+              <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+                <p className="text-sm font-medium">{t("webhook_pull_events")}</p>
+                <Button type="button" className={cn(ORANGE, "text-white")} onClick={listenForTest}>
+                  <Zap className="mr-2 size-4" />
+                  {t("webhook_listen_test")}
+                </Button>
+              </div>
+              <div className="border-t p-4">
+                <p className="text-muted-foreground mb-3 text-[11px] leading-relaxed">
+                  {t("webhook_production_hint")}
+                </p>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">{t("webhook_trigger_when")}</Label>
+                  <Select value={triggerMode} onValueChange={(v) => patch({ webhookTriggerMode: v })}>
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="workflow_active">{t("webhook_trigger_workflow_active")}</SelectItem>
+                      <SelectItem value="always">{t("webhook_trigger_always")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Middle — parameters */}
@@ -556,43 +555,63 @@ export function WebhookNodeConfigPanel({
 
         {/* Right — output */}
         <div className="flex min-h-0 flex-col">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              {t("section_output")}
-            </h3>
-            <Button type="button" variant="ghost" size="icon" className="size-7" aria-label={t("webhook_edit_output")}>
-              <Pencil className="size-3.5" />
-            </Button>
-          </div>
-
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-            {hasOutput ? (
-              <pre className="max-h-full w-full overflow-auto rounded-md border p-3 text-left font-mono text-xs">
-                {JSON.stringify(output, null, 2)}
-              </pre>
-            ) : (
-              <>
-                <Zap className="text-muted-foreground/50 size-10" />
-                <p className="text-muted-foreground text-sm">{t("webhook_no_trigger_output")}</p>
-                {onExecuteStep ? (
-                  <Button
-                    type="button"
-                    className={cn(ORANGE, "text-white")}
-                    onClick={() => onExecuteStep(node.id)}
-                  >
-                    {t("webhook_test_trigger")}
-                  </Button>
-                ) : null}
-                <button
+          {editingOutput ? (
+            <WebhookEditOutputPanel
+              initialOutput={outputPinned ? output : undefined}
+              onCancel={cancelEditOutput}
+              onSave={(parsed) => {
+                patch({ _output: parsed, _outputPinned: true });
+                setEditingOutput(false);
+              }}
+            />
+          ) : (
+            <>
+              <div className="flex items-center justify-between border-b px-3 py-2">
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                  {t("section_output")}
+                </h3>
+                <Button
                   type="button"
-                  className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-                  onClick={() => patch({ _output: { body: {}, headers: {}, query: {} } })}
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  aria-label={t("webhook_edit_output")}
+                  onClick={openEditOutput}
                 >
-                  {t("webhook_set_mock_data")}
-                </button>
-              </>
-            )}
-          </div>
+                  <Pencil className="size-3.5" />
+                </Button>
+              </div>
+
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                {hasOutput ? (
+                  <pre className="max-h-full w-full overflow-auto rounded-md border p-3 text-left font-mono text-xs">
+                    {JSON.stringify(output, null, 2)}
+                  </pre>
+                ) : (
+                  <>
+                    <Zap className="text-muted-foreground/50 size-10" />
+                    <p className="text-muted-foreground text-sm">{t("webhook_no_trigger_output")}</p>
+                    {onExecuteStep ? (
+                      <Button
+                        type="button"
+                        className={cn(ORANGE, "text-white")}
+                        onClick={() => onExecuteStep(node.id)}
+                      >
+                        {t("webhook_test_trigger")}
+                      </Button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+                      onClick={openEditOutput}
+                    >
+                      {t("webhook_set_mock_data")}
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
