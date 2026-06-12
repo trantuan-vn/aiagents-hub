@@ -25,9 +25,6 @@ const ADMIN_MANAGEMENT_PREFIXES = [
   "/dashboard/policy",
   "/dashboard/user-groups",
   "/dashboard/workflow/services",
-  "/dashboard/workflow/nodes",
-  "/dashboard/workflow/tools",
-  "/dashboard/workflow/memory",
 ] as const;
 
 export function isSensitiveDashboardPath(pathname: string, role?: "member" | "admin"): boolean {

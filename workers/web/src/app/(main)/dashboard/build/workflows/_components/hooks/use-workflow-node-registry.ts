@@ -1,50 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import {
-  DEFAULT_WORKFLOW_NODE_REGISTRY,
-  fetchWorkflowNodeRegistry,
-  type WorkflowNodeRegistry,
-} from "@/lib/workflow-node-registry";
-
-let cachedRegistry: WorkflowNodeRegistry | null = null;
-let inflight: Promise<WorkflowNodeRegistry> | null = null;
-
-export function prefetchWorkflowNodeRegistry(): Promise<WorkflowNodeRegistry> {
-  if (cachedRegistry) return Promise.resolve(cachedRegistry);
-  if (inflight) return inflight;
-  inflight = fetchWorkflowNodeRegistry()
-    .then((registry) => {
-      cachedRegistry = registry;
-      return registry;
-    })
-    .finally(() => {
-      inflight = null;
-    });
-  return inflight;
-}
+import { DEFAULT_WORKFLOW_NODE_REGISTRY, type WorkflowNodeRegistry } from "@/lib/workflow-node-registry";
 
 export function useWorkflowNodeRegistry() {
-  const [registry, setRegistry] = useState<WorkflowNodeRegistry>(cachedRegistry ?? DEFAULT_WORKFLOW_NODE_REGISTRY);
-  const [loading, setLoading] = useState(!cachedRegistry);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefetchWorkflowNodeRegistry().then((r) => {
-      if (!cancelled) {
-        setRegistry(r);
-        setLoading(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return { registry, loading };
+  return { registry: DEFAULT_WORKFLOW_NODE_REGISTRY, loading: false };
 }
 
-export function invalidateWorkflowNodeRegistryCache() {
-  cachedRegistry = null;
+export function prefetchWorkflowNodeRegistry(): Promise<WorkflowNodeRegistry> {
+  return Promise.resolve(DEFAULT_WORKFLOW_NODE_REGISTRY);
 }

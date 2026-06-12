@@ -75,9 +75,3 @@ export type WorkflowNodeRegistry = {
   nodes: WorkflowNodeDefinition[];
   updatedAt?: string;
 };
-
-export type CreateWorkflowNodeInput = Omit<WorkflowNodeDefinition, "createdAt" | "updatedAt" | "isBuiltin"> & {
-  isBuiltin?: boolean;
-};
-
-export type UpdateWorkflowNodeInput = Partial<Omit<WorkflowNodeDefinition, "id" | "isBuiltin" | "createdAt">>;

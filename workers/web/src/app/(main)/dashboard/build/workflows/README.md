@@ -1,36 +1,24 @@
 # Workflow — Kiến trúc & Hướng dẫn bảo trì
 
-Tài liệu mô tả giải pháp workflow của AIAgentsHub: builder (React Flow), **Node Registry** (schema-driven), admin quản lý node, và API backend.
+Tài liệu mô tả giải pháp workflow của AIAgentsHub: builder (React Flow), **Node Registry** (schema-driven tĩnh trên frontend), và API backend.
 
 ## Tổng quan
-
-Hệ thống gồm **hai khu vực UI** và **một nguồn sự thật** cho định nghĩa node:
 
 | Khu vực | Route | Vai trò |
 |---------|-------|---------|
 | **Workflow Builder** | `/dashboard/build/workflows` | Soạn thảo graph, chạy workflow, chat agent |
-| **Workflow Admin** | `/dashboard/workflow/nodes` | Admin CRUD + thiết kế trường Input / Parameters / Output |
-| **Node Registry** | API + KV | Lưu override admin, merge với defaults |
+| **Service Management** | `/dashboard/workflow/services` | Admin CRUD dịch vụ API |
+| **Node Registry** | `lib/workflow-node-registry` | Schema built-in cho config panel (frontend) |
 
 ```mermaid
 flowchart LR
-  subgraph Admin
-    A["/dashboard/workflow/nodes"]
-  end
-  subgraph API
-    B["auth-worker\n/dashboard/admin/workflow-nodes"]
-    C["SYSTEM_CONFIG_KV"]
-  end
   subgraph Builder
     D["Workflow Editor"]
     E["Node Config Panel\n3 cột"]
   end
   subgraph Lib
-    F["lib/workflow-node-registry"]
+    F["lib/workflow-node-registry\ndefault-nodes.ts"]
   end
-  A --> B
-  B --> C
-  B --> F
   F --> D
   D --> E
 ```
@@ -60,64 +48,15 @@ Mỗi node trong registry có **3 phần** (theo phong cách n8n):
 | `options-group` | Nhóm tham số tuỳ chọn |
 | `resource-link` | Liên kết resource trên canvas (service / memory / tools) |
 
-### Node built-in vs custom
+### Node built-in
 
-- **Built-in** (`isBuiltin: true`): 12 node mặc định (agent, trigger, flow, core, …). Admin **không xoá** được, chỉ **mở rộng thêm trường** hoặc **tắt** (`isActive: false`).
-- **Custom** (`isBuiltin: false`): Admin tạo mới hoàn toàn, có thể xoá.
+- **Built-in** (`isBuiltin: true`): node mặc định (agent, trigger, flow, core, …) định nghĩa trong `default-nodes.ts`.
 
 Schema TypeScript: `workers/web/src/lib/workflow-node-registry/types.ts`
 
 Defaults: `workers/web/src/lib/workflow-node-registry/default-nodes.ts`
 
 **Agent node** có schema đầy đủ (prompt source, prompt fx, toggles, Chat Model / Memory / Tools) — tham chiếu layout n8n AI Agent.
-
-## API Backend
-
-**Worker:** `workers/auth-worker`  
-**Route prefix:** `/dashboard/admin/workflow-nodes`  
-**Lưu trữ:** `SYSTEM_CONFIG_KV`, key `aiagents-hub-workflow-node-registry`
-
-| Method | Path | Quyền | Mô tả |
-|--------|------|-------|--------|
-| `GET` | `/` | Auth (mọi user) | Lấy registry đã merge defaults + overrides |
-| `POST` | `/` | Admin | Tạo node custom |
-| `PUT` | `/:id` | Admin | Cập nhật node (built-in → lưu override) |
-| `DELETE` | `/:id` | Admin | Xoá node custom |
-
-Code backend:
-
-```
-workers/auth-worker/src/features/admin/workflow-nodes/
-├── domain.ts          # Zod schema
-├── default-nodes.ts   # Defaults (mirror frontend)
-├── infrastructure.ts  # KV load/save + merge
-├── application.ts     # CRUD logic
-└── presentation.ts    # Hono routes
-```
-
-Đăng ký route trong `workers/auth-worker/src/index.ts`.
-
-## Admin UI
-
-**Trang:** `/dashboard/workflow/nodes`  
-**Yêu cầu:** role `admin` + step-up (xem `sensitive-step-up.ts`)
-
-```
-workers/web/src/app/(main)/dashboard/workflow/
-├── nodes/page.tsx
-└── _components/
-    ├── node-management-page.tsx   # Danh sách + CRUD
-    ├── node-form-dialog.tsx       # Form metadata + 3 tab section
-    └── node-field-editor.tsx      # Thêm/sửa/xoá trường trong section
-```
-
-**Thao tác admin:**
-
-1. **Sửa node built-in** — mở form → tab Input / Parameters / Output → thêm trường → Lưu.
-2. **Tạo node custom** — nút «Thêm node» → khai báo `id`, `runtimeType`, category → thiết kế trường.
-3. **Xoá** — chỉ node custom.
-
-i18n namespace: `WorkflowNodeRegistry` (+ `WorkflowEditorPage` cho tên node có sẵn).
 
 ## Workflow Builder
 
@@ -173,12 +112,10 @@ workers/web/src/lib/workflow-node-registry/
 ├── types.ts
 ├── default-sections.ts
 ├── default-nodes.ts
-├── merge.ts           # Merge KV overrides + defaults
-├── api.ts             # Client fetch CRUD
 └── index.ts
 ```
 
-Hook cache: `hooks/use-workflow-node-registry.ts` (prefetch khi mở editor).
+Hook: `hooks/use-workflow-node-registry.ts` (đọc `DEFAULT_WORKFLOW_NODE_REGISTRY`).
 
 ## Lưu workflow (graph)
 
@@ -195,46 +132,37 @@ Node types hợp lệ (Zod): `workers/auth-worker/src/features/member/workflows/
 
 ## Hướng dẫn mở rộng
 
-### Thêm trường cho node built-in (admin)
+### Thêm trường cho node built-in
 
-1. Vào `/dashboard/workflow/nodes` → chọn node → Sửa.
-2. Tab tương ứng → **Thêm trường** → khai báo `id`, `type`, `labelKey`.
-3. Thêm key i18n vào `messages/en-US.json` và `vi-VN.json` (namespace `WorkflowNodeRegistry`).
-4. Lưu — override ghi vào KV, merge khi `GET` registry.
+1. Bổ sung field trong `default-nodes.ts`.
+2. Thêm key i18n vào `messages/en-US.json` và `vi-VN.json` (namespace `WorkflowNodeRegistry`).
 
-### Thêm node custom mới
+### Thêm node built-in mới
 
-1. Admin tạo node với `runtimeType` trùng executor (hoặc mở rộng executor trước).
-2. Thiết kế 3 section trong form.
-3. (Tuỳ chọn) Thêm React component canvas trong `nodes/workflow-nodes.tsx` + đăng ký `workflowNodeTypes`.
-
-### Thêm node built-in mặc định (code)
-
-1. Bổ sung entry trong `default-nodes.ts` (web **và** auth-worker).
+1. Bổ sung entry trong `default-nodes.ts`.
 2. Thêm `WorkflowNodeTypeSchema` nếu là type executor mới.
 3. Implement case trong `executor.ts`.
 4. Thêm i18n + component canvas nếu cần.
 
 ## Deploy
 
-Cần deploy **cả hai**:
-
-- `workers/auth-worker` — API `/dashboard/admin/workflow-nodes`
-- `workers/web` — Admin UI + Node Config Panel
-
-KV `SYSTEM_CONFIG_KV` đã dùng cho system-config; node registry dùng key riêng, **không cần migration D1**.
+- `workers/web` — Workflow Builder + Node Config Panel
+- `workers/auth-worker` — Workflow API (graph CRUD, execute)
 
 ## Roadmap gợi ý
 
-- [ ] Đồng bộ add-node drawer (`catalogs/`) với Node Registry API
+- [ ] **Node Plugin Architecture** — [`docs/workflow-node-plugin-architecture.md`](../../../../../../../../docs/workflow-node-plugin-architecture.md) (khung) · [`docs/workflow-nodes/webhook.md`](../../../../../../../../docs/workflow-nodes/webhook.md) (webhook mẫu)
+- [ ] Đồng bộ add-node drawer (`catalogs/`) với Node Registry
 - [ ] Execute step thật theo từng node (hiện mới có UI)
 - [ ] Align `coreKind` / `flowKind` UI với `runtimeType` executor
-- [ ] Gói shared types vào `packages/` để tránh duplicate `default-nodes` web ↔ auth-worker
+- [ ] Gói shared types vào `packages/workflow-nodes`
 
 ## Liên quan
 
 | Thành phần | Đường dẫn |
 |------------|-----------|
+| **Node Plugin — kiến trúc khung** | [`docs/workflow-node-plugin-architecture.md`](../../../../../../../../docs/workflow-node-plugin-architecture.md) |
+| **Node Plugin — webhook (mẫu)** | [`docs/workflow-nodes/webhook.md`](../../../../../../../../docs/workflow-nodes/webhook.md) |
+| **Node specs index** | [`docs/workflow-nodes/README.md`](../../../../../../../../docs/workflow-nodes/README.md) |
 | Workflow API (graph CRUD, execute) | `workers/auth-worker/src/features/member/workflows/` |
-| Admin tools / memory (catalog tĩnh) | `/dashboard/workflow/tools`, `/memory` |
-| Service management (CRUD thật) | `/dashboard/workflow/services` |
+| Service management (CRUD) | `/dashboard/workflow/services` |

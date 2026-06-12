@@ -5,7 +5,6 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { WorkflowAddNodeDrawer } from "./workflow-add-node-drawer";
 import { WorkflowEditorActionsProvider } from "./workflow-editor-actions-context";
 import { WorkflowEditorAiSidebar } from "./workflow-editor-ai-sidebar";
-import { prefetchWorkflowNodeRegistry } from "./hooks/use-workflow-node-registry";
 import { prefetchApprovedServices } from "./use-approved-services";
 
 interface WorkflowEditorShellWorkspaceProps {
@@ -44,7 +43,6 @@ export function WorkflowEditorShellWorkspace({
   useEffect(() => {
     if (!readOnly) {
       void prefetchApprovedServices();
-      void prefetchWorkflowNodeRegistry();
     }
   }, [readOnly]);
 

@@ -3,8 +3,6 @@ import {
   BarChart3,
   Bell,
   Bot,
-  Box,
-  Brain,
   ChartBar,
   Code,
   Coins,
@@ -19,7 +17,6 @@ import {
   Ticket,
   UserCircle,
   Wallet,
-  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -138,23 +135,11 @@ export const sidebarItems: NavGroup[] = [
         icon: Send,
         adminOnly: true,
       },
-    ],
-  },
-  {
-    id: 5,
-    label: "Workflow",
-    items: [
       {
-        title: "Workflow Admin",
-        url: "/dashboard/workflow/nodes",
-        icon: GitBranch,
+        title: "Service Management",
+        url: "/dashboard/workflow/services",
+        icon: Code,
         adminOnly: true,
-        subItems: [
-          { title: "Node Management", url: "/dashboard/workflow/nodes", icon: Box, adminOnly: true },
-          { title: "Tool Management", url: "/dashboard/workflow/tools", icon: Wrench, adminOnly: true },
-          { title: "Memory Management", url: "/dashboard/workflow/memory", icon: Brain, adminOnly: true },
-          { title: "Service Management", url: "/dashboard/workflow/services", icon: Code, adminOnly: true },
-        ],
       },
     ],
   },
