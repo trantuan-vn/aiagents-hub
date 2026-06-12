@@ -5,13 +5,15 @@
 > **Ngày:** 2026-06-12  
 > **Phạm vi:** Backend (`auth-worker`), Frontend (`web`), Shared package (`packages/workflow-nodes`)
 
-Tài liệu mô tả **kiến trúc khung** cho hệ thống workflow node plugin. Mỗi node cụ thể có spec riêng trong [`docs/workflow-nodes/`](./workflow-nodes/README.md).
+Tài liệu **rút gọn** kiến trúc khung. **Spec chính đầy đủ:** [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md).
 
 **Liên quan:**
 
 | Tài liệu | Đường dẫn |
 |----------|-----------|
+| **Spec chính** | [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md) |
 | Kiến trúc workflow hiện tại | [`workers/web/.../workflows/README.md`](../workers/web/src/app/(main)/dashboard/build/workflows/README.md) |
+| **Luồng vận hành từng bước** | [`workflow-how-it-works.md`](./workflow-how-it-works.md) |
 | Spec từng node | [`docs/workflow-nodes/`](./workflow-nodes/README.md) |
 | Workflow API | `workers/auth-worker/src/features/member/workflows/` |
 | Node Registry (frontend) | `workers/web/src/lib/workflow-node-registry/` |

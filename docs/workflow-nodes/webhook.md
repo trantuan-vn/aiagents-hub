@@ -1,7 +1,9 @@
 # Node: Webhook (`trigger:webhook` / `core:webhook`)
 
 > **Trạng thái:** In progress (Phase 1 — reference implementation)  
-> **Kiến trúc khung:** [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)
+> **Spec chính:** [`workflow-node-plugin-spec.md`](../workflow-node-plugin-spec.md)  
+> **Kiến trúc khung:** [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)  
+> **Luồng vận hành:** [`workflow-how-it-works.md`](../workflow-how-it-works.md)
 
 Webhook là **node mẫu đầu tiên** — có đủ registry schema, custom config panel, external HTTP trigger, và hai biến thể trên canvas (trigger vs core).
 

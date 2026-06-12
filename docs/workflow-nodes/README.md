@@ -2,7 +2,9 @@
 
 Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát triển với Cursor hoặc onboard developer.
 
-**Kiến trúc khung:** [`docs/workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)
+**Spec chính:** [`workflow-node-plugin-spec.md`](../workflow-node-plugin-spec.md)  
+**Kiến trúc khung:** [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)  
+**Luồng vận hành:** [`workflow-how-it-works.md`](../workflow-how-it-works.md)
 
 ---
 

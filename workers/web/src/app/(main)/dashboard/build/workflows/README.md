@@ -151,7 +151,7 @@ Node types hợp lệ (Zod): `workers/auth-worker/src/features/member/workflows/
 
 ## Roadmap gợi ý
 
-- [ ] **Node Plugin Architecture** — [`docs/workflow-node-plugin-architecture.md`](../../../../../../../../docs/workflow-node-plugin-architecture.md) (khung) · [`docs/workflow-nodes/webhook.md`](../../../../../../../../docs/workflow-nodes/webhook.md) (webhook mẫu)
+- [ ] **Node Plugin Architecture** — [`docs/workflow-node-plugin-spec.md`](../../../../../../../../docs/workflow-node-plugin-spec.md) (spec) · [`docs/workflow-nodes/webhook.md`](../../../../../../../../docs/workflow-nodes/webhook.md) (webhook mẫu)
 - [ ] Đồng bộ add-node drawer (`catalogs/`) với Node Registry
 - [ ] Execute step thật theo từng node (hiện mới có UI)
 - [ ] Align `coreKind` / `flowKind` UI với `runtimeType` executor
@@ -161,6 +161,8 @@ Node types hợp lệ (Zod): `workers/auth-worker/src/features/member/workflows/
 
 | Thành phần | Đường dẫn |
 |------------|-----------|
+| **Node Plugin — Spec** | [`docs/workflow-node-plugin-spec.md`](../../../../../../../../docs/workflow-node-plugin-spec.md) |
+| **Luồng vận hành từng bước** | [`docs/workflow-how-it-works.md`](../../../../../../../../docs/workflow-how-it-works.md) |
 | **Node Plugin — kiến trúc khung** | [`docs/workflow-node-plugin-architecture.md`](../../../../../../../../docs/workflow-node-plugin-architecture.md) |
 | **Node Plugin — webhook (mẫu)** | [`docs/workflow-nodes/webhook.md`](../../../../../../../../docs/workflow-nodes/webhook.md) |
 | **Node specs index** | [`docs/workflow-nodes/README.md`](../../../../../../../../docs/workflow-nodes/README.md) |
