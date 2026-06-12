@@ -1,5 +1,6 @@
 import { executeUtils } from '../../../shared/utils.js';
 import type { UserDO } from '../../ws/infrastructure/UserDO.js';
+import type { WorkflowDefinition } from './domain.js';
 import type { ResolvedWorkflow } from './workflow-context.js';
 import { parseWorkflowDefinition } from './workflow-context.js';
 import { executeWorkflowGraph } from './executor.js';
@@ -21,6 +22,10 @@ export interface WorkflowTriggerRow {
   enabled: number;
   cronExpr: string | null;
   webhookToken: string | null;
+  /** Canvas node id for webhook triggers (one D1 row per webhook node). */
+  nodeId: string | null;
+  /** URL path segment — mirrors node.data.webhookPath. */
+  webhookPath: string | null;
   input: string | null;
   autoApproveHumanReview: number;
   lastRunMinute: string | null;
@@ -28,6 +33,35 @@ export interface WorkflowTriggerRow {
   lastStatus: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface WebhookTriggerNodeRef {
+  nodeId: string;
+  webhookPath: string;
+}
+
+/** Path segment used in `/hooks/workflows/:workflowId/:path`. */
+export function resolveNodeWebhookPath(
+  node: WorkflowDefinition['nodes'][number],
+): string {
+  const data = (node.data ?? {}) as { webhookPath?: string };
+  const custom = String(data.webhookPath ?? '').trim().replace(/^\/+/, '');
+  return custom || node.id;
+}
+
+/** All webhook trigger entry nodes on the workflow graph. */
+export function listWebhookTriggerNodes(definition: WorkflowDefinition): WebhookTriggerNodeRef[] {
+  return definition.nodes
+    .filter(
+      (n) =>
+        n.type === 'trigger' &&
+        (n.data as { triggerKind?: string } | undefined)?.triggerKind === 'webhook',
+    )
+    .map((n) => ({ nodeId: n.id, webhookPath: resolveNodeWebhookPath(n) }));
+}
+
+export function workflowDefinitionHasWebhookTrigger(definition: WorkflowDefinition): boolean {
+  return listWebhookTriggerNodes(definition).length > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +139,22 @@ export async function ensureTriggerTable(db: D1Database): Promise<void> {
     ),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_wt_token ON workflow_triggers(ownerId, webhookToken)`),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_wt_cron ON workflow_triggers(type, enabled)`),
+    db.prepare(
+      `CREATE INDEX IF NOT EXISTS idx_wt_workflow ON workflow_triggers(ownerId, workflowId, type)`,
+    ),
   ]);
+  for (const sql of [
+    `ALTER TABLE workflow_triggers ADD COLUMN nodeId TEXT`,
+    `ALTER TABLE workflow_triggers ADD COLUMN webhookPath TEXT`,
+    `CREATE INDEX IF NOT EXISTS idx_wt_webhook_path ON workflow_triggers(ownerId, workflowId, webhookPath)`,
+    `CREATE INDEX IF NOT EXISTS idx_wt_webhook_node ON workflow_triggers(ownerId, workflowId, nodeId)`,
+  ]) {
+    try {
+      await db.prepare(sql).run();
+    } catch {
+      /* column or index may already exist */
+    }
+  }
   tableReady = true;
 }
 
@@ -117,6 +166,8 @@ export interface CreateTriggerInput {
   cronExpr?: string;
   input?: string;
   autoApproveHumanReview?: boolean;
+  nodeId?: string;
+  webhookPath?: string;
 }
 
 export async function createTrigger(
@@ -132,8 +183,8 @@ export async function createTrigger(
   await db
     .prepare(
       `INSERT INTO workflow_triggers
-        (triggerId, ownerId, workflowId, type, enabled, cronExpr, webhookToken, input, autoApproveHumanReview, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (triggerId, ownerId, workflowId, type, enabled, cronExpr, webhookToken, nodeId, webhookPath, input, autoApproveHumanReview, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       triggerId,
@@ -143,6 +194,8 @@ export async function createTrigger(
       input.enabled === false ? 0 : 1,
       input.cronExpr ?? null,
       webhookToken,
+      input.nodeId ?? null,
+      input.webhookPath ?? null,
       input.input ?? null,
       input.autoApproveHumanReview === false ? 0 : 1,
       now,
@@ -184,7 +237,14 @@ export async function updateTrigger(
   db: D1Database,
   ownerId: string,
   triggerId: string,
-  patch: { enabled?: boolean; cronExpr?: string | null; input?: string | null; autoApproveHumanReview?: boolean },
+  patch: {
+    enabled?: boolean;
+    cronExpr?: string | null;
+    input?: string | null;
+    autoApproveHumanReview?: boolean;
+    webhookPath?: string | null;
+    nodeId?: string | null;
+  },
 ): Promise<WorkflowTriggerRow | null> {
   await ensureTriggerTable(db);
   const sets: string[] = [];
@@ -204,6 +264,14 @@ export async function updateTrigger(
   if (patch.autoApproveHumanReview !== undefined) {
     sets.push('autoApproveHumanReview = ?');
     binds.push(patch.autoApproveHumanReview ? 1 : 0);
+  }
+  if (patch.webhookPath !== undefined) {
+    sets.push('webhookPath = ?');
+    binds.push(patch.webhookPath);
+  }
+  if (patch.nodeId !== undefined) {
+    sets.push('nodeId = ?');
+    binds.push(patch.nodeId);
   }
   if (sets.length) {
     sets.push('updatedAt = ?');
@@ -236,20 +304,154 @@ export async function findWebhookTrigger(
   return findChannelTrigger(db, ownerId, 'webhook', token);
 }
 
-/** Resolve an enabled webhook trigger by workflow id (owner derived from D1). */
-export async function findWebhookTriggerByWorkflowId(
+/** Enabled webhook triggers for a workflow (owner-scoped). */
+export async function listWebhookTriggersForWorkflow(
   db: D1Database,
   workflowId: number,
+  ownerId: string,
+): Promise<WorkflowTriggerRow[]> {
+  await ensureTriggerTable(db);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'webhook' AND enabled = 1
+       ORDER BY createdAt ASC`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  return results ?? [];
+}
+
+export async function findWebhookTriggerByNodeId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+  nodeId: string,
 ): Promise<WorkflowTriggerRow | null> {
   await ensureTriggerTable(db);
   return db
     .prepare(
       `SELECT * FROM workflow_triggers
-       WHERE workflowId = ? AND type = 'webhook' AND enabled = 1
-       ORDER BY updatedAt DESC LIMIT 1`,
+       WHERE workflowId = ? AND ownerId = ? AND type = 'webhook' AND nodeId = ? AND enabled = 1
+       LIMIT 1`,
     )
-    .bind(workflowId)
+    .bind(workflowId, ownerId, nodeId)
     .first<WorkflowTriggerRow>();
+}
+
+/**
+ * Resolve webhook trigger for an HTTP request.
+ * When `webhookPath` is omitted and multiple webhooks exist, returns null (caller should 400).
+ */
+export async function findWebhookTriggerByWorkflowId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+  webhookPath?: string,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  const webhooks = await listWebhookTriggersForWorkflow(db, workflowId, ownerId);
+  if (!webhooks.length) return null;
+
+  if (webhookPath) {
+    const normalized = webhookPath.trim().replace(/^\/+/, '');
+    return (
+      webhooks.find((t) => t.webhookPath === normalized || t.nodeId === normalized) ?? null
+    );
+  }
+
+  if (webhooks.length === 1) return webhooks[0]!;
+
+  // Legacy row without nodeId/path — only when graph has a single webhook node
+  const legacy = webhooks.filter((t) => !t.nodeId && !t.webhookPath);
+  if (legacy.length === 1 && webhooks.length === 1) return legacy[0]!;
+
+  return null;
+}
+
+/** Sync D1 webhook triggers with webhook nodes on the workflow graph. */
+export async function syncWebhookTriggersForWorkflow(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+): Promise<WebhookTriggerNodeRef[]> {
+  let resolved: ResolvedWorkflow;
+  try {
+    resolved = await resolveOwnedWorkflow(env, bindingName, ownerId, workflowId);
+  } catch {
+    return [];
+  }
+
+  const nodes = listWebhookTriggerNodes(resolved.definition);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'webhook'`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  const existing = results ?? [];
+  const nodeIds = new Set(nodes.map((n) => n.nodeId));
+
+  for (const row of existing) {
+    if (row.nodeId && !nodeIds.has(row.nodeId)) {
+      await deleteTrigger(db, ownerId, row.triggerId);
+    }
+  }
+
+  const byNodeId = new Map(
+    existing.filter((r) => r.nodeId).map((r) => [r.nodeId!, r]),
+  );
+
+  // Attach legacy orphan trigger to the sole webhook node
+  if (nodes.length === 1) {
+    const legacy = existing.find((r) => !r.nodeId);
+    if (legacy && !byNodeId.has(nodes[0]!.nodeId)) {
+      await updateTrigger(db, ownerId, legacy.triggerId, {
+        nodeId: nodes[0]!.nodeId,
+        webhookPath: nodes[0]!.webhookPath,
+      });
+      byNodeId.set(nodes[0]!.nodeId, {
+        ...legacy,
+        nodeId: nodes[0]!.nodeId,
+        webhookPath: nodes[0]!.webhookPath,
+      });
+    }
+  }
+
+  for (const node of nodes) {
+    const row = byNodeId.get(node.nodeId);
+    if (!row) {
+      await createTrigger(db, {
+        ownerId,
+        workflowId,
+        type: 'webhook',
+        nodeId: node.nodeId,
+        webhookPath: node.webhookPath,
+      });
+      continue;
+    }
+    if (row.webhookPath !== node.webhookPath) {
+      await updateTrigger(db, ownerId, row.triggerId, { webhookPath: node.webhookPath });
+    }
+  }
+
+  return nodes;
+}
+
+/** @deprecated Use syncWebhookTriggersForWorkflow — kept for call-site compat during migration. */
+export async function ensureWebhookTriggerForWorkflow(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+  webhookPath?: string,
+): Promise<WorkflowTriggerRow | null> {
+  await syncWebhookTriggersForWorkflow(env, bindingName, db, ownerId, workflowId);
+  return findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
 }
 
 /** Resolve an enabled trigger by owner, channel type, and URL token. */
@@ -353,6 +555,8 @@ export async function runTrigger(
   inputOverride?: string,
 ) {
   const resolved = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
+  const entryNodeIds =
+    trigger.type === 'webhook' && trigger.nodeId ? [trigger.nodeId] : undefined;
   return executeWorkflowGraph({
     c: { env } as any,
     bindingName,
@@ -362,5 +566,6 @@ export async function runTrigger(
     autoApproveHumanReview: trigger.autoApproveHumanReview === 1,
     runnerDoIdString: trigger.ownerId,
     requestMeta: { userAgent: `trigger:${trigger.type}` },
+    entryNodeIds,
   });
 }

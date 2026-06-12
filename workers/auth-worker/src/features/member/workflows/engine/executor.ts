@@ -67,6 +67,8 @@ export interface ExecuteWorkflowParams {
    * string (used by triggers, where no authenticated identifier is available).
    */
   runnerDoIdString?: string;
+  /** When set, only these entry nodes are queued (e.g. a specific webhook trigger). */
+  entryNodeIds?: string[];
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -474,6 +476,26 @@ export async function executeWorkflowGraph(
   const { definition } = resolved;
   const userDO = resolveRunnerDO(c, bindingName, user.identifier, params.runnerDoIdString);
   const executionKey = crypto.randomUUID();
+  const initialQueue =
+    params.entryNodeIds?.length
+      ? params.entryNodeIds
+      : getWorkflowEntryNodeIds(definition);
+
+  if (params.entryNodeIds?.length) {
+    const nodeIds = new Set(definition.nodes.map((n) => n.id));
+    const missing = params.entryNodeIds.filter((id) => !nodeIds.has(id));
+    if (missing.length) {
+      return {
+        status: 'failed',
+        executionKey: crypto.randomUUID(),
+        workflowId: resolved.workflowId,
+        workflowOwnerId: resolved.ownerId,
+        output: { error: `Entry node not found: ${missing.join(', ')}` },
+        steps: [],
+        totalCostVnd: 0,
+      };
+    }
+  }
 
   if (!definition.nodes.length) {
     return {
@@ -503,7 +525,7 @@ export async function executeWorkflowGraph(
     autoApproveHumanReview: autoApproveHumanReview ?? false,
     requestMeta: params.requestMeta,
     engine: {
-      queue: getWorkflowEntryNodeIds(definition),
+      queue: initialQueue,
       visited: [],
       skipped: [],
       outputs: {},

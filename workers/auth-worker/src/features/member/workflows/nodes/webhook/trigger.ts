@@ -59,10 +59,12 @@ export async function handleWebhookRequestByWorkflowId(
   bindingName: string,
   db: D1Database,
   workflowId: number,
+  ownerId: string,
+  webhookPath: string | undefined,
   request: Request,
   _auth: ValidatedWebhookToken,
 ): Promise<WebhookHandleResult> {
-  const trigger = await findWebhookTriggerByWorkflowId(db, workflowId);
+  const trigger = await findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
   if (!trigger) return { notFound: true };
 
   const input = await parseWebhookInput(request, trigger);

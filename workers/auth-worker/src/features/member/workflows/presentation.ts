@@ -16,8 +16,11 @@ import { createCredential, deleteCredential, listCredentials } from './credentia
 import {
   createTrigger,
   deleteTrigger,
+  findWebhookTriggerByNodeId,
   listTriggers,
+  syncWebhookTriggersForWorkflow,
   updateTrigger,
+  workflowDefinitionHasWebhookTrigger,
 } from './triggers.js';
 import { WORKFLOW_INTEGRATIONS } from './integrations.js';
 import { getVersionByKey, listVersions, snapshotVersion } from './version-store.js';
@@ -37,7 +40,7 @@ import {
   listWorkflowRoyalties,
 } from './infrastructure';
 import { getWorkflowEarningsMonthlySummary } from './earnings-monthly.js';
-import { resolveWorkflow } from './workflow-context.js';
+import { parseWorkflowDefinition, resolveWorkflow } from './workflow-context.js';
 import { createWorkflowChatStreamResponse } from './workflow-chat.js';
 
 const CreateWorkflowSchema = AgentWorkflowSchema;
@@ -61,6 +64,8 @@ const CreateTriggerSchema = z
     input: z.string().max(10000).optional(),
     enabled: z.boolean().optional(),
     autoApproveHumanReview: z.boolean().optional(),
+    nodeId: z.string().min(1).max(200).optional(),
+    webhookPath: z.string().min(1).max(200).optional(),
   })
   .refine((d) => d.type !== 'cron' || !!d.cronExpr, {
     message: 'cronExpr is required for cron triggers',
@@ -437,9 +442,13 @@ export function createWorkflowRoutes(bindingName: string) {
     workflowId: number,
     type: string,
     token: string | null,
+    webhookPath?: string | null,
   ) => {
     const base = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
-    if (type === 'webhook') return `${base}/hooks/workflows/${workflowId}`;
+    if (type === 'webhook') {
+      const pathSeg = webhookPath ? `/${encodeURIComponent(webhookPath)}` : '';
+      return `${base}/hooks/workflows/${workflowId}${pathSeg}`;
+    }
     if (!token) return undefined;
     if (isChannelTriggerType(type)) return `${base}/hooks/channels/${type}/${ownerId}/${token}`;
     return undefined;
@@ -448,10 +457,16 @@ export function createWorkflowRoutes(bindingName: string) {
   const enrichTrigger = (
     c: any,
     ownerId: string,
-    t: { type: string; workflowId: number; webhookToken: string | null },
+    t: {
+      type: string;
+      workflowId: number;
+      webhookToken: string | null;
+      webhookPath?: string | null;
+      nodeId?: string | null;
+    },
   ) => ({
     ...t,
-    webhookUrl: buildTriggerUrl(c, ownerId, t.workflowId, t.type, t.webhookToken),
+    webhookUrl: buildTriggerUrl(c, ownerId, t.workflowId, t.type, t.webhookToken, t.webhookPath),
     webhookClientId: t.type === 'webhook' ? ownerId : undefined,
   });
 
@@ -479,6 +494,15 @@ export function createWorkflowRoutes(bindingName: string) {
       if (!db) throw new Error('D1 database binding not configured');
       const body = CreateTriggerSchema.parse(await c.req.json());
       const ownerId = getUserId(c, user.identifier);
+      if (body.type === 'webhook' && body.nodeId) {
+        const existing = await findWebhookTriggerByNodeId(db, id, ownerId, body.nodeId);
+        if (existing) {
+          return c.json(
+            { trigger: enrichTrigger(c, ownerId, existing) },
+            200,
+          );
+        }
+      }
       const trigger = await createTrigger(db, { ownerId, workflowId: id, ...body });
       return c.json(
         { trigger: enrichTrigger(c, ownerId, trigger) },
@@ -563,6 +587,22 @@ export function createWorkflowRoutes(bindingName: string) {
           await snapshotVersion(userDO, { workflowId: id, definition: def, reason: 'publish' });
         } catch (e) {
           console.error('[workflows] publish snapshot failed:', e);
+        }
+      }
+      if (body.definition !== undefined) {
+        try {
+          const db = c.env.D1DB;
+          const defRaw =
+            typeof body.definition === 'string'
+              ? body.definition
+              : ((updated as { definition?: string })?.definition ?? '{"nodes":[],"edges":[]}');
+          const definition = parseWorkflowDefinition(defRaw);
+          if (db && workflowDefinitionHasWebhookTrigger(definition)) {
+            const ownerId = getUserId(c, user.identifier);
+            await syncWebhookTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
+          }
+        } catch (e) {
+          console.error('[workflows] webhook trigger sync failed:', e);
         }
       }
       return c.json({ workflow: updated });

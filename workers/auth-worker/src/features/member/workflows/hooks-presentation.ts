@@ -7,15 +7,21 @@ import {
   type ChannelType,
 } from './channel-hooks.js';
 import { handleWebhookRequest, handleWebhookRequestByWorkflowId } from './nodes/webhook/trigger.js';
-import { findChannelTrigger, findWebhookTriggerByWorkflowId, runTrigger } from './triggers.js';
+import {
+  findChannelTrigger,
+  findWebhookTriggerByWorkflowId,
+  listWebhookTriggersForWorkflow,
+  runTrigger,
+  syncWebhookTriggersForWorkflow,
+} from './triggers.js';
 import { validateWebhookApiToken } from './webhook-auth.js';
 
 /**
  * Public webhook endpoints that fire workflows. Mounted OUTSIDE the
  * authenticated `/dashboard/*` and `/api/*` namespaces.
  *
- * Workflow webhooks use `/hooks/workflows/:workflowId` with Bearer API token
- * auth (X-Client-ID + Authorization), matching the eKYC token model.
+ * Workflow webhooks use `/hooks/workflows/:workflowId/:path` (one path per
+ * webhook node) with Bearer API token auth (X-Client-ID + Authorization).
  */
 export function createWorkflowHookRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -25,18 +31,48 @@ export function createWorkflowHookRoutes(bindingName: string) {
       const workflowId = parseInt(c.req.param('workflowId'), 10);
       if (isNaN(workflowId)) return c.json({ error: 'Invalid workflow id' }, 400);
 
+      const webhookPathRaw = c.req.param('webhookPath');
+      const webhookPath = webhookPathRaw
+        ? decodeURIComponent(webhookPathRaw).trim().replace(/^\/+/, '')
+        : undefined;
+
+      const clientId = c.req.header('X-Client-ID') || c.req.query('client_id');
+      if (!clientId) return c.json({ error: 'Missing X-Client-ID header' }, 401);
+
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
 
-      const trigger = await findWebhookTriggerByWorkflowId(db, workflowId);
-      if (!trigger) return c.json({ error: 'Webhook not found' }, 404);
+      const auth = await validateWebhookApiToken(c, bindingName, clientId);
 
-      const auth = await validateWebhookApiToken(c, bindingName, trigger.ownerId);
+      await syncWebhookTriggersForWorkflow(c.env, bindingName, db, clientId, workflowId);
+
+      const trigger = await findWebhookTriggerByWorkflowId(
+        db,
+        workflowId,
+        clientId,
+        webhookPath,
+      );
+      if (!trigger) {
+        const count = (await listWebhookTriggersForWorkflow(db, workflowId, clientId)).length;
+        if (count > 1 && !webhookPath) {
+          return c.json(
+            {
+              error:
+                'Multiple webhooks in this workflow — use /hooks/workflows/:workflowId/:webhookPath',
+            },
+            400,
+          );
+        }
+        return c.json({ error: 'Webhook not found' }, 404);
+      }
+
       const result = await handleWebhookRequestByWorkflowId(
         c.env,
         bindingName,
         db,
         workflowId,
+        clientId,
+        webhookPath,
         c.req.raw,
         auth,
       );
@@ -53,6 +89,8 @@ export function createWorkflowHookRoutes(bindingName: string) {
     }
   };
 
+  app.post('/workflows/:workflowId/:webhookPath', workflowHandler);
+  app.get('/workflows/:workflowId/:webhookPath', workflowHandler);
   app.post('/workflows/:workflowId', workflowHandler);
   app.get('/workflows/:workflowId', workflowHandler);
 

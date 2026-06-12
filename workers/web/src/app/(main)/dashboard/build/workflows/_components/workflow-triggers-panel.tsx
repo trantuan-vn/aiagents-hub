@@ -229,6 +229,12 @@ export function WorkflowTriggersPanel({ workflowId }: WorkflowTriggersPanelProps
                         </code>
                       ) : null}
                     </div>
+                    {trg.type === "webhook" && trg.webhookPath ? (
+                      <p className="text-muted-foreground font-mono text-[11px]">
+                        path: {trg.webhookPath}
+                        {trg.nodeId ? ` · node: ${trg.nodeId}` : ""}
+                      </p>
+                    ) : null}
                     {trg.webhookUrl ? (
                       <div className="flex items-center gap-1">
                         <code className="text-muted-foreground max-w-[22rem] truncate font-mono text-[11px]">

@@ -25,7 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { listWorkflowTriggers } from "../../../_lib/api";
+import { createWorkflowTrigger, listWorkflowTriggers } from "../../../_lib/api";
 
 import { WebhookEditOutputPanel } from "./webhook-edit-output-panel";
 import { WebhookListeningPanel } from "./webhook-listening-panel";
@@ -133,21 +133,34 @@ export function WebhookNodeConfigPanel({
 
   useEffect(() => {
     if (!workflowId || isNaN(workflowId)) return;
-    void listWorkflowTriggers(workflowId)
-      .then(({ triggers }) => {
-        const webhook = triggers.find((tr) => tr.type === "webhook" && tr.webhookUrl);
+    void (async () => {
+      try {
+        const { triggers } = await listWorkflowTriggers(workflowId);
+        let webhook = triggers.find(
+          (tr) =>
+            tr.type === "webhook" &&
+            (tr.nodeId === node.id || tr.webhookPath === path),
+        );
+        if (!webhook) {
+          const created = await createWorkflowTrigger(workflowId, {
+            type: "webhook",
+            nodeId: node.id,
+            webhookPath: path,
+          });
+          webhook = created.trigger;
+        }
         if (webhook?.webhookUrl) setProductionUrl(webhook.webhookUrl);
         if (webhook?.webhookClientId) setWebhookClientId(webhook.webhookClientId);
-      })
-      .catch(() => {
+      } catch {
         /* optional — panel still works without triggers */
-      });
-  }, [workflowId]);
+      }
+    })();
+  }, [workflowId, node.id, path]);
 
   const workflowWebhookUrl = useMemo(() => {
     if (!workflowId || isNaN(workflowId)) return undefined;
-    return `${API_BASE_URL}/hooks/workflows/${workflowId}`;
-  }, [workflowId]);
+    return `${API_BASE_URL}/hooks/workflows/${workflowId}/${encodeURIComponent(path)}`;
+  }, [workflowId, path]);
 
   const displayUrl =
     urlMode === "production" && productionUrl

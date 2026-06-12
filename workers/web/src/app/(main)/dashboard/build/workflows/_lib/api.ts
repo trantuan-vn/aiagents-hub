@@ -241,6 +241,8 @@ export interface WorkflowTrigger {
   enabled: number;
   cronExpr: string | null;
   webhookToken: string | null;
+  nodeId?: string | null;
+  webhookPath?: string | null;
   webhookUrl?: string;
   /** Workflow owner DO id — required as X-Client-ID when calling the webhook URL. */
   webhookClientId?: string;
@@ -267,6 +269,8 @@ export function createWorkflowTrigger(
     input?: string;
     enabled?: boolean;
     autoApproveHumanReview?: boolean;
+    nodeId?: string;
+    webhookPath?: string;
   },
 ) {
   return apiFetch<{ trigger: WorkflowTrigger }>(
