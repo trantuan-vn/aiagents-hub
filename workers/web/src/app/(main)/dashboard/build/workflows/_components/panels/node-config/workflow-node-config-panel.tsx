@@ -16,7 +16,8 @@ import { useWorkflowNodeRegistry } from "../../hooks/use-workflow-node-registry"
 import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
 import { NodeConfigIoPanel } from "./node-config-io-panel";
-import { isWebhookNode, WebhookNodeConfigPanel } from "./webhook-node-config-panel";
+import { resolveUIPlugin } from "../../nodes";
+import { warnLegacyRuntimeType } from "../../../_lib/runtime-type";
 
 type WorkflowNodeConfigPanelProps = {
   node: Node | null;
@@ -71,9 +72,13 @@ export function WorkflowNodeConfigPanel({
 
   if (!node || (!definition && !n8nDescription)) return null;
 
-  if (isWebhookNode(node)) {
+  warnLegacyRuntimeType(node);
+
+  const uiPlugin = resolveUIPlugin(node);
+  if (uiPlugin?.ConfigPanel) {
+    const ConfigPanel = uiPlugin.ConfigPanel;
     return (
-      <WebhookNodeConfigPanel
+      <ConfigPanel
         node={node}
         workflowId={workflowId}
         onClose={onClose}

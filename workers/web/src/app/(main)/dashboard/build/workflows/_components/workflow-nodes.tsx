@@ -1,1 +1,2 @@
-export * from "./nodes/workflow-nodes";
+/** @deprecated Import from `./nodes` */
+export * from "./nodes";

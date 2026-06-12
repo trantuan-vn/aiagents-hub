@@ -81,7 +81,7 @@ function SettingsToggleRow({
   );
 }
 
-type WebhookNodeConfigPanelProps = {
+export type WebhookNodeConfigPanelProps = {
   node: Node;
   workflowId?: number;
   onClose: () => void;

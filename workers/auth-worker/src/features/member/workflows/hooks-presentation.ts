@@ -6,7 +6,8 @@ import {
   parseChannelPayload,
   type ChannelType,
 } from './channel-hooks.js';
-import { findChannelTrigger, findWebhookTrigger, runTrigger } from './triggers.js';
+import { handleWebhookRequest } from './nodes/webhook/trigger.js';
+import { findChannelTrigger, runTrigger } from './triggers.js';
 
 /**
  * Public webhook endpoints that fire workflows. Mounted OUTSIDE the
@@ -23,16 +24,16 @@ export function createWorkflowHookRoutes(bindingName: string) {
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
 
-      const trigger = await findWebhookTrigger(db, ownerId, token);
-      if (!trigger) return c.json({ error: 'Webhook not found' }, 404);
+      const result = await handleWebhookRequest(
+        c.env,
+        bindingName,
+        db,
+        ownerId,
+        token,
+        c.req.raw,
+      );
+      if (result.notFound) return c.json({ error: 'Webhook not found' }, 404);
 
-      let input = c.req.query('input') ?? '';
-      if (!input) {
-        const raw = await c.req.text().catch(() => '');
-        input = raw || trigger.input || '';
-      }
-
-      const result = await runTrigger(c.env, bindingName, trigger, input);
       return c.json({
         status: result.status,
         executionKey: result.executionKey,

@@ -25,7 +25,13 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ], 
+      ],
+      "@aiagents-hub/workflow-nodes": [
+        "../../packages/workflow-nodes/src/index.ts"
+      ],
+      "@aiagents-hub/workflow-nodes/*": [
+        "../../packages/workflow-nodes/src/*"
+      ],
       "react": ["./node_modules/@types/react"]
     },
     "types": [

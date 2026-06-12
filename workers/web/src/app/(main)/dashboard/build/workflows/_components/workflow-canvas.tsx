@@ -23,7 +23,9 @@ import { WorkflowDeletableEdge } from "./workflow-deletable-edge";
 import { WorkflowEdgeMarkers } from "./workflow-edge-markers";
 import { WORKFLOW_EDGE_MARKER_END, WORKFLOW_EDGE_STYLE } from "./workflow-edge-utils";
 import { WorkflowNodeConfigPanel } from "./panels/node-config/workflow-node-config-panel";
-import { workflowNodeTypes } from "./workflow-nodes";
+import { createNodeDataFromPlugin, resolveUIPluginById, workflowNodeTypes } from "./nodes";
+import { webhookNodeDefaults } from "./nodes/webhook/defaults";
+import { warnLegacyRuntimeType } from "../_lib/runtime-type";
 
 export type { WorkflowDefinition };
 export { toPersistedDefinition };
@@ -330,19 +332,6 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
 }
 
-function webhookNodeDefaults(id: string, extra?: Record<string, unknown>): Record<string, unknown> {
-  const isWebhook = extra?.coreKind === "webhook" || extra?.triggerKind === "webhook";
-  if (!isWebhook) return {};
-  const path = id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 36);
-  return {
-    httpMethod: "GET",
-    webhookPath: path || id,
-    webhookAuth: "none",
-    webhookRespond: "immediately",
-    webhookTriggerMode: "workflow_active",
-  };
-}
-
 export function addNodeToDefinition(
   def: WorkflowDefinition,
   type: string,
@@ -350,12 +339,23 @@ export function addNodeToDefinition(
   extraData?: Record<string, unknown>,
 ): WorkflowDefinition {
   const id = `${type}-${Date.now()}`;
+  const pluginId = extraData?.triggerKind
+    ? `trigger:${extraData.triggerKind}`
+    : extraData?.coreKind
+      ? `core:${extraData.coreKind}`
+      : type;
+  const plugin = resolveUIPluginById(String(pluginId));
+  const baseData = plugin
+    ? createNodeDataFromPlugin(plugin, label).data
+    : { label, ...webhookNodeDefaults(id, extraData), ...extraData };
+
   const node: Node = {
     id,
     type,
     position: { x: 120 + def.nodes.length * 40, y: 80 + def.nodes.length * 30 },
-    data: { label, ...webhookNodeDefaults(id, extraData), ...extraData },
+    data: { ...baseData, label, ...extraData },
   };
+  warnLegacyRuntimeType(node);
   return { ...def, nodes: [...def.nodes, node] };
 }
 
