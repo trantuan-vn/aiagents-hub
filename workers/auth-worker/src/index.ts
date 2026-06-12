@@ -63,6 +63,7 @@ function createRoutes(bindingName: string) {
         'X-Client-IP',
         'X-Client-UA',
         'X-Client-Device-Id',
+        'X-Client-ID',
       ],
       credentials: true, 
       allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -111,7 +112,7 @@ function createRoutes(bindingName: string) {
   routes.route('/api/ekyc', createEkycRoutes(bindingName));
   routes.route('/api/ws', createApiWebSocketRoutes(bindingName));
 
-  // III. PUBLIC WEBHOOKS (no auth; authorized by per-trigger token in the URL)
+  // III. PUBLIC WEBHOOKS (workflow webhooks: Bearer API token + X-Client-ID)
   routes.route('/hooks', createWorkflowHookRoutes(bindingName));
 
   return routes;

@@ -1,4 +1,10 @@
-import { findWebhookTrigger, runTrigger, type WorkflowTriggerRow } from '../../triggers.js';
+import {
+  findWebhookTrigger,
+  findWebhookTriggerByWorkflowId,
+  runTrigger,
+  type WorkflowTriggerRow,
+} from '../../triggers.js';
+import type { ValidatedWebhookToken } from '../../webhook-auth.js';
 
 export const WEBHOOK_TRIGGER_TYPE = 'webhook';
 
@@ -25,7 +31,7 @@ export async function parseWebhookInput(
   return input;
 }
 
-/** Handle an incoming webhook HTTP request (GET or POST). */
+/** Handle an incoming webhook HTTP request (GET or POST) — legacy ownerId + token URL. */
 export async function handleWebhookRequest(
   env: Env,
   bindingName: string,
@@ -35,6 +41,28 @@ export async function handleWebhookRequest(
   request: Request,
 ): Promise<WebhookHandleResult> {
   const trigger = await findWebhookTrigger(db, ownerId, token);
+  if (!trigger) return { notFound: true };
+
+  const input = await parseWebhookInput(request, trigger);
+  const result = await runTrigger(env, bindingName, trigger, input);
+  return {
+    notFound: false,
+    status: result.status,
+    executionKey: result.executionKey,
+    output: result.output,
+  };
+}
+
+/** Handle webhook by workflow id after API token auth (owner resolved from D1). */
+export async function handleWebhookRequestByWorkflowId(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  workflowId: number,
+  request: Request,
+  _auth: ValidatedWebhookToken,
+): Promise<WebhookHandleResult> {
+  const trigger = await findWebhookTriggerByWorkflowId(db, workflowId);
   if (!trigger) return { notFound: true };
 
   const input = await parseWebhookInput(request, trigger);

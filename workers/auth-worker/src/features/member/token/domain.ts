@@ -25,6 +25,11 @@ export const RevokeApiTokenSchema = z.object({
   tokenId: z.number().int(),
 });
 
+export const UpdateApiTokenSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  permissions: z.array(z.string()).min(1).optional(),
+});
+
 export const ValidateApiTokenSchema = z.object({
   token: z.string(),
 });
@@ -33,11 +38,13 @@ export const ValidateApiTokenSchema = z.object({
 export type ApiToken = z.infer<typeof ApiTokenSchema>;
 export type CreateApiToken = z.infer<typeof CreateApiTokenSchema>;
 export type RevokeApiToken = z.infer<typeof RevokeApiTokenSchema>;
+export type UpdateApiToken = z.infer<typeof UpdateApiTokenSchema>;
 export type ValidateApiToken = z.infer<typeof ValidateApiTokenSchema>;
 
 // Domain Interfaces
 export interface IApiTokenService {
   createApiToken(identifier: string, request: CreateApiToken): Promise<{apiToken: any, rawToken: string}>;
+  updateApiToken(tokenId: number, request: UpdateApiToken): Promise<any>;
   revokeApiToken(tokenId: number): Promise<void>;
   revokeAllApiTokens(): Promise<void>;
   getUserApiTokens(): Promise<any[]>;

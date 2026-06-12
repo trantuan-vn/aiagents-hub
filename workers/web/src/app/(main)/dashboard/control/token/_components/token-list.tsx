@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { Calendar, Copy, Eye, EyeOff, Key, Shield, Trash2 } from "lucide-react";
+import { Calendar, Copy, Eye, Key, Pencil, Shield, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import {
@@ -21,25 +21,43 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
+import { EditTokenDialog } from "./edit-token-dialog";
 import type { ApiToken } from "./schema";
+import { TokenDetailDialog } from "./token-detail-dialog";
 
 interface TokenListProps {
   tokens: ApiToken[];
   onRevoke: (tokenId: number) => Promise<void>;
   onRevokeAll: () => Promise<void>;
+  onRefresh: () => Promise<void>;
 }
 
-export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
+function buildTokenReference(token: ApiToken): string {
+  const lines = [
+    `Token: ${token.name}`,
+    `ID: ${token.id}`,
+    `Status: ${token.isActive ? "active" : "inactive"}`,
+    `Expires: ${token.expiresAt ?? "never"}`,
+    `Permissions:`,
+    ...(token.permissions.length > 0 ? token.permissions.map((p) => `  - ${p}`) : ["  (none)"]),
+    "",
+    "Secret: [hidden — only shown once at creation]",
+  ];
+  return lines.join("\n");
+}
+
+export function TokenList({ tokens, onRevoke, onRevokeAll, onRefresh }: TokenListProps) {
   const t = useTranslations("TokenPage");
   const { toast } = useToast();
-  const [showToken, setShowToken] = useState<number | null>(null);
   const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
+  const [detailToken, setDetailToken] = useState<ApiToken | null>(null);
+  const [editToken, setEditToken] = useState<ApiToken | null>(null);
 
-  const copyToClipboard = (text: string): void => {
-    void navigator.clipboard.writeText(text);
+  const copyReference = (token: ApiToken): void => {
+    void navigator.clipboard.writeText(buildTokenReference(token));
     toast({
-      title: t("token_copied"),
-      description: t("token_copied_description"),
+      title: t("token_ref_copied"),
+      description: t("token_ref_copied_description"),
     });
   };
 
@@ -103,14 +121,14 @@ export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>{t("api_tokens")}</CardTitle>
-            <CardDescription>{t("api_tokens_description")}</CardDescription>
-          </div>
-          {tokens.length > 0 && (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>{t("api_tokens")}</CardTitle>
+              <CardDescription>{t("api_tokens_description")}</CardDescription>
+            </div>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -129,87 +147,137 @@ export function TokenList({ tokens, onRevoke, onRevokeAll }: TokenListProps) {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {tokens.map((token) => {
-            const expired = isExpired(token.expiresAt);
-            const maskedToken = `utk_${"•".repeat(32)}`;
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {tokens.map((token) => {
+              const expired = isExpired(token.expiresAt);
+              const canEdit = token.isActive && !expired;
 
-            return (
-              <div key={token.id} className="bg-muted/50 flex items-center justify-between rounded-lg p-4">
-                <div className="flex flex-1 items-center gap-3">
-                  <div className="bg-primary/10 flex h-10 w-10 items-center justify-center rounded-lg">
-                    <Key className="text-primary h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="text-sm font-medium">{token.name}</span>
-                      <Badge
-                        variant={!token.isActive ? "secondary" : expired ? "destructive" : "default"}
-                        className="text-xs"
-                      >
-                        {!token.isActive ? t("inactive") : expired ? t("expired") : t("active")}
-                      </Badge>
+              return (
+                <div key={token.id} className="bg-muted/50 flex items-center justify-between gap-3 rounded-lg p-4">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                      <Key className="text-primary h-5 w-5" />
                     </div>
-                    <div className="text-muted-foreground flex items-center gap-4 text-xs">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {token.expiresAt ? formatDate(token.expiresAt) : t("never_expires")}
-                      </div>
-                      {token.permissions.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Shield className="h-3 w-3" />
-                          {token.permissions.length} {t("permissions")}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground mt-1 font-mono text-xs">{maskedToken}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setShowToken(showToken === token.id ? null : token.id)}
-                  >
-                    {showToken === token.id ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => copyToClipboard(maskedToken)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" disabled={revokingTokenId === token.id}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>{t("revoke_token_confirm_title")}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {t("revoke_token_confirm_description", { name: token.name })}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleRevoke(token.id)}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{token.name}</span>
+                        <Badge
+                          variant={!token.isActive ? "secondary" : expired ? "destructive" : "default"}
+                          className="text-xs"
                         >
-                          {t("revoke")}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                          {!token.isActive ? t("inactive") : expired ? t("expired") : t("active")}
+                        </Badge>
+                        <span className="text-muted-foreground font-mono text-[10px]">ID {token.id}</span>
+                      </div>
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {token.expiresAt ? formatDate(token.expiresAt) : t("never_expires")}
+                        </div>
+                        {token.permissions.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Shield className="h-3 w-3" />
+                            {token.permissions.length} {t("permissions")}
+                          </div>
+                        )}
+                      </div>
+                      {token.permissions.length > 0 ? (
+                        <div className="mt-2 flex max-h-14 flex-wrap gap-1 overflow-hidden">
+                          {token.permissions.slice(0, 4).map((perm) => (
+                            <Badge key={perm} variant="outline" className="max-w-[180px] truncate font-mono text-[10px] font-normal">
+                              {perm}
+                            </Badge>
+                          ))}
+                          {token.permissions.length > 4 ? (
+                            <Badge variant="outline" className="text-[10px] font-normal">
+                              +{token.permissions.length - 4}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={t("view_token")}
+                      aria-label={t("view_token")}
+                      onClick={() => setDetailToken(token)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={t("edit_token")}
+                      aria-label={t("edit_token")}
+                      disabled={!canEdit}
+                      onClick={() => setEditToken(token)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title={t("copy_token_ref")}
+                      aria-label={t("copy_token_ref")}
+                      onClick={() => copyReference(token)}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title={t("revoke")}
+                          aria-label={t("revoke")}
+                          disabled={revokingTokenId === token.id}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t("revoke_token_confirm_title")}</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            {t("revoke_token_confirm_description", { name: token.name })}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRevoke(token.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {t("revoke")}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      <TokenDetailDialog
+        token={detailToken}
+        open={detailToken !== null}
+        onOpenChange={(open) => !open && setDetailToken(null)}
+      />
+      <EditTokenDialog
+        token={editToken}
+        open={editToken !== null}
+        onOpenChange={(open) => !open && setEditToken(null)}
+        onUpdated={onRefresh}
+      />
+    </>
   );
 }

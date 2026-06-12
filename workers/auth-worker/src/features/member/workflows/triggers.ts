@@ -236,6 +236,22 @@ export async function findWebhookTrigger(
   return findChannelTrigger(db, ownerId, 'webhook', token);
 }
 
+/** Resolve an enabled webhook trigger by workflow id (owner derived from D1). */
+export async function findWebhookTriggerByWorkflowId(
+  db: D1Database,
+  workflowId: number,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  return db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND type = 'webhook' AND enabled = 1
+       ORDER BY updatedAt DESC LIMIT 1`,
+    )
+    .bind(workflowId)
+    .first<WorkflowTriggerRow>();
+}
+
 /** Resolve an enabled trigger by owner, channel type, and URL token. */
 export async function findChannelTrigger(
   db: D1Database,

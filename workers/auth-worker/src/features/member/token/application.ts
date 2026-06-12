@@ -5,15 +5,19 @@ import { createApiTokenService } from './infrastructure';
 import { 
   CreateApiToken,
   RevokeApiToken,
+  UpdateApiToken,
 } from './domain';
-import { TOKEN_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { createServiceInfrastructureService } from '../../admin/service/infrastructure';
+import { getPermissionGroups, toServicePermissionRow, isApprovedActiveService } from './permissions';
 
 interface ITokenApplicationService {
   // Token Management
   createApiTokenUseCase(identifier: string, request: CreateApiToken): Promise<{ apiToken: any; rawToken: string; warning?: string }>;
+  updateApiTokenUseCase(identifier: string, tokenId: number, request: UpdateApiToken): Promise<{ apiToken: any }>;
   revokeApiTokenUseCase(identifier: string, request: RevokeApiToken): Promise<{ success: boolean }>;
   revokeAllApiTokensUseCase(identifier: string): Promise<{ success: boolean }>;
   getUserApiTokensUseCase(identifier: string): Promise<{ tokens: any[] }>;
+  getPermissionGroupsUseCase(identifier: string): Promise<ReturnType<typeof getPermissionGroups>>;
   // Token Validation
   validateApiTokenUseCase(clientId: string, token: string): Promise<{ isValid: boolean; token?: any; error?: string; permissions?: string[] }>;
 }
@@ -53,6 +57,32 @@ export function createTokenApplicationService(c: Context, bindingName: string): 
       const tokenService = getTokenService(identifier);
       const tokens = await tokenService.getUserApiTokens();
       return { tokens };
+    },
+
+    async getPermissionGroupsUseCase(identifier: string) {
+      const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+      const serviceInfra = createServiceInfrastructureService(userDO);
+      const rows = await serviceInfra.getApprovedActiveServices();
+      const services = (Array.isArray(rows) ? rows : [])
+        .filter((row) => isApprovedActiveService(row as Record<string, unknown>))
+        .map((row) => toServicePermissionRow(row as Record<string, unknown>))
+        .filter((row): row is NonNullable<typeof row> => row !== null);
+      return getPermissionGroups(services);
+    },
+
+    async updateApiTokenUseCase(identifier: string, tokenId: number, request: UpdateApiToken) {
+      const tokenService = getTokenService(identifier);
+      const apiToken = await tokenService.updateApiToken(tokenId, request);
+      return {
+        apiToken: {
+          id: apiToken.id,
+          name: apiToken.name,
+          permissions: apiToken.permissions,
+          expiresAt: apiToken.expiresAt,
+          createdAt: apiToken.createdAt,
+          isActive: apiToken.isActive,
+        },
+      };
     },
 
     async revokeApiTokenUseCase(identifier: string, request: RevokeApiToken): Promise<{ success: boolean }> {

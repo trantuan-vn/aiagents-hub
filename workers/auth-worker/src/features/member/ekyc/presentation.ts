@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { createDocumentAIService } from './application';
 import { handleError, getIPAndUserAgent } from '../../../shared/utils';
 import { processFormData, mergeImages } from './utils';
-import { requirePermissions } from '../token/authMiddleware';
+import { requireServiceEndpointPermission } from '../token/service-permission';
 import { EKYC_SERVICES } from './constant';
 
 export function createEkycRoutes(bindingName: string) {
@@ -28,7 +28,7 @@ export function createEkycRoutes(bindingName: string) {
           throw new Error('Missing IP address or user agent');
         }
 
-        const token = requirePermissions(c, [servicePath]);
+        const { token } = await requireServiceEndpointPermission(c, bindingName, servicePath);
         const aiService = createDocumentAIService(c, bindingName);
         
         return await handler(c, token, aiService, { endpoint, ipAddress, userAgent });

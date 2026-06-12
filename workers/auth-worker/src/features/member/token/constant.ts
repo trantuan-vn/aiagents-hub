@@ -31,11 +31,7 @@ export const SECURITY_CONSTANTS = {
   UUID_PATTERN: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 } as const;
 
-// Import permissions from other modules
-import { EKYC_SERVICE_PERMISSIONS } from '../ekyc/constant';
-import { WEBSOCKET_PERMISSIONS } from '../../ws/constant';
+import { STATIC_API_PERMISSIONS } from './permissions';
 
-export const DEFAULT_PERMISSIONS = [
-  ...EKYC_SERVICE_PERMISSIONS,
-  ...WEBSOCKET_PERMISSIONS
-];
+/** Static permissions always available (service endpoints are validated separately). */
+export const DEFAULT_PERMISSIONS = [...STATIC_API_PERMISSIONS];

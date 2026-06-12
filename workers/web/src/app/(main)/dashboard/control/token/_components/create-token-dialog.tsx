@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Key, Plus } from "lucide-react";
@@ -21,7 +21,10 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
+import { PermissionSelector, type PermissionGroup } from "./permission-selector";
 import { createApiTokenSchema, type CreateApiToken } from "./schema";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
 interface CreateTokenResponse {
   apiToken: { id: number; name: string; permissions: string[]; expiresAt?: string; createdAt: string };
@@ -38,6 +41,7 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([]);
 
   const form = useForm<CreateApiToken>({
     resolver: zodResolver(createApiTokenSchema) as Resolver<CreateApiToken>,
@@ -48,7 +52,28 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
     },
   });
 
+  useEffect(() => {
+    if (!open) return;
+    void (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/dashboard/token/permissions`, {
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        });
+        if (!res.ok) throw new Error("fetch permissions failed");
+        const data = (await res.json()) as { groups?: PermissionGroup[] };
+        setPermissionGroups(data.groups ?? []);
+      } catch {
+        setPermissionGroups([]);
+      }
+    })();
+  }, [open]);
+
   const onSubmit = async (data: CreateApiToken): Promise<void> => {
+    if (!data.permissions?.length) {
+      form.setError("permissions", { message: t("permissions_required") });
+      return;
+    }
     setIsLoading(true);
     try {
       const result = await onCreate(data);
@@ -85,6 +110,8 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
     form.reset();
   };
 
+  const selectedPermissions = form.watch("permissions") ?? [];
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -93,7 +120,7 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
           {t("create_token")}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
         <DialogHeader>
           <DialogTitle>{t("create_token_title")}</DialogTitle>
           <DialogDescription>{t("create_token_description")}</DialogDescription>
@@ -159,11 +186,28 @@ export function CreateTokenDialog({ onCreate }: CreateTokenDialogProps) {
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="permissions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t("permissions_label")}</FormLabel>
+                    <FormDescription>{t("permissions_description")}</FormDescription>
+                    <PermissionSelector
+                      groups={permissionGroups}
+                      value={field.value ?? []}
+                      onChange={field.onChange}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={handleClose}>
                   {t("cancel")}
                 </Button>
-                <Button type="submit" disabled={isLoading}>
+                <Button type="submit" disabled={isLoading || selectedPermissions.length === 0}>
                   {isLoading ? t("creating") : t("create")}
                 </Button>
               </DialogFooter>

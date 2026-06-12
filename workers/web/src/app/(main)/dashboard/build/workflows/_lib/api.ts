@@ -242,6 +242,8 @@ export interface WorkflowTrigger {
   cronExpr: string | null;
   webhookToken: string | null;
   webhookUrl?: string;
+  /** Workflow owner DO id — required as X-Client-ID when calling the webhook URL. */
+  webhookClientId?: string;
   input: string | null;
   autoApproveHumanReview: number;
   lastRunMinute: string | null;

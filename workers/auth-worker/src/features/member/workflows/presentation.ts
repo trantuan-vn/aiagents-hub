@@ -431,17 +431,28 @@ export function createWorkflowRoutes(bindingName: string) {
   );
 
   // --- Triggers (cron + webhook + OpenClaw channels) ---
-  const buildTriggerUrl = (c: any, ownerId: string, type: string, token: string | null) => {
-    if (!token) return undefined;
+  const buildTriggerUrl = (
+    c: any,
+    ownerId: string,
+    workflowId: number,
+    type: string,
+    token: string | null,
+  ) => {
     const base = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
-    if (type === 'webhook') return `${base}/hooks/workflows/${ownerId}/${token}`;
+    if (type === 'webhook') return `${base}/hooks/workflows/${workflowId}`;
+    if (!token) return undefined;
     if (isChannelTriggerType(type)) return `${base}/hooks/channels/${type}/${ownerId}/${token}`;
     return undefined;
   };
 
-  const enrichTrigger = (c: any, ownerId: string, t: { type: string; webhookToken: string | null }) => ({
+  const enrichTrigger = (
+    c: any,
+    ownerId: string,
+    t: { type: string; workflowId: number; webhookToken: string | null },
+  ) => ({
     ...t,
-    webhookUrl: buildTriggerUrl(c, ownerId, t.type, t.webhookToken),
+    webhookUrl: buildTriggerUrl(c, ownerId, t.workflowId, t.type, t.webhookToken),
+    webhookClientId: t.type === 'webhook' ? ownerId : undefined,
   });
 
   app.get(

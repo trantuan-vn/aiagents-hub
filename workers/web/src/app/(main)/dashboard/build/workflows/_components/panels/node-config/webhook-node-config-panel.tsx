@@ -127,6 +127,7 @@ export function WebhookNodeConfigPanel({
   const [addOptionOpen, setAddOptionOpen] = useState(false);
   const [urlsOpen, setUrlsOpen] = useState(true);
   const [productionUrl, setProductionUrl] = useState<string | undefined>();
+  const [webhookClientId, setWebhookClientId] = useState<string | undefined>();
   const [listening, setListening] = useState(false);
   const [editingOutput, setEditingOutput] = useState(false);
 
@@ -136,20 +137,22 @@ export function WebhookNodeConfigPanel({
       .then(({ triggers }) => {
         const webhook = triggers.find((tr) => tr.type === "webhook" && tr.webhookUrl);
         if (webhook?.webhookUrl) setProductionUrl(webhook.webhookUrl);
+        if (webhook?.webhookClientId) setWebhookClientId(webhook.webhookClientId);
       })
       .catch(() => {
         /* optional — panel still works without triggers */
       });
   }, [workflowId]);
 
-  const testUrl = useMemo(
-    () => `${API_BASE_URL}/webhook-test/${path}`,
-    [path],
-  );
+  const workflowWebhookUrl = useMemo(() => {
+    if (!workflowId || isNaN(workflowId)) return undefined;
+    return `${API_BASE_URL}/hooks/workflows/${workflowId}`;
+  }, [workflowId]);
 
-  const displayUrl = urlMode === "production" && productionUrl
-    ? productionUrl
-    : testUrl;
+  const displayUrl =
+    urlMode === "production" && productionUrl
+      ? productionUrl
+      : workflowWebhookUrl ?? productionUrl ?? `${API_BASE_URL}/hooks/workflows/{workflowId}`;
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
@@ -228,7 +231,7 @@ export function WebhookNodeConfigPanel({
         {/* Left — listen / preview */}
         <div className="flex min-h-0 flex-col border-r">
           {listening ? (
-            <WebhookListeningPanel httpMethod={httpMethod} testUrl={testUrl} onStop={stopListening} />
+            <WebhookListeningPanel httpMethod={httpMethod} testUrl={displayUrl} onStop={stopListening} />
           ) : (
             <>
               <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -332,6 +335,19 @@ export function WebhookNodeConfigPanel({
                       >
                         <Copy className="size-3.5" />
                       </Button>
+                    </div>
+                    <div className="bg-muted/40 space-y-2 rounded-md border px-3 py-2.5 text-xs leading-relaxed">
+                      <p className="font-medium">{t("webhook_auth_headers_title")}</p>
+                      <p className="text-muted-foreground">{t("webhook_auth_headers_desc")}</p>
+                      <div className="space-y-1 font-mono text-[11px]">
+                        <p>
+                          <span className="text-muted-foreground">Authorization:</span> Bearer {"{api_token}"}
+                        </p>
+                        <p>
+                          <span className="text-muted-foreground">X-Client-ID:</span>{" "}
+                          {webhookClientId ?? t("webhook_client_id_pending")}
+                        </p>
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>

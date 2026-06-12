@@ -2,7 +2,12 @@ import type { WorkflowNodePlugin } from '../types.js';
 import { findWebhookTrigger } from '../../triggers.js';
 import { parseWebhookInput, WEBHOOK_TRIGGER_TYPE } from './trigger.js';
 
-export { handleWebhookRequest, parseWebhookInput, WEBHOOK_TRIGGER_TYPE } from './trigger.js';
+export {
+  handleWebhookRequest,
+  handleWebhookRequestByWorkflowId,
+  parseWebhookInput,
+  WEBHOOK_TRIGGER_TYPE,
+} from './trigger.js';
 
 /** Webhook trigger plugin — HTTP ingress + pass-through on graph execution. */
 export const webhookTriggerPlugin: WorkflowNodePlugin = {

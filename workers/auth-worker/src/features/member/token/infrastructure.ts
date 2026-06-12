@@ -5,8 +5,14 @@ import {
   IPermissionService,
   ApiToken,
   CreateApiToken,
+  UpdateApiToken,
 } from './domain';
 import { DEFAULT_PERMISSIONS, ERROR_MESSAGES } from './constant';
+import {
+  getAllowedPermissionPaths,
+  isApprovedActiveService,
+  toServicePermissionRow,
+} from './permissions';
 import { tokenGenerationUtils } from './utils';
 
 import { executeUtils } from '../../../shared/utils';
@@ -53,6 +59,7 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
         return [...DEFAULT_PERMISSIONS];
       },
 
+
       createDefaultPermissions(): string[] {
         return [...DEFAULT_PERMISSIONS];
       },
@@ -60,14 +67,6 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
   };
 
   // Helper methods
-  const mergePermissions = (defaultPerms: string[], customPerms?: string[]): string[] => {
-    if (!customPerms || customPerms.length === 0) {
-      return defaultPerms;
-    }
-    
-    return [...new Set([...defaultPerms, ...customPerms])];
-  };
-
   const calculateExpiryDate = (expiresInDays?: number): string | undefined => {
     if (!expiresInDays) return undefined;
     
@@ -78,15 +77,37 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
     return tokens.map(({ tokenHash, ...token }) => token);
   };
 
+  const listApprovedServicePermissions = async () => {
+    const rows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'services');
+    const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+    return list
+      .filter((row) => isApprovedActiveService(row as Record<string, unknown>))
+      .map((row) => toServicePermissionRow(row as Record<string, unknown>))
+      .filter((row): row is NonNullable<typeof row> => row !== null);
+  };
+
+  const validateRequestedPermissions = async (permissions: string[]) => {
+    const serviceRows = await listApprovedServicePermissions();
+    const allowed = new Set(getAllowedPermissionPaths(serviceRows));
+    const requested = [...new Set(permissions)];
+    const invalid = requested.filter((perm) => !allowed.has(perm));
+    if (invalid.length > 0) {
+      throw new Error(`Invalid permissions: ${invalid.join(', ')}`);
+    }
+    return requested;
+  };
+
   // Token Management Methods
   const createToken = async (identifier: string, request: CreateApiToken): Promise<{apiToken: any, rawToken: string}> => {
     const tokenGenerator = createTokenGenerator();
-    const permissionService = createPermissionService();
 
     const rawToken = tokenGenerator.generateToken();
     const tokenHash = await tokenGenerator.hashToken(rawToken);
     const expiresAt = calculateExpiryDate(request.expiresInDays);
-    const mergedPerms = mergePermissions(permissionService.createDefaultPermissions(), request.permissions);
+
+    const mergedPerms = request.permissions?.length
+      ? await validateRequestedPermissions(request.permissions)
+      : [];
 
     const apiToken: ApiToken = {
       identifier,
@@ -112,6 +133,30 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
     );
     
     return sanitizeTokenForResponse(tokens);
+  };
+
+  const updateToken = async (tokenId: number, request: UpdateApiToken): Promise<any> => {
+    const rows = await executeUtils.executeDynamicAction(
+      userDO,
+      'select',
+      { where: { field: 'id', operator: '=', value: tokenId } },
+      'api_tokens',
+    );
+    const existing = Array.isArray(rows) ? rows[0] : rows;
+    if (!existing || !existing.isActive) {
+      throw new Error(ERROR_MESSAGES.TOKEN.TOKEN_NOT_FOUND);
+    }
+
+    const patch: Record<string, unknown> = { id: tokenId };
+    if (request.name !== undefined) patch.name = request.name;
+    if (request.permissions !== undefined) {
+      patch.permissions = await validateRequestedPermissions(request.permissions);
+    }
+    if (Object.keys(patch).length === 1) {
+      return existing;
+    }
+
+    return await executeUtils.executeDynamicAction(userDO, 'update', patch, 'api_tokens');
   };
 
   const revokeToken = async (tokenId: number): Promise<void> => {    
@@ -162,6 +207,9 @@ export function createApiTokenService(env:Env, userDO: DurableObjectStub<UserDO>
 
     getUserApiTokens: () => 
       getUserTokens(),
+
+    updateApiToken: (tokenId: number, request: UpdateApiToken) =>
+      updateToken(tokenId, request),
 
     revokeApiToken: (tokenId: number) => 
       revokeToken(tokenId),

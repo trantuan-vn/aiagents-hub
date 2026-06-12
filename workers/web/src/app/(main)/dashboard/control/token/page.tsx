@@ -195,7 +195,12 @@ export default function TokenPage() {
           </CardContent>
         </Card>
       ) : (
-        <TokenList tokens={tokens} onRevoke={handleRevokeToken} onRevokeAll={handleRevokeAll} />
+        <TokenList
+          tokens={tokens}
+          onRevoke={handleRevokeToken}
+          onRevokeAll={handleRevokeAll}
+          onRefresh={fetchTokens}
+        />
       )}
     </div>
   );
