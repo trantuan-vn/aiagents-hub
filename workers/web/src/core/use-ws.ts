@@ -17,7 +17,7 @@ export type UseWsOptions = {
 
 function getDefaultWsUrl(): string {
   if (typeof window === "undefined") return "";
-  const base = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn";
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
   const url = new URL(base);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.pathname = "/dashboard/ws/connect";

@@ -26,11 +26,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { createWorkflowTrigger, listWorkflowTriggers } from "../../../_lib/api";
+import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "../../hooks/use-webhook-listen-ws";
 
 import { WebhookEditOutputPanel } from "./webhook-edit-output-panel";
 import { WebhookListeningPanel } from "./webhook-listening-panel";
+import { WebhookOutputPanel } from "./webhook-output-panel";
+import {
+  buildWebhookItemOutput,
+  normalizeWebhookItemOutput,
+  type WebhookItemOutput,
+} from "@aiagents-hub/workflow-nodes";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
+const WEBHOOK_HTTP_METHOD = "POST";
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
 const WEBHOOK_RESPOND_OPTIONS = [
@@ -109,9 +117,7 @@ export function WebhookNodeConfigPanel({
   const te = useTranslations("WorkflowEditorPage");
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
-  const httpMethod = String(nodeData.httpMethod ?? "GET");
   const path = String(nodeData.webhookPath ?? defaultPath(node.id));
-  const authentication = String(nodeData.webhookAuth ?? "none");
   const respond = String(nodeData.webhookRespond ?? "immediately");
   const triggerMode = String(nodeData.webhookTriggerMode ?? "workflow_active");
   const webhookOptions = (nodeData.webhookOptions ?? {}) as Record<string, unknown>;
@@ -130,6 +136,7 @@ export function WebhookNodeConfigPanel({
   const [webhookClientId, setWebhookClientId] = useState<string | undefined>();
   const [listening, setListening] = useState(false);
   const [editingOutput, setEditingOutput] = useState(false);
+  const [liveOutput, setLiveOutput] = useState<WebhookItemOutput | null>(null);
 
   useEffect(() => {
     if (!workflowId || isNaN(workflowId)) return;
@@ -172,6 +179,42 @@ export function WebhookNodeConfigPanel({
     [node.id, onPatchData],
   );
 
+  const applyWebhookEvent = useCallback(
+    (event: WorkflowWebhookWsEvent) => {
+      const executionMode = urlMode === "production" ? "production" : "test";
+      const item =
+        normalizeWebhookItemOutput(event.output, displayUrl) ??
+        buildWebhookItemOutput({
+          webhookUrl: displayUrl ?? "",
+          headers: { "x-http-method": event.method },
+          body: (() => {
+            try {
+              return JSON.parse(event.input);
+            } catch {
+              return event.input;
+            }
+          })(),
+          executionMode,
+        });
+      setLiveOutput(item);
+      patch({
+        _output: item,
+        _outputPinned: true,
+      });
+      toast.success(t("webhook_event_received"));
+    },
+    [displayUrl, patch, t, urlMode],
+  );
+
+  useWebhookListenWs({
+    workflowId,
+    nodeId: node.id,
+    webhookPath: path,
+    listening,
+    enabled: true,
+    onEvent: applyWebhookEvent,
+  });
+
   const patchOption = useCallback(
     (optionId: string, value: unknown) => {
       patch({ webhookOptions: { ...webhookOptions, [optionId]: value } });
@@ -204,15 +247,16 @@ export function WebhookNodeConfigPanel({
     }
   };
 
-  const listenForTest = () => setListening(true);
+  const listenForTest = () => {
+    setLiveOutput(null);
+    setListening(true);
+  };
   const stopListening = () => setListening(false);
 
   const outputPinned = !!nodeData._outputPinned;
-  const output = nodeData._output;
-  const hasOutput =
-    outputPinned &&
-    output != null &&
-    (Array.isArray(output) ? output.length > 0 : typeof output === "object" && Object.keys(output as object).length > 0);
+  const storedOutput = normalizeWebhookItemOutput(nodeData._output, displayUrl);
+  const output = liveOutput ?? storedOutput ?? undefined;
+  const hasOutput = output != null;
 
   const openEditOutput = () => setEditingOutput(true);
 
@@ -244,7 +288,7 @@ export function WebhookNodeConfigPanel({
         {/* Left — listen / preview */}
         <div className="flex min-h-0 flex-col border-r">
           {listening ? (
-            <WebhookListeningPanel httpMethod={httpMethod} testUrl={displayUrl} onStop={stopListening} />
+            <WebhookListeningPanel testUrl={displayUrl} onStop={stopListening} receivedOutput={liveOutput} />
           ) : (
             <>
               <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -277,30 +321,29 @@ export function WebhookNodeConfigPanel({
 
         {/* Middle — parameters */}
         <div className="flex min-h-0 flex-col border-r">
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <Tabs defaultValue="parameters" className="flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <TabsList className="h-8 bg-transparent p-0">
-                  <TabsTrigger
-                    value="parameters"
-                    className="data-[state=active]:border-[#ff6f00] data-[state=active]:text-[#ff6f00] rounded-none border-b-2 border-transparent px-3 text-xs shadow-none data-[state=active]:shadow-none"
-                  >
-                    {t("section_parameters")}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="settings"
-                    className="data-[state=active]:border-[#ff6f00] data-[state=active]:text-[#ff6f00] rounded-none border-b-2 border-transparent px-3 text-xs shadow-none data-[state=active]:shadow-none"
-                  >
-                    {t("section_settings")}
-                  </TabsTrigger>
-                </TabsList>
-                <Button type="button" size="sm" className={cn(ORANGE, "shrink-0 text-xs text-white")} onClick={listenForTest}>
-                  <Zap className="mr-1.5 size-3.5" />
-                  {t("webhook_listen_test")}
-                </Button>
-              </div>
+          <Tabs defaultValue="parameters" className="flex min-h-0 flex-1 flex-col">
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b px-3 py-2">
+              <TabsList className="h-8 bg-transparent p-0">
+                <TabsTrigger
+                  value="parameters"
+                  className="data-[state=active]:border-[#ff6f00] data-[state=active]:text-[#ff6f00] rounded-none border-b-2 border-transparent px-3 text-xs shadow-none data-[state=active]:shadow-none"
+                >
+                  {t("section_parameters")}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="settings"
+                  className="data-[state=active]:border-[#ff6f00] data-[state=active]:text-[#ff6f00] rounded-none border-b-2 border-transparent px-3 text-xs shadow-none data-[state=active]:shadow-none"
+                >
+                  {t("section_settings")}
+                </TabsTrigger>
+              </TabsList>
+              <Button type="button" size="sm" className={cn(ORANGE, "shrink-0 text-xs text-white")} onClick={listenForTest}>
+                <Zap className="mr-1.5 size-3.5" />
+                {t("webhook_listen_test")}
+              </Button>
+            </div>
 
-              <TabsContent value="parameters" className="mt-0 max-h-[calc(100vh-10rem)] overflow-y-auto p-4">
+            <TabsContent value="parameters" className="mt-0 min-h-0 flex-1 overflow-y-auto p-4">
                 <Collapsible open={urlsOpen} onOpenChange={setUrlsOpen} className="mb-5">
                   <CollapsibleTrigger className="flex w-full items-center gap-2 text-sm font-medium">
                     <ChevronDown className={cn("size-4 transition-transform", urlsOpen && "rotate-180")} />
@@ -331,7 +374,7 @@ export function WebhookNodeConfigPanel({
                     </div>
                     <div className="flex items-stretch gap-0 overflow-hidden rounded-md border">
                       <span className="bg-muted text-muted-foreground flex items-center px-2.5 font-mono text-xs font-semibold">
-                        {httpMethod}
+                        {WEBHOOK_HTTP_METHOD}
                       </span>
                       <Input
                         readOnly
@@ -367,42 +410,12 @@ export function WebhookNodeConfigPanel({
 
                 <div className="space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs">{t("field_http_method")}</Label>
-                    <Select value={httpMethod} onValueChange={(v) => patch({ httpMethod: v })}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="GET">{t("opt_http_get")}</SelectItem>
-                        <SelectItem value="POST">{t("opt_http_post")}</SelectItem>
-                        <SelectItem value="PUT">{t("opt_http_put")}</SelectItem>
-                        <SelectItem value="DELETE">{t("opt_http_delete")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
                     <Label className="text-xs">{t("webhook_path")}</Label>
                     <Input
                       value={path}
                       className="h-9 font-mono text-xs"
                       onChange={(e) => patch({ webhookPath: e.target.value })}
                     />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">{t("webhook_authentication")}</Label>
-                    <Select value={authentication} onValueChange={(v) => patch({ webhookAuth: v })}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">{t("webhook_auth_none")}</SelectItem>
-                        <SelectItem value="basic">{t("webhook_auth_basic")}</SelectItem>
-                        <SelectItem value="header">{t("webhook_auth_header")}</SelectItem>
-                        <SelectItem value="jwt">{t("webhook_auth_jwt")}</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
 
                   <div className="space-y-1.5">
@@ -510,7 +523,7 @@ export function WebhookNodeConfigPanel({
                 </div>
               </TabsContent>
 
-              <TabsContent value="settings" className="mt-0 max-h-[calc(100vh-10rem)] overflow-y-auto p-4">
+            <TabsContent value="settings" className="mt-0 min-h-0 flex-1 overflow-y-auto p-4">
                 <div className="divide-y">
                   <SettingsToggleRow
                     label={t("webhook_allow_multiple_methods")}
@@ -577,9 +590,8 @@ export function WebhookNodeConfigPanel({
                   <p className="text-muted-foreground text-xs">{t("webhook_node_version")}</p>
                 </div>
               </TabsContent>
-            </Tabs>
-          </div>
-          <p className="text-muted-foreground border-t px-4 py-2 text-[11px] italic">{t("webhook_wish")}</p>
+          </Tabs>
+          <p className="text-muted-foreground shrink-0 border-t px-4 py-2 text-[11px] italic">{t("webhook_wish")}</p>
         </div>
 
         {/* Right — output */}
@@ -587,12 +599,21 @@ export function WebhookNodeConfigPanel({
           {editingOutput ? (
             <WebhookEditOutputPanel
               initialOutput={outputPinned ? output : undefined}
+              webhookUrl={displayUrl}
               onCancel={cancelEditOutput}
               onSave={(parsed) => {
-                patch({ _output: parsed, _outputPinned: true });
+                const item = normalizeWebhookItemOutput(parsed, displayUrl);
+                if (!item) {
+                  toast.error(t("webhook_edit_output_invalid_json"));
+                  return;
+                }
+                setLiveOutput(item);
+                patch({ _output: item, _outputPinned: true });
                 setEditingOutput(false);
               }}
             />
+          ) : hasOutput && output ? (
+            <WebhookOutputPanel item={output} onEdit={openEditOutput} />
           ) : (
             <>
               <div className="flex items-center justify-between border-b px-3 py-2">
@@ -612,12 +633,6 @@ export function WebhookNodeConfigPanel({
               </div>
 
               <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-                {hasOutput ? (
-                  <pre className="max-h-full w-full overflow-auto rounded-md border p-3 text-left font-mono text-xs">
-                    {JSON.stringify(output, null, 2)}
-                  </pre>
-                ) : (
-                  <>
                     <Zap className="text-muted-foreground/50 size-10" />
                     <p className="text-muted-foreground text-sm">{t("webhook_no_trigger_output")}</p>
                     {onExecuteStep ? (
@@ -636,8 +651,6 @@ export function WebhookNodeConfigPanel({
                     >
                       {t("webhook_set_mock_data")}
                     </button>
-                  </>
-                )}
               </div>
             </>
           )}

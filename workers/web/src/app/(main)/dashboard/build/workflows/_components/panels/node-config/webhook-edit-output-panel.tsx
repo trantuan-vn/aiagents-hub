@@ -9,23 +9,47 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import {
+  buildWebhookItemOutput,
+  normalizeWebhookItemOutput,
+} from "@aiagents-hub/workflow-nodes";
+
 import { JsonCodeEditor } from "./json-code-editor";
 
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
-export const DEFAULT_MOCK_OUTPUT_JSON = `[
-  {
-    "name": "First item",
-    "code": 1
-  },
-  {
-    "name": "Second item",
-    "code": 2
-  }
-]`;
+export const DEFAULT_MOCK_OUTPUT_JSON = JSON.stringify(
+  [
+    buildWebhookItemOutput({
+      webhookUrl: "https://api.example.com/hooks/workflows/1/my-webhook",
+      headers: {
+        host: "api.example.com",
+        "user-agent": "curl/8.7.1",
+        accept: "*/*",
+      },
+      params: {},
+      query: {},
+      body: { message: "Hello" },
+      executionMode: "test",
+    }),
+  ],
+  null,
+  2,
+);
 
-export function outputToEditorText(output: unknown): string {
-  if (output == null) return DEFAULT_MOCK_OUTPUT_JSON;
+export function outputToEditorText(output: unknown, webhookUrl?: string): string {
+  const item = normalizeWebhookItemOutput(output, webhookUrl);
+  if (item) return JSON.stringify([item], null, 2);
+  if (output == null) {
+    if (webhookUrl) {
+      return JSON.stringify(
+        [buildWebhookItemOutput({ webhookUrl, body: { message: "Hello" }, executionMode: "test" })],
+        null,
+        2,
+      );
+    }
+    return DEFAULT_MOCK_OUTPUT_JSON;
+  }
   if (typeof output === "object" && Object.keys(output as object).length === 0) {
     return DEFAULT_MOCK_OUTPUT_JSON;
   }
@@ -34,13 +58,19 @@ export function outputToEditorText(output: unknown): string {
 
 type WebhookEditOutputPanelProps = {
   initialOutput: unknown;
+  webhookUrl?: string;
   onSave: (output: unknown) => void;
   onCancel: () => void;
 };
 
-export function WebhookEditOutputPanel({ initialOutput, onSave, onCancel }: WebhookEditOutputPanelProps) {
+export function WebhookEditOutputPanel({
+  initialOutput,
+  webhookUrl,
+  onSave,
+  onCancel,
+}: WebhookEditOutputPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
-  const [text, setText] = useState(() => outputToEditorText(initialOutput));
+  const [text, setText] = useState(() => outputToEditorText(initialOutput, webhookUrl));
 
   const handleSave = () => {
     try {

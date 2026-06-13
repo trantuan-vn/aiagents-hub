@@ -2,6 +2,7 @@ import type { z } from 'zod';
 
 import type { WorkflowDefinition } from '../domain.js';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
+import type { BuildWebhookItemParams } from './webhook/output.js';
 
 export type NodeOutput = Record<string, unknown>;
 
@@ -38,6 +39,7 @@ export interface NodeContext {
   meta: WorkflowMeta;
   attr?: WorkflowAttribution;
   requestMeta?: RequestMeta;
+  webhookItem?: BuildWebhookItemParams;
   onCost?: (vnd: number) => void;
 }
 

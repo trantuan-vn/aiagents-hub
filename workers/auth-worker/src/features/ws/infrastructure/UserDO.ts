@@ -322,6 +322,7 @@ export class UserDO extends DurableObject {
         '/debug/id-counters': async () => this.handleDebugIdCounters(),
         '/workflow/collab/get': (req) => this.handleWorkflowCollabGet(req),
         '/workflow/collab/publish': (req) => this.handleWorkflowCollabPublish(req),
+        '/workflow/webhook/broadcast': (req) => this.handleWorkflowWebhookBroadcast(req),
       };
 
       const handler = routeHandlers[url.pathname];
@@ -1329,8 +1330,14 @@ export class UserDO extends DurableObject {
   }
 
   protected broadcast(event: string, data: any): void {
+    void this.broadcastToAllClients(event, data);
+  }
+
+  protected async broadcastToAllClients(event: string, data: unknown): Promise<void> {
     const message = { event, data, timestamp: Date.now() };
-    this.state.getWebSockets().forEach(ws => this.sendMessage(ws, message));
+    const sockets = this.state.getWebSockets();
+    if (!sockets.length) return;
+    await Promise.all(sockets.map((ws) => this.sendMessage(ws, message)));
   }
 
   /** Gửi notification 2FA khi user connect WS lần đầu (đúng flow: login → token → WS connect → notification) */
@@ -1414,6 +1421,12 @@ export class UserDO extends DurableObject {
     return this.jsonResponse({ state });
   }
 
+  private async handleWorkflowWebhookBroadcast(request: Request): Promise<Response> {
+    const body = await request.json();
+    await this.broadcastToAllClients('workflow_webhook', body);
+    return this.jsonResponse({ success: true });
+  }
+
   // ========== SUBSCRIPTION MANAGEMENT ==========
   private async handleSubscribe(channel: string) {
     await this.database.dynamicUpsert('subscriptions', {
@@ -1445,6 +1458,12 @@ export class UserDO extends DurableObject {
     
     if (url.pathname.startsWith('/repository/')) {
       return await this.handleRepositoryOperations(request, url.pathname);
+    }
+
+    if (url.pathname === '/workflow/webhook/broadcast' && request.method === 'POST') {
+      const body = await request.json();
+      await this.broadcastToAllClients('workflow_webhook', body);
+      return this.jsonResponse({ success: true });
     }
 
     const message = await request.json() as { type: string; [key: string]: any };

@@ -6,8 +6,15 @@ export {
   handleWebhookRequest,
   handleWebhookRequestByWorkflowId,
   parseWebhookInput,
+  parseWebhookRequest,
   WEBHOOK_TRIGGER_TYPE,
 } from './trigger.js';
+export {
+  buildWebhookItemOutput,
+  normalizeWebhookItemOutput,
+  type WebhookItemOutput,
+  type BuildWebhookItemParams,
+} from './output.js';
 
 /** Webhook trigger plugin — HTTP ingress + pass-through on graph execution. */
 export const webhookTriggerPlugin: WorkflowNodePlugin = {

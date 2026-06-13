@@ -42,18 +42,18 @@ export function createWorkflowHookRoutes(bindingName: string) {
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
 
-      const auth = await validateWebhookApiToken(c, bindingName, clientId);
+      const auth = await validateWebhookApiToken(c, bindingName, String(clientId));
 
-      await syncWebhookTriggersForWorkflow(c.env, bindingName, db, clientId, workflowId);
+      await syncWebhookTriggersForWorkflow(c.env, bindingName, db, String(clientId), workflowId);
 
       const trigger = await findWebhookTriggerByWorkflowId(
         db,
         workflowId,
-        clientId,
+        String(clientId),
         webhookPath,
       );
       if (!trigger) {
-        const count = (await listWebhookTriggersForWorkflow(db, workflowId, clientId)).length;
+        const count = (await listWebhookTriggersForWorkflow(db, workflowId, String(clientId))).length;
         if (count > 1 && !webhookPath) {
           return c.json(
             {
@@ -71,7 +71,7 @@ export function createWorkflowHookRoutes(bindingName: string) {
         bindingName,
         db,
         workflowId,
-        clientId,
+        String(clientId),
         webhookPath,
         c.req.raw,
         auth,

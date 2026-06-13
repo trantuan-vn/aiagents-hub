@@ -7,9 +7,9 @@ export function webhookNodeDefaults(
   if (!isWebhook) return {};
   const path = id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 36);
   return {
-    httpMethod: "GET",
+    httpMethod: "POST",
     webhookPath: path || id,
-    webhookAuth: "none",
+    webhookAuth: "header",
     webhookRespond: "immediately",
     webhookTriggerMode: "workflow_active",
   };

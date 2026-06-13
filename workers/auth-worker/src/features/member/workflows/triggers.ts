@@ -49,14 +49,18 @@ export function resolveNodeWebhookPath(
   return custom || node.id;
 }
 
-/** All webhook trigger entry nodes on the workflow graph. */
+/** Webhook ingress nodes on the canvas (trigger + core variants). */
+export function isWebhookIngressNode(node: WorkflowDefinition['nodes'][number]): boolean {
+  const data = (node.data ?? {}) as { triggerKind?: string; coreKind?: string };
+  if (node.type === 'trigger' && data.triggerKind === 'webhook') return true;
+  if (node.type === 'core' && data.coreKind === 'webhook') return true;
+  return false;
+}
+
+/** All webhook nodes that may expose a production URL (matches editor UI). */
 export function listWebhookTriggerNodes(definition: WorkflowDefinition): WebhookTriggerNodeRef[] {
   return definition.nodes
-    .filter(
-      (n) =>
-        n.type === 'trigger' &&
-        (n.data as { triggerKind?: string } | undefined)?.triggerKind === 'webhook',
-    )
+    .filter(isWebhookIngressNode)
     .map((n) => ({ nodeId: n.id, webhookPath: resolveNodeWebhookPath(n) }));
 }
 
@@ -553,6 +557,7 @@ export async function runTrigger(
   bindingName: string,
   trigger: WorkflowTriggerRow,
   inputOverride?: string,
+  webhookItem?: import('./nodes/webhook/output.js').BuildWebhookItemParams,
 ) {
   const resolved = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
   const entryNodeIds =
@@ -567,5 +572,6 @@ export async function runTrigger(
     runnerDoIdString: trigger.ownerId,
     requestMeta: { userAgent: `trigger:${trigger.type}` },
     entryNodeIds,
+    webhookItem,
   });
 }

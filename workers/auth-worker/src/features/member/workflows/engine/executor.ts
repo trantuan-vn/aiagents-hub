@@ -11,6 +11,8 @@ import {
 } from '../execution-store.js';
 import { nodePluginRegistry } from '../nodes/index.js';
 import type { NodeContext as PluginNodeContext } from '../nodes/types.js';
+import { buildWebhookItemOutput } from '../nodes/webhook/output.js';
+import { isWebhookIngressNode } from '../triggers.js';
 import {
   activeHandlesForNode,
   isEdgeActiveForBranches,
@@ -20,6 +22,7 @@ import {
   getIncomingDataFlowEdges,
   getOutgoingDataFlowEdges,
   getWorkflowEntryNodeIds,
+  isDataFlowEdge,
   isMergeFlowNode,
   isNonExecutableNodeType,
   mergeMode,
@@ -69,6 +72,8 @@ export interface ExecuteWorkflowParams {
   runnerDoIdString?: string;
   /** When set, only these entry nodes are queued (e.g. a specific webhook trigger). */
   entryNodeIds?: string[];
+  /** Parsed HTTP webhook payload — seeds webhook node output (n8n item shape). */
+  webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -107,6 +112,7 @@ interface PersistedState {
   variables: Record<string, unknown>;
   autoApproveHumanReview: boolean;
   requestMeta?: { userAgent?: string; ipAddress?: string };
+  webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
   engine: EngineState;
 }
 
@@ -177,6 +183,7 @@ interface NodeContext {
   attr: ReturnType<typeof workflowAttribution>;
   input?: string;
   requestMeta?: { userAgent?: string; ipAddress?: string };
+  webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
   runContext: NodeOutput;
   definition: WorkflowDefinition;
   outputs: Record<string, NodeOutput>;
@@ -190,6 +197,16 @@ async function executeNodeLogic(
 ): Promise<NodeOutput> {
   const plugin = nodePluginRegistry.resolve(node);
   if (!plugin) throw new Error(`Unknown node type: ${node.type}`);
+
+  if (isWebhookIngressNode(node) && ctx.webhookItem) {
+    const hasMainParents = ctx.definition.edges.some(
+      (e) => e.target === node.id && isDataFlowEdge(e),
+    );
+    if (!hasMainParents) {
+      return buildWebhookItemOutput(ctx.webhookItem) as NodeOutput;
+    }
+  }
+
   if (plugin.skipExecution) return nodeInput;
   if (!plugin.execute) throw new Error(`Node ${plugin.id} has no execute handler`);
 
@@ -207,6 +224,7 @@ async function executeNodeLogic(
     meta: ctx.meta,
     attr: ctx.attr,
     requestMeta: ctx.requestMeta,
+    webhookItem: ctx.webhookItem,
     onCost,
   };
   return plugin.execute(pluginCtx);
@@ -333,6 +351,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     attr,
     input: persisted.input,
     requestMeta: persisted.requestMeta,
+    webhookItem: persisted.webhookItem,
     runContext: engine.runContext,
     definition,
     outputs: engine.outputs,
@@ -524,6 +543,7 @@ export async function executeWorkflowGraph(
     variables,
     autoApproveHumanReview: autoApproveHumanReview ?? false,
     requestMeta: params.requestMeta,
+    webhookItem: params.webhookItem,
     engine: {
       queue: initialQueue,
       visited: [],

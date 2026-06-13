@@ -5,6 +5,11 @@ import {
   type WorkflowTriggerRow,
 } from '../../triggers.js';
 import type { ValidatedWebhookToken } from '../../webhook-auth.js';
+import { broadcastWorkflowWebhookResult } from '../../webhook-notify.js';
+import {
+  buildWebhookItemOutput,
+  parseWebhookRequest,
+} from './output.js';
 
 export const WEBHOOK_TRIGGER_TYPE = 'webhook';
 
@@ -22,12 +27,7 @@ export async function parseWebhookInput(
   request: Request,
   trigger: WorkflowTriggerRow,
 ): Promise<string> {
-  const url = new URL(request.url);
-  let input = url.searchParams.get('input') ?? '';
-  if (!input) {
-    const raw = await request.text().catch(() => '');
-    input = raw || trigger.input || '';
-  }
+  const { input } = await parseWebhookRequest(request, trigger, { executionMode: 'test' });
   return input;
 }
 
@@ -43,8 +43,8 @@ export async function handleWebhookRequest(
   const trigger = await findWebhookTrigger(db, ownerId, token);
   if (!trigger) return { notFound: true };
 
-  const input = await parseWebhookInput(request, trigger);
-  const result = await runTrigger(env, bindingName, trigger, input);
+  const { input, itemParams } = await parseWebhookRequest(request, trigger, { executionMode: 'production' });
+  const result = await runTrigger(env, bindingName, trigger, input, itemParams);
   return {
     notFound: false,
     status: result.status,
@@ -67,8 +67,22 @@ export async function handleWebhookRequestByWorkflowId(
   const trigger = await findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
   if (!trigger) return { notFound: true };
 
-  const input = await parseWebhookInput(request, trigger);
-  const result = await runTrigger(env, bindingName, trigger, input);
+  const { input, itemParams } = await parseWebhookRequest(request, trigger, { executionMode: 'test' });
+  const webhookItem = buildWebhookItemOutput(itemParams);
+  const result = await runTrigger(env, bindingName, trigger, input, itemParams);
+
+  await broadcastWorkflowWebhookResult(env, bindingName, ownerId, {
+    workflowId,
+    nodeId: trigger.nodeId,
+    webhookPath: trigger.webhookPath ?? webhookPath ?? null,
+    executionKey: result.executionKey,
+    status: result.status,
+    input,
+    output: webhookItem,
+    receivedAt: Date.now(),
+    method: request.method,
+  });
+
   return {
     notFound: false,
     status: result.status,
