@@ -191,7 +191,7 @@ export const MemoryWorkflowNode = memo((props: NodeProps) => (
     accent="border-emerald-500/40"
     handleAccent="!bg-emerald-500"
     handleId="memory"
-    defaultLabel="Memory"
+    defaultLabel="Vectorize"
   />
 ));
 MemoryWorkflowNode.displayName = "MemoryWorkflowNode";

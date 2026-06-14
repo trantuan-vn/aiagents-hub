@@ -12,15 +12,20 @@ export const SERVICE_NODE_N8N_DESCRIPTION = resourceNode({
       name: "endpoint",
       type: "string",
       default: "",
-      required: true,
       description: "Approved AI service endpoint",
       typeOptions: { aiHubServiceSelect: true },
+      displayOptions: {
+        hide: { label: ["Service"] },
+      },
     },
     {
       displayName: "Catalog ID",
       name: "catalogId",
       type: "string",
       default: "",
+      displayOptions: {
+        hide: { label: ["Service"] },
+      },
     },
     {
       displayName: "Label",

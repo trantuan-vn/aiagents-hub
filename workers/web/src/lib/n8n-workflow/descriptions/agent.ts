@@ -1,6 +1,6 @@
 import { mainFlowNode } from "./common";
 
-/** AI Agent node — n8n-style parameter schema; Chat Model uses repo services (serviceEndpoint). */
+/** AI Agent node — n8n-style parameter schema; Service uses repo services (serviceEndpoint). */
 export const AGENT_N8N_DESCRIPTION = mainFlowNode({
   displayName: "AI Agent",
   name: "agent",
@@ -36,7 +36,7 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       default: "",
       description: "Optional system instructions prepended to the model context",
       displayOptions: {
-        show: { promptSource: ["define_below"] },
+        hide: { promptSource: ["define_below", "from_input"] },
       },
     },
     {
@@ -62,6 +62,9 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       type: "boolean",
       default: false,
       noDataExpression: true,
+      displayOptions: {
+        hide: { promptSource: ["define_below", "from_input"] },
+      },
     },
     {
       displayName:
@@ -74,23 +77,18 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       },
     },
     {
-      displayName: "Chat Model",
+      displayName: "Service",
       name: "serviceEndpoint",
       type: "string",
       default: "",
-      required: true,
       description:
-        "Approved AI service on this platform. Overridden when a service node is connected on the canvas.",
+        "Approved AI service on this platform. Connect a service node on the canvas or pick from workflow settings.",
       typeOptions: {
         aiHubServiceSelect: true,
       },
-    },
-    {
-      displayName: "Connect Chat Model, Memory and Tools on the canvas (optional)",
-      name: "subNodesNotice",
-      type: "notice",
-      default:
-        "You can also wire service, memory and tool nodes below the agent — the selected service endpoint above is used at runtime.",
+      displayOptions: {
+        hide: { promptSource: ["define_below", "from_input"] },
+      },
     },
     {
       displayName: "Memory collection",
@@ -98,6 +96,9 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       type: "string",
       default: "vectorize-default",
       description: "Vectorize index name for RAG memory lookup",
+      displayOptions: {
+        hide: { promptSource: ["define_below", "from_input"] },
+      },
     },
     {
       displayName: "Max tokens",
@@ -105,6 +106,9 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       type: "number",
       default: 1024,
       description: "Maximum tokens for the model response",
+      displayOptions: {
+        hide: { promptSource: ["define_below", "from_input"] },
+      },
     },
   ],
 });

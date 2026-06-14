@@ -1,5 +1,8 @@
 /** Shared Vectorize helpers for RAG — embed, query, upsert. */
 
+import { normalizeVectorizeCollection, VECTORIZE_COLLECTION } from './vectorize-scope.js';
+
+export { VECTORIZE_COLLECTION };
 export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 
 export type VectorMatch = {
@@ -30,8 +33,10 @@ export type QueryCollectionOptions = {
 };
 
 export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBinding | undefined {
+  const normalized = normalizeVectorizeCollection(collection);
   const fallback = (env as unknown as Record<string, unknown>).VECTORIZE as VectorizeBinding | undefined;
-  const named = (env as unknown as Record<string, unknown>)[collection] as VectorizeBinding | undefined;
+  if (normalized === VECTORIZE_COLLECTION) return fallback;
+  const named = (env as unknown as Record<string, unknown>)[normalized] as VectorizeBinding | undefined;
   return named ?? fallback;
 }
 
@@ -59,7 +64,7 @@ export async function queryCollection(
   queryVector: number[],
   opts: QueryCollectionOptions = {},
 ): Promise<VectorMatch[]> {
-  const index = resolveVectorizeIndex(env, collection);
+  const index = resolveVectorizeIndex(env, normalizeVectorizeCollection(collection));
   if (!index?.query || !queryVector.length) return [];
 
   const topK = opts.topK ?? 5;
@@ -83,7 +88,7 @@ export async function upsertVectors(
   collection: string,
   vectors: VectorizeVectorRecord[],
 ): Promise<number> {
-  const index = resolveVectorizeIndex(env, collection);
+  const index = resolveVectorizeIndex(env, normalizeVectorizeCollection(collection));
   if (!index?.upsert || !vectors.length) return 0;
   try {
     const result = await index.upsert(vectors);

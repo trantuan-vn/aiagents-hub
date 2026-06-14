@@ -70,21 +70,29 @@ export async function createWorkflowChatStreamResponse(
   const wfDesc = String(resolved.workflow.description ?? '');
   const latestUser = extractLatestUserText(uiMessages);
 
-  const linked = resolveAgentResources(resolved.definition, agentNode.id);
+  const linked = resolveAgentResources(resolved.definition, agentNode.id, {
+    ownerId: resolved.ownerId,
+    workflowId: resolved.workflowId,
+  });
   const memoryCollection = String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
+  const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
   const hasGetRagTool = agentHasRagToolKind(resolved.definition, agentNode.id, 'get-rag');
   const httpTools = buildAgentToolset({ env: c.env, userDO }, resolved.definition);
-  const ragTools = buildRagToolset({ env: c.env, userDO }, resolved.definition, agentNode.id);
+  const ragTools = buildRagToolset(
+    { env: c.env, userDO, ownerId: resolved.ownerId, workflowId: resolved.workflowId },
+    resolved.definition,
+    agentNode.id,
+  );
   const memoryTools =
     memoryCollection && !hasGetRagTool && !Object.keys(ragTools).length
-      ? buildMemoryTool(c.env, memoryCollection)
+      ? buildMemoryTool(c.env, memoryCollection, memoryNamespace || undefined)
       : {};
   const tools = { ...httpTools, ...ragTools, ...memoryTools };
   const toolNames = Object.keys(tools);
 
   const ragSnippets =
     memoryCollection && !hasGetRagTool
-      ? await retrieveMemory(c.env, memoryCollection, latestUser, 4)
+      ? await retrieveMemory(c.env, memoryCollection, latestUser, 4, memoryNamespace || undefined)
       : [];
 
   const systemPrompt = [

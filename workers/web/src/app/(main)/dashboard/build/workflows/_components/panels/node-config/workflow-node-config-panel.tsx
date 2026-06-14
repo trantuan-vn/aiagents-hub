@@ -63,7 +63,6 @@ export function WorkflowNodeConfigPanel({
     [runtimeType, kind],
   );
 
-  const inputSection = definition?.sections.find((s) => s.id === "input");
   const paramsSection = definition?.sections.find((s) => s.id === "parameters");
   const outputSection = definition?.sections.find((s) => s.id === "output");
 
@@ -85,6 +84,8 @@ export function WorkflowNodeConfigPanel({
     return (
       <ConfigPanel
         node={node}
+        nodes={nodes}
+        edges={edges}
         workflowId={workflowId}
         onClose={onClose}
         onPatchData={onPatchData}
@@ -112,16 +113,7 @@ export function WorkflowNodeConfigPanel({
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
-        {runtimeType === "agent" ? (
-          <AgentUpstreamInputPanel nodeId={node.id} nodes={nodes} edges={edges} />
-        ) : inputSection ? (
-          <NodeConfigIoPanel
-            title={t("section_input")}
-            section={inputSection}
-            data={nodeData}
-            emptyLabel={t("no_input_data")}
-          />
-        ) : null}
+        <AgentUpstreamInputPanel nodeId={node.id} nodes={nodes} edges={edges} />
 
         <div className="flex min-h-0 flex-col border-r">
           <div className="border-b px-3 py-2">

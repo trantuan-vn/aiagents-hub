@@ -7,7 +7,7 @@ import {
   upsertVectors,
   buildMetadataFilter,
 } from './rag-vector.js';
-import { chunkText } from './nodes/tool/chunk.js';
+import { chunkText } from './nodes/tool/save-rag/chunk.js';
 
 describe('rag-vector', () => {
   it('buildMetadataFilter includes namespace and docType', () => {

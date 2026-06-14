@@ -126,13 +126,14 @@ export async function runTextModel(
   modelId: string,
   messages: Array<{ role: string; content: string }>,
   maxTokens = 1024,
+  extra?: Record<string, unknown>,
 ): Promise<unknown> {
   const id = (modelId || DEFAULT_TEXT_MODEL) as keyof AiModels;
 
   const run = () =>
     env.AI.run(
       id,
-      { messages, max_tokens: maxTokens },
+      { messages, max_tokens: maxTokens, ...extra },
       { gateway: { id: AI_GATEWAY_ID } },
     );
 

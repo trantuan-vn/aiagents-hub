@@ -1,11 +1,13 @@
 import type { ComponentType } from "react";
 
-import type { Node, NodeProps } from "@xyflow/react";
+import type { Edge, Node, NodeProps } from "@xyflow/react";
 
 import type { N8nNodeProperty } from "@/lib/n8n-workflow/types";
 
 export type NodeConfigPanelProps = {
   node: Node;
+  nodes?: Node[];
+  edges?: Edge[];
   workflowId?: number;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;

@@ -16,6 +16,7 @@ import {
 } from "./connection-handle-parts";
 import { useWorkflowCanvasUi } from "../canvas/workflow-canvas-ui-context";
 import { type WorkflowHandleId } from "./workflow-connection-utils";
+import type { WorkflowAddNodePick } from "../add-node/workflow-add-node-panel";
 
 interface ConnectionHandleProps {
   handleId: WorkflowHandleId;
@@ -30,6 +31,8 @@ interface ConnectionHandleProps {
   required?: boolean;
   /** Override React Flow handle anchor (e.g. split true/false vertically). */
   handleStyle?: React.CSSProperties;
+  /** Create this node immediately on + click instead of opening the add-node drawer. */
+  directPickOnPlus?: WorkflowAddNodePick;
 }
 
 function useConnectionHandleModel({
@@ -39,6 +42,7 @@ function useConnectionHandleModel({
   showAddNode = true,
   allowedNodeTypes,
   allowMultipleConnections = false,
+  directPickOnPlus,
 }: ConnectionHandleProps) {
   const nodeId = useNodeId();
   const ui = useWorkflowCanvasUi();
@@ -96,6 +100,7 @@ function useConnectionHandleModel({
     clusterClass: getHandleClusterClass(position),
     isSideHandle: position === Position.Left || position === Position.Right,
     allowedNodeTypes,
+    directPickOnPlus,
   };
 }
 
@@ -109,7 +114,7 @@ function ConnectionHandleView({
   required,
   model,
 }: ConnectionHandleProps & { model: ReturnType<typeof useConnectionHandleModel> }) {
-  const { t, onPick, showPlus, clusterClass, isSideHandle, allowedNodeTypes } = model;
+  const { t, onPick, showPlus, clusterClass, isSideHandle, allowedNodeTypes, directPickOnPlus } = model;
 
   return (
     <ConnectionHandleCluster
@@ -128,6 +133,7 @@ function ConnectionHandleView({
           onPick={onPick}
           t={t}
           allowedNodeTypes={allowedNodeTypes}
+          directPickOnPlus={directPickOnPlus}
         />
       ) : (
         <ConnectionHandleDot

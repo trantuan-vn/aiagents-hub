@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { WorkflowDefinition } from '../../domain/domain.js';
-import { executeGetRag } from './get-rag.js';
+import type { WorkflowDefinition } from '../../../domain/domain.js';
+import { executeGetRag } from './execute.js';
 
 const definition: WorkflowDefinition = {
   nodes: [

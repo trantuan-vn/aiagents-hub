@@ -6,6 +6,9 @@ import {
   Globe,
   Link2,
   LogIn,
+  Search,
+  TableProperties,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import type { SimpleIcon } from "simple-icons";
@@ -63,7 +66,7 @@ export const WORKFLOW_AGENT_TOOL_RECOMMENDED: WorkflowAgentRecommendedTool[] = [
   },
 ];
 
-export type WorkflowAgentToolCategoryId = "action_in_app" | "mcp" | "vector_stores" | "human_review";
+export type WorkflowAgentToolCategoryId = "action_in_app" | "mcp" | "human_review";
 
 export type WorkflowAgentToolCategory = {
   id: WorkflowAgentToolCategoryId;
@@ -96,12 +99,6 @@ export const WORKFLOW_AGENT_TOOL_CATEGORIES: WorkflowAgentToolCategory[] = [
     badgeNew: true,
   },
   {
-    id: "vector_stores",
-    nameKey: "tool_category_vector_stores",
-    descKey: "tool_category_vector_stores_desc",
-    icon: Database,
-  },
-  {
     id: "human_review",
     nameKey: "add_category_human_review",
     descKey: "add_category_human_review_desc",
@@ -109,17 +106,25 @@ export const WORKFLOW_AGENT_TOOL_CATEGORIES: WorkflowAgentToolCategory[] = [
   },
 ];
 
-export type WorkflowAgentVectorStoreId = "supabase" | "pinecone" | "mongodb" | "pgvector" | "qdrant";
+export type WorkflowAgentVectorStoreId =
+  | "vectorize"
+  | "supabase"
+  | "pinecone"
+  | "mongodb"
+  | "pgvector"
+  | "qdrant";
 
 export type WorkflowAgentVectorStoreItem = {
   id: WorkflowAgentVectorStoreId;
   nameKey:
+    | "mem_vectorize"
     | "tool_vector_supabase"
     | "tool_vector_pinecone"
     | "tool_vector_mongodb"
     | "tool_vector_pgvector"
     | "tool_vector_qdrant";
   descKey:
+    | "mem_vectorize_desc"
     | "tool_vector_supabase_desc"
     | "tool_vector_pinecone_desc"
     | "tool_vector_mongodb_desc"
@@ -130,6 +135,12 @@ export type WorkflowAgentVectorStoreItem = {
 };
 
 export const WORKFLOW_AGENT_VECTOR_STORES: WorkflowAgentVectorStoreItem[] = [
+  {
+    id: "vectorize",
+    nameKey: "mem_vectorize",
+    descKey: "mem_vectorize_desc",
+    lucideIcon: Database,
+  },
   {
     id: "supabase",
     nameKey: "tool_vector_supabase",
@@ -159,6 +170,37 @@ export const WORKFLOW_AGENT_VECTOR_STORES: WorkflowAgentVectorStoreItem[] = [
     nameKey: "tool_vector_qdrant",
     descKey: "tool_vector_qdrant_desc",
     lucideIcon: Database,
+  },
+];
+
+/** Hub-built tool_node kinds — extend this list when adding new runtime tools. */
+export type WorkflowAgentBuiltinToolId = "save-rag" | "get-rag" | "get-db-info";
+
+export type WorkflowAgentBuiltinTool = {
+  id: WorkflowAgentBuiltinToolId;
+  nameKey: "tool_save_rag" | "tool_get_rag" | "tool_get_db_info";
+  descKey: "tool_save_rag_desc" | "tool_get_rag_desc" | "tool_get_db_info_desc";
+  icon: LucideIcon;
+};
+
+export const WORKFLOW_AGENT_BUILTIN_TOOLS: WorkflowAgentBuiltinTool[] = [
+  {
+    id: "save-rag",
+    nameKey: "tool_save_rag",
+    descKey: "tool_save_rag_desc",
+    icon: Upload,
+  },
+  {
+    id: "get-rag",
+    nameKey: "tool_get_rag",
+    descKey: "tool_get_rag_desc",
+    icon: Search,
+  },
+  {
+    id: "get-db-info",
+    nameKey: "tool_get_db_info",
+    descKey: "tool_get_db_info_desc",
+    icon: TableProperties,
   },
 ];
 

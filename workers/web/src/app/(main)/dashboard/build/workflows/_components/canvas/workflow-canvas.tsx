@@ -25,6 +25,7 @@ import { WORKFLOW_EDGE_MARKER_END, WORKFLOW_EDGE_STYLE } from "../edges/workflow
 import { WorkflowNodeConfigPanel } from "../panels/node-config/workflow-node-config-panel";
 import { createNodeDataFromPlugin, resolveUIPluginById, workflowNodeTypes } from "../nodes";
 import { webhookNodeDefaults } from "../nodes/webhook/defaults";
+import { buildVectorizeNodeData } from "../layout/vectorize-node-data";
 import { warnLegacyRuntimeType } from "../../_lib/runtime-type";
 
 export type { WorkflowDefinition };
@@ -85,7 +86,7 @@ function CanvasInner({
     onNodeMenuAction,
     tidyLayout,
     isValidConnection,
-  } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint, definitionSyncKey);
+  } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint, definitionSyncKey, workflowId);
 
   const interactionProps = useMemo(
     () =>
@@ -339,6 +340,7 @@ export function addNodeToDefinition(
   type: string,
   label: string,
   extraData?: Record<string, unknown>,
+  workflowId?: number,
 ): WorkflowDefinition {
   const id = `${type}-${Date.now()}`;
   const pluginId = extraData?.triggerKind
@@ -347,9 +349,10 @@ export function addNodeToDefinition(
       ? `core:${extraData.coreKind}`
       : type;
   const plugin = resolveUIPluginById(String(pluginId));
+  const vectorizeDefaults = type === "memory_node" ? buildVectorizeNodeData(workflowId, id, label) : undefined;
   const baseData = plugin
     ? createNodeDataFromPlugin(plugin, label).data
-    : { label, ...webhookNodeDefaults(id, extraData), ...extraData };
+    : { label, ...webhookNodeDefaults(id, extraData), ...vectorizeDefaults, ...extraData };
 
   const node: Node = {
     id,

@@ -17,8 +17,32 @@ import {
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
-import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/pdf-extract.js';
+import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
+
+function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<string, unknown> {
+  if (!opts) return {};
+  const out: Record<string, unknown> = {};
+  if (opts.temperature != null && opts.temperature !== '') out.temperature = Number(opts.temperature);
+  if (opts.topP != null && opts.topP !== '') out.top_p = Number(opts.topP);
+  if (opts.frequencyPenalty != null && opts.frequencyPenalty !== '') {
+    out.frequency_penalty = Number(opts.frequencyPenalty);
+  }
+  if (opts.presencePenalty != null && opts.presencePenalty !== '') {
+    out.presence_penalty = Number(opts.presencePenalty);
+  }
+  if (opts.responseFormat === 'json_object') out.response_format = { type: 'json_object' };
+  return out;
+}
+
+function resolveMaxTokens(
+  agentData: Record<string, unknown>,
+  serviceOptions?: Record<string, unknown>,
+): number {
+  const fromService = serviceOptions?.maxTokens;
+  const raw = fromService ?? agentData.maxTokens ?? 1024;
+  return Number(raw) || 1024;
+}
 
 function resolveEmbedModel(service: Record<string, unknown>): string {
   const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim();
@@ -44,7 +68,10 @@ function extractTriggerContext(ctx: NodeContext): Record<string, unknown> {
 
 export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
-  const linked = resolveAgentResources(ctx.definition, ctx.node.id);
+  const linked = resolveAgentResources(ctx.definition, ctx.node.id, {
+    ownerId: ctx.meta.ownerId,
+    workflowId: ctx.meta.workflowId,
+  });
   const endpoint = String(
     linked.serviceEndpoint ?? data.serviceEndpoint ?? data.endpoint ?? '',
   ).trim();
@@ -75,14 +102,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const memoryCollection = String(
     data.memoryCollection ?? linked.memoryCollection ?? '',
   ).trim();
-  const memoryNode = ctx.definition.nodes.find((n) => {
-    if (n.type !== 'memory_node') return false;
-    return ctx.definition.edges.some(
-      (e) => e.source === n.id && e.target === ctx.node.id && e.targetHandle === 'memory',
-    );
-  });
-  const memData = (memoryNode?.data ?? {}) as Record<string, unknown>;
-  const memoryNamespace = String(memData.namespace ?? '').trim();
+  const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
 
   const hasGetRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
   const ragTools = buildRagToolset(
@@ -92,6 +112,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       agentId: ctx.node.id,
       triggerContext: extractTriggerContext(ctx),
       embedModel,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
     },
     ctx.definition,
     ctx.node.id,
@@ -127,7 +149,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       : '',
   ].filter(Boolean);
 
-  const maxTokens = Number(data.maxTokens ?? 1024) || 1024;
+  const maxTokens = resolveMaxTokens(data, linked.serviceOptions);
+  const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
 
   if (useToolLoop && ctx.c.env.AI) {
     const workersAI = createWorkersAI({
@@ -140,6 +163,10 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       system: systemParts.join('\n\n'),
       messages: [{ role: 'user', content: userText }],
       maxOutputTokens: maxTokens,
+      temperature: modelParams.temperature as number | undefined,
+      topP: modelParams.top_p as number | undefined,
+      frequencyPenalty: modelParams.frequency_penalty as number | undefined,
+      presencePenalty: modelParams.presence_penalty as number | undefined,
       tools,
       stopWhen: stepCountIs(5),
     });
@@ -170,7 +197,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     { role: 'user', content: userText },
   ];
 
-  const aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens);
+  const aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams);
   const text = extractTextFromAiResponse(aiResponse);
 
   const costVnd = await billAgentUsage(

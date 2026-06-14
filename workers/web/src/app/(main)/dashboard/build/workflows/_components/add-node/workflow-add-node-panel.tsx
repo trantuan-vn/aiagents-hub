@@ -5,13 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BadgeCheck,
   Bot,
-  Brain,
   Briefcase,
   CheckCheck,
   CheckCircle2,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Database,
   GitBranch,
   Globe,
   Pencil,
@@ -26,6 +26,7 @@ import { SimpleIcon as BrandIcon } from "@/components/simple-icon";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { TOOL_KIND_DEFAULTS } from "@aiagents-hub/workflow-nodes";
 
 import { useApprovedServices } from "../hooks/use-approved-services";
 import { useWorkflowIntegrations } from "../hooks/use-workflow-integrations";
@@ -49,11 +50,7 @@ import {
   type WorkflowAddNodeCategory,
 } from "../catalogs/workflow-add-node-catalog";
 import {
-  WORKFLOW_AGENT_MEMORY_BEGINNERS,
-  WORKFLOW_AGENT_MEMORY_OTHER,
-  type WorkflowAgentMemoryItem,
-} from "../catalogs/workflow-memory-catalog";
-import {
+  WORKFLOW_AGENT_BUILTIN_TOOLS,
   WORKFLOW_AGENT_MCP_SERVERS,
   WORKFLOW_AGENT_TOOL_CATEGORIES,
   WORKFLOW_AGENT_TOOL_RECOMMENDED,
@@ -134,7 +131,6 @@ export type WorkflowAddNodePanelView =
   | "memory"
   | "tools"
   | "tools_mcp"
-  | "tools_vector_stores"
   | "services"
   | "human_review"
   | "flow"
@@ -160,8 +156,6 @@ export function WorkflowAddNodePanel({
   const [view, setView] = useState<WorkflowAddNodePanelView>(initialView ?? "categories");
   const [selectedActionApp, setSelectedActionApp] = useState<WorkflowActionAppRuntimeItem | null>(null);
   const [sendWaitExpanded, setSendWaitExpanded] = useState(true);
-  const [memoryBeginnersExpanded, setMemoryBeginnersExpanded] = useState(true);
-  const [memoryOtherExpanded, setMemoryOtherExpanded] = useState(true);
   const [flowPopularExpanded, setFlowPopularExpanded] = useState(true);
   const [flowOtherExpanded, setFlowOtherExpanded] = useState(true);
   const [corePopularExpanded, setCorePopularExpanded] = useState(true);
@@ -245,26 +239,15 @@ export function WorkflowAddNodePanel({
     });
   }, [services, q]);
 
-  const filterAgentMemory = useMemo(() => {
-    return (items: WorkflowAgentMemoryItem[]) =>
-      items.filter((item) => {
-        const name = t(item.nameKey).toLowerCase();
-        const desc = t(item.descKey).toLowerCase();
-        return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
-      });
+  const filteredMemoryVectorStores = useMemo(() => {
+    return WORKFLOW_AGENT_VECTOR_STORES.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
   }, [q, t]);
 
-  const filteredMemoryBeginners = useMemo(
-    () => filterAgentMemory(WORKFLOW_AGENT_MEMORY_BEGINNERS),
-    [filterAgentMemory],
-  );
-
-  const filteredMemoryOther = useMemo(
-    () => filterAgentMemory(WORKFLOW_AGENT_MEMORY_OTHER),
-    [filterAgentMemory],
-  );
-
-  const memoryHasResults = filteredMemoryBeginners.length > 0 || filteredMemoryOther.length > 0;
+  const memoryHasResults = filteredMemoryVectorStores.length > 0;
 
   const filteredRecommendedTools = useMemo(() => {
     return WORKFLOW_AGENT_TOOL_RECOMMENDED.filter((item) => {
@@ -290,8 +273,8 @@ export function WorkflowAddNodePanel({
     });
   }, [q, t]);
 
-  const filteredVectorStores = useMemo(() => {
-    return WORKFLOW_AGENT_VECTOR_STORES.filter((item) => {
+  const filteredBuiltinTools = useMemo(() => {
+    return WORKFLOW_AGENT_BUILTIN_TOOLS.filter((item) => {
       const name = t(item.nameKey).toLowerCase();
       const desc = t(item.descKey).toLowerCase();
       return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
@@ -299,7 +282,9 @@ export function WorkflowAddNodePanel({
   }, [q, t]);
 
   const toolsHasResults =
-    filteredRecommendedTools.length > 0 || filteredToolCategories.length > 0;
+    filteredRecommendedTools.length > 0 ||
+    filteredBuiltinTools.length > 0 ||
+    filteredToolCategories.length > 0;
 
   const filteredHumanReviewChannels = useMemo(() => {
     return HUMAN_REVIEW_SEND_WAIT_CHANNELS.filter((item) => {
@@ -441,14 +426,12 @@ export function WorkflowAddNodePanel({
                   : activeView === "services"
                 ? t("add_ai_services_title")
                 : activeView === "memory"
-                  ? t("search_section_memory")
+                  ? t("tool_category_vector_stores")
                   : activeView === "tools"
                     ? t("search_section_tools")
                     : activeView === "tools_mcp"
                       ? t("tool_category_mcp")
-                      : activeView === "tools_vector_stores"
-                        ? t("tool_category_vector_stores")
-                        : activeView === "human_review"
+                      : activeView === "human_review"
                       ? t("add_category_human_review")
                       : activeView === "flow"
                         ? t("add_category_flow")
@@ -577,12 +560,24 @@ export function WorkflowAddNodePanel({
     pickAgentTool(t(item.nameKey), item.id);
   };
 
+  const pickBuiltinTool = (item: (typeof WORKFLOW_AGENT_BUILTIN_TOOLS)[number]) => {
+    const defaults = TOOL_KIND_DEFAULTS[item.id] ?? {};
+    pickAgentTool(t(item.nameKey), item.id, defaults);
+  };
+
   const pickMcpServer = (item: WorkflowAgentMcpServerItem) => {
     pickAgentTool(t(item.nameKey), "mcp", { mcpTransport: item.id });
   };
 
-  const pickVectorStore = (item: WorkflowAgentVectorStoreItem) => {
-    pickAgentTool(t(item.nameKey), "vector_store", { vectorStoreId: item.id });
+  const pickMemoryVectorStore = (item: WorkflowAgentVectorStoreItem) => {
+    onPick({
+      type: "memory_node",
+      label: t(item.nameKey),
+      extra: {
+        catalogId: item.id,
+        memoryKind: item.id === "vectorize" ? "vectorize" : item.id,
+      },
+    });
   };
 
   const openToolCategory = (categoryId: WorkflowAgentToolCategoryId) => {
@@ -596,10 +591,6 @@ export function WorkflowAddNodePanel({
     }
     if (categoryId === "mcp") {
       setView("tools_mcp");
-      return;
-    }
-    if (categoryId === "vector_stores") {
-      setView("tools_vector_stores");
     }
   };
 
@@ -652,14 +643,6 @@ export function WorkflowAddNodePanel({
     });
   };
 
-  const pickMemory = (item: WorkflowAgentMemoryItem) => {
-    onPick({
-      type: "memory_node",
-      label: t(item.nameKey),
-      extra: { catalogId: item.id, memoryKind: item.id },
-    });
-  };
-
   const goBack = () => {
     if (resourceOnly && !fromAgentTools) return;
     if (activeView === "action_in_app_detail") {
@@ -672,8 +655,7 @@ export function WorkflowAddNodePanel({
       if (
         activeView === "action_in_app" ||
         activeView === "human_review" ||
-        activeView === "tools_mcp" ||
-        activeView === "tools_vector_stores"
+        activeView === "tools_mcp"
       ) {
         setView("tools");
         setQuery("");
@@ -699,8 +681,6 @@ export function WorkflowAddNodePanel({
     setTransformCombineExpanded(false);
     setTransformConvertExpanded(true);
     setTransformOtherExpanded(true);
-    setMemoryBeginnersExpanded(true);
-    setMemoryOtherExpanded(true);
   };
 
   const showBack =
@@ -724,10 +704,8 @@ export function WorkflowAddNodePanel({
               : activeView === "action_in_app"
                 ? Globe
                 : activeView === "memory"
-                  ? Brain
-                  : activeView === "tools" ||
-                      activeView === "tools_mcp" ||
-                      activeView === "tools_vector_stores"
+                  ? Database
+                  : activeView === "tools" || activeView === "tools_mcp"
                     ? Wrench
                     : null;
 
@@ -893,48 +871,19 @@ export function WorkflowAddNodePanel({
         ) : null}
 
         {activeView === "memory" ? (
-          <div className="pb-1">
-            <div
-              className="mx-2 mt-2 rounded-md border border-amber-200/80 bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/35 dark:text-amber-100"
-              role="note"
-            >
-              {t("memory_connect_intro")}
-            </div>
-            <div className="p-1">
-              <MemorySection
-                title={t("memory_section_beginners")}
-                expanded={memoryBeginnersExpanded}
-                onToggle={() => setMemoryBeginnersExpanded((v) => !v)}
-              >
-                {filteredMemoryBeginners.map((item) => (
-                  <MemoryItemRow
-                    key={item.id}
-                    item={item}
-                    title={t(item.nameKey)}
-                    description={t(item.descKey)}
-                    onClick={() => pickMemory(item)}
-                  />
-                ))}
-              </MemorySection>
-              <MemorySection
-                title={t("memory_section_other")}
-                expanded={memoryOtherExpanded}
-                onToggle={() => setMemoryOtherExpanded((v) => !v)}
-              >
-                {filteredMemoryOther.map((item) => (
-                  <MemoryItemRow
-                    key={item.id}
-                    item={item}
-                    title={t(item.nameKey)}
-                    description={t(item.descKey)}
-                    onClick={() => pickMemory(item)}
-                  />
-                ))}
-              </MemorySection>
-              {!memoryHasResults ? (
-                <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
-              ) : null}
-            </div>
+          <div className="p-1">
+            {filteredMemoryVectorStores.map((item) => (
+              <VectorStoreItemRow
+                key={item.id}
+                item={item}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                onClick={() => pickMemoryVectorStore(item)}
+              />
+            ))}
+            {!memoryHasResults ? (
+              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
+            ) : null}
           </div>
         ) : null}
 
@@ -950,7 +899,17 @@ export function WorkflowAddNodePanel({
                 onClick={() => pickRecommendedTool(item)}
               />
             ))}
-            {filteredRecommendedTools.length > 0 && filteredToolCategories.length > 0 ? (
+            {filteredBuiltinTools.map((item) => (
+              <ToolRecommendedRow
+                key={item.id}
+                icon={item.icon}
+                title={t(item.nameKey)}
+                description={t(item.descKey)}
+                onClick={() => pickBuiltinTool(item)}
+              />
+            ))}
+            {(filteredRecommendedTools.length > 0 || filteredBuiltinTools.length > 0) &&
+            filteredToolCategories.length > 0 ? (
               <div className="bg-border my-1 h-px" />
             ) : null}
             {filteredToolCategories.map((category) => (
@@ -981,23 +940,6 @@ export function WorkflowAddNodePanel({
               />
             ))}
             {filteredMcpServers.length === 0 ? (
-              <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {activeView === "tools_vector_stores" ? (
-          <div className="p-1">
-            {filteredVectorStores.map((item) => (
-              <VectorStoreItemRow
-                key={item.id}
-                item={item}
-                title={t(item.nameKey)}
-                description={t(item.descKey)}
-                onClick={() => pickVectorStore(item)}
-              />
-            ))}
-            {filteredVectorStores.length === 0 ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
             ) : null}
           </div>
@@ -1360,78 +1302,6 @@ function ChannelIcon({ channel }: { channel: HumanReviewChannelItem }) {
   const Icon = channel.lucideIcon;
   if (!Icon) return null;
   return <Icon className="text-muted-foreground size-5 shrink-0" aria-hidden />;
-}
-
-function MemorySection({
-  title,
-  expanded,
-  onToggle,
-  children,
-}: {
-  title: string;
-  expanded: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <>
-      <button
-        type="button"
-        className="text-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm font-semibold"
-        onClick={onToggle}
-        aria-expanded={expanded}
-      >
-        {title}
-        <ChevronDown className={cn("size-4 shrink-0 transition-transform", expanded && "rotate-180")} aria-hidden />
-      </button>
-      {expanded ? <div className="pb-1">{children}</div> : null}
-    </>
-  );
-}
-
-function MemoryItemRow({
-  item,
-  title,
-  description,
-  onClick,
-}: {
-  item: WorkflowAgentMemoryItem;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
-      onClick={onClick}
-    >
-      <MemoryItemIcon item={item} />
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold">{title}</span>
-        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
-      </span>
-    </button>
-  );
-}
-
-function MemoryItemIcon({ item }: { item: WorkflowAgentMemoryItem }) {
-  if (item.customIcon === "xata") {
-    return (
-      <span
-        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded bg-[#9f8fef] text-[10px] font-bold text-white"
-        aria-hidden
-      >
-        X
-      </span>
-    );
-  }
-  if (item.brandIcon) {
-    return <BrandIcon icon={item.brandIcon} className="mt-0.5 size-5 shrink-0" />;
-  }
-  const Icon = item.lucideIcon;
-  if (!Icon) return null;
-  return <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden />;
 }
 
 function FlowSection({

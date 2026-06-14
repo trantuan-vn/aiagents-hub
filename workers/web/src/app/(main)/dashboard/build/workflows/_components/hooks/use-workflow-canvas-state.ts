@@ -32,6 +32,7 @@ export function useWorkflowCanvasState(
   readOnly?: boolean,
   serviceEndpoint?: string,
   externalSyncKey?: number,
+  workflowId?: number,
 ) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initial?.nodes ?? []);
   const [edges, setEdges, onEdgesChange] = useEdgesState((initial?.edges ?? []).map(normalizeWorkflowEdge));
@@ -288,7 +289,7 @@ export function useWorkflowCanvasState(
   const createConnectedNode = useCallback(
     (args: CreateConnectedNodeArgs) => {
       if (readOnly) return;
-      const result = applyCreateConnectedNode(nodesRef.current, edgesRef.current, args, serviceEndpoint);
+      const result = applyCreateConnectedNode(nodesRef.current, edgesRef.current, args, serviceEndpoint, workflowId);
       if (!result) return;
       nodesRef.current = result.nodes;
       edgesRef.current = result.edges;
@@ -299,7 +300,7 @@ export function useWorkflowCanvasState(
         pushToParent();
       });
     },
-    [readOnly, serviceEndpoint, setNodes, setEdges, pushToParent],
+    [readOnly, serviceEndpoint, workflowId, setNodes, setEdges, pushToParent],
   );
 
   const isValidConnection = useCallback(

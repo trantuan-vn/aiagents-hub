@@ -1,6 +1,9 @@
 import type { Node } from "@xyflow/react";
 
 import type { WorkflowNodeUIPlugin } from "./types";
+import { agentUIPlugin } from "./agent";
+import { memoryUIPlugin } from "./memory";
+import { serviceUIPlugin } from "./service";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
 import {
   ActionNode,
@@ -18,6 +21,9 @@ import {
 
 export * from "./types";
 export * from "./workflow-sticky-note-node";
+export * from "./agent";
+export * from "./memory";
+export * from "./service";
 export * from "./webhook";
 // workflow-nodes exports are included below after plugin setup
 
@@ -32,6 +38,9 @@ function plugin(
 export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   webhookTriggerUIPlugin,
   coreWebhookUIPlugin,
+  agentUIPlugin,
+  serviceUIPlugin,
+  memoryUIPlugin,
   plugin(
     {
       id: "trigger",
@@ -39,14 +48,6 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
       catalog: { category: "trigger", labelKey: "node_trigger", descriptionKey: "node_trigger_desc", icon: "Play" },
     },
     TriggerNode,
-  ),
-  plugin(
-    {
-      id: "agent",
-      runtimeType: "agent",
-      catalog: { category: "ai", labelKey: "node_agent", descriptionKey: "node_agent_desc", icon: "Bot" },
-    },
-    AgentWorkflowNode,
   ),
   plugin(
     {
@@ -97,22 +98,6 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
       },
     },
     TransformNode,
-  ),
-  plugin(
-    {
-      id: "service_node",
-      runtimeType: "service_node",
-      catalog: { category: "tool", labelKey: "node_service", descriptionKey: "node_service_desc", icon: "Server", visible: false },
-    },
-    ServiceWorkflowNode,
-  ),
-  plugin(
-    {
-      id: "memory_node",
-      runtimeType: "memory_node",
-      catalog: { category: "memory", labelKey: "node_memory", descriptionKey: "node_memory_desc", icon: "Database", visible: false },
-    },
-    MemoryWorkflowNode,
   ),
   plugin(
     {

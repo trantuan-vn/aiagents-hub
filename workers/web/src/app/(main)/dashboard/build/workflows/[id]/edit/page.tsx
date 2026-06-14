@@ -207,9 +207,9 @@ export default function EditWorkflowPage() {
       const extra =
         pickExtra ??
         (type === "agent"
-          ? { memoryCollection: "vectorize-default", tools: [] }
+          ? { tools: [] }
           : undefined);
-      setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra)));
+      setDefinition(JSON.stringify(addNodeToDefinition(def, type, label, extra, id)));
     },
     [definition, record],
   );

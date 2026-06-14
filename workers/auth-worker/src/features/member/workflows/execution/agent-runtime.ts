@@ -10,9 +10,11 @@ import {
   matchesToSnippets,
   queryCollection,
 } from '../rag-vector.js';
-import { executeGetDbInfo } from '../nodes/tool/get-db-info.js';
-import { executeGetRag } from '../nodes/tool/get-rag.js';
-import { executeSaveRag } from '../nodes/tool/save-rag.js';
+import {
+  executeGetDbInfo,
+  executeGetRag,
+  executeSaveRag,
+} from '../nodes/tool/index.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -31,6 +33,8 @@ interface AgentToolContext {
   agentId?: string;
   triggerContext?: Record<string, unknown>;
   embedModel?: string;
+  ownerId?: string;
+  workflowId?: number;
 }
 
 function sanitizeToolName(raw: string, fallback: string): string {
@@ -152,6 +156,8 @@ export function buildRagToolset(
             agentId,
             input,
             embedModel: ctx.embedModel,
+            ownerId: ctx.ownerId,
+            workflowId: ctx.workflowId,
           }),
       });
     }
@@ -175,6 +181,8 @@ export function buildRagToolset(
             agentId,
             input,
             embedModel: ctx.embedModel,
+            ownerId: ctx.ownerId,
+            workflowId: ctx.workflowId,
           }),
       });
     }

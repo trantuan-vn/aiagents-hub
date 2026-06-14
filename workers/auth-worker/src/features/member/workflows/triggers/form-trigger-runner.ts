@@ -1,7 +1,7 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { executeWorkflowGraph } from '../engine/executor.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
-import { listDatabaseTables } from '../nodes/tool/get-db-info.js';
+import { listDatabaseTables } from '../nodes/tool/index.js';
 import type { WorkflowTriggerRow } from './triggers.js';
 
 export type FormDatabaseTriggerData = {

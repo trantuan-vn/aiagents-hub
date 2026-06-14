@@ -130,6 +130,12 @@
 	"ai": {
 		"binding": "AI"  
 	},
+	"vectorize": [
+		{
+			"binding": "VECTORIZE",
+			"index_name": "ask-ai-semantic"
+		}
+	],
 	"routes": [
 		{
 		"pattern": "api.aiagents-hub.vn",

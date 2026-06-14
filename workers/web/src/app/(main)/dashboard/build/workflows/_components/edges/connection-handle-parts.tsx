@@ -74,6 +74,7 @@ export function ConnectionHandleWithPlus({
   onPick,
   t,
   allowedNodeTypes,
+  directPickOnPlus,
 }: {
   handleId: WorkflowHandleId;
   type: "target" | "source";
@@ -83,6 +84,7 @@ export function ConnectionHandleWithPlus({
   onPick: (pick: WorkflowAddNodePick) => void;
   t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>;
   allowedNodeTypes?: string[];
+  directPickOnPlus?: WorkflowAddNodePick;
 }) {
   const openDrawer = useWorkflowCanvasUi()?.openAddNodeDrawer;
 
@@ -103,6 +105,10 @@ export function ConnectionHandleWithPlus({
         onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
+          if (directPickOnPlus) {
+            onPick(directPickOnPlus);
+            return;
+          }
           openDrawer?.({
             variant: "connect",
             allowedNodeTypes,

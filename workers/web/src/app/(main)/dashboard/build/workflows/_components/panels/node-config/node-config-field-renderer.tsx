@@ -2,12 +2,12 @@
 
 import { useTranslations } from "next-intl";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import type { WorkflowNodeFieldDefinition } from "@/lib/workflow-node-registry";
+
+import { ExpressionDropField } from "./expression-drop-field";
 
 type NodeConfigFieldRendererProps = {
   field: WorkflowNodeFieldDefinition;
@@ -16,7 +16,8 @@ type NodeConfigFieldRendererProps = {
 };
 
 const EDITOR_KEYS = new Set([
-  "tool_http", "tool_code", "mem_r2", "mem_d1", "mem_vectorize",
+  "tool_http", "tool_code", "mem_vectorize", "node_vectorize",
+  "tool_save_rag", "tool_get_rag", "tool_get_db_info",
   "core_kind_http_request", "core_kind_code", "node_trigger", "node_flow", "node_core",
   "node_agent", "node_action", "node_transform", "node_human_review", "node_service", "node_memory", "node_tool",
 ]);
@@ -37,10 +38,19 @@ export function NodeConfigFieldRenderer({ field, value, onChange }: NodeConfigFi
   };
 
   if (field.type === "info") {
+    const displayValue =
+      field.id === "collection"
+        ? String(value ?? "VECTORIZE")
+        : field.id === "namespace"
+          ? String(value ?? "")
+          : null;
     return (
       <div className="bg-muted/50 rounded-md border px-3 py-2 text-xs">
         <p className="font-medium">{label(field.labelKey)}</p>
         {field.descriptionKey ? <p className="text-muted-foreground mt-1">{label(field.descriptionKey)}</p> : null}
+        {displayValue ? (
+          <p className="text-muted-foreground mt-2 font-mono text-[11px] break-all">{displayValue || "—"}</p>
+        ) : null}
       </div>
     );
   }
@@ -80,23 +90,22 @@ export function NodeConfigFieldRenderer({ field, value, onChange }: NodeConfigFi
   }
 
   if (field.type === "textarea" || field.type === "json" || field.type === "expression") {
+    const stringValue =
+      typeof value === "string" ? value : value != null ? JSON.stringify(value, null, 2) : "";
     return (
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label>{label(field.labelKey)}</Label>
-          {field.supportsExpression ? (
-            <span className="text-muted-foreground font-mono text-[10px]">fx</span>
-          ) : null}
         </div>
         {field.descriptionKey ? (
           <p className="text-muted-foreground text-xs">{label(field.descriptionKey)}</p>
         ) : null}
-        <Textarea
-          value={typeof value === "string" ? value : value != null ? JSON.stringify(value, null, 2) : ""}
+        <ExpressionDropField
+          value={stringValue}
           placeholder={field.placeholderKey ? label(field.placeholderKey) : undefined}
+          multiline
           rows={field.type === "textarea" ? 5 : 4}
-          className="font-mono text-xs"
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
         />
       </div>
     );
@@ -129,11 +138,15 @@ export function NodeConfigFieldRenderer({ field, value, onChange }: NodeConfigFi
   return (
     <div className="space-y-1.5">
       <Label>{label(field.labelKey)}</Label>
-      <Input
-        type={field.type === "number" ? "number" : "text"}
+      {field.descriptionKey ? (
+        <p className="text-muted-foreground text-xs">{label(field.descriptionKey)}</p>
+      ) : null}
+      <ExpressionDropField
         value={value != null ? String(value) : ""}
-        onChange={(e) =>
-          onChange(field.type === "number" ? Number(e.target.value) : e.target.value)
+        numeric={field.type === "number"}
+        placeholder={field.placeholderKey ? label(field.placeholderKey) : undefined}
+        onChange={(v) =>
+          onChange(field.type === "number" && !v.includes("{{") ? Number(v) : v)
         }
       />
     </div>

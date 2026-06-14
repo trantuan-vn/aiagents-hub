@@ -1,5 +1,8 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
+import { resolveVectorizeScope, type VectorizeScopeContext } from '../vectorize-scope.js';
 import { isBranchSourceHandle } from './flow-helpers.js';
+
+export type { VectorizeScopeContext };
 
 export type ResourceHandle = 'service' | 'memory' | 'tools';
 
@@ -149,22 +152,28 @@ export function gatherMainFlowInputs(
 
 export interface AgentResourceContext {
   serviceEndpoint?: string;
+  serviceOptions?: Record<string, unknown>;
   memoryCollection?: string;
   memoryKind?: string;
   memoryNamespace?: string;
+  memoryNodeId?: string;
   tools: Array<Record<string, unknown>>;
 }
+export type { VectorizeScopeContext };
 
 export function resolveAgentResources(
   definition: WorkflowDefinition,
   agentId: string,
+  scope?: VectorizeScopeContext,
 ): AgentResourceContext {
   const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
   const tools: Array<Record<string, unknown>> = [];
   let serviceEndpoint: string | undefined;
+  let serviceOptions: Record<string, unknown> | undefined;
   let memoryCollection: string | undefined;
   let memoryKind: string | undefined;
   let memoryNamespace: string | undefined;
+  let memoryNodeId: string | undefined;
 
   for (const edge of definition.edges) {
     if (edge.target !== agentId || !edge.targetHandle) continue;
@@ -176,12 +185,27 @@ export function resolveAgentResources(
 
     if (handle === 'service' && source.type === 'service_node') {
       serviceEndpoint = String(data.endpoint ?? data.catalogId ?? data.serviceEndpoint ?? '').trim() || serviceEndpoint;
+      const opts = data.serviceOptions;
+      if (opts && typeof opts === 'object' && !Array.isArray(opts)) {
+        serviceOptions = opts as Record<string, unknown>;
+      }
     }
 
     if (handle === 'memory' && source.type === 'memory_node') {
+      memoryNodeId = source.id;
       memoryKind = String(data.memoryKind ?? 'vectorize');
-      memoryCollection = String(data.collection ?? data.memoryCollection ?? 'vectorize-default');
-      memoryNamespace = String(data.namespace ?? '').trim() || memoryNamespace;
+      memoryCollection = String(data.collection ?? data.memoryCollection ?? 'VECTORIZE');
+      const configuredNamespace = String(data.namespace ?? '').trim();
+      if (scope?.ownerId && scope.workflowId) {
+        memoryNamespace = resolveVectorizeScope(
+          scope.ownerId,
+          scope.workflowId,
+          source.id,
+          configuredNamespace,
+        );
+      } else {
+        memoryNamespace = configuredNamespace || memoryNamespace;
+      }
     }
 
     if (handle === 'tools' && source.type === 'tool_node') {
@@ -194,5 +218,5 @@ export function resolveAgentResources(
     }
   }
 
-  return { serviceEndpoint, memoryCollection, memoryKind, memoryNamespace, tools };
+  return { serviceEndpoint, serviceOptions, memoryCollection, memoryKind, memoryNamespace, memoryNodeId, tools };
 }

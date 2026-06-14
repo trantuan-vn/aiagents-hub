@@ -3,13 +3,12 @@
 import { displayParameter } from "@/lib/n8n-workflow/display-parameter";
 import type { N8nNodeParameters, N8nNodeProperty, N8nNodeTypeDescription } from "@/lib/n8n-workflow/types";
 
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 
 import { ServiceEndpointSelect } from "../../node-ui/service-endpoint-select";
+import { ExpressionDropField } from "./expression-drop-field";
 
 type N8nParameterRendererProps = {
   description: N8nNodeTypeDescription;
@@ -93,51 +92,52 @@ function N8nPropertyField({
         {property.description ? (
           <p className="text-muted-foreground text-xs">{property.description}</p>
         ) : null}
-        <Input
-          type="number"
+        <ExpressionDropField
           value={value != null ? String(value) : String(property.default ?? "")}
-          onChange={(e) => onChange(Number(e.target.value))}
+          numeric
+          showFx={!property.noDataExpression}
+          onChange={(v) => onChange(v.includes("{{") ? v : Number(v))}
         />
       </div>
     );
   }
 
   if (property.type === "json") {
+    const stringValue =
+      typeof value === "string" ? value : value != null ? JSON.stringify(value, null, 2) : "";
     return (
       <div className="space-y-1.5">
         <Label>{property.displayName}</Label>
         {property.description ? (
           <p className="text-muted-foreground text-xs">{property.description}</p>
         ) : null}
-        <Textarea
-          value={typeof value === "string" ? value : value != null ? JSON.stringify(value, null, 2) : ""}
+        <ExpressionDropField
+          value={stringValue}
+          multiline
           rows={4}
-          className="font-mono text-xs"
-          onChange={(e) => onChange(e.target.value)}
+          showFx={!property.noDataExpression}
+          onChange={onChange}
         />
       </div>
     );
   }
 
   const rows = property.typeOptions?.rows ?? (property.type === "string" ? 1 : 4);
+  const allowExpression = !property.noDataExpression;
   if (rows > 1) {
     return (
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <Label>{property.displayName}</Label>
-          {!property.noDataExpression ? (
-            <span className="text-muted-foreground font-mono text-[10px]">fx</span>
-          ) : null}
-        </div>
+        <Label>{property.displayName}</Label>
         {property.description ? (
           <p className="text-muted-foreground text-xs">{property.description}</p>
         ) : null}
-        <Textarea
+        <ExpressionDropField
           value={typeof value === "string" ? value : value != null ? String(value) : ""}
           placeholder={property.placeholder}
+          multiline
           rows={rows}
-          className="font-mono text-xs"
-          onChange={(e) => onChange(e.target.value)}
+          showFx={allowExpression}
+          onChange={onChange}
         />
       </div>
     );
@@ -149,10 +149,11 @@ function N8nPropertyField({
       {property.description ? (
         <p className="text-muted-foreground text-xs">{property.description}</p>
       ) : null}
-      <Input
+      <ExpressionDropField
         value={value != null ? String(value) : ""}
         placeholder={property.placeholder}
-        onChange={(e) => onChange(e.target.value)}
+        showFx={allowExpression}
+        onChange={onChange}
       />
     </div>
   );
