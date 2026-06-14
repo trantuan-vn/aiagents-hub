@@ -85,8 +85,31 @@ Copy template dưới đây vào `docs/workflow-nodes/<tên-node>.md`, rồi th�
 
 ```
 packages/workflow-nodes/src/nodes/<name>/
-workers/auth-worker/.../nodes/<name>/
-workers/web/.../nodes/<name>/
+workers/auth-worker/.../workflows/nodes/<name>/
+workers/web/.../build/workflows/_components/nodes/<name>/
+```
+
+### Cấu trúc workflows (tham chiếu)
+
+```
+workers/auth-worker/.../workflows/
+├── api/          # presentation, hooks-presentation
+├── domain/       # schemas, constants
+├── execution/    # context, store, node-runtime, agent-runtime
+├── engine/       # executor, graph-helpers, flow-helpers
+├── nodes/        # plugin registry
+└── triggers/     # triggers.ts, channel-hooks, webhook-auth
+
+workers/web/.../build/workflows/_components/
+├── canvas/       # workflow-canvas
+├── editor/       # shell, header, sidebar
+├── add-node/     # drawer, panel
+├── edges/        # connection utils, handles
+├── layout/       # definition, placement
+├── nodes/        # canvas components + UI plugin registry
+├── panels/       # node-config + workflow-panels
+├── catalogs/     # add-node catalog (tạm thời)
+└── hooks/        # state, undo, collab
 ```
 
 ## 6. Backend

@@ -121,16 +121,16 @@ Webhook là **node mẫu đầu tiên** — có đủ registry schema, custom co
 | `workers/web/.../panels/node-config/webhook-listening-panel.tsx` | Test listening UI |
 | `workers/web/.../panels/node-config/webhook-edit-output-panel.tsx` | Edit mock output |
 | `workers/web/.../panels/node-config/workflow-node-config-panel.tsx` | Router: `isWebhookNode()` → webhook panel |
-| `workers/web/.../workflow-canvas.tsx` | `webhookNodeDefaults()` |
+| `workers/web/.../canvas/workflow-canvas.tsx` | Import `webhookNodeDefaults` từ `nodes/webhook/defaults` |
 | `workers/web/.../catalogs/workflow-trigger-catalog.ts` | Add-node catalog entry |
 | `workers/web/.../catalogs/workflow-core-catalog.ts` | Add-node catalog entry |
-| `workers/web/.../workflow-add-node-panel.tsx` | `pickTrigger("webhook")`, `pickCoreItem(webhook)` |
+| `workers/web/.../add-node/workflow-add-node-panel.tsx` | `pickTrigger("webhook")`, `pickCoreItem(webhook)` |
 | `workers/web/.../nodes/workflow-nodes.tsx` | `TriggerNode` canvas component |
-| `workers/web/.../workflow-triggers-panel.tsx` | Tạo/list trigger + hiển thị webhook URL |
-| `workers/auth-worker/.../triggers.ts` | D1 CRUD, `runTrigger()`, token lookup |
-| `workers/auth-worker/.../hooks-presentation.ts` | Public `POST/GET /hooks/workflows/:ownerId/:token` |
-| `workers/auth-worker/.../presentation.ts` | `buildTriggerUrl()`, enrich trigger response |
-| `workers/auth-worker/.../executor.ts` | `case 'trigger'`: pass-through (không logic webhook riêng) |
+| `workers/web/.../panels/workflow-panels/workflow-triggers-panel.tsx` | Tạo/list trigger + hiển thị webhook URL |
+| `workers/auth-worker/.../triggers/triggers.ts` | D1 CRUD, `runTrigger()`, token lookup |
+| `workers/auth-worker/.../api/hooks-presentation.ts` | Public `POST/GET /hooks/workflows/:ownerId/:token` |
+| `workers/auth-worker/.../api/presentation.ts` | `buildTriggerUrl()`, enrich trigger response |
+| `workers/auth-worker/.../engine/executor.ts` | Plugin dispatch (trigger pass-through) |
 
 ### Mục tiêu (sau Phase 1 migration)
 
@@ -150,7 +150,7 @@ workers/web/.../build/workflows/_components/nodes/webhook/
 ├── config-panel.tsx                           # move từ webhook-node-config-panel.tsx
 ├── listening-panel.tsx
 ├── edit-output-panel.tsx
-├── defaults.ts                                # move từ workflow-canvas.tsx
+├── defaults.ts                                # từ nodes/webhook/defaults.ts
 └── n8n-properties.ts                          # move từ lib/n8n-workflow/descriptions/
 ```
 
@@ -172,7 +172,7 @@ export { WebhookNodeConfigPanel, isWebhookNode } from '../../nodes/webhook/confi
 **Tạo trigger:**
 
 - API: `POST /dashboard/build/workflows/:id/triggers` body `{ type: "webhook" }`
-- Code: `workers/auth-worker/.../triggers.ts` → `createWorkflowTrigger()`
+- Code: `workers/auth-worker/.../triggers/triggers.ts` → `createWorkflowTrigger()`
 - Sinh `webhookToken`, lưu D1 `workflow_triggers`
 
 **Public URL:**
@@ -181,8 +181,8 @@ export { WebhookNodeConfigPanel, isWebhookNode } from '../../nodes/webhook/confi
 /hooks/workflows/:ownerId/:webhookToken
 ```
 
-- Route: `hooks-presentation.ts` (mounted tại `/hooks`)
-- Build URL: `presentation.ts` → `buildTriggerUrl()`
+- Route: `api/hooks-presentation.ts` (mounted tại `/hooks`)
+- Build URL: `api/presentation.ts` → `buildTriggerUrl()`
 
 **Handle request:**
 
@@ -284,7 +284,7 @@ export function webhookNodeDefaults(
 **Hiện tại:**
 
 ```typescript
-// workflow-add-node-panel.tsx
+// add-node/workflow-add-node-panel.tsx
 pickTrigger('webhook', ...)   // → type: 'trigger', { triggerKind: 'webhook' }
 pickCoreItem(webhookItem)     // → type: 'core', { coreKind: 'webhook' }
 ```
@@ -362,7 +362,7 @@ Files: `workers/web/messages/en-US.json`, `workers/web/messages/vi-VN.json`
 ### Backend
 
 - [ ] Tạo `workflows/nodes/webhook/index.ts`
-- [ ] Move trigger logic từ `triggers.ts` / `hooks-presentation.ts` → `trigger.ts` (delegate, không breaking routes)
+- [ ] Move trigger logic từ `triggers/triggers.ts` / `api/hooks-presentation.ts` → `trigger.ts` (delegate, không breaking routes)
 - [ ] Register plugin trong `workflows/nodes/index.ts`
 - [ ] (Optional) `respond.ts` stub cho respond modes
 
@@ -392,7 +392,7 @@ Files: `workers/web/messages/en-US.json`, `workers/web/messages/vi-VN.json`
 
 1. Đọc [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md) — hiểu khung plugin.
 2. Đọc spec này — hiểu dual model canvas vs D1 trigger.
-3. **Không** thêm case webhook vào `executor.ts` monolith — logic HTTP ingress thuộc `nodes/webhook/trigger.ts`.
+3. **Không** thêm case webhook vào `engine/executor.ts` monolith — logic HTTP ingress thuộc `nodes/webhook/trigger.ts`.
 4. **Không** xóa route `/hooks/workflows/...` — chỉ delegate implementation.
 5. Giữ **re-export shims** tại path cũ cho đến hết migration.
 6. Custom config panel giữ nguyên UX — chỉ move file, không redesign.

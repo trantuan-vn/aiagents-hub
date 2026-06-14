@@ -15,7 +15,7 @@ Tài liệu **rút gọn** kiến trúc khung. **Spec chính đầy đủ:** [`w
 | Kiến trúc workflow hiện tại | [`workers/web/.../workflows/README.md`](../workers/web/src/app/(main)/dashboard/build/workflows/README.md) |
 | **Luồng vận hành từng bước** | [`workflow-how-it-works.md`](./workflow-how-it-works.md) |
 | Spec từng node | [`docs/workflow-nodes/`](./workflow-nodes/README.md) |
-| Workflow API | `workers/auth-worker/src/features/member/workflows/` |
+| Workflow API | `workers/auth-worker/src/features/member/workflows/` ([README](../workers/auth-worker/src/features/member/workflows/README.md)) |
 | Node Registry (frontend) | `workers/web/src/lib/workflow-node-registry/` |
 
 ---
@@ -28,13 +28,13 @@ Logic của một node hiện bị **phân tán** qua nhiều lớp:
 
 | Lớp | Vị trí hiện tại | Vấn đề |
 |-----|-----------------|--------|
-| Executor | `executor.ts` (~700 dòng) | Thêm node = sửa switch-case lớn |
+| Executor | `engine/executor.ts` | Thêm node = đăng ký plugin (đang migrate từ switch-case) |
 | Schema / Registry | `default-nodes.ts` × 2 | Duplicate web ↔ auth-worker |
 | Add-node catalog | `catalogs/*.ts` | Hardcoded, không đồng bộ registry |
 | Canvas UI | `nodes/workflow-nodes.tsx` | Tất cả node trong một file |
 | Config panel | `panels/node-config/` + custom | Không có pattern thống nhất |
-| Trigger / Hook | `triggers.ts`, `hooks-presentation.ts` | Tách rời khỏi node canvas |
-| Connection rules | `graph-helpers.ts` + `workflow-connection-utils.ts` | Node không khai báo handles rõ ràng |
+| Trigger / Hook | `triggers/triggers.ts`, `api/hooks-presentation.ts` | Tách rời khỏi node canvas |
+| Connection rules | `engine/graph-helpers.ts` + `edges/workflow-connection-utils.ts` | Node không khai báo handles rõ ràng |
 
 **Hệ quả:** Thêm node mới cần sửa ~12 file ở 4+ thư mục, không có checklist rõ ràng.
 
@@ -189,6 +189,17 @@ Node plugin chỉ **khai báo handles**; engine validate và render.
 
 ```
 workers/auth-worker/src/features/member/workflows/
+├── api/
+│   ├── presentation.ts
+│   └── hooks-presentation.ts       # delegate → nodes/<name>/trigger.ts
+├── domain/
+│   ├── domain.ts
+│   └── constant.ts
+├── execution/
+│   ├── workflow-context.ts
+│   ├── execution-store.ts
+│   ├── node-runtime.ts
+│   └── agent-runtime.ts
 ├── engine/
 │   ├── executor.ts
 │   ├── graph-helpers.ts
@@ -205,10 +216,14 @@ workers/auth-worker/src/features/member/workflows/
 │       ├── index.ts
 │       ├── execute.ts              # optional
 │       └── trigger.ts              # optional
-├── presentation.ts
-├── hooks-presentation.ts           # delegate → nodes/<name>/trigger.ts
-├── triggers.ts
-└── domain.ts
+├── triggers/
+│   ├── triggers.ts
+│   ├── channel-hooks.ts
+│   ├── webhook-auth.ts
+│   └── webhook-notify.ts
+├── billing/, collab/, storage/, integrations/
+├── executor.ts                     # re-export → engine/executor
+└── README.md
 ```
 
 ### 4.2 Plugin Contract
@@ -258,7 +273,11 @@ return plugin.trigger.handle(request, trigger);
 ```
 workers/web/src/app/(main)/dashboard/build/workflows/
 ├── _components/
-│   ├── engine/                     # canvas, edges, connection handles
+│   ├── canvas/                     # workflow-canvas, controls, theme
+│   ├── editor/                     # shell, header, sidebar
+│   ├── add-node/                   # drawer, panel
+│   ├── edges/                      # edges, handles, connection utils
+│   ├── layout/                     # definition, placement
 │   ├── nodes/
 │   │   ├── index.ts                # workflowNodeTypes + NODE_CATALOG
 │   │   ├── types.ts
@@ -269,10 +288,15 @@ workers/web/src/app/(main)/dashboard/build/workflows/
 │   │       ├── config-panel.tsx    # optional
 │   │       ├── defaults.ts
 │   │       └── n8n-properties.ts   # optional
-│   └── panels/node-config/
-│       ├── workflow-node-config-panel.tsx   # router
-│       └── generic-config-panel.tsx
-└── _lib/node-registry.ts
+│   ├── panels/
+│   │   ├── node-config/
+│   │   │   ├── workflow-node-config-panel.tsx   # router
+│   │   │   └── generic-config-panel.tsx
+│   │   └── workflow-panels/
+│   ├── catalogs/                   # sẽ xóa dần
+│   ├── hooks/
+│   └── engine/                     # re-exports edges & layout
+└── _lib/
 ```
 
 **Xóa dần:** `catalogs/workflow-*-catalog.ts` → catalog sinh từ UI plugins.
@@ -432,7 +456,7 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 
 | # | Câu hỏi | Đề xuất |
 |---|---------|---------|
-| 1 | `node-runtime.ts` shared hay per-node? | Shared cho HTTP/code helpers |
+| 1 | `execution/node-runtime.ts` shared hay per-node? | Shared cho HTTP/code helpers |
 | 2 | Một `runtimeType` nhiều Canvas? | Một component, handles dynamic theo kind |
 | 3 | Admin custom nodes cần plugin folder? | Không — generic canvas + panel |
 | 4 | Package name? | `@aiagents-hub/workflow-nodes` |

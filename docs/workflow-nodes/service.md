@@ -86,7 +86,7 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 | Hành vi | Trạng thái |
 |---------|------------|
 | Node tự execute trong graph | ❌ `skipExecution: true` |
-| Inject `serviceEndpoint` vào Agent | ✅ `graph-helpers.ts` |
+| Inject `serviceEndpoint` vào Agent | ✅ `engine/graph-helpers.ts` |
 | Billing | Qua Agent → `billAgentUsage` |
 | Embed PDF/chunk | ⚠️ Phase 2 — Agent/tool gọi model embed từ service này |
 
@@ -104,7 +104,7 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 | `workers/web/.../nodes/workflow-nodes.tsx` | `ServiceWorkflowNode` canvas |
 | `workers/web/src/lib/n8n-workflow/descriptions/service-node.ts` | n8n properties |
 | `workers/auth-worker/.../engine/graph-helpers.ts` | `resolveAgentResources` |
-| `workers/auth-worker/.../billing.ts` | `resolveServiceByEndpoint`, `runTextModel` |
+| `workers/auth-worker/.../billing/billing.ts` | `resolveServiceByEndpoint`, `runTextModel` |
 
 ---
 

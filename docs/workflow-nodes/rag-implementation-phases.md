@@ -18,7 +18,7 @@
 
 ### Không làm trong bất kỳ phase RAG nào (trừ khi phase riêng)
 
-- Refactor toàn bộ `executor.ts` monolith
+- Refactor toàn bộ `engine/executor.ts` (đang migrate từ switch-case monolith)
 - Gộp `workflow-chat.ts` với graph execute
 - Đổi schema D1 `agent_workflows.definition`
 - Migration plugin folder (Phase 7) song song với runtime RAG
@@ -85,7 +85,7 @@ flowchart LR
 
 ### Phase 0 — Vector RAG infra
 
-**Mục tiêu:** Một module dùng chung; bỏ duplicate giữa `nodes/agent/execute.ts` và `agent-runtime.ts`.
+**Mục tiêu:** Một module dùng chung; bỏ duplicate giữa `nodes/agent/execute.ts` và `execution/agent-runtime.ts`.
 
 | Làm | Không làm |
 |-----|-----------|
@@ -97,9 +97,9 @@ flowchart LR
 
 ```
 workers/auth-worker/src/features/member/workflows/
-├── rag-vector.ts              # NEW
+├── rag-vector.ts              # NEW (planned)
 ├── nodes/agent/execute.ts     # refactor
-├── agent-runtime.ts           # refactor
+├── execution/agent-runtime.ts # refactor
 └── rag-vector.test.ts         # NEW
 ```
 
@@ -116,7 +116,7 @@ Implement shared RAG vector module per docs/workflow-nodes/vectorize.md:
 
 - Create workers/auth-worker/src/features/member/workflows/rag-vector.ts
   (embedText, queryCollection, upsertVectors)
-- Refactor nodes/agent/execute.ts and agent-runtime.ts to use it
+- Refactor nodes/agent/execute.ts and execution/agent-runtime.ts to use it
 - Add unit tests. No behavior change for existing workflows.
 ```
 
@@ -178,7 +178,7 @@ saveRag.md, getRag.md:
 ```
 workers/auth-worker/src/features/member/workflows/
 ├── nodes/tool/get-rag.ts
-├── agent-runtime.ts              # buildRagToolset()
+├── execution/agent-runtime.ts   # buildRagToolset()
 └── nodes/tool/get-rag.test.ts
 ```
 
@@ -194,7 +194,7 @@ workers/auth-worker/src/features/member/workflows/
 Implement get-rag tool per docs/workflow-nodes/getRag.md:
 
 - workers/auth-worker/.../nodes/tool/get-rag.ts
-- Extend agent-runtime buildRagToolset() for tool_node toolKind get-rag
+- Extend execution/agent-runtime buildRagToolset() for tool_node toolKind get-rag
 - Use rag-vector.ts + resolveAgentResources for collection/namespace
 - Unit tests only; do not wire full graph execute yet.
 ```

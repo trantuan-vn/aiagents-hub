@@ -139,7 +139,7 @@ Tool RAG **không** nối trực tiếp dashed edge tới Vectorize — lấy `m
 | `workers/web/src/lib/n8n-workflow/descriptions/memory-node.ts` | n8n properties |
 | `workers/auth-worker/.../engine/graph-helpers.ts` | Resolve memory |
 | `workers/auth-worker/.../nodes/agent/execute.ts` | `queryVectorMemory` |
-| `workers/auth-worker/.../agent-runtime.ts` | `retrieveMemory` |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `retrieveMemory` |
 
 ---
 

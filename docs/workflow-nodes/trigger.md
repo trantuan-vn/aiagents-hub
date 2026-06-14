@@ -160,8 +160,8 @@ sequenceDiagram
 | Bước | File đích |
 |------|-----------|
 | Form validate + list tables | `nodes/trigger/form-database.ts` |
-| Spawn per-table executions | `triggers.ts` hoặc `form-trigger-runner.ts` |
-| Credential resolve | `credentials.ts` |
+| Spawn per-table executions | `triggers/triggers.ts` hoặc `form-trigger-runner.ts` |
+| Credential resolve | `storage/credentials.ts` |
 
 **Hiện tại:** `triggerKind` trong registry chỉ có `manual` \| `webhook` \| `schedule` — cần thêm `form`.
 

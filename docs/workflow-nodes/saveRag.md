@@ -136,7 +136,7 @@ Chi tiết graph mẫu: [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-
 |------|---------|
 | `packages/workflow-nodes/src/nodes/tool/save-rag.ts` | Registry definition |
 | `workers/auth-worker/.../nodes/tool/save-rag.ts` | Tool executor + register |
-| `workers/auth-worker/.../agent-runtime.ts` | `buildRagToolset()` — gom save/get |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset()` — gom save/get |
 | `workers/web/.../nodes/tool/save-rag/` | UI plugin + defaults |
 
 **Hiện tại:** `toolKind` chỉ có `http-request` \| `code` trong `builtins.ts` — cần thêm `save-rag`.

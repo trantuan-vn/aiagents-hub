@@ -295,14 +295,14 @@ Resource nodes đăng ký `skipExecution: true` — không bao giờ vào execut
 | `workers/auth-worker/.../nodes/agent/execute.ts` | Graph execute logic |
 | `workers/auth-worker/.../nodes/index.ts` | Register `{ id: 'agent', execute: executeAgent }` |
 | `workers/auth-worker/.../engine/graph-helpers.ts` | `resolveAgentResources()` |
-| `workers/auth-worker/.../billing.ts` | Service resolve, `runTextModel`, `billAgentUsage` |
+| `workers/auth-worker/.../billing/billing.ts` | Service resolve, `runTextModel`, `billAgentUsage` |
 | `workers/web/.../nodes/workflow-nodes.tsx` | `AgentWorkflowNode` — handles + warning UI |
 | `workers/web/.../nodes/index.ts` | UI plugin `agent` → `AgentWorkflowNode` |
-| `workers/web/.../workflow-create-connected-node.ts` | Defaults khi add agent + service |
-| `workers/web/.../workflow-resource-layout.ts` | Đặt resource nodes dưới agent |
-| `workers/web/.../workflow-connection-utils.ts` | Resource edge helpers |
+| `workers/web/.../layout/workflow-create-connected-node.ts` | Defaults khi add agent + service |
+| `workers/web/.../layout/workflow-resource-layout.ts` | Đặt resource nodes dưới agent |
+| `workers/web/.../edges/workflow-connection-utils.ts` | Resource edge helpers |
 | `workers/web/.../_lib/definition-utils.ts` | Merge sidebar `serviceEndpoint` vào agents |
-| `workers/web/.../workflow-editor-sidebar.tsx` | Global service endpoint picker |
+| `workers/web/.../editor/workflow-editor-sidebar.tsx` | Global service endpoint picker |
 | `workers/web/.../panels/node-config/generic-config-panel.tsx` | Generic 3-column config (agent dùng registry) |
 | `workers/web/src/lib/n8n-workflow/descriptions/agent.ts` | n8n INodeProperties (legacy) |
 | `workers/web/messages/en-US.json`, `vi-VN.json` | i18n keys |
@@ -391,7 +391,7 @@ export function agentNodeDefaults(
 }
 ```
 
-**Hiện tại:** `workflow-create-connected-node.ts` seed `serviceEndpoint`, `memoryCollection`, `tools: []` khi add từ canvas có sidebar endpoint.
+**Hiện tại:** `layout/workflow-create-connected-node.ts` seed `serviceEndpoint`, `memoryCollection`, `tools: []` khi add từ canvas có sidebar endpoint.
 
 ### 10.4 Add node
 
@@ -403,7 +403,7 @@ onPick({ type: "agent", label: t("node_agent") });
 addNode("agent");
 ```
 
-Catalog: `workflow-add-node-catalog.ts`, `workflow-node-palette.ts` — category `ai`.
+Catalog: `catalogs/workflow-add-node-catalog.ts`, `catalogs/workflow-node-palette.ts` — category `ai`.
 
 ### 10.5 UI plugin (mục tiêu)
 

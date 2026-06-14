@@ -34,7 +34,7 @@ flowchart LR
 
   subgraph Runtime["3. Runtime (auth-worker)"]
     Hook["/hooks/workflows/..."]
-    Exec["executor.ts"]
+    Exec["engine/executor.ts"]
   end
 
   Canvas --> D1_WF
@@ -67,7 +67,7 @@ Frontend load:
 
 Code tham chiếu:
 
-- Canvas: `workers/web/.../build/workflows/_components/workflow-canvas.tsx`
+- Canvas: `workers/web/.../build/workflows/_components/canvas/workflow-canvas.tsx`
 - Registry hook: `workers/web/.../build/workflows/_components/hooks/use-workflow-node-registry.ts`
 
 ### Bước 2: Thêm node từ catalog
@@ -101,8 +101,8 @@ Frontend tạo node mới trên canvas, ví dụ:
 
 Code tham chiếu:
 
-- Add node: `workflow-add-node-panel.tsx`, `catalogs/workflow-trigger-catalog.ts`
-- Defaults webhook: `workflow-canvas.tsx` → `webhookNodeDefaults()`
+- Add node: `add-node/workflow-add-node-panel.tsx`, `catalogs/workflow-trigger-catalog.ts`
+- Defaults webhook: `canvas/workflow-canvas.tsx` → `nodes/webhook/defaults.ts`
 
 ### Bước 3: Kéo dây nối (edges)
 
@@ -125,12 +125,12 @@ User nối **Webhook** `out` → **Agent** `in`:
 | **Data-flow** | `out`→`in`, `true`/`false`→`in`, `case_N`→`in` | Nét liền | Luồng thực thi chính |
 | **Resource** | `service` / `memory` / `tools` → Agent | Nét đứt | Cấu hình agent; **không** chạy như bước riêng |
 
-Validation phía frontend: `workflow-connection-utils.ts`  
-Logic phía backend: `graph-helpers.ts`
+Validation phía frontend: `edges/workflow-connection-utils.ts`  
+Logic phía backend: `engine/graph-helpers.ts`
 
 ### Bước 4: Mở config panel (double-click node)
 
-Luồng trong `workflow-node-config-panel.tsx`:
+Luồng trong `panels/node-config/workflow-node-config-panel.tsx`:
 
 ```
 1. Đọc node.type + triggerKind / coreKind / flowKind
@@ -149,7 +149,7 @@ User save → API cập nhật `definition` JSON.
 
 Backend ghi vào D1 bảng `agent_workflows.definition` — **đây là nguồn sự thật của graph**.
 
-Code tham chiếu: `workers/auth-worker/.../workflows/presentation.ts`
+Code tham chiếu: `workers/auth-worker/.../workflows/api/presentation.ts`
 
 ---
 
@@ -191,11 +191,11 @@ Content-Type: application/json
 { "type": "webhook" }
 ```
 
-Backend (`triggers.ts`):
+Backend (`triggers/triggers.ts`):
 
 1. Sinh `webhookToken` ngẫu nhiên
 2. Insert row vào D1
-3. Trả về `webhookUrl` đầy đủ (`presentation.ts` → `buildTriggerUrl()`)
+3. Trả về `webhookUrl` đầy đủ (`api/presentation.ts` → `buildTriggerUrl()`)
 
 > HTTP từ bên ngoài **không** đọc trực tiếp `node.data` trên canvas. Nó lookup token trong D1.
 
@@ -216,7 +216,7 @@ Content-Type: application/json
 
 ### Bước 7: Route công khai xử lý
 
-`hooks-presentation.ts` — mounted tại `/hooks` (không cần auth user; bảo mật bằng token trong URL):
+`api/hooks-presentation.ts` — mounted tại `/hooks` (không cần auth user; bảo mật bằng token trong URL):
 
 ```
 1. Parse ownerId + token từ URL
@@ -227,7 +227,7 @@ Content-Type: application/json
 
 ### Bước 8: runTrigger → executeWorkflowGraph
 
-`triggers.ts` → `runTrigger()`:
+`triggers/triggers.ts` → `runTrigger()`:
 
 1. Load workflow từ D1 theo `trigger.workflowId`
 2. Parse `definition` JSON
@@ -241,7 +241,7 @@ Content-Type: application/json
 
 ### Bước 9: Khởi tạo engine
 
-`executeWorkflowGraph` trong `executor.ts` tạo state ban đầu:
+`executeWorkflowGraph` trong `engine/executor.ts` tạo state ban đầu:
 
 ```typescript
 engine: {
@@ -257,7 +257,7 @@ engine: {
 
 **Entry nodes** = node executable không có incoming data-flow edge — thường là trigger (webhook, manual, cron…).
 
-Hàm tìm entry: `graph-helpers.ts` → `getWorkflowEntryNodeIds()`
+Hàm tìm entry: `engine/graph-helpers.ts` → `getWorkflowEntryNodeIds()`
 
 ### Bước 10: Vòng lặp runEngine
 
@@ -282,13 +282,13 @@ Mỗi vòng lặp:
 
 ### Bước 11: Logic từng loại node
 
-`executeNodeLogic` trong `executor.ts` — switch theo `node.type`:
+`executeNodeLogic` trong `engine/executor.ts` — dispatch qua node plugin registry:
 
 | `node.type` | Hành vi runtime |
 |-------------|-----------------|
 | `trigger` | Pass-through: `{ triggeredAt, text: input, data: ... }` |
 | `agent` | Gọi LLM; đọc service/memory/tools từ resource edges |
-| `http_request` | Gọi HTTP API (`node-runtime.ts`) |
+| `http_request` | Gọi HTTP API (`execution/node-runtime.ts`) |
 | `code` | Transform JSON / template |
 | `flow` | IF / switch / merge — quyết định nhánh active |
 | `human_review` | **Dừng** workflow, chờ approve/reject |
@@ -300,10 +300,10 @@ Mỗi vòng lặp:
 
 ### Bước 12: Đi theo edge (scheduleDownstream)
 
-`scheduleDownstream` trong `executor.ts`:
+`scheduleDownstream` trong `engine/executor.ts`:
 
 - Duyệt edge ra từ node vừa chạy
-- **IF node:** chỉ follow edge `true` hoặc `false` (đánh giá trong `flow-helpers.ts`)
+- **IF node:** chỉ follow edge `true` hoặc `false` (đánh giá trong `engine/flow-helpers.ts`)
 - **Switch:** chỉ follow `case_N` hoặc `default` đang active
 - **Merge + wait_all:** đợi đủ parent có output rồi mới enqueue
 - Nhánh không active → node không vào queue (bị skip)
@@ -317,7 +317,7 @@ Mỗi vòng lặp:
 | `pending_human` | Dừng tại human_review; persist state để resume |
 | `cancelled` | Human reject |
 
-Execution lưu vào User Durable Object qua `execution-store.ts` (steps, cost, output).
+Execution lưu vào User Durable Object qua `execution/execution-store.ts` (steps, cost, output).
 
 Resume sau human review: `resumeWorkflowExecution()` đọc lại snapshot engine và tiếp tục vòng lặp.
 
@@ -329,8 +329,8 @@ Resume sau human review: `resumeWorkflowExecution()` đọc lại snapshot engin
 sequenceDiagram
   participant Ext as Client bên ngoài
   participant Hook as /hooks/workflows/...
-  participant Trg as triggers.ts
-  participant Exec as executor.ts
+  participant Trg as triggers/triggers.ts
+  participant Exec as engine/executor.ts
   participant WH as Trigger node
   participant Agent as Agent node
 
@@ -375,7 +375,7 @@ Code: `workers/web/src/lib/workflow-node-registry/`
 
 ## 8. Phần G — Kiến trúc plugin (hướng đi)
 
-**Hiện tại:** logic mỗi node rải nhiều file; `executor.ts` là switch-case lớn.
+**Hiện tại:** logic mỗi node rải nhiều file; `engine/executor.ts` đang migrate sang plugin registry.
 
 **Mục tiêu (spec):** mỗi node là module `nodes/<name>/`; executor chỉ dispatch qua registry.
 
@@ -387,7 +387,7 @@ flowchart TB
     DEF["definition.ts"]
   end
 
-  Hook2["hooks-presentation.ts"] -->|"delegate"| TR
+  Hook2["api/hooks-presentation.ts"] -->|"delegate"| TR
   Exec2["engine/executor.ts"] -->|"registry.resolve()"| Plugin
   Panel["config router"] -->|"plugin.ConfigPanel"| CFG
 ```
@@ -404,9 +404,9 @@ Ngoài webhook public URL, workflow có thể start từ:
 
 | Cách | Entry | Code |
 |------|-------|------|
-| **Manual run** | Nút Run trên editor | `presentation.ts` → `executeWorkflowGraph` |
-| **Cron** | Cloudflare `scheduled` | `triggers.ts` → `runDueCronTriggers` |
-| **Telegram / Slack / Discord** | `/hooks/channels/:ch/:ownerId/:token` | `hooks-presentation.ts` + `channel-hooks.ts` |
+| **Manual run** | Nút Run trên editor | `api/presentation.ts` → `executeWorkflowGraph` |
+| **Cron** | Cloudflare `scheduled` | `triggers/triggers.ts` → `runDueCronTriggers` |
+| **Telegram / Slack / Discord** | `/hooks/channels/:ch/:ownerId/:token` | `api/hooks-presentation.ts` + `triggers/channel-hooks.ts` |
 | **Resume human review** | Approve/reject API | `resumeWorkflowExecution` |
 
 Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã lưu trên D1.
@@ -432,16 +432,16 @@ Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã
 
 | Thành phần | Đường dẫn |
 |------------|-----------|
-| Workflow API | `workers/auth-worker/src/features/member/workflows/presentation.ts` |
-| Public hooks | `workers/auth-worker/src/features/member/workflows/hooks-presentation.ts` |
-| Triggers (D1) | `workers/auth-worker/src/features/member/workflows/triggers.ts` |
-| Executor | `workers/auth-worker/src/features/member/workflows/executor.ts` |
-| Graph helpers | `workers/auth-worker/src/features/member/workflows/graph-helpers.ts` |
-| Flow branches | `workers/auth-worker/src/features/member/workflows/flow-helpers.ts` |
-| Canvas | `workers/web/.../build/workflows/_components/workflow-canvas.tsx` |
+| Workflow API | `workers/auth-worker/.../workflows/api/presentation.ts` |
+| Public hooks | `workers/auth-worker/.../workflows/api/hooks-presentation.ts` |
+| Triggers (D1) | `workers/auth-worker/.../workflows/triggers/triggers.ts` |
+| Executor | `workers/auth-worker/.../workflows/engine/executor.ts` |
+| Graph helpers | `workers/auth-worker/.../workflows/engine/graph-helpers.ts` |
+| Flow branches | `workers/auth-worker/.../workflows/engine/flow-helpers.ts` |
+| Canvas | `workers/web/.../build/workflows/_components/canvas/workflow-canvas.tsx` |
 | Node components | `workers/web/.../build/workflows/_components/nodes/workflow-nodes.tsx` |
-| Config panel router | `workers/web/.../panels/node-config/workflow-node-config-panel.tsx` |
-| Webhook config | `workers/web/.../panels/node-config/webhook-node-config-panel.tsx` |
+| Config panel router | `workers/web/.../build/workflows/_components/panels/node-config/workflow-node-config-panel.tsx` |
+| Webhook config | `workers/web/.../build/workflows/_components/panels/node-config/webhook-node-config-panel.tsx` |
 | Node Registry | `workers/web/src/lib/workflow-node-registry/` |
 
 ---
@@ -450,4 +450,5 @@ Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-06-14 | Cập nhật đường dẫn theo cấu trúc thư mục workflows mới |
 | 0.1 | 2026-06-12 | Initial — giải thích luồng vận hành từng bước |

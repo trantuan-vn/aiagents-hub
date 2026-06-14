@@ -139,7 +139,7 @@ Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--
 |------|---------|
 | `packages/workflow-nodes/src/nodes/tool/get-rag.ts` | Registry |
 | `workers/auth-worker/.../nodes/tool/get-rag.ts` | Tool executor |
-| `workers/auth-worker/.../agent-runtime.ts` | `retrieveMemory` (shared) |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `retrieveMemory` (shared) |
 
 **Hiện tại:** tương tự [`saveRag.md`](./saveRag.md) — `get-rag` chưa có trong registry.
 
