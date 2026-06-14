@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '../domain.js';
+import type { WorkflowDefinition } from '../domain/domain.js';
 import { isBranchSourceHandle } from './flow-helpers.js';
 
 export type ResourceHandle = 'service' | 'memory' | 'tools';

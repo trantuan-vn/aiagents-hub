@@ -21,9 +21,9 @@ import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
-import { ConnectionHandle } from "../connection-handle";
-import { edgeUsesHandle, type WorkflowHandleId } from "../workflow-connection-utils";
-import { WorkflowNodeShell } from "../workflow-node-shell";
+import { ConnectionHandle } from "../edges/connection-handle";
+import { edgeUsesHandle, type WorkflowHandleId } from "../edges/workflow-connection-utils";
+import { WorkflowNodeShell } from "../node-ui/workflow-node-shell";
 import { StickyNoteNode } from "./workflow-sticky-note-node";
 
 function useAgentMissingConfig(nodeId: string | undefined) {

@@ -64,23 +64,23 @@ Defaults: `workers/web/src/lib/workflow-node-registry/default-nodes.ts`
 
 ```
 _components/
-├── catalogs/          # Danh mục add-node (core, flow, trigger, tool, memory, …)
-│   └── index.ts
-├── nodes/             # React Flow node components
-│   ├── workflow-nodes.tsx
-│   └── workflow-sticky-note-node.tsx
-├── hooks/             # State, undo, collab, node registry
-│   ├── use-workflow-canvas-state.ts
-│   └── use-workflow-node-registry.ts
+├── canvas/            # React Flow canvas (controls, minimap, theme, UI context)
+├── editor/            # Editor shell, header, sidebar, settings, logs
+├── add-node/          # Add-node drawer & catalog panel
+├── edges/             # Edges, handles, connection utils
+├── layout/            # Node placement, definition JSON, resource layout
+├── list/              # Workflow list tabs & cards (my / shared)
+├── node-ui/           # Node shell, toolbar, palette, service select
+├── action-app/        # Action-in-app detail panel & icon
+├── chat/              # Workflow chat UI
+├── catalogs/          # Add-node catalog definitions (core, flow, trigger, …)
+├── nodes/             # React Flow node components (plugin registry)
+├── hooks/             # State, undo, collab, integrations, node registry
 ├── panels/
-│   └── node-config/   # Panel cấu hình 3 cột
-│       ├── workflow-node-config-panel.tsx
-│       ├── node-config-io-panel.tsx
-│       └── node-config-field-renderer.tsx
-└── workflow-*.ts(x)   # Canvas, editor shell, edges, layout, …
+│   ├── node-config/   # Panel cấu hình 3 cột (parameters, I/O)
+│   └── workflow-panels/  # Build, executions, triggers, versions, …
+└── engine/            # Re-exports edges & layout helpers
 ```
-
-Các file re-export ở root `_components/` (vd. `workflow-nodes.tsx` → `./nodes/workflow-nodes`) giữ **tương thích import cũ**.
 
 ### Node Config Panel (editor)
 
@@ -128,7 +128,7 @@ Workflow graph **không** lưu trong Node Registry. Mỗi workflow lưu JSON `de
 }
 ```
 
-Node types hợp lệ (Zod): `workers/auth-worker/src/features/member/workflows/domain.ts` → `WorkflowNodeTypeSchema`.
+Node types hợp lệ (Zod): `workers/auth-worker/src/features/member/workflows/domain/domain.ts` → `WorkflowNodeTypeSchema`.
 
 ## Hướng dẫn mở rộng
 

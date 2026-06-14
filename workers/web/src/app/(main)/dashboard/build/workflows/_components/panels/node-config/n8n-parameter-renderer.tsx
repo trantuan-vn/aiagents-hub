@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
-import { ServiceEndpointSelect } from "../../service-endpoint-select";
+import { ServiceEndpointSelect } from "../../node-ui/service-endpoint-select";
 
 type N8nParameterRendererProps = {
   description: N8nNodeTypeDescription;

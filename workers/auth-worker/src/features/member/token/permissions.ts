@@ -1,4 +1,4 @@
-import { WEBHOOK_TRIGGER_PERMISSION } from '../workflows/constant.js';
+import { WEBHOOK_TRIGGER_PERMISSION } from '../workflows/domain/constant.js';
 import { WEBSOCKET_PERMISSIONS } from '../../ws/constant.js';
 
 export type ServicePermissionRow = {

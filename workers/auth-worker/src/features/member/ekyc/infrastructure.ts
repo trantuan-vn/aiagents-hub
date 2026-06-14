@@ -123,7 +123,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     if (workflowAttribution && amountUsd > 0) {
       const consumerId =
         String(u.identifier ?? u.user_identifier ?? userDO.id?.toString?.() ?? '');
-      const { recordWorkflowRoyalty } = await import('../workflows/royalty.js');
+      const { recordWorkflowRoyalty } = await import('../workflows/billing/royalty.js');
       await recordWorkflowRoyalty(env, 'USER_DO', {
         workflowId: workflowAttribution.workflowId,
         workflowOwnerId: workflowAttribution.workflowOwnerId,

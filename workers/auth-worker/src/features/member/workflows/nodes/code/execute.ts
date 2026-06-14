@@ -1,4 +1,4 @@
-import { runCodeNode } from '../../node-runtime.js';
+import { runCodeNode } from '../../execution/node-runtime.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
 export async function executeCode(ctx: NodeContext): Promise<NodeOutput> {

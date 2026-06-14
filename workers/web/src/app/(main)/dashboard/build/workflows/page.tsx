@@ -8,8 +8,8 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { MyWorkflowsTab } from "./_components/my-workflows-tab";
-import { SharedWorkflowsTab } from "./_components/shared-workflows-tab";
+import { MyWorkflowsTab } from "./_components/list/my-workflows-tab";
+import { SharedWorkflowsTab } from "./_components/list/shared-workflows-tab";
 
 export default function WorkflowsPage() {
   const t = useTranslations("WorkflowsPage");

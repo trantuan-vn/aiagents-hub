@@ -7,7 +7,7 @@ import {
   billAgentUsage,
   ensureWalletBalance,
   resolveServiceByEndpoint,
-} from '../member/workflows/billing';
+} from '../member/workflows/billing/billing';
 import { createApiKeyTool } from './tools/create-api-key-tool';
 import { createPaymentUrlTool } from './tools/create-payment-url-tool';
 import { createOrderTool } from './tools/create-order-tool';

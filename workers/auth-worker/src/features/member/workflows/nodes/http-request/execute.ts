@@ -1,5 +1,5 @@
-import { resolveCredential } from '../../credentials.js';
-import { runHttpRequest } from '../../node-runtime.js';
+import { resolveCredential } from '../../storage/credentials.js';
+import { runHttpRequest } from '../../execution/node-runtime.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
 export async function executeHttpRequest(ctx: NodeContext): Promise<NodeOutput> {

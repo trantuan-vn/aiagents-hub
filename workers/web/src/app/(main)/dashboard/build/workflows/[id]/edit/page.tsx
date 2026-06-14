@@ -7,13 +7,13 @@ import { useParams, useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { addNodeToDefinition, addStickyNoteToDefinition, type WorkflowDefinition } from "../../_components/workflow-canvas";
-import { normalizeWorkflowEdge } from "../../_components/workflow-edge-utils";
-import { WorkflowEditor } from "../../_components/workflow-editor";
-import { WorkflowEditorShell } from "../../_components/workflow-editor-shell";
-import { WorkflowExecuteDialog } from "../../_components/workflow-execute-dialog";
-import { useWorkflowCollab } from "../../_components/use-workflow-collab";
-import { useWorkflowUndo, useWorkflowUndoKeyboard } from "../../_components/use-workflow-undo";
+import { addNodeToDefinition, addStickyNoteToDefinition, type WorkflowDefinition } from "../../_components/canvas/workflow-canvas";
+import { normalizeWorkflowEdge } from "../../_components/edges/workflow-edge-utils";
+import { WorkflowEditor } from "../../_components/editor/workflow-editor";
+import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
+import { WorkflowExecuteDialog } from "../../_components/panels/workflow-panels/workflow-execute-dialog";
+import { useWorkflowCollab } from "../../_components/hooks/use-workflow-collab";
+import { useWorkflowUndo, useWorkflowUndoKeyboard } from "../../_components/hooks/use-workflow-undo";
 import { createWorkflow, deleteWorkflow, getWorkflow, updateWorkflow } from "../../_lib/api";
 import { parseWorkflowTags, serializeWorkflowTags } from "../../_lib/workflow-tags";
 

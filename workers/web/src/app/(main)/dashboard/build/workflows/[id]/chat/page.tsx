@@ -10,7 +10,7 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
-import { WorkflowChat } from "../../_components/workflow-chat";
+import { WorkflowChat } from "../../_components/chat/workflow-chat";
 import { getSharedWorkflow, getWorkflow } from "../../_lib/api";
 
 export default function WorkflowChatPage() {

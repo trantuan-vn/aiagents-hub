@@ -9,10 +9,10 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 
-import { StarDisplay } from "../../_components/star-display";
-import { WorkflowEditor } from "../../_components/workflow-editor";
-import { WorkflowEditorShell } from "../../_components/workflow-editor-shell";
-import { WorkflowExecuteDialog } from "../../_components/workflow-execute-dialog";
+import { StarDisplay } from "../../_components/list/star-display";
+import { WorkflowEditor } from "../../_components/editor/workflow-editor";
+import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
+import { WorkflowExecuteDialog } from "../../_components/panels/workflow-panels/workflow-execute-dialog";
 import { getSharedWorkflow, type AgentWorkflow } from "../../_lib/api";
 interface ViewWorkflowState {
   name: string;

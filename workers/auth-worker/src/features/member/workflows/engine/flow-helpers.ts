@@ -1,4 +1,4 @@
-import { interpolate } from '../node-runtime.js';
+import { interpolate } from '../execution/node-runtime.js';
 
 type NodeOutput = Record<string, unknown>;
 

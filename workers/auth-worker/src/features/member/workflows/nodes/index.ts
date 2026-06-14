@@ -1,4 +1,4 @@
-import type { WorkflowDefinition } from '../domain.js';
+import type { WorkflowDefinition } from '../domain/domain.js';
 import type { NodePluginRegistry, WorkflowNodePlugin } from './types.js';
 import { executeActionInApp } from './action-in-app/execute.js';
 import { executeAgent } from './agent/execute.js';

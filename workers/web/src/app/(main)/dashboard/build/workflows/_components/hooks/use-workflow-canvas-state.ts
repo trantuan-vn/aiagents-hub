@@ -12,11 +12,11 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import { isResourceEdge, isValidWorkflowConnection } from "../workflow-connection-utils";
-import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "../workflow-create-connected-node";
-import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } from "../workflow-definition";
-import { normalizeWorkflowEdge } from "../workflow-edge-utils";
-import { layoutWorkflowNodes } from "../workflow-layout";
+import { isResourceEdge, isValidWorkflowConnection } from "../edges/workflow-connection-utils";
+import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "../layout/workflow-create-connected-node";
+import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } from "../layout/workflow-definition";
+import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
+import { layoutWorkflowNodes } from "../layout/workflow-layout";
 
 function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
   return changes.some((c) => {

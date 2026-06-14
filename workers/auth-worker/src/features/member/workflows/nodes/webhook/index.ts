@@ -1,5 +1,5 @@
 import type { WorkflowNodePlugin } from '../types.js';
-import { findWebhookTrigger } from '../../triggers.js';
+import { findWebhookTrigger } from '../../triggers/triggers.js';
 import { parseWebhookInput, WEBHOOK_TRIGGER_TYPE } from './trigger.js';
 
 export {

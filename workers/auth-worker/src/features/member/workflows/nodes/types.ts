@@ -1,6 +1,6 @@
 import type { z } from 'zod';
 
-import type { WorkflowDefinition } from '../domain.js';
+import type { WorkflowDefinition } from '../domain/domain.js';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { BuildWebhookItemParams } from './webhook/output.js';
 

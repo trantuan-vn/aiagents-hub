@@ -5,7 +5,7 @@ import {
   getModelForService,
   resolveServiceByEndpoint,
   runTextModel,
-} from '../../billing.js';
+} from '../../billing/billing.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 

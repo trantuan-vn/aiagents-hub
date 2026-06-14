@@ -2,7 +2,7 @@ import type { Context } from 'hono';
 
 import { getIdFromString } from '../../../shared/utils.js';
 import type { UserDO } from '../../ws/infrastructure/UserDO.js';
-import { resolveServiceByEndpoint } from '../workflows/billing.js';
+import { resolveServiceByEndpoint } from '../workflows/billing/billing.js';
 import { requirePermissions } from './authMiddleware.js';
 
 /** Token must include `endpoint` permission and the endpoint must be an approved active service. */

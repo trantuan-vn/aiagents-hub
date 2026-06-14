@@ -3,9 +3,9 @@ import {
   findWebhookTriggerByWorkflowId,
   runTrigger,
   type WorkflowTriggerRow,
-} from '../../triggers.js';
-import type { ValidatedWebhookToken } from '../../webhook-auth.js';
-import { broadcastWorkflowWebhookResult } from '../../webhook-notify.js';
+} from '../../triggers/triggers.js';
+import type { ValidatedWebhookToken } from '../../triggers/webhook-auth.js';
+import { broadcastWorkflowWebhookResult } from '../../triggers/webhook-notify.js';
 import {
   buildWebhookItemOutput,
   parseWebhookRequest,

@@ -1,18 +1,18 @@
-import type { WorkflowDefinition, WorkflowNodeTypeSchema } from '../domain.js';
+import type { WorkflowDefinition, WorkflowNodeTypeSchema } from '../domain/domain.js';
 import type { z } from 'zod';
-import type { ResolvedWorkflow } from '../workflow-context.js';
-import { workflowAttribution } from '../workflow-context.js';
+import type { ResolvedWorkflow } from '../execution/workflow-context.js';
+import { workflowAttribution } from '../execution/workflow-context.js';
 import { getIdFromName } from '../../../../shared/utils.js';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import {
   createExecution,
   getExecutionByKey,
   updateExecution,
-} from '../execution-store.js';
+} from '../execution/execution-store.js';
 import { nodePluginRegistry } from '../nodes/index.js';
 import type { NodeContext as PluginNodeContext } from '../nodes/types.js';
 import { buildWebhookItemOutput } from '../nodes/webhook/output.js';
-import { isWebhookIngressNode } from '../triggers.js';
+import { isWebhookIngressNode } from '../triggers/triggers.js';
 import {
   activeHandlesForNode,
   isEdgeActiveForBranches,
