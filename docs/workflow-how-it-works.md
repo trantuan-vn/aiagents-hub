@@ -407,7 +407,6 @@ Ngoài webhook public URL, workflow có thể start từ:
 | **Manual run** | Nút Run trên editor | `presentation.ts` → `executeWorkflowGraph` |
 | **Cron** | Cloudflare `scheduled` | `triggers.ts` → `runDueCronTriggers` |
 | **Telegram / Slack / Discord** | `/hooks/channels/:ch/:ownerId/:token` | `hooks-presentation.ts` + `channel-hooks.ts` |
-| **Chat agent** | Workflow chat UI | `workflow-chat.ts` |
 | **Resume human review** | Approve/reject API | `resumeWorkflowExecution` |
 
 Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã lưu trên D1.

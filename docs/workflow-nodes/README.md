@@ -14,7 +14,17 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 |------|------|------------|---------|
 | Webhook | [`webhook.md`](./webhook.md) | Reference | Trigger + custom panel + D1 trigger |
 | HTTP Request | — | Planned | — |
-| Agent | — | Planned | — |
+| Agent | [`agent.md`](./agent.md) | Draft (review) | LLM execute + resource wiring |
+| Service | [`service.md`](./service.md) | Draft | Resource → Agent Service handle |
+| Vectorize | [`vectorize.md`](./vectorize.md) | Draft | `memory_node` + `memoryKind: vectorize` |
+| Save RAG | [`saveRag.md`](./saveRag.md) | Draft | `tool_node` + `toolKind: save-rag` |
+| Get RAG | [`getRag.md`](./getRag.md) | Draft | `tool_node` + `toolKind: get-rag` |
+| **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | Draft | Graph mẫu ingest PDF + Q&A |
+| **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | Active | Kế hoạch chia phase coding Cursor |
+| Trigger (form DB) | [`trigger.md`](./trigger.md) | Draft | Form trigger + DB connection + per_table fan-out |
+| Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | Draft | Tool introspect bảng + SQL history |
+| schema.md | [`schema.md`](./schema.md) | Draft | Artifact — table schema document |
+| sqlexample.md | [`sqlexample.md`](./sqlexample.md) | Draft | Artifact — SQL examples document |
 | Code | — | Planned | — |
 | Flow (if/switch/merge) | — | Planned | — |
 | Schedule | — | Planned | — |
