@@ -242,6 +242,8 @@ function CanvasInnerWithDrawerUi({
       {configNode && !readOnly ? (
         <WorkflowNodeConfigPanel
           node={configNode}
+          nodes={nodes}
+          edges={edges}
           workflowId={workflowId}
           onClose={() => setConfigNodeId(null)}
           onPatchData={patchNodeDataById}

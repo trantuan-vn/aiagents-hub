@@ -1,3 +1,6 @@
+import { stepCountIs, streamText } from 'ai';
+import { createWorkersAI } from 'workers-ai-provider';
+
 import {
   billAgentUsage,
   ensureWalletBalance,
@@ -6,33 +9,37 @@ import {
   resolveServiceByEndpoint,
   runTextModel,
 } from '../../billing/billing.js';
+import {
+  agentHasRagToolKind,
+  buildAgentToolset,
+  buildRagToolset,
+  retrieveMemory,
+} from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
+import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
+import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
-async function queryVectorMemory(
-  env: Env,
-  collection: string,
-  query: string,
-): Promise<string[]> {
-  const binding = (env as unknown as Record<string, unknown>).VECTORIZE as
-    | { query: (vector: number[], opts: { topK: number }) => Promise<{ matches?: { metadata?: Record<string, string> }[] }> }
-    | undefined;
-  if (!binding?.query || !query.trim()) return [];
+function resolveEmbedModel(service: Record<string, unknown>): string {
+  const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim();
+  if (catalog.includes('bge')) return DEFAULT_EMBED_MODEL;
+  const model = String(service.embedModel ?? service.embed_model ?? '').trim();
+  return model || DEFAULT_EMBED_MODEL;
+}
 
-  try {
-    const embed = await env.AI.run('@cf/baai/bge-base-en-v1.5', { text: query });
-    const vector = (embed as { data?: number[][] })?.data?.[0];
-    if (!vector?.length) return [];
-    const index = (env as unknown as Record<string, unknown>)[collection] as typeof binding | undefined;
-    const target = index ?? binding;
-    const result = await target.query(vector, { topK: 5 });
-    return (result.matches ?? [])
-      .map((m) => m.metadata?.text ?? m.metadata?.content ?? '')
-      .filter(Boolean);
-  } catch (e) {
-    console.warn('[workflow] vector memory query failed:', e);
-    return [];
+function extractTriggerContext(ctx: NodeContext): Record<string, unknown> {
+  const input = ctx.nodeInput ?? {};
+  if (input && typeof input === 'object' && !Array.isArray(input)) {
+    const obj = input as Record<string, unknown>;
+    if (obj.triggerKind === 'form' || obj.dbId || obj.tableName) return obj;
+    if (obj.parents && typeof obj.parents === 'object') {
+      const parents = obj.parents as Record<string, Record<string, unknown>>;
+      for (const parent of Object.values(parents)) {
+        if (parent?.triggerKind === 'form' || parent?.dbId || parent?.tableName) return parent;
+      }
+    }
   }
+  return {};
 }
 
 export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
@@ -46,41 +53,123 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   await ensureWalletBalance(ctx.userDO);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
+  const embedModel = resolveEmbedModel(service);
 
   const promptSource = String(data.promptSource ?? 'define_below');
-  const userText =
+  let userText =
     promptSource === 'from_input'
       ? String(ctx.nodeInput.text ?? ctx.input ?? '') || JSON.stringify(ctx.nodeInput)
       : String(data.prompt ?? ctx.nodeInput.text ?? ctx.input ?? '') || JSON.stringify(ctx.nodeInput);
 
+  const pdfFiles = filesFromWebhookBody(
+    (ctx.nodeInput as Record<string, unknown>)?.body ?? ctx.nodeInput,
+  );
+  if (pdfFiles.length) {
+    const extracted = await extractTextFromPdfFiles(ctx.c.env, pdfFiles);
+    if (extracted.length) {
+      const pdfContext = extracted.map((f) => `--- ${f.filename} ---\n${f.text}`).join('\n\n');
+      userText = `${userText}\n\nExtracted PDF text:\n${pdfContext}`;
+    }
+  }
+
   const memoryCollection = String(
     data.memoryCollection ?? linked.memoryCollection ?? '',
   ).trim();
-  const memorySnippets =
-    memoryCollection && linked.memoryKind !== 'r2' && linked.memoryKind !== 'd1'
-      ? await queryVectorMemory(ctx.c.env, memoryCollection, userText)
-      : [];
+  const memoryNode = ctx.definition.nodes.find((n) => {
+    if (n.type !== 'memory_node') return false;
+    return ctx.definition.edges.some(
+      (e) => e.source === n.id && e.target === ctx.node.id && e.targetHandle === 'memory',
+    );
+  });
+  const memData = (memoryNode?.data ?? {}) as Record<string, unknown>;
+  const memoryNamespace = String(memData.namespace ?? '').trim();
 
-  const toolList =
-    Array.isArray(data.tools) && data.tools.length
-      ? (data.tools as unknown[])
-      : linked.tools;
+  const hasGetRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
+  const ragTools = buildRagToolset(
+    {
+      env: ctx.c.env,
+      userDO: ctx.userDO,
+      agentId: ctx.node.id,
+      triggerContext: extractTriggerContext(ctx),
+      embedModel,
+    },
+    ctx.definition,
+    ctx.node.id,
+  );
+  const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
+  const tools = { ...httpTools, ...ragTools };
+  const toolNames = Object.keys(tools);
+  const useToolLoop = toolNames.length > 0;
+
+  const memorySnippets =
+    memoryCollection &&
+    !hasGetRagTool &&
+    linked.memoryKind !== 'r2' &&
+    linked.memoryKind !== 'd1'
+      ? await retrieveMemory(ctx.c.env, memoryCollection, userText, 5, memoryNamespace || undefined)
+      : [];
 
   const systemParts = [
     String(data.systemPrompt ?? ''),
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     memorySnippets.length ? `Relevant memory:\n${memorySnippets.join('\n')}` : '',
-    toolList.length
-      ? `Available tools (configure in service): ${JSON.stringify(toolList)}`
+    toolNames.length
+      ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
+      : '',
+    hasGetRagTool
+      ? 'Use get_rag to search the knowledge base before answering factual questions.'
+      : '',
+    agentHasRagToolKind(ctx.definition, ctx.node.id, 'save-rag')
+      ? 'Use save_rag to persist extracted document text into the knowledge base.'
+      : '',
+    agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-db-info')
+      ? 'Call get_db_info first to load table schema and sample rows before generating schema or SQL examples.'
       : '',
   ].filter(Boolean);
+
+  const maxTokens = Number(data.maxTokens ?? 1024) || 1024;
+
+  if (useToolLoop && ctx.c.env.AI) {
+    const workersAI = createWorkersAI({
+      binding: ctx.c.env.AI,
+      gateway: { id: 'unitoken' },
+    });
+
+    const result = streamText({
+      model: workersAI(modelId as never),
+      system: systemParts.join('\n\n'),
+      messages: [{ role: 'user', content: userText }],
+      maxOutputTokens: maxTokens,
+      tools,
+      stopWhen: stepCountIs(5),
+    });
+
+    const text = await result.text;
+    const usage = await result.usage;
+
+    const costVnd = await billAgentUsage(
+      ctx.c.env,
+      ctx.bindingName,
+      ctx.userDO,
+      ctx.user.identifier,
+      service,
+      {
+        endpoint,
+        aiResponse: usage ? { usage } : { response: text },
+        userAgent: ctx.requestMeta?.userAgent,
+        ipAddress: ctx.requestMeta?.ipAddress,
+        workflowAttribution: ctx.attr,
+      },
+    );
+    ctx.onCost?.(costVnd);
+    return { text, raw: { usage, toolNames }, endpoint };
+  }
 
   const messages = [
     ...(systemParts.length ? [{ role: 'system', content: systemParts.join('\n\n') }] : []),
     { role: 'user', content: userText },
   ];
 
-  const maxTokens = Number(data.maxTokens ?? 1024) || 1024;
   const aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens);
   const text = extractTextFromAiResponse(aiResponse);
 

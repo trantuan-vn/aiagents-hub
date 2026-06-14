@@ -3,7 +3,14 @@ import { createWorkersAI } from 'workers-ai-provider';
 
 import { getIdFromName } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
-import { buildAgentToolset, buildMemoryTool, retrieveMemory } from '../execution/agent-runtime.js';
+import {
+  agentHasRagToolKind,
+  buildAgentToolset,
+  buildMemoryTool,
+  buildRagToolset,
+  retrieveMemory,
+} from '../execution/agent-runtime.js';
+import { resolveAgentResources } from '../engine/graph-helpers.js';
 import {
   billAgentUsage,
   ensureWalletBalance,
@@ -63,17 +70,22 @@ export async function createWorkflowChatStreamResponse(
   const wfDesc = String(resolved.workflow.description ?? '');
   const latestUser = extractLatestUserText(uiMessages);
 
-  // Real tool-calling: expose http_request nodes flagged asTool + a RAG tool.
-  const memoryCollection = String(data.memoryCollection ?? '').trim();
+  const linked = resolveAgentResources(resolved.definition, agentNode.id);
+  const memoryCollection = String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
+  const hasGetRagTool = agentHasRagToolKind(resolved.definition, agentNode.id, 'get-rag');
   const httpTools = buildAgentToolset({ env: c.env, userDO }, resolved.definition);
-  const memoryTools = memoryCollection ? buildMemoryTool(c.env, memoryCollection) : {};
-  const tools = { ...httpTools, ...memoryTools };
+  const ragTools = buildRagToolset({ env: c.env, userDO }, resolved.definition, agentNode.id);
+  const memoryTools =
+    memoryCollection && !hasGetRagTool && !Object.keys(ragTools).length
+      ? buildMemoryTool(c.env, memoryCollection)
+      : {};
+  const tools = { ...httpTools, ...ragTools, ...memoryTools };
   const toolNames = Object.keys(tools);
 
-  // RAG grounding: pre-fetch a few relevant snippets for the latest message.
-  const ragSnippets = memoryCollection
-    ? await retrieveMemory(c.env, memoryCollection, latestUser, 4)
-    : [];
+  const ragSnippets =
+    memoryCollection && !hasGetRagTool
+      ? await retrieveMemory(c.env, memoryCollection, latestUser, 4)
+      : [];
 
   const systemPrompt = [
     `You are the conversational agent for the "${wfName}" workflow.`,

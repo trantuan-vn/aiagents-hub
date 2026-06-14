@@ -1,11 +1,11 @@
 import { resourceNode } from "./common";
 
 export const SERVICE_NODE_N8N_DESCRIPTION = resourceNode({
-  displayName: "Chat Model (Service)",
+  displayName: "Service",
   name: "service_node",
   icon: "fa:server",
   group: ["transform"],
-  description: "Approved AI service — connect to an Agent node's Chat Model input.",
+  description: "Approved AI service — connect to an Agent node's Service input.",
   properties: [
     {
       displayName: "Service",

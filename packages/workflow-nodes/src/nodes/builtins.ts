@@ -4,6 +4,9 @@ import {
   defaultParametersSection,
 } from "./default-sections";
 import type { WorkflowNodeDefinition, WorkflowNodeRegistry } from "../types/node-definition";
+import { FORM_DATABASE_TRIGGER_DEFINITION } from "./trigger/form-database";
+import { TOOL_NODE_DEFINITION } from "./tool/definition";
+import { MEMORY_NODE_DEFINITION } from "./vectorize/definition";
 
 const now = () => new Date().toISOString();
 
@@ -93,8 +96,8 @@ const AGENT_NODE = builtin({
         {
           id: "chatModel",
           type: "resource-link",
-          labelKey: "field_chat_model",
-          descriptionKey: "field_chat_model_desc",
+          labelKey: "field_service",
+          descriptionKey: "field_service_desc",
           required: true,
           order: 6,
         },
@@ -138,6 +141,7 @@ const SIMPLE_NODES: WorkflowNodeDefinition[] = [
             { value: "manual", labelKey: "opt_trigger_manual" },
             { value: "webhook", labelKey: "opt_trigger_webhook" },
             { value: "schedule", labelKey: "opt_trigger_schedule" },
+            { value: "form", labelKey: "opt_trigger_form" },
           ],
           order: 1,
         },
@@ -499,57 +503,9 @@ const SIMPLE_NODES: WorkflowNodeDefinition[] = [
       defaultOutputSection(false),
     ],
   }),
-  builtin({
-    id: "memory_node",
-    runtimeType: "memory_node",
-    nameKey: "node_memory",
-    descriptionKey: "node_memory_desc",
-    category: "resource",
-    icon: "Database",
-    sections: [
-      defaultInputSection(),
-      defaultParametersSection([
-        {
-          id: "memoryKind",
-          type: "select",
-          labelKey: "field_memory_kind",
-          defaultValue: "r2",
-          options: [
-            { value: "r2", labelKey: "mem_r2" },
-            { value: "d1", labelKey: "mem_d1" },
-            { value: "vectorize", labelKey: "mem_vectorize" },
-          ],
-          order: 1,
-        },
-      ]),
-      defaultOutputSection(false),
-    ],
-  }),
-  builtin({
-    id: "tool_node",
-    runtimeType: "tool_node",
-    nameKey: "node_tool",
-    descriptionKey: "node_tool_desc",
-    category: "resource",
-    icon: "Wrench",
-    sections: [
-      defaultInputSection(),
-      defaultParametersSection([
-        {
-          id: "toolKind",
-          type: "select",
-          labelKey: "field_tool_kind",
-          defaultValue: "http-request",
-          options: [
-            { value: "http-request", labelKey: "tool_http" },
-            { value: "code", labelKey: "tool_code" },
-          ],
-          order: 1,
-        },
-      ]),
-      defaultOutputSection(false),
-    ],
-  }),
+  MEMORY_NODE_DEFINITION,
+  TOOL_NODE_DEFINITION,
+  FORM_DATABASE_TRIGGER_DEFINITION,
 ];
 
 export const DEFAULT_WORKFLOW_NODE_REGISTRY: WorkflowNodeRegistry = {

@@ -11,6 +11,10 @@ import {
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
 import { executeWorkflowGraph, resumeWorkflowExecution } from '../executor.js';
+import {
+  findFormDatabaseTriggerNode,
+  runFormDatabaseTrigger,
+} from '../triggers/form-trigger-runner.js';
 import { getExecutionByKey, listExecutions } from '../execution/execution-store.js';
 import { createCredential, deleteCredential, listCredentials } from '../storage/credentials.js';
 import {
@@ -147,6 +151,38 @@ export function createWorkflowRoutes(bindingName: string) {
       workflowId,
       ownerIdParam,
     );
+
+    const formTriggerNode = findFormDatabaseTriggerNode(resolved.definition);
+    if (formTriggerNode) {
+      const triggerRow = {
+        triggerId: 'manual-form',
+        ownerId: user.identifier,
+        workflowId,
+        type: 'webhook' as const,
+        enabled: 1,
+        cronExpr: null,
+        webhookToken: null,
+        nodeId: formTriggerNode.id,
+        webhookPath: null,
+        input: body.input ?? null,
+        autoApproveHumanReview: body.autoApproveHumanReview ? 1 : 0,
+        lastRunMinute: null,
+        lastRunAt: null,
+        lastStatus: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      return runFormDatabaseTrigger({
+        env: c.env,
+        bindingName,
+        user,
+        resolved,
+        trigger: triggerRow,
+        triggerNode: formTriggerNode,
+        autoApproveHumanReview: body.autoApproveHumanReview ?? false,
+      });
+    }
+
     return executeWorkflowGraph({
       c,
       bindingName,

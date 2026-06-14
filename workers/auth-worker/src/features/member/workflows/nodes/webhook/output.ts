@@ -1,9 +1,16 @@
 /** n8n-compatible webhook item — downstream nodes receive this shape as input. */
+export type WebhookFileOutput = {
+  filename: string;
+  mimeType: string;
+  data: string;
+};
+
 export type WebhookItemOutput = {
   headers: Record<string, string>;
   params: Record<string, string>;
   query: Record<string, string>;
   body: unknown;
+  files?: WebhookFileOutput[];
   webhookUrl: string;
   executionMode: "test" | "production";
 };
@@ -15,6 +22,7 @@ export type BuildWebhookItemParams = {
   query?: Record<string, string>;
   params?: Record<string, string>;
   body?: unknown;
+  files?: WebhookFileOutput[];
   executionMode?: "test" | "production";
 };
 
@@ -26,6 +34,7 @@ export function buildWebhookItemOutput(params: BuildWebhookItemParams): WebhookI
     params: params.params ?? {},
     query: params.query ?? {},
     body: params.body ?? {},
+    ...(params.files?.length ? { files: params.files } : {}),
     webhookUrl: params.webhookUrl,
     executionMode: params.executionMode ?? "test",
   };
@@ -162,7 +171,10 @@ export function flattenWebhookItemForTable(item: WebhookItemOutput): TableRow[] 
 export async function parseWebhookRequest(
   request: Request,
   trigger: { input: string | null },
-  options: { executionMode: "test" | "production" },
+  options: {
+    executionMode: "test" | "production";
+    binaryField?: string;
+  },
 ): Promise<{ input: string; itemParams: BuildWebhookItemParams }> {
   const url = new URL(request.url);
   const query: Record<string, string> = {};
@@ -177,28 +189,64 @@ export async function parseWebhookRequest(
 
   let input = query.input ?? "";
   let body: unknown = {};
-  const raw = await request.text().catch(() => "");
+  let files: WebhookFileOutput[] | undefined;
+  const contentType = request.headers.get("content-type") ?? "";
+  const binaryField = options.binaryField ?? "data";
 
-  if (!input && raw) {
-    input = raw;
-  }
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData().catch(() => null);
+    if (form) {
+      const formBody: Record<string, unknown> = {};
+      files = [];
+      const fileTasks: Promise<void>[] = [];
+      form.forEach((value, key) => {
+        if (value instanceof File) {
+          fileTasks.push(
+            (async () => {
+              const buffer = await value.arrayBuffer();
+              const base64 = arrayBufferToBase64(buffer);
+              const fileEntry: WebhookFileOutput = {
+                filename: value.name || key,
+                mimeType: value.type || "application/octet-stream",
+                data: base64,
+              };
+              files!.push(fileEntry);
+              if (key === binaryField || !formBody[binaryField]) {
+                formBody[binaryField] = files;
+              }
+            })(),
+          );
+        } else {
+          formBody[key] = String(value);
+        }
+      });
+      await Promise.all(fileTasks);
+      body = formBody;
+      if (!input) input = JSON.stringify(formBody);
+    }
+  } else {
+    const raw = await request.text().catch(() => "");
 
-  if (raw) {
-    const contentType = request.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json")) {
-      try {
-        body = JSON.parse(raw);
-      } catch {
+    if (!input && raw) {
+      input = raw;
+    }
+
+    if (raw) {
+      if (contentType.includes("application/json")) {
+        try {
+          body = JSON.parse(raw);
+        } catch {
+          body = raw;
+        }
+      } else if (raw.trim()) {
         body = raw;
       }
-    } else if (raw.trim()) {
-      body = raw;
-    }
-  } else if (input) {
-    try {
-      body = JSON.parse(input);
-    } catch {
-      body = input;
+    } else if (input) {
+      try {
+        body = JSON.parse(input);
+      } catch {
+        body = input;
+      }
     }
   }
 
@@ -215,7 +263,17 @@ export async function parseWebhookRequest(
       query,
       params: {},
       body,
+      ...(files?.length ? { files } : {}),
       executionMode: options.executionMode,
     },
   };
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i]!);
+  }
+  return btoa(binary);
 }

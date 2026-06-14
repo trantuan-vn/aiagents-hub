@@ -74,6 +74,8 @@ export interface ExecuteWorkflowParams {
   entryNodeIds?: string[];
   /** Parsed HTTP webhook payload — seeds webhook node output (n8n item shape). */
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
+  /** Merge into initial runContext (form trigger fan-out per-table payload). */
+  runContextOverride?: Record<string, unknown>;
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -554,6 +556,7 @@ export async function executeWorkflowGraph(
         input: input ?? '',
         variables,
         workflowName: resolved.workflow.name,
+        ...(params.runContextOverride ?? {}),
       },
       totalCostVnd: 0,
     },

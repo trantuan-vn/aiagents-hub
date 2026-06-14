@@ -26,6 +26,32 @@ export const MEMORY_NODE_N8N_DESCRIPTION = resourceNode({
       displayOptions: { show: { memoryKind: ["vectorize"] } },
     },
     {
+      displayName: "Namespace",
+      name: "namespace",
+      type: "string",
+      default: "",
+      displayOptions: { show: { memoryKind: ["vectorize"] } },
+    },
+    {
+      displayName: "Dimensions",
+      name: "dimensions",
+      type: "number",
+      default: 768,
+      displayOptions: { show: { memoryKind: ["vectorize"] } },
+    },
+    {
+      displayName: "Metric",
+      name: "metric",
+      type: "options",
+      default: "cosine",
+      options: [
+        { name: "Cosine", value: "cosine" },
+        { name: "Euclidean", value: "euclidean" },
+        { name: "Dot product", value: "dot-product" },
+      ],
+      displayOptions: { show: { memoryKind: ["vectorize"] } },
+    },
+    {
       displayName: "Label",
       name: "label",
       type: "string",

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { Play, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -15,12 +15,15 @@ import type { N8nNodeParameters } from "@/lib/n8n-workflow/types";
 import { useWorkflowNodeRegistry } from "../../hooks/use-workflow-node-registry";
 import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
+import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
 import { NodeConfigIoPanel } from "./node-config-io-panel";
 import { resolveUIPlugin } from "../../nodes";
 import { warnLegacyRuntimeType } from "../../../_lib/runtime-type";
 
 type WorkflowNodeConfigPanelProps = {
   node: Node | null;
+  nodes?: Node[];
+  edges?: Edge[];
   workflowId?: number;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
@@ -29,6 +32,8 @@ type WorkflowNodeConfigPanelProps = {
 
 export function WorkflowNodeConfigPanel({
   node,
+  nodes = [],
+  edges = [],
   workflowId,
   onClose,
   onPatchData,
@@ -107,7 +112,9 @@ export function WorkflowNodeConfigPanel({
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
-        {inputSection ? (
+        {runtimeType === "agent" ? (
+          <AgentUpstreamInputPanel nodeId={node.id} nodes={nodes} edges={edges} />
+        ) : inputSection ? (
           <NodeConfigIoPanel
             title={t("section_input")}
             section={inputSection}

@@ -151,6 +151,7 @@ export interface AgentResourceContext {
   serviceEndpoint?: string;
   memoryCollection?: string;
   memoryKind?: string;
+  memoryNamespace?: string;
   tools: Array<Record<string, unknown>>;
 }
 
@@ -163,6 +164,7 @@ export function resolveAgentResources(
   let serviceEndpoint: string | undefined;
   let memoryCollection: string | undefined;
   let memoryKind: string | undefined;
+  let memoryNamespace: string | undefined;
 
   for (const edge of definition.edges) {
     if (edge.target !== agentId || !edge.targetHandle) continue;
@@ -179,6 +181,7 @@ export function resolveAgentResources(
     if (handle === 'memory' && source.type === 'memory_node') {
       memoryKind = String(data.memoryKind ?? 'vectorize');
       memoryCollection = String(data.collection ?? data.memoryCollection ?? 'vectorize-default');
+      memoryNamespace = String(data.namespace ?? '').trim() || memoryNamespace;
     }
 
     if (handle === 'tools' && source.type === 'tool_node') {
@@ -191,5 +194,5 @@ export function resolveAgentResources(
     }
   }
 
-  return { serviceEndpoint, memoryCollection, memoryKind, tools };
+  return { serviceEndpoint, memoryCollection, memoryKind, memoryNamespace, tools };
 }

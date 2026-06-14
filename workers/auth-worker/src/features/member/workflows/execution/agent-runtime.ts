@@ -4,6 +4,15 @@ import { z } from 'zod';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import { resolveCredential } from '../storage/credentials.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
+import { resolveAgentResources } from '../engine/graph-helpers.js';
+import {
+  embedText,
+  matchesToSnippets,
+  queryCollection,
+} from '../rag-vector.js';
+import { executeGetDbInfo } from '../nodes/tool/get-db-info.js';
+import { executeGetRag } from '../nodes/tool/get-rag.js';
+import { executeSaveRag } from '../nodes/tool/save-rag.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -19,6 +28,9 @@ import { runHttpRequest } from './node-runtime.js';
 interface AgentToolContext {
   env: Env;
   userDO: DurableObjectStub<UserDO>;
+  agentId?: string;
+  triggerContext?: Record<string, unknown>;
+  embedModel?: string;
 }
 
 function sanitizeToolName(raw: string, fallback: string): string {
@@ -102,27 +114,109 @@ export function buildAgentToolset(
   return tools;
 }
 
+export function agentHasRagToolKind(definition: WorkflowDefinition, agentId: string, kind: string): boolean {
+  const linked = resolveAgentResources(definition, agentId);
+  return linked.tools.some((t) => String(t.kind ?? '') === kind);
+}
+
+export function buildRagToolset(
+  ctx: AgentToolContext,
+  definition: WorkflowDefinition,
+  agentId: string,
+): ToolSet {
+  const tools: ToolSet = {};
+  const linked = resolveAgentResources(definition, agentId);
+  const triggerContext = ctx.triggerContext ?? {};
+
+  for (const t of linked.tools) {
+    const kind = String(t.kind ?? '');
+    const config = (t.config ?? {}) as Record<string, unknown>;
+    const toolName = sanitizeToolName(String(config.toolName ?? kind.replace(/-/g, '_')), kind.replace(/-/g, '_'));
+    const description = String(
+      config.toolDescription ?? config.description ?? `RAG tool: ${kind}`,
+    );
+
+    if (kind === 'get-rag') {
+      tools[toolName] = tool({
+        description,
+        inputSchema: z.object({
+          query: z.string().describe('Search query'),
+          topK: z.number().optional(),
+          namespace: z.string().optional(),
+          docType: z.string().optional().describe('Filter by docType metadata (schema | sqlexample)'),
+        }),
+        execute: async (input) =>
+          executeGetRag({
+            env: ctx.env,
+            definition,
+            agentId,
+            input,
+            embedModel: ctx.embedModel,
+          }),
+      });
+    }
+
+    if (kind === 'save-rag') {
+      tools[toolName] = tool({
+        description,
+        inputSchema: z.object({
+          content: z.string().describe('Text content to embed and store'),
+          documentId: z.string().optional(),
+          source: z.string().optional(),
+          chunks: z
+            .array(z.object({ content: z.string(), index: z.number() }))
+            .optional(),
+          metadata: z.record(z.string()).optional(),
+        }),
+        execute: async (input) =>
+          executeSaveRag({
+            env: ctx.env,
+            definition,
+            agentId,
+            input,
+            embedModel: ctx.embedModel,
+          }),
+      });
+    }
+
+    if (kind === 'get-db-info') {
+      tools[toolName] = tool({
+        description,
+        inputSchema: z.object({
+          tableName: z.string().optional(),
+          schemaName: z.string().optional(),
+          sampleRowLimit: z.number().optional(),
+          sqlHistoryLimit: z.number().optional(),
+        }),
+        execute: async (input) =>
+          executeGetDbInfo({
+            env: ctx.env,
+            definition,
+            agentId,
+            triggerContext,
+            input,
+          }),
+      });
+    }
+  }
+
+  return tools;
+}
+
 /** Retrieve top-K snippets from a Vectorize collection for RAG grounding. */
 export async function retrieveMemory(
   env: Env,
   collection: string,
   query: string,
   topK = 5,
+  namespace?: string,
 ): Promise<string[]> {
-  const fallback = (env as unknown as Record<string, unknown>).VECTORIZE as
-    | { query: (vector: number[], opts: { topK: number }) => Promise<{ matches?: { metadata?: Record<string, string> }[] }> }
-    | undefined;
-  const index =
-    ((env as unknown as Record<string, unknown>)[collection] as typeof fallback) ?? fallback;
-  if (!index?.query || !query.trim()) return [];
+  if (!query.trim()) return [];
   try {
-    const embed = await env.AI.run('@cf/baai/bge-base-en-v1.5', { text: query });
-    const vector = (embed as { data?: number[][] })?.data?.[0];
-    if (!vector?.length) return [];
-    const result = await index.query(vector, { topK });
-    return (result.matches ?? [])
-      .map((m) => m.metadata?.text ?? m.metadata?.content ?? '')
-      .filter(Boolean);
+    const vector = await embedText(env, query);
+    if (!vector.length) return [];
+    const matches = await queryCollection(env, collection, vector, { topK, namespace });
+    return matchesToSnippets(matches);
   } catch (e) {
     console.warn('[agent-runtime] memory retrieval failed:', e);
     return [];
@@ -130,7 +224,7 @@ export async function retrieveMemory(
 }
 
 /** A RAG retrieval tool the agent can call on demand. */
-export function buildMemoryTool(env: Env, collection: string): ToolSet {
+export function buildMemoryTool(env: Env, collection: string, namespace?: string): ToolSet {
   return {
     retrieve_memory: tool({
       description:
@@ -139,7 +233,7 @@ export function buildMemoryTool(env: Env, collection: string): ToolSet {
         query: z.string().describe('The search query to find relevant memory snippets'),
       }),
       execute: async ({ query }: { query: string }) => {
-        const snippets = await retrieveMemory(env, collection, query);
+        const snippets = await retrieveMemory(env, collection, query, 5, namespace);
         return { snippets, count: snippets.length };
       },
     }),
