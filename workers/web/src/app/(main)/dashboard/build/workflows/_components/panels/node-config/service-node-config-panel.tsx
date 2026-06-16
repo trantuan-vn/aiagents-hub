@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
-import { ArrowRightFromLine, ChevronDown, Play, Server } from "lucide-react";
+import { ChevronDown, Play, Server } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { Service } from "@/app/(main)/dashboard/service/_components/schema";
@@ -14,10 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
+import { resolveInputNodeId } from "../../edges/workflow-connection-utils";
 import type { NodeConfigPanelProps } from "../../nodes/types";
 import { ServiceSearchCombobox } from "../../node-ui/service-search-combobox";
 import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
 import { ExpressionDropField } from "./expression-drop-field";
+import { NodeMockOutputSection } from "./node-mock-output-section";
 
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
@@ -43,13 +45,6 @@ const SERVICE_EXTRA_OPTIONS = [
 
 type ServiceExtraOptionId = (typeof SERVICE_EXTRA_OPTIONS)[number]["id"];
 
-function getConnectedAgentId(serviceNodeId: string, edges: Edge[]): string | null {
-  const edge = edges.find(
-    (e) => e.source === serviceNodeId && e.sourceHandle === "service" && e.targetHandle === "service",
-  );
-  return edge?.target ?? null;
-}
-
 export type ServiceNodeConfigPanelProps = NodeConfigPanelProps;
 
 export function isServiceNode(node: Node): boolean {
@@ -74,11 +69,10 @@ export function ServiceNodeConfigPanel({
 
   const [addOptionOpen, setAddOptionOpen] = useState(false);
 
-  const connectedAgentId = useMemo(
-    () => getConnectedAgentId(node.id, edges),
-    [node.id, edges],
+  const inputNodeId = useMemo(
+    () => resolveInputNodeId(node.id, node.type, edges),
+    [node.id, node.type, edges],
   );
-  const inputNodeId = connectedAgentId ?? node.id;
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
@@ -266,27 +260,14 @@ export function ServiceNodeConfigPanel({
         </div>
 
         {/* Right — OUTPUT */}
-        <div className="flex min-h-0 flex-col">
-          <div className="border-b px-3 py-2">
-            <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              {t("section_output")}
-            </h3>
-          </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-            <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />
-            <p className="text-muted-foreground max-w-xs text-sm">{t("service_no_output")}</p>
-            {onExecuteStep ? (
-              <Button
-                type="button"
-                className={cn(ORANGE, "text-white")}
-                onClick={() => onExecuteStep(node.id)}
-              >
-                <Play className="mr-2 size-3.5 fill-current" />
-                {te("menu_execute_step")}
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <NodeMockOutputSection
+          output={nodeData._output}
+          outputPinned={!!nodeData._outputPinned}
+          defaultMockJson={'{\n  "text": "Hello from service"\n}'}
+          onSaveOutput={(parsed) => patch({ _output: parsed, _outputPinned: true })}
+          onUnpinOutput={() => patch({ _output: undefined, _outputPinned: false })}
+          onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+        />
       </div>
     </div>
   );

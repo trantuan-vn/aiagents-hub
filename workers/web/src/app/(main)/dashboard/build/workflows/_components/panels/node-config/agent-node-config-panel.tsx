@@ -5,7 +5,6 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import {
   ArrowLeftFromLine,
-  ArrowRightFromLine,
   Bot,
   Check,
   ChevronDown,
@@ -17,7 +16,6 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/workflow-nodes";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -29,7 +27,7 @@ import { cn } from "@/lib/utils";
 import type { NodeConfigPanelProps } from "../../nodes/types";
 import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
 import { ExpressionDropField } from "./expression-drop-field";
-import { JsonCodeEditor } from "./json-code-editor";
+import { NodeMockOutputSection } from "./node-mock-output-section";
 
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
@@ -40,8 +38,6 @@ const AGENT_EXTRA_OPTIONS = [
 ] as const;
 
 type AgentExtraOptionId = (typeof AGENT_EXTRA_OPTIONS)[number]["id"];
-
-type IoViewMode = "schema" | "table" | "json";
 
 function isDataFlowEdge(edge: Edge): boolean {
   const targetHandle = edge.targetHandle ?? "in";
@@ -124,73 +120,6 @@ function SubNodeChip({
   );
 }
 
-function AgentOutputView({ output }: { output: Record<string, unknown> }) {
-  const t = useTranslations("WorkflowNodeRegistry");
-  const [viewMode, setViewMode] = useState<IoViewMode>("schema");
-
-  const schemaRows = useMemo(() => buildSchemaTreeRows(output), [output]);
-  const tableRows = useMemo(() => flattenWebhookItemForTable(output as never), [output]);
-  const jsonText = useMemo(() => JSON.stringify(output, null, 2), [output]);
-
-  return (
-    <>
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{t("section_output")}</h3>
-        <div className="flex gap-0.5 rounded-md border p-0.5">
-          {(["schema", "table", "json"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={cn(
-                "rounded px-2 py-0.5 text-[10px] font-medium capitalize",
-                viewMode === mode ? "bg-muted" : "text-muted-foreground hover:text-foreground",
-              )}
-              onClick={() => setViewMode(mode)}
-            >
-              {t(`view_${mode}`)}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {viewMode === "json" ? (
-          <pre className="text-muted-foreground overflow-x-auto text-[11px] whitespace-pre-wrap">{jsonText}</pre>
-        ) : viewMode === "table" ? (
-          <table className="w-full text-left text-[11px]">
-            <thead>
-              <tr>
-                <th className="text-muted-foreground pb-2 pr-3 font-medium">{t("webhook_output_field")}</th>
-                <th className="text-muted-foreground pb-2 font-medium">{t("webhook_output_value")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableRows.map((row) => (
-                <tr key={row.path} className="border-t">
-                  <td className="text-muted-foreground py-1 pr-3 font-mono">{row.path}</td>
-                  <td className="max-w-[60%] truncate py-1 font-mono">{row.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <ul className="space-y-1 text-[11px]">
-            {schemaRows.map((row) => (
-              <li
-                key={row.path}
-                className="flex items-center gap-2"
-                style={{ paddingLeft: `${row.depth * 12}px` }}
-              >
-                <span className="font-mono">{row.name}</span>
-                <span className="text-muted-foreground">{row.type}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </>
-  );
-}
-
 export type AgentNodeConfigPanelProps = NodeConfigPanelProps;
 
 export function isAgentNode(node: Node): boolean {
@@ -216,8 +145,6 @@ export function AgentNodeConfigPanel({
   const visibleOptions = (nodeData.agentVisibleOptions ?? []) as AgentExtraOptionId[];
 
   const [addOptionOpen, setAddOptionOpen] = useState(false);
-  const [editingOutput, setEditingOutput] = useState(false);
-  const [outputDraft, setOutputDraft] = useState("");
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
@@ -238,7 +165,6 @@ export function AgentNodeConfigPanel({
   );
 
   const output = nodeData._output;
-  const hasOutput = output != null && typeof output === "object";
 
   const addOption = (optionId: AgentExtraOptionId) => {
     if (visibleOptions.includes(optionId)) return;
@@ -265,24 +191,6 @@ export function AgentNodeConfigPanel({
       return;
     }
     toast.message(t("agent_no_upstream"));
-  };
-
-  const openEditOutput = () => {
-    setOutputDraft(
-      hasOutput ? JSON.stringify(output, null, 2) : '{\n  "text": "Hello from agent"\n}',
-    );
-    setEditingOutput(true);
-  };
-
-  const saveOutput = () => {
-    try {
-      const parsed = JSON.parse(outputDraft) as unknown;
-      patch({ _output: parsed, _outputPinned: true });
-      setEditingOutput(false);
-      toast.success(t("agent_mock_saved"));
-    } catch {
-      toast.error(t("webhook_edit_output_invalid_json"));
-    }
   };
 
   return (
@@ -536,55 +444,14 @@ export function AgentNodeConfigPanel({
 
         {/* Right — OUTPUT */}
         <div className="flex min-h-0 flex-col">
-          {editingOutput ? (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <h3 className="text-xs font-medium">{t("field_mock_output")}</h3>
-                <div className="flex gap-2">
-                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setEditingOutput(false)}>
-                    {t("close")}
-                  </Button>
-                  <Button type="button" size="sm" className={cn(ORANGE, "h-8 text-xs text-white")} onClick={saveOutput}>
-                    {t("agent_save_mock")}
-                  </Button>
-                </div>
-              </div>
-              <div className="min-h-0 flex-1 p-2">
-                <JsonCodeEditor value={outputDraft} onChange={setOutputDraft} className="h-full min-h-[200px]" />
-              </div>
-            </div>
-          ) : hasOutput ? (
-            <AgentOutputView output={output as Record<string, unknown>} />
-          ) : (
-            <>
-              <div className="border-b px-3 py-2">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  {t("section_output")}
-                </h3>
-              </div>
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-                <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />
-                <p className="text-muted-foreground text-sm">{t("no_output_data")}</p>
-                {onExecuteStep ? (
-                  <Button
-                    type="button"
-                    className={cn(ORANGE, "text-white")}
-                    onClick={() => onExecuteStep(node.id)}
-                  >
-                    <Play className="mr-2 size-3.5 fill-current" />
-                    {te("menu_execute_step")}
-                  </Button>
-                ) : null}
-                <button
-                  type="button"
-                  className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-                  onClick={openEditOutput}
-                >
-                  {t("webhook_set_mock_data")}
-                </button>
-              </div>
-            </>
-          )}
+          <NodeMockOutputSection
+            output={output}
+            outputPinned={!!nodeData._outputPinned}
+            defaultMockJson={'{\n  "text": "Hello from agent"\n}'}
+            onSaveOutput={(parsed) => patch({ _output: parsed, _outputPinned: true })}
+            onUnpinOutput={() => patch({ _output: undefined, _outputPinned: false })}
+            onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+          />
         </div>
       </div>
     </div>

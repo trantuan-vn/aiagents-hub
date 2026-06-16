@@ -3,7 +3,7 @@
 import { useCallback, useEffect } from "react";
 
 import type { Node } from "@xyflow/react";
-import { ArrowRightFromLine, Database } from "lucide-react";
+import { Database } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   VECTORIZE_INDEX_OPTIONS,
 } from "../../layout/vectorize-node-data";
 import type { NodeConfigPanelProps } from "../../nodes/types";
+import { NodeOutputPanel } from "./node-output-panel";
 
 const METRIC_OPTIONS = [
   { value: "cosine", labelKey: "metric_cosine" },
@@ -204,17 +205,7 @@ export function VectorizeNodeConfigPanel({
           </Tabs>
         </div>
 
-        <div className="flex min-h-0 flex-col">
-          <div className="border-b px-3 py-2">
-            <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-              {t("section_output")}
-            </h3>
-          </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-            <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />
-            <p className="text-muted-foreground max-w-xs text-sm">{t("vectorize_no_output")}</p>
-          </div>
-        </div>
+        <NodeOutputPanel emptyLabel={t("vectorize_no_output")} />
       </div>
     </div>
   );

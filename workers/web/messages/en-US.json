@@ -2877,6 +2877,7 @@
     "webhook_add_option": "Add option",
     "webhook_wish": "I wish this node would…",
     "webhook_edit_output": "Edit output",
+    "output_unpin": "Unpin output",
     "webhook_edit_output_title": "EDIT OUTPUT",
     "webhook_edit_output_cancel": "Cancel",
     "webhook_edit_output_save": "Save",

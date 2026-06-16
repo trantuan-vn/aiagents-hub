@@ -12,11 +12,12 @@ import { hasN8nNodeDescription, getN8nNodeDescription } from "@/lib/n8n-workflow
 import { resolveNodeDefinition } from "@/lib/workflow-node-registry";
 import type { N8nNodeParameters } from "@/lib/n8n-workflow/types";
 
+import { resolveInputNodeId } from "../../edges/workflow-connection-utils";
 import { useWorkflowNodeRegistry } from "../../hooks/use-workflow-node-registry";
 import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
 import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
-import { NodeConfigIoPanel } from "./node-config-io-panel";
+import { NodeMockOutputSection } from "./node-mock-output-section";
 import { resolveUIPlugin } from "../../nodes";
 import { warnLegacyRuntimeType } from "../../../_lib/runtime-type";
 
@@ -74,6 +75,11 @@ export function WorkflowNodeConfigPanel({
     [node, onPatchData],
   );
 
+  const inputNodeId = useMemo(
+    () => (node ? resolveInputNodeId(node.id, runtimeType, edges) : ""),
+    [node, runtimeType, edges],
+  );
+
   if (!node || (!definition && !n8nDescription)) return null;
 
   warnLegacyRuntimeType(node);
@@ -113,7 +119,7 @@ export function WorkflowNodeConfigPanel({
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
-        <AgentUpstreamInputPanel nodeId={node.id} nodes={nodes} edges={edges} />
+        <AgentUpstreamInputPanel nodeId={inputNodeId} nodes={nodes} edges={edges} />
 
         <div className="flex min-h-0 flex-col border-r">
           <div className="border-b px-3 py-2">
@@ -164,28 +170,13 @@ export function WorkflowNodeConfigPanel({
         </div>
 
         {outputSection ? (
-          <div className="relative flex min-h-0 flex-col">
-            <NodeConfigIoPanel
-              title={t("section_output")}
-              section={outputSection}
-              data={(nodeData._output as Record<string, unknown>) ?? {}}
-              readOnly
-              emptyLabel={t("no_output_data")}
-            />
-            {outputSection.showExecuteStep && onExecuteStep ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 p-4 text-center">
-                <p className="text-muted-foreground text-sm">{t("no_output_data")}</p>
-                <Button
-                  type="button"
-                  className="bg-[#ff6f00] hover:bg-[#e66300] text-white"
-                  onClick={() => onExecuteStep(node.id)}
-                >
-                  <Play className="mr-2 h-4 w-4 fill-current" />
-                  {te("menu_execute_step")}
-                </Button>
-              </div>
-            ) : null}
-          </div>
+          <NodeMockOutputSection
+            output={nodeData._output}
+            outputPinned={!!nodeData._outputPinned}
+            onSaveOutput={(parsed) => onPatchData(node.id, { _output: parsed, _outputPinned: true })}
+            onUnpinOutput={() => onPatchData(node.id, { _output: undefined, _outputPinned: false })}
+            onExecute={outputSection.showExecuteStep && onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+          />
         ) : null}
       </div>
     </div>

@@ -2877,6 +2877,7 @@
     "webhook_add_option": "Thêm tùy chọn",
     "webhook_wish": "Tôi mong node này sẽ…",
     "webhook_edit_output": "Sửa output",
+    "output_unpin": "Bỏ ghim output",
     "webhook_edit_output_title": "SỬA OUTPUT",
     "webhook_edit_output_cancel": "Hủy",
     "webhook_edit_output_save": "Lưu",

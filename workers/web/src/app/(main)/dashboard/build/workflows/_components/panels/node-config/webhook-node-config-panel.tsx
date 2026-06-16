@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Copy,
   MoreVertical,
-  Pencil,
   Webhook,
   Zap,
 } from "lucide-react";
@@ -31,6 +30,7 @@ import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "../../hooks/use
 import { WebhookEditOutputPanel } from "./webhook-edit-output-panel";
 import { WebhookListeningPanel } from "./webhook-listening-panel";
 import { WebhookOutputPanel } from "./webhook-output-panel";
+import { NodeOutputPanel } from "./node-output-panel";
 import {
   buildWebhookItemOutput,
   normalizeWebhookItemOutput,
@@ -259,6 +259,11 @@ export function WebhookNodeConfigPanel({
   const hasOutput = output != null;
 
   const openEditOutput = () => setEditingOutput(true);
+
+  const unpinOutput = () => {
+    setLiveOutput(null);
+    patch({ _output: undefined, _outputPinned: false });
+  };
 
   const cancelEditOutput = () => {
     setEditingOutput(false);
@@ -613,46 +618,19 @@ export function WebhookNodeConfigPanel({
               }}
             />
           ) : hasOutput && output ? (
-            <WebhookOutputPanel item={output} onEdit={openEditOutput} />
+            <WebhookOutputPanel
+              item={output}
+              onEdit={openEditOutput}
+              onUnpin={outputPinned ? unpinOutput : undefined}
+            />
           ) : (
-            <>
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <h3 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-                  {t("section_output")}
-                </h3>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  aria-label={t("webhook_edit_output")}
-                  onClick={openEditOutput}
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-              </div>
-
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-                    <Zap className="text-muted-foreground/50 size-10" />
-                    <p className="text-muted-foreground text-sm">{t("webhook_no_trigger_output")}</p>
-                    {onExecuteStep ? (
-                      <Button
-                        type="button"
-                        className={cn(ORANGE, "text-white")}
-                        onClick={() => onExecuteStep(node.id)}
-                      >
-                        {t("webhook_test_trigger")}
-                      </Button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-                      onClick={openEditOutput}
-                    >
-                      {t("webhook_set_mock_data")}
-                    </button>
-              </div>
-            </>
+            <NodeOutputPanel
+              emptyLabel={t("webhook_no_trigger_output")}
+              onEdit={openEditOutput}
+              onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+              onSetMockData={openEditOutput}
+              executeLabel={t("webhook_test_trigger")}
+            />
           )}
         </div>
       </div>

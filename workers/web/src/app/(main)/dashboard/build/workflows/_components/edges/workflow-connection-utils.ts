@@ -149,6 +149,38 @@ function handleMatchesId(
   return handle === handleId;
 }
 
+/** Parent agent for a resource node (service / memory / tool) wired below an agent. */
+export function getConnectedAgentId(
+  resourceNodeId: string,
+  edges: Edge[],
+  nodeType?: string,
+): string | null {
+  const handle = nodeType ? RESOURCE_NODE_HANDLE[nodeType] : undefined;
+  if (handle) {
+    const edge = edges.find(
+      (e) => e.source === resourceNodeId && e.sourceHandle === handle && e.targetHandle === handle,
+    );
+    return edge?.target ?? null;
+  }
+
+  for (const resourceHandle of RESOURCE_HANDLES) {
+    const edge = edges.find(
+      (e) =>
+        e.source === resourceNodeId &&
+        e.sourceHandle === resourceHandle &&
+        e.targetHandle === resourceHandle,
+    );
+    if (edge) return edge.target;
+  }
+
+  return null;
+}
+
+/** Node id whose upstream data-flow output should populate the INPUT panel. */
+export function resolveInputNodeId(nodeId: string, nodeType: string | undefined, edges: Edge[]): string {
+  return getConnectedAgentId(nodeId, edges, nodeType) ?? nodeId;
+}
+
 export function edgeUsesHandle(
   edge: { source: string; sourceHandle?: string | null; target: string; targetHandle?: string | null },
   nodeId: string,
