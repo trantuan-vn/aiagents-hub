@@ -54,6 +54,7 @@ const ExecuteBodySchema = z.object({
   input: z.string().optional(),
   variables: z.record(z.unknown()).optional(),
   autoApproveHumanReview: z.boolean().optional(),
+  entryNodeId: z.string().min(1).max(200).optional(),
 });
 
 const ResumeBodySchema = z.object({
@@ -153,7 +154,10 @@ export function createWorkflowRoutes(bindingName: string) {
     );
 
     const formTriggerNode = findFormDatabaseTriggerNode(resolved.definition);
-    if (formTriggerNode) {
+    if (
+      formTriggerNode &&
+      (!body.entryNodeId || body.entryNodeId === formTriggerNode.id)
+    ) {
       const triggerRow = {
         triggerId: 'manual-form',
         ownerId: user.identifier,
@@ -191,6 +195,7 @@ export function createWorkflowRoutes(bindingName: string) {
       input: body.input,
       variables: body.variables,
       autoApproveHumanReview: body.autoApproveHumanReview ?? false,
+      entryNodeIds: body.entryNodeId ? [body.entryNodeId] : undefined,
       requestMeta: {
         userAgent: c.req.header('user-agent'),
         ipAddress: c.req.header('cf-connecting-ip') ?? undefined,

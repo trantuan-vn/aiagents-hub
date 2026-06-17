@@ -12,7 +12,7 @@ interface WorkflowEditorProps {
   readOnly?: boolean;
   serviceEndpoint?: string;
   workflowId?: number;
-  onExecute?: () => void;
+  ownerId?: string;
   className?: string;
 }
 
@@ -34,7 +34,7 @@ export function WorkflowEditor({
   readOnly = false,
   serviceEndpoint = "",
   workflowId,
-  onExecute,
+  ownerId,
   className,
 }: WorkflowEditorProps) {
   const definition = useMemo(() => parseDef(definitionJson), [definitionJson]);
@@ -55,7 +55,7 @@ export function WorkflowEditor({
       readOnly={readOnly}
       serviceEndpoint={serviceEndpoint}
       workflowId={workflowId}
-      onExecute={onExecute}
+      ownerId={ownerId}
     />
   );
 }

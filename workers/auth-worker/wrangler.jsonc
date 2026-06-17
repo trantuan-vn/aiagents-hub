@@ -10,6 +10,9 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"alias": {
+		"@aiagents-hub/workflow-nodes": "../../packages/workflow-nodes/src/index.ts"
+	},
 	"rules": [
 		{
 			"type": "Text",

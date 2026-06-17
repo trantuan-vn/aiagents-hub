@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   BadgeCheck,
@@ -25,11 +25,13 @@ import { useTranslations } from "next-intl";
 import { SimpleIcon as BrandIcon } from "@/components/simple-icon";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { TOOL_KIND_DEFAULTS } from "@aiagents-hub/workflow-nodes";
+import { TOOL_KIND_DEFAULTS, resolveCatalogEntryId } from "@aiagents-hub/workflow-nodes";
 
 import { useApprovedServices } from "../hooks/use-approved-services";
 import { useWorkflowIntegrations } from "../hooks/use-workflow-integrations";
+import { useWorkflowNodeCatalog } from "../hooks/use-workflow-node-catalog";
 import { ActionAppIcon } from "../action-app/workflow-action-app-icon";
 import {
   WorkflowActionAppDetailHeader,
@@ -174,6 +176,19 @@ export function WorkflowAddNodePanel({
   }, [initialView, resetOnOpenGeneration]);
   const { services, loading: servicesLoading } = useApprovedServices();
   const { integrations, loading: integrationsLoading } = useWorkflowIntegrations();
+  const { isCatalogActive } = useWorkflowNodeCatalog();
+  const { toast } = useToast();
+
+  const guardCatalogPick = useCallback(
+    (catalogId: string, fn: () => void) => {
+      if (!isCatalogActive(catalogId)) {
+        toast({ description: t("node_catalog_disabled") });
+        return;
+      }
+      fn();
+    },
+    [isCatalogActive, t, toast],
+  );
 
   const q = query.trim().toLowerCase();
 
@@ -474,10 +489,16 @@ export function WorkflowAddNodePanel({
   };
 
   const pickAgentTool = (label: string, toolKind: string, extra?: Record<string, unknown>) => {
-    onPick({
-      type: "tool_node",
-      label,
-      extra: { toolKind, catalogId: toolKind, ...extra },
+    const catalogId =
+      toolKind === "action_in_app" || toolKind === "human_review" || toolKind === "mcp"
+        ? resolveCatalogEntryId(toolKind === "human_review" ? "human_review" : toolKind, extra?.channel as string | undefined)
+        : resolveCatalogEntryId("tool_node", toolKind);
+    guardCatalogPick(catalogId, () => {
+      onPick({
+        type: "tool_node",
+        label,
+        extra: { toolKind, catalogId: toolKind, ...extra },
+      });
     });
   };
 
@@ -517,26 +538,32 @@ export function WorkflowAddNodePanel({
   }, [integrations, selectedActionApp]);
 
   const pickTransformItem = (item: WorkflowTransformCatalogItem) => {
-    onPick({
-      type: "data_transformation",
-      label: t(item.nameKey),
-      extra: { transformKind: item.id },
+    guardCatalogPick(`transform:${item.id}`, () => {
+      onPick({
+        type: "data_transformation",
+        label: t(item.nameKey),
+        extra: { transformKind: item.id },
+      });
     });
   };
 
   const pickCoreItem = (item: WorkflowCoreCatalogItem) => {
-    onPick({
-      type: "core",
-      label: t(item.nameKey),
-      extra: { coreKind: item.id },
+    guardCatalogPick(`core:${item.id}`, () => {
+      onPick({
+        type: "core",
+        label: t(item.nameKey),
+        extra: { coreKind: item.id },
+      });
     });
   };
 
   const pickFlowItem = (item: WorkflowFlowCatalogItem) => {
-    onPick({
-      type: "flow",
-      label: t(item.nameKey),
-      extra: { flowKind: item.id },
+    guardCatalogPick(`flow:${item.id}`, () => {
+      onPick({
+        type: "flow",
+        label: t(item.nameKey),
+        extra: { flowKind: item.id },
+      });
     });
   };
 
@@ -549,10 +576,12 @@ export function WorkflowAddNodePanel({
       });
       return;
     }
-    onPick({
-      type: "human_review",
-      label,
-      extra: { channel: channel.id, reviewMode: "send_and_wait" },
+    guardCatalogPick(`human_review:${channel.id}`, () => {
+      onPick({
+        type: "human_review",
+        label,
+        extra: { channel: channel.id, reviewMode: "send_and_wait" },
+      });
     });
   };
 
@@ -570,13 +599,15 @@ export function WorkflowAddNodePanel({
   };
 
   const pickMemoryVectorStore = (item: WorkflowAgentVectorStoreItem) => {
-    onPick({
-      type: "memory_node",
-      label: t(item.nameKey),
-      extra: {
-        catalogId: item.id,
-        memoryKind: item.id === "vectorize" ? "vectorize" : item.id,
-      },
+    guardCatalogPick("memory_node", () => {
+      onPick({
+        type: "memory_node",
+        label: t(item.nameKey),
+        extra: {
+          catalogId: item.id,
+          memoryKind: item.id === "vectorize" ? "vectorize" : item.id,
+        },
+      });
     });
   };
 
@@ -595,10 +626,12 @@ export function WorkflowAddNodePanel({
   };
 
   const pickTrigger = (kind: WorkflowTriggerKindId, label: string, extra?: Record<string, unknown>) => {
-    onPick({
-      type: WORKFLOW_ADD_TRIGGER.nodeType,
-      label,
-      extra: { triggerKind: kind, ...extra },
+    guardCatalogPick(`trigger:${kind}`, () => {
+      onPick({
+        type: WORKFLOW_ADD_TRIGGER.nodeType,
+        label,
+        extra: { triggerKind: kind, ...extra },
+      });
     });
   };
 
@@ -624,22 +657,28 @@ export function WorkflowAddNodePanel({
 
   const pickEvaluationAction = (action: WorkflowEvaluationActionId) => {
     const item = WORKFLOW_EVALUATION_ACTIONS.find((entry) => entry.id === action);
-    onPick({
-      type: "core",
-      label: item?.label ?? action,
-      extra: { coreKind: "execution_data", evaluationAction: action },
+    guardCatalogPick("core:execution_data", () => {
+      onPick({
+        type: "core",
+        label: item?.label ?? action,
+        extra: { coreKind: "execution_data", evaluationAction: action },
+      });
     });
   };
 
   const pickAgent = () => {
-    onPick({ type: "agent", label: t("node_agent") });
+    guardCatalogPick("agent", () => {
+      onPick({ type: "agent", label: t("node_agent") });
+    });
   };
 
   const pickService = (endpoint: string, name: string) => {
-    onPick({
-      type: "service_node",
-      label: name,
-      extra: { serviceEndpoint: endpoint, catalogId: endpoint },
+    guardCatalogPick("service_node", () => {
+      onPick({
+        type: "service_node",
+        label: name,
+        extra: { serviceEndpoint: endpoint, catalogId: endpoint },
+      });
     });
   };
 
@@ -838,6 +877,7 @@ export function WorkflowAddNodePanel({
               icon={Bot}
               title={t("node_agent")}
               description={t("add_category_ai_desc")}
+              disabled={!isCatalogActive("agent")}
               onClick={pickAgent}
             />
             <CategoryRow
@@ -963,6 +1003,7 @@ export function WorkflowAddNodePanel({
                     key={channel.id}
                     channel={channel}
                     title={t(channel.nameKey)}
+                    disabled={!isCatalogActive(`human_review:${channel.id}`)}
                     onClick={() => pickHumanReviewChannel(channel)}
                   />
                 ))}
@@ -988,6 +1029,7 @@ export function WorkflowAddNodePanel({
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
                   highlighted={index === 0}
+                  disabled={!isCatalogActive(`flow:${item.id}`)}
                   onClick={() => pickFlowItem(item)}
                 />
               ))}
@@ -1003,6 +1045,7 @@ export function WorkflowAddNodePanel({
                   icon={item.icon}
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
+                  disabled={!isCatalogActive(`flow:${item.id}`)}
                   onClick={() => pickFlowItem(item)}
                 />
               ))}
@@ -1029,6 +1072,7 @@ export function WorkflowAddNodePanel({
                   highlighted={index === 0}
                   hasSubmenu={item.hasSubmenu}
                   isTrigger={item.isTrigger}
+                  disabled={!isCatalogActive(`core:${item.id}`)}
                   onClick={() => pickCoreItem(item)}
                 />
               ))}
@@ -1046,6 +1090,7 @@ export function WorkflowAddNodePanel({
                   description={t(item.descKey)}
                   hasSubmenu={item.hasSubmenu}
                   isTrigger={item.isTrigger}
+                  disabled={!isCatalogActive(`core:${item.id}`)}
                   onClick={() => pickCoreItem(item)}
                 />
               ))}
@@ -1071,6 +1116,7 @@ export function WorkflowAddNodePanel({
                   description={t(item.descKey)}
                   highlighted={index === 0}
                   hasSubmenu={item.hasSubmenu}
+                  disabled={!isCatalogActive(`transform:${item.id}`)}
                   onClick={() => pickTransformItem(item)}
                 />
               ))}
@@ -1087,6 +1133,7 @@ export function WorkflowAddNodePanel({
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
                   hasSubmenu={item.hasSubmenu}
+                  disabled={!isCatalogActive(`transform:${item.id}`)}
                   onClick={() => pickTransformItem(item)}
                 />
               ))}
@@ -1102,6 +1149,7 @@ export function WorkflowAddNodePanel({
                   icon={item.icon}
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
+                  disabled={!isCatalogActive(`transform:${item.id}`)}
                   onClick={() => pickTransformItem(item)}
                 />
               ))}
@@ -1118,6 +1166,7 @@ export function WorkflowAddNodePanel({
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
                   hasSubmenu={item.hasSubmenu}
+                  disabled={!isCatalogActive(`transform:${item.id}`)}
                   onClick={() => pickTransformItem(item)}
                 />
               ))}
@@ -1133,6 +1182,7 @@ export function WorkflowAddNodePanel({
                   icon={item.icon}
                   title={t(item.nameKey)}
                   description={t(item.descKey)}
+                  disabled={!isCatalogActive(`transform:${item.id}`)}
                   onClick={() => pickTransformItem(item)}
                 />
               ))}
@@ -1195,6 +1245,7 @@ export function WorkflowAddNodePanel({
                 title={t(item.nameKey)}
                 description={t(item.descKey)}
                 hasSubmenu={item.hasSubmenu}
+                disabled={!item.hasSubmenu && !isCatalogActive(`trigger:${item.id}`)}
                 onClick={() => pickTriggerCatalogItem(item)}
               />
             ))}
@@ -1211,6 +1262,7 @@ export function WorkflowAddNodePanel({
                 key={app.id}
                 title={t(app.nameKey)}
                 description={t(app.descKey)}
+                disabled={!isCatalogActive("trigger:app_event")}
                 onClick={() => pickTriggerApp(app)}
               />
             ))}
@@ -1227,6 +1279,7 @@ export function WorkflowAddNodePanel({
                 key={item.id}
                 title={t(item.nameKey)}
                 description={t(item.descKey)}
+                disabled={!isCatalogActive("trigger:other")}
                 onClick={() => pickTriggerOtherItem(item)}
               />
             ))}
@@ -1246,6 +1299,7 @@ function CategoryRow({
   description,
   highlighted,
   hasSubmenu,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
@@ -1253,6 +1307,7 @@ function CategoryRow({
   description: string;
   highlighted?: boolean;
   hasSubmenu?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1261,6 +1316,7 @@ function CategoryRow({
       className={cn(
         "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
         highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+        disabled && "opacity-50",
       )}
       onClick={onClick}
     >
@@ -1277,16 +1333,21 @@ function CategoryRow({
 function HumanReviewChannelRow({
   channel,
   title,
+  disabled,
   onClick,
 }: {
   channel: HumanReviewChannelItem;
   title: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className="hover:bg-muted focus-visible:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
+        disabled && "opacity-50",
+      )}
       onClick={onClick}
     >
       <ChannelIcon channel={channel} />
@@ -1336,12 +1397,14 @@ function FlowItemRow({
   title,
   description,
   highlighted,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
   highlighted?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1350,6 +1413,7 @@ function FlowItemRow({
       className={cn(
         "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
         highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+        disabled && "opacity-50",
       )}
       onClick={onClick}
     >
@@ -1368,6 +1432,7 @@ function TransformItemRow({
   description,
   highlighted,
   hasSubmenu,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
@@ -1375,6 +1440,7 @@ function TransformItemRow({
   description: string;
   highlighted?: boolean;
   hasSubmenu?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1383,6 +1449,7 @@ function TransformItemRow({
       className={cn(
         "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
         highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+        disabled && "opacity-50",
       )}
       onClick={onClick}
     >
@@ -1403,6 +1470,7 @@ function CoreItemRow({
   highlighted,
   hasSubmenu,
   isTrigger,
+  disabled,
   onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
@@ -1411,6 +1479,7 @@ function CoreItemRow({
   highlighted?: boolean;
   hasSubmenu?: boolean;
   isTrigger?: boolean;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1419,6 +1488,7 @@ function CoreItemRow({
       className={cn(
         "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
         highlighted && "border-l-[3px] border-l-orange-500 pl-[calc(0.5rem-3px)]",
+        disabled && "opacity-50",
       )}
       onClick={onClick}
     >
@@ -1584,17 +1654,22 @@ function PickRow({
   icon: Icon,
   title,
   description,
+  disabled,
   onClick,
 }: {
   icon?: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
+  disabled?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      className={cn(
+        "hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors",
+        disabled && "opacity-50",
+      )}
       onClick={onClick}
     >
       {Icon ? <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" /> : null}

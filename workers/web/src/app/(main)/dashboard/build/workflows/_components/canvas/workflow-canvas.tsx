@@ -10,7 +10,9 @@ import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { useWorkflowCanvasState } from "../hooks/use-workflow-canvas-state";
+import { useWorkflowExecuteEntry } from "../hooks/use-workflow-execute-entry";
 import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
+import { WorkflowCanvasWebhookListeningPanel } from "./workflow-canvas-webhook-listening-panel";
 import { WorkflowCanvasEmptyState } from "./workflow-canvas-empty-state";
 import { WorkflowCanvasMinimap } from "./workflow-canvas-minimap";
 import { useWorkflowAddNodeDrawerActions } from "../add-node/workflow-add-node-drawer-context";
@@ -42,7 +44,7 @@ interface WorkflowCanvasProps {
   readOnly?: boolean;
   serviceEndpoint?: string;
   workflowId?: number;
-  onExecute?: () => void;
+  ownerId?: string;
   className?: string;
 }
 
@@ -65,7 +67,7 @@ function CanvasInner({
   readOnly,
   serviceEndpoint,
   workflowId,
-  onExecute,
+  ownerId,
   className,
 }: WorkflowCanvasProps) {
   const themeMode = usePreferencesStore((s) => s.themeMode);
@@ -130,9 +132,9 @@ function CanvasInner({
       interactionProps={interactionProps}
       readOnly={readOnly}
       workflowId={workflowId}
+      ownerId={ownerId}
       tidyLayout={tidyLayout}
       onTidyWithFitReady={onTidyWithFitReady}
-      onExecute={onExecute}
       createConnectedNode={createConnectedNode}
       deleteEdgeById={deleteEdgeById}
       deleteNodeById={deleteNodeById}
@@ -152,9 +154,9 @@ function CanvasInnerWithDrawerUi({
   interactionProps,
   readOnly,
   workflowId,
+  ownerId,
   tidyLayout,
   onTidyWithFitReady,
-  onExecute,
   createConnectedNode,
   deleteEdgeById,
   deleteNodeById,
@@ -170,9 +172,9 @@ function CanvasInnerWithDrawerUi({
   interactionProps: Record<string, unknown>;
   readOnly?: boolean;
   workflowId?: number;
+  ownerId?: string;
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
-  onExecute?: () => void;
   createConnectedNode: ReturnType<typeof useWorkflowCanvasState>["createConnectedNode"];
   deleteEdgeById: ReturnType<typeof useWorkflowCanvasState>["deleteEdgeById"];
   deleteNodeById: ReturnType<typeof useWorkflowCanvasState>["deleteNodeById"];
@@ -183,6 +185,20 @@ function CanvasInnerWithDrawerUi({
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+  const {
+    executeFromEntry,
+    running,
+    webhookListening,
+    stopWebhookListen,
+    testUrl,
+    liveOutput,
+  } = useWorkflowExecuteEntry({
+    workflowId,
+    ownerId,
+    nodes,
+    patchNodeDataById: readOnly ? undefined : patchNodeDataById,
+    readOnly,
+  });
 
   const onMenuActionWrapped = useCallback(
     (nodeId: string, action: string) => {
@@ -190,9 +206,13 @@ function CanvasInnerWithDrawerUi({
         setConfigNodeId(nodeId);
         return;
       }
+      if (action === "execute_step") {
+        void executeFromEntry(nodeId);
+        return;
+      }
       onNodeMenuAction(nodeId, action);
     },
-    [onNodeMenuAction],
+    [onNodeMenuAction, executeFromEntry],
   );
 
   const configNode = configNodeId ? nodes.find((n) => n.id === configNodeId) : undefined;
@@ -237,7 +257,13 @@ function CanvasInnerWithDrawerUi({
         readOnly={readOnly}
         tidyLayout={tidyLayout}
         onTidyWithFitReady={onTidyWithFitReady}
-        onExecute={onExecute}
+        workflowId={workflowId}
+        running={running}
+        webhookListening={webhookListening}
+        testUrl={testUrl}
+        liveOutput={liveOutput}
+        onStopWebhookListen={stopWebhookListen}
+        onExecuteTriggerNode={executeFromEntry}
         onNodeDoubleClick={readOnly ? undefined : (_, node) => setConfigNodeId(node.id)}
       />
       {configNode && !readOnly ? (
@@ -264,7 +290,13 @@ const CanvasSurface = memo(function CanvasSurface({
   readOnly,
   tidyLayout,
   onTidyWithFitReady,
-  onExecute,
+  workflowId,
+  running,
+  webhookListening,
+  testUrl,
+  liveOutput,
+  onStopWebhookListen,
+  onExecuteTriggerNode,
   onNodeDoubleClick,
 }: {
   className?: string;
@@ -275,7 +307,13 @@ const CanvasSurface = memo(function CanvasSurface({
   readOnly?: boolean;
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
-  onExecute?: () => void;
+  workflowId?: number;
+  running?: boolean;
+  webhookListening?: boolean;
+  testUrl?: string;
+  liveOutput?: import("@aiagents-hub/workflow-nodes").WebhookItemOutput | null;
+  onStopWebhookListen?: () => void;
+  onExecuteTriggerNode: (nodeId: string) => void;
   onNodeDoubleClick?: (event: React.MouseEvent, node: Node) => void;
 }) {
   const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
@@ -318,7 +356,22 @@ const CanvasSurface = memo(function CanvasSurface({
           tidyLayout={tidyLayout}
           onTidyWithFitReady={onTidyWithFitReady}
         />
-        {onExecute ? <WorkflowCanvasExecutePanel onExecute={onExecute} /> : null}
+        {webhookListening && testUrl && onStopWebhookListen ? (
+          <WorkflowCanvasWebhookListeningPanel
+            testUrl={testUrl}
+            liveOutput={liveOutput}
+            onStop={onStopWebhookListen}
+          />
+        ) : null}
+        {workflowId ? (
+          <WorkflowCanvasExecutePanel
+            nodes={nodes}
+            edges={edges}
+            running={running}
+            webhookListening={webhookListening}
+            onExecuteTriggerNode={onExecuteTriggerNode}
+          />
+        ) : null}
         <WorkflowCanvasSideToolbar />
         <WorkflowCanvasMinimap />
       </ReactFlow>

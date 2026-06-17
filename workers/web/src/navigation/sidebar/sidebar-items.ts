@@ -10,6 +10,7 @@ import {
   FileText,
   GitBranch,
   Key,
+  Layers,
   LayoutDashboard,
   RefreshCw,
   Send,
@@ -133,6 +134,12 @@ export const sidebarItems: NavGroup[] = [
         title: "WebSocket Notify",
         url: "/dashboard/notify",
         icon: Send,
+        adminOnly: true,
+      },
+      {
+        title: "Workflow Nodes",
+        url: "/dashboard/workflow-nodes",
+        icon: Layers,
         adminOnly: true,
       },
       {

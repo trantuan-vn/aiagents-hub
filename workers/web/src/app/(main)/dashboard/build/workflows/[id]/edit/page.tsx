@@ -11,7 +11,6 @@ import { addNodeToDefinition, addStickyNoteToDefinition, type WorkflowDefinition
 import { normalizeWorkflowEdge } from "../../_components/edges/workflow-edge-utils";
 import { WorkflowEditor } from "../../_components/editor/workflow-editor";
 import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
-import { WorkflowExecuteDialog } from "../../_components/panels/workflow-panels/workflow-execute-dialog";
 import { useWorkflowCollab } from "../../_components/hooks/use-workflow-collab";
 import { useWorkflowUndo, useWorkflowUndoKeyboard } from "../../_components/hooks/use-workflow-undo";
 import { createWorkflow, deleteWorkflow, getWorkflow, updateWorkflow } from "../../_lib/api";
@@ -70,7 +69,6 @@ export default function EditWorkflowPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
-  const [executeOpen, setExecuteOpen] = useState(false);
   const [definitionSyncKey, setDefinitionSyncKey] = useState(0);
 
   const hydratedRef = useRef(false);
@@ -302,7 +300,6 @@ export default function EditWorkflowPage() {
 
   return (
     <>
-      <WorkflowExecuteDialog workflowId={id} open={executeOpen} onOpenChange={setExecuteOpen} />
       <WorkflowEditorShell
         workflowId={id}
         workflowName={name}
@@ -324,7 +321,7 @@ export default function EditWorkflowPage() {
           bumpDefinitionSync();
           toast.success(te("import_done"));
         }}
-        onExecute={() => setExecuteOpen(true)}
+        onExecute={() => {}}
         onAddNode={handleAddNode}
         onAddStickyNote={handleAddStickyNote}
         onApplyDefinition={(json) => {
@@ -353,7 +350,6 @@ export default function EditWorkflowPage() {
           definitionJson={definition}
           definitionSyncKey={definitionSyncKey}
           onDefinitionChange={(json) => recordAndSet("definition", json)}
-          onExecute={() => setExecuteOpen(true)}
         />
       </WorkflowEditorShell>
     </>

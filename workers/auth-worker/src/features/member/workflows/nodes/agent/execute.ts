@@ -44,6 +44,16 @@ function resolveMaxTokens(
   return Number(raw) || 1024;
 }
 
+/** Embedding models cannot be used with streamText / chat completions. */
+function assertTextGenerationModel(modelId: string): void {
+  const id = modelId.toLowerCase();
+  if (id.includes('bge') || id.includes('embed')) {
+    throw new Error(
+      `Agent requires a text generation model (e.g. @cf/meta/llama-3.1-8b-instruct), but the connected service uses embedding model "${modelId}". Connect an LLM service to the Agent "Service" handle; keep embedding models for Memory/RAG tools only.`,
+    );
+  }
+}
+
 function resolveEmbedModel(service: Record<string, unknown>): string {
   const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim();
   if (catalog.includes('bge')) return DEFAULT_EMBED_MODEL;
@@ -80,6 +90,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   await ensureWalletBalance(ctx.userDO);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
+  assertTextGenerationModel(modelId);
   const embedModel = resolveEmbedModel(service);
 
   const promptSource = String(data.promptSource ?? 'define_below');

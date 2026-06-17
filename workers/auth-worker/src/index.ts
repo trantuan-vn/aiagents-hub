@@ -38,6 +38,10 @@ import { createAdminCrmRoutes } from './features/admin/crm/presentation';
 import { createAdminFinanceRoutes } from './features/admin/finance/presentation';
 import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payout/presentation';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
+import {
+  createWorkflowNodeCatalogAdminRoutes,
+  createWorkflowNodeCatalogMemberRoutes,
+} from './features/admin/workflow-node-catalog/presentation';
 export { UserDO } from './features/ws/infrastructure/UserDO';
 export { BroadcastServiceDO } from './features/ws/infrastructure/BroadcastServiceDO';
 export { UserShardDO } from './features/ws/infrastructure/UserShardDO';
@@ -86,6 +90,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/order', createOrderRoutes(bindingName));  
   routes.route('/dashboard/assistant', createAssistantRoutes(bindingName));
   routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
+  routes.route('/dashboard/build/workflows/node-catalog', createWorkflowNodeCatalogMemberRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));
@@ -93,6 +98,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/membership-tier', createMembershipTierRoutes(bindingName));
   routes.route('/dashboard/admin/version', createVersionRoutes(bindingName));
   routes.route('/dashboard/admin/system-config', createSystemConfigRoutes(bindingName));
+  routes.route('/dashboard/admin/workflow-node-catalog', createWorkflowNodeCatalogAdminRoutes(bindingName));
   routes.route('/dashboard/referral', createReferralRoutes(bindingName));
   routes.route('/dashboard/admin/commission-policy', createCommissionPolicyRoutes(bindingName));
   routes.route('/dashboard/overview', createOverviewRoutes(bindingName));

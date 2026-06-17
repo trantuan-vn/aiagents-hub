@@ -37,6 +37,14 @@
     "strict": true,
     /* Skip type checking all .d.ts files. */
     "skipLibCheck": true,
+    "paths": {
+      "@aiagents-hub/workflow-nodes": [
+        "../../packages/workflow-nodes/src/index.ts"
+      ],
+      "@aiagents-hub/workflow-nodes/*": [
+        "../../packages/workflow-nodes/src/*"
+      ]
+    }
   },
   "include": [
     "src/**/*"

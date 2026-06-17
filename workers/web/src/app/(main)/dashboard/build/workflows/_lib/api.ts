@@ -124,6 +124,7 @@ export function executeWorkflow(
     variables?: Record<string, unknown>;
     autoApproveHumanReview?: boolean;
     ownerId?: string;
+    entryNodeId?: string;
   },
 ) {
   const path =
@@ -136,6 +137,7 @@ export function executeWorkflow(
       input: options?.input,
       variables: options?.variables,
       autoApproveHumanReview: options?.autoApproveHumanReview,
+      entryNodeId: options?.entryNodeId,
     }),
   });
 }
@@ -482,4 +484,22 @@ export function restoreWorkflowVersion(id: number, versionKey: string) {
     `/dashboard/build/workflows/${id}/versions/${versionKey}/restore`,
     { method: "POST" },
   );
+}
+
+export interface WorkflowNodeCatalogEntry {
+  id: string;
+  addCategory: string;
+  runtimeType: string;
+  kind?: string;
+  nameKey: string;
+  descKey: string;
+  hasBackend: boolean;
+  hasFrontend: boolean;
+  isActive: boolean;
+  sortOrder?: number;
+  updatedAt?: number;
+}
+
+export function listWorkflowNodeCatalog() {
+  return apiFetch<{ entries: WorkflowNodeCatalogEntry[] }>("/dashboard/build/workflows/node-catalog");
 }

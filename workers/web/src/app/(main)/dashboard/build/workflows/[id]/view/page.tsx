@@ -12,7 +12,6 @@ import { Badge } from "@/components/ui/badge";
 import { StarDisplay } from "../../_components/list/star-display";
 import { WorkflowEditor } from "../../_components/editor/workflow-editor";
 import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
-import { WorkflowExecuteDialog } from "../../_components/panels/workflow-panels/workflow-execute-dialog";
 import { getSharedWorkflow, type AgentWorkflow } from "../../_lib/api";
 interface ViewWorkflowState {
   name: string;
@@ -57,7 +56,6 @@ export default function ViewSharedWorkflowPage() {
 
   const [view, setView] = useState<ViewWorkflowState>(EMPTY_VIEW_STATE);
   const [loading, setLoading] = useState(true);
-  const [executeOpen, setExecuteOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!id || isNaN(id) || !ownerId) return;
@@ -103,7 +101,6 @@ export default function ViewSharedWorkflowPage() {
 
   return (
     <>
-      <WorkflowExecuteDialog workflowId={id} ownerId={ownerId} open={executeOpen} onOpenChange={setExecuteOpen} />
       <WorkflowEditorShell
         readOnly
         workflowId={id}
@@ -111,13 +108,13 @@ export default function ViewSharedWorkflowPage() {
         headerMeta={headerMeta}
         backHref="/dashboard/build/workflows"
         backLabel={tv("back")}
-        onExecute={() => setExecuteOpen(true)}
+        onExecute={() => {}}
       >
         <WorkflowEditor
           workflowId={id}
+          ownerId={ownerId}
           definitionJson={view.definition}
           readOnly
-          onExecute={() => setExecuteOpen(true)}
         />
       </WorkflowEditorShell>
     </>

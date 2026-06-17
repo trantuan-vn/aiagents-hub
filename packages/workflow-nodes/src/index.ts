@@ -5,6 +5,7 @@ export * from "./types/connection-rules";
 export * from "./registry/merge";
 export * from "./registry/resolve";
 export * from "./nodes";
+export * from "./catalog";
 export {
   defaultInputSection,
   defaultOutputSection,
