@@ -1,5 +1,6 @@
 import { resolveCredential } from '../../../storage/credentials.js';
 import { toolNodeConfig } from '../shared/rag-context.js';
+import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 
 export type DbColumnInfo = {
   name: string;
@@ -223,7 +224,7 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
     if (credentialKey) {
       try {
         await resolveCredential(
-          {} as DurableObjectStub<import('../../../../ws/infrastructure/UserDO.js').UserDO>,
+          {} as DurableObjectStub<UserDO>,
           env,
           credentialKey,
         );

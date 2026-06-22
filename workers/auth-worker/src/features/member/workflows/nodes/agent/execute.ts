@@ -90,6 +90,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   await ensureWalletBalance(ctx.userDO);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
+  
   assertTextGenerationModel(modelId);
   const embedModel = resolveEmbedModel(service);
 

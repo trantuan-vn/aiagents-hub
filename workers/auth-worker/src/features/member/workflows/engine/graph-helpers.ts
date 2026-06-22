@@ -159,7 +159,6 @@ export interface AgentResourceContext {
   memoryNodeId?: string;
   tools: Array<Record<string, unknown>>;
 }
-export type { VectorizeScopeContext };
 
 export function resolveAgentResources(
   definition: WorkflowDefinition,
