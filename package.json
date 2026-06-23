@@ -13,12 +13,13 @@
     "dev:consumer": "wrangler dev workers/consumer-worker",
     "dev:web": "wrangler dev workers/web",
     "dev:assistant": "wrangler dev workers/assistant-worker",
-    "deploy:auth": "wrangler deploy workers/auth-worker",
-    "deploy:queue": "wrangler deploy workers/queue-worker",
-    "deploy:consumer": "wrangler deploy workers/consumer-worker",
-    "deploy:web": "wrangler deploy workers/web",
-    "deploy:assistant": "wrangler deploy workers/assistant-worker",
-    "deploy:all": "npm run deploy:auth && npm run deploy:queue && npm run deploy:consumer && npm run deploy:assistant && npm run deploy:web"
+    "deploy:auth": "wrangler deploy -c workers/auth-worker/wrangler.jsonc",
+    "deploy:queue": "wrangler deploy -c workers/queue-worker/wrangler.jsonc",
+    "deploy:consumer": "wrangler deploy -c workers/consumer-worker/wrangler.jsonc",
+    "deploy:web": "npm run deploy --workspace=trading-sto",
+    "deploy:all": "npm run deploy:queue && npm run deploy:consumer && npm run deploy:auth && npm run deploy:web",
+    "cf": "powershell -ExecutionPolicy Bypass -File scripts/cf.ps1",
+    "cf:login": "powershell -ExecutionPolicy Bypass -File scripts/cf.ps1 login"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250528.0",
