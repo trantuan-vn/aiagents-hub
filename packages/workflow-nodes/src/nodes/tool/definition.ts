@@ -41,15 +41,54 @@ const RAG_COMMON_FIELDS = [
 ];
 
 const SAVE_RAG_FIELDS = [
-  { id: "chunkSize", type: "number" as const, labelKey: "field_chunk_size", defaultValue: 800, order: 4 },
-  { id: "chunkOverlap", type: "number" as const, labelKey: "field_chunk_overlap", defaultValue: 120, order: 5 },
-  { id: "inputMode", type: "select" as const, labelKey: "field_input_mode", defaultValue: "agent_tool_call", order: 6,
+  {
+    id: "serviceEndpoint",
+    type: "text" as const,
+    labelKey: "field_service",
+    descriptionKey: "field_service_embed_desc",
+    order: 4,
+  },
+  {
+    id: "userPrompt",
+    type: "textarea" as const,
+    labelKey: "field_user_prompt",
+    descriptionKey: "field_user_prompt_desc",
+    order: 5,
+  },
+  {
+    id: "systemPrompt",
+    type: "textarea" as const,
+    labelKey: "field_system_prompt",
+    descriptionKey: "field_system_prompt_desc",
+    order: 6,
+  },
+  { id: "chunkSize", type: "number" as const, labelKey: "field_chunk_size", defaultValue: 800, order: 7 },
+  { id: "chunkOverlap", type: "number" as const, labelKey: "field_chunk_overlap", defaultValue: 120, order: 8 },
+  { id: "inputMode", type: "select" as const, labelKey: "field_input_mode", defaultValue: "agent_tool_call", order: 9,
     options: [
       { value: "agent_tool_call", labelKey: "opt_input_agent_tool" },
       { value: "pipeline_auto", labelKey: "opt_input_pipeline_auto" },
     ],
   },
 ];
+
+export const SAVE_RAG_TOOL_DEFINITION = builtin({
+  id: "tool_node:save-rag",
+  runtimeType: "tool_node",
+  kind: "save-rag",
+  nameKey: "tool_save_rag",
+  descriptionKey: "tool_save_rag_desc",
+  category: "resource",
+  icon: "Upload",
+  sections: [
+    defaultInputSection(),
+    defaultParametersSection([
+      ...RAG_COMMON_FIELDS,
+      ...SAVE_RAG_FIELDS,
+    ]),
+    defaultOutputSection(false),
+  ],
+});
 
 const GET_RAG_FIELDS = [
   { id: "topK", type: "number" as const, labelKey: "field_top_k", defaultValue: 5, order: 4 },
@@ -102,6 +141,9 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolKind: "save-rag",
     toolName: "save_rag",
     toolDescription: "Embed document chunks and upsert into the knowledge base.",
+    serviceEndpoint: "",
+    userPrompt: "When document text is available, call save_rag with the full extracted content.",
+    systemPrompt: "Use save_rag to persist extracted document text into the knowledge base.",
     chunkSize: 800,
     chunkOverlap: 120,
     inputMode: "agent_tool_call",

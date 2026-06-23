@@ -52,7 +52,9 @@ export function WorkflowNodeConfigPanel({
       ? nodeData.flowKind
       : typeof nodeData.triggerKind === "string"
         ? nodeData.triggerKind
-        : undefined;
+        : typeof nodeData.toolKind === "string"
+          ? nodeData.toolKind
+          : undefined;
 
   const definition = useMemo(
     () => (runtimeType ? resolveNodeDefinition(runtimeType, kind, registry) : undefined),

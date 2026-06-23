@@ -180,7 +180,7 @@ export function buildRagToolset(
             definition,
             agentId,
             input,
-            embedModel: ctx.embedModel,
+            userDO: ctx.userDO,
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
           }),

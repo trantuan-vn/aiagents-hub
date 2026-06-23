@@ -1,5 +1,6 @@
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
+import { getServiceModel } from '../../../../../admin/service/pricing.js';
 import { DEFAULT_EMBED_MODEL, VECTORIZE_COLLECTION } from '../../../rag-vector.js';
 import { normalizeVectorizeCollection, type VectorizeScopeContext } from '../../../vectorize-scope.js';
 
@@ -43,6 +44,22 @@ export function resolveRagResources(
     serviceEndpoint: linked.serviceEndpoint,
     memoryNodeId: linked.memoryNodeId,
   };
+}
+
+export function resolveEmbedModelFromService(service: Record<string, unknown>): string {
+  const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim().toLowerCase();
+  const explicit = String(service.embedModel ?? service.embed_model ?? '').trim();
+  if (explicit) return explicit;
+
+  const model = getServiceModel(service);
+  if (model) {
+    const lower = model.toLowerCase();
+    if (lower.includes('bge') || lower.includes('embed')) return model;
+  }
+  if (catalog.includes('bge') || catalog.includes('embed')) {
+    return model ?? DEFAULT_EMBED_MODEL;
+  }
+  return DEFAULT_EMBED_MODEL;
 }
 
 export function toolNodeConfig(

@@ -5,7 +5,7 @@ import {
 } from "./default-sections";
 import type { WorkflowNodeDefinition, WorkflowNodeRegistry } from "../types/node-definition";
 import { FORM_DATABASE_TRIGGER_DEFINITION } from "./trigger/form-database";
-import { TOOL_NODE_DEFINITION } from "./tool/definition";
+import { TOOL_NODE_DEFINITION, SAVE_RAG_TOOL_DEFINITION } from "./tool/definition";
 import { MEMORY_NODE_DEFINITION } from "./vectorize/definition";
 
 const now = () => new Date().toISOString();
@@ -505,6 +505,7 @@ const SIMPLE_NODES: WorkflowNodeDefinition[] = [
   }),
   MEMORY_NODE_DEFINITION,
   TOOL_NODE_DEFINITION,
+  SAVE_RAG_TOOL_DEFINITION,
   FORM_DATABASE_TRIGGER_DEFINITION,
 ];
 

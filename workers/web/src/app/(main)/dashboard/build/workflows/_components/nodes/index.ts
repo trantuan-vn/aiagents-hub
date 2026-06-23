@@ -147,6 +147,7 @@ function kindFromNode(node: Node): string | undefined {
   if (typeof data.coreKind === "string") return data.coreKind;
   if (typeof data.flowKind === "string") return data.flowKind;
   if (typeof data.triggerKind === "string") return data.triggerKind;
+  if (typeof data.toolKind === "string") return data.toolKind;
   return undefined;
 }
 

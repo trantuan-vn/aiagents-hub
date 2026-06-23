@@ -17,6 +17,7 @@ import {
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
+import { toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
@@ -94,6 +95,13 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   assertTextGenerationModel(modelId);
   const embedModel = resolveEmbedModel(service);
 
+  const hasSaveRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'save-rag');
+  const saveRagConfig = hasSaveRagTool
+    ? (toolNodeConfig(ctx.definition, ctx.node.id, 'save-rag') ?? {})
+    : undefined;
+  const saveRagSystemPrompt = String(saveRagConfig?.systemPrompt ?? '').trim();
+  const saveRagUserPrompt = String(saveRagConfig?.userPrompt ?? '').trim();
+
   const promptSource = String(data.promptSource ?? 'define_below');
   let userText =
     promptSource === 'from_input'
@@ -109,6 +117,10 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       const pdfContext = extracted.map((f) => `--- ${f.filename} ---\n${f.text}`).join('\n\n');
       userText = `${userText}\n\nExtracted PDF text:\n${pdfContext}`;
     }
+  }
+
+  if (saveRagUserPrompt) {
+    userText = userText ? `${saveRagUserPrompt}\n\n${userText}` : saveRagUserPrompt;
   }
 
   const memoryCollection = String(
@@ -145,6 +157,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   const systemParts = [
     String(data.systemPrompt ?? ''),
+    saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     memorySnippets.length ? `Relevant memory:\n${memorySnippets.join('\n')}` : '',
     toolNames.length
@@ -153,7 +166,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     hasGetRagTool
       ? 'Use get_rag to search the knowledge base before answering factual questions.'
       : '',
-    agentHasRagToolKind(ctx.definition, ctx.node.id, 'save-rag')
+    hasSaveRagTool && !saveRagSystemPrompt
       ? 'Use save_rag to persist extracted document text into the knowledge base.'
       : '',
     agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-db-info')

@@ -10,6 +10,7 @@ import { HUMAN_REVIEW_N8N_DESCRIPTION } from "./descriptions/human-review";
 import { HTTP_REQUEST_N8N_DESCRIPTION } from "./descriptions/http-request";
 import { MEMORY_NODE_N8N_DESCRIPTION } from "./descriptions/memory-node";
 import { SERVICE_NODE_N8N_DESCRIPTION } from "./descriptions/service-node";
+import { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./descriptions/save-rag-tool";
 import { TOOL_NODE_N8N_DESCRIPTION } from "./descriptions/tool-node";
 import { TRIGGER_N8N_DESCRIPTION } from "./descriptions/trigger";
 import { CORE_WEBHOOK_N8N_DESCRIPTION, TRIGGER_WEBHOOK_N8N_DESCRIPTION } from "./descriptions/webhook";
@@ -36,6 +37,7 @@ const BY_KIND: Record<string, N8nNodeTypeDescription> = {
   "core:webhook": CORE_WEBHOOK_N8N_DESCRIPTION,
   "core:http_request": HTTP_REQUEST_N8N_DESCRIPTION,
   "core:code": CODE_N8N_DESCRIPTION,
+  "tool_node:save-rag": SAVE_RAG_TOOL_N8N_DESCRIPTION,
 };
 
 export function getN8nNodeDescription(
