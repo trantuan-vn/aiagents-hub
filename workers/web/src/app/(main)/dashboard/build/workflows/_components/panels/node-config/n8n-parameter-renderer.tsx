@@ -40,9 +40,19 @@ function N8nPropertyField({
   }
 
   if (property.type === "notice" || property.type === "callout") {
+    const isWarning = property.typeOptions?.variant === "warning";
     return (
-      <div className="bg-muted/50 rounded-md border border-dashed px-3 py-2 text-xs">
-        <p className="text-muted-foreground">{property.displayName}</p>
+      <div
+        className={
+          isWarning
+            ? "rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-100"
+            : "bg-muted/50 rounded-md border border-dashed px-3 py-2 text-xs"
+        }
+      >
+        <p className={isWarning ? undefined : "text-muted-foreground"}>{property.displayName}</p>
+        {property.description ? (
+          <p className={isWarning ? "mt-1 opacity-80" : "text-muted-foreground mt-1"}>{property.description}</p>
+        ) : null}
       </div>
     );
   }

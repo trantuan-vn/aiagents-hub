@@ -176,8 +176,13 @@ export function WorkflowAddNodePanel({
   }, [initialView, resetOnOpenGeneration]);
   const { services, loading: servicesLoading } = useApprovedServices();
   const { integrations, loading: integrationsLoading } = useWorkflowIntegrations();
-  const { isCatalogActive } = useWorkflowNodeCatalog();
+  const { isCatalogActive, reload: reloadNodeCatalog } = useWorkflowNodeCatalog();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (resetOnOpenGeneration <= 0) return;
+    void reloadNodeCatalog();
+  }, [resetOnOpenGeneration, reloadNodeCatalog]);
 
   const guardCatalogPick = useCallback(
     (catalogId: string, fn: () => void) => {
@@ -559,10 +564,14 @@ export function WorkflowAddNodePanel({
 
   const pickFlowItem = (item: WorkflowFlowCatalogItem) => {
     guardCatalogPick(`flow:${item.id}`, () => {
+      const extra: Record<string, unknown> = { flowKind: item.id };
+      if (item.id === "loop_over_items") {
+        extra.batchSize = 1;
+      }
       onPick({
         type: "flow",
         label: t(item.nameKey),
-        extra: { flowKind: item.id },
+        extra,
       });
     });
   };

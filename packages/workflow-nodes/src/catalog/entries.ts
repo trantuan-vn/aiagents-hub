@@ -80,13 +80,13 @@ const HUMAN_REVIEW_CHANNELS = [
 
 /** Sub-kinds with dedicated backend handlers (auth-worker node plugins). */
 const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
-const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter"]);
+const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>([]);
 
 /** Sub-kinds with dedicated frontend config / canvas plugins. */
 const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
-const FRONTEND_FLOW_KINDS = new Set(["if", "merge", "filter", "switch"]);
+const FRONTEND_FLOW_KINDS = new Set(["if", "merge", "filter", "switch", "loop_over_items"]);
 const FRONTEND_CORE_KINDS = new Set(["http_request", "code"]);
 const FRONTEND_TRANSFORM_KINDS = new Set<string>([]);
 

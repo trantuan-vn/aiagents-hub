@@ -2,7 +2,7 @@ import type { WorkflowNodeDefinition } from "./node-definition";
 import type { GraphNode } from "./graph";
 
 const RESOURCE_HANDLES = new Set(["service", "memory", "tools"]);
-const BRANCH_SOURCE_HANDLES = new Set(["out", "true", "false", "default"]);
+const BRANCH_SOURCE_HANDLES = new Set(["out", "true", "false", "default", "loop", "done"]);
 
 function isBranchSourceHandle(handle: string | null | undefined): boolean {
   if (!handle || handle === "in") return false;

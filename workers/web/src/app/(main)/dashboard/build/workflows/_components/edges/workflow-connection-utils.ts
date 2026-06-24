@@ -9,11 +9,13 @@ export type WorkflowHandleId =
   | "true"
   | "false"
   | "default"
+  | "loop"
+  | "done"
   | `case_${number}`;
 
 const RESOURCE_HANDLES = new Set<WorkflowHandleId>(["service", "memory", "tools"]);
 
-const BRANCH_SOURCE_HANDLES = new Set<string>(["out", "true", "false", "default"]);
+const BRANCH_SOURCE_HANDLES = new Set<string>(["out", "true", "false", "default", "loop", "done"]);
 
 function isBranchSourceHandle(handle: string): boolean {
   if (BRANCH_SOURCE_HANDLES.has(handle)) return true;
@@ -89,6 +91,8 @@ function parseWorkflowConnectionHandles(
   if (sourceHandle === "true" && targetHandle === "in") return { kind: "flow" };
   if (sourceHandle === "false" && targetHandle === "in") return { kind: "flow" };
   if (sourceHandle === "default" && targetHandle === "in") return { kind: "flow" };
+  if (sourceHandle === "loop" && targetHandle === "in") return { kind: "flow" };
+  if (sourceHandle === "done" && targetHandle === "in") return { kind: "flow" };
   if (/^case_\d+$/.test(sourceHandle) && targetHandle === "in") return { kind: "flow" };
   if (sourceHandle !== targetHandle) return null;
   if (!RESOURCE_HANDLES.has(sourceHandle as WorkflowHandleId)) return null;

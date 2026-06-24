@@ -18,6 +18,11 @@ import {
   isEdgeActiveForBranches,
 } from './flow-helpers.js';
 import {
+  isLoopOverItemsNode,
+  resetLoopSubgraphVisited,
+  type LoopState,
+} from './loop-helpers.js';
+import {
   gatherMainFlowInputs,
   getIncomingDataFlowEdges,
   getOutgoingDataFlowEdges,
@@ -102,6 +107,10 @@ interface EngineState {
   runContext: NodeOutput;
   totalCostVnd: number;
   finalOutput?: unknown;
+  /** Loop Over Items — persisted batch state per loop node. */
+  loopStates?: Record<string, LoopState>;
+  /** Pending loop return (set when loop branch feeds back into the loop node). */
+  pendingLoopReturn?: { loopNodeId: string; returnOutput: NodeOutput };
   /** @deprecated legacy linear runs — migrated on resume */
   order?: string[];
   cursor?: number;
@@ -254,6 +263,7 @@ interface RunEngineResult {
 function migrateEngineState(engine: EngineState, definition: WorkflowDefinition): void {
   engine.visited = engine.visited ?? engine.steps?.map((s) => s.nodeId) ?? [];
   engine.skipped = engine.skipped ?? [];
+  engine.loopStates = engine.loopStates ?? {};
   if (engine.queue?.length) return;
   if (engine.order?.length && engine.cursor != null) {
     const remaining = engine.order.slice(engine.cursor);
@@ -309,6 +319,21 @@ function scheduleDownstream(
 
     const target = nodeById.get(edge.target);
     if (!target || isNonExecutableNodeType(target.type)) continue;
+
+    // Loop branch feeds back into an already-visited Loop Over Items node.
+    if (
+      isLoopOverItemsNode(target) &&
+      engine.visited.includes(target.id) &&
+      (edge.targetHandle ?? 'in') === 'in'
+    ) {
+      engine.pendingLoopReturn = {
+        loopNodeId: target.id,
+        returnOutput: sourceOutput,
+      };
+      engine.visited = resetLoopSubgraphVisited(definition, target.id, engine.visited);
+      enqueueNode(engine, target.id);
+      continue;
+    }
 
     if (isMergeFlowNode(target)) {
       const mode = mergeMode(target);
@@ -389,6 +414,25 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       input: nodeInput,
     };
 
+    const pendingLoop = engine.pendingLoopReturn;
+    const isLoopReturn =
+      isLoopOverItemsNode(node) &&
+      pendingLoop?.loopNodeId === nodeId;
+    if (isLoopReturn) {
+      engine.pendingLoopReturn = undefined;
+    }
+
+    engine.runContext._loopStates = engine.loopStates ?? {};
+    if (isLoopReturn) {
+      engine.runContext._loop = {
+        nodeId,
+        isReturn: true,
+        returnOutput: pendingLoop!.returnOutput,
+      };
+    } else {
+      delete engine.runContext._loop;
+    }
+
     // --- human review: flow control + pause/resume ---
     if (node.type === 'human_review') {
       const data = (node.data ?? {}) as Record<string, unknown>;
@@ -450,8 +494,25 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
+
+      if (isLoopOverItemsNode(node)) {
+        const loopState = out._loopState as LoopState | null | undefined;
+        engine.loopStates = engine.loopStates ?? {};
+        if (loopState) {
+          engine.loopStates[nodeId] = loopState;
+        } else {
+          delete engine.loopStates[nodeId];
+        }
+        const { _loopState, ...publicOut } = out;
+        engine.outputs[nodeId] = publicOut;
+        log.output = publicOut;
+        engine.finalOutput = publicOut;
+      }
+
       engine.visited.push(nodeId);
-      scheduleDownstream(definition, node, out, {
+      delete engine.runContext._loop;
+      delete engine.runContext._loopStates;
+      scheduleDownstream(definition, node, engine.outputs[nodeId], {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
       }, engine, nodeById);
@@ -559,6 +620,7 @@ export async function executeWorkflowGraph(
         ...(params.runContextOverride ?? {}),
       },
       totalCostVnd: 0,
+      loopStates: {},
     },
   };
 

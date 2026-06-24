@@ -11,6 +11,7 @@ import {
   GitBranch,
   Layers,
   Play,
+  RotateCw,
   Server,
   UserCheck,
   Wrench,
@@ -220,7 +221,7 @@ export const HumanReviewNode = memo((props: NodeProps) => (
 ));
 HumanReviewNode.displayName = "HumanReviewNode";
 
-type BranchBadgeVariant = "true" | "false" | "case" | "default";
+type BranchBadgeVariant = "true" | "false" | "case" | "default" | "loop" | "done";
 
 function BranchBadge({
   variant,
@@ -234,6 +235,8 @@ function BranchBadge({
     false: "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300",
     case: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
     default: "border-border bg-muted/60 text-muted-foreground",
+    loop: "border-teal-500/30 bg-teal-500/10 text-teal-700 dark:text-teal-300",
+    done: "border-border bg-muted/60 text-muted-foreground",
   };
 
   return (
@@ -271,6 +274,44 @@ function FlowBranchRow({
         accentClass={handleAccent}
       />
     </div>
+  );
+}
+
+function FlowLoopOverItemsNode({
+  label,
+  selected,
+  deactivated,
+}: {
+  label: string;
+  selected?: boolean;
+  deactivated?: boolean;
+}) {
+  const t = useTranslations("WorkflowEditorPage");
+
+  return (
+    <WorkflowNodeShell selected={selected} accent="border-teal-500/40" deactivated={deactivated}>
+      <div className="-mx-3 -mt-2.5 min-w-[228px]">
+        <div className="relative flex items-center gap-2.5 px-3 py-2.5">
+          <ConnectionHandle handleId="in" type="target" position={Position.Left} accentClass="!bg-teal-500" />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-teal-500/15">
+            <RotateCw className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+          </div>
+          <span className="truncate font-medium">{label}</span>
+        </div>
+        <FlowBranchRow
+          badge={t("flow_branch_done")}
+          badgeVariant="done"
+          handleId="done"
+          handleAccent="!bg-slate-400"
+        />
+        <FlowBranchRow
+          badge={t("flow_branch_loop")}
+          badgeVariant="loop"
+          handleId="loop"
+          handleAccent="!bg-teal-500"
+        />
+      </div>
+    </WorkflowNodeShell>
   );
 }
 
@@ -393,6 +434,16 @@ export const FlowNode = memo((props: NodeProps) => {
         selected={props.selected}
         deactivated={d.deactivated}
         caseCount={typeof d.switchCases === "number" ? d.switchCases : 2}
+      />
+    );
+  }
+
+  if (flowKind === "loop_over_items") {
+    return (
+      <FlowLoopOverItemsNode
+        label={String(label)}
+        selected={props.selected}
+        deactivated={d.deactivated}
       />
     );
   }

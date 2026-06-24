@@ -53,7 +53,8 @@ export type WorkflowNodeCategory =
   | "action"
   | "human"
   | "resource"
-  | "utility";
+  | "utility"
+  | "flow";
 
 export type WorkflowNodeDefinition = {
   /** Unique registry id, e.g. `agent` or `core:http_request` */

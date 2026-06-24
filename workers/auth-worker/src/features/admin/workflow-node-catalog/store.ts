@@ -27,6 +27,7 @@ export function seedToRow(seed: WorkflowCatalogEntrySeed, now = Date.now()) {
 type CatalogRow = ReturnType<typeof seedToRow>;
 
 function rowToEntry(row: CatalogRow): WorkflowCatalogEntry {
+  const flag = (v: number) => Number(v) === 1;
   return {
     id: row.id,
     addCategory: row.add_category as WorkflowCatalogEntry['addCategory'],
@@ -34,9 +35,9 @@ function rowToEntry(row: CatalogRow): WorkflowCatalogEntry {
     kind: row.kind ?? undefined,
     nameKey: row.name_key,
     descKey: row.desc_key,
-    hasBackend: row.has_backend === 1,
-    hasFrontend: row.has_frontend === 1,
-    isActive: row.is_active === 1,
+    hasBackend: flag(row.has_backend),
+    hasFrontend: flag(row.has_frontend),
+    isActive: flag(row.is_active),
     sortOrder: row.sort_order,
     updatedAt: row.updated_at,
   };
@@ -124,6 +125,11 @@ export async function syncWorkflowNodeCatalogFromSeeds(db: D1Database): Promise<
           desc_key = excluded.desc_key,
           has_backend = excluded.has_backend,
           has_frontend = excluded.has_frontend,
+          is_active = CASE
+            WHEN excluded.has_backend = 1 AND excluded.has_frontend = 1
+            THEN excluded.is_active
+            ELSE workflow_node_catalog.is_active
+          END,
           sort_order = excluded.sort_order,
           updated_at = excluded.updated_at`,
       )

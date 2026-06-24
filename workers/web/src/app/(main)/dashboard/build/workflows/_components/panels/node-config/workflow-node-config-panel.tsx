@@ -12,7 +12,7 @@ import { hasN8nNodeDescription, getN8nNodeDescription } from "@/lib/n8n-workflow
 import { resolveNodeDefinition } from "@/lib/workflow-node-registry";
 import type { N8nNodeParameters } from "@/lib/n8n-workflow/types";
 
-import { resolveInputNodeId } from "../../edges/workflow-connection-utils";
+import { resolveInputNodeId, edgeUsesHandle } from "../../edges/workflow-connection-utils";
 import { useWorkflowNodeRegistry } from "../../hooks/use-workflow-node-registry";
 import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
@@ -81,6 +81,13 @@ export function WorkflowNodeConfigPanel({
     () => (node ? resolveInputNodeId(node.id, runtimeType, edges) : ""),
     [node, runtimeType, edges],
   );
+
+  const loopOutputWarning = useMemo(() => {
+    if (kind !== "loop_over_items" || !node) return null;
+    const hasLoopEdge = edges.some((e) => edgeUsesHandle(e, node.id, "loop", "source"));
+    if (hasLoopEdge) return null;
+    return te("loop_no_loop_output_connected");
+  }, [kind, node, edges, te]);
 
   if (!node || (!definition && !n8nDescription)) return null;
 
@@ -178,6 +185,11 @@ export function WorkflowNodeConfigPanel({
             onSaveOutput={(parsed) => onPatchData(node.id, { _output: parsed, _outputPinned: true })}
             onUnpinOutput={() => onPatchData(node.id, { _output: undefined, _outputPinned: false })}
             onExecute={outputSection.showExecuteStep && onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+            headerExtra={
+              loopOutputWarning ? (
+                <p className="text-muted-foreground text-[11px] leading-snug">{loopOutputWarning}</p>
+              ) : undefined
+            }
           />
         ) : null}
       </div>

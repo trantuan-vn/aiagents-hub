@@ -2,13 +2,14 @@ import { interpolate } from '../execution/node-runtime.js';
 
 type NodeOutput = Record<string, unknown>;
 
-export type FlowBranchHandle = 'true' | 'false' | 'default' | `case_${number}`;
+export type FlowBranchHandle = 'true' | 'false' | 'default' | 'loop' | 'done' | `case_${number}`;
 
 const CASE_HANDLE_RE = /^case_(\d+)$/;
 
 export function isBranchSourceHandle(handle: string | undefined | null): boolean {
   if (!handle || handle === 'in') return false;
   if (handle === 'true' || handle === 'false' || handle === 'default' || handle === 'out') return true;
+  if (handle === 'loop' || handle === 'done') return true;
   return CASE_HANDLE_RE.test(handle);
 }
 
@@ -95,6 +96,16 @@ export function resolveActiveBranchHandles(
     return active;
   }
 
+  if (flowKind === 'loop_over_items') {
+    const branches = nodeInput.activeBranches ?? data.activeBranches;
+    if (Array.isArray(branches)) {
+      for (const b of branches) active.add(String(b));
+      return active;
+    }
+    active.add('loop');
+    return active;
+  }
+
   // merge, wait, passthrough, unknown
   active.add('out');
   return active;
@@ -127,6 +138,9 @@ export function isEdgeActiveForBranches(
       // Legacy single-output IF: follow `out` only when condition is true.
       if (activeHandles.has('true') || activeHandles.has('false')) {
         return activeHandles.has('true');
+      }
+      if (activeHandles.has('loop') || activeHandles.has('done')) {
+        return false;
       }
       return activeHandles.has('out') || activeHandles.size === 0;
     }

@@ -412,6 +412,28 @@ const SIMPLE_NODES: WorkflowNodeDefinition[] = [
     ],
   }),
   builtin({
+    id: "flow:loop_over_items",
+    runtimeType: "flow",
+    kind: "loop_over_items",
+    nameKey: "flow_kind_loop_over_items",
+    descriptionKey: "flow_kind_loop_over_items_desc",
+    category: "flow",
+    icon: "RotateCw",
+    sections: [
+      defaultInputSection(),
+      defaultParametersSection([
+        {
+          id: "batchSize",
+          type: "number",
+          labelKey: "field_batch_size",
+          defaultValue: 1,
+          order: 1,
+        },
+      ]),
+      defaultOutputSection(true),
+    ],
+  }),
+  builtin({
     id: "action_in_app",
     runtimeType: "action_in_app",
     nameKey: "node_action",

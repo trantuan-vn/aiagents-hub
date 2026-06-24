@@ -23,6 +23,7 @@ export type N8nNodePropertyOption = {
 export type N8nNodePropertyTypeOptions = {
   rows?: number;
   aiHubServiceSelect?: boolean;
+  variant?: "default" | "warning";
 };
 
 export type N8nNodeProperty = {

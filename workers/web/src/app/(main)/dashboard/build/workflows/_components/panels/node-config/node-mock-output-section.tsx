@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ export type NodeMockOutputSectionProps = {
   emptyLabel?: string;
   defaultMockJson?: string;
   className?: string;
+  headerExtra?: ReactNode;
 };
 
 export function hasOutputData(output: unknown): output is Record<string, unknown> {
@@ -41,6 +42,7 @@ export function NodeMockOutputSection({
   emptyLabel,
   defaultMockJson = '{\n  "text": "Hello"\n}',
   className,
+  headerExtra,
 }: NodeMockOutputSectionProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const [editingOutput, setEditingOutput] = useState(false);
@@ -93,6 +95,7 @@ export function NodeMockOutputSection({
       executeLabel={executeLabel}
       emptyLabel={emptyLabel}
       className={className}
+      headerExtra={headerExtra}
     />
   );
 }

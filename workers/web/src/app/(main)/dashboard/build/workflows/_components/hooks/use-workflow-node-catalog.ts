@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   WORKFLOW_NODE_CATALOG_SEEDS,
   defaultIsActive,
+  getCatalogSeedById,
   type WorkflowCatalogEntry,
 } from "@aiagents-hub/workflow-nodes";
 
@@ -66,12 +67,15 @@ export function useWorkflowNodeCatalog() {
 
   const isCatalogActive = useCallback(
     (catalogId: string) => {
+      const seed = getCatalogSeedById(catalogId);
+      if (seed && defaultIsActive(seed)) return true;
+
       if (entries.length > 0) {
         const entry = entries.find((item) => item.id === catalogId);
         if (!entry) return true;
         return entry.isActive;
       }
-      if (!WORKFLOW_NODE_CATALOG_SEEDS.some((seed) => seed.id === catalogId)) return true;
+      if (!WORKFLOW_NODE_CATALOG_SEEDS.some((s) => s.id === catalogId)) return true;
       return activeIds.has(catalogId);
     },
     [entries, activeIds],
