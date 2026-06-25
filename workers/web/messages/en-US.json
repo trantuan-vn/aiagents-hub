@@ -2509,6 +2509,7 @@
     "menu_group": "Group selection",
     "menu_ungroup": "Ungroup",
     "group_nodes": "Group",
+    "group_title_placeholder": "Group name",
     "ungroup_nodes": "Ungroup",
     "selection_toolbar": "Selection actions",
     "selection_count": "{count, plural, one {# node selected} other {# nodes selected}}",

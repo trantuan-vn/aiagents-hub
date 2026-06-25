@@ -2510,6 +2510,7 @@
     "menu_group": "Nhóm các node đã chọn",
     "menu_ungroup": "Bỏ nhóm",
     "group_nodes": "Nhóm",
+    "group_title_placeholder": "Tên nhóm",
     "ungroup_nodes": "Bỏ nhóm",
     "selection_toolbar": "Thao tác với vùng chọn",
     "selection_count": "Đã chọn {count} node",

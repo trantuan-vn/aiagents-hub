@@ -132,7 +132,7 @@ export function groupNodes(nodes: Node[]): Node[] {
     type: WORKFLOW_GROUP_NODE_TYPE,
     position: groupPosition,
     style: { width: groupWidth, height: groupHeight },
-    data: { label: "Group" },
+    data: { label: "" },
     zIndex: -1,
     selectable: true,
     draggable: true,
