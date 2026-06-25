@@ -67,6 +67,18 @@
   background-color: color-mix(in oklch, var(--muted) 25%, var(--background));
 }
 
+.workflow-group-node {
+  box-sizing: border-box;
+}
+
+.react-flow__node-workflow_group {
+  z-index: -1 !important;
+}
+
+.react-flow__node-workflow_group.selected {
+  z-index: 0 !important;
+}
+
 .workflow-handle-diamond {
   width: 10px !important;
   height: 10px !important;

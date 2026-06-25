@@ -15,15 +15,22 @@ export function toPersistedDefinition(
   viewport?: WorkflowDefinition["viewport"],
 ): WorkflowDefinition {
   return {
-    nodes: nodes.map((n) => ({
-      id: n.id,
-      type: n.type,
-      position: {
-        x: Math.round(n.position.x),
-        y: Math.round(n.position.y),
-      },
-      data: n.data,
-    })),
+    nodes: nodes.map((n) => {
+      const base: Node = {
+        id: n.id,
+        type: n.type,
+        position: {
+          x: Math.round(n.position.x),
+          y: Math.round(n.position.y),
+        },
+        data: n.data,
+      };
+      if (n.parentId) base.parentId = n.parentId;
+      if (n.extent) base.extent = n.extent;
+      if (n.style && Object.keys(n.style).length > 0) base.style = n.style;
+      if (n.zIndex != null) base.zIndex = n.zIndex;
+      return base;
+    }),
     edges: edges.map((e) => {
       const base = {
         id: e.id,

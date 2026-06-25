@@ -7,6 +7,7 @@ import {
   Copy,
   Eraser,
   GitBranch,
+  Group,
   MoreHorizontal,
   Play,
   Power,
@@ -15,6 +16,7 @@ import {
   Scissors,
   Trash2,
   Type,
+  Ungroup,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -128,6 +130,15 @@ function WorkflowNodeToolbarInner({
             <DropdownMenuItem onClick={() => onMenuAction("duplicate")}>
               <Copy className="mr-2 h-4 w-4" />
               {t("menu_duplicate")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onMenuAction("group")}>
+              <Group className="mr-2 h-4 w-4" />
+              {t("menu_group")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onMenuAction("ungroup")}>
+              <Ungroup className="mr-2 h-4 w-4" />
+              {t("menu_ungroup")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => ui?.tidyLayout?.()}>{t("menu_tidy")}</DropdownMenuItem>

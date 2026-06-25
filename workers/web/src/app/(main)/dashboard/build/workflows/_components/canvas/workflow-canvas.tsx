@@ -17,6 +17,8 @@ import { WorkflowCanvasEmptyState } from "./workflow-canvas-empty-state";
 import { WorkflowCanvasMinimap } from "./workflow-canvas-minimap";
 import { useWorkflowAddNodeDrawerActions } from "../add-node/workflow-add-node-drawer-context";
 import { WorkflowCanvasSideToolbar } from "./workflow-canvas-side-toolbar";
+import { WorkflowCanvasSelectionToolbar } from "./workflow-canvas-selection-toolbar";
+import { WorkflowCanvasKeyboardShortcuts } from "./workflow-canvas-keyboard-shortcuts";
 import { WorkflowCanvasInitialFit } from "./workflow-canvas-initial-fit";
 import { WorkflowCanvasTidyBridge } from "./workflow-canvas-ui-bridge";
 import { useWorkflowCanvasUi, WorkflowCanvasUiContext } from "./workflow-canvas-ui-context";
@@ -89,6 +91,10 @@ function CanvasInner({
     onNodeMenuAction,
     tidyLayout,
     isValidConnection,
+    groupSelectedNodes,
+    ungroupSelectedNodes,
+    selectAllNodesOnCanvas,
+    clearSelectionOnCanvas,
   } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint, definitionSyncKey, workflowId);
 
   const interactionProps = useMemo(
@@ -106,6 +112,11 @@ function CanvasInner({
             nodesConnectable: true,
             elementsSelectable: true,
             isValidConnection,
+            panOnDrag: [1, 2],
+            selectionOnDrag: true,
+            selectionMode: "partial",
+            selectNodesOnDrag: false,
+            multiSelectionKeyCode: "Shift",
           },
     [
       readOnly,
@@ -144,6 +155,10 @@ function CanvasInner({
       toggleNodeActive={toggleNodeActive}
       onNodeMenuAction={onNodeMenuAction}
       tidyWithFitRef={tidyWithFitRef}
+      groupSelectedNodes={groupSelectedNodes}
+      ungroupSelectedNodes={ungroupSelectedNodes}
+      selectAllNodesOnCanvas={selectAllNodesOnCanvas}
+      clearSelectionOnCanvas={clearSelectionOnCanvas}
     />
   );
 }
@@ -167,6 +182,10 @@ function CanvasInnerWithDrawerUi({
   toggleNodeActive,
   onNodeMenuAction,
   tidyWithFitRef,
+  groupSelectedNodes,
+  ungroupSelectedNodes,
+  selectAllNodesOnCanvas,
+  clearSelectionOnCanvas,
 }: {
   className?: string;
   themeMode: "light" | "dark" | "system";
@@ -186,6 +205,10 @@ function CanvasInnerWithDrawerUi({
   toggleNodeActive: ReturnType<typeof useWorkflowCanvasState>["toggleNodeActive"];
   onNodeMenuAction: ReturnType<typeof useWorkflowCanvasState>["onNodeMenuAction"];
   tidyWithFitRef: MutableRefObject<(() => void) | undefined>;
+  groupSelectedNodes: ReturnType<typeof useWorkflowCanvasState>["groupSelectedNodes"];
+  ungroupSelectedNodes: ReturnType<typeof useWorkflowCanvasState>["ungroupSelectedNodes"];
+  selectAllNodesOnCanvas: ReturnType<typeof useWorkflowCanvasState>["selectAllNodesOnCanvas"];
+  clearSelectionOnCanvas: ReturnType<typeof useWorkflowCanvasState>["clearSelectionOnCanvas"];
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
@@ -236,6 +259,10 @@ function CanvasInnerWithDrawerUi({
       openAddNodeDrawer: readOnly ? undefined : open,
       closeAddNodeDrawer: readOnly ? undefined : close,
       openNodeConfig: readOnly ? undefined : (nodeId: string) => setConfigNodeId(nodeId),
+      groupSelected: readOnly ? undefined : groupSelectedNodes,
+      ungroupSelected: readOnly ? undefined : ungroupSelectedNodes,
+      selectAll: readOnly ? undefined : selectAllNodesOnCanvas,
+      clearSelection: readOnly ? undefined : clearSelectionOnCanvas,
     }),
     [
       readOnly,
@@ -249,6 +276,10 @@ function CanvasInnerWithDrawerUi({
       open,
       close,
       tidyWithFitRef,
+      groupSelectedNodes,
+      ungroupSelectedNodes,
+      selectAllNodesOnCanvas,
+      clearSelectionOnCanvas,
     ],
   );
 
@@ -379,6 +410,8 @@ const CanvasSurface = memo(function CanvasSurface({
           />
         ) : null}
         <WorkflowCanvasSideToolbar />
+        <WorkflowCanvasSelectionToolbar />
+        <WorkflowCanvasKeyboardShortcuts enabled={!readOnly} />
         <WorkflowCanvasMinimap />
       </ReactFlow>
       {!readOnly && nodes.length === 0 ? <WorkflowCanvasEmptyState /> : null}

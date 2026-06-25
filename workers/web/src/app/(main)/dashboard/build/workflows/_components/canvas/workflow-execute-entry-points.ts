@@ -12,7 +12,7 @@ export type WorkflowExecuteEntryPoint = {
   nodeLabel: string;
 };
 
-const NON_EXECUTABLE_TYPES = new Set(["service_node", "memory_node", "tool_node", "sticky_note"]);
+const NON_EXECUTABLE_TYPES = new Set(["service_node", "memory_node", "tool_node", "sticky_note", "workflow_group"]);
 
 const TRIGGER_KINDS = new Set<WorkflowTriggerKindId>(
   WORKFLOW_TRIGGER_CATALOG.map((item) => item.id),

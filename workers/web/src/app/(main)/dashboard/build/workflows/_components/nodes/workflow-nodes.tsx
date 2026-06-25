@@ -25,6 +25,7 @@ import { cn } from "@/lib/utils";
 import { ConnectionHandle } from "../edges/connection-handle";
 import { edgeUsesHandle, type WorkflowHandleId } from "../edges/workflow-connection-utils";
 import { WorkflowNodeShell } from "../node-ui/workflow-node-shell";
+import { WorkflowGroupNode } from "./workflow-group-node";
 import { StickyNoteNode } from "./workflow-sticky-note-node";
 
 function useAgentMissingConfig(nodeId: string | undefined) {
@@ -540,6 +541,7 @@ export const TransformNode = memo((props: NodeProps) => (
 TransformNode.displayName = "TransformNode";
 
 export const workflowNodeTypes = {
+  workflow_group: WorkflowGroupNode,
   agent: AgentWorkflowNode,
   service_node: ServiceWorkflowNode,
   memory_node: MemoryWorkflowNode,

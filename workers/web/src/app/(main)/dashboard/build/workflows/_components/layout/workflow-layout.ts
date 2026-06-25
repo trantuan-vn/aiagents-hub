@@ -12,13 +12,16 @@ const ORIGIN = { x: 80, y: 80 };
 
 const RESOURCE_NODE_TYPES = new Set(["service_node", "memory_node", "tool_node"]);
 const STICKY_NOTE_TYPE = "sticky_note";
+const GROUP_NODE_TYPE = "workflow_group";
 
 function isFlowEdge(edge: Edge): boolean {
   return edge.sourceHandle === "out" && edge.targetHandle === "in";
 }
 
 function isLayoutFlowNode(node: Node): boolean {
-  return node.type !== STICKY_NOTE_TYPE && !RESOURCE_NODE_TYPES.has(node.type ?? "");
+  if (node.parentId) return false;
+  if (node.type === STICKY_NOTE_TYPE || node.type === GROUP_NODE_TYPE) return false;
+  return !RESOURCE_NODE_TYPES.has(node.type ?? "");
 }
 
 function buildFlowAdjacency(
@@ -306,8 +309,13 @@ function buildResourceCountByAgent(edges: Edge[], flowNodeIds: Set<string>): Map
 export function layoutWorkflowNodes(nodes: Node[], edges: Edge[]): Node[] {
   if (nodes.length === 0) return nodes;
 
+  const organizationalNodes = nodes.filter(
+    (node) => node.type === GROUP_NODE_TYPE || Boolean(node.parentId),
+  );
   const stickyNotes = nodes.filter((node) => node.type === STICKY_NOTE_TYPE);
-  const resourceNodes = nodes.filter((node) => RESOURCE_NODE_TYPES.has(node.type ?? ""));
+  const resourceNodes = nodes.filter(
+    (node) => !node.parentId && RESOURCE_NODE_TYPES.has(node.type ?? ""),
+  );
   const flowNodes = nodes.filter(isLayoutFlowNode);
 
   const flowNodeIds = new Set(flowNodes.map((node) => node.id));
@@ -321,5 +329,5 @@ export function layoutWorkflowNodes(nodes: Node[], edges: Edge[]): Node[] {
   const positionedById = new Map(positionedFlow.map((node) => [node.id, node]));
   const positionedResources = layoutResourceNodes(resourceNodes, edges, positionedById);
 
-  return [...positionedFlow, ...positionedResources, ...stickyNotes];
+  return [...positionedFlow, ...positionedResources, ...stickyNotes, ...organizationalNodes];
 }

@@ -37,6 +37,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   { id: 'memory_node', runtimeType: 'memory_node', skipExecution: true },
   { id: 'tool_node', runtimeType: 'tool_node', skipExecution: true },
   { id: 'sticky_note', runtimeType: 'sticky_note', skipExecution: true },
+  { id: 'workflow_group', runtimeType: 'workflow_group', skipExecution: true },
 ];
 
 class Registry implements NodePluginRegistry {

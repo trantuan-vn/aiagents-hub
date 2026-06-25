@@ -15,6 +15,7 @@ export const WorkflowNodeTypeSchema = z.enum([
   'memory_node',
   'tool_node',
   'sticky_note',
+  'workflow_group',
 ]);
 
 export const WorkflowDefinitionSchema = z.object({
@@ -24,6 +25,10 @@ export const WorkflowDefinitionSchema = z.object({
       type: WorkflowNodeTypeSchema,
       position: z.object({ x: z.number(), y: z.number() }),
       data: z.record(z.unknown()).default({}),
+      parentId: z.string().optional(),
+      extent: z.literal('parent').optional(),
+      style: z.record(z.unknown()).optional(),
+      zIndex: z.number().optional(),
     }),
   ),
   edges: z.array(

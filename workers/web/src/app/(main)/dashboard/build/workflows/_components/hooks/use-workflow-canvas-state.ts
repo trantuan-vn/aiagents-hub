@@ -18,6 +18,13 @@ import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } fr
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
 import { readEdgeRouteAdjustments, type WorkflowEdgeRouteAdjustments } from "../edges/workflow-edge-route-data";
 import { layoutWorkflowNodes } from "../layout/workflow-layout";
+import {
+  clearNodeSelection,
+  groupNodes,
+  isWorkflowGroupNode,
+  selectAllNodes,
+  ungroupNodes,
+} from "../layout/workflow-node-group-utils";
 
 function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
   return changes.some((c) => {
@@ -111,15 +118,40 @@ export function useWorkflowCanvasState(
     pushToParent();
   }, [pushToParent]);
 
-  const onNodesDelete = useCallback((deleted: Node[]) => {
-    const deletedIds = new Set(deleted.map((n) => n.id));
-    const nextNodes = nodesRef.current.filter((n) => !deletedIds.has(n.id));
-    const nextEdges = edgesRef.current.filter((e) => !deletedIds.has(e.source) && !deletedIds.has(e.target));
-    nodesRef.current = nextNodes;
-    edgesRef.current = nextEdges;
-    lastEmittedRef.current = persistedSignature(nextNodes, nextEdges);
-    onChangeRef.current?.(toPersistedDefinition(nextNodes, nextEdges, viewportRef.current));
-  }, []);
+  const onNodesDelete = useCallback(
+    (deleted: Node[]) => {
+      const deletedIds = new Set(deleted.map((n) => n.id));
+      const deletedGroups = new Map(
+        deleted.filter((node) => isWorkflowGroupNode(node)).map((node) => [node.id, node]),
+      );
+
+      setNodes((nds) => {
+        const nextNodes = nds.map((node) => {
+          if (!node.parentId || !deletedIds.has(node.parentId)) return node;
+          const parent = deletedGroups.get(node.parentId);
+          if (!parent) return node;
+
+          const { parentId: _parentId, extent: _extent, ...rest } = node;
+          return {
+            ...rest,
+            position: {
+              x: node.position.x + parent.position.x,
+              y: node.position.y + parent.position.y,
+            },
+          };
+        });
+        nodesRef.current = nextNodes;
+        lastEmittedRef.current = persistedSignature(nextNodes, edgesRef.current);
+        onChangeRef.current?.(toPersistedDefinition(nextNodes, edgesRef.current, viewportRef.current));
+        return nextNodes;
+      });
+
+      const nextEdges = edgesRef.current.filter((e) => !deletedIds.has(e.source) && !deletedIds.has(e.target));
+      edgesRef.current = nextEdges;
+      setEdges(nextEdges);
+    },
+    [setNodes, setEdges],
+  );
 
   const onEdgesDelete = useCallback((deleted: Edge[]) => {
     const deletedIds = new Set(deleted.map((e) => e.id));
@@ -170,6 +202,32 @@ export function useWorkflowCanvasState(
   const deleteNodeById = useCallback(
     (nodeId: string) => {
       if (readOnly) return;
+      const target = nodesRef.current.find((node) => node.id === nodeId);
+      if (!target) return;
+
+      if (isWorkflowGroupNode(target)) {
+        setNodes((nds) => {
+          const nextNodes = nds
+            .filter((node) => node.id !== nodeId)
+            .map((node) => {
+              if (node.parentId !== nodeId) return node;
+              const { parentId: _parentId, extent: _extent, ...rest } = node;
+              return {
+                ...rest,
+                position: {
+                  x: node.position.x + target.position.x,
+                  y: node.position.y + target.position.y,
+                },
+              };
+            });
+          nodesRef.current = nextNodes;
+          lastEmittedRef.current = persistedSignature(nextNodes, edgesRef.current);
+          onChangeRef.current?.(toPersistedDefinition(nextNodes, edgesRef.current, viewportRef.current));
+          return nextNodes;
+        });
+        return;
+      }
+
       const nextNodes = nodesRef.current.filter((n) => n.id !== nodeId);
       const nextEdges = edgesRef.current.filter((e) => e.source !== nodeId && e.target !== nodeId);
       nodesRef.current = nextNodes;
@@ -249,6 +307,38 @@ export function useWorkflowCanvasState(
     });
   }, [readOnly, setNodes]);
 
+  const applyNodeTransform = useCallback(
+    (transform: (nodes: Node[]) => Node[], persist = true) => {
+      if (readOnly) return;
+      setNodes((nds) => {
+        const nextNodes = transform(nds);
+        nodesRef.current = nextNodes;
+        if (persist) {
+          lastEmittedRef.current = persistedSignature(nextNodes, edgesRef.current);
+          onChangeRef.current?.(toPersistedDefinition(nextNodes, edgesRef.current, viewportRef.current));
+        }
+        return nextNodes;
+      });
+    },
+    [readOnly, setNodes],
+  );
+
+  const groupSelectedNodes = useCallback(() => {
+    applyNodeTransform(groupNodes);
+  }, [applyNodeTransform]);
+
+  const ungroupSelectedNodes = useCallback(() => {
+    applyNodeTransform(ungroupNodes);
+  }, [applyNodeTransform]);
+
+  const selectAllNodesOnCanvas = useCallback(() => {
+    applyNodeTransform(selectAllNodes, false);
+  }, [applyNodeTransform]);
+
+  const clearSelectionOnCanvas = useCallback(() => {
+    applyNodeTransform(clearNodeSelection, false);
+  }, [applyNodeTransform]);
+
   const onNodeMenuAction = useCallback(
     (nodeId: string, action: string) => {
       if (readOnly) return;
@@ -262,11 +352,32 @@ export function useWorkflowCanvasState(
         case "delete":
           deleteNodeById(nodeId);
           break;
+        case "select_all":
+          selectAllNodesOnCanvas();
+          break;
+        case "clear_selection":
+          clearSelectionOnCanvas();
+          break;
+        case "group":
+          groupSelectedNodes();
+          break;
+        case "ungroup":
+          ungroupSelectedNodes();
+          break;
         default:
           break;
       }
     },
-    [readOnly, toggleNodeActive, duplicateNodeById, deleteNodeById],
+    [
+      readOnly,
+      toggleNodeActive,
+      duplicateNodeById,
+      deleteNodeById,
+      selectAllNodesOnCanvas,
+      clearSelectionOnCanvas,
+      groupSelectedNodes,
+      ungroupSelectedNodes,
+    ],
   );
 
   const onConnect = useCallback(
@@ -353,5 +464,9 @@ export function useWorkflowCanvasState(
     onNodeMenuAction,
     tidyLayout,
     isValidConnection,
+    groupSelectedNodes,
+    ungroupSelectedNodes,
+    selectAllNodesOnCanvas,
+    clearSelectionOnCanvas,
   };
 }

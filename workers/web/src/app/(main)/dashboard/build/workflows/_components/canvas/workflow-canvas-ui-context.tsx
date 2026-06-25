@@ -22,6 +22,10 @@ export interface WorkflowCanvasUiValue {
   openAddNodeDrawer?: (options: WorkflowAddNodeDrawerOpenOptions) => void;
   closeAddNodeDrawer?: () => void;
   openNodeConfig?: (nodeId: string) => void;
+  groupSelected?: () => void;
+  ungroupSelected?: () => void;
+  selectAll?: () => void;
+  clearSelection?: () => void;
 }
 
 export const WorkflowCanvasUiContext = createContext<WorkflowCanvasUiValue | null>(null);

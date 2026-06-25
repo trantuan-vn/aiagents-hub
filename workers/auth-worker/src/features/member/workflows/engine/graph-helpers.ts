@@ -33,7 +33,7 @@ export function isResourceNodeType(type: string): boolean {
 }
 
 export function isNonExecutableNodeType(type: string): boolean {
-  return isResourceNodeType(type) || type === 'sticky_note';
+  return isResourceNodeType(type) || type === 'sticky_note' || type === 'workflow_group';
 }
 
 export function getExecutableNodes(definition: WorkflowDefinition): WorkflowDefinition['nodes'] {
