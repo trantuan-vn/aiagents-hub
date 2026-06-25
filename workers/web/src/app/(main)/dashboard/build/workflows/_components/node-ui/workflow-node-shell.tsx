@@ -15,6 +15,8 @@ interface WorkflowNodeShellProps {
   accent?: string;
   deactivated?: boolean;
   pill?: boolean;
+  /** Minimal chrome — for compact nodes (e.g. n8n-style loop). */
+  compact?: boolean;
   children: ReactNode;
   footer?: ReactNode;
 }
@@ -24,6 +26,7 @@ export function WorkflowNodeShell({
   accent,
   deactivated,
   pill,
+  compact,
   children,
   footer,
 }: WorkflowNodeShellProps) {
@@ -70,10 +73,12 @@ export function WorkflowNodeShell({
   return (
     <div
       className={cn(
-        "group/node relative min-w-[200px] border bg-card text-sm shadow-md",
-        pill ? "rounded-full px-5 py-2.5" : "rounded-lg px-3 py-2.5",
-        accent,
-        selected && "ring-2 ring-primary",
+        "group/node relative border bg-card text-sm shadow-md",
+        compact
+          ? "min-w-0 rounded-none border-0 bg-transparent p-0 shadow-none"
+          : cn("min-w-[200px] rounded-lg px-3 py-2.5", pill && "rounded-full px-5 py-2.5"),
+        !compact && accent,
+        !compact && selected && "ring-2 ring-primary",
         deactivated && "opacity-60",
       )}
       onPointerEnter={onToolbarZoneEnter}

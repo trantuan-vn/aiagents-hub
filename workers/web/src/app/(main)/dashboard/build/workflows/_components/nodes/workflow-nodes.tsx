@@ -288,28 +288,55 @@ function FlowLoopOverItemsNode({
 }) {
   const t = useTranslations("WorkflowEditorPage");
 
+  const squareClass = cn(
+    "relative h-[84px] w-[84px] rounded-[10px] border-2 border-border/80 bg-card shadow-sm",
+    selected && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+  );
+
+  const sideHandleCluster = (top: string) =>
+    `absolute right-0 z-20 flex translate-x-1/2 -translate-y-1/2 flex-row-reverse items-center gap-1.5 ${top}`;
+
   return (
-    <WorkflowNodeShell selected={selected} accent="border-teal-500/40" deactivated={deactivated}>
-      <div className="-mx-3 -mt-2.5 min-w-[228px]">
-        <div className="relative flex items-center gap-2.5 px-3 py-2.5">
-          <ConnectionHandle handleId="in" type="target" position={Position.Left} accentClass="!bg-teal-500" />
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-teal-500/15">
-            <RotateCw className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+    <WorkflowNodeShell compact selected={selected} deactivated={deactivated}>
+      <div className="flex flex-col items-center">
+        <div className={squareClass}>
+          <ConnectionHandle
+            handleId="in"
+            type="target"
+            position={Position.Left}
+            accentClass="!bg-muted-foreground/80 !size-2.5"
+            clusterClass="absolute left-0 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center"
+          />
+          <div className="flex h-full w-full items-center justify-center">
+            <RotateCw
+              className="h-[34px] w-[34px] text-[#1a6b5c] dark:text-teal-400"
+              strokeWidth={1.75}
+              aria-hidden
+            />
           </div>
-          <span className="truncate font-medium">{label}</span>
+          <ConnectionHandle
+            handleId="done"
+            type="source"
+            position={Position.Right}
+            accentClass="!bg-muted-foreground/80 !size-2.5"
+            clusterClass={sideHandleCluster("top-[26%]")}
+            label={t("flow_branch_done")}
+          />
+          <ConnectionHandle
+            handleId="loop"
+            type="source"
+            position={Position.Right}
+            accentClass="!bg-muted-foreground/80 !size-2.5"
+            clusterClass={sideHandleCluster("top-[74%]")}
+            label={t("flow_branch_loop")}
+          />
         </div>
-        <FlowBranchRow
-          badge={t("flow_branch_done")}
-          badgeVariant="done"
-          handleId="done"
-          handleAccent="!bg-slate-400"
-        />
-        <FlowBranchRow
-          badge={t("flow_branch_loop")}
-          badgeVariant="loop"
-          handleId="loop"
-          handleAccent="!bg-teal-500"
-        />
+        <p
+          className="text-foreground/85 mt-2 max-w-[172px] truncate text-center text-[11px] leading-snug font-medium"
+          title={label}
+        >
+          {label}
+        </p>
       </div>
     </WorkflowNodeShell>
   );

@@ -1,5 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
+import { hasRouteAdjustments, readEdgeRouteAdjustments } from "../edges/workflow-edge-route-data";
+
 export interface WorkflowDefinition {
   nodes: Node[];
   edges: Edge[];
@@ -22,14 +24,21 @@ export function toPersistedDefinition(
       },
       data: n.data,
     })),
-    edges: edges.map((e) => ({
-      id: e.id,
-      type: e.type ?? "workflowDeletable",
-      source: e.source,
-      target: e.target,
-      sourceHandle: e.sourceHandle,
-      targetHandle: e.targetHandle,
-    })),
+    edges: edges.map((e) => {
+      const base = {
+        id: e.id,
+        type: e.type ?? "workflowDeletable",
+        source: e.source,
+        target: e.target,
+        sourceHandle: e.sourceHandle,
+        targetHandle: e.targetHandle,
+      };
+      const routeAdjustments = readEdgeRouteAdjustments(e.data);
+      if (hasRouteAdjustments(routeAdjustments)) {
+        return { ...base, data: { routeAdjustments } };
+      }
+      return base;
+    }),
     viewport,
   };
 }

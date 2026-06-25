@@ -31,6 +31,8 @@ interface ConnectionHandleProps {
   required?: boolean;
   /** Override React Flow handle anchor (e.g. split true/false vertically). */
   handleStyle?: React.CSSProperties;
+  /** Override absolute cluster positioning (e.g. split loop/done vertically). */
+  clusterClass?: string;
   /** Create this node immediately on + click instead of opening the add-node drawer. */
   directPickOnPlus?: WorkflowAddNodePick;
 }
@@ -43,6 +45,7 @@ function useConnectionHandleModel({
   allowedNodeTypes,
   allowMultipleConnections = false,
   directPickOnPlus,
+  clusterClass,
 }: ConnectionHandleProps) {
   const nodeId = useNodeId();
   const ui = useWorkflowCanvasUi();
@@ -97,7 +100,7 @@ function useConnectionHandleModel({
     t,
     onPick,
     showPlus,
-    clusterClass: getHandleClusterClass(position),
+    clusterClass: clusterClass ?? getHandleClusterClass(position),
     isSideHandle: position === Position.Left || position === Position.Right,
     allowedNodeTypes,
     directPickOnPlus,

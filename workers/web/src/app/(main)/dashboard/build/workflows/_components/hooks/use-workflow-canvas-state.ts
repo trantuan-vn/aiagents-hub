@@ -16,6 +16,7 @@ import { isResourceEdge, isValidWorkflowConnection } from "../edges/workflow-con
 import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "../layout/workflow-create-connected-node";
 import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } from "../layout/workflow-definition";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
+import { readEdgeRouteAdjustments, type WorkflowEdgeRouteAdjustments } from "../edges/workflow-edge-route-data";
 import { layoutWorkflowNodes } from "../layout/workflow-layout";
 
 function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
@@ -137,6 +138,31 @@ export function useWorkflowCanvasState(
       setEdges(nextEdges);
       lastEmittedRef.current = persistedSignature(nodesRef.current, nextEdges);
       onChangeRef.current?.(toPersistedDefinition(nodesRef.current, nextEdges, viewportRef.current));
+    },
+    [readOnly, setEdges],
+  );
+
+  const patchEdgeRouteById = useCallback(
+    (edgeId: string, patch: WorkflowEdgeRouteAdjustments) => {
+      if (readOnly) return;
+      setEdges((eds) => {
+        const nextEdges = eds.map((e) => {
+          if (e.id !== edgeId) return e;
+          const current = readEdgeRouteAdjustments(e.data);
+          const routeAdjustments = { ...current, ...patch };
+          return {
+            ...e,
+            data: {
+              ...((e.data as Record<string, unknown> | undefined) ?? {}),
+              routeAdjustments,
+            },
+          };
+        });
+        edgesRef.current = nextEdges;
+        lastEmittedRef.current = persistedSignature(nodesRef.current, nextEdges);
+        onChangeRef.current?.(toPersistedDefinition(nodesRef.current, nextEdges, viewportRef.current));
+        return nextEdges;
+      });
     },
     [readOnly, setEdges],
   );
@@ -320,6 +346,7 @@ export function useWorkflowCanvasState(
     onEdgesDelete,
     createConnectedNode,
     deleteEdgeById,
+    patchEdgeRouteById,
     deleteNodeById,
     patchNodeDataById,
     toggleNodeActive,

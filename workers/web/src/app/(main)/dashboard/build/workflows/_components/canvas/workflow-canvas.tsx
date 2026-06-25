@@ -82,6 +82,7 @@ function CanvasInner({
     onEdgesDelete,
     createConnectedNode,
     deleteEdgeById,
+    patchEdgeRouteById,
     deleteNodeById,
     patchNodeDataById,
     toggleNodeActive,
@@ -137,6 +138,7 @@ function CanvasInner({
       onTidyWithFitReady={onTidyWithFitReady}
       createConnectedNode={createConnectedNode}
       deleteEdgeById={deleteEdgeById}
+      patchEdgeRouteById={patchEdgeRouteById}
       deleteNodeById={deleteNodeById}
       patchNodeDataById={patchNodeDataById}
       toggleNodeActive={toggleNodeActive}
@@ -159,6 +161,7 @@ function CanvasInnerWithDrawerUi({
   onTidyWithFitReady,
   createConnectedNode,
   deleteEdgeById,
+  patchEdgeRouteById,
   deleteNodeById,
   patchNodeDataById,
   toggleNodeActive,
@@ -177,6 +180,7 @@ function CanvasInnerWithDrawerUi({
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   createConnectedNode: ReturnType<typeof useWorkflowCanvasState>["createConnectedNode"];
   deleteEdgeById: ReturnType<typeof useWorkflowCanvasState>["deleteEdgeById"];
+  patchEdgeRouteById: ReturnType<typeof useWorkflowCanvasState>["patchEdgeRouteById"];
   deleteNodeById: ReturnType<typeof useWorkflowCanvasState>["deleteNodeById"];
   patchNodeDataById: ReturnType<typeof useWorkflowCanvasState>["patchNodeDataById"];
   toggleNodeActive: ReturnType<typeof useWorkflowCanvasState>["toggleNodeActive"];
@@ -222,6 +226,7 @@ function CanvasInnerWithDrawerUi({
       readOnly: !!readOnly,
       createConnectedNode: readOnly ? undefined : createConnectedNode,
       deleteEdge: readOnly ? undefined : deleteEdgeById,
+      patchEdgeRoute: readOnly ? undefined : patchEdgeRouteById,
       deleteNode: readOnly ? undefined : deleteNodeById,
       patchNodeData: readOnly ? undefined : patchNodeDataById,
       toggleNodeActive: readOnly ? undefined : toggleNodeActive,
@@ -236,6 +241,7 @@ function CanvasInnerWithDrawerUi({
       readOnly,
       createConnectedNode,
       deleteEdgeById,
+      patchEdgeRouteById,
       deleteNodeById,
       patchNodeDataById,
       toggleNodeActive,
