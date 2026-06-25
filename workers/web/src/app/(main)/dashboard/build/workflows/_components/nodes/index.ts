@@ -2,6 +2,7 @@ import type { Node } from "@xyflow/react";
 
 import type { WorkflowNodeUIPlugin } from "./types";
 import { agentUIPlugin } from "./agent";
+import { formTriggerUIPlugin } from "./form";
 import { memoryUIPlugin } from "./memory";
 import { serviceUIPlugin } from "./service";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
@@ -22,6 +23,7 @@ import {
 export * from "./types";
 export * from "./workflow-sticky-note-node";
 export * from "./agent";
+export * from "./form";
 export * from "./memory";
 export * from "./service";
 export * from "./webhook";
@@ -38,6 +40,7 @@ function plugin(
 export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   webhookTriggerUIPlugin,
   coreWebhookUIPlugin,
+  formTriggerUIPlugin,
   agentUIPlugin,
   serviceUIPlugin,
   memoryUIPlugin,
