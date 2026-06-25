@@ -3043,7 +3043,10 @@
     "form_text_to_show": "Văn bản hiển thị",
     "form_text_to_show_default": "Phản hồi của bạn đã được ghi nhận.",
     "form_path": "Đường dẫn",
-    "form_wish": "Tôi ước node này có thể…"
+    "form_wish": "Tôi ước node này có thể…",
+    "form_event_received": "Form đã gửi — output đã cập nhật",
+    "form_execute_listening": "Đã mở form — đang chờ gửi",
+    "form_owner_required": "Cần owner id để mở form thử nghiệm"
   },
   "WorkflowChatPage": {
     "title": "Chat workflow",

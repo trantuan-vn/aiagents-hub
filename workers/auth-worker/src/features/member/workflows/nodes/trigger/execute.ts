@@ -34,5 +34,27 @@ export async function executeTrigger(ctx: NodeContext): Promise<NodeOutput> {
     return merged;
   }
 
+  if (triggerKind === 'form') {
+    const runContext = ctx.runContext as Record<string, unknown>;
+    const fields =
+      (runContext.fields as Record<string, unknown> | undefined) ??
+      (() => {
+        try {
+          return ctx.input ? (JSON.parse(ctx.input) as Record<string, unknown>) : {};
+        } catch {
+          return {};
+        }
+      })();
+    return {
+      ...base,
+      ...fields,
+      fields,
+      formTitle: data.formTitle ?? '',
+      submittedAt: runContext.submittedAt ?? Date.now(),
+      formUrl: runContext.formUrl ?? '',
+      executionMode: runContext.executionMode ?? 'test',
+    };
+  }
+
   return base;
 }

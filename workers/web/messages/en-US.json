@@ -3041,7 +3041,10 @@
     "form_text_to_show": "Text to Show",
     "form_text_to_show_default": "Your response has been recorded.",
     "form_path": "Path",
-    "form_wish": "I wish this node would…"
+    "form_wish": "I wish this node would…",
+    "form_event_received": "Form submitted — output updated",
+    "form_execute_listening": "Form opened — waiting for submission",
+    "form_owner_required": "Owner id is required to open the test form"
   },
   "WorkflowChatPage": {
     "title": "Workflow chat",

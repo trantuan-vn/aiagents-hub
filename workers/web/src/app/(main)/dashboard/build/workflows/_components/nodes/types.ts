@@ -9,6 +9,7 @@ export type NodeConfigPanelProps = {
   nodes?: Node[];
   edges?: Edge[];
   workflowId?: number;
+  ownerId?: string;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;

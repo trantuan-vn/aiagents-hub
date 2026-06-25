@@ -11,12 +11,16 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
+
 import {
   createWorkflowTrigger,
   getWorkflowExecution,
   listWorkflowTriggers,
   type ExecutionStepLog,
 } from "../../_lib/api";
+import { buildFormPublicUrl, resolveFormPath } from "../panels/node-config/form-url";
+import { isFormNode } from "../panels/node-config/form-node-config-panel";
 import { isWebhookNode } from "../panels/node-config/webhook-node-config-panel";
 
 import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "./use-webhook-listen-ws";
@@ -58,6 +62,8 @@ export function useWorkflowExecuteEntry({
   const tExecute = useTranslations("WorkflowExecutePage");
   const tRegistry = useTranslations("WorkflowNodeRegistry");
   const tEditor = useTranslations("WorkflowEditorPage");
+  const dashboardUser = useDashboardUser();
+  const resolvedOwnerId = ownerId ?? dashboardUser?.id;
 
   const { runFromNode, running } = useWorkflowRunFromNode({
     workflowId,
@@ -67,19 +73,34 @@ export function useWorkflowExecuteEntry({
   });
 
   const [listeningNodeId, setListeningNodeId] = useState<string | null>(null);
-  const [liveOutput, setLiveOutput] = useState<WebhookItemOutput | null>(null);
+  const [liveOutput, setLiveOutput] = useState<unknown>(null);
+  const [formOwnerId, setFormOwnerId] = useState<string | undefined>();
 
   const listeningNode = useMemo(
     () => (listeningNodeId ? nodes.find((node) => node.id === listeningNodeId) : undefined),
     [listeningNodeId, nodes],
   );
 
-  const webhookPath = listeningNode ? resolveWebhookPath(listeningNode) : "";
+  const listenPath = useMemo(() => {
+    if (!listeningNode) return "";
+    if (isFormNode(listeningNode)) {
+      return resolveFormPath((listeningNode.data ?? {}) as Record<string, unknown>, listeningNode.id);
+    }
+    return resolveWebhookPath(listeningNode);
+  }, [listeningNode]);
 
   const testUrl = useMemo(() => {
-    if (!workflowId || !webhookPath) return undefined;
-    return `${API_BASE_URL}/hooks/workflows/${workflowId}/${encodeURIComponent(webhookPath)}`;
-  }, [workflowId, webhookPath]);
+    if (!workflowId || !listenPath || !listeningNode) return undefined;
+    if (isFormNode(listeningNode)) {
+      return buildFormPublicUrl({
+        workflowId,
+        formPath: listenPath,
+        mode: "test",
+        ownerId: formOwnerId ?? resolvedOwnerId,
+      });
+    }
+    return `${API_BASE_URL}/hooks/workflows/${workflowId}/${encodeURIComponent(listenPath)}`;
+  }, [workflowId, listenPath, listeningNode, resolvedOwnerId, formOwnerId]);
 
   const ensureWebhookTrigger = useCallback(
     async (node: Node) => {
@@ -101,28 +122,56 @@ export function useWorkflowExecuteEntry({
     [workflowId],
   );
 
-  const applyWebhookEvent = useCallback(
-    async (event: WorkflowWebhookWsEvent) => {
-      if (!listeningNodeId || !patchNodeDataById) return;
+  const ensureFormTrigger = useCallback(
+    async (node: Node): Promise<string | undefined> => {
+      if (!workflowId) return undefined;
+      const path = resolveFormPath((node.data ?? {}) as Record<string, unknown>, node.id);
+      const { triggers } = await listWorkflowTriggers(workflowId);
+      const existing = triggers.find(
+        (trigger) =>
+          trigger.type === "form" &&
+          (trigger.nodeId === node.id || trigger.webhookPath === path),
+      );
+      if (existing) return existing.ownerId || undefined;
+      const { trigger } = await createWorkflowTrigger(workflowId, {
+        type: "form",
+        nodeId: node.id,
+        webhookPath: path,
+      });
+      return trigger?.ownerId || undefined;
+    },
+    [workflowId],
+  );
 
-      const url = testUrl ?? "";
-      const item =
-        normalizeWebhookItemOutput(event.output, url) ??
-        buildWebhookItemOutput({
-          webhookUrl: url,
-          headers: { "x-http-method": event.method },
-          body: (() => {
+  const applyTriggerEvent = useCallback(
+    async (event: WorkflowWebhookWsEvent) => {
+      if (!listeningNodeId || !patchNodeDataById || !listeningNode) return;
+
+      const isForm = isFormNode(listeningNode);
+      const output = isForm
+        ? (event.output ?? (() => {
             try {
               return JSON.parse(event.input);
             } catch {
-              return event.input;
+              return { input: event.input };
             }
-          })(),
-          executionMode: "test",
-        });
+          })())
+        : (normalizeWebhookItemOutput(event.output, testUrl ?? "") ??
+          buildWebhookItemOutput({
+            webhookUrl: testUrl ?? "",
+            headers: { "x-http-method": event.method },
+            body: (() => {
+              try {
+                return JSON.parse(event.input);
+              } catch {
+                return event.input;
+              }
+            })(),
+            executionMode: "test",
+          }));
 
-      setLiveOutput(item);
-      patchNodeDataById(listeningNodeId, { _output: item, _outputPinned: true });
+      setLiveOutput(output);
+      patchNodeDataById(listeningNodeId, { _output: output, _outputPinned: true });
 
       try {
         const { execution: record } = await getWorkflowExecution(event.executionKey);
@@ -133,31 +182,57 @@ export function useWorkflowExecuteEntry({
         else if (record.status === "pending_human") toast.message(tExecute("pending_human"));
         else if (record.status === "cancelled") toast.message(tExecute("cancelled"));
         else if (record.status === "failed") toast.error(tExecute("failed"));
-        else toast.success(tRegistry("webhook_event_received"));
+        else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       } catch {
-        if (event.status === "completed") toast.success(tRegistry("webhook_event_received"));
-        else if (event.status === "failed") toast.error(tExecute("failed"));
-        else toast.success(tRegistry("webhook_event_received"));
+        if (event.status === "completed") {
+          toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
+        } else if (event.status === "failed") toast.error(tExecute("failed"));
+        else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       }
     },
-    [listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
+    [listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
   );
 
   useWebhookListenWs({
     workflowId,
     nodeId: listeningNodeId ?? "",
-    webhookPath,
+    webhookPath: listenPath,
     listening: !!listeningNodeId,
     enabled: !!listeningNodeId && !!workflowId,
     onEvent: (event) => {
-      void applyWebhookEvent(event);
+      void applyTriggerEvent(event);
     },
   });
 
-  const stopWebhookListen = useCallback(() => {
+  const stopListen = useCallback(() => {
     setListeningNodeId(null);
     setLiveOutput(null);
   }, []);
+
+  const startFormTest = useCallback(
+    async (nodeId: string) => {
+      const node = nodes.find((entry) => entry.id === nodeId);
+      if (!node || !isFormNode(node) || !workflowId) return;
+      try {
+        const triggerOwnerId = await ensureFormTrigger(node);
+        const ownerIdForUrl = triggerOwnerId ?? resolvedOwnerId;
+        if (!ownerIdForUrl) {
+          toast.error(tRegistry("form_owner_required"));
+          return;
+        }
+        if (triggerOwnerId) setFormOwnerId(triggerOwnerId);
+        const path = resolveFormPath((node.data ?? {}) as Record<string, unknown>, node.id);
+        const url = buildFormPublicUrl({ workflowId, formPath: path, mode: "test", ownerId: ownerIdForUrl });
+        setLiveOutput(null);
+        setListeningNodeId(nodeId);
+        window.open(url, "_blank", "noopener,noreferrer");
+        toast.message(tRegistry("form_execute_listening"));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : tExecute("failed"));
+      }
+    },
+    [ensureFormTrigger, nodes, resolvedOwnerId, tExecute, tRegistry, workflowId],
+  );
 
   const startWebhookListen = useCallback(
     async (nodeId: string) => {
@@ -180,15 +255,23 @@ export function useWorkflowExecuteEntry({
       const node = nodes.find((entry) => entry.id === nodeId);
       if (node && isWebhookNode(node)) {
         if (listeningNodeId === nodeId) {
-          stopWebhookListen();
+          stopListen();
           return;
         }
         await startWebhookListen(nodeId);
         return;
       }
+      if (node && isFormNode(node)) {
+        if (listeningNodeId === nodeId) {
+          stopListen();
+          return;
+        }
+        await startFormTest(nodeId);
+        return;
+      }
       await runFromNode(nodeId);
     },
-    [listeningNodeId, nodes, runFromNode, startWebhookListen, stopWebhookListen],
+    [listeningNodeId, nodes, runFromNode, startFormTest, startWebhookListen, stopListen],
   );
 
   return {
@@ -196,8 +279,8 @@ export function useWorkflowExecuteEntry({
     running,
     webhookListening: !!listeningNodeId,
     listeningNodeId,
-    stopWebhookListen,
+    stopWebhookListen: stopListen,
     testUrl,
-    liveOutput,
+    liveOutput: liveOutput as WebhookItemOutput | null,
   };
 }

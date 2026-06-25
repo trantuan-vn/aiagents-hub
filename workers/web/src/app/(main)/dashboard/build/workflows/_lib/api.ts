@@ -233,7 +233,7 @@ export function resumeWorkflowExecution(
 }
 
 // --- Triggers (cron + webhook) ---
-export type WorkflowTriggerType = "cron" | "webhook" | "telegram" | "slack" | "discord";
+export type WorkflowTriggerType = "cron" | "webhook" | "form" | "telegram" | "slack" | "discord";
 
 export interface WorkflowTrigger {
   triggerId: string;

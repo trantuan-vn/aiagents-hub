@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Node } from "@xyflow/react";
 import { ChevronDown, ClipboardList, Copy, GripVertical, Plus, Trash2, Zap } from "lucide-react";
@@ -16,10 +16,12 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
+import { createWorkflowTrigger, listWorkflowTriggers } from "../../../_lib/api";
+import { buildFormPublicUrl } from "./form-url";
 import { NodeMockOutputSection } from "./node-mock-output-section";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
 const FORM_AUTH_OPTIONS = [
@@ -68,6 +70,7 @@ export type FormElement = {
 export type FormNodeConfigPanelProps = {
   node: Node;
   workflowId?: number;
+  ownerId?: string;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
@@ -75,7 +78,7 @@ export type FormNodeConfigPanelProps = {
 
 export function isFormNode(node: Node): boolean {
   const d = (node.data ?? {}) as Record<string, unknown>;
-  return d.triggerKind === "form" || node.type === "form";
+  return (d.triggerKind === "form" && d.formKind !== "database") || node.type === "form";
 }
 
 function slugify(value: string): string {
@@ -103,12 +106,15 @@ function createElement(): FormElement {
 export function FormNodeConfigPanel({
   node,
   workflowId,
+  ownerId,
   onClose,
   onPatchData,
   onExecuteStep,
 }: FormNodeConfigPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const te = useTranslations("WorkflowEditorPage");
+  const dashboardUser = useDashboardUser();
+  const resolvedOwnerId = ownerId ?? dashboardUser?.id;
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
   const path = String(nodeData.formPath ?? defaultPath(node.id));
@@ -125,17 +131,55 @@ export function FormNodeConfigPanel({
 
   const [urlMode, setUrlMode] = useState<"test" | "production">("test");
   const [urlsOpen, setUrlsOpen] = useState(true);
+  const [triggerOwnerId, setTriggerOwnerId] = useState<string | undefined>();
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
     [node.id, onPatchData],
   );
 
+  const effectiveOwnerId = triggerOwnerId ?? resolvedOwnerId;
+
   const formUrl = useMemo(() => {
-    const base = workflowId && !isNaN(workflowId) ? String(workflowId) : "{workflowId}";
-    const segment = urlMode === "production" ? "form" : "form-test";
-    return `${API_BASE_URL}/${segment}/${base}/${encodeURIComponent(path)}`;
-  }, [workflowId, urlMode, path]);
+    if (!workflowId || isNaN(workflowId)) {
+      return buildFormPublicUrl({
+        workflowId: 0,
+        formPath: path,
+        mode: urlMode === "production" ? "production" : "test",
+        ownerId: effectiveOwnerId,
+      }).replace("/0/", "/{workflowId}/");
+    }
+    return buildFormPublicUrl({
+      workflowId,
+      formPath: path,
+      mode: urlMode === "production" ? "production" : "test",
+      ownerId: effectiveOwnerId,
+    });
+  }, [workflowId, urlMode, path, effectiveOwnerId]);
+
+  useEffect(() => {
+    if (!workflowId || isNaN(workflowId)) return;
+    void (async () => {
+      try {
+        const { triggers } = await listWorkflowTriggers(workflowId);
+        const existing = triggers.find(
+          (tr) => tr.type === "form" && (tr.nodeId === node.id || tr.webhookPath === path),
+        );
+        if (existing) {
+          if (existing.ownerId) setTriggerOwnerId(existing.ownerId);
+          return;
+        }
+        const { trigger } = await createWorkflowTrigger(workflowId, {
+          type: "form",
+          nodeId: node.id,
+          webhookPath: path,
+        });
+        if (trigger?.ownerId) setTriggerOwnerId(trigger.ownerId);
+      } catch {
+        /* optional */
+      }
+    })();
+  }, [workflowId, node.id, path]);
 
   const copyUrl = async () => {
     try {

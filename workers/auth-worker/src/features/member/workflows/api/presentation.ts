@@ -20,6 +20,7 @@ import { createCredential, deleteCredential, listCredentials } from '../storage/
 import {
   createTrigger,
   deleteTrigger,
+  findFormTriggerByNodeId,
   findWebhookTriggerByNodeId,
   listTriggers,
   syncWebhookTriggersForWorkflow,
@@ -64,7 +65,7 @@ const ResumeBodySchema = z.object({
 
 const CreateTriggerSchema = z
   .object({
-    type: z.enum(['cron', 'webhook', 'telegram', 'slack', 'discord']),
+    type: z.enum(['cron', 'webhook', 'form', 'telegram', 'slack', 'discord']),
     cronExpr: z.string().min(1).max(120).optional(),
     input: z.string().max(10000).optional(),
     enabled: z.boolean().optional(),
@@ -490,6 +491,10 @@ export function createWorkflowRoutes(bindingName: string) {
       const pathSeg = webhookPath ? `/${encodeURIComponent(webhookPath)}` : '';
       return `${base}/hooks/workflows/${workflowId}${pathSeg}`;
     }
+    if (type === 'form') {
+      const pathSeg = webhookPath ? `/${encodeURIComponent(webhookPath)}` : '';
+      return `${base}/form/${workflowId}${pathSeg}`;
+    }
     if (!token) return undefined;
     if (isChannelTriggerType(type)) return `${base}/hooks/channels/${type}/${ownerId}/${token}`;
     return undefined;
@@ -537,6 +542,15 @@ export function createWorkflowRoutes(bindingName: string) {
       const ownerId = getUserId(c, user.identifier);
       if (body.type === 'webhook' && body.nodeId) {
         const existing = await findWebhookTriggerByNodeId(db, id, ownerId, body.nodeId);
+        if (existing) {
+          return c.json(
+            { trigger: enrichTrigger(c, ownerId, existing) },
+            200,
+          );
+        }
+      }
+      if (body.type === 'form' && body.nodeId) {
+        const existing = await findFormTriggerByNodeId(db, id, ownerId, body.nodeId);
         if (existing) {
           return c.json(
             { trigger: enrichTrigger(c, ownerId, existing) },

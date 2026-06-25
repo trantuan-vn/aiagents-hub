@@ -4,9 +4,10 @@ import type { WorkflowDefinition } from '../domain/domain.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { parseWorkflowDefinition } from '../execution/workflow-context.js';
 import { executeWorkflowGraph } from '../executor.js';
+import { listFormSubmissionNodes } from './form-submission.js';
 
 /** Channel types align with OpenClaw multi-channel support (Telegram/Slack/Discord). */
-export type TriggerType = 'cron' | 'webhook' | 'telegram' | 'slack' | 'discord';
+export type TriggerType = 'cron' | 'webhook' | 'form' | 'telegram' | 'slack' | 'discord';
 
 const CHANNEL_TYPES: TriggerType[] = ['webhook', 'telegram', 'slack', 'discord'];
 
@@ -343,6 +344,120 @@ export async function findWebhookTriggerByNodeId(
     .first<WorkflowTriggerRow>();
 }
 
+/** Enabled form submission triggers for a workflow (owner-scoped). */
+export async function listFormTriggersForWorkflow(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+): Promise<WorkflowTriggerRow[]> {
+  await ensureTriggerTable(db);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'form' AND enabled = 1
+       ORDER BY createdAt ASC`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  return results ?? [];
+}
+
+export async function findFormTriggerByNodeId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+  nodeId: string,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  return db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'form' AND nodeId = ?
+       LIMIT 1`,
+    )
+    .bind(workflowId, ownerId, nodeId)
+    .first<WorkflowTriggerRow>();
+}
+
+export async function findFormTriggerByWorkflowId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string | undefined,
+  formPath: string,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  const normalized = formPath.trim().replace(/^\/+/, '');
+  if (ownerId) {
+    const forms = await listFormTriggersForWorkflow(db, workflowId, ownerId);
+    return forms.find((t) => t.webhookPath === normalized || t.nodeId === normalized) ?? null;
+  }
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND type = 'form' AND enabled = 1`,
+    )
+    .bind(workflowId)
+    .all<WorkflowTriggerRow>();
+  const forms = results ?? [];
+  return forms.find((t) => t.webhookPath === normalized || t.nodeId === normalized) ?? null;
+}
+
+/** Keep D1 form trigger rows in sync with canvas form submission nodes. */
+export async function syncFormTriggersForWorkflow(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+): Promise<Array<{ nodeId: string; formPath: string }>> {
+  let resolved: ResolvedWorkflow;
+  try {
+    resolved = await resolveOwnedWorkflow(env, bindingName, ownerId, workflowId);
+  } catch {
+    return [];
+  }
+
+  const nodes = listFormSubmissionNodes(resolved.definition);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'form'`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  const existing = results ?? [];
+  const nodeIds = new Set(nodes.map((n) => n.nodeId));
+
+  for (const row of existing) {
+    if (row.nodeId && !nodeIds.has(row.nodeId)) {
+      await deleteTrigger(db, ownerId, row.triggerId);
+    }
+  }
+
+  const byNodeId = new Map(
+    existing.filter((r) => r.nodeId).map((r) => [r.nodeId!, r]),
+  );
+
+  for (const node of nodes) {
+    const row = byNodeId.get(node.nodeId);
+    if (!row) {
+      await createTrigger(db, {
+        ownerId,
+        workflowId,
+        type: 'form',
+        nodeId: node.nodeId,
+        webhookPath: node.formPath,
+      });
+      continue;
+    }
+    if (row.webhookPath !== node.formPath) {
+      await updateTrigger(db, ownerId, row.triggerId, { webhookPath: node.formPath });
+    }
+  }
+
+  return nodes;
+}
+
 /**
  * Resolve webhook trigger for an HTTP request.
  * When `webhookPath` is omitted and multiple webhooks exist, returns null (caller should 400).
@@ -506,7 +621,7 @@ export async function markTriggerRun(
 // Runner
 // ---------------------------------------------------------------------------
 
-async function resolveOwnedWorkflow(
+export async function resolveOwnedWorkflow(
   env: Env,
   bindingName: string,
   ownerId: string,
@@ -561,7 +676,9 @@ export async function runTrigger(
 ) {
   const resolved = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
   const entryNodeIds =
-    trigger.type === 'webhook' && trigger.nodeId ? [trigger.nodeId] : undefined;
+    (trigger.type === 'webhook' || trigger.type === 'form') && trigger.nodeId
+      ? [trigger.nodeId]
+      : undefined;
   return executeWorkflowGraph({
     c: { env } as any,
     bindingName,

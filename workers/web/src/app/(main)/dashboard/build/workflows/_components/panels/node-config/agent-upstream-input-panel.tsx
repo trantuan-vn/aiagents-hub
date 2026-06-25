@@ -84,6 +84,54 @@ function getUpstreamNode(nodeId: string, nodes: Node[], edges: Edge[]): Node | n
   return nodes.find((n) => n.id === parentEdge.source) ?? null;
 }
 
+type FormElementLike = {
+  id?: string;
+  label?: string;
+  fieldType?: string;
+  fieldName?: string;
+  multipleFiles?: boolean;
+};
+
+function isFormSubmissionNode(node: Node): boolean {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  return (d.triggerKind === "form" && d.formKind !== "database") || node.type === "form";
+}
+
+function sampleValueForFieldType(type: string | undefined, multiple?: boolean): unknown {
+  switch (type) {
+    case "number":
+      return 0;
+    case "file": {
+      const file = { filename: "", mimeType: "", size: 0 };
+      return multiple ? [file] : file;
+    }
+    default:
+      return "";
+  }
+}
+
+/** Static output schema for a form trigger derived from its configured elements. */
+function buildFormPreviewOutput(parentData: Record<string, unknown>): Record<string, unknown> {
+  const elements = Array.isArray(parentData.formElements)
+    ? (parentData.formElements as FormElementLike[])
+    : [];
+  const fields: Record<string, unknown> = {};
+  for (const el of elements) {
+    const key = String(el.fieldName || el.id || "").trim();
+    if (!key) continue;
+    fields[key] = sampleValueForFieldType(el.fieldType, el.multipleFiles);
+  }
+  return {
+    ...fields,
+    fields,
+    formTitle: String(parentData.formTitle ?? ""),
+    submittedAt: 0,
+    formUrl: "",
+    executionMode: "test",
+    triggerKind: "form",
+  };
+}
+
 function getUpstreamOutputData(
   nodeId: string,
   nodes: Node[],
@@ -94,9 +142,24 @@ function getUpstreamOutputData(
 
   const parentData = (parent.data ?? {}) as Record<string, unknown>;
   const output = parentData._output;
-  if (output && typeof output === "object" && !Array.isArray(output)) {
-    return output as Record<string, unknown>;
+  const realOutput =
+    output && typeof output === "object" && !Array.isArray(output)
+      ? (output as Record<string, unknown>)
+      : null;
+
+  // Form triggers expose their configured fields as the downstream schema even
+  // before execution; real run values (if any) are merged on top.
+  if (isFormSubmissionNode(parent)) {
+    const preview = buildFormPreviewOutput(parentData);
+    if (!realOutput) return preview;
+    const mergedFields = {
+      ...(preview.fields as Record<string, unknown>),
+      ...((realOutput.fields as Record<string, unknown> | undefined) ?? {}),
+    };
+    return { ...preview, ...realOutput, fields: mergedFields };
   }
+
+  if (realOutput) return realOutput;
 
   if (parentData.body != null || parentData.headers != null) {
     return parentData;
