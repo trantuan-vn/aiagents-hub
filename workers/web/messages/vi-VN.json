@@ -2242,6 +2242,8 @@
     "add_category_core_desc": "Chạy code, gọi HTTP, đặt webhook, v.v.",
     "add_category_human_review": "Human review",
     "add_category_human_review_desc": "Yêu cầu phê duyệt qua Slack, Telegram trước khi gọi tool",
+    "add_category_tools": "Tool",
+    "add_category_tools_desc": "HTTP request, MCP server, công cụ RAG và các tool khác cho agent",
     "human_review_section_send_wait": "Gửi và chờ phản hồi",
     "human_review_channel_chat": "Chat",
     "human_review_channel_discord": "Discord",

@@ -5,6 +5,7 @@ import {
   Globe,
   Layers,
   Pencil,
+  Wrench,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -15,7 +16,8 @@ export type WorkflowAddNodeCategoryId =
   | "data_transformation"
   | "flow"
   | "core"
-  | "human_review";
+  | "human_review"
+  | "tools";
 
 export type WorkflowAddNodeCategory = {
   id: WorkflowAddNodeCategoryId;
@@ -29,7 +31,8 @@ export type WorkflowAddNodeCategory = {
     | "node_transform"
     | "node_flow"
     | "node_core"
-    | "node_human_review";
+    | "node_human_review"
+    | "node_tool";
 };
 
 export const WORKFLOW_ADD_NODE_CATEGORIES: WorkflowAddNodeCategory[] = [
@@ -80,6 +83,14 @@ export const WORKFLOW_ADD_NODE_CATEGORIES: WorkflowAddNodeCategory[] = [
     descKey: "add_category_human_review_desc",
     nodeType: "human_review",
     nodeKey: "node_human_review",
+  },
+  {
+    id: "tools",
+    icon: Wrench,
+    titleKey: "add_category_tools",
+    descKey: "add_category_tools_desc",
+    nodeType: "tool_node",
+    nodeKey: "node_tool",
   },
 ];
 

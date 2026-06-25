@@ -227,7 +227,7 @@ export function WorkflowAddNodePanel({
   const categories = useMemo(() => {
     let list = WORKFLOW_ADD_NODE_CATEGORIES;
     if (variant === "connect" && !allowedNodeTypes?.length) {
-      list = list.filter((c) => FLOW_NODE_TYPES.has(c.nodeType) || c.id === "ai");
+      list = list.filter((c) => FLOW_NODE_TYPES.has(c.nodeType) || c.id === "ai" || c.id === "tools");
     }
     if (allowedNodeTypes?.length) {
       return list.filter((c) => {
@@ -488,6 +488,10 @@ export function WorkflowAddNodePanel({
     }
     if (category.id === "action_in_app") {
       setView("action_in_app");
+      return;
+    }
+    if (category.id === "tools") {
+      setView("tools");
       return;
     }
     onPick({ type: category.nodeType, label: t(category.nodeKey) });
@@ -824,7 +828,8 @@ export function WorkflowAddNodePanel({
                   category.id === "human_review" ||
                   category.id === "flow" ||
                   category.id === "core" ||
-                  category.id === "data_transformation"
+                  category.id === "data_transformation" ||
+                  category.id === "tools"
                 }
                 onClick={() => pickCategory(category)}
               />
