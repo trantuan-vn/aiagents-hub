@@ -17,6 +17,7 @@ import {
   createWorkflowTrigger,
   getWorkflowExecution,
   listWorkflowTriggers,
+  setFormTestListening,
   type ExecutionStepLog,
 } from "../../_lib/api";
 import { buildFormPublicUrl, resolveFormPath } from "../panels/node-config/form-url";
@@ -75,6 +76,15 @@ export function useWorkflowExecuteEntry({
   const [listeningNodeId, setListeningNodeId] = useState<string | null>(null);
   const [liveOutput, setLiveOutput] = useState<unknown>(null);
   const [formOwnerId, setFormOwnerId] = useState<string | undefined>();
+
+  const deactivateFormListening = useCallback(
+    (node: Node | undefined) => {
+      if (!workflowId || !node || !isFormNode(node)) return;
+      const path = resolveFormPath((node.data ?? {}) as Record<string, unknown>, node.id);
+      void setFormTestListening(workflowId, { formPath: path, active: false }).catch(() => {});
+    },
+    [workflowId],
+  );
 
   const listeningNode = useMemo(
     () => (listeningNodeId ? nodes.find((node) => node.id === listeningNodeId) : undefined),
@@ -189,8 +199,14 @@ export function useWorkflowExecuteEntry({
         } else if (event.status === "failed") toast.error(tExecute("failed"));
         else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       }
+
+      // n8n behaviour: a test form deactivates after the first submission.
+      if (isForm) {
+        deactivateFormListening(listeningNode);
+        setListeningNodeId(null);
+      }
     },
-    [listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
+    [deactivateFormListening, listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
   );
 
   useWebhookListenWs({
@@ -205,9 +221,11 @@ export function useWorkflowExecuteEntry({
   });
 
   const stopListen = useCallback(() => {
+    const node = listeningNodeId ? nodes.find((entry) => entry.id === listeningNodeId) : undefined;
+    deactivateFormListening(node);
     setListeningNodeId(null);
     setLiveOutput(null);
-  }, []);
+  }, [deactivateFormListening, listeningNodeId, nodes]);
 
   const startFormTest = useCallback(
     async (nodeId: string) => {
@@ -222,6 +240,7 @@ export function useWorkflowExecuteEntry({
         }
         if (triggerOwnerId) setFormOwnerId(triggerOwnerId);
         const path = resolveFormPath((node.data ?? {}) as Record<string, unknown>, node.id);
+        await setFormTestListening(workflowId, { formPath: path, active: true });
         const url = buildFormPublicUrl({ workflowId, formPath: path, mode: "test", ownerId: ownerIdForUrl });
         setLiveOutput(null);
         setListeningNodeId(nodeId);

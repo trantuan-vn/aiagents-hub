@@ -10,9 +10,12 @@ export type NodeConfigPanelProps = {
   edges?: Edge[];
   workflowId?: number;
   ownerId?: string;
+  /** Id of the node currently listening for a test trigger (webhook/form), if any. */
+  listeningNodeId?: string | null;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
+  onStopListen?: () => void;
 };
 
 export type WorkflowNodeCatalogCategory =

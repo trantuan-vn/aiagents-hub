@@ -171,6 +171,66 @@ export function renderFormPageHtml(params: {
 </html>`;
 }
 
+/** TTL (seconds) for a "test form is listening" registration. */
+const FORM_TEST_LISTEN_TTL = 300;
+
+function formTestListenKey(ownerId: string, workflowId: number, formPath: string): string {
+  const normalized = formPath.trim().replace(/^\/+/, '');
+  return `form-test-listen:${ownerId}:${workflowId}:${normalized}`;
+}
+
+/** Register (or clear) the "listening for a test submission" flag for a form node. */
+export async function setFormTestListening(
+  kv: KVNamespace | undefined,
+  ownerId: string,
+  workflowId: number,
+  formPath: string,
+  active: boolean,
+): Promise<void> {
+  if (!kv) return;
+  const key = formTestListenKey(ownerId, workflowId, formPath);
+  if (active) {
+    await kv.put(key, '1', { expirationTtl: FORM_TEST_LISTEN_TTL });
+  } else {
+    await kv.delete(key);
+  }
+}
+
+export async function isFormTestListening(
+  kv: KVNamespace | undefined,
+  ownerId: string,
+  workflowId: number,
+  formPath: string,
+): Promise<boolean> {
+  if (!kv) return false;
+  const key = formTestListenKey(ownerId, workflowId, formPath);
+  return (await kv.get(key)) != null;
+}
+
+export function renderFormInactiveHtml(message: string): string {
+  const text = escapeHtml(message || 'This form is not currently available.');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Form not available</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f6f6f6; margin: 0; padding: 2rem 1rem; }
+    .card { max-width: 560px; margin: 0 auto; background: #fff; border-radius: 12px; padding: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); text-align: center; }
+    h1 { margin: 0 0 .5rem; font-size: 1.2rem; }
+    p { color: #555; margin: 0; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>${text}</h1>
+    <p>Open the workflow editor and click "Execute step" on the form node to start a test submission.</p>
+  </div>
+</body>
+</html>`;
+}
+
 export function renderFormSuccessHtml(message: string): string {
   const text = escapeHtml(message || 'Your response has been recorded.');
   return `<!DOCTYPE html>

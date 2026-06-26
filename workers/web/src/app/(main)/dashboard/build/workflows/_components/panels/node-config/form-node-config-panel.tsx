@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { Node } from "@xyflow/react";
-import { ChevronDown, ClipboardList, Copy, GripVertical, Plus, Trash2, Zap } from "lucide-react";
+import { ChevronDown, ClipboardList, Copy, GripVertical, Loader2, Plus, Trash2, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -71,9 +71,11 @@ export type FormNodeConfigPanelProps = {
   node: Node;
   workflowId?: number;
   ownerId?: string;
+  listeningNodeId?: string | null;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
+  onStopListen?: () => void;
 };
 
 export function isFormNode(node: Node): boolean {
@@ -107,14 +109,17 @@ export function FormNodeConfigPanel({
   node,
   workflowId,
   ownerId,
+  listeningNodeId,
   onClose,
   onPatchData,
   onExecuteStep,
+  onStopListen,
 }: FormNodeConfigPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const te = useTranslations("WorkflowEditorPage");
   const dashboardUser = useDashboardUser();
   const resolvedOwnerId = ownerId ?? dashboardUser?.id;
+  const isListening = listeningNodeId === node.id;
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
   const path = String(nodeData.formPath ?? defaultPath(node.id));
@@ -221,15 +226,33 @@ export function FormNodeConfigPanel({
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
         {/* Left — test submission */}
         <div className="flex min-h-0 flex-col border-r">
-          <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
-            <p className="text-sm font-medium">{t("form_pull_test")}</p>
-            {onExecuteStep ? (
-              <Button type="button" className={cn(ORANGE, "text-white")} onClick={() => onExecuteStep(node.id)}>
-                <Zap className="mr-2 size-4" />
-                {t("form_execute_step")}
-              </Button>
-            ) : null}
-          </div>
+          {isListening ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+              <div className="relative flex size-12 items-center justify-center">
+                <Loader2 className="absolute size-12 animate-spin text-[#ff6f00]/40" />
+                <ClipboardList className="size-5 text-[#ff6f00]" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">{t("form_listening_title")}</p>
+                <p className="text-muted-foreground text-xs leading-relaxed">{t("form_listening_hint")}</p>
+              </div>
+              {onStopListen ? (
+                <Button type="button" className={cn(ORANGE, "text-white")} onClick={onStopListen}>
+                  {t("form_stop_listening")}
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+              <p className="text-sm font-medium">{t("form_pull_test")}</p>
+              {onExecuteStep ? (
+                <Button type="button" className={cn(ORANGE, "text-white")} onClick={() => onExecuteStep(node.id)}>
+                  <Zap className="mr-2 size-4" />
+                  {t("form_execute_step")}
+                </Button>
+              ) : null}
+            </div>
+          )}
           <div className="border-t p-4">
             <p className="text-muted-foreground text-[11px] leading-relaxed">{t("form_production_hint")}</p>
           </div>

@@ -27,6 +27,7 @@ import {
   updateTrigger,
   workflowDefinitionHasWebhookTrigger,
 } from '../triggers/triggers.js';
+import { setFormTestListening } from '../triggers/form-submission.js';
 import { WORKFLOW_INTEGRATIONS } from '../integrations/integrations.js';
 import { getVersionByKey, listVersions, snapshotVersion } from '../storage/version-store.js';
 import { autofixWorkflowDefinition, generateWorkflowDefinition } from '../collab/ai-authoring.js';
@@ -564,6 +565,25 @@ export function createWorkflowRoutes(bindingName: string) {
         201,
       );
     }, 'Failed to create trigger'),
+  );
+
+  // Toggle the "listening for a test form submission" window for a form node.
+  // While active, the public /form-test URL renders/accepts; otherwise it 404s.
+  app.post(
+    '/:id/form-test-listen',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const body = (await c.req.json().catch(() => ({}))) as {
+        formPath?: string;
+        active?: boolean;
+      };
+      const formPath = String(body.formPath ?? '').trim().replace(/^\/+/, '');
+      if (!formPath) throw new Error('Missing formPath');
+      const ownerId = getUserId(c, user.identifier);
+      await setFormTestListening(c.env.NONCE_KV, ownerId, id, formPath, body.active !== false);
+      return c.json({ ok: true, active: body.active !== false });
+    }, 'Failed to set form test listening'),
   );
 
   app.put(

@@ -3044,7 +3044,10 @@
     "form_wish": "I wish this node would…",
     "form_event_received": "Form submitted — output updated",
     "form_execute_listening": "Form opened — waiting for submission",
-    "form_owner_required": "Owner id is required to open the test form"
+    "form_owner_required": "Owner id is required to open the test form",
+    "form_listening_title": "Listening for a test form submission",
+    "form_listening_hint": "Submit the test form that just opened in a new tab",
+    "form_stop_listening": "Stop Listening"
   },
   "WorkflowChatPage": {
     "title": "Workflow chat",

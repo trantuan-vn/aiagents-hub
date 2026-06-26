@@ -216,6 +216,7 @@ function CanvasInnerWithDrawerUi({
     executeFromEntry,
     running,
     webhookListening,
+    listeningNodeId,
     stopWebhookListen,
     testUrl,
     liveOutput,
@@ -310,9 +311,11 @@ function CanvasInnerWithDrawerUi({
           edges={edges}
           workflowId={workflowId}
           ownerId={ownerId}
+          listeningNodeId={listeningNodeId}
           onClose={() => setConfigNodeId(null)}
           onPatchData={patchNodeDataById}
           onExecuteStep={(nodeId) => onMenuActionWrapped(nodeId, "execute_step")}
+          onStopListen={stopWebhookListen}
         />
       ) : null}
     </WorkflowCanvasUiContext.Provider>

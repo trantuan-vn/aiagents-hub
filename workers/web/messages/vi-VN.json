@@ -3046,7 +3046,10 @@
     "form_wish": "Tôi ước node này có thể…",
     "form_event_received": "Form đã gửi — output đã cập nhật",
     "form_execute_listening": "Đã mở form — đang chờ gửi",
-    "form_owner_required": "Cần owner id để mở form thử nghiệm"
+    "form_owner_required": "Cần owner id để mở form thử nghiệm",
+    "form_listening_title": "Đang chờ một lần gửi form thử nghiệm",
+    "form_listening_hint": "Hãy gửi form thử nghiệm vừa mở ở tab mới",
+    "form_stop_listening": "Dừng lắng nghe"
   },
   "WorkflowChatPage": {
     "title": "Chat workflow",

@@ -297,6 +297,17 @@ export function deleteWorkflowTrigger(triggerId: string) {
   });
 }
 
+/** Toggle the test-submission listening window for a form node's public URL. */
+export function setFormTestListening(
+  workflowId: number,
+  body: { formPath: string; active: boolean },
+) {
+  return apiFetch<{ ok: boolean; active: boolean }>(
+    `/dashboard/build/workflows/${workflowId}/form-test-listen`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
 // --- Credential vault ---
 export type WorkflowCredentialType = "bearer" | "header" | "basic" | "query" | "none";
 

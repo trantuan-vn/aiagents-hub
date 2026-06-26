@@ -27,9 +27,11 @@ type WorkflowNodeConfigPanelProps = {
   edges?: Edge[];
   workflowId?: number;
   ownerId?: string;
+  listeningNodeId?: string | null;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
+  onStopListen?: () => void;
 };
 
 export function WorkflowNodeConfigPanel({
@@ -38,9 +40,11 @@ export function WorkflowNodeConfigPanel({
   edges = [],
   workflowId,
   ownerId,
+  listeningNodeId,
   onClose,
   onPatchData,
   onExecuteStep,
+  onStopListen,
 }: WorkflowNodeConfigPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const te = useTranslations("WorkflowEditorPage");
@@ -105,9 +109,11 @@ export function WorkflowNodeConfigPanel({
         edges={edges}
         workflowId={workflowId}
         ownerId={ownerId}
+        listeningNodeId={listeningNodeId}
         onClose={onClose}
         onPatchData={onPatchData}
         onExecuteStep={onExecuteStep}
+        onStopListen={onStopListen}
       />
     );
   }

@@ -5,11 +5,14 @@ import {
   broadcastFormSubmissionResult,
   findFormSubmissionNodeByPath,
   isFormSubmissionNode,
+  isFormTestListening,
   parseFormSubmissionRequest,
+  renderFormInactiveHtml,
   renderFormPageHtml,
   renderFormSuccessHtml,
   resolveNodeFormPath,
   runFormSubmissionTrigger,
+  setFormTestListening,
   type FormElementConfig,
   type FormSubmissionNodeData,
 } from '../triggers/form-submission.js';
@@ -118,6 +121,18 @@ async function handleFormRequest(
     return c.json({ error: ctx.error }, ctx.status);
   }
 
+  // A test URL is only valid while the editor is actively listening (mirrors
+  // n8n: press "Execute step" → form goes live → first submission consumes it).
+  if (mode === 'test') {
+    const listening = await isFormTestListening(c.env.NONCE_KV, ctx.ownerId, workflowId, ctx.formPath);
+    if (!listening) {
+      if (c.req.method === 'GET') {
+        return c.html(renderFormInactiveHtml('This test form is not currently active.'), 404);
+      }
+      return c.json({ error: 'Form test is not active' }, 404);
+    }
+  }
+
   const data = (ctx.node.data ?? {}) as FormSubmissionNodeData;
   const elements = Array.isArray(data.formElements) ? (data.formElements as FormElementConfig[]) : [];
   const origin = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
@@ -157,6 +172,11 @@ async function handleFormRequest(
     formUrl,
     executionMode: mode,
   });
+
+  // One-shot test submission: deactivate the test URL after a successful run.
+  if (mode === 'test') {
+    await setFormTestListening(c.env.NONCE_KV, ctx.ownerId, workflowId, ctx.formPath, false);
+  }
 
   const responseMode = String(data.formResponseMode ?? 'text');
   const responseText = String(data.formResponseText ?? 'Your response has been recorded.');
