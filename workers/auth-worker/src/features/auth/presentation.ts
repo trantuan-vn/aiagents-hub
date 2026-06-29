@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getCookie } from 'hono/cookie';  
+import { getCookie, deleteCookie } from 'hono/cookie';  
 import {
   handleError,
   parseBody,
@@ -220,6 +220,21 @@ export function createAuthRoutes(bindingName: string) {
   };
 
   // I. OAUTH Routes
+  /** Read + validate the post-login redirect cookie (first-party hosts only). */
+  const resolvePostLoginRedirect = (c: any): string | null => {
+    const raw = getCookie(c, 'post_login_redirect');
+    if (!raw) return null;
+    try {
+      const url = new URL(raw);
+      if ((url.protocol === 'https:' || url.protocol === 'http:') && url.hostname.endsWith('aiagents-hub.vn')) {
+        return url.toString();
+      }
+    } catch {
+      /* invalid */
+    }
+    return null;
+  };
+
   app.get('/oauth/:provider/url', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string) => {
     const provider = c.req.param('provider') as any;
     
@@ -336,6 +351,11 @@ export function createAuthRoutes(bindingName: string) {
 
     const { sessionId: newSessionId } = result as { sessionId: string };
     await cookieUtils.setSessionCookieWithConfig(c, newSessionId);
+    const postLoginRedirect = resolvePostLoginRedirect(c);
+    if (postLoginRedirect) {
+      deleteCookie(c, 'post_login_redirect', { path: '/', domain: '.aiagents-hub.vn' });
+      return c.redirect(postLoginRedirect);
+    }
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 

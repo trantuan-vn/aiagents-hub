@@ -68,6 +68,17 @@ export async function authMiddleware(req: NextRequest) {
 
   // Handle authenticated user trying to access login page
   if (isLoggedIn && pathname === "/auth/v3/login") {
+    const redirect = req.nextUrl.searchParams.get("redirect");
+    if (redirect) {
+      try {
+        const url = new URL(redirect);
+        if (url.hostname.endsWith("aiagents-hub.vn")) {
+          return NextResponse.redirect(url);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     return handleAuthenticatedLogin(req);
   }
 

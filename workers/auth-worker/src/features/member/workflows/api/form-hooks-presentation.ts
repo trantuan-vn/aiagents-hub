@@ -2,6 +2,13 @@ import { Hono } from 'hono';
 
 import { handleErrorWithoutIp } from '../../../../shared/utils';
 import {
+  buildHubLoginRedirectUrl,
+  handleBasicAuthLoginPost,
+  isFormAccessGranted,
+  normalizeFormAuth,
+  renderFormBasicLoginHtml,
+} from '../triggers/form-auth.js';
+import {
   broadcastFormSubmissionResult,
   findFormSubmissionNodeByPath,
   isFormSubmissionNode,
@@ -134,13 +141,61 @@ async function handleFormRequest(
   }
 
   const data = (ctx.node.data ?? {}) as FormSubmissionNodeData;
+  const formAuth = normalizeFormAuth(data.formAuth);
   const elements = Array.isArray(data.formElements) ? (data.formElements as FormElementConfig[]) : [];
   const origin = (c.env.BASE_URL as string) || new URL(c.req.url).origin;
   const actionUrl = buildFormActionUrl(origin, mode, workflowId, ctx.formPath, ctx.ownerId);
+  const formTitle = String(data.formTitle || data.label || 'Form');
+  const credentialKey = String(data.formCredentialKey ?? '');
+
+  // Basic-auth login POST (urlencoded only — multipart is always a form submission).
+  if (c.req.method === 'POST' && formAuth === 'basic') {
+    const contentType = c.req.header('content-type') ?? '';
+    if (contentType.includes('application/x-www-form-urlencoded')) {
+      const text = await c.req.text();
+      const params = new URLSearchParams(text);
+      if (params.get('_form_auth') === 'login') {
+        return handleBasicAuthLoginPost(c, bindingName, {
+          workflowId,
+          formPath: ctx.formPath,
+          ownerId: ctx.ownerId,
+          credentialKey,
+          returnUrl: actionUrl,
+          formTitle,
+          username: params.get('username') ?? '',
+          password: params.get('password') ?? '',
+        });
+      }
+    }
+  }
+
+  const accessGranted = await isFormAccessGranted(c, bindingName, {
+    formAuth,
+    workflowId,
+    formPath: ctx.formPath,
+    ownerId: ctx.ownerId,
+    credentialKey,
+  });
+
+  if (!accessGranted) {
+    if (formAuth === 'hub_users') {
+      const frontend = (c.env.FRONTEND_URL as string) || 'https://aiagents-hub.vn';
+      const loginUrl = buildHubLoginRedirectUrl(frontend, actionUrl);
+      return c.redirect(loginUrl, 302);
+    }
+    if (formAuth === 'basic') {
+      if (c.req.method === 'GET') {
+        return c.html(
+          renderFormBasicLoginHtml({ title: formTitle, actionUrl }),
+        );
+      }
+      return c.json({ error: 'Authentication required' }, 401);
+    }
+  }
 
   if (c.req.method === 'GET') {
     const html = renderFormPageHtml({
-      title: String(data.formTitle || data.label || 'Form'),
+      title: formTitle,
       description: String(data.formDescription ?? ''),
       elements,
       actionUrl,

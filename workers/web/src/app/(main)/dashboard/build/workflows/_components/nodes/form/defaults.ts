@@ -9,6 +9,7 @@ export function formTriggerDefaults(nodeId: string): Record<string, unknown> {
     triggerKind: "form",
     formPath: path,
     formAuth: "none",
+    formCredentialKey: "",
     formTitle: "",
     formDescription: "",
     formElements: elements,

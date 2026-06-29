@@ -308,6 +308,39 @@ function SmsDialogWithBackup({
   );
 }
 
+const POST_LOGIN_REDIRECT_COOKIE = "post_login_redirect";
+
+/** Only allow redirects back to first-party aiagents-hub.vn hosts. */
+function sanitizeHubRedirect(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if ((url.protocol === "https:" || url.protocol === "http:") && url.hostname.endsWith("aiagents-hub.vn")) {
+      return url.toString();
+    }
+  } catch {
+    /* invalid url */
+  }
+  return null;
+}
+
+function writePostLoginRedirectCookie(value: string): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${POST_LOGIN_REDIRECT_COOKIE}=${encodeURIComponent(value)}; path=/; domain=.aiagents-hub.vn; max-age=600; secure; samesite=lax`;
+}
+
+function readPostLoginRedirectCookie(): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${POST_LOGIN_REDIRECT_COOKIE}=([^;]*)`));
+  if (!match) return null;
+  return sanitizeHubRedirect(decodeURIComponent(match[1] ?? ""));
+}
+
+function clearPostLoginRedirectCookie(): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${POST_LOGIN_REDIRECT_COOKIE}=; path=/; domain=.aiagents-hub.vn; max-age=0`;
+}
+
 export function LoginForm() {
   const t = useTranslations("LoginForm");
   const locale = useLocale();
@@ -325,7 +358,25 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [passkeyStatus, setPasskeyStatus] = useState<{ enabled: boolean } | null>(null);
   const [usePasskeyMode, setUsePasskeyMode] = useState(false);
+  const redirectTarget = searchParams.get("redirect");
   const isMounted = useRef(true);
+
+  // Persist the post-login redirect so it survives OAuth round-trips and the
+  // TOTP/SMS step (which return to /auth/v3/login without the query param).
+  useEffect(() => {
+    const safe = sanitizeHubRedirect(redirectTarget);
+    if (safe) writePostLoginRedirectCookie(safe);
+  }, [redirectTarget]);
+
+  const navigateAfterLogin = useCallback(() => {
+    const target = sanitizeHubRedirect(redirectTarget) ?? readPostLoginRedirectCookie();
+    if (target) {
+      clearPostLoginRedirectCookie();
+      window.location.href = target;
+      return;
+    }
+    router.push("/dashboard");
+  }, [redirectTarget, router]);
 
   const language = locale.startsWith("vi") ? "vi" : "en";
 
@@ -469,7 +520,7 @@ export function LoginForm() {
         if (!verifyData.ok) throw new Error(t("passkey_error"));
 
         form.reset();
-        router.push("/dashboard");
+        navigateAfterLogin();
       } catch (error) {
         if (isMounted.current) {
           const msg = error instanceof Error ? error.message : t("passkey_error");
@@ -527,7 +578,7 @@ export function LoginForm() {
         } else if (response.ok) {
           setShowOtpPopup(false);
           form.reset();
-          router.push("/dashboard");
+          navigateAfterLogin();
         } else {
           throw new Error(
             formatAuthApiErrorMessage(data, t("otp_verify_error"), t, response.status),
@@ -562,7 +613,7 @@ export function LoginForm() {
         }
         setShowSmsPopup(false);
         form.reset();
-        router.push("/dashboard");
+        navigateAfterLogin();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("sms_verify_error"));
       } finally {
@@ -592,7 +643,7 @@ export function LoginForm() {
         }
         setShowTotpPopup(false);
         form.reset();
-        router.push("/dashboard");
+        navigateAfterLogin();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("totp_verify_error"));
       } finally {
@@ -625,7 +676,7 @@ export function LoginForm() {
       setShowSmsPopup(false);
       setBackupCode("");
       form.reset();
-      router.push("/dashboard");
+      navigateAfterLogin();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
     } finally {
@@ -685,7 +736,7 @@ export function LoginForm() {
         setShowRecoverSection(false);
         setRecoverBackupCode("");
         form.reset();
-        router.push("/dashboard");
+        navigateAfterLogin();
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
       } finally {

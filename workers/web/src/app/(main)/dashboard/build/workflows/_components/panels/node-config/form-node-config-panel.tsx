@@ -18,7 +18,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
-import { createWorkflowTrigger, listWorkflowTriggers } from "../../../_lib/api";
+import { createWorkflowTrigger, listWorkflowCredentials, listWorkflowTriggers, type WorkflowCredential } from "../../../_lib/api";
+import { FormBasicCredentialDialog } from "./form-credential-dialog";
 import { buildFormPublicUrl } from "./form-url";
 import { NodeMockOutputSection } from "./node-mock-output-section";
 
@@ -27,7 +28,7 @@ const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 const FORM_AUTH_OPTIONS = [
   { value: "none", labelKey: "form_auth_none" },
   { value: "basic", labelKey: "form_auth_basic" },
-  { value: "header", labelKey: "form_auth_header" },
+  { value: "hub_users", labelKey: "form_auth_hub_users" },
 ] as const;
 
 const FORM_ELEMENT_TYPES = [
@@ -123,7 +124,9 @@ export function FormNodeConfigPanel({
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
   const path = String(nodeData.formPath ?? defaultPath(node.id));
-  const auth = String(nodeData.formAuth ?? "none");
+  const rawAuth = String(nodeData.formAuth ?? "none");
+  const auth = rawAuth === "header" ? "hub_users" : rawAuth;
+  const formCredentialKey = String(nodeData.formCredentialKey ?? "");
   const formTitle = String(nodeData.formTitle ?? "");
   const formDescription = String(nodeData.formDescription ?? "");
   const respondWhen = String(nodeData.formRespondWhen ?? "form_submitted");
@@ -137,6 +140,8 @@ export function FormNodeConfigPanel({
   const [urlMode, setUrlMode] = useState<"test" | "production">("test");
   const [urlsOpen, setUrlsOpen] = useState(true);
   const [triggerOwnerId, setTriggerOwnerId] = useState<string | undefined>();
+  const [basicCredentials, setBasicCredentials] = useState<WorkflowCredential[]>([]);
+  const [credentialDialogOpen, setCredentialDialogOpen] = useState(false);
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
@@ -185,6 +190,18 @@ export function FormNodeConfigPanel({
       }
     })();
   }, [workflowId, node.id, path]);
+
+  useEffect(() => {
+    if (auth !== "basic") return;
+    void (async () => {
+      try {
+        const { credentials } = await listWorkflowCredentials();
+        setBasicCredentials(credentials.filter((c) => c.type === "basic"));
+      } catch {
+        setBasicCredentials([]);
+      }
+    })();
+  }, [auth]);
 
   const copyUrl = async () => {
     try {
@@ -341,7 +358,14 @@ export function FormNodeConfigPanel({
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs">{t("form_authentication")}</Label>
-                  <Select value={auth} onValueChange={(v) => patch({ formAuth: v })}>
+                  <Select
+                    value={auth}
+                    onValueChange={(v) => {
+                      const patchFields: Record<string, unknown> = { formAuth: v };
+                      if (v !== "basic") patchFields.formCredentialKey = "";
+                      patch(patchFields);
+                    }}
+                  >
                     <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
@@ -354,6 +378,48 @@ export function FormNodeConfigPanel({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {auth === "basic" ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("form_credential_for_basic")}</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={formCredentialKey || "__none__"}
+                        onValueChange={(v) =>
+                          patch({ formCredentialKey: v === "__none__" ? "" : v })
+                        }
+                      >
+                        <SelectTrigger className="h-9 flex-1">
+                          <SelectValue placeholder={t("form_credential_none_yet")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">{t("form_credential_none_yet")}</SelectItem>
+                          {basicCredentials.map((cred) => (
+                            <SelectItem key={cred.credentialKey} value={cred.credentialKey}>
+                              {cred.name}
+                              {cred.meta.username ? ` (${cred.meta.username})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 shrink-0 text-xs"
+                        onClick={() => setCredentialDialogOpen(true)}
+                      >
+                        {t("form_credential_setup")}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {auth === "hub_users" ? (
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    {t("form_auth_hub_users_hint")}
+                  </p>
+                ) : null}
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">{t("form_title")}</Label>
@@ -502,6 +568,27 @@ export function FormNodeConfigPanel({
           />
         </div>
       </div>
+      <FormBasicCredentialDialog
+        open={credentialDialogOpen}
+        onOpenChange={setCredentialDialogOpen}
+        onSaved={(credentialKey, name) => {
+          setBasicCredentials((prev) => {
+            const exists = prev.some((c) => c.credentialKey === credentialKey);
+            if (exists) return prev;
+            return [
+              {
+                id: Date.now(),
+                credentialKey,
+                name,
+                type: "basic",
+                meta: {},
+              },
+              ...prev,
+            ];
+          });
+          patch({ formCredentialKey: credentialKey });
+        }}
+      />
     </div>
   );
 }

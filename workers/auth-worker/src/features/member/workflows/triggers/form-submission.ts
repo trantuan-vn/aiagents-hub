@@ -20,6 +20,8 @@ export type FormSubmissionNodeData = {
   triggerKind?: string;
   formKind?: string;
   formPath?: string;
+  formAuth?: string;
+  formCredentialKey?: string;
   formTitle?: string;
   formDescription?: string;
   formElements?: FormElementConfig[];
