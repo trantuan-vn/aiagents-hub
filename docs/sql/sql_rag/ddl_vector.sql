@@ -66,73 +66,57 @@ CREATE TABLE RAG_QUERY_HISTORY (
 CREATE SEQUENCE SEQ_RAG_ERROR_LOG START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE SEQ_RAG_QUERY_ID START WITH 1 INCREMENT BY 1;
 
+-- 7. Bảng lưu thông tin AI models (nếu chưa có)
+-- Lưu ý: Bảng này có thể đã tồn tại trong hệ thống của bạn
+-- Nếu chưa có, bạn có thể tạo hoặc sử dụng bảng có sẵn
+-- CREATE TABLE USER_AI_MODELS (
+--     MODEL_NAME VARCHAR2(100) PRIMARY KEY,
+--     MODEL_TYPE VARCHAR2(50),
+--     CREATED_DATE DATE DEFAULT SYSDATE
+-- );
+
+-- 8. Tạo các index để tăng hiệu suất
+CREATE INDEX RAG_SCHEMA_VECTORS_IDX1 ON RAG_SCHEMA_VECTORS(OWNER, TABLE_NAME);
+CREATE INDEX RAG_QUERY_HISTORY_IDX1 ON RAG_QUERY_HISTORY(CREATED_DATE DESC);
+CREATE INDEX RAG_ERROR_LOG_IDX1 ON RAG_ERROR_LOG(CREATED_DATE DESC);
+
 -- =====================================================
--- 7. PACKAGE CHÍNH - PHIÊN BẢN ĐÃ VÁ LỖ HỔNG
+-- 9. PACKAGE CHÍNH - PHIÊN BẢN ĐÃ VÁ LỖ HỔNG
 -- =====================================================
+-- Package Specification
 CREATE OR REPLACE PACKAGE RAG_VECTOR_SEARCH AS
-    
-    -- =============================================
-    -- CÁC HÀM CORE
-    -- =============================================
-    
-    -- Kiểm tra model tồn tại (MỚI)
+    -- Model Management
     FUNCTION is_model_available RETURN BOOLEAN;
-    
-    -- Lấy danh sách model (MỚI)
     FUNCTION get_available_models RETURN SYS_REFCURSOR;
     
-    -- Tạo vector embedding với kiểm tra model (ĐÃ SỬA)
+    -- Embedding Functions
     FUNCTION create_schema_embedding(p_schema_text IN CLOB) RETURN VECTOR;
-    
-    -- Tạo vector embedding cho câu hỏi với kiểm tra model (ĐÃ SỬA)
     FUNCTION create_question_embedding(p_question IN VARCHAR2) RETURN VECTOR;
     
-    -- =============================================
-    -- CÁC HÀM EXPORT SCHEMA (ĐÃ SỬA)
-    -- =============================================
-    
-    -- Export schema thành text (có comment) (ĐÃ SỬA)
+    -- Schema Export Functions
+    FUNCTION get_columns(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN SYS_REFCURSOR;
+    FUNCTION get_primary_key(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
+    FUNCTION get_foreign_keys(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
+    FUNCTION get_table_comments(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
     FUNCTION export_schema_to_text(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
     
-    -- Export một schema cụ thể (ĐÃ SỬA)
+    -- Vector Search Functions
+    FUNCTION find_relevant_schemas(p_question IN VARCHAR2, p_top_k IN NUMBER DEFAULT 3) RETURN SYS_REFCURSOR;
+    FUNCTION get_relevant_context(p_question IN VARCHAR2, p_top_k IN NUMBER DEFAULT 3) RETURN CLOB;
+    
+    -- Export Procedures
     PROCEDURE export_schema_to_vector(p_table_name IN VARCHAR2, p_owner IN VARCHAR2 DEFAULT USER);
-    
-    -- Export toàn bộ schema (ĐÃ SỬA)
     PROCEDURE export_all_schemas_to_vector(p_owner IN VARCHAR2 DEFAULT USER);
-    
-    -- Xóa schema (ĐÃ SỬA)
     PROCEDURE remove_schema_from_vector(p_table_name IN VARCHAR2, p_owner IN VARCHAR2 DEFAULT USER);
-    
-    -- Xóa tất cả schema (MỚI)
     PROCEDURE clear_all_vectors;
     
-    -- =============================================
-    -- CÁC HÀM VECTOR SEARCH (ĐÃ SỬA)
-    -- =============================================
+    -- Regenerate Embeddings
+    PROCEDURE regenerate_all_embeddings(p_owner IN VARCHAR2 DEFAULT USER);
     
-    -- Tìm schema liên quan nhất (ĐÃ SỬA)
-    FUNCTION find_relevant_schemas(
-        p_question IN VARCHAR2,
-        p_top_k IN NUMBER DEFAULT 3
-    ) RETURN SYS_REFCURSOR;
+    -- Context Building
+    FUNCTION build_rag_context(p_question IN VARCHAR2, p_top_k IN NUMBER DEFAULT 3) RETURN CLOB;
     
-    -- Tự động phát hiện schema (ĐÃ SỬA)
-    FUNCTION get_relevant_context(
-        p_question IN VARCHAR2,
-        p_top_k IN NUMBER DEFAULT 3
-    ) RETURN CLOB;
-    
-    -- Xây dựng context cho LLM (ĐÃ SỬA)
-    FUNCTION build_rag_context(
-        p_question IN VARCHAR2,
-        p_top_k IN NUMBER DEFAULT 3
-    ) RETURN CLOB;
-    
-    -- =============================================
-    -- CÁC PROCEDURE TIỆN ÍCH (MỚI)
-    -- =============================================
-    
-    -- Lưu lịch sử (ĐÃ SỬA)
+    -- Query History
     PROCEDURE save_query_history(
         p_question IN VARCHAR2,
         p_detected_tables IN VARCHAR2 DEFAULT NULL,
@@ -141,23 +125,13 @@ CREATE OR REPLACE PACKAGE RAG_VECTOR_SEARCH AS
         p_response_time IN NUMBER DEFAULT NULL
     );
     
-    -- Ghi log lỗi (MỚI)
-    PROCEDURE log_error(
-        p_procedure_name IN VARCHAR2,
-        p_table_name IN VARCHAR2 DEFAULT NULL,
-        p_error_message IN CLOB,
-        p_error_stack IN CLOB DEFAULT NULL
-    );
-    
-    -- Kiểm tra trạng thái vector (MỚI)
+    -- Status Function
     FUNCTION get_vector_status RETURN SYS_REFCURSOR;
-    
-    -- Tái tạo embedding cho tất cả (MỚI)
-    PROCEDURE regenerate_all_embeddings(p_owner IN VARCHAR2 DEFAULT USER);
     
 END RAG_VECTOR_SEARCH;
 /
 
+-- Package Body
 CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
 
     -- =============================================
@@ -167,13 +141,14 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     PROCEDURE log_error(
         p_procedure_name IN VARCHAR2,
         p_table_name IN VARCHAR2 DEFAULT NULL,
-        p_error_message IN CLOB,
-        p_error_stack IN CLOB DEFAULT NULL
+        p_error_message IN VARCHAR2,
+        p_error_stack IN VARCHAR2 DEFAULT NULL
     ) IS
         PRAGMA AUTONOMOUS_TRANSACTION;
         v_error_id VARCHAR2(50);
+        v_error_msg VARCHAR2(4000);
     BEGIN
-        v_error_id := 'ERR_' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') || '_' || LPAD(SEQ_RAG_ERROR_LOG.NEXTVAL, 4, '0');
+        v_error_id := 'ERR_' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') || '_' || LPAD(TO_CHAR(SEQ_RAG_ERROR_LOG.NEXTVAL), 4, '0');
         
         INSERT INTO RAG_ERROR_LOG (
             ERROR_ID,
@@ -205,7 +180,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_count NUMBER;
     BEGIN
         SELECT COUNT(*) INTO v_count 
-        FROM USER_AI_MODELS 
+        FROM USER_MINING_MODELS 
         WHERE MODEL_NAME = 'ALL_MINILM_L12_V2';
         
         RETURN v_count > 0;
@@ -218,19 +193,20 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_cursor SYS_REFCURSOR;
     BEGIN
         OPEN v_cursor FOR
-            SELECT MODEL_NAME, MODEL_TYPE, CREATED_DATE
-            FROM USER_AI_MODELS
-            ORDER BY CREATED_DATE DESC;
+            SELECT MODEL_NAME, MINING_FUNCTION, CREATION_DATE 
+            FROM USER_MINING_MODELS
+            ORDER BY CREATION_DATE  DESC;
         RETURN v_cursor;
     END get_available_models;
 
     -- =============================================
-    -- EMBEDDING FUNCTIONS (ĐÃ SỬA)
+    -- EMBEDDING FUNCTIONS
     -- =============================================
     
     FUNCTION create_schema_embedding(p_schema_text IN CLOB) RETURN VECTOR IS
         v_vector VECTOR;
         v_model_exists BOOLEAN;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         -- Kiểm tra model tồn tại
         v_model_exists := is_model_available;
@@ -240,7 +216,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
                 'CREATE_SCHEMA_EMBEDDING',
                 NULL,
                 'Model ALL_MINILM_L12_V2 not found. Please import model first.',
-                DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+                DBMS_UTILITY.FORMAT_ERROR_BACKTRACE()
             );
             RETURN NULL;
         END IF;
@@ -257,11 +233,12 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             RETURN v_vector;
         EXCEPTION
             WHEN OTHERS THEN
+                v_error_msg := SQLERRM;
                 log_error(
                     'CREATE_SCHEMA_EMBEDDING',
                     NULL,
-                    'Error creating embedding: ' || SQLERRM,
-                    DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+                    'Error creating embedding: ' || v_error_msg,
+                    DBMS_UTILITY.FORMAT_ERROR_BACKTRACE()
                 );
                 RETURN NULL;
         END;
@@ -270,6 +247,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     FUNCTION create_question_embedding(p_question IN VARCHAR2) RETURN VECTOR IS
         v_vector VECTOR;
         v_model_exists BOOLEAN;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         v_model_exists := is_model_available;
         
@@ -278,7 +256,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
                 'CREATE_QUESTION_EMBEDDING',
                 NULL,
                 'Model ALL_MINILM_L12_V2 not found. Please import model first.',
-                DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+                DBMS_UTILITY.FORMAT_ERROR_BACKTRACE()
             );
             RETURN NULL;
         END IF;
@@ -294,22 +272,24 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             RETURN v_vector;
         EXCEPTION
             WHEN OTHERS THEN
+                v_error_msg := SQLERRM;
                 log_error(
                     'CREATE_QUESTION_EMBEDDING',
                     NULL,
-                    'Error creating embedding: ' || SQLERRM,
-                    DBMS_UTILITY.FORMAT_ERROR_BACKTRACE
+                    'Error creating embedding: ' || v_error_msg,
+                    DBMS_UTILITY.FORMAT_ERROR_BACKTRACE()
                 );
                 RETURN NULL;
         END;
     END create_question_embedding;
 
     -- =============================================
-    -- SCHEMA EXPORT FUNCTIONS (ĐÃ SỬA)
+    -- SCHEMA EXPORT FUNCTIONS
     -- =============================================
     
     FUNCTION get_columns(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN SYS_REFCURSOR IS
         v_cursor SYS_REFCURSOR;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         OPEN v_cursor FOR
             SELECT 
@@ -327,12 +307,14 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_cursor;
     EXCEPTION
         WHEN OTHERS THEN
-            log_error('GET_COLUMNS', p_table_name, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            v_error_msg := SQLERRM;
+            log_error('GET_COLUMNS', p_table_name, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
             RETURN NULL;
     END get_columns;
 
     FUNCTION get_primary_key(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB IS
         v_pk CLOB;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_pk, TRUE);
         
@@ -352,13 +334,14 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             DBMS_LOB.WRITEAPPEND(v_pk, LENGTH(rec.COLUMN_NAME), rec.COLUMN_NAME);
         END LOOP;
         
-        IF DBMS_LOB.GETLENGTH(v_pk) = 0 THEN
+        IF NVL(DBMS_LOB.GETLENGTH(v_pk), 0) = 0 THEN
             DBMS_LOB.WRITEAPPEND(v_pk, 15, 'No primary key');
         END IF;
         
         RETURN v_pk;
     EXCEPTION
         WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
             DBMS_LOB.CREATETEMPORARY(v_pk, TRUE);
             DBMS_LOB.WRITEAPPEND(v_pk, 15, 'No primary key');
             RETURN v_pk;
@@ -366,6 +349,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
 
     FUNCTION get_foreign_keys(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB IS
         v_fk CLOB;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_fk, TRUE);
         
@@ -381,28 +365,30 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             AND A.POSITION = B.POSITION
             ORDER BY A.POSITION
         ) LOOP
-            IF DBMS_LOB.GETLENGTH(v_fk) > 0 THEN
+            IF NVL(DBMS_LOB.GETLENGTH(v_fk), 0) > 0 THEN
                 DBMS_LOB.WRITEAPPEND(v_fk, 2, '; ');
             END IF;
             DBMS_LOB.WRITEAPPEND(v_fk, LENGTH(rec.fk_info), rec.fk_info);
         END LOOP;
         
-        IF DBMS_LOB.GETLENGTH(v_fk) = 0 THEN
+        IF NVL(DBMS_LOB.GETLENGTH(v_fk), 0) = 0 THEN
             DBMS_LOB.WRITEAPPEND(v_fk, 15, 'No foreign keys');
         END IF;
         
         RETURN v_fk;
     EXCEPTION
         WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
             DBMS_LOB.CREATETEMPORARY(v_fk, TRUE);
             DBMS_LOB.WRITEAPPEND(v_fk, 22, 'Error getting foreign keys');
             RETURN v_fk;
     END get_foreign_keys;
 
-    -- Lấy comments của table và columns (MỚI)
+    -- Lấy comments của table và columns
     FUNCTION get_table_comments(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB IS
         v_comments CLOB;
         v_comment VARCHAR2(4000);
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_comments, TRUE);
         
@@ -429,7 +415,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             WHERE TABLE_NAME = UPPER(p_table_name)
             AND OWNER = UPPER(p_owner)
             AND COMMENTS IS NOT NULL
-            ORDER BY COLUMN_ID
+            ORDER BY COLUMN_NAME
         ) LOOP
             DBMS_LOB.WRITEAPPEND(v_comments, 
                 LENGTH('  - ' || rec.COLUMN_NAME || ': ' || rec.COMMENTS || CHR(10)),
@@ -439,6 +425,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_comments;
     EXCEPTION
         WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
             RETURN NULL;
     END get_table_comments;
 
@@ -456,6 +443,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_pk CLOB;
         v_fk CLOB;
         v_comments CLOB;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
         
@@ -483,7 +471,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         
         -- Comments
         v_comments := get_table_comments(p_table_name, p_owner);
-        IF DBMS_LOB.GETLENGTH(v_comments) > 0 THEN
+        IF NVL(DBMS_LOB.GETLENGTH(v_comments), 0) > 0 THEN
             v_line := 'Comments:' || CHR(10);
             DBMS_LOB.WRITEAPPEND(v_result, LENGTH(v_line), v_line);
             DBMS_LOB.APPEND(v_result, v_comments);
@@ -518,12 +506,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_result;
     EXCEPTION
         WHEN OTHERS THEN
-            log_error('EXPORT_SCHEMA_TO_TEXT', p_table_name, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            v_error_msg := SQLERRM;
+            log_error('EXPORT_SCHEMA_TO_TEXT', p_table_name, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
             RETURN NULL;
     END export_schema_to_text;
 
     -- =============================================
-    -- VECTOR SEARCH FUNCTIONS (ĐÃ SỬA)
+    -- VECTOR SEARCH FUNCTIONS
     -- =============================================
     
     FUNCTION find_relevant_schemas(
@@ -533,11 +522,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_cursor SYS_REFCURSOR;
         v_question_vector VECTOR;
         v_model_exists BOOLEAN;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         -- Kiểm tra model
         v_model_exists := is_model_available;
         IF NOT v_model_exists THEN
-            log_error('FIND_RELEVANT_SCHEMAS', NULL, 'Model not available');
+            v_error_msg := 'Model not available';
+            log_error('FIND_RELEVANT_SCHEMAS', NULL, v_error_msg);
             OPEN v_cursor FOR SELECT 'Model not available' AS ERROR FROM DUAL;
             RETURN v_cursor;
         END IF;
@@ -563,8 +554,9 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_cursor;
     EXCEPTION
         WHEN OTHERS THEN
-            log_error('FIND_RELEVANT_SCHEMAS', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            OPEN v_cursor FOR SELECT SQLERRM AS ERROR FROM DUAL;
+            v_error_msg := SQLERRM;
+            log_error('FIND_RELEVANT_SCHEMAS', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            OPEN v_cursor FOR SELECT v_error_msg AS ERROR FROM DUAL;
             RETURN v_cursor;
     END find_relevant_schemas;
 
@@ -579,6 +571,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_schema_text CLOB;
         v_distance NUMBER;
         v_count NUMBER := 0;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
         
@@ -608,12 +601,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_result;
     EXCEPTION
         WHEN OTHERS THEN
-            log_error('GET_RELEVANT_CONTEXT', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            RETURN 'Error getting context: ' || SQLERRM;
+            v_error_msg := SQLERRM;
+            log_error('GET_RELEVANT_CONTEXT', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            RETURN 'Error getting context: ' || v_error_msg;
     END get_relevant_context;
 
     -- =============================================
-    -- EXPORT PROCEDURES (ĐÃ SỬA)
+    -- EXPORT PROCEDURES
     -- =============================================
     
     PROCEDURE export_schema_to_vector(
@@ -625,12 +619,8 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_table_upper VARCHAR2(100) := UPPER(p_table_name);
         v_owner_upper VARCHAR2(100) := UPPER(p_owner);
         v_exists NUMBER;
-        v_error_msg CLOB;
-        v_savepoint VARCHAR2(30);
+        v_error_msg VARCHAR2(4000);
     BEGIN
-        v_savepoint := 'SP_' || REPLACE(v_table_upper, '$', '_') || '_' || TO_CHAR(SYSDATE, 'HH24MISS');
-        SAVEPOINT &v_savepoint; -- Ghi chú: Không dùng dynamic SAVEPOINT, chỉ dùng trong code thực tế
-        
         -- Kiểm tra table tồn tại
         SELECT COUNT(*) INTO v_exists 
         FROM ALL_TABLES 
@@ -638,14 +628,16 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         AND OWNER = v_owner_upper;
         
         IF v_exists = 0 THEN
-            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, 'Table does not exist');
+            v_error_msg := 'Table does not exist';
+            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg);
             DBMS_OUTPUT.PUT_LINE('❌ Table ' || v_table_upper || ' does not exist');
             RETURN;
         END IF;
         
         -- Kiểm tra model
         IF NOT is_model_available THEN
-            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, 'Model ALL_MINILM_L12_V2 not available');
+            v_error_msg := 'Model ALL_MINILM_L12_V2 not available';
+            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg);
             DBMS_OUTPUT.PUT_LINE('❌ Model not available. Please import model first.');
             RETURN;
         END IF;
@@ -654,7 +646,8 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_schema_text := export_schema_to_text(v_table_upper, v_owner_upper);
         
         IF v_schema_text IS NULL THEN
-            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, 'Failed to export schema text');
+            v_error_msg := 'Failed to export schema text';
+            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg);
             DBMS_OUTPUT.PUT_LINE('❌ Failed to export schema text for ' || v_table_upper);
             RETURN;
         END IF;
@@ -663,7 +656,8 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_embedding := create_schema_embedding(v_schema_text);
         
         IF v_embedding IS NULL THEN
-            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, 'Failed to create embedding');
+            v_error_msg := 'Failed to create embedding';
+            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg);
             DBMS_OUTPUT.PUT_LINE('❌ Failed to create embedding for ' || v_table_upper);
             RETURN;
         END IF;
@@ -694,7 +688,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         WHEN OTHERS THEN
             ROLLBACK;
             v_error_msg := SQLERRM;
-            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            log_error('EXPORT_SCHEMA_TO_VECTOR', p_table_name, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
             DBMS_OUTPUT.PUT_LINE('❌ Error exporting ' || v_table_upper || ': ' || v_error_msg);
     END export_schema_to_vector;
 
@@ -703,6 +697,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_error_count NUMBER := 0;
         v_start_time NUMBER := DBMS_UTILITY.GET_TIME;
         v_owner_upper VARCHAR2(100) := UPPER(p_owner);
+        v_error_msg VARCHAR2(4000);
         
         CURSOR c_tables IS
             SELECT TABLE_NAME 
@@ -714,8 +709,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             AND TABLE_NAME NOT LIKE '%VIEW%'
             AND TABLE_NAME NOT LIKE '%HISTORY%'
             AND TABLE_NAME NOT LIKE '%LOG%'
-            AND TABLE_NAME NOT LIKE 'DBTOOLS$%'
-            AND TABLE_NAME NOT LIKE 'DR$%'
+            AND TABLE_NAME NOT LIKE '%$%'
             AND TABLE_NAME NOT LIKE 'MVIEW%'
             AND TABLE_NAME NOT LIKE 'PLAN_TABLE%'
             ORDER BY TABLE_NAME;
@@ -725,8 +719,9 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         
         -- Kiểm tra model trước
         IF NOT is_model_available THEN
-            DBMS_OUTPUT.PUT_LINE('❌ Model ALL_MINILM_L12_V2 not available. Cannot proceed.');
-            log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', NULL, 'Model not available');
+            v_error_msg := 'Model ALL_MINILM_L12_V2 not available. Cannot proceed.';
+            DBMS_OUTPUT.PUT_LINE('❌ ' || v_error_msg);
+            log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', NULL, v_error_msg);
             RETURN;
         END IF;
         
@@ -746,8 +741,9 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             EXCEPTION
                 WHEN OTHERS THEN
                     v_error_count := v_error_count + 1;
-                    log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', t.TABLE_NAME, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-                    DBMS_OUTPUT.PUT_LINE('❌ Error processing ' || t.TABLE_NAME || ': ' || SQLERRM);
+                    v_error_msg := SQLERRM;
+                    log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', t.TABLE_NAME, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+                    DBMS_OUTPUT.PUT_LINE('❌ Error processing ' || t.TABLE_NAME || ': ' || v_error_msg);
                     -- Rollback chỉ bảng này
                     ROLLBACK;
             END;
@@ -765,14 +761,16 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
-            log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            DBMS_OUTPUT.PUT_LINE('❌ Fatal error: ' || SQLERRM);
+            v_error_msg := SQLERRM;
+            log_error('EXPORT_ALL_SCHEMAS_TO_VECTOR', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            DBMS_OUTPUT.PUT_LINE('❌ Fatal error: ' || v_error_msg);
     END export_all_schemas_to_vector;
 
     PROCEDURE remove_schema_from_vector(
         p_table_name IN VARCHAR2,
         p_owner IN VARCHAR2 DEFAULT USER
     ) IS
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DELETE FROM RAG_SCHEMA_VECTORS 
         WHERE TABLE_NAME = UPPER(p_table_name) 
@@ -783,11 +781,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
-            log_error('REMOVE_SCHEMA_FROM_VECTOR', p_table_name, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            DBMS_OUTPUT.PUT_LINE('❌ Error removing ' || UPPER(p_table_name) || ': ' || SQLERRM);
+            v_error_msg := SQLERRM;
+            log_error('REMOVE_SCHEMA_FROM_VECTOR', p_table_name, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            DBMS_OUTPUT.PUT_LINE('❌ Error removing ' || UPPER(p_table_name) || ': ' || v_error_msg);
     END remove_schema_from_vector;
 
     PROCEDURE clear_all_vectors IS
+        v_error_msg VARCHAR2(4000);
     BEGIN
         DELETE FROM RAG_SCHEMA_VECTORS;
         COMMIT;
@@ -795,16 +795,18 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
-            log_error('CLEAR_ALL_VECTORS', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            DBMS_OUTPUT.PUT_LINE('❌ Error clearing vectors: ' || SQLERRM);
+            v_error_msg := SQLERRM;
+            log_error('CLEAR_ALL_VECTORS', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            DBMS_OUTPUT.PUT_LINE('❌ Error clearing vectors: ' || v_error_msg);
     END clear_all_vectors;
 
     -- =============================================
-    -- REGENERATE EMBEDDINGS (MỚI)
+    -- REGENERATE EMBEDDINGS
     -- =============================================
     
     PROCEDURE regenerate_all_embeddings(p_owner IN VARCHAR2 DEFAULT USER) IS
         v_count NUMBER := 0;
+        v_error_msg VARCHAR2(4000);
         CURSOR c_vectors IS
             SELECT TABLE_NAME, OWNER, SCHEMA_TEXT
             FROM RAG_SCHEMA_VECTORS
@@ -827,16 +829,22 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
                 END IF;
             EXCEPTION
                 WHEN OTHERS THEN
-                    log_error('REGENERATE_ALL_EMBEDDINGS', rec.TABLE_NAME, SQLERRM);
+                    v_error_msg := SQLERRM;
+                    log_error('REGENERATE_ALL_EMBEDDINGS', rec.TABLE_NAME, v_error_msg);
             END;
         END LOOP;
         
         COMMIT;
         DBMS_OUTPUT.PUT_LINE('✅ Regenerated ' || v_count || ' embeddings');
+    EXCEPTION
+        WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
+            log_error('REGENERATE_ALL_EMBEDDINGS', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            DBMS_OUTPUT.PUT_LINE('❌ Error regenerating embeddings: ' || v_error_msg);
     END regenerate_all_embeddings;
 
     -- =============================================
-    -- CONTEXT BUILDING (ĐÃ SỬA)
+    -- CONTEXT BUILDING
     -- =============================================
     
     FUNCTION build_rag_context(
@@ -848,12 +856,15 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_start_time NUMBER := DBMS_UTILITY.GET_TIME;
         v_response_time NUMBER;
         v_tables CLOB;
+        v_error_msg VARCHAR2(4000);
+        v_instructions VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
         
         -- Header
-        DBMS_LOB.WRITEAPPEND(v_result, 100, 
-            '# RAG SQL Generation Context' || CHR(10) || CHR(10));
+        DBMS_LOB.WRITEAPPEND(v_result, 
+            LENGTH('# RAG SQL Generation Context' || CHR(10) || CHR(10)),
+            '# RAG SQL Generation Context' || CHR(10) || CHR(10));            
         
         -- User question
         DBMS_LOB.WRITEAPPEND(v_result, LENGTH('## User Question' || CHR(10) || CHR(10)),
@@ -869,7 +880,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         DBMS_LOB.APPEND(v_result, v_relevant_context);
         
         -- Instructions
-        DBMS_LOB.WRITEAPPEND(v_result, 700,
+        v_instructions := 
             CHR(10) || '## SQL Generation Instructions' || CHR(10) || CHR(10) ||
             'Based on the above schema information, generate Oracle SQL query for the user question.' || CHR(10) ||
             'Important:' || CHR(10) ||
@@ -880,8 +891,8 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             '5. Use column names exactly as shown in schema' || CHR(10) ||
             '6. Consider table relationships (foreign keys)' || CHR(10) ||
             '7. Use ROWNUM or FETCH FIRST for pagination' || CHR(10) ||
-            '8. Handle NULL values appropriately' || CHR(10)
-        );
+            '8. Handle NULL values appropriately' || CHR(10);        
+        DBMS_LOB.WRITEAPPEND(v_result, LENGTH(v_instructions), v_instructions);            
         
         -- Tính response time
         v_response_time := (DBMS_UTILITY.GET_TIME - v_start_time) / 100;
@@ -896,12 +907,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         RETURN v_result;
     EXCEPTION
         WHEN OTHERS THEN
-            log_error('BUILD_RAG_CONTEXT', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
-            RETURN 'Error building context: ' || SQLERRM;
+            v_error_msg := SQLERRM;
+            log_error('BUILD_RAG_CONTEXT', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            RETURN 'Error building context: ' || v_error_msg;
     END build_rag_context;
 
     -- =============================================
-    -- QUERY HISTORY (ĐÃ SỬA)
+    -- QUERY HISTORY
     -- =============================================
     
     PROCEDURE save_query_history(
@@ -913,9 +925,10 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     ) IS
         PRAGMA AUTONOMOUS_TRANSACTION;
         v_query_id VARCHAR2(50);
+        v_error_msg VARCHAR2(4000);
     BEGIN
         v_query_id := 'Q' || TO_CHAR(SYSDATE, 'YYYYMMDDHH24MISS') || 
-                      '_' || LPAD(SEQ_RAG_QUERY_ID.NEXTVAL, 4, '0');
+                      '_' || LPAD(TO_CHAR(SEQ_RAG_QUERY_ID.NEXTVAL), 4, '0');
         
         INSERT INTO RAG_QUERY_HISTORY (
             QUERY_ID,
@@ -939,15 +952,17 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
     EXCEPTION
         WHEN OTHERS THEN
             ROLLBACK;
-            log_error('SAVE_QUERY_HISTORY', NULL, SQLERRM, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+            v_error_msg := SQLERRM;
+            log_error('SAVE_QUERY_HISTORY', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
     END save_query_history;
 
     -- =============================================
-    -- STATUS FUNCTION (MỚI)
+    -- STATUS FUNCTION
     -- =============================================
     
     FUNCTION get_vector_status RETURN SYS_REFCURSOR IS
         v_cursor SYS_REFCURSOR;
+        v_error_msg VARCHAR2(4000);
     BEGIN
         OPEN v_cursor FOR
             SELECT 
@@ -967,13 +982,18 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             FROM RAG_SCHEMA_VECTORS
             ORDER BY OWNER, TABLE_NAME;
         RETURN v_cursor;
+    EXCEPTION
+        WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
+            log_error('GET_VECTOR_STATUS', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            RETURN NULL;
     END get_vector_status;
 
 END RAG_VECTOR_SEARCH;
 /
 
 -- =====================================================
--- 8. TẠO VIEW TRẠNG THÁI
+-- 10. TẠO VIEW TRẠNG THÁI
 -- =====================================================
 
 CREATE OR REPLACE VIEW V_RAG_VECTOR_STATUS AS
@@ -993,9 +1013,9 @@ SELECT
     UPDATED_DATE
 FROM RAG_SCHEMA_VECTORS
 ORDER BY OWNER, TABLE_NAME;
-
+/
 -- =====================================================
--- 9. VIEW LỖI (MỚI)
+-- 11. VIEW LỖI (MỚI)
 -- =====================================================
 
 CREATE OR REPLACE VIEW V_RAG_ERRORS AS
@@ -1008,21 +1028,19 @@ SELECT
 FROM RAG_ERROR_LOG
 ORDER BY CREATED_DATE DESC
 FETCH FIRST 100 ROWS ONLY;
-
+/
 -- =====================================================
--- 10. VIEW MODEL STATUS (MỚI)
+-- 12. VIEW MODEL STATUS (MỚI)
 -- =====================================================
 
 CREATE OR REPLACE VIEW V_RAG_MODEL_STATUS AS
 SELECT 
-    MODEL_NAME,
-    MODEL_TYPE,
-    CREATED_DATE
-FROM USER_AI_MODELS
-ORDER BY CREATED_DATE DESC;
-
+    MODEL_NAME, ALGORITHM, MINING_FUNCTION, CREATION_DATE
+FROM USER_MINING_MODELS
+ORDER BY CREATION_DATE DESC;
+/
 -- =====================================================
--- 11. PROCEDURE TEST (ĐÃ SỬA)
+-- 13. PROCEDURE TEST (ĐÃ SỬA)
 -- =====================================================
 
 CREATE OR REPLACE PROCEDURE test_vector_search(p_question IN VARCHAR2) IS
@@ -1072,9 +1090,9 @@ EXCEPTION
             CLOSE v_cursor;
         END IF;
 END test_vector_search;
-
+/
 -- =====================================================
--- 12. PROCEDURE KIỂM TRA TÍNH TOÀN VẸN (MỚI)
+-- 14. PROCEDURE KIỂM TRA TÍNH TOÀN VẸN (MỚI)
 -- =====================================================
 
 CREATE OR REPLACE PROCEDURE validate_rag_system IS
@@ -1126,10 +1144,10 @@ BEGIN
     
     DBMS_OUTPUT.PUT_LINE('========================================');
 END validate_rag_system;
-/
+
 
 -- =====================================================
--- 13. GRANT PERMISSIONS (THÊM NẾU CẦN)
+-- 15. GRANT PERMISSIONS (THÊM NẾU CẦN)
 -- =====================================================
 
 /*
@@ -1141,7 +1159,29 @@ GRANT SELECT ON V_RAG_MODEL_STATUS TO APP_USER;
 */
 
 -- =====================================================
--- 14. HƯỚNG DẪN SỬ DỤNG
+-- 16. LOAD MODEL
+-- =====================================================
+BEGIN
+    -- ADB có sẵn thư mục DATA_PUMP_DIR, không cần tạo directory riêng
+    DBMS_CLOUD.GET_OBJECT(
+        credential_name => NULL,   -- NULL vì đây là public PAR link
+        directory_name  => 'DATA_PUMP_DIR',
+        object_uri      => 'https://adwc4pm.objectstorage.us-ashburn-1.oci.customer-oci.com/p/eLddQappgBJ7jNi6Guz9m9LOtYe2u8LWY19GfgU8flFK4N9YgP4kTlrE9Px3pE12/n/adwc4pm/b/OML-Resources/o/all_MiniLM_L12_v2.onnx'
+    );
+END;
+/
+
+BEGIN
+    DBMS_VECTOR.LOAD_ONNX_MODEL(
+        directory  => 'DATA_PUMP_DIR',
+        file_name  => 'all_MiniLM_L12_v2.onnx',
+        model_name => 'ALL_MINILM_L12_V2'
+    );
+END;
+/
+
+-- =====================================================
+-- 17. HƯỚNG DẪN SỬ DỤNG
 -- =====================================================
 
 /*
@@ -1154,10 +1194,10 @@ GRANT SELECT ON V_RAG_MODEL_STATUS TO APP_USER;
    
    -- Kiểm tra model đã import:
    SELECT * FROM V_RAG_MODEL_STATUS;
-   
+
    -- Hoặc dùng:
    SELECT RAG_VECTOR_SEARCH.is_model_available FROM DUAL;
-
+   
 2. 📦 BƯỚC 2: EXPORT SCHEMAS
    ---------------------------
    -- Export tất cả schemas của current user:
@@ -1234,4 +1274,14 @@ DROP PROCEDURE test_vector_search;
 DROP PROCEDURE validate_rag_system;
 DROP SEQUENCE SEQ_RAG_ERROR_LOG;
 DROP SEQUENCE SEQ_RAG_QUERY_ID;
+
+BEGIN
+    -- Xoá model cũ nếu có (tránh lỗi trùng tên)
+    DBMS_VECTOR.DROP_ONNX_MODEL(
+        model_name => 'ALL_MINILM_L12_V2',
+        force      => TRUE
+    );
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+
 */
