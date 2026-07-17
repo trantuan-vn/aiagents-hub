@@ -66,19 +66,104 @@ CREATE TABLE RAG_QUERY_HISTORY (
 CREATE SEQUENCE SEQ_RAG_ERROR_LOG START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE SEQ_RAG_QUERY_ID START WITH 1 INCREMENT BY 1;
 
--- 7. Bảng lưu thông tin AI models (nếu chưa có)
--- Lưu ý: Bảng này có thể đã tồn tại trong hệ thống của bạn
--- Nếu chưa có, bạn có thể tạo hoặc sử dụng bảng có sẵn
--- CREATE TABLE USER_AI_MODELS (
---     MODEL_NAME VARCHAR2(100) PRIMARY KEY,
---     MODEL_TYPE VARCHAR2(50),
---     CREATED_DATE DATE DEFAULT SYSDATE
--- );
-
--- 8. Tạo các index để tăng hiệu suất
+-- 7. Tạo các index để tăng hiệu suất
 CREATE INDEX RAG_SCHEMA_VECTORS_IDX1 ON RAG_SCHEMA_VECTORS(OWNER, TABLE_NAME);
 CREATE INDEX RAG_QUERY_HISTORY_IDX1 ON RAG_QUERY_HISTORY(CREATED_DATE DESC);
 CREATE INDEX RAG_ERROR_LOG_IDX1 ON RAG_ERROR_LOG(CREATED_DATE DESC);
+
+-- =====================================================
+-- 8. TẠO HÀM GET_RELATED_TABLES (ĐỘC LẬP BÊN NGOÀI PACKAGE)
+-- =====================================================
+CREATE OR REPLACE FUNCTION get_related_tables(p_table_list IN VARCHAR2)
+RETURN SYS.ODCIVARCHAR2LIST
+IS
+    v_result SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+    v_new_tables SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+    v_has_new BOOLEAN := TRUE;
+    v_loop_count NUMBER := 0;
+    v_max_loop NUMBER := 100;
+    
+    -- Hàm kiểm tra bảng đã tồn tại trong danh sách (nội tuyến)
+    FUNCTION exists_in_list(p_list IN SYS.ODCIVARCHAR2LIST, p_name IN VARCHAR2) 
+    RETURN BOOLEAN
+    IS
+    BEGIN
+        FOR i IN 1..p_list.COUNT LOOP
+            IF UPPER(p_list(i)) = UPPER(p_name) THEN
+                RETURN TRUE;
+            END IF;
+        END LOOP;
+        RETURN FALSE;
+    END exists_in_list;
+    
+BEGIN
+    -- Bước 1: Thêm các bảng ban đầu từ chuỗi đầu vào
+    FOR rec IN (
+        SELECT TRIM(REGEXP_SUBSTR(p_table_list, '[^,]+', 1, LEVEL)) AS table_name
+        FROM DUAL
+        CONNECT BY LEVEL <= REGEXP_COUNT(p_table_list, ',') + 1
+    ) LOOP
+        IF rec.table_name IS NOT NULL AND NOT exists_in_list(v_result, rec.table_name) THEN
+            v_result.EXTEND;
+            v_result(v_result.COUNT) := UPPER(rec.table_name);
+        END IF;
+    END LOOP;
+    
+    -- Bước 2: Vòng lặp tìm tất cả bảng liên quan (cha và con)
+    WHILE v_has_new AND v_loop_count < v_max_loop
+    LOOP
+        v_loop_count := v_loop_count + 1;
+        v_has_new := FALSE;
+        v_new_tables := SYS.ODCIVARCHAR2LIST();
+        
+        -- Tìm các bảng cha và con
+        FOR fk_rec IN (
+            WITH fk_info AS (
+                SELECT
+                    uc.table_name AS child_table,
+                    upc.table_name AS parent_table
+                FROM
+                    user_constraints uc
+                    JOIN user_constraints upc ON uc.r_constraint_name = upc.constraint_name
+                WHERE
+                    uc.constraint_type = 'R'
+                    AND upc.owner = USER
+            ),
+            current_tables AS (
+                SELECT COLUMN_VALUE AS table_name
+                FROM TABLE(v_result)
+            )
+            SELECT DISTINCT related_table
+            FROM (
+                -- Lấy các bảng cha (parent)
+                SELECT parent_table AS related_table
+                FROM fk_info
+                WHERE child_table IN (SELECT table_name FROM current_tables)
+                UNION
+                -- Lấy các bảng con (child)
+                SELECT child_table AS related_table
+                FROM fk_info
+                WHERE parent_table IN (SELECT table_name FROM current_tables)
+            )
+            WHERE related_table IS NOT NULL
+        ) LOOP
+            IF NOT exists_in_list(v_result, fk_rec.related_table) THEN
+                v_new_tables.EXTEND;
+                v_new_tables(v_new_tables.COUNT) := UPPER(fk_rec.related_table);
+                v_has_new := TRUE;
+            END IF;
+        END LOOP;
+        
+        -- Thêm các bảng mới vào kết quả
+        FOR i IN 1..v_new_tables.COUNT LOOP
+            v_result.EXTEND;
+            v_result(v_result.COUNT) := v_new_tables(i);
+        END LOOP;
+    END LOOP;
+    
+    RETURN v_result;
+END get_related_tables;
+/
 
 -- =====================================================
 -- 9. PACKAGE CHÍNH - PHIÊN BẢN ĐÃ VÁ LỖ HỔNG
@@ -127,6 +212,9 @@ CREATE OR REPLACE PACKAGE RAG_VECTOR_SEARCH AS
     
     -- Status Function
     FUNCTION get_vector_status RETURN SYS_REFCURSOR;
+    
+    -- Related Tables Function (wrapper)
+    FUNCTION get_related_tables(p_table_list IN VARCHAR2) RETURN SYS.ODCIVARCHAR2LIST;
     
 END RAG_VECTOR_SEARCH;
 /
@@ -195,7 +283,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         OPEN v_cursor FOR
             SELECT MODEL_NAME, MINING_FUNCTION, CREATION_DATE 
             FROM USER_MINING_MODELS
-            ORDER BY CREATION_DATE  DESC;
+            ORDER BY CREATION_DATE DESC;
         RETURN v_cursor;
     END get_available_models;
 
@@ -560,6 +648,20 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             RETURN v_cursor;
     END find_relevant_schemas;
 
+    -- =============================================
+    -- RELATED TABLES FUNCTION (WRAPPER)
+    -- =============================================
+    
+    FUNCTION get_related_tables(p_table_list IN VARCHAR2) RETURN SYS.ODCIVARCHAR2LIST IS
+    BEGIN
+        -- Gọi hàm độc lập bên ngoài
+        RETURN RAG_VECTOR_SEARCH.get_related_tables(p_table_list);
+    END get_related_tables;
+
+    -- =============================================
+    -- GET RELEVANT CONTEXT (ĐÃ SỬA - LẤY ĐẦY ĐỦ BẢNG LIÊN QUAN)
+    -- =============================================
+    
     FUNCTION get_relevant_context(
         p_question IN VARCHAR2,
         p_top_k IN NUMBER DEFAULT 3
@@ -572,19 +674,57 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_distance NUMBER;
         v_count NUMBER := 0;
         v_error_msg VARCHAR2(4000);
+        v_table_list VARCHAR2(4000);
+        v_related_tables SYS.ODCIVARCHAR2LIST;
+        v_all_tables SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+        v_temp_table_name VARCHAR2(100);
+        v_temp_owner VARCHAR2(100);
+        v_temp_schema CLOB;
+        v_temp_distance NUMBER;
+        
+        -- Hàm kiểm tra bảng đã tồn tại trong danh sách
+        FUNCTION exists_in_list(p_list IN SYS.ODCIVARCHAR2LIST, p_name IN VARCHAR2) 
+        RETURN BOOLEAN
+        IS
+        BEGIN
+            FOR i IN 1..p_list.COUNT LOOP
+                IF UPPER(p_list(i)) = UPPER(p_name) THEN
+                    RETURN TRUE;
+                END IF;
+            END LOOP;
+            RETURN FALSE;
+        END exists_in_list;
+        
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
         
         DBMS_LOB.WRITEAPPEND(v_result, LENGTH('Question: ' || p_question || CHR(10) || CHR(10)), 
             'Question: ' || p_question || CHR(10) || CHR(10));
         
+        -- Bước 1: Tìm các bảng liên quan nhất bằng vector search
         v_cursor := find_relevant_schemas(p_question, p_top_k);
-        ...
+        
+        -- Lưu danh sách bảng và xây dựng chuỗi table_list
         LOOP
             FETCH v_cursor INTO v_table_name, v_owner, v_schema_text, v_distance;
             EXIT WHEN v_cursor%NOTFOUND;
             
             v_count := v_count + 1;
+            
+            -- Thêm vào danh sách tất cả bảng
+            IF NOT exists_in_list(v_all_tables, v_table_name) THEN
+                v_all_tables.EXTEND;
+                v_all_tables(v_all_tables.COUNT) := UPPER(v_table_name);
+            END IF;
+            
+            -- Thêm vào chuỗi table_list để tìm bảng liên quan
+            IF v_table_list IS NULL THEN
+                v_table_list := UPPER(v_table_name);
+            ELSE
+                v_table_list := v_table_list || ',' || UPPER(v_table_name);
+            END IF;
+            
+            -- Thêm schema vào kết quả
             DBMS_LOB.WRITEAPPEND(v_result, 
                 LENGTH('--- Relevant Schema #' || v_count || ' (Owner: ' || v_owner || ', Distance: ' || ROUND(v_distance, 4) || ')' || CHR(10)),
                 '--- Relevant Schema #' || v_count || ' (Owner: ' || v_owner || ', Distance: ' || ROUND(v_distance, 4) || ')' || CHR(10));
@@ -593,6 +733,60 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         END LOOP;
         
         CLOSE v_cursor;
+        
+        -- Bước 2: Tìm các bảng liên quan (cha và con) từ danh sách bảng đã tìm được
+        IF v_table_list IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('🔍 Finding related tables for: ' || v_table_list);
+            
+            -- Gọi hàm get_related_tables để lấy danh sách bảng liên quan
+            BEGIN
+                v_related_tables := get_related_tables(v_table_list);
+                
+                -- Thêm các bảng liên quan vào danh sách nếu chưa có
+                FOR i IN 1..v_related_tables.COUNT LOOP
+                    IF NOT exists_in_list(v_all_tables, v_related_tables(i)) THEN
+                        v_all_tables.EXTEND;
+                        v_all_tables(v_all_tables.COUNT) := UPPER(v_related_tables(i));
+                    END IF;
+                END LOOP;
+                
+                DBMS_OUTPUT.PUT_LINE('✅ Found ' || v_all_tables.COUNT || ' total related tables');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    DBMS_OUTPUT.PUT_LINE('⚠️ Error getting related tables: ' || SQLERRM);
+            END;
+        END IF;
+        
+        -- Bước 3: Lấy schema cho tất cả bảng liên quan (đã được embedded)
+        IF v_all_tables.COUNT > 0 THEN
+            DBMS_LOB.WRITEAPPEND(v_result, 
+                LENGTH('--- All Related Tables (Including Parent/Child) ---' || CHR(10) || CHR(10)),
+                '--- All Related Tables (Including Parent/Child) ---' || CHR(10) || CHR(10));
+            
+            -- Lấy schema từ bảng RAG_SCHEMA_VECTORS cho tất cả bảng liên quan
+            FOR i IN 1..v_all_tables.COUNT LOOP
+                BEGIN
+                    SELECT SCHEMA_TEXT INTO v_temp_schema
+                    FROM RAG_SCHEMA_VECTORS
+                    WHERE TABLE_NAME = v_all_tables(i)
+                    AND OWNER = USER;
+                    
+                    DBMS_LOB.WRITEAPPEND(v_result, 
+                        LENGTH('--- Related Table: ' || v_all_tables(i) || CHR(10)),
+                        '--- Related Table: ' || v_all_tables(i) || CHR(10));
+                    DBMS_LOB.APPEND(v_result, v_temp_schema);
+                    DBMS_LOB.WRITEAPPEND(v_result, 2, CHR(10) || CHR(10));
+                    
+                EXCEPTION
+                    WHEN NO_DATA_FOUND THEN
+                        DBMS_LOB.WRITEAPPEND(v_result, 
+                            LENGTH('⚠️ Table ' || v_all_tables(i) || ' not found in vector store' || CHR(10) || CHR(10)),
+                            '⚠️ Table ' || v_all_tables(i) || ' not found in vector store' || CHR(10) || CHR(10));
+                    WHEN OTHERS THEN
+                        NULL;
+                END;
+            END LOOP;
+        END IF;
         
         IF v_count = 0 THEN
             DBMS_LOB.WRITEAPPEND(v_result, 80, 'No relevant schemas found. Please run export_all_schemas_to_vector first.');
@@ -603,6 +797,9 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         WHEN OTHERS THEN
             v_error_msg := SQLERRM;
             log_error('GET_RELEVANT_CONTEXT', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            IF v_cursor%ISOPEN THEN
+                CLOSE v_cursor;
+            END IF;
             RETURN 'Error getting context: ' || v_error_msg;
     END get_relevant_context;
 
@@ -1014,6 +1211,7 @@ SELECT
 FROM RAG_SCHEMA_VECTORS
 ORDER BY OWNER, TABLE_NAME;
 /
+
 -- =====================================================
 -- 11. VIEW LỖI (MỚI)
 -- =====================================================
@@ -1029,6 +1227,7 @@ FROM RAG_ERROR_LOG
 ORDER BY CREATED_DATE DESC
 FETCH FIRST 100 ROWS ONLY;
 /
+
 -- =====================================================
 -- 12. VIEW MODEL STATUS (MỚI)
 -- =====================================================
@@ -1039,6 +1238,7 @@ SELECT
 FROM USER_MINING_MODELS
 ORDER BY CREATION_DATE DESC;
 /
+
 -- =====================================================
 -- 13. PROCEDURE TEST (ĐÃ SỬA)
 -- =====================================================
@@ -1091,6 +1291,7 @@ EXCEPTION
         END IF;
 END test_vector_search;
 /
+
 -- =====================================================
 -- 14. PROCEDURE KIỂM TRA TÍNH TOÀN VẸN (MỚI)
 -- =====================================================
@@ -1144,7 +1345,7 @@ BEGIN
     
     DBMS_OUTPUT.PUT_LINE('========================================');
 END validate_rag_system;
-
+/
 
 -- =====================================================
 -- 15. GRANT PERMISSIONS (THÊM NẾU CẦN)
@@ -1248,16 +1449,16 @@ END;
    -- Xem log lỗi:
    SELECT * FROM RAG_ERROR_LOG ORDER BY CREATED_DATE DESC;
 
-7. ⚠️ LƯU Ý QUAN TRỌNG
-   ---------------------
-   - Model ALL_MINILM_L12_V2 phải được import trước
-   - Kiểm tra model: SELECT RAG_VECTOR_SEARCH.is_model_available FROM DUAL;
-   - Các lỗi sẽ được log vào RAG_ERROR_LOG
-   - Sử dụng V_RAG_ERRORS để xem lỗi gần đây
+7. ⚠️ LƯU Ý QUAN TRỌNG VỀ TÍNH NĂNG MỚI
+   --------------------------------------
+   - Hàm get_related_tables đã được tích hợp để tự động tìm các bảng cha/con
+   - Khi truy vấn, hệ thống sẽ tự động lấy tất cả bảng liên quan
+   - Context sẽ đầy đủ hơn để LLM tạo SQL chính xác
+   - Sử dụng: SELECT RAG_VECTOR_SEARCH.get_related_tables('TABLE1,TABLE2') FROM DUAL;
 */
 
 -- =====================================================
--- 15. CLEANUP SCRIPT
+-- 18. CLEANUP SCRIPT
 -- =====================================================
 
 /*
@@ -1283,5 +1484,4 @@ BEGIN
     );
 EXCEPTION WHEN OTHERS THEN NULL;
 END;
-
 */

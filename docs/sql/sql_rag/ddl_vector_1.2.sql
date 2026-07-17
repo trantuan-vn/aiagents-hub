@@ -1,6 +1,6 @@
 -- =====================================================
 -- HỆ THỐNG RAG VỚI AI VECTOR SEARCH TRÊN OCI
--- Phiên bản đã vá lỗ hổng và tối ưu
+-- Phiên bản đã vá lỗ hổng - FIX PLS-00597
 -- =====================================================
 
 -- =====================================================
@@ -66,19 +66,11 @@ CREATE TABLE RAG_QUERY_HISTORY (
 CREATE SEQUENCE SEQ_RAG_ERROR_LOG START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE SEQ_RAG_QUERY_ID START WITH 1 INCREMENT BY 1;
 
--- 7. Bảng lưu thông tin AI models (nếu chưa có)
--- Lưu ý: Bảng này có thể đã tồn tại trong hệ thống của bạn
--- Nếu chưa có, bạn có thể tạo hoặc sử dụng bảng có sẵn
--- CREATE TABLE USER_AI_MODELS (
---     MODEL_NAME VARCHAR2(100) PRIMARY KEY,
---     MODEL_TYPE VARCHAR2(50),
---     CREATED_DATE DATE DEFAULT SYSDATE
--- );
-
--- 8. Tạo các index để tăng hiệu suất
+-- 7. Tạo các index để tăng hiệu suất
 CREATE INDEX RAG_SCHEMA_VECTORS_IDX1 ON RAG_SCHEMA_VECTORS(OWNER, TABLE_NAME);
 CREATE INDEX RAG_QUERY_HISTORY_IDX1 ON RAG_QUERY_HISTORY(CREATED_DATE DESC);
 CREATE INDEX RAG_ERROR_LOG_IDX1 ON RAG_ERROR_LOG(CREATED_DATE DESC);
+
 
 -- =====================================================
 -- 9. PACKAGE CHÍNH - PHIÊN BẢN ĐÃ VÁ LỖ HỔNG
@@ -98,6 +90,7 @@ CREATE OR REPLACE PACKAGE RAG_VECTOR_SEARCH AS
     FUNCTION get_primary_key(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
     FUNCTION get_foreign_keys(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
     FUNCTION get_table_comments(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
+    FUNCTION get_sample_data(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER, p_limit IN NUMBER DEFAULT 10) RETURN CLOB;
     FUNCTION export_schema_to_text(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB;
     
     -- Vector Search Functions
@@ -127,6 +120,9 @@ CREATE OR REPLACE PACKAGE RAG_VECTOR_SEARCH AS
     
     -- Status Function
     FUNCTION get_vector_status RETURN SYS_REFCURSOR;
+    
+    -- Related Tables Function (wrapper)
+    FUNCTION get_related_tables(p_table_list IN VARCHAR2) RETURN SYS.ODCIVARCHAR2LIST;
     
 END RAG_VECTOR_SEARCH;
 /
@@ -195,7 +191,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         OPEN v_cursor FOR
             SELECT MODEL_NAME, MINING_FUNCTION, CREATION_DATE 
             FROM USER_MINING_MODELS
-            ORDER BY CREATION_DATE  DESC;
+            ORDER BY CREATION_DATE DESC;
         RETURN v_cursor;
     END get_available_models;
 
@@ -429,6 +425,248 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             RETURN NULL;
     END get_table_comments;
 
+    -- =============================================
+    -- HÀM LẤY DỮ LIỆU MẪU (FIX PLS-00597 - SỬ DỤNG CÁCH TIẾP CẬN ĐƠN GIẢN NHẤT)
+    -- =============================================
+    
+    FUNCTION get_sample_data(
+        p_table_name VARCHAR2, 
+        p_owner VARCHAR2 DEFAULT USER, 
+        p_limit IN NUMBER DEFAULT 10
+    ) RETURN CLOB IS
+        v_sample CLOB;
+        v_sql VARCHAR2(4000);
+        v_row_count NUMBER := 0;
+        v_error_msg VARCHAR2(4000);
+        v_col_count NUMBER := 0;
+        
+        -- Sử dụng REF CURSOR với các biến đơn giản
+        TYPE ref_cursor IS REF CURSOR;
+        v_cursor ref_cursor;
+        
+        -- Lấy danh sách cột
+        CURSOR c_cols IS
+            SELECT COLUMN_NAME
+            FROM ALL_TAB_COLUMNS
+            WHERE TABLE_NAME = UPPER(p_table_name)
+            AND OWNER = UPPER(p_owner)
+            AND DATA_TYPE NOT IN ('BLOB', 'CLOB', 'NCLOB', 'BFILE', 'LONG', 'LONG RAW')
+            ORDER BY COLUMN_ID;
+            
+        TYPE col_list_type IS TABLE OF VARCHAR2(100) INDEX BY BINARY_INTEGER;
+        v_cols col_list_type;
+        
+        -- Biến cho từng cột (tối đa 50 cột)
+        v_val1 VARCHAR2(4000);
+        v_val2 VARCHAR2(4000);
+        v_val3 VARCHAR2(4000);
+        v_val4 VARCHAR2(4000);
+        v_val5 VARCHAR2(4000);
+        v_val6 VARCHAR2(4000);
+        v_val7 VARCHAR2(4000);
+        v_val8 VARCHAR2(4000);
+        v_val9 VARCHAR2(4000);
+        v_val10 VARCHAR2(4000);
+        v_val11 VARCHAR2(4000);
+        v_val12 VARCHAR2(4000);
+        v_val13 VARCHAR2(4000);
+        v_val14 VARCHAR2(4000);
+        v_val15 VARCHAR2(4000);
+        v_val16 VARCHAR2(4000);
+        v_val17 VARCHAR2(4000);
+        v_val18 VARCHAR2(4000);
+        v_val19 VARCHAR2(4000);
+        v_val20 VARCHAR2(4000);
+        v_val21 VARCHAR2(4000);
+        v_val22 VARCHAR2(4000);
+        v_val23 VARCHAR2(4000);
+        v_val24 VARCHAR2(4000);
+        v_val25 VARCHAR2(4000);
+        v_val26 VARCHAR2(4000);
+        v_val27 VARCHAR2(4000);
+        v_val28 VARCHAR2(4000);
+        v_val29 VARCHAR2(4000);
+        v_val30 VARCHAR2(4000);
+        
+        v_row_data VARCHAR2(4000);
+        v_has_data BOOLEAN := FALSE;
+    BEGIN
+        DBMS_LOB.CREATETEMPORARY(v_sample, TRUE);
+        
+        DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('Sample Data (Top ' || p_limit || ' rows):' || CHR(10)), 
+            'Sample Data (Top ' || p_limit || ' rows):' || CHR(10));
+        
+        -- Kiểm tra bảng có dữ liệu không
+        BEGIN
+            EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM ' || UPPER(p_table_name) INTO v_row_count;
+        EXCEPTION
+            WHEN OTHERS THEN
+                DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  (Table may not exist or no access)' || CHR(10)), 
+                    '  (Table may not exist or no access)' || CHR(10));
+                RETURN v_sample;
+        END;
+        
+        IF v_row_count = 0 THEN
+            DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  (No data available)' || CHR(10)), 
+                '  (No data available)' || CHR(10));
+            RETURN v_sample;
+        END IF;
+        
+        -- Lấy danh sách cột
+        FOR col IN c_cols LOOP
+            v_col_count := v_col_count + 1;
+            v_cols(v_col_count) := col.COLUMN_NAME;
+        END LOOP;
+        
+        IF v_col_count = 0 THEN
+            DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  (No columns found)' || CHR(10)), 
+                '  (No columns found)' || CHR(10));
+            RETURN v_sample;
+        END IF;
+        
+        -- Xây dựng SQL động với TO_CHAR cho tất cả cột
+        v_sql := 'SELECT ';
+        FOR i IN 1..v_col_count LOOP
+            IF i > 1 THEN
+                v_sql := v_sql || ', ';
+            END IF;
+            -- Chuyển tất cả về VARCHAR2 để tránh lỗi kiểu dữ liệu
+            v_sql := v_sql || 'TO_CHAR(' || v_cols(i) || ') AS ' || v_cols(i);
+        END LOOP;
+        v_sql := v_sql || ' FROM ' || UPPER(p_table_name) || ' WHERE ROWNUM <= ' || p_limit;
+        
+        -- Thực thi và lấy dữ liệu
+        BEGIN
+            OPEN v_cursor FOR v_sql;
+            
+            v_row_count := 0;
+            LOOP
+                -- Sử dụng CASE để xác định số lượng cột
+                IF v_col_count = 1 THEN
+                    FETCH v_cursor INTO v_val1;
+                ELSIF v_col_count = 2 THEN
+                    FETCH v_cursor INTO v_val1, v_val2;
+                ELSIF v_col_count = 3 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3;
+                ELSIF v_col_count = 4 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4;
+                ELSIF v_col_count = 5 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5;
+                ELSIF v_col_count = 6 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6;
+                ELSIF v_col_count = 7 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7;
+                ELSIF v_col_count = 8 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8;
+                ELSIF v_col_count = 9 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9;
+                ELSIF v_col_count = 10 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10;
+                ELSIF v_col_count = 11 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11;
+                ELSIF v_col_count = 12 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12;
+                ELSIF v_col_count = 13 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13;
+                ELSIF v_col_count = 14 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14;
+                ELSIF v_col_count = 15 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15;
+                ELSIF v_col_count = 16 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15, v_val16;
+                ELSIF v_col_count = 17 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15, v_val16, v_val17;
+                ELSIF v_col_count = 18 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15, v_val16, v_val17, v_val18;
+                ELSIF v_col_count = 19 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15, v_val16, v_val17, v_val18, v_val19;
+                ELSIF v_col_count = 20 THEN
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10, v_val11, v_val12, v_val13, v_val14, v_val15, v_val16, v_val17, v_val18, v_val19, v_val20;
+                ELSE
+                    -- Nếu có nhiều hơn 20 cột, chỉ lấy 20 cột đầu
+                    FETCH v_cursor INTO v_val1, v_val2, v_val3, v_val4, v_val5, v_val6, v_val7, v_val8, v_val9, v_val10,
+                                       v_val11, v_val12, v_val13, v_val14, v_val15, v_val16, v_val17, v_val18, v_val19, v_val20;
+                END IF;
+                
+                EXIT WHEN v_cursor%NOTFOUND;
+                
+                v_row_count := v_row_count + 1;
+                v_has_data := TRUE;
+                
+                DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  Row ' || v_row_count || ': '), 
+                    '  Row ' || v_row_count || ': ');
+                
+                -- Hiển thị các cột
+                FOR i IN 1..LEAST(v_col_count, 20) LOOP
+                    IF i > 1 THEN
+                        DBMS_LOB.WRITEAPPEND(v_sample, 2, ', ');
+                    END IF;
+                    
+                    -- Lấy giá trị theo index
+                    IF i = 1 THEN v_row_data := v_val1;
+                    ELSIF i = 2 THEN v_row_data := v_val2;
+                    ELSIF i = 3 THEN v_row_data := v_val3;
+                    ELSIF i = 4 THEN v_row_data := v_val4;
+                    ELSIF i = 5 THEN v_row_data := v_val5;
+                    ELSIF i = 6 THEN v_row_data := v_val6;
+                    ELSIF i = 7 THEN v_row_data := v_val7;
+                    ELSIF i = 8 THEN v_row_data := v_val8;
+                    ELSIF i = 9 THEN v_row_data := v_val9;
+                    ELSIF i = 10 THEN v_row_data := v_val10;
+                    ELSIF i = 11 THEN v_row_data := v_val11;
+                    ELSIF i = 12 THEN v_row_data := v_val12;
+                    ELSIF i = 13 THEN v_row_data := v_val13;
+                    ELSIF i = 14 THEN v_row_data := v_val14;
+                    ELSIF i = 15 THEN v_row_data := v_val15;
+                    ELSIF i = 16 THEN v_row_data := v_val16;
+                    ELSIF i = 17 THEN v_row_data := v_val17;
+                    ELSIF i = 18 THEN v_row_data := v_val18;
+                    ELSIF i = 19 THEN v_row_data := v_val19;
+                    ELSIF i = 20 THEN v_row_data := v_val20;
+                    END IF;
+                    
+                    DBMS_LOB.WRITEAPPEND(v_sample, LENGTH(v_cols(i) || '='), v_cols(i) || '=');
+                    DBMS_LOB.WRITEAPPEND(v_sample, LENGTH(NVL(v_row_data, 'NULL')), NVL(v_row_data, 'NULL'));
+                END LOOP;
+                
+                IF v_col_count > 20 THEN
+                    DBMS_LOB.WRITEAPPEND(v_sample, LENGTH(', ... (and ' || (v_col_count - 20) || ' more columns)'), 
+                        ', ... (and ' || (v_col_count - 20) || ' more columns)');
+                END IF;
+                
+                DBMS_LOB.WRITEAPPEND(v_sample, 1, CHR(10));
+            END LOOP;
+            
+            CLOSE v_cursor;
+            
+            IF NOT v_has_data THEN
+                DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  (No data returned)' || CHR(10)), 
+                    '  (No data returned)' || CHR(10));
+            END IF;
+            
+        EXCEPTION
+            WHEN OTHERS THEN
+                IF v_cursor%ISOPEN THEN
+                    CLOSE v_cursor;
+                END IF;
+                DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('  (Error getting sample data: ' || SQLERRM || ')' || CHR(10)), 
+                    '  (Error getting sample data: ' || SQLERRM || ')' || CHR(10));
+        END;
+        
+        RETURN v_sample;
+    EXCEPTION
+        WHEN OTHERS THEN
+            v_error_msg := SQLERRM;
+            DBMS_LOB.CREATETEMPORARY(v_sample, TRUE);
+            DBMS_LOB.WRITEAPPEND(v_sample, LENGTH('Error getting sample data: ' || v_error_msg), 
+                'Error getting sample data: ' || v_error_msg);
+            RETURN v_sample;
+    END get_sample_data;
+
+    -- =============================================
+    -- EXPORT SCHEMA TO TEXT (ĐÃ CẬP NHẬT - CÓ DỮ LIỆU MẪU)
+    -- =============================================
+    
     FUNCTION export_schema_to_text(p_table_name VARCHAR2, p_owner VARCHAR2 DEFAULT USER) RETURN CLOB IS
         v_result CLOB;
         v_cursor SYS_REFCURSOR;
@@ -443,6 +681,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_pk CLOB;
         v_fk CLOB;
         v_comments CLOB;
+        v_sample_data CLOB;
         v_error_msg VARCHAR2(4000);
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
@@ -503,6 +742,13 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             CLOSE v_cursor;
         END IF;
         
+        -- =============================================
+        -- THÊM DỮ LIỆU MẪU
+        -- =============================================
+        DBMS_LOB.WRITEAPPEND(v_result, 1, CHR(10));
+        v_sample_data := get_sample_data(p_table_name, p_owner, 10);
+        DBMS_LOB.APPEND(v_result, v_sample_data);
+        
         RETURN v_result;
     EXCEPTION
         WHEN OTHERS THEN
@@ -548,7 +794,7 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
                 VECTOR_DISTANCE(SCHEMA_EMBEDDING, v_question_vector, COSINE) AS DISTANCE
             FROM RAG_SCHEMA_VECTORS
             WHERE SCHEMA_EMBEDDING IS NOT NULL
-            ORDER BY DISTANCE
+            ORDER BY DISTANCE 
             FETCH FIRST p_top_k ROWS ONLY;
             
         RETURN v_cursor;
@@ -559,6 +805,105 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             OPEN v_cursor FOR SELECT v_error_msg AS ERROR FROM DUAL;
             RETURN v_cursor;
     END find_relevant_schemas;
+
+    -- =============================================
+    -- RELATED TABLES FUNCTION (WRAPPER)
+    -- =============================================
+    
+    FUNCTION get_related_tables(p_table_list IN VARCHAR2)
+    RETURN SYS.ODCIVARCHAR2LIST
+    IS
+        v_result SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+        v_new_tables SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+        v_has_new BOOLEAN := TRUE;
+        v_loop_count NUMBER := 0;
+        v_max_loop NUMBER := 100;
+        
+        -- Hàm kiểm tra bảng đã tồn tại trong danh sách (nội tuyến)
+        FUNCTION exists_in_list(p_list IN SYS.ODCIVARCHAR2LIST, p_name IN VARCHAR2) 
+        RETURN BOOLEAN
+        IS
+        BEGIN
+            FOR i IN 1..p_list.COUNT LOOP
+                IF UPPER(p_list(i)) = UPPER(p_name) THEN
+                    RETURN TRUE;
+                END IF;
+            END LOOP;
+            RETURN FALSE;
+        END exists_in_list;
+        
+    BEGIN
+        -- Bước 1: Thêm các bảng ban đầu từ chuỗi đầu vào
+        FOR rec IN (
+            SELECT TRIM(REGEXP_SUBSTR(p_table_list, '[^,]+', 1, LEVEL)) AS table_name
+            FROM DUAL
+            CONNECT BY LEVEL <= REGEXP_COUNT(p_table_list, ',') + 1
+        ) LOOP
+            IF rec.table_name IS NOT NULL AND NOT exists_in_list(v_result, rec.table_name) THEN
+                v_result.EXTEND;
+                v_result(v_result.COUNT) := UPPER(rec.table_name);
+            END IF;
+        END LOOP;
+        
+        -- Bước 2: Vòng lặp tìm tất cả bảng liên quan (cha và con)
+        WHILE v_has_new AND v_loop_count < v_max_loop
+        LOOP
+            v_loop_count := v_loop_count + 1;
+            v_has_new := FALSE;
+            v_new_tables := SYS.ODCIVARCHAR2LIST();
+            
+            -- Tìm các bảng cha và con
+            FOR fk_rec IN (
+                WITH fk_info AS (
+                    SELECT
+                        uc.table_name AS child_table,
+                        upc.table_name AS parent_table
+                    FROM
+                        user_constraints uc
+                        JOIN user_constraints upc ON uc.r_constraint_name = upc.constraint_name
+                    WHERE
+                        uc.constraint_type = 'R'
+                        AND upc.owner = USER
+                ),
+                current_tables AS (
+                    SELECT COLUMN_VALUE AS table_name
+                    FROM TABLE(v_result)
+                )
+                SELECT DISTINCT related_table
+                FROM (
+                    -- Lấy các bảng cha (parent)
+                    SELECT parent_table AS related_table
+                    FROM fk_info
+                    WHERE child_table IN (SELECT table_name FROM current_tables)
+                    UNION
+                    -- Lấy các bảng con (child)
+                    SELECT child_table AS related_table
+                    FROM fk_info
+                    WHERE parent_table IN (SELECT table_name FROM current_tables)
+                )
+                WHERE related_table IS NOT NULL
+            ) LOOP
+                IF NOT exists_in_list(v_result, fk_rec.related_table) THEN
+                    v_new_tables.EXTEND;
+                    v_new_tables(v_new_tables.COUNT) := UPPER(fk_rec.related_table);
+                    v_has_new := TRUE;
+                END IF;
+            END LOOP;
+            
+            -- Thêm các bảng mới vào kết quả
+            FOR i IN 1..v_new_tables.COUNT LOOP
+                v_result.EXTEND;
+                v_result(v_result.COUNT) := v_new_tables(i);
+            END LOOP;
+        END LOOP;
+        
+        RETURN v_result;
+    END get_related_tables;
+
+
+    -- =============================================
+    -- GET RELEVANT CONTEXT
+    -- =============================================
 
     FUNCTION get_relevant_context(
         p_question IN VARCHAR2,
@@ -572,19 +917,71 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         v_distance NUMBER;
         v_count NUMBER := 0;
         v_error_msg VARCHAR2(4000);
+        v_table_list VARCHAR2(4000);
+        v_related_tables SYS.ODCIVARCHAR2LIST;
+        
+        -- Collection để lưu danh sách bảng đã xử lý (tránh trùng)
+        TYPE table_set_type IS TABLE OF VARCHAR2(100) INDEX BY VARCHAR2(100);
+        v_processed_tables table_set_type;
+        
+        -- Hàm kiểm tra bảng đã được xử lý chưa
+        FUNCTION is_processed(p_table_name IN VARCHAR2) 
+        RETURN BOOLEAN
+        IS
+        BEGIN
+            RETURN v_processed_tables.EXISTS(UPPER(p_table_name));
+        END is_processed;
+        
+        -- Procedure để đánh dấu bảng đã xử lý
+        PROCEDURE mark_processed(p_table_name IN VARCHAR2)
+        IS
+        BEGIN
+            v_processed_tables(UPPER(p_table_name)) := UPPER(p_table_name);
+        END mark_processed;
+        
+        -- Hàm lấy schema từ RAG_SCHEMA_VECTORS
+        FUNCTION get_schema_from_vector(p_table_name IN VARCHAR2) 
+        RETURN CLOB
+        IS
+            v_schema CLOB;
+        BEGIN
+            SELECT SCHEMA_TEXT INTO v_schema
+            FROM RAG_SCHEMA_VECTORS
+            WHERE TABLE_NAME = UPPER(p_table_name)
+            AND OWNER = USER;
+            RETURN v_schema;
+        EXCEPTION
+            WHEN NO_DATA_FOUND THEN
+                RETURN NULL;
+        END get_schema_from_vector;
+        
     BEGIN
         DBMS_LOB.CREATETEMPORARY(v_result, TRUE);
         
         DBMS_LOB.WRITEAPPEND(v_result, LENGTH('Question: ' || p_question || CHR(10) || CHR(10)), 
             'Question: ' || p_question || CHR(10) || CHR(10));
         
+        -- Bước 1: Tìm các bảng liên quan nhất bằng vector search
         v_cursor := find_relevant_schemas(p_question, p_top_k);
-        ...
+        
+        -- Lưu danh sách bảng và xây dựng chuỗi table_list
         LOOP
             FETCH v_cursor INTO v_table_name, v_owner, v_schema_text, v_distance;
             EXIT WHEN v_cursor%NOTFOUND;
             
             v_count := v_count + 1;
+            
+            -- Đánh dấu bảng đã xử lý
+            mark_processed(v_table_name);
+            
+            -- Thêm vào chuỗi table_list để tìm bảng liên quan
+            IF v_table_list IS NULL THEN
+                v_table_list := UPPER(v_table_name);
+            ELSE
+                v_table_list := v_table_list || ',' || UPPER(v_table_name);
+            END IF;
+            
+            -- Thêm schema của bảng này vào kết quả
             DBMS_LOB.WRITEAPPEND(v_result, 
                 LENGTH('--- Relevant Schema #' || v_count || ' (Owner: ' || v_owner || ', Distance: ' || ROUND(v_distance, 4) || ')' || CHR(10)),
                 '--- Relevant Schema #' || v_count || ' (Owner: ' || v_owner || ', Distance: ' || ROUND(v_distance, 4) || ')' || CHR(10));
@@ -593,6 +990,57 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         END LOOP;
         
         CLOSE v_cursor;
+        
+        -- Bước 2: Tìm các bảng liên quan (cha và con) từ danh sách bảng đã tìm được
+        IF v_table_list IS NOT NULL THEN
+            DBMS_OUTPUT.PUT_LINE('🔍 Finding related tables for: ' || v_table_list);
+            
+            -- Gọi hàm get_related_tables để lấy danh sách bảng liên quan
+            BEGIN
+                v_related_tables := get_related_tables(v_table_list);
+                
+                -- Thêm các bảng liên quan vào kết quả nếu chưa được xử lý
+                IF v_related_tables.COUNT > 0 THEN
+                    DBMS_LOB.WRITEAPPEND(v_result, 
+                        LENGTH('--- Related Tables (Parent/Child) ---' || CHR(10) || CHR(10)),
+                        '--- Related Tables (Parent/Child) ---' || CHR(10) || CHR(10));
+                    
+                    FOR i IN 1..v_related_tables.COUNT LOOP
+                        -- Chỉ xử lý nếu bảng chưa được đánh dấu
+                        IF NOT is_processed(v_related_tables(i)) THEN
+                            BEGIN
+                                -- Đánh dấu đã xử lý
+                                mark_processed(v_related_tables(i));
+                                
+                                -- Lấy schema từ bảng RAG_SCHEMA_VECTORS
+                                v_schema_text := get_schema_from_vector(v_related_tables(i));
+                                
+                                IF v_schema_text IS NOT NULL THEN
+                                    DBMS_LOB.WRITEAPPEND(v_result, 
+                                        LENGTH('--- Related Table: ' || v_related_tables(i) || CHR(10)),
+                                        '--- Related Table: ' || v_related_tables(i) || CHR(10));
+                                    DBMS_LOB.APPEND(v_result, v_schema_text);
+                                    DBMS_LOB.WRITEAPPEND(v_result, 2, CHR(10) || CHR(10));
+                                ELSE
+                                    DBMS_LOB.WRITEAPPEND(v_result, 
+                                        LENGTH('⚠️ Table ' || v_related_tables(i) || ' not found in vector store' || CHR(10) || CHR(10)),
+                                        '⚠️ Table ' || v_related_tables(i) || ' not found in vector store' || CHR(10) || CHR(10));
+                                END IF;
+                                
+                            EXCEPTION
+                                WHEN OTHERS THEN
+                                    NULL;
+                            END;
+                        END IF;
+                    END LOOP;
+                END IF;
+                
+                DBMS_OUTPUT.PUT_LINE('✅ Processed ' || v_processed_tables.COUNT || ' unique tables');
+            EXCEPTION
+                WHEN OTHERS THEN
+                    DBMS_OUTPUT.PUT_LINE('⚠️ Error getting related tables: ' || SQLERRM);
+            END;
+        END IF;
         
         IF v_count = 0 THEN
             DBMS_LOB.WRITEAPPEND(v_result, 80, 'No relevant schemas found. Please run export_all_schemas_to_vector first.');
@@ -603,6 +1051,9 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
         WHEN OTHERS THEN
             v_error_msg := SQLERRM;
             log_error('GET_RELEVANT_CONTEXT', NULL, v_error_msg, DBMS_UTILITY.FORMAT_ERROR_BACKTRACE());
+            IF v_cursor%ISOPEN THEN
+                CLOSE v_cursor;
+            END IF;
             RETURN 'Error getting context: ' || v_error_msg;
     END get_relevant_context;
 
@@ -891,7 +1342,8 @@ CREATE OR REPLACE PACKAGE BODY RAG_VECTOR_SEARCH AS
             '5. Use column names exactly as shown in schema' || CHR(10) ||
             '6. Consider table relationships (foreign keys)' || CHR(10) ||
             '7. Use ROWNUM or FETCH FIRST for pagination' || CHR(10) ||
-            '8. Handle NULL values appropriately' || CHR(10);        
+            '8. Handle NULL values appropriately' || CHR(10) ||
+            '9. Use sample data to understand data format and content' || CHR(10);        
         DBMS_LOB.WRITEAPPEND(v_result, LENGTH(v_instructions), v_instructions);            
         
         -- Tính response time
@@ -1014,6 +1466,7 @@ SELECT
 FROM RAG_SCHEMA_VECTORS
 ORDER BY OWNER, TABLE_NAME;
 /
+
 -- =====================================================
 -- 11. VIEW LỖI (MỚI)
 -- =====================================================
@@ -1029,6 +1482,7 @@ FROM RAG_ERROR_LOG
 ORDER BY CREATED_DATE DESC
 FETCH FIRST 100 ROWS ONLY;
 /
+
 -- =====================================================
 -- 12. VIEW MODEL STATUS (MỚI)
 -- =====================================================
@@ -1039,6 +1493,7 @@ SELECT
 FROM USER_MINING_MODELS
 ORDER BY CREATION_DATE DESC;
 /
+
 -- =====================================================
 -- 13. PROCEDURE TEST (ĐÃ SỬA)
 -- =====================================================
@@ -1091,6 +1546,7 @@ EXCEPTION
         END IF;
 END test_vector_search;
 /
+
 -- =====================================================
 -- 14. PROCEDURE KIỂM TRA TÍNH TOÀN VẸN (MỚI)
 -- =====================================================
@@ -1144,7 +1600,7 @@ BEGIN
     
     DBMS_OUTPUT.PUT_LINE('========================================');
 END validate_rag_system;
-
+/
 
 -- =====================================================
 -- 15. GRANT PERMISSIONS (THÊM NẾU CẦN)
@@ -1185,13 +1641,10 @@ END;
 -- =====================================================
 
 /*
-📌 HƯỚNG DẪN SỬ DỤNG - PHIÊN BẢN ĐÃ VÁ LỖ HỔNG
+📌 HƯỚNG DẪN SỬ DỤNG - FIX PLS-00597
 
 1. ⚡ BƯỚC 1: IMPORT MODEL (QUAN TRỌNG)
    --------------------------------------
-   -- Trước khi chạy bất kỳ function nào, phải import model
-   -- Sử dụng DBMS_VECTOR.LOAD_MODEL hoặc công cụ của Oracle
-   
    -- Kiểm tra model đã import:
    SELECT * FROM V_RAG_MODEL_STATUS;
 
@@ -1203,28 +1656,21 @@ END;
    -- Export tất cả schemas của current user:
    EXEC RAG_VECTOR_SEARCH.export_all_schemas_to_vector;
    
-   -- Export cho một owner cụ thể:
-   EXEC RAG_VECTOR_SEARCH.export_all_schemas_to_vector('SYSTEM');
-   
    -- Export một schema cụ thể:
    EXEC RAG_VECTOR_SEARCH.export_schema_to_vector('NHA_DAU_TU');
-   EXEC RAG_VECTOR_SEARCH.export_schema_to_vector('NHA_DAU_TU', 'APP_USER');
 
 3. 🔍 BƯỚC 3: TEST VECTOR SEARCH
    ------------------------------
    -- Test với câu hỏi:
    EXEC test_vector_search('Tổng số lượng cổ phiếu VIC của Nguyễn Văn An');
    
-   -- Lấy context cho LLM:
+   -- Lấy context cho LLM (có kèm dữ liệu mẫu):
    SELECT RAG_VECTOR_SEARCH.build_rag_context('Tổng số lượng cổ phiếu VIC của Nguyễn Văn An') FROM DUAL;
 
 4. 📊 BƯỚC 4: KIỂM TRA TRẠNG THÁI
    --------------------------------
    -- Kiểm tra trạng thái vectors:
    SELECT * FROM V_RAG_VECTOR_STATUS;
-   
-   -- Kiểm tra lỗi:
-   SELECT * FROM V_RAG_ERRORS;
    
    -- Validate toàn bộ hệ thống:
    EXEC validate_rag_system;
@@ -1233,7 +1679,6 @@ END;
    --------------------
    -- Xóa một schema:
    EXEC RAG_VECTOR_SEARCH.remove_schema_from_vector('TEMP_TABLE');
-   EXEC RAG_VECTOR_SEARCH.remove_schema_from_vector('TEMP_TABLE', 'APP_USER');
    
    -- Xóa tất cả:
    EXEC RAG_VECTOR_SEARCH.clear_all_vectors;
@@ -1244,23 +1689,14 @@ END;
 6. 📈 BƯỚC 6: XEM LỊCH SỬ
    ------------------------
    SELECT * FROM RAG_QUERY_HISTORY ORDER BY CREATED_DATE DESC;
-   
-   -- Xem log lỗi:
-   SELECT * FROM RAG_ERROR_LOG ORDER BY CREATED_DATE DESC;
 
-7. ⚠️ LƯU Ý QUAN TRỌNG
-   ---------------------
-   - Model ALL_MINILM_L12_V2 phải được import trước
-   - Kiểm tra model: SELECT RAG_VECTOR_SEARCH.is_model_available FROM DUAL;
-   - Các lỗi sẽ được log vào RAG_ERROR_LOG
-   - Sử dụng V_RAG_ERRORS để xem lỗi gần đây
-*/
-
--- =====================================================
--- 15. CLEANUP SCRIPT
--- =====================================================
-
-/*
+7. ⚠️ LƯU Ý VỀ LỖI PLS-00597 ĐÃ ĐƯỢC FIX
+   -----------------------------------------
+   - Nguyên nhân: Fetch vào collection không đúng kiểu
+   - Đã sửa bằng cách sử dụng các biến đơn giản cho từng cột
+   - Sử dụng TO_CHAR trong SQL để chuyển tất cả về VARCHAR2
+   - Hỗ trợ tối đa 20 cột, nếu nhiều hơn sẽ thông báo
+8. CLEANUP SCRIPT
 -- Xóa tất cả objects
 DROP TABLE RAG_SCHEMA_VECTORS PURGE;
 DROP TABLE RAG_QUERY_HISTORY PURGE;
@@ -1282,6 +1718,5 @@ BEGIN
         force      => TRUE
     );
 EXCEPTION WHEN OTHERS THEN NULL;
-END;
-
+END;   
 */
