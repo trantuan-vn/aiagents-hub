@@ -7,6 +7,7 @@
 
 | Tài liệu | Đường dẫn |
 |----------|-----------|
+| **Kiến trúc tổng thể** | [`workflow-architecture.md`](./workflow-architecture.md) |
 | **Spec chính (plugin)** | [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md) |
 | Kiến trúc khung (rút gọn) | [`workflow-node-plugin-architecture.md`](./workflow-node-plugin-architecture.md) |
 | Spec node webhook | [`workflow-nodes/webhook.md`](./workflow-nodes/webhook.md) |

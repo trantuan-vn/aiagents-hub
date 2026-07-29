@@ -12,6 +12,7 @@ Tài liệu **rút gọn** kiến trúc khung. **Spec chính đầy đủ:** [`w
 | Tài liệu | Đường dẫn |
 |----------|-----------|
 | **Spec chính** | [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md) |
+| **Kiến trúc tổng thể** | [`workflow-architecture.md`](./workflow-architecture.md) |
 | Kiến trúc workflow hiện tại | [`workers/web/.../workflows/README.md`](../workers/web/src/app/(main)/dashboard/build/workflows/README.md) |
 | **Luồng vận hành từng bước** | [`workflow-how-it-works.md`](./workflow-how-it-works.md) |
 | Spec từng node | [`docs/workflow-nodes/`](./workflow-nodes/README.md) |

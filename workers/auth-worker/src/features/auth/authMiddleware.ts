@@ -46,16 +46,29 @@ export function createAuthMiddleware(bindingName: string) {
       }
     } catch (error) {
       handleErrorWithoutIp(error, 'Auth middleware error', c.env);
-      // Logout session trên server trước khi xoá cookie (invalid session, revoke sessionId nếu còn)
-      if (sessionId) {
-        try {
-          const applicationService = createApplicationService(c, bindingName);
-          await applicationService.revokeSessionBySessionIdUseCase(sessionId);
-        } catch (revokeErr) {
-          console.warn('[Auth] revokeSessionBySessionIdUseCase failed:', revokeErr);
+
+      const isAuthError = error instanceof Error && (
+        error.message === ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND ||
+        error.message === ERROR_MESSAGES.AUTH.SESSION_EXPIRED ||
+        error.message === ERROR_MESSAGES.AUTH.NOT_AUTHENTICATED ||
+        error.message === 'sessionId not found'
+      );
+
+      if (isAuthError) {
+        if (sessionId) {
+          try {
+            const applicationService = createApplicationService(c, bindingName);
+            await applicationService.revokeSessionBySessionIdUseCase(sessionId);
+          } catch (revokeErr) {
+            console.warn('[Auth] revokeSessionBySessionIdUseCase failed:', revokeErr);
+          }
         }
+        cookieUtils.clearAuthCookies(c);
+      } else {
+        // Transient error (DO cold start, timeout, network) — don't revoke session,
+        // just treat as unauthenticated for this request so the client can retry.
+        console.warn('[Auth] Transient error, session preserved:', (error as Error).message);
       }
-      cookieUtils.clearAuthCookies(c);
     }
 
     const path = c.req.path;
