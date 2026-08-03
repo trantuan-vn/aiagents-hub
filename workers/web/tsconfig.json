@@ -35,8 +35,8 @@
       "react": ["./node_modules/@types/react"]
     },
     "types": [
-      "@cloudflare/workers-types",
-    ], 
+      "@cloudflare/workers-types"
+    ]
   },
   "include": [
     "next-env.d.ts",

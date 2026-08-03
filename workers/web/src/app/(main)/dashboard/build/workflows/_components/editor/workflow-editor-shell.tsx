@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { cn } from "@/lib/utils";
 
+import "../canvas/workflow-canvas-theme.css";
+
 import { WorkflowEditorHeader, type WorkflowEditorTab } from "./workflow-editor-header";
 import { WorkflowEvaluationsPanel } from "../panels/workflow-panels/workflow-evaluations-panel";
 import { WorkflowEditorLogsPanel } from "./workflow-editor-logs-panel";
@@ -141,7 +143,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     <div
       className={cn(
         "workflow-editor-shell -mx-4 -mt-4 -mb-4 flex flex-col md:-mx-6 md:-mt-6 md:-mb-6",
-        "h-[calc(100dvh-3rem)] max-h-[calc(100dvh-3rem)]",
       )}
     >
       <WorkflowEditorHeader

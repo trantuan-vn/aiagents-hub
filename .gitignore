@@ -30,9 +30,9 @@ Desktop.ini
 !.dev.vars.example
 .alchemy.dev.vars
 
-# build outputs
+# build outputs (anchor so src/.../dashboard/build/ is not ignored)
 dist/
-build/
+/build/
 out/
 .next/
 .open-next/

@@ -1,0 +1,23 @@
+packages:
+  - packages/*
+  - workers/*
+
+allowBuilds:
+  '@parcel/watcher': set this to true or false
+  '@swc/core': set this to true or false
+  bufferutil: set this to true or false
+  esbuild: set this to true or false
+  keccak: set this to true or false
+  sharp: set this to true or false
+  unrs-resolver: set this to true or false
+  utf-8-validate: set this to true or false
+  workerd: set this to true or false
+
+# pnpm 10+ defaults link-workspace-packages to false, which makes the "*"
+# specs for @aiagents-hub/workflow-nodes resolve from the registry (404)
+# instead of the local packages/workflow-nodes workspace package.
+linkWorkspacePackages: true
+
+# @opennextjs/cloudflare@1.20.x pulls a non-existent AWS SDK patch range.
+overrides:
+  "@aws-sdk/signature-v4-multi-region": "3.996.42"

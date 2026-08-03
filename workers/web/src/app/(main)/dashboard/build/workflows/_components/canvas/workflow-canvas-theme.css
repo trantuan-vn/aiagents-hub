@@ -57,6 +57,12 @@
 .workflow-editor-shell {
   --workflow-accent: #ff6f00;
   --workflow-ai-accent: #8a2be2;
+
+  /* Plain CSS — Tailwind does not emit h-[calc(100dvh-3rem)] in the production
+     OpenNext build, which left the shell at auto height and collapsed the
+     React Flow canvas to 0px. 3rem offsets the page padding the shell cancels. */
+  height: calc(100dvh - 3rem);
+  max-height: calc(100dvh - 3rem);
 }
 
 .workflow-canvas-surface .react-flow__background {
