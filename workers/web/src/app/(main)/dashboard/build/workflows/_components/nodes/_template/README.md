@@ -14,6 +14,15 @@ Copy this folder to `nodes/<name>/` when adding a new built-in workflow node.
 8. Add backend plugin in `auth-worker/.../nodes/<name>/index.ts`
 9. Add i18n keys in `messages/en-US.json` and `messages/vi-VN.json`
 
+## Family + kind
+
+If the node is a **sub-kind** of an existing family:
+
+1. Prefer the family **factory** (`create*KindUIPlugin`) — shared Canvas, kind-specific `defaults` + catalog
+2. Set base family plugin `catalog.visible: false` so only kind entries appear
+3. Add a dedicated folder only for custom Canvas/ConfigPanel — and list the kind in `*_OVERRIDE_KINDS`
+4. `defaults()` must set the kind field (`channel`, `flowKind`, `coreKind`, `triggerKind`, `transformKind`)
+
 ## Files
 
 | File | Required | Purpose |
@@ -31,5 +40,6 @@ Copy this folder to `nodes/<name>/` when adding a new built-in workflow node.
 
 ## Reference
 
-See `nodes/webhook/` for trigger + custom config panel pattern.
+See `nodes/webhook/` for trigger + custom config panel override.
+See `nodes/human-review/` for family + channel factory pattern.
 See `nodes/agent/` for custom canvas + config panel.

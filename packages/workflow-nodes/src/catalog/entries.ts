@@ -1,98 +1,32 @@
 import type { WorkflowCatalogEntrySeed } from "./types";
-
-const TRIGGER_KINDS = [
-  "manual",
-  "app_event",
-  "schedule",
-  "webhook",
-  "form",
-  "sub_workflow",
-  "chat",
-  "evaluation",
-  "other",
-] as const;
-
-const FLOW_KINDS = [
-  "filter",
-  "if",
-  "loop_over_items",
-  "merge",
-  "compare_datasets",
-  "execute_sub_workflow",
-  "stop_and_error",
-  "switch",
-  "wait",
-] as const;
-
-const CORE_KINDS = [
-  "code",
-  "data_table",
-  "http_request",
-  "webhook",
-  "execute_sub_workflow",
-  "execution_data",
-  "ftp",
-  "hub",
-  "hub_form",
-  "no_op",
-  "respond_to_webhook",
-  "track_time_saved",
-  "wait",
-] as const;
-
-const TRANSFORM_KINDS = [
-  "ai_transform",
-  "code",
-  "date_time",
-  "edit_fields",
-  "filter",
-  "limit",
-  "remove_duplicates",
-  "split_out",
-  "rename_keys",
-  "sort",
-  "aggregate",
-  "merge",
-  "summarize",
-  "compression",
-  "convert_to_file",
-  "crypto",
-  "edit_image",
-  "extract_from_file",
-  "html",
-  "markdown",
-  "spreadsheet_file",
-  "xml",
-] as const;
-
-const HUMAN_REVIEW_CHANNELS = [
-  "chat",
-  "discord",
-  "gmail",
-  "google_chat",
-  "microsoft_outlook",
-  "microsoft_teams",
-  "send_email",
-  "slack",
-  "telegram",
-  "whatsapp_business",
-] as const;
+import { AGENT_KINDS } from "../nodes/agent/kinds";
+import { CORE_KINDS } from "../nodes/core/kinds";
+import { TRANSFORM_KINDS } from "../nodes/data-transformation/kinds";
+import { FLOW_KINDS } from "../nodes/flow/kinds";
+import { HUMAN_REVIEW_CHANNELS } from "../nodes/human-review/channels";
+import { MEMORY_KINDS, MEMORY_OVERRIDE_KINDS } from "../nodes/memory/kinds";
+import { TOOL_KINDS, TOOL_OVERRIDE_KINDS } from "../nodes/tool/kinds";
+import { TRIGGER_KINDS } from "../nodes/trigger/kinds";
 
 /** Sub-kinds with dedicated backend handlers (auth-worker node plugins). */
 const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
 const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>([]);
+const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
+const BACKEND_MEMORY_KINDS = new Set(["vectorize"]);
+const BACKEND_AGENT_KINDS = new Set(["tools_agent"]);
 
 /** Sub-kinds with dedicated frontend config / canvas plugins. */
 const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
 const FRONTEND_FLOW_KINDS = new Set(["if", "merge", "filter", "switch", "loop_over_items"]);
 const FRONTEND_CORE_KINDS = new Set(["http_request", "code"]);
 const FRONTEND_TRANSFORM_KINDS = new Set<string>([]);
+const FRONTEND_TOOL_KINDS = new Set(TOOL_KINDS);
+const FRONTEND_MEMORY_KINDS = new Set(MEMORY_KINDS);
+const FRONTEND_AGENT_KINDS = new Set(AGENT_KINDS);
 
-function entry(
-  partial: WorkflowCatalogEntrySeed,
-): WorkflowCatalogEntrySeed {
+function entry(partial: WorkflowCatalogEntrySeed): WorkflowCatalogEntrySeed {
   return partial;
 }
 
@@ -176,6 +110,68 @@ function humanReviewEntries(): WorkflowCatalogEntrySeed[] {
   );
 }
 
+function agentEntries(): WorkflowCatalogEntrySeed[] {
+  return AGENT_KINDS.map((kind, index) =>
+    entry({
+      id: `agent:${kind}`,
+      addCategory: "ai",
+      runtimeType: "agent",
+      kind,
+      nameKey: kind === "tools_agent" ? "node_agent" : `agent_kind_${kind}`,
+      descKey: kind === "tools_agent" ? "node_agent_desc" : `agent_kind_${kind}_desc`,
+      hasBackend: BACKEND_AGENT_KINDS.has(kind),
+      hasFrontend: FRONTEND_AGENT_KINDS.has(kind),
+      sortOrder: index,
+    }),
+  );
+}
+
+function toolEntries(): WorkflowCatalogEntrySeed[] {
+  return TOOL_KINDS.map((kind, index) =>
+    entry({
+      id: `tool_node:${kind}`,
+      addCategory: "ai",
+      runtimeType: "tool_node",
+      kind,
+      nameKey:
+        kind === "save-rag"
+          ? "tool_kind_save_rag"
+          : kind === "get-rag"
+            ? "tool_kind_get_rag"
+            : kind === "get-db-info"
+              ? "tool_kind_get_db_info"
+              : `tool_kind_${kind}`,
+      descKey:
+        kind === "save-rag"
+          ? "tool_kind_save_rag_desc"
+          : kind === "get-rag"
+            ? "tool_kind_get_rag_desc"
+            : kind === "get-db-info"
+              ? "tool_kind_get_db_info_desc"
+              : `tool_kind_${kind}_desc`,
+      hasBackend: BACKEND_TOOL_KINDS.has(kind) || !TOOL_OVERRIDE_KINDS.has(kind),
+      hasFrontend: FRONTEND_TOOL_KINDS.has(kind),
+      sortOrder: 100 + index,
+    }),
+  );
+}
+
+function memoryEntries(): WorkflowCatalogEntrySeed[] {
+  return MEMORY_KINDS.map((kind, index) =>
+    entry({
+      id: `memory_node:${kind}`,
+      addCategory: "ai",
+      runtimeType: "memory_node",
+      kind,
+      nameKey: `memory_kind_${kind}`,
+      descKey: `memory_kind_${kind}_desc`,
+      hasBackend: BACKEND_MEMORY_KINDS.has(kind) || !MEMORY_OVERRIDE_KINDS.has(kind),
+      hasFrontend: FRONTEND_MEMORY_KINDS.has(kind),
+      sortOrder: 200 + index,
+    }),
+  );
+}
+
 /** Built-in catalog seeds — source of truth for D1 `workflow_node_catalog`. */
 export const WORKFLOW_NODE_CATALOG_SEEDS: WorkflowCatalogEntrySeed[] = [
   entry({
@@ -188,6 +184,7 @@ export const WORKFLOW_NODE_CATALOG_SEEDS: WorkflowCatalogEntrySeed[] = [
     hasFrontend: true,
     sortOrder: 0,
   }),
+  ...agentEntries(),
   entry({
     id: "action_in_app",
     addCategory: "action_in_app",
@@ -203,6 +200,7 @@ export const WORKFLOW_NODE_CATALOG_SEEDS: WorkflowCatalogEntrySeed[] = [
   ...coreEntries(),
   ...humanReviewEntries(),
   ...triggerEntries(),
+  // service_node kept for resource attach; not shown under AI add-node UI
   entry({
     id: "service_node",
     addCategory: "ai",
@@ -211,51 +209,10 @@ export const WORKFLOW_NODE_CATALOG_SEEDS: WorkflowCatalogEntrySeed[] = [
     descKey: "node_service_desc",
     hasBackend: true,
     hasFrontend: true,
-    sortOrder: 100,
+    sortOrder: 50,
   }),
-  entry({
-    id: "memory_node",
-    addCategory: "ai",
-    runtimeType: "memory_node",
-    nameKey: "node_memory",
-    descKey: "node_memory_desc",
-    hasBackend: true,
-    hasFrontend: true,
-    sortOrder: 101,
-  }),
-  entry({
-    id: "tool_node:save-rag",
-    addCategory: "ai",
-    runtimeType: "tool_node",
-    kind: "save-rag",
-    nameKey: "tool_kind_save_rag",
-    descKey: "tool_kind_save_rag_desc",
-    hasBackend: true,
-    hasFrontend: true,
-    sortOrder: 102,
-  }),
-  entry({
-    id: "tool_node:get-rag",
-    addCategory: "ai",
-    runtimeType: "tool_node",
-    kind: "get-rag",
-    nameKey: "tool_kind_get_rag",
-    descKey: "tool_kind_get_rag_desc",
-    hasBackend: true,
-    hasFrontend: true,
-    sortOrder: 103,
-  }),
-  entry({
-    id: "tool_node:get-db-info",
-    addCategory: "ai",
-    runtimeType: "tool_node",
-    kind: "get-db-info",
-    nameKey: "tool_kind_get_db_info",
-    descKey: "tool_kind_get_db_info_desc",
-    hasBackend: true,
-    hasFrontend: true,
-    sortOrder: 104,
-  }),
+  ...memoryEntries(),
+  ...toolEntries(),
 ];
 
 export function defaultIsActive(seed: WorkflowCatalogEntrySeed): boolean {
@@ -263,9 +220,11 @@ export function defaultIsActive(seed: WorkflowCatalogEntrySeed): boolean {
 }
 
 export function resolveCatalogEntryId(runtimeType: string, kind?: string): string {
-  if (runtimeType === "agent") return "agent";
+  if (runtimeType === "agent" && !kind) return "agent";
+  if (runtimeType === "agent" && kind) return `agent:${kind}`;
   if (runtimeType === "action_in_app" && !kind) return "action_in_app";
   if (runtimeType === "tool_node" && kind) return `tool_node:${kind}`;
+  if (runtimeType === "memory_node" && kind) return `memory_node:${kind}`;
   if (kind) {
     if (runtimeType === "trigger") return `trigger:${kind}`;
     if (runtimeType === "flow") return `flow:${kind}`;

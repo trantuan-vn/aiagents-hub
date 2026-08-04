@@ -2,17 +2,30 @@ import type { Node } from "@xyflow/react";
 
 import type { WorkflowNodeUIPlugin } from "./types";
 import { actionInAppUIPlugin } from "./action-in-app";
-import { agentUIPlugin } from "./agent";
-import { coreUIPlugin } from "./core";
-import { dataTransformationUIPlugin } from "./data-transformation";
-import { flowUIPlugin } from "./flow";
+import { agentUIPlugin, AGENT_KIND_UI_PLUGINS } from "./agent";
+import { coreUIPlugin, CORE_KIND_UI_PLUGINS } from "./core";
+import {
+  dataTransformationUIPlugin,
+  TRANSFORM_KIND_UI_PLUGINS,
+} from "./data-transformation";
+import { flowUIPlugin, FLOW_KIND_UI_PLUGINS, flowLoopOverItemsUIPlugin } from "./flow";
 import { formTriggerUIPlugin } from "./form";
-import { humanReviewUIPlugin } from "./human-review";
-import { memoryUIPlugin } from "./memory";
+import { humanReviewUIPlugin, HUMAN_REVIEW_CHANNEL_UI_PLUGINS } from "./human-review";
+import {
+  memoryUIPlugin,
+  MEMORY_KIND_UI_PLUGINS,
+  memoryVectorizeUIPlugin,
+} from "./memory";
 import { serviceUIPlugin } from "./service";
 import { stickyNoteUIPlugin } from "./sticky-note";
-import { toolUIPlugin } from "./tool";
-import { triggerUIPlugin } from "./trigger";
+import {
+  toolUIPlugin,
+  TOOL_KIND_UI_PLUGINS,
+  toolSaveRagUIPlugin,
+  toolGetRagUIPlugin,
+  toolGetDbInfoUIPlugin,
+} from "./tool";
+import { triggerUIPlugin, TRIGGER_KIND_UI_PLUGINS } from "./trigger";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
 import { workflowGroupUIPlugin } from "./workflow-group";
 
@@ -34,21 +47,37 @@ export * from "./workflow-group";
 
 /** Built-in UI plugins — catalog metadata + canvas components. */
 export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
-  webhookTriggerUIPlugin,
-  coreWebhookUIPlugin,
-  formTriggerUIPlugin,
+  // Family bases (catalog.visible: false for kind-expanded families)
   triggerUIPlugin,
-  agentUIPlugin,
-  serviceUIPlugin,
-  memoryUIPlugin,
   flowUIPlugin,
   coreUIPlugin,
   humanReviewUIPlugin,
-  actionInAppUIPlugin,
   dataTransformationUIPlugin,
+  actionInAppUIPlugin,
+  agentUIPlugin,
+  serviceUIPlugin,
+  memoryUIPlugin,
   toolUIPlugin,
   stickyNoteUIPlugin,
   workflowGroupUIPlugin,
+  // Kind factories
+  ...TRIGGER_KIND_UI_PLUGINS,
+  ...FLOW_KIND_UI_PLUGINS,
+  flowLoopOverItemsUIPlugin,
+  ...CORE_KIND_UI_PLUGINS,
+  ...TRANSFORM_KIND_UI_PLUGINS,
+  ...HUMAN_REVIEW_CHANNEL_UI_PLUGINS,
+  ...AGENT_KIND_UI_PLUGINS,
+  ...MEMORY_KIND_UI_PLUGINS,
+  memoryVectorizeUIPlugin,
+  ...TOOL_KIND_UI_PLUGINS,
+  toolSaveRagUIPlugin,
+  toolGetRagUIPlugin,
+  toolGetDbInfoUIPlugin,
+  // Overrides (dedicated modules — registered last so resolve-by-id wins)
+  webhookTriggerUIPlugin,
+  coreWebhookUIPlugin,
+  formTriggerUIPlugin,
 ];
 
 export type NodeCatalogCategory = WorkflowNodeUIPlugin["catalog"]["category"];
@@ -90,6 +119,10 @@ function kindFromNode(node: Node): string | undefined {
   if (typeof data.flowKind === "string") return data.flowKind;
   if (typeof data.triggerKind === "string") return data.triggerKind;
   if (typeof data.toolKind === "string") return data.toolKind;
+  if (typeof data.transformKind === "string") return data.transformKind;
+  if (typeof data.memoryKind === "string") return data.memoryKind;
+  if (typeof data.agentKind === "string") return data.agentKind;
+  if (typeof data.channel === "string" && node.type === "human_review") return data.channel;
   return undefined;
 }
 

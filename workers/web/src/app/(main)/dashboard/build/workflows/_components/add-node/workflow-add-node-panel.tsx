@@ -232,7 +232,7 @@ export function WorkflowAddNodePanel({
     if (allowedNodeTypes?.length) {
       return list.filter((c) => {
         if (c.id === "ai") {
-          return allowedNodeTypes.some((type) => ["agent", "service_node"].includes(type));
+          return allowedNodeTypes.includes("agent");
         }
         return allowedNodeTypes.includes(c.nodeType);
       });
@@ -680,8 +680,12 @@ export function WorkflowAddNodePanel({
   };
 
   const pickAgent = () => {
-    guardCatalogPick("agent", () => {
-      onPick({ type: "agent", label: t("node_agent") });
+    guardCatalogPick("agent:tools_agent", () => {
+      onPick({
+        type: "agent",
+        label: t("node_agent"),
+        extra: { agentKind: "tools_agent", promptSource: "define_below" },
+      });
     });
   };
 
@@ -891,15 +895,8 @@ export function WorkflowAddNodePanel({
               icon={Bot}
               title={t("node_agent")}
               description={t("add_category_ai_desc")}
-              disabled={!isCatalogActive("agent")}
+              disabled={!isCatalogActive("agent") && !isCatalogActive("agent:tools_agent")}
               onClick={pickAgent}
-            />
-            <CategoryRow
-              icon={Server}
-              title={t("add_ai_services_title")}
-              description={t("add_ai_services_desc")}
-              hasSubmenu
-              onClick={() => setView("services")}
             />
           </div>
         ) : null}

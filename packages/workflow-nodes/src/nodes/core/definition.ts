@@ -5,7 +5,11 @@ import {
 } from "../default-sections";
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
+import { CORE_KIND_FIELD, CORE_KINDS, CORE_OVERRIDE_KINDS, type CoreKind } from "./kinds";
 
+export { CORE_KIND_FIELD, CORE_KINDS, CORE_OVERRIDE_KINDS, type CoreKind } from "./kinds";
+
+/** Base family definition — fallback when no coreKind is set. */
 export const CORE_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   id: "core",
   runtimeType: "core",
@@ -17,15 +21,14 @@ export const CORE_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
     defaultInputSection(),
     defaultParametersSection([
       {
-        id: "coreKind",
+        id: CORE_KIND_FIELD,
         type: "select",
         labelKey: "field_core_kind",
         defaultValue: "http_request",
-        options: [
-          { value: "http_request", labelKey: "opt_core_http" },
-          { value: "code", labelKey: "opt_core_code" },
-          { value: "webhook", labelKey: "opt_core_webhook" },
-        ],
+        options: CORE_KINDS.map((value) => ({
+          value,
+          labelKey: `core_kind_${value}`,
+        })),
         order: 1,
       },
     ]),
@@ -33,6 +36,40 @@ export const CORE_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   ],
 });
 
+export function createCoreKindDefinition(kind: CoreKind): WorkflowNodeDefinition {
+  return createBuiltin({
+    id: `core:${kind}`,
+    runtimeType: "core",
+    kind,
+    nameKey: `core_kind_${kind}`,
+    descriptionKey: `core_kind_${kind}_desc`,
+    category: "core",
+    icon: "Layers",
+    defaultData: {
+      [CORE_KIND_FIELD]: kind,
+      label: kind.replace(/_/g, " "),
+    },
+    sections: [
+      defaultInputSection(),
+      defaultParametersSection([
+        {
+          id: CORE_KIND_FIELD,
+          type: "select",
+          labelKey: "field_core_kind",
+          defaultValue: kind,
+          options: CORE_KINDS.map((value) => ({
+            value,
+            labelKey: `core_kind_${value}`,
+          })),
+          order: 1,
+        },
+      ]),
+      defaultOutputSection(true),
+    ],
+  });
+}
+
+/** Override — HTTP request params (legacy runtimeType kept for graph compat). */
 export const CORE_HTTP_REQUEST_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   id: "core:http_request",
   runtimeType: "http_request",
@@ -41,6 +78,10 @@ export const CORE_HTTP_REQUEST_DEFINITION: WorkflowNodeDefinition = createBuilti
   descriptionKey: "core_kind_http_request_desc",
   category: "core",
   icon: "Globe",
+  defaultData: {
+    [CORE_KIND_FIELD]: "http_request",
+    method: "GET",
+  },
   sections: [
     defaultInputSection(),
     defaultParametersSection([
@@ -77,6 +118,7 @@ export const CORE_HTTP_REQUEST_DEFINITION: WorkflowNodeDefinition = createBuilti
   ],
 });
 
+/** Override — code params (legacy runtimeType kept for graph compat). */
 export const CORE_CODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   id: "core:code",
   runtimeType: "code",
@@ -85,6 +127,10 @@ export const CORE_CODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   descriptionKey: "core_kind_code_desc",
   category: "core",
   icon: "Braces",
+  defaultData: {
+    [CORE_KIND_FIELD]: "code",
+    language: "javascript",
+  },
   sections: [
     defaultInputSection(),
     defaultParametersSection([
@@ -110,3 +156,8 @@ export const CORE_CODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
     defaultOutputSection(true),
   ],
 });
+
+/** Factory definitions for kinds without dedicated override modules. */
+export const CORE_KIND_DEFINITIONS: WorkflowNodeDefinition[] = CORE_KINDS.filter(
+  (kind) => !CORE_OVERRIDE_KINDS.has(kind),
+).map(createCoreKindDefinition);

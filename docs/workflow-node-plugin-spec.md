@@ -458,8 +458,13 @@ Tóm tắt:
 | `trigger` | `triggerKind` | `webhook`, `schedule`, `manual` |
 | `core` | `coreKind` | `http_request`, `webhook`, `code` |
 | `flow` | `flowKind` | `if`, `switch`, `merge`, `filter` |
+| `human_review` | `channel` | `slack`, `gmail`, `telegram` |
+| `data_transformation` | `transformKind` | `edit_fields`, `filter`, `sort` |
+| `tool_node` | `toolKind` | `save-rag`, `get-rag`, `http_request` |
+| `memory_node` | `memoryKind` | `vectorize`, `simple`, `redis` |
+| `agent` | `agentKind` | `tools_agent` |
 
-**Chuẩn hóa (Phase 5):** Ưu tiên `node.type === runtimeType`; hạn chế `type: "core" + coreKind`.
+Kind-expanded families use a **factory** to generate `{runtimeType}:{kind}` definitions + BE/FE plugins. Dedicated override modules (e.g. `webhook/`, `form/`, `http-request/`, `tool/save-rag/`, `memory` vectorize panel) skip the factory and own their own files.
 
 ### 7.3 File naming
 

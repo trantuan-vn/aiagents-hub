@@ -12,6 +12,14 @@ Copy this folder to `nodes/<name>/` when adding a new built-in workflow node.
 6. Add shared definition in `packages/workflow-nodes/src/nodes/<name>/definition.ts`
 7. Add frontend UI plugin in `web/.../nodes/<name>/`
 
+## Family + kind
+
+If the node is a **sub-kind** of an existing family (`human_review`, `flow`, `core`, `trigger`, `data_transformation`):
+
+1. Prefer the family **factory** (`create*KindPlugin`) — no new folder needed for stubs
+2. Add a dedicated folder only when execute/trigger logic differs (override) — and list the kind in `*_OVERRIDE_KINDS`
+3. Kind field must be set on `node.data` (`channel`, `flowKind`, `coreKind`, `triggerKind`, `transformKind`)
+
 ## Files
 
 | File | Required | Purpose |
@@ -22,5 +30,6 @@ Copy this folder to `nodes/<name>/` when adding a new built-in workflow node.
 
 ## Reference
 
-See `nodes/webhook/` for trigger + pass-through pattern.
+See `nodes/webhook/` for trigger + pass-through override pattern.
+See `nodes/human-review/` for family + channel factory pattern.
 See `nodes/agent/` for execute-only pattern.

@@ -13,19 +13,19 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | Node | Spec | Module folders | Ghi chú |
 |------|------|----------------|---------|
 | Webhook | [`webhook.md`](./webhook.md) | `nodes/webhook/` (shared + FE + BE) | Reference Lego module |
-| Agent | [`agent.md`](./agent.md) | `nodes/agent/` | LLM execute + resource wiring |
-| Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` | Manual + form DB kinds |
-| Flow | — | `nodes/flow/` | if / switch / loop_over_items |
-| Core | — | `nodes/core/` | http_request / code kinds |
-| Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | Resource → Agent |
-| Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` (FE), `vectorize/` (shared), `memory-node/` (BE) | `memoryKind: vectorize` |
-| Tool | — | `nodes/tool/` | Agent tools; RAG subfolders |
+| Agent | [`agent.md`](./agent.md) | `nodes/agent/` | Family + `agentKind` factory (`tools_agent`) |
+| Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` | Family + `triggerKind` factory (overrides: webhook/form) |
+| Flow | — | `nodes/flow/` | Family + `flowKind` factory (override: loop_over_items) |
+| Core | — | `nodes/core/` | Family + `coreKind` factory (overrides: http/code/webhook) |
+| Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | Resource attach only (not under AI add-node) |
+| Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` | Family + `memoryKind` factory (override: vectorize panel) |
+| Tool | — | `nodes/tool/` | Family + `toolKind` factory (overrides: save/get-rag, get-db-info) |
 | Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | `toolKind: save-rag` |
 | Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | `toolKind: get-rag` |
 | Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | SQL introspect |
-| Human review | — | `nodes/human-review/` | Engine flow-control |
+| Human review | — | `nodes/human-review/` | Family + channel factory (`channel`) |
 | Action in app | — | `nodes/action-in-app/` | Integration actions |
-| Data transform | — | `nodes/data-transformation/` | Transform modes |
+| Data transform | — | `nodes/data-transformation/` | Family + `transformKind` factory |
 | Sticky note | — | `nodes/sticky-note/` | Canvas-only |
 | Workflow group | — | `nodes/workflow-group/` | Canvas-only |
 | **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | — | Graph mẫu ingest PDF + Q&A |
@@ -40,6 +40,19 @@ packages/workflow-nodes/src/nodes/<name>/definition.ts
 workers/auth-worker/.../workflows/nodes/<name>/index.ts   (+ execute.ts | trigger.ts)
 workers/web/.../workflows/_components/nodes/<name>/        (index + canvas + optional config)
 ```
+
+### Family + kind (catalog expand)
+
+Một số family (`human_review`, `data_transformation`, `flow`, `core`, `trigger`, `agent`, `tool_node`, `memory_node`) có **nhiều catalog entry** nhưng **một Lego family**:
+
+| Layer | Pattern |
+|-------|---------|
+| Kind list | `nodes/<family>/kinds.ts` hoặc `channels.ts` (single source of truth) |
+| Definitions | Base + factory `create*KindDefinition` → `*_KIND_DEFINITIONS` |
+| BE plugins | Base + factory plugins; override modules skip factory (`OVERRIDE_KINDS`) |
+| FE plugins | Base `catalog.visible: false` + kind UI plugins; override folders for custom canvas/panel |
+
+Override examples: `webhook/`, `form/`, `http-request/`, `code/`, `flow:loop_over_items`.
 
 ---
 

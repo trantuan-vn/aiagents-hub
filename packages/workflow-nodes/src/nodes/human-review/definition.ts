@@ -5,7 +5,19 @@ import {
 } from "../default-sections";
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
+import {
+  HUMAN_REVIEW_CHANNELS,
+  HUMAN_REVIEW_KIND_FIELD,
+  type HumanReviewChannel,
+} from "./channels";
 
+export {
+  HUMAN_REVIEW_CHANNELS,
+  HUMAN_REVIEW_KIND_FIELD,
+  type HumanReviewChannel,
+} from "./channels";
+
+/** Base family definition — fallback when no channel kind is set. */
 export const HUMAN_REVIEW_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   id: "human_review",
   runtimeType: "human_review",
@@ -17,17 +29,55 @@ export const HUMAN_REVIEW_DEFINITION: WorkflowNodeDefinition = createBuiltin({
     defaultInputSection(),
     defaultParametersSection([
       {
-        id: "channel",
+        id: HUMAN_REVIEW_KIND_FIELD,
         type: "select",
         labelKey: "field_review_channel",
-        defaultValue: "email",
-        options: [
-          { value: "email", labelKey: "opt_review_email" },
-          { value: "slack", labelKey: "opt_review_slack" },
-        ],
+        defaultValue: "chat",
+        options: HUMAN_REVIEW_CHANNELS.map((value) => ({
+          value,
+          labelKey: `human_review_channel_${value}`,
+        })),
         order: 1,
       },
     ]),
     defaultOutputSection(true),
   ],
 });
+
+export function createHumanReviewChannelDefinition(
+  channel: HumanReviewChannel,
+): WorkflowNodeDefinition {
+  return createBuiltin({
+    id: `human_review:${channel}`,
+    runtimeType: "human_review",
+    kind: channel,
+    nameKey: `human_review_channel_${channel}`,
+    descriptionKey: `human_review_channel_${channel}_desc`,
+    category: "human",
+    icon: "UserCheck",
+    defaultData: {
+      [HUMAN_REVIEW_KIND_FIELD]: channel,
+      label: channel.replace(/_/g, " "),
+    },
+    sections: [
+      defaultInputSection(),
+      defaultParametersSection([
+        {
+          id: HUMAN_REVIEW_KIND_FIELD,
+          type: "select",
+          labelKey: "field_review_channel",
+          defaultValue: channel,
+          options: HUMAN_REVIEW_CHANNELS.map((value) => ({
+            value,
+            labelKey: `human_review_channel_${value}`,
+          })),
+          order: 1,
+        },
+      ]),
+      defaultOutputSection(true),
+    ],
+  });
+}
+
+export const HUMAN_REVIEW_CHANNEL_DEFINITIONS: WorkflowNodeDefinition[] =
+  HUMAN_REVIEW_CHANNELS.map(createHumanReviewChannelDefinition);
