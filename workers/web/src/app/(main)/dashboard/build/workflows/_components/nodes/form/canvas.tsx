@@ -1,4 +1,2 @@
-"use client";
-
 /** Form trigger uses the shared TriggerNode canvas component. */
-export { TriggerNode as FormTriggerCanvas } from "../workflow-nodes";
+export { TriggerNode as FormTriggerCanvas } from "../trigger/canvas";

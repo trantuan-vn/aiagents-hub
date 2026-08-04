@@ -9,8 +9,8 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-import { useWorkflowEditorActions } from "../editor/workflow-editor-actions-context";
-import { useWorkflowCanvasUi } from "../canvas/workflow-canvas-ui-context";
+import { useWorkflowCanvasUi } from "../../canvas/workflow-canvas-ui-context";
+import { useWorkflowEditorActions } from "../../editor/workflow-editor-actions-context";
 
 function StickyNoteNodeInner({ data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");

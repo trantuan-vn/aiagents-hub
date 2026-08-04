@@ -1,14 +1,16 @@
 import type { WorkflowNodeUIPlugin } from "../types";
-import { AgentWorkflowNode } from "../workflow-nodes";
-import { AgentNodeConfigPanel, isAgentNode } from "../../panels/node-config/agent-node-config-panel";
+import { AgentWorkflowNode } from "./canvas";
+import { AgentNodeConfigPanel, isAgentNode } from "./config-panel";
 
-export { AgentNodeConfigPanel, isAgentNode } from "../../panels/node-config/agent-node-config-panel";
+export { AgentWorkflowNode } from "./canvas";
+export { AgentNodeConfigPanel, isAgentNode } from "./config-panel";
 
 export const agentUIPlugin: WorkflowNodeUIPlugin = {
   id: "agent",
   runtimeType: "agent",
   Canvas: AgentWorkflowNode,
   ConfigPanel: AgentNodeConfigPanel,
+  defaults: () => ({ label: "Agent", promptSource: "define_below" }),
   catalog: {
     category: "ai",
     labelKey: "node_agent",

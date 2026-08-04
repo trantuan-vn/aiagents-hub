@@ -7,8 +7,8 @@ import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
-import { useWorkflowCanvasUi } from "../canvas/workflow-canvas-ui-context";
-import { useWorkflowEditorActions } from "../editor/workflow-editor-actions-context";
+import { useWorkflowCanvasUi } from "../../canvas/workflow-canvas-ui-context";
+import { useWorkflowEditorActions } from "../../editor/workflow-editor-actions-context";
 
 export const WorkflowGroupNode = memo(function WorkflowGroupNode({ data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");

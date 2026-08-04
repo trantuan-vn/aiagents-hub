@@ -7,18 +7,20 @@ Copy this folder to `nodes/<name>/` when adding a new built-in workflow node.
 1. Read `docs/workflow-node-plugin-spec.md` and `docs/workflow-nodes/<name>.md`
 2. Create `execute.ts` if the node runs during graph execution
 3. Create `trigger.ts` if the node has an external HTTP/cron ingress
-4. Export a `WorkflowNodePlugin` from `index.ts`
-5. Register in `nodes/index.ts` → `registerAllNodes()`
-6. Add shared definition in `packages/workflow-nodes/src/nodes/<name>/`
+4. Export a `WorkflowNodePlugin` (`*Plugin`) from `index.ts`
+5. Register the plugin import in `nodes/index.ts` → `BUILTIN_PLUGINS`
+6. Add shared definition in `packages/workflow-nodes/src/nodes/<name>/definition.ts`
+7. Add frontend UI plugin in `web/.../nodes/<name>/`
 
 ## Files
 
 | File | Required | Purpose |
 |------|----------|---------|
-| `index.ts` | Yes | Plugin entry — id, runtimeType, kind, register |
+| `index.ts` | Yes | Plugin entry — id, runtimeType, kind, execute/trigger/skip |
 | `execute.ts` | If executable | `execute(ctx) => NodeOutput` |
 | `trigger.ts` | If external trigger | `create`, `handle`, optional `delete` |
 
 ## Reference
 
 See `nodes/webhook/` for trigger + pass-through pattern.
+See `nodes/agent/` for execute-only pattern.

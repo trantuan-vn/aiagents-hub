@@ -1,5 +1,7 @@
 /** Public entry points for agent tool_node runtimes. */
 
+import type { WorkflowNodePlugin } from '../types.js';
+
 export { executeSaveRag } from './save-rag/execute.js';
 export type {
   SaveRagChunkInput,
@@ -37,3 +39,10 @@ export type { PdfFileInput } from './save-rag/pdf-extract.js';
 
 export { resolveRagResources, toolNodeConfig } from './shared/rag-context.js';
 export type { RagResourceContext } from './shared/rag-context.js';
+
+/** Tool resource node on the canvas — agent tools run via agent runtime, not graph execute. */
+export const toolNodePlugin: WorkflowNodePlugin = {
+  id: 'tool_node',
+  runtimeType: 'tool_node',
+  skipExecution: true,
+};

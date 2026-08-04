@@ -1,115 +1,54 @@
 import type { Node } from "@xyflow/react";
 
 import type { WorkflowNodeUIPlugin } from "./types";
+import { actionInAppUIPlugin } from "./action-in-app";
 import { agentUIPlugin } from "./agent";
+import { coreUIPlugin } from "./core";
+import { dataTransformationUIPlugin } from "./data-transformation";
+import { flowUIPlugin } from "./flow";
 import { formTriggerUIPlugin } from "./form";
+import { humanReviewUIPlugin } from "./human-review";
 import { memoryUIPlugin } from "./memory";
 import { serviceUIPlugin } from "./service";
+import { stickyNoteUIPlugin } from "./sticky-note";
+import { toolUIPlugin } from "./tool";
+import { triggerUIPlugin } from "./trigger";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
-import {
-  ActionNode,
-  AgentWorkflowNode,
-  CoreNode,
-  FlowNode,
-  HumanReviewNode,
-  MemoryWorkflowNode,
-  ServiceWorkflowNode,
-  ToolWorkflowNode,
-  TransformNode,
-  TriggerNode,
-  workflowNodeTypes,
-} from "./workflow-nodes";
+import { workflowGroupUIPlugin } from "./workflow-group";
 
 export * from "./types";
-export * from "./workflow-sticky-note-node";
 export * from "./agent";
 export * from "./form";
 export * from "./memory";
 export * from "./service";
 export * from "./webhook";
-// workflow-nodes exports are included below after plugin setup
-
-function plugin(
-  partial: Omit<WorkflowNodeUIPlugin, "Canvas"> & { Canvas?: WorkflowNodeUIPlugin["Canvas"] },
-  Canvas: WorkflowNodeUIPlugin["Canvas"],
-): WorkflowNodeUIPlugin {
-  return { ...partial, Canvas };
-}
+export * from "./trigger";
+export * from "./flow";
+export * from "./core";
+export * from "./human-review";
+export * from "./action-in-app";
+export * from "./data-transformation";
+export * from "./tool";
+export * from "./sticky-note";
+export * from "./workflow-group";
 
 /** Built-in UI plugins — catalog metadata + canvas components. */
 export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   webhookTriggerUIPlugin,
   coreWebhookUIPlugin,
   formTriggerUIPlugin,
+  triggerUIPlugin,
   agentUIPlugin,
   serviceUIPlugin,
   memoryUIPlugin,
-  plugin(
-    {
-      id: "trigger",
-      runtimeType: "trigger",
-      catalog: { category: "trigger", labelKey: "node_trigger", descriptionKey: "node_trigger_desc", icon: "Play" },
-    },
-    TriggerNode,
-  ),
-  plugin(
-    {
-      id: "flow",
-      runtimeType: "flow",
-      catalog: { category: "flow", labelKey: "node_flow", descriptionKey: "node_flow_desc", icon: "GitBranch" },
-    },
-    FlowNode,
-  ),
-  plugin(
-    {
-      id: "core",
-      runtimeType: "core",
-      catalog: { category: "core", labelKey: "node_core", descriptionKey: "node_core_desc", icon: "Layers" },
-    },
-    CoreNode,
-  ),
-  plugin(
-    {
-      id: "human_review",
-      runtimeType: "human_review",
-      catalog: {
-        category: "human",
-        labelKey: "node_human_review",
-        descriptionKey: "node_human_review_desc",
-        icon: "UserCheck",
-      },
-    },
-    HumanReviewNode,
-  ),
-  plugin(
-    {
-      id: "action_in_app",
-      runtimeType: "action_in_app",
-      catalog: { category: "action", labelKey: "node_action", descriptionKey: "node_action_desc", icon: "Zap" },
-    },
-    ActionNode,
-  ),
-  plugin(
-    {
-      id: "data_transformation",
-      runtimeType: "data_transformation",
-      catalog: {
-        category: "transform",
-        labelKey: "node_transform",
-        descriptionKey: "node_transform_desc",
-        icon: "Wrench",
-      },
-    },
-    TransformNode,
-  ),
-  plugin(
-    {
-      id: "tool_node",
-      runtimeType: "tool_node",
-      catalog: { category: "tool", labelKey: "node_tool", descriptionKey: "node_tool_desc", icon: "Wrench", visible: false },
-    },
-    ToolWorkflowNode,
-  ),
+  flowUIPlugin,
+  coreUIPlugin,
+  humanReviewUIPlugin,
+  actionInAppUIPlugin,
+  dataTransformationUIPlugin,
+  toolUIPlugin,
+  stickyNoteUIPlugin,
+  workflowGroupUIPlugin,
 ];
 
 export type NodeCatalogCategory = WorkflowNodeUIPlugin["catalog"]["category"];
@@ -184,6 +123,14 @@ export function createNodeDataFromPlugin(
   return { type: plugin.runtimeType, data };
 }
 
+/** React Flow nodeTypes map — first plugin Canvas wins per runtimeType. */
+export const workflowNodeTypes: Record<string, WorkflowNodeUIPlugin["Canvas"]> = {};
+for (const plugin of BUILTIN_UI_PLUGINS) {
+  if (!workflowNodeTypes[plugin.runtimeType]) {
+    workflowNodeTypes[plugin.runtimeType] = plugin.Canvas;
+  }
+}
+
 export {
   ActionNode,
   AgentWorkflowNode,
@@ -192,8 +139,9 @@ export {
   HumanReviewNode,
   MemoryWorkflowNode,
   ServiceWorkflowNode,
+  StickyNoteNode,
   ToolWorkflowNode,
   TransformNode,
   TriggerNode,
-  workflowNodeTypes,
-};
+  WorkflowGroupNode,
+} from "./workflow-nodes";

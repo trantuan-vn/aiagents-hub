@@ -1,15 +1,20 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
 import type { NodePluginRegistry, WorkflowNodePlugin } from './types.js';
-import { executeActionInApp } from './action-in-app/execute.js';
-import { executeAgent } from './agent/execute.js';
-import { executeCode } from './code/execute.js';
-import { executeCore } from './core/execute.js';
-import { executeDataTransformation } from './data-transformation/execute.js';
-import { executeFlow } from './flow/execute.js';
-import { executeHttpRequest } from './http-request/execute.js';
+import { actionInAppPlugin } from './action-in-app/index.js';
+import { agentPlugin } from './agent/index.js';
+import { codePlugin, coreCodePlugin } from './code/index.js';
+import { corePlugin } from './core/index.js';
+import { dataTransformationPlugin } from './data-transformation/index.js';
+import { flowPlugin } from './flow/index.js';
+import { coreHttpRequestPlugin, httpRequestPlugin } from './http-request/index.js';
 import { humanReviewPlugin } from './human-review/index.js';
-import { executeTrigger } from './trigger/execute.js';
+import { memoryNodePlugin } from './memory-node/index.js';
+import { serviceNodePlugin } from './service-node/index.js';
+import { stickyNotePlugin } from './sticky-note/index.js';
+import { toolNodePlugin } from './tool/index.js';
+import { triggerPlugin } from './trigger/index.js';
 import { coreWebhookPlugin, webhookTriggerPlugin } from './webhook/index.js';
+import { workflowGroupPlugin } from './workflow-group/index.js';
 
 function kindFromNode(node: WorkflowDefinition['nodes'][number]): string | undefined {
   const data = (node.data ?? {}) as Record<string, unknown>;
@@ -20,24 +25,24 @@ function kindFromNode(node: WorkflowDefinition['nodes'][number]): string | undef
 }
 
 const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
-  { id: 'trigger', runtimeType: 'trigger', execute: executeTrigger },
+  triggerPlugin,
   webhookTriggerPlugin,
-  { id: 'http_request', runtimeType: 'http_request', execute: executeHttpRequest },
-  { id: 'core:http_request', runtimeType: 'http_request', kind: 'http_request', execute: executeHttpRequest },
-  { id: 'code', runtimeType: 'code', execute: executeCode },
-  { id: 'core:code', runtimeType: 'code', kind: 'code', execute: executeCode },
-  { id: 'agent', runtimeType: 'agent', execute: executeAgent },
-  { id: 'flow', runtimeType: 'flow', execute: executeFlow },
-  { id: 'core', runtimeType: 'core', execute: executeCore },
+  httpRequestPlugin,
+  coreHttpRequestPlugin,
+  codePlugin,
+  coreCodePlugin,
+  agentPlugin,
+  flowPlugin,
+  corePlugin,
   coreWebhookPlugin,
-  { id: 'action_in_app', runtimeType: 'action_in_app', execute: executeActionInApp },
-  { id: 'data_transformation', runtimeType: 'data_transformation', execute: executeDataTransformation },
+  actionInAppPlugin,
+  dataTransformationPlugin,
   humanReviewPlugin,
-  { id: 'service_node', runtimeType: 'service_node', skipExecution: true },
-  { id: 'memory_node', runtimeType: 'memory_node', skipExecution: true },
-  { id: 'tool_node', runtimeType: 'tool_node', skipExecution: true },
-  { id: 'sticky_note', runtimeType: 'sticky_note', skipExecution: true },
-  { id: 'workflow_group', runtimeType: 'workflow_group', skipExecution: true },
+  serviceNodePlugin,
+  memoryNodePlugin,
+  toolNodePlugin,
+  stickyNotePlugin,
+  workflowGroupPlugin,
 ];
 
 class Registry implements NodePluginRegistry {

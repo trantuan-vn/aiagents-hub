@@ -1,8 +1,9 @@
 import type { WorkflowNodeUIPlugin } from "../types";
-import { ServiceWorkflowNode } from "../workflow-nodes";
-import { isServiceNode, ServiceNodeConfigPanel } from "../../panels/node-config/service-node-config-panel";
+import { ServiceWorkflowNode } from "./canvas";
+import { isServiceNode, ServiceNodeConfigPanel } from "./config-panel";
 
-export { isServiceNode, ServiceNodeConfigPanel } from "../../panels/node-config/service-node-config-panel";
+export { ServiceWorkflowNode } from "./canvas";
+export { isServiceNode, ServiceNodeConfigPanel } from "./config-panel";
 
 export const serviceUIPlugin: WorkflowNodeUIPlugin = {
   id: "service_node",

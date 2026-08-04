@@ -10,24 +10,36 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 
 ## Node specs
 
-| Node | Spec | Trạng thái | Ghi chú |
-|------|------|------------|---------|
-| Webhook | [`webhook.md`](./webhook.md) | Reference | Trigger + custom panel + D1 trigger |
-| HTTP Request | — | Planned | — |
-| Agent | [`agent.md`](./agent.md) | Draft (review) | LLM execute + resource wiring |
-| Service | [`service.md`](./service.md) | Draft | Resource → Agent Service handle |
-| Vectorize | [`vectorize.md`](./vectorize.md) | Draft | `memory_node` + `memoryKind: vectorize` |
-| Save RAG | [`saveRag.md`](./saveRag.md) | Draft | `tool_node` + `toolKind: save-rag` |
-| Get RAG | [`getRag.md`](./getRag.md) | Draft | `tool_node` + `toolKind: get-rag` |
-| **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | Draft | Graph mẫu ingest PDF + Q&A |
-| **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | Active | Kế hoạch chia phase coding Cursor |
-| Trigger (form DB) | [`trigger.md`](./trigger.md) | Draft | Form trigger + DB connection + per_table fan-out |
-| Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | Draft | Tool introspect bảng + SQL history |
-| schema.md | [`schema.md`](./schema.md) | Draft | Artifact — table schema document |
-| sqlexample.md | [`sqlexample.md`](./sqlexample.md) | Draft | Artifact — SQL examples document |
-| Code | — | Planned | — |
-| Flow (if/switch/merge) | — | Planned | — |
-| Schedule | — | Planned | — |
+| Node | Spec | Module folders | Ghi chú |
+|------|------|----------------|---------|
+| Webhook | [`webhook.md`](./webhook.md) | `nodes/webhook/` (shared + FE + BE) | Reference Lego module |
+| Agent | [`agent.md`](./agent.md) | `nodes/agent/` | LLM execute + resource wiring |
+| Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` | Manual + form DB kinds |
+| Flow | — | `nodes/flow/` | if / switch / loop_over_items |
+| Core | — | `nodes/core/` | http_request / code kinds |
+| Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | Resource → Agent |
+| Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` (FE), `vectorize/` (shared), `memory-node/` (BE) | `memoryKind: vectorize` |
+| Tool | — | `nodes/tool/` | Agent tools; RAG subfolders |
+| Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | `toolKind: save-rag` |
+| Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | `toolKind: get-rag` |
+| Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | SQL introspect |
+| Human review | — | `nodes/human-review/` | Engine flow-control |
+| Action in app | — | `nodes/action-in-app/` | Integration actions |
+| Data transform | — | `nodes/data-transformation/` | Transform modes |
+| Sticky note | — | `nodes/sticky-note/` | Canvas-only |
+| Workflow group | — | `nodes/workflow-group/` | Canvas-only |
+| **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | — | Graph mẫu ingest PDF + Q&A |
+| **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | — | Kế hoạch chia phase |
+| schema.md | [`schema.md`](./schema.md) | — | Artifact — table schema |
+| sqlexample.md | [`sqlexample.md`](./sqlexample.md) | — | Artifact — SQL examples |
+
+### Module layout (mỗi node = 1 Lego)
+
+```
+packages/workflow-nodes/src/nodes/<name>/definition.ts
+workers/auth-worker/.../workflows/nodes/<name>/index.ts   (+ execute.ts | trigger.ts)
+workers/web/.../workflows/_components/nodes/<name>/        (index + canvas + optional config)
+```
 
 ---
 

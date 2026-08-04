@@ -1,11 +1,9 @@
 import type { WorkflowNodeUIPlugin } from "../types";
-import { MemoryWorkflowNode } from "../workflow-nodes";
-import {
-  isVectorizeMemoryNode,
-  VectorizeNodeConfigPanel,
-} from "../../panels/node-config/vectorize-node-config-panel";
+import { MemoryWorkflowNode } from "./canvas";
+import { isVectorizeMemoryNode, VectorizeNodeConfigPanel } from "./config-panel";
 
-export { isVectorizeMemoryNode, VectorizeNodeConfigPanel } from "../../panels/node-config/vectorize-node-config-panel";
+export { MemoryWorkflowNode } from "./canvas";
+export { isVectorizeMemoryNode, VectorizeNodeConfigPanel } from "./config-panel";
 
 export const memoryUIPlugin: WorkflowNodeUIPlugin = {
   id: "memory_node",
