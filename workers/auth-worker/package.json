@@ -8,6 +8,7 @@
   },
   "main": "dist/src/index.js",
   "dependencies": {
+    "@aiagents-hub/oracle-db": "*",
     "@aiagents-hub/workflow-nodes": "*",
     "@ai-sdk/provider": "^3.0.8",
     "@simplewebauthn/server": "^10.0.0",

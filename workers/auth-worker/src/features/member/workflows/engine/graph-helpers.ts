@@ -32,12 +32,29 @@ export function isResourceNodeType(type: string): boolean {
   return type === 'service_node' || type === 'memory_node' || type === 'tool_node';
 }
 
+/** Types that never run on the data-flow path (tools may run when wired in/out). */
 export function isNonExecutableNodeType(type: string): boolean {
-  return isResourceNodeType(type) || type === 'sticky_note' || type === 'workflow_group';
+  return type === 'service_node' || type === 'memory_node' || type === 'sticky_note' || type === 'workflow_group';
+}
+
+/** True when a tool_node is connected via in/out data-flow (pipeline), not only Agent tools. */
+export function isToolNodeOnDataFlow(definition: WorkflowDefinition, nodeId: string): boolean {
+  return definition.edges.some(
+    (e) => (e.source === nodeId || e.target === nodeId) && isDataFlowEdge(e),
+  );
+}
+
+export function isNonExecutableNode(
+  node: { id: string; type: string },
+  definition: WorkflowDefinition,
+): boolean {
+  if (isNonExecutableNodeType(node.type)) return true;
+  if (node.type === 'tool_node') return !isToolNodeOnDataFlow(definition, node.id);
+  return false;
 }
 
 export function getExecutableNodes(definition: WorkflowDefinition): WorkflowDefinition['nodes'] {
-  return definition.nodes.filter((n) => !isNonExecutableNodeType(n.type));
+  return definition.nodes.filter((n) => !isNonExecutableNode(n, definition));
 }
 
 export function getIncomingDataFlowEdges(
@@ -89,7 +106,7 @@ export function mergeParentsReady(
 
 export function topologicalMainFlowOrder(definition: WorkflowDefinition): string[] {
   const { nodes, edges } = definition;
-  const executableIds = nodes.filter((n) => !isNonExecutableNodeType(n.type)).map((n) => n.id);
+  const executableIds = nodes.filter((n) => !isNonExecutableNode(n, definition)).map((n) => n.id);
   const executableSet = new Set(executableIds);
   const mainEdges = edges.filter((e) => isDataFlowEdge(e) && (e.sourceHandle ?? 'out') === 'out');
 
@@ -148,6 +165,27 @@ export function gatherMainFlowInputs(
 
   const lastParent = outputs[parents[parents.length - 1]] ?? {};
   return { ...lastParent, ...merged };
+}
+
+export function parseWorkflowExecuteInput(input?: string): NodeOutput {
+  if (!input?.trim()) return {};
+  try {
+    const parsed = JSON.parse(input) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed as NodeOutput;
+    return { value: parsed };
+  } catch {
+    return { text: input };
+  }
+}
+
+export function isEmptyNodeInput(input: NodeOutput): boolean {
+  const { parents, ...rest } = input;
+  if (Object.keys(rest).length) return false;
+  if (!parents || typeof parents !== 'object') return true;
+  return Object.values(parents as Record<string, unknown>).every((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return true;
+    return Object.keys(value as Record<string, unknown>).length === 0;
+  });
 }
 
 export interface AgentResourceContext {

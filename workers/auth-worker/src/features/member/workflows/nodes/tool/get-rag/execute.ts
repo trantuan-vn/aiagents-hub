@@ -4,6 +4,8 @@ import {
   queryCollection,
   type VectorMatch,
 } from '../../../rag-vector.js';
+import type { NodeContext, NodeOutput } from '../../types.js';
+import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 import { resolveRagResources, toolNodeConfig } from '../shared/rag-context.js';
 
 export type GetRagInput = {
@@ -74,4 +76,44 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
 
   const snippets = matches.map((m) => mapMatch(m, includeMetadata));
   return { snippets, count: snippets.length };
+}
+
+function queryFromInput(ctx: NodeContext): string {
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  const items = pipelineItems(ctx.nodeInput);
+  const item = items[0] ?? ctx.nodeInput;
+  const fromField = resolvePipelineField(data.queryField, item, ctx.nodeInput, [
+    'query',
+    'question',
+    'text',
+  ]);
+  if (fromField.trim()) return fromField;
+
+  const body = (ctx.nodeInput.body ?? item.body) as Record<string, unknown> | undefined;
+  if (body && typeof body === 'object') {
+    const q = body.question ?? body.query ?? body.text;
+    if (q != null) return String(q);
+  }
+  return String(ctx.input ?? ctx.nodeInput.text ?? '').trim();
+}
+
+/** Graph-path execute: retrieve snippets for the current item / webhook question. */
+export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
+  const query = queryFromInput(ctx);
+  if (!query) {
+    return { snippets: [], count: 0, text: '', query: '' };
+  }
+  const result = await executeGetRag({
+    env: ctx.c.env,
+    definition: ctx.definition,
+    agentId: ctx.node.id,
+    input: { query },
+    ownerId: ctx.meta.ownerId,
+    workflowId: ctx.meta.workflowId,
+  });
+  return {
+    ...result,
+    query,
+    text: result.snippets.map((s) => s.text).join('\n\n'),
+  };
 }

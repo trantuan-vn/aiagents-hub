@@ -28,10 +28,12 @@ import {
   getOutgoingDataFlowEdges,
   getWorkflowEntryNodeIds,
   isDataFlowEdge,
+  isEmptyNodeInput,
   isMergeFlowNode,
-  isNonExecutableNodeType,
+  isNonExecutableNode,
   mergeMode,
   mergeParentsReady,
+  parseWorkflowExecuteInput,
 } from './graph-helpers.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
@@ -318,7 +320,7 @@ function scheduleDownstream(
     }
 
     const target = nodeById.get(edge.target);
-    if (!target || isNonExecutableNodeType(target.type)) continue;
+    if (!target || isNonExecutableNode(target, definition)) continue;
 
     // Loop branch feeds back into an already-visited Loop Over Items node.
     if (
@@ -391,7 +393,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     if (engine.visited.includes(nodeId) || engine.skipped.includes(nodeId)) continue;
 
     const node = nodeById.get(nodeId);
-    if (!node || isNonExecutableNodeType(node.type)) {
+    if (!node || isNonExecutableNode(node, definition)) {
       engine.visited.push(nodeId);
       continue;
     }
@@ -405,7 +407,12 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       continue;
     }
 
-    const nodeInput = gatherMainFlowInputs(nodeId, definition.edges, engine.outputs);
+    const gathered = gatherMainFlowInputs(nodeId, definition.edges, engine.outputs);
+    const fallback = parseWorkflowExecuteInput(persisted.input);
+    const nodeInput =
+      isEmptyNodeInput(gathered) && Object.keys(fallback).length
+        ? { ...fallback, parents: gathered.parents }
+        : gathered;
     const started = Date.now();
     const log: ExecutionStepLog = {
       nodeId,
@@ -519,7 +526,10 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     } catch (e) {
       log.status = 'error';
       log.error = e instanceof Error ? e.message : String(e);
+      log.output = { error: log.error };
       engine.steps.push({ ...log, durationMs: Date.now() - started });
+      engine.outputs[nodeId] = log.output as NodeOutput;
+      engine.finalOutput = log.output;
       return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
     }
   }
@@ -528,6 +538,16 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
 }
 
 /** Persist the latest engine snapshot + result onto the execution record. */
+const MAX_PERSIST_BYTES = 256_000;
+
+function capJson(value: unknown, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  const json = JSON.stringify(value);
+  if (json.length <= MAX_PERSIST_BYTES) return json;
+  console.warn(`[persistResult] ${label} too large (${json.length} bytes), truncating`);
+  return JSON.stringify({ _truncated: true, byteLength: json.length });
+}
+
 async function persistResult(
   userDO: DurableObjectStub<UserDO>,
   executionId: number,
@@ -537,8 +557,8 @@ async function persistResult(
   const terminal = result.status !== 'pending_human';
   await updateExecution(userDO, executionId, {
     status: result.status,
-    state: JSON.stringify(persisted),
-    output: result.output !== undefined ? JSON.stringify(result.output) : undefined,
+    state: capJson(persisted, 'state') ?? '{}',
+    output: capJson(result.output, 'output'),
     totalCostVnd: persisted.engine.totalCostVnd,
     stepCount: persisted.engine.steps.length,
     pendingNodeId: result.pendingNodeId ?? '',

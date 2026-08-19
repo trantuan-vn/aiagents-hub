@@ -1,6 +1,16 @@
 import { resolveCredential } from '../../../storage/credentials.js';
 import { toolNodeConfig } from '../shared/rag-context.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
+import type { NodeContext, NodeOutput } from '../../types.js';
+import {
+  isOracleConnectionType,
+  pickUpstreamString,
+  resolveOracleConnectConfig,
+  resolveOracleSchema,
+  type OracleConnectConfig,
+} from './connect-config.js';
+import { ragDocumentsFromDbInfo } from './documents.js';
+import { introspectOracleTable, listOracleTables } from './oracle.js';
 
 export type DbColumnInfo = {
   name: string;
@@ -55,6 +65,9 @@ type DbConnection = {
   type: string;
   credentialKey?: string;
   databaseId?: string;
+  user?: string;
+  password?: string;
+  connectString?: string;
 };
 
 async function listD1Tables(db: D1Database): Promise<string[]> {
@@ -148,12 +161,32 @@ async function fetchSqlHistory(
   }
 }
 
+function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnection): OracleConnectConfig | null {
+  return resolveOracleConnectConfig({
+    ...source,
+    ...(connection ?? {}),
+    connection: connection ?? source.connection,
+  });
+}
+
 export async function listDatabaseTables(
   env: Env,
   connection: DbConnection,
   schemaName = 'public',
   tableFilter = '*',
 ): Promise<string[]> {
+  const oracleConfig = oracleConfigFrom(connection, connection);
+  if (oracleConfig || isOracleConnectionType(connection.type)) {
+    if (!oracleConfig) {
+      throw new Error(
+        'get_db_info: Oracle user, password, and connectString are required from the previous node',
+      );
+    }
+    const owner = resolveOracleSchema(schemaName, oracleConfig.user);
+    const tables = await listOracleTables(oracleConfig, owner, env);
+    return filterTables(tables, tableFilter);
+  }
+
   if (connection.type === 'd1') {
     const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
     if (!db) return [];
@@ -196,10 +229,16 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
   const { env, definition, agentId, triggerContext, input } = params;
   const config = toolNodeConfig(definition, agentId, 'get-db-info') ?? {};
 
+  const connection = (triggerContext.connection ?? {}) as DbConnection;
+  const oracleConfig = oracleConfigFrom(triggerContext, connection);
   const dbId = String(triggerContext.dbId ?? triggerContext.databaseId ?? '');
-  const schemaName = input.schemaName ?? String(triggerContext.schemaName ?? 'public');
   const tableName = input.tableName ?? String(triggerContext.tableName ?? '');
   if (!tableName) throw new Error('get_db_info: tableName is required');
+
+  const requestedSchema = input.schemaName ?? String(triggerContext.schemaName ?? 'public');
+  const schemaName = oracleConfig
+    ? resolveOracleSchema(requestedSchema, oracleConfig.user)
+    : requestedSchema;
 
   const limits = (triggerContext.limits ?? {}) as Record<string, unknown>;
   const sampleLimit =
@@ -210,12 +249,20 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
     (Number(config.sqlHistoryLimit ?? limits.sqlHistoryLimit ?? 10) || 10);
   const historySource = String(config.sqlHistorySource ?? 'audit_log');
 
-  const connection = (triggerContext.connection ?? {}) as DbConnection;
-  const connType = String(connection.type ?? triggerContext.connectionType ?? 'd1');
+  const connType = String(
+    connection.type ?? triggerContext.connectionType ?? (oracleConfig ? 'oracle' : 'd1'),
+  );
 
   let introspection: Omit<GetDbInfoResult, 'dbId' | 'schemaName' | 'tableName' | 'sqlHistory'>;
 
-  if (connType === 'd1') {
+  if (oracleConfig || isOracleConnectionType(connType)) {
+    if (!oracleConfig) {
+      throw new Error(
+        'get_db_info: Oracle user, password, and connectString are required from the previous node',
+      );
+    }
+    introspection = await introspectOracleTable(oracleConfig, schemaName, tableName, sampleLimit, env);
+  } else if (connType === 'd1') {
     const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
     if (!db) throw new Error('get_db_info: D1 binding not configured');
     introspection = await introspectD1Table(db, tableName, sampleLimit);
@@ -255,5 +302,119 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
     ...introspection,
     sampleRows,
     sqlHistory,
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function triggerContextFromNodeInput(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
+  const fields = asRecord(nodeInput.fields);
+  const merged = { ...fields, ...nodeInput, ...data };
+  const oracleConfig = resolveOracleConnectConfig(merged);
+  const defaultType = oracleConfig ? 'oracle' : 'd1';
+  const connectionType = String(
+    nodeInput.connectionType ?? fields.connectionType ?? data.connectionType ?? defaultType,
+  );
+  const incomingConnection = asRecord(nodeInput.connection);
+  const tableName =
+    pickUpstreamString(merged, ['tableName', 'table_name']) || String(data.tableName ?? '');
+  const schemaName =
+    pickUpstreamString(merged, ['schemaName', 'schema_name', 'owner', 'schema']) ||
+    String(data.schemaName ?? 'public');
+  return {
+    ...fields,
+    ...nodeInput,
+    dbId:
+      pickUpstreamString(merged, ['dbId', 'databaseId', 'database_id']) ||
+      String(data.databaseId ?? ''),
+    databaseId:
+      pickUpstreamString(merged, ['databaseId', 'dbId', 'database_id']) ||
+      String(data.databaseId ?? ''),
+    schemaName,
+    tableName,
+    tableFilter:
+      pickUpstreamString(merged, ['tableFilter', 'table_filter']) || String(data.tableFilter ?? '*'),
+    connectionType,
+    credentialKey: nodeInput.credentialKey ?? fields.credentialKey ?? data.credentialKey ?? '',
+    connection: {
+      type: String(incomingConnection.type ?? connectionType),
+      credentialKey: String(
+        incomingConnection.credentialKey ?? nodeInput.credentialKey ?? fields.credentialKey ?? data.credentialKey ?? '',
+      ),
+      databaseId: String(
+        incomingConnection.databaseId ?? nodeInput.databaseId ?? nodeInput.dbId ?? fields.databaseId ?? data.databaseId ?? '',
+      ),
+      ...(oracleConfig ?? {}),
+    },
+    limits: nodeInput.limits ?? {
+      sampleRowLimit: data.sampleRowLimit ?? 10,
+      sqlHistoryLimit: data.sqlHistoryLimit ?? 10,
+    },
+  };
+}
+
+/** Graph-path execute: introspect table(s) and emit RAG documents as loop `items`. */
+export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOutput> {
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  const triggerContext = triggerContextFromNodeInput(ctx.nodeInput, data);
+  const connection = asRecord(triggerContext.connection) as DbConnection;
+  const oracleConfig = oracleConfigFrom(triggerContext, connection);
+  const schemaName = oracleConfig
+    ? resolveOracleSchema(String(triggerContext.schemaName ?? ''), oracleConfig.user)
+    : String(triggerContext.schemaName ?? 'public');
+  const tableFilter = String(triggerContext.tableFilter ?? '*');
+  const namedTable = String(triggerContext.tableName ?? '').trim();
+
+  const tables = namedTable
+    ? [namedTable]
+    : await listDatabaseTables(ctx.c.env, connection, schemaName, tableFilter);
+
+  if (!tables.length) {
+    throw new Error(
+      oracleConfig
+        ? `get_db_info: no tables found in Oracle schema ${schemaName} (set tableName on the form, or check the user can see ALL_TABLES)`
+        : 'get_db_info: no tables found (previous node must provide user/password/connectString or u/p/c, and tableName)',
+    );
+  }
+
+  const maxTables = 25;
+  const selected = tables.slice(0, maxTables);
+  const sampleLimit = Math.min(Number(triggerContext.limits?.sampleRowLimit ?? 3), 5);
+  const infos: GetDbInfoResult[] = [];
+  for (const tableName of selected) {
+    infos.push(
+      await executeGetDbInfo({
+        env: ctx.c.env,
+        definition: ctx.definition,
+        agentId: ctx.node.id,
+        triggerContext: { ...triggerContext, tableName },
+        input: { tableName, schemaName, sampleRowLimit: sampleLimit },
+      }),
+    );
+  }
+
+  for (const info of infos) {
+    info.sampleRows = info.sampleRows.slice(0, sampleLimit).map((row) => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
+      }
+      return out;
+    });
+  }
+
+  const items = infos.flatMap((info) => ragDocumentsFromDbInfo(info));
+  return {
+    dbId: String(triggerContext.dbId ?? ''),
+    schemaName,
+    tableName: namedTable || selected.join(','),
+    tables,
+    items,
+    count: items.length,
+    tableCount: selected.length,
   };
 }

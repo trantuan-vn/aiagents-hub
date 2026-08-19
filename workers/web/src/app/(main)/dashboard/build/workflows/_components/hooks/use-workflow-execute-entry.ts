@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import {
   buildWebhookItemOutput,
   normalizeWebhookItemOutput,
@@ -29,6 +29,26 @@ import { useWorkflowRunFromNode } from "./use-workflow-run-from-node";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
+function isExecuteDataFlowEdge(edge: Edge): boolean {
+  const targetHandle = edge.targetHandle ?? "in";
+  if (targetHandle !== "in") return false;
+  const sourceHandle = edge.sourceHandle ?? "out";
+  return sourceHandle === "out" || sourceHandle === "true" || sourceHandle === "false" || sourceHandle === "loop" || sourceHandle === "done" || sourceHandle.startsWith("out_");
+}
+
+function upstreamExecuteInput(nodeId: string, nodes: Node[], edges: Edge[]): string | undefined {
+  const parentEdge = edges.find((e) => e.target === nodeId && isExecuteDataFlowEdge(e));
+  if (!parentEdge) return undefined;
+  const parent = nodes.find((n) => n.id === parentEdge.source);
+  const output = (parent?.data as Record<string, unknown> | undefined)?._output;
+  if (!output || typeof output !== "object" || Array.isArray(output)) return undefined;
+  try {
+    return JSON.stringify(output);
+  } catch {
+    return undefined;
+  }
+}
+
 function resolveWebhookPath(node: Node): string {
   const data = (node.data ?? {}) as Record<string, unknown>;
   const custom = String(data.webhookPath ?? "").trim().replace(/^\/+/, "");
@@ -43,6 +63,11 @@ function applyStepOutputs(
   for (const step of steps) {
     if (step.status === "success" && step.output != null) {
       patchNodeDataById(step.nodeId, { _output: step.output, _outputPinned: true });
+    } else if (step.status === "error") {
+      patchNodeDataById(step.nodeId, {
+        _output: step.output ?? { error: step.error ?? "Execution failed" },
+        _outputPinned: true,
+      });
     }
   }
 }
@@ -51,12 +76,14 @@ export function useWorkflowExecuteEntry({
   workflowId,
   ownerId,
   nodes,
+  edges = [],
   patchNodeDataById,
   readOnly,
 }: {
   workflowId?: number;
   ownerId?: string;
   nodes: Node[];
+  edges?: Edge[];
   patchNodeDataById?: (nodeId: string, patch: Record<string, unknown>) => void;
   readOnly?: boolean;
 }) {
@@ -191,7 +218,9 @@ export function useWorkflowExecuteEntry({
         if (record.status === "completed") toast.success(tExecute("completed"));
         else if (record.status === "pending_human") toast.message(tExecute("pending_human"));
         else if (record.status === "cancelled") toast.message(tExecute("cancelled"));
-        else if (record.status === "failed") toast.error(tExecute("failed"));
+        else if (record.status === "failed") {
+          toast.error(String(record.error ?? tExecute("failed")));
+        }
         else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       } catch {
         if (event.status === "completed") {
@@ -288,9 +317,9 @@ export function useWorkflowExecuteEntry({
         await startFormTest(nodeId);
         return;
       }
-      await runFromNode(nodeId);
+      await runFromNode(nodeId, upstreamExecuteInput(nodeId, nodes, edges));
     },
-    [listeningNodeId, nodes, runFromNode, startFormTest, startWebhookListen, stopListen],
+    [listeningNodeId, nodes, edges, runFromNode, startFormTest, startWebhookListen, stopListen],
   );
 
   return {

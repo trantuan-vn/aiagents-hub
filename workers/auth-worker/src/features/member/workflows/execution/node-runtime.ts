@@ -16,9 +16,17 @@ type Json = unknown;
 // Template interpolation: resolves {{ path.to.value }} against a scope object.
 // ---------------------------------------------------------------------------
 
+function normalizeTemplatePath(path: string): string {
+  const trimmed = path.trim();
+  if (trimmed === '$json') return '';
+  if (trimmed.startsWith('$json.')) return trimmed.slice('$json.'.length);
+  return trimmed;
+}
+
 function resolvePath(scope: NodeScope, path: string): unknown {
-  const parts = path
-    .trim()
+  const normalized = normalizeTemplatePath(path);
+  if (!normalized) return scope;
+  const parts = normalized
     .replace(/\[(\d+)\]/g, '.$1')
     .split('.')
     .filter(Boolean);

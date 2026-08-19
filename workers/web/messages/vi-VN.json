@@ -2472,7 +2472,7 @@
     "tool_vector_qdrant": "Qdrant Vector Store",
     "tool_vector_qdrant_desc": "Lưu và truy vấn embedding trên Qdrant.",
     "handle_tools": "Tool",
-    "agent_config_warning": "Chưa kết nối service hoặc memory",
+    "agent_config_warning": "Chưa kết nối service",
     "toolbar_run": "Chạy node",
     "toolbar_deactivate": "Tắt node",
     "toolbar_activate": "Bật node",

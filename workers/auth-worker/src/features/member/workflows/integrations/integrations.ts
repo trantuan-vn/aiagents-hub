@@ -121,6 +121,23 @@ export const WORKFLOW_INTEGRATIONS: IntegrationPreset[] = [
     },
   },
   {
+    id: 'gmail',
+    name: 'Gmail',
+    category: 'Email',
+    description: 'Send an email via the Gmail API. Use a bearer OAuth token credential.',
+    docsUrl: 'https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send',
+    credentialType: 'bearer',
+    node: {
+      method: 'POST',
+      url: 'https://gmail.googleapis.com/gmail/v1/users/me/messages/send',
+      headers: { 'Content-Type': 'application/json' },
+      body: {
+        raw: '{{ variables.raw }}',
+      },
+      jsonResponse: true,
+    },
+  },
+  {
     id: 'sendgrid',
     name: 'SendGrid',
     category: 'Email',

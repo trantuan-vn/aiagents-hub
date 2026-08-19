@@ -1,6 +1,7 @@
 import { stepCountIs, streamText } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
+import { interpolate } from '../../execution/node-runtime.js';
 import {
   billAgentUsage,
   ensureWalletBalance,
@@ -62,17 +63,46 @@ function resolveEmbedModel(service: Record<string, unknown>): string {
   return model || DEFAULT_EMBED_MODEL;
 }
 
+function extractQuestionText(nodeInput: Record<string, unknown>, fallbackInput?: string): string {
+  const body = nodeInput.body;
+  if (body && typeof body === 'object' && !Array.isArray(body)) {
+    const rec = body as Record<string, unknown>;
+    const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text;
+    if (q != null && String(q).trim()) return String(q);
+  }
+  if (typeof body === 'string' && body.trim()) return body;
+  if (nodeInput.question != null) return String(nodeInput.question);
+  if (nodeInput.text != null && String(nodeInput.text).trim()) return String(nodeInput.text);
+  if (fallbackInput?.trim()) return fallbackInput;
+  return JSON.stringify(nodeInput);
+}
+
+function resolveAgentUserText(
+  data: Record<string, unknown>,
+  nodeInput: Record<string, unknown>,
+  fallbackInput?: string,
+): string {
+  const promptSource = String(data.promptSource ?? 'define_below');
+  const prompt = String(data.prompt ?? '');
+  const scope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: fallbackInput ?? '' };
+
+  if (prompt.includes('{{')) {
+    const resolved = interpolate(prompt, scope);
+    if (resolved != null && String(resolved).trim()) return String(resolved);
+  }
+
+  if (promptSource === 'from_input') {
+    return extractQuestionText(nodeInput, fallbackInput);
+  }
+
+  if (prompt.trim()) return prompt;
+  return extractQuestionText(nodeInput, fallbackInput);
+}
+
 function extractTriggerContext(ctx: NodeContext): Record<string, unknown> {
   const input = ctx.nodeInput ?? {};
   if (input && typeof input === 'object' && !Array.isArray(input)) {
-    const obj = input as Record<string, unknown>;
-    if (obj.triggerKind === 'form' || obj.dbId || obj.tableName) return obj;
-    if (obj.parents && typeof obj.parents === 'object') {
-      const parents = obj.parents as Record<string, Record<string, unknown>>;
-      for (const parent of Object.values(parents)) {
-        if (parent?.triggerKind === 'form' || parent?.dbId || parent?.tableName) return parent;
-      }
-    }
+    return input as Record<string, unknown>;
   }
   return {};
 }
@@ -102,11 +132,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const saveRagSystemPrompt = String(saveRagConfig?.systemPrompt ?? '').trim();
   const saveRagUserPrompt = String(saveRagConfig?.userPrompt ?? '').trim();
 
-  const promptSource = String(data.promptSource ?? 'define_below');
-  let userText =
-    promptSource === 'from_input'
-      ? String(ctx.nodeInput.text ?? ctx.input ?? '') || JSON.stringify(ctx.nodeInput)
-      : String(data.prompt ?? ctx.nodeInput.text ?? ctx.input ?? '') || JSON.stringify(ctx.nodeInput);
+  let userText = resolveAgentUserText(data, ctx.nodeInput as Record<string, unknown>, ctx.input);
 
   const pdfFiles = filesFromWebhookBody(
     (ctx.nodeInput as Record<string, unknown>)?.body ?? ctx.nodeInput,
@@ -164,7 +190,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
     hasGetRagTool
-      ? 'Use get_rag to search the knowledge base before answering factual questions.'
+      ? 'Use get_rag to search the knowledge base before answering. If the user wants SQL, call get_rag first (schema and sqlexample), then return a single read-only SQL query in a fenced sql code block, qualifying tables as schema.table.'
       : '',
     hasSaveRagTool && !saveRagSystemPrompt
       ? 'Use save_rag to persist extracted document text into the knowledge base.'

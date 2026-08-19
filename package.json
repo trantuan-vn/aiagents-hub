@@ -5,7 +5,8 @@
   "private": true,
   "workspaces": [
     "packages/*",
-    "workers/*"
+    "workers/*",
+    "services/*"
   ],
   "scripts": {
     "dev:auth": "wrangler dev workers/auth-worker",
@@ -13,6 +14,7 @@
     "dev:consumer": "wrangler dev workers/consumer-worker",
     "dev:web": "wrangler dev workers/web",
     "dev:assistant": "wrangler dev workers/assistant-worker",
+    "dev:oracle-proxy": "npm run dev --workspace=@aiagents-hub/oracle-proxy",
     "deploy:auth": "wrangler deploy -c workers/auth-worker/wrangler.jsonc",
     "deploy:queue": "wrangler deploy -c workers/queue-worker/wrangler.jsonc",
     "deploy:consumer": "wrangler deploy -c workers/consumer-worker/wrangler.jsonc",

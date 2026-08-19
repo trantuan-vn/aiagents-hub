@@ -8,10 +8,12 @@
 	"main": "src/index.ts",
 	"compatibility_date": "2025-04-01",
 	"compatibility_flags": [
-		"nodejs_compat"
+		"nodejs_compat",
+		"enable_weak_ref"
 	],
 	"alias": {
-		"@aiagents-hub/workflow-nodes": "../../packages/workflow-nodes/src/index.ts"
+		"@aiagents-hub/workflow-nodes": "../../packages/workflow-nodes/src/index.ts",
+		"@aiagents-hub/oracle-db": "../../packages/oracle-db/src/index.ts"
 	},
 	"rules": [
 		{
@@ -84,6 +86,7 @@
 		"ADMIN_IDENTIFIERS": "tuanta2021@gmail.com",
 		"PRIMARY_ADMIN_IDENTIFIER": "tuanta2021@gmail.com",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADXOWPMRtW0XIcLk",
+		"ORACLE_PROXY_URL": "http://138.2.99.43.nip.io"
 	},
 	// ========== QUEUE CONFIGURATION ==========
 	"queues": {

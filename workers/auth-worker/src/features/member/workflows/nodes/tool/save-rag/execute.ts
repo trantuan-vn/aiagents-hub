@@ -6,6 +6,8 @@ import {
   resolveRagResources,
   toolNodeConfig,
 } from '../shared/rag-context.js';
+import type { NodeContext, NodeOutput } from '../../types.js';
+import { pipelineItems, resolvePipelineField, stringifyUnknown } from '../shared/pipeline.js';
 import { chunkText } from './chunk.js';
 
 export type SaveRagChunkInput = {
@@ -40,7 +42,10 @@ export type SaveRagExecuteParams = {
 };
 
 function vectorId(documentId: string, index: number): string {
-  return `${documentId}::chunk-${index}`;
+  const raw = `${documentId}::chunk-${index}`;
+  if (raw.length <= 64) return raw;
+  const suffix = `::c${index}`;
+  return raw.slice(0, 64 - suffix.length) + suffix;
 }
 
 async function resolveSaveRagEmbedModel(
@@ -104,4 +109,67 @@ export async function executeSaveRag(params: SaveRagExecuteParams): Promise<Save
 
   const saved = await upsertVectors(env, rag.collection, vectors);
   return { ok: saved > 0, saved, documentId, collection: rag.collection };
+}
+
+function metadataFromItem(item: Record<string, unknown>): Record<string, string> {
+  const raw = item.metadata;
+  const out: Record<string, string> = {};
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (v != null) out[k] = String(v);
+    }
+  }
+  for (const key of ['docType', 'tableName', 'schemaName', 'dbId', 'namespace']) {
+    if (item[key] != null && out[key] == null) out[key] = String(item[key]);
+  }
+  return out;
+}
+
+/** Graph-path execute (pipeline_auto / loop item): chunk + embed + upsert. */
+export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  const items = pipelineItems(ctx.nodeInput);
+  if (!items.length) {
+    throw new Error('save_rag: no content to save (upstream item is empty)');
+  }
+
+  const results: SaveRagResult[] = [];
+  for (const item of items) {
+    const content =
+      resolvePipelineField(data.contentField, item, ctx.nodeInput, ['content', 'text', 'ddl']) ||
+      stringifyUnknown(item.content ?? item.text ?? item);
+    if (!String(content).trim()) continue;
+
+    const documentId = resolvePipelineField(data.documentIdField, item, ctx.nodeInput, [
+      'documentId',
+      'id',
+    ]);
+    const source = resolvePipelineField(data.sourceField, item, ctx.nodeInput, ['source']);
+
+    results.push(
+      await executeSaveRag({
+        env: ctx.c.env,
+        definition: ctx.definition,
+        agentId: ctx.node.id,
+        input: {
+          content,
+          documentId: documentId || undefined,
+          source: source || undefined,
+          metadata: metadataFromItem(item),
+        },
+        userDO: ctx.userDO,
+        ownerId: ctx.meta.ownerId,
+        workflowId: ctx.meta.workflowId,
+      }),
+    );
+  }
+
+  const saved = results.reduce((sum, r) => sum + r.saved, 0);
+  return {
+    ok: results.some((r) => r.ok),
+    saved,
+    items: results,
+    documentIds: results.map((r) => r.documentId),
+    collection: results[0]?.collection,
+  };
 }

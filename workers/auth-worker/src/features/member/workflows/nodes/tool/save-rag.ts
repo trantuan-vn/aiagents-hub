@@ -1,6 +1,7 @@
 /** Re-export shim — implementation lives in ./save-rag/execute.ts */
 export {
   executeSaveRag,
+  executeSaveRagPipeline,
   type SaveRagChunkInput,
   type SaveRagInput,
   type SaveRagResult,

@@ -12,19 +12,17 @@ import { WorkflowNodeShell } from "../../node-ui/workflow-node-shell";
 
 function useAgentMissingConfig(nodeId: string | undefined) {
   const edges = useStore((s) => s.edges);
-  if (!nodeId) return { missingService: true, missingMemory: true };
+  if (!nodeId) return { missingService: true };
 
   const hasService = edges.some((e) => edgeUsesHandle(e, nodeId, "service", "target"));
-  const hasMemory = edges.some((e) => edgeUsesHandle(e, nodeId, "memory", "target"));
-
-  return { missingService: !hasService, missingMemory: !hasMemory };
+  return { missingService: !hasService };
 }
 
 function AgentNode({ id, data, selected }: NodeProps) {
   const t = useTranslations("WorkflowEditorPage");
   const d = data as { label?: string; deactivated?: boolean };
-  const { missingService, missingMemory } = useAgentMissingConfig(id);
-  const showWarning = missingService || missingMemory;
+  const { missingService } = useAgentMissingConfig(id);
+  const showWarning = missingService;
 
   return (
     <WorkflowNodeShell

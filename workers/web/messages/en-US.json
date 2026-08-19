@@ -2472,7 +2472,7 @@
     "tool_vector_qdrant": "Qdrant Vector Store",
     "tool_vector_qdrant_desc": "Store and query embeddings in Qdrant.",
     "handle_tools": "Tool",
-    "agent_config_warning": "Service or memory not connected",
+    "agent_config_warning": "Service not connected",
     "toolbar_run": "Run node",
     "toolbar_deactivate": "Deactivate node",
     "toolbar_activate": "Activate node",

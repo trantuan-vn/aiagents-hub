@@ -224,6 +224,7 @@ function CanvasInnerWithDrawerUi({
     workflowId,
     ownerId,
     nodes,
+    edges,
     patchNodeDataById: readOnly ? undefined : patchNodeDataById,
     readOnly,
   });

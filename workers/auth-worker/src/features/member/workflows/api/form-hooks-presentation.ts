@@ -205,36 +205,52 @@ async function handleFormRequest(
 
   const fields = await parseFormSubmissionRequest(c.req.raw, elements);
   const formUrl = actionUrl.split('?')[0] ?? actionUrl;
-  const result = await runFormSubmissionTrigger({
-    env: c.env,
-    bindingName,
-    ownerId: ctx.ownerId,
-    resolved: ctx.resolved,
-    node: ctx.node,
-    fields,
-    formUrl,
-    executionMode: mode,
-    autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
-  });
-
-  await broadcastFormSubmissionResult(c.env, bindingName, ctx.ownerId, {
-    workflowId,
-    nodeId: ctx.node.id,
-    formPath: ctx.formPath,
-    executionKey: result.executionKey,
-    status: result.status,
-    fields,
-    formUrl,
-    executionMode: mode,
-  });
-
-  // One-shot test submission: deactivate the test URL after a successful run.
-  if (mode === 'test') {
-    await setFormTestListening(c.env.NONCE_KV, ctx.ownerId, workflowId, ctx.formPath, false);
-  }
 
   const responseMode = String(data.formResponseMode ?? 'text');
   const responseText = String(data.formResponseText ?? 'Your response has been recorded.');
+
+  // Run the workflow in the background so the form response is immediate.
+  const bgWork = (async () => {
+    try {
+      const result = await runFormSubmissionTrigger({
+        env: c.env,
+        bindingName,
+        ownerId: ctx.ownerId,
+        resolved: ctx.resolved,
+        node: ctx.node,
+        fields,
+        formUrl,
+        executionMode: mode,
+        autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
+      });
+
+      await broadcastFormSubmissionResult(c.env, bindingName, ctx.ownerId, {
+        workflowId,
+        nodeId: ctx.node.id,
+        formPath: ctx.formPath,
+        executionKey: result.executionKey,
+        status: result.status,
+        fields,
+        formUrl,
+        executionMode: mode,
+      });
+    } catch (e) {
+      console.error('[form-hook] background workflow failed', e instanceof Error ? e.message : String(e));
+    } finally {
+      if (mode === 'test') {
+        await setFormTestListening(c.env.NONCE_KV, ctx.ownerId, workflowId, ctx.formPath, false).catch(() => {});
+      }
+    }
+  })();
+
+  // Use waitUntil so the Worker stays alive for the background workflow.
+  const execCtx = c.executionCtx as ExecutionContext | undefined;
+  if (execCtx?.waitUntil) {
+    execCtx.waitUntil(bgWork);
+  } else {
+    // Hono may expose it differently; fall back to awaiting.
+    await bgWork;
+  }
 
   if (responseMode === 'redirect' && responseText.startsWith('http')) {
     return c.redirect(responseText, 302);

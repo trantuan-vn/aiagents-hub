@@ -105,7 +105,7 @@ export async function runFormDatabaseTrigger(params: {
         user: params.user,
         resolved: params.resolved,
         input: JSON.stringify(output),
-        autoApproveHumanReview: params.autoApproveHumanReview ?? false,
+        autoApproveHumanReview: params.autoApproveHumanReview ?? true,
         runnerDoIdString: params.trigger.ownerId,
         requestMeta: { userAgent: 'trigger:form' },
         entryNodeIds: [params.triggerNode.id],

@@ -1,6 +1,7 @@
 /** Re-export shim — implementation lives in ./get-db-info/execute.ts */
 export {
   executeGetDbInfo,
+  executeGetDbInfoPipeline,
   listDatabaseTables,
   type DbColumnInfo,
   type DbForeignKey,

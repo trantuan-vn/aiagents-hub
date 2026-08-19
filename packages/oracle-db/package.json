@@ -1,0 +1,17 @@
+{
+  "name": "@aiagents-hub/oracle-db",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "oracledb": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3"
+  }
+}
