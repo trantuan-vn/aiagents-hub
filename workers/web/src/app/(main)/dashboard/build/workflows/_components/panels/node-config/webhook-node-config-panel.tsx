@@ -25,17 +25,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { createWorkflowTrigger, listWorkflowTriggers } from "../../../_lib/api";
-import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "../../hooks/use-webhook-listen-ws";
 
 import { WebhookEditOutputPanel } from "./webhook-edit-output-panel";
 import { WebhookListeningPanel } from "./webhook-listening-panel";
 import { WebhookOutputPanel } from "./webhook-output-panel";
 import { NodeOutputPanel } from "./node-output-panel";
-import {
-  buildWebhookItemOutput,
-  normalizeWebhookItemOutput,
-  type WebhookItemOutput,
-} from "@aiagents-hub/workflow-nodes";
+import { normalizeWebhookItemOutput, type WebhookItemOutput } from "@aiagents-hub/workflow-nodes";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 const WEBHOOK_HTTP_METHOD = "POST";
@@ -92,9 +87,12 @@ function SettingsToggleRow({
 export type WebhookNodeConfigPanelProps = {
   node: Node;
   workflowId?: number;
+  listeningNodeId?: string | null;
+  liveOutput?: unknown;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
+  onStopListen?: () => void;
 };
 
 export function isWebhookNode(node: Node): boolean {
@@ -109,12 +107,16 @@ function defaultPath(nodeId: string): string {
 export function WebhookNodeConfigPanel({
   node,
   workflowId,
+  listeningNodeId,
+  liveOutput,
   onClose,
   onPatchData,
   onExecuteStep,
+  onStopListen,
 }: WebhookNodeConfigPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const te = useTranslations("WorkflowEditorPage");
+  const listening = listeningNodeId === node.id;
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
   const path = String(nodeData.webhookPath ?? defaultPath(node.id));
@@ -134,9 +136,7 @@ export function WebhookNodeConfigPanel({
   const [urlsOpen, setUrlsOpen] = useState(true);
   const [productionUrl, setProductionUrl] = useState<string | undefined>();
   const [webhookClientId, setWebhookClientId] = useState<string | undefined>();
-  const [listening, setListening] = useState(false);
   const [editingOutput, setEditingOutput] = useState(false);
-  const [liveOutput, setLiveOutput] = useState<WebhookItemOutput | null>(null);
 
   useEffect(() => {
     if (!workflowId || isNaN(workflowId)) return;
@@ -179,42 +179,6 @@ export function WebhookNodeConfigPanel({
     [node.id, onPatchData],
   );
 
-  const applyWebhookEvent = useCallback(
-    (event: WorkflowWebhookWsEvent) => {
-      const executionMode = urlMode === "production" ? "production" : "test";
-      const item =
-        normalizeWebhookItemOutput(event.output, displayUrl) ??
-        buildWebhookItemOutput({
-          webhookUrl: displayUrl ?? "",
-          headers: { "x-http-method": event.method },
-          body: (() => {
-            try {
-              return JSON.parse(event.input);
-            } catch {
-              return event.input;
-            }
-          })(),
-          executionMode,
-        });
-      setLiveOutput(item);
-      patch({
-        _output: item,
-        _outputPinned: true,
-      });
-      toast.success(t("webhook_event_received"));
-    },
-    [displayUrl, patch, t, urlMode],
-  );
-
-  useWebhookListenWs({
-    workflowId,
-    nodeId: node.id,
-    webhookPath: path,
-    listening,
-    enabled: true,
-    onEvent: applyWebhookEvent,
-  });
-
   const patchOption = useCallback(
     (optionId: string, value: unknown) => {
       patch({ webhookOptions: { ...webhookOptions, [optionId]: value } });
@@ -248,20 +212,18 @@ export function WebhookNodeConfigPanel({
   };
 
   const listenForTest = () => {
-    setLiveOutput(null);
-    setListening(true);
+    if (listening) return;
+    onExecuteStep?.(node.id);
   };
-  const stopListening = () => setListening(false);
+  const stopListening = () => onStopListen?.();
 
   const outputPinned = !!nodeData._outputPinned;
-  const storedOutput = normalizeWebhookItemOutput(nodeData._output, displayUrl);
-  const output = liveOutput ?? storedOutput ?? undefined;
+  const output = normalizeWebhookItemOutput(nodeData._output, displayUrl) ?? undefined;
   const hasOutput = output != null;
 
   const openEditOutput = () => setEditingOutput(true);
 
   const unpinOutput = () => {
-    setLiveOutput(null);
     patch({ _output: undefined, _outputPinned: false });
   };
 
@@ -293,7 +255,11 @@ export function WebhookNodeConfigPanel({
         {/* Left — listen / preview */}
         <div className="flex min-h-0 flex-col border-r">
           {listening ? (
-            <WebhookListeningPanel testUrl={displayUrl} onStop={stopListening} receivedOutput={liveOutput} />
+            <WebhookListeningPanel
+              testUrl={workflowWebhookUrl ?? displayUrl}
+              onStop={stopListening}
+              receivedOutput={liveOutput as WebhookItemOutput | null | undefined}
+            />
           ) : (
             <>
               <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
@@ -342,9 +308,17 @@ export function WebhookNodeConfigPanel({
                   {t("section_settings")}
                 </TabsTrigger>
               </TabsList>
-              <Button type="button" size="sm" className={cn(ORANGE, "shrink-0 text-xs text-white")} onClick={listenForTest}>
+              <Button
+                type="button"
+                size="sm"
+                className={cn(
+                  listening ? "bg-[#eb5262] hover:bg-[#d94558]" : ORANGE,
+                  "shrink-0 text-xs text-white",
+                )}
+                onClick={listening ? stopListening : listenForTest}
+              >
                 <Zap className="mr-1.5 size-3.5" />
-                {t("webhook_listen_test")}
+                {listening ? t("webhook_stop_listening") : t("webhook_listen_test")}
               </Button>
             </div>
 
@@ -612,7 +586,6 @@ export function WebhookNodeConfigPanel({
                   toast.error(t("webhook_edit_output_invalid_json"));
                   return;
                 }
-                setLiveOutput(item);
                 patch({ _output: item, _outputPinned: true });
                 setEditingOutput(false);
               }}

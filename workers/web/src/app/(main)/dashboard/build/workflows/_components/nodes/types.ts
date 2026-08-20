@@ -12,6 +12,8 @@ export type NodeConfigPanelProps = {
   ownerId?: string;
   /** Id of the node currently listening for a test trigger (webhook/form), if any. */
   listeningNodeId?: string | null;
+  /** Latest test payload received while listening, if any. */
+  liveOutput?: unknown;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;

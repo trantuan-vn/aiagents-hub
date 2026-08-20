@@ -29,6 +29,7 @@ type WorkflowNodeConfigPanelProps = {
   workflowId?: number;
   ownerId?: string;
   listeningNodeId?: string | null;
+  liveOutput?: unknown;
   onClose: () => void;
   onPatchData: (nodeId: string, patch: Record<string, unknown>) => void;
   onExecuteStep?: (nodeId: string) => void;
@@ -42,6 +43,7 @@ export function WorkflowNodeConfigPanel({
   workflowId,
   ownerId,
   listeningNodeId,
+  liveOutput,
   onClose,
   onPatchData,
   onExecuteStep,
@@ -111,6 +113,7 @@ export function WorkflowNodeConfigPanel({
         workflowId={workflowId}
         ownerId={ownerId}
         listeningNodeId={listeningNodeId}
+        liveOutput={liveOutput}
         onClose={onClose}
         onPatchData={onPatchData}
         onExecuteStep={onExecuteStep}

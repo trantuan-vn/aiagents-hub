@@ -341,6 +341,7 @@ function CanvasInnerWithDrawerUi({
           workflowId={workflowId}
           ownerId={ownerId}
           listeningNodeId={listeningNodeId}
+          liveOutput={liveOutput}
           onClose={() => setConfigNodeId(null)}
           onPatchData={patchNodeDataById}
           onExecuteStep={(nodeId) => onMenuActionWrapped(nodeId, "execute_step")}
