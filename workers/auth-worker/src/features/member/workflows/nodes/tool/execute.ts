@@ -3,7 +3,7 @@ import { executeGetDbInfoPipeline } from './get-db-info/execute.js';
 import { executeGetRagPipeline } from './get-rag/execute.js';
 import { executeSaveRagPipeline } from './save-rag/execute.js';
 
-/** Execute a RAG tool_node on the main data-flow path (Form → Get DB Info → Loop → Save RAG). */
+/** Execute a RAG tool_node on the main data-flow path (Form → Get DB Info → Loop → Save RAG, or Webhook → Get RAG → Agent). */
 export async function executeToolNode(ctx: NodeContext): Promise<NodeOutput> {
   const kind = String((ctx.node.data as Record<string, unknown> | undefined)?.toolKind ?? '');
   if (kind === 'get-db-info') return executeGetDbInfoPipeline(ctx);

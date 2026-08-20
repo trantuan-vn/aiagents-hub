@@ -628,6 +628,7 @@ export function WebhookNodeConfigPanel({
               emptyLabel={t("webhook_no_trigger_output")}
               onEdit={openEditOutput}
               onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+              executeNodeId={node.id}
               onSetMockData={openEditOutput}
               executeLabel={t("webhook_test_trigger")}
             />

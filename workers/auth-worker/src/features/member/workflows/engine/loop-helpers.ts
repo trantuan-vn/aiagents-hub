@@ -7,6 +7,8 @@ export interface LoopState {
   currentBatchIndex: number;
   totalBatches: number;
   iterationOutputs: Record<string, unknown>[];
+  /** Oracle/D1 credentials from Get DB Info — kept across loop iterations. */
+  connectionCtx?: Record<string, unknown>;
 }
 
 export interface LoopExecutionResult {
@@ -43,6 +45,33 @@ export function extractLoopItems(input: NodeOutput): unknown[] {
   return [];
 }
 
+/** Forward DB connection fields so Loop → Save RAG still has Oracle/D1 credentials. */
+export function connectionContextFromInput(input: NodeOutput): Record<string, unknown> {
+  const keys = [
+    'connection',
+    'connectionType',
+    'user',
+    'password',
+    'connectString',
+    'username',
+    'u',
+    'p',
+    'c',
+    'dbId',
+    'databaseId',
+    'schemaName',
+    'fields',
+    'credentialKey',
+    'tables',
+    'limits',
+  ];
+  const out: Record<string, unknown> = {};
+  for (const key of keys) {
+    if (input[key] != null) out[key] = input[key];
+  }
+  return out;
+}
+
 export function executeLoopOverItems(
   data: Record<string, unknown>,
   nodeInput: NodeOutput,
@@ -51,6 +80,7 @@ export function executeLoopOverItems(
   returnOutput?: NodeOutput,
 ): LoopExecutionResult {
   const batchSize = Math.max(1, Number(data.batchSize ?? 1) || 1);
+  const incomingConnection = connectionContextFromInput(nodeInput);
 
   let state = existingState;
   if (!state) {
@@ -62,8 +92,13 @@ export function executeLoopOverItems(
       currentBatchIndex: 0,
       totalBatches: batches.length,
       iterationOutputs: [],
+      connectionCtx: incomingConnection,
     };
+  } else if (!state.connectionCtx || !Object.keys(state.connectionCtx).length) {
+    state.connectionCtx = incomingConnection;
   }
+
+  const connectionCtx = state.connectionCtx ?? incomingConnection;
 
   if (isReturn && returnOutput) {
     state.iterationOutputs.push(returnOutput);
@@ -73,6 +108,7 @@ export function executeLoopOverItems(
   if (state.totalBatches === 0 || state.currentBatchIndex >= state.totalBatches) {
     return {
       output: {
+        ...connectionCtx,
         items: state.items,
         iterationOutputs: state.iterationOutputs,
         loopCompleted: true,
@@ -89,6 +125,7 @@ export function executeLoopOverItems(
 
   return {
     output: {
+      ...connectionCtx,
       items: batch,
       batchIndex: state.currentBatchIndex,
       batchSize: state.batchSize,

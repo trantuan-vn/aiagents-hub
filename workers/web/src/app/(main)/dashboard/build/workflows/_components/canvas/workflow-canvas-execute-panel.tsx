@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { WORKFLOW_TRIGGER_CATALOG, type WorkflowTriggerKindId } from "../catalogs/workflow-trigger-catalog";
+import { useWorkflowExecutionUi } from "../hooks/workflow-execution-ui";
 import {
   entryPointNeedsNodeLabel,
   getWorkflowTriggerEntryPoints,
@@ -45,6 +46,13 @@ interface WorkflowCanvasExecutePanelProps {
   onExecuteTriggerNode: (nodeId: string) => void;
 }
 
+function nodeLabelFromNodes(nodes: Node[], nodeId: string | null | undefined): string {
+  if (!nodeId) return "";
+  const node = nodes.find((entry) => entry.id === nodeId);
+  const data = (node?.data ?? {}) as Record<string, unknown>;
+  return String(data.label ?? "").trim();
+}
+
 function entryPointKey(kind: WorkflowTriggerKindId | "manual"): `execute_from_${WorkflowTriggerKindId | "manual"}` {
   return `execute_from_${kind}`;
 }
@@ -69,6 +77,7 @@ export function WorkflowCanvasExecutePanel({
   onExecuteTriggerNode,
 }: WorkflowCanvasExecutePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
+  const execution = useWorkflowExecutionUi();
   const entryPoints = useMemo(() => getWorkflowTriggerEntryPoints(nodes, edges), [nodes, edges]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     () => pickDefaultEntryPoint(entryPoints)?.nodeId ?? null,
@@ -98,7 +107,23 @@ export function WorkflowCanvasExecutePanel({
     return <Icon className={cn("size-4 shrink-0", TRIGGER_ICON_COLORS[kind] ?? "text-muted-foreground")} aria-hidden />;
   };
 
-  const fromLabel = webhookListening ? t("webhook_execute_listening") : formatEntryLabel(selected, entryPoints, t);
+  const triggerLabel =
+    nodeLabelFromNodes(nodes, execution?.entryNodeId) || formatEntryLabel(selected, entryPoints, t);
+  const currentLabel = nodeLabelFromNodes(nodes, execution?.currentNodeId);
+  const fromLabel =
+    running && currentLabel && execution?.currentNodeId !== execution?.entryNodeId
+      ? t("execute_running_at", { trigger: triggerLabel, node: currentLabel })
+      : running
+        ? t("execute_running_from", { trigger: triggerLabel })
+        : webhookListening
+          ? t("webhook_execute_listening")
+          : formatEntryLabel(selected, entryPoints, t);
+
+  const mainTitle = webhookListening && !running
+    ? t("webhook_stop_listening_short")
+    : running
+      ? t("execute_running")
+      : t("execute_workflow");
 
   const mainButton = (
     <button
@@ -112,16 +137,14 @@ export function WorkflowCanvasExecutePanel({
         hasMultipleTriggers ? "rounded-l-full pl-4 pr-3" : "rounded-full px-5",
       )}
     >
-      {running && !webhookListening ? (
+      {running ? (
         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
       ) : (
         <FlaskConical className="size-4 shrink-0 stroke-[1.75]" aria-hidden />
       )}
       <span className="flex min-w-0 flex-col leading-none">
-        <span className="text-[13px] font-semibold tracking-tight">
-          {webhookListening ? t("webhook_stop_listening_short") : t("execute_workflow")}
-        </span>
-        <span className="mt-0.5 text-[11px] font-normal text-white/80">{fromLabel}</span>
+        <span className="text-[13px] font-semibold tracking-tight">{mainTitle}</span>
+        <span className="mt-0.5 max-w-[16rem] truncate text-[11px] font-normal text-white/80">{fromLabel}</span>
       </span>
     </button>
   );

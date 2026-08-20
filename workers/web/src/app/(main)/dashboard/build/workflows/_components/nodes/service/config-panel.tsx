@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
-import { ChevronDown, Play, Server } from "lucide-react";
+import { ChevronDown, Server } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { Service } from "@/app/(main)/dashboard/service/_components/schema";
@@ -16,12 +16,11 @@ import { cn } from "@/lib/utils";
 
 import { resolveInputNodeId } from "../../edges/workflow-connection-utils";
 import { ServiceSearchCombobox } from "../../node-ui/service-search-combobox";
+import { WorkflowExecuteStepButton } from "../../node-ui/workflow-execute-step-button";
 import { AgentUpstreamInputPanel } from "../../panels/node-config/agent-upstream-input-panel";
 import { ExpressionDropField } from "../../panels/node-config/expression-drop-field";
 import { NodeMockOutputSection } from "../../panels/node-config/node-mock-output-section";
 import type { NodeConfigPanelProps } from "../types";
-
-const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
 const SERVICE_EXTRA_OPTIONS = [
   { id: "frequencyPenalty", labelKey: "service_opt_frequency_penalty", type: "number" as const, defaultValue: 0 },
@@ -154,15 +153,14 @@ export function ServiceNodeConfigPanel({
                 </TabsTrigger>
               </TabsList>
               {onExecuteStep ? (
-                <Button
-                  type="button"
+                <WorkflowExecuteStepButton
+                  nodeId={node.id}
                   size="sm"
-                  className={cn(ORANGE, "shrink-0 text-xs text-white")}
+                  className="shrink-0 text-xs"
                   onClick={() => onExecuteStep(node.id)}
-                >
-                  <Play className="mr-1.5 size-3.5 fill-current" />
-                  {te("menu_execute_step")}
-                </Button>
+                  label={te("menu_execute_step")}
+                  executingLabel={te("menu_executing_step")}
+                />
               ) : null}
             </div>
 
@@ -267,6 +265,7 @@ export function ServiceNodeConfigPanel({
           onSaveOutput={(parsed) => patch({ _output: parsed, _outputPinned: true })}
           onUnpinOutput={() => patch({ _output: undefined, _outputPinned: false })}
           onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+          executeNodeId={node.id}
         />
       </div>
     </div>

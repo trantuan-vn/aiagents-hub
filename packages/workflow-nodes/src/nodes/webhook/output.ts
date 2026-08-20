@@ -146,6 +146,18 @@ export function flattenWebhookItemForTable(item: WebhookItemOutput): TableRow[] 
       return;
     }
     if (Array.isArray(value)) {
+      const allObjects =
+        value.length > 0 && value.every((entry) => entry && typeof entry === "object" && !Array.isArray(entry));
+      if (allObjects) {
+        const limit = Math.min(value.length, 50);
+        for (let i = 0; i < limit; i++) {
+          walk(value[i], prefix ? `${prefix}[${i}]` : `[${i}]`);
+        }
+        if (value.length > limit) {
+          rows.push({ path: prefix ? `${prefix}[${limit}…]` : `[${limit}…]`, value: `${value.length - limit} more` });
+        }
+        return;
+      }
       rows.push({ path: prefix, value: JSON.stringify(value) });
       return;
     }

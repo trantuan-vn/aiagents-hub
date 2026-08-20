@@ -78,18 +78,18 @@ export const FLOW_LOOP_OVER_ITEMS_DEFINITION: WorkflowNodeDefinition = createBui
   descriptionKey: "flow_kind_loop_over_items_desc",
   category: "flow",
   icon: "RotateCw",
-  defaultData: {
-    [FLOW_KIND_FIELD]: "loop_over_items",
-    batchSize: 1,
-  },
-  sections: [
-    defaultInputSection(),
-    defaultParametersSection([
-      {
-        id: "batchSize",
-        type: "number",
-        labelKey: "field_batch_size",
-        defaultValue: 1,
+    defaultData: {
+      [FLOW_KIND_FIELD]: "loop_over_items",
+      batchSize: 1,
+    },
+    sections: [
+      defaultInputSection(),
+      defaultParametersSection([
+        {
+          id: "batchSize",
+          type: "number",
+          labelKey: "field_batch_size",
+          defaultValue: 1,
         order: 1,
       },
     ]),

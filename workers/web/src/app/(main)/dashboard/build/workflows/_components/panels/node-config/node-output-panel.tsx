@@ -3,13 +3,15 @@
 import { useMemo, useState, type ReactNode } from "react";
 
 import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/workflow-nodes";
-import { ArrowRightFromLine, Copy, Pencil, PinOff, Play, Search } from "lucide-react";
+import { ArrowRightFromLine, Copy, Pencil, PinOff, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+
+import { WorkflowExecuteStepButton } from "../../node-ui/workflow-execute-step-button";
 
 export type IoViewMode = "schema" | "table" | "json";
 
@@ -22,6 +24,7 @@ export type NodeOutputPanelProps = {
   onEdit?: () => void;
   onUnpin?: () => void;
   onExecute?: () => void;
+  executeNodeId?: string;
   onSetMockData?: () => void;
   executeLabel?: string;
   emptyLabel?: string;
@@ -82,6 +85,7 @@ export function NodeOutputPanel({
   onEdit,
   onUnpin,
   onExecute,
+  executeNodeId,
   onSetMockData,
   executeLabel,
   emptyLabel,
@@ -213,9 +217,15 @@ export function NodeOutputPanel({
           <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-3 p-6 text-center">
             <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />
             <p className="text-sm font-semibold">{emptyLabel ?? t("no_output_data")}</p>
-            {onExecute ? (
+            {onExecute && executeNodeId ? (
+              <WorkflowExecuteStepButton
+                nodeId={executeNodeId}
+                onClick={onExecute}
+                label={executeLabel ?? te("menu_execute_step")}
+                executingLabel={te("menu_executing_step")}
+              />
+            ) : onExecute ? (
               <Button type="button" className={cn(ORANGE, "text-white")} onClick={onExecute}>
-                <Play className="mr-2 size-3.5 fill-current" />
                 {executeLabel ?? te("menu_execute_step")}
               </Button>
             ) : null}

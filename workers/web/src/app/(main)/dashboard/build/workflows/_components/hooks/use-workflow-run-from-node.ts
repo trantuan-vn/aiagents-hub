@@ -37,11 +37,15 @@ export function useWorkflowRunFromNode({
   ownerId,
   patchNodeDataById,
   readOnly,
+  startRun,
+  finishRun,
 }: {
   workflowId?: number;
   ownerId?: string;
   patchNodeDataById?: (nodeId: string, patch: Record<string, unknown>) => void;
   readOnly?: boolean;
+  startRun?: (nodeId: string) => void;
+  finishRun?: (steps?: ExecutionStepLog[]) => void;
 }) {
   const t = useTranslations("WorkflowExecutePage");
   const [running, setRunning] = useState(false);
@@ -50,12 +54,15 @@ export function useWorkflowRunFromNode({
     async (nodeId: string, input?: string) => {
       if (!workflowId) return;
       setRunning(true);
+      startRun?.(nodeId);
+      let steps: ExecutionStepLog[] | undefined;
       try {
         const result = await executeWorkflow(workflowId, {
           entryNodeId: nodeId,
           ownerId,
           input,
         });
+        steps = result.steps;
 
         if (!readOnly && patchNodeDataById) {
           applyStepOutputs(result.steps, patchNodeDataById);
@@ -68,10 +75,11 @@ export function useWorkflowRunFromNode({
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("failed"));
       } finally {
+        finishRun?.(steps);
         setRunning(false);
       }
     },
-    [workflowId, ownerId, patchNodeDataById, readOnly, t],
+    [workflowId, ownerId, patchNodeDataById, readOnly, startRun, finishRun, t],
   );
 
   return { runFromNode, running };

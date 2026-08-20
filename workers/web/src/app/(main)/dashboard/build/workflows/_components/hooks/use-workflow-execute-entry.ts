@@ -36,14 +36,37 @@ function isExecuteDataFlowEdge(edge: Edge): boolean {
   return sourceHandle === "out" || sourceHandle === "true" || sourceHandle === "false" || sourceHandle === "loop" || sourceHandle === "done" || sourceHandle.startsWith("out_");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Merge pinned ancestor outputs so mid-graph Execute step keeps Form/Get DB Info credentials. */
 function upstreamExecuteInput(nodeId: string, nodes: Node[], edges: Edge[]): string | undefined {
-  const parentEdge = edges.find((e) => e.target === nodeId && isExecuteDataFlowEdge(e));
-  if (!parentEdge) return undefined;
-  const parent = nodes.find((n) => n.id === parentEdge.source);
-  const output = (parent?.data as Record<string, unknown> | undefined)?._output;
-  if (!output || typeof output !== "object" || Array.isArray(output)) return undefined;
+  const chain: string[] = [];
+  let cursor: string | undefined = nodeId;
+  const seen = new Set<string>();
+  while (cursor && !seen.has(cursor)) {
+    seen.add(cursor);
+    const parentEdge = edges.find((e) => e.target === cursor && isExecuteDataFlowEdge(e));
+    if (!parentEdge) break;
+    chain.unshift(parentEdge.source);
+    cursor = parentEdge.source;
+  }
+  if (!chain.length) return undefined;
+
+  const merged: Record<string, unknown> = {};
+  for (const id of chain) {
+    const node = nodes.find((n) => n.id === id);
+    const output = asRecord((node?.data as Record<string, unknown> | undefined)?._output);
+    if (!output) continue;
+    Object.assign(merged, output);
+  }
+
+  if (!Object.keys(merged).length) return undefined;
   try {
-    return JSON.stringify(output);
+    return JSON.stringify(merged);
   } catch {
     return undefined;
   }
@@ -79,6 +102,8 @@ export function useWorkflowExecuteEntry({
   edges = [],
   patchNodeDataById,
   readOnly,
+  startRun,
+  finishRun,
 }: {
   workflowId?: number;
   ownerId?: string;
@@ -86,6 +111,8 @@ export function useWorkflowExecuteEntry({
   edges?: Edge[];
   patchNodeDataById?: (nodeId: string, patch: Record<string, unknown>) => void;
   readOnly?: boolean;
+  startRun?: (nodeId: string) => void;
+  finishRun?: (steps?: ExecutionStepLog[]) => void;
 }) {
   const tExecute = useTranslations("WorkflowExecutePage");
   const tRegistry = useTranslations("WorkflowNodeRegistry");
@@ -98,6 +125,8 @@ export function useWorkflowExecuteEntry({
     ownerId,
     patchNodeDataById,
     readOnly,
+    startRun,
+    finishRun,
   });
 
   const [listeningNodeId, setListeningNodeId] = useState<string | null>(null);
@@ -214,6 +243,7 @@ export function useWorkflowExecuteEntry({
         const { execution: record } = await getWorkflowExecution(event.executionKey);
         if (record.steps?.length) {
           applyStepOutputs(record.steps, patchNodeDataById);
+          finishRun?.(record.steps);
         }
         if (record.status === "completed") toast.success(tExecute("completed"));
         else if (record.status === "pending_human") toast.message(tExecute("pending_human"));
@@ -223,6 +253,7 @@ export function useWorkflowExecuteEntry({
         }
         else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       } catch {
+        finishRun?.();
         if (event.status === "completed") {
           toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
         } else if (event.status === "failed") toast.error(tExecute("failed"));
@@ -235,7 +266,7 @@ export function useWorkflowExecuteEntry({
         setListeningNodeId(null);
       }
     },
-    [deactivateFormListening, listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
+    [deactivateFormListening, finishRun, listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
   );
 
   useWebhookListenWs({

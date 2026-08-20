@@ -323,6 +323,7 @@ export class UserDO extends DurableObject {
         '/workflow/collab/get': (req) => this.handleWorkflowCollabGet(req),
         '/workflow/collab/publish': (req) => this.handleWorkflowCollabPublish(req),
         '/workflow/webhook/broadcast': (req) => this.handleWorkflowWebhookBroadcast(req),
+        '/workflow/execution/progress': (req) => this.handleWorkflowExecutionProgress(req),
       };
 
       const handler = routeHandlers[url.pathname];
@@ -1427,6 +1428,12 @@ export class UserDO extends DurableObject {
     return this.jsonResponse({ success: true });
   }
 
+  private async handleWorkflowExecutionProgress(request: Request): Promise<Response> {
+    const body = await request.json();
+    await this.broadcastToAllClients('workflow_execution', body);
+    return this.jsonResponse({ success: true });
+  }
+
   // ========== SUBSCRIPTION MANAGEMENT ==========
   private async handleSubscribe(channel: string) {
     await this.database.dynamicUpsert('subscriptions', {
@@ -1463,6 +1470,12 @@ export class UserDO extends DurableObject {
     if (url.pathname === '/workflow/webhook/broadcast' && request.method === 'POST') {
       const body = await request.json();
       await this.broadcastToAllClients('workflow_webhook', body);
+      return this.jsonResponse({ success: true });
+    }
+
+    if (url.pathname === '/workflow/execution/progress' && request.method === 'POST') {
+      const body = await request.json();
+      await this.broadcastToAllClients('workflow_execution', body);
       return this.jsonResponse({ success: true });
     }
 

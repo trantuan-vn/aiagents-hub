@@ -97,11 +97,11 @@ function queryFromInput(ctx: NodeContext): string {
   return String(ctx.input ?? ctx.nodeInput.text ?? '').trim();
 }
 
-/** Graph-path execute: retrieve snippets for the current item / webhook question. */
+/** Graph-path execute: retrieve snippets for the webhook prompt, then pass through to Agent. */
 export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const query = queryFromInput(ctx);
   if (!query) {
-    return { snippets: [], count: 0, text: '', query: '' };
+    return { ...ctx.nodeInput, snippets: [], count: 0, text: '', query: '' };
   }
   const result = await executeGetRag({
     env: ctx.c.env,
@@ -111,9 +111,12 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
   });
+  const ragText = result.snippets.map((s) => s.text).join('\n\n');
   return {
+    ...ctx.nodeInput,
     ...result,
     query,
-    text: result.snippets.map((s) => s.text).join('\n\n'),
+    ragText,
+    text: ragText,
   };
 }

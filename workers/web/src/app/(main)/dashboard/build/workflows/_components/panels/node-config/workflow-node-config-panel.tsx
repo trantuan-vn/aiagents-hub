@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
-import { Play, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
 import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
 import { NodeMockOutputSection } from "./node-mock-output-section";
 import { resolveUIPlugin } from "../../nodes";
+import { WorkflowExecuteStepButton } from "../../node-ui/workflow-execute-step-button";
 import { warnLegacyRuntimeType } from "../../../_lib/runtime-type";
 
 type WorkflowNodeConfigPanelProps = {
@@ -153,14 +154,13 @@ export function WorkflowNodeConfigPanel({
               <TabsContent value="parameters" className="mt-0">
                 <div className="max-h-[calc(100vh-12rem)] space-y-4 overflow-y-auto p-3">
                   {onExecuteStep ? (
-                    <Button
-                      type="button"
-                      className="bg-[#ff6f00] hover:bg-[#e66300] w-full text-white"
+                    <WorkflowExecuteStepButton
+                      nodeId={node.id}
+                      className="w-full"
                       onClick={() => onExecuteStep(node.id)}
-                    >
-                      <Play className="mr-2 h-4 w-4 fill-current" />
-                      {te("menu_execute_step")}
-                    </Button>
+                      label={te("menu_execute_step")}
+                      executingLabel={te("menu_executing_step")}
+                    />
                   ) : null}
                   {n8nDescription ? (
                     <N8nParameterRenderer
@@ -194,6 +194,7 @@ export function WorkflowNodeConfigPanel({
             onSaveOutput={(parsed) => onPatchData(node.id, { _output: parsed, _outputPinned: true })}
             onUnpinOutput={() => onPatchData(node.id, { _output: undefined, _outputPinned: false })}
             onExecute={outputSection.showExecuteStep && onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+            executeNodeId={node.id}
             headerExtra={
               loopOutputWarning ? (
                 <p className="text-muted-foreground text-[11px] leading-snug">{loopOutputWarning}</p>

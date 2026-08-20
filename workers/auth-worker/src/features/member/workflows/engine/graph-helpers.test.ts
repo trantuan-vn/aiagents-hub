@@ -8,7 +8,32 @@ import {
   isToolNodeOnDataFlow,
   parseWorkflowExecuteInput,
 } from './graph-helpers.js';
-import { extractLoopItems } from './loop-helpers.js';
+import { extractLoopItems, executeLoopOverItems } from './loop-helpers.js';
+
+describe('loop connection passthrough', () => {
+  it('forwards Oracle credentials onto each batch output', () => {
+    const result = executeLoopOverItems(
+      { batchSize: 1 },
+      {
+        items: [{ tableName: 'ORDERS' }, { tableName: 'USERS' }],
+        schemaName: 'ADMIN',
+        connection: { type: 'oracle', user: 'ADMIN', password: 'secret', connectString: 'dsn' },
+        user: 'ADMIN',
+        password: 'secret',
+        connectString: 'dsn',
+        tables: ['ORDERS', 'USERS'],
+      },
+      undefined,
+      false,
+    );
+    expect(result.output.items).toEqual([{ tableName: 'ORDERS' }]);
+    expect(result.output.user).toBe('ADMIN');
+    expect(result.output.password).toBe('secret');
+    expect(result.output.connectString).toBe('dsn');
+    expect(result.output.tables).toEqual(['ORDERS', 'USERS']);
+    expect(result.loopState?.connectionCtx?.password).toBe('secret');
+  });
+});
 
 const generateVector: WorkflowDefinition = {
   nodes: [
@@ -31,16 +56,16 @@ const generateVector: WorkflowDefinition = {
 const generateSql: WorkflowDefinition = {
   nodes: [
     { id: 'wh', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'webhook' } },
+    { id: 'getrag', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag' } },
     { id: 'agent', type: 'agent', position: { x: 0, y: 0 }, data: {} },
     { id: 'http', type: 'http_request', position: { x: 0, y: 0 }, data: { url: '' } },
     { id: 'svc', type: 'service_node', position: { x: 0, y: 0 }, data: { endpoint: '/chat' } },
-    { id: 'getrag', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag' } },
   ],
   edges: [
-    { id: 'e1', source: 'wh', target: 'agent', sourceHandle: 'out', targetHandle: 'in' },
-    { id: 'e2', source: 'agent', target: 'http', sourceHandle: 'out', targetHandle: 'in' },
-    { id: 'e3', source: 'svc', target: 'agent', sourceHandle: 'service', targetHandle: 'service' },
-    { id: 'e4', source: 'getrag', target: 'agent', sourceHandle: 'tools', targetHandle: 'tools' },
+    { id: 'e1', source: 'wh', target: 'getrag', sourceHandle: 'out', targetHandle: 'in' },
+    { id: 'e2', source: 'getrag', target: 'agent', sourceHandle: 'out', targetHandle: 'in' },
+    { id: 'e3', source: 'agent', target: 'http', sourceHandle: 'out', targetHandle: 'in' },
+    { id: 'e4', source: 'svc', target: 'agent', sourceHandle: 'service', targetHandle: 'service' },
   ],
 };
 
@@ -54,23 +79,23 @@ describe('GENERATE VECTOR / GENERATE SQL graph wiring', () => {
     expect(getWorkflowEntryNodeIds(generateVector)).toEqual(['form']);
   });
 
-  it('keeps Get RAG as an agent tool (not a graph entry) on GENERATE SQL', () => {
-    expect(isToolNodeOnDataFlow(generateSql, 'getrag')).toBe(false);
-    expect(isNonExecutableNode({ id: 'getrag', type: 'tool_node' }, generateSql)).toBe(true);
+  it('executes Get RAG on the data-flow path before Agent on GENERATE SQL', () => {
+    expect(isToolNodeOnDataFlow(generateSql, 'getrag')).toBe(true);
+    expect(isNonExecutableNode({ id: 'getrag', type: 'tool_node' }, generateSql)).toBe(false);
     expect(getWorkflowEntryNodeIds(generateSql)).toEqual(['wh']);
   });
 
-  it('loop extracts schema/sqlexample documents from Get DB Info output', () => {
+  it('loop extracts table items from Get DB Info output', () => {
     const items = extractLoopItems({
       items: [
-        { content: '# schema', documentId: 'db.public.orders.schema' },
-        { content: '# sql', documentId: 'db.public.orders.sqlexample' },
+        { tableName: 'orders', schemaName: 'public' },
+        { tableName: 'users', schemaName: 'public' },
       ],
-      tableCount: 1,
+      tableCount: 2,
       parents: {},
     });
     expect(items).toHaveLength(2);
-    expect((items[0] as { documentId: string }).documentId).toContain('schema');
+    expect((items[0] as { tableName: string }).tableName).toBe('orders');
   });
 });
 

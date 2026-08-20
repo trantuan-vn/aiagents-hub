@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import {
   introspectOracleTableDirect,
+  introspectOracleTablesDirect,
   listOracleTablesDirect,
   type OracleConnectConfig,
 } from '@aiagents-hub/oracle-db';
@@ -53,7 +54,13 @@ app.post('/oracle', async (c) => {
   }
 
   const t0 = Date.now();
-  const label = action === 'introspectTable' ? `${action} ${body.tableName}` : action;
+  const tableCount = Array.isArray(body.tableNames) ? body.tableNames.length : 0;
+  const label =
+    action === 'introspectTable'
+      ? `${action} ${body.tableName}`
+      : action === 'introspectTables'
+        ? `${action} x${tableCount}`
+        : action;
   console.log(`[oracle-proxy] START ${label}`);
   try {
     if (action === 'listTables') {
@@ -68,6 +75,17 @@ app.post('/oracle', async (c) => {
       const sampleLimit = Number(body.sampleLimit ?? 10);
       if (!tableName) return badRequest('Missing tableName');
       const result = await introspectOracleTableDirect(config, schemaName, tableName, sampleLimit);
+      console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
+      return jsonResponse({ ok: true, result });
+    }
+    if (action === 'introspectTables') {
+      const schemaName = String(body.schemaName ?? config.user);
+      const tableNames = Array.isArray(body.tableNames)
+        ? body.tableNames.map((name) => String(name ?? '').trim()).filter(Boolean)
+        : [];
+      const sampleLimit = Number(body.sampleLimit ?? 3);
+      if (!tableNames.length) return badRequest('Missing tableNames');
+      const result = await introspectOracleTablesDirect(config, schemaName, tableNames, sampleLimit);
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }

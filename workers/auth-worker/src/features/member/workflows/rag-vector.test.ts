@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_EMBED_MODEL,
   embedText,
+  embedTexts,
   queryCollection,
   upsertVectors,
   buildMetadataFilter,
@@ -28,6 +29,27 @@ describe('rag-vector', () => {
     const vector = await embedText(env, 'hello world', DEFAULT_EMBED_MODEL);
     expect(vector).toEqual([0.1, 0.2, 0.3]);
     expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: 'hello world' });
+  });
+
+  it('embedTexts batches multiple strings in one AI call', async () => {
+    const env = {
+      AI: {
+        run: vi.fn().mockResolvedValue({
+          data: [
+            [0.1, 0.2],
+            [0.3, 0.4],
+          ],
+        }),
+      },
+    } as unknown as Env;
+
+    const vectors = await embedTexts(env, ['alpha', 'beta'], DEFAULT_EMBED_MODEL);
+    expect(vectors).toEqual([
+      [0.1, 0.2],
+      [0.3, 0.4],
+    ]);
+    expect(env.AI.run).toHaveBeenCalledTimes(1);
+    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: ['alpha', 'beta'] });
   });
 
   it('queryCollection queries vectorize index', async () => {

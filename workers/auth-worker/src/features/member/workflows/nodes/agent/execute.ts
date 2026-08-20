@@ -20,6 +20,7 @@ import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
 import { toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
+import { executeGetRag } from '../tool/get-rag/execute.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
 function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<string, unknown> {
@@ -71,10 +72,44 @@ function extractQuestionText(nodeInput: Record<string, unknown>, fallbackInput?:
     if (q != null && String(q).trim()) return String(q);
   }
   if (typeof body === 'string' && body.trim()) return body;
-  if (nodeInput.question != null) return String(nodeInput.question);
-  if (nodeInput.text != null && String(nodeInput.text).trim()) return String(nodeInput.text);
+  if (nodeInput.question != null && String(nodeInput.question).trim()) return String(nodeInput.question);
+  if (nodeInput.query != null && String(nodeInput.query).trim()) return String(nodeInput.query);
   if (fallbackInput?.trim()) return fallbackInput;
+  const hasSnippets = Array.isArray(nodeInput.snippets) && nodeInput.snippets.length > 0;
+  if (!hasSnippets && nodeInput.text != null && String(nodeInput.text).trim()) return String(nodeInput.text);
   return JSON.stringify(nodeInput);
+}
+
+function ragSnippetsFromInput(nodeInput: Record<string, unknown>): string[] {
+  const snippets = nodeInput.snippets;
+  if (Array.isArray(snippets) && snippets.length) {
+    return snippets
+      .map((s) => {
+        if (typeof s === 'string') return s.trim();
+        if (s && typeof s === 'object' && !Array.isArray(s)) {
+          const rec = s as Record<string, unknown>;
+          const text = String(rec.text ?? '').trim();
+          const source = rec.source != null ? String(rec.source).trim() : '';
+          if (!text) return '';
+          return source ? `[${source}]\n${text}` : text;
+        }
+        return '';
+      })
+      .filter(Boolean);
+  }
+  const ragText = String(nodeInput.ragText ?? '').trim();
+  return ragText ? [ragText] : [];
+}
+
+function withoutGetRagTools<T extends Record<string, unknown>>(tools: T): T {
+  const out = { ...tools };
+  for (const key of Object.keys(out)) {
+    const normalized = key.replace(/-/g, '_');
+    if (normalized === 'get_rag' || normalized.endsWith('_get_rag')) {
+      delete out[key];
+    }
+  }
+  return out;
 }
 
 function resolveAgentUserText(
@@ -155,43 +190,67 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
 
   const hasGetRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
-  const ragTools = buildRagToolset(
-    {
-      env: ctx.c.env,
-      userDO: ctx.userDO,
-      agentId: ctx.node.id,
-      triggerContext: extractTriggerContext(ctx),
-      embedModel,
-      ownerId: ctx.meta.ownerId,
-      workflowId: ctx.meta.workflowId,
-    },
-    ctx.definition,
-    ctx.node.id,
+  const ragTools = withoutGetRagTools(
+    buildRagToolset(
+      {
+        env: ctx.c.env,
+        userDO: ctx.userDO,
+        agentId: ctx.node.id,
+        triggerContext: extractTriggerContext(ctx),
+        embedModel,
+        ownerId: ctx.meta.ownerId,
+        workflowId: ctx.meta.workflowId,
+      },
+      ctx.definition,
+      ctx.node.id,
+    ),
   );
   const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
   const tools = { ...httpTools, ...ragTools };
   const toolNames = Object.keys(tools);
   const useToolLoop = toolNames.length > 0;
 
+  let ragContext = ragSnippetsFromInput(ctx.nodeInput as Record<string, unknown>);
+  if (!ragContext.length && hasGetRagTool) {
+    const retrieved = await executeGetRag({
+      env: ctx.c.env,
+      definition: ctx.definition,
+      agentId: ctx.node.id,
+      input: { query: userText },
+      embedModel,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
+    });
+    ragContext = retrieved.snippets.map((s) => {
+      const source = s.source?.trim();
+      return source ? `[${source}]\n${s.text}` : s.text;
+    });
+  }
+
   const memorySnippets =
-    memoryCollection &&
-    !hasGetRagTool &&
-    linked.memoryKind !== 'r2' &&
-    linked.memoryKind !== 'd1'
-      ? await retrieveMemory(ctx.c.env, memoryCollection, userText, 5, memoryNamespace || undefined)
-      : [];
+    ragContext.length
+      ? ragContext
+      : memoryCollection &&
+          linked.memoryKind !== 'r2' &&
+          linked.memoryKind !== 'd1'
+        ? await retrieveMemory(ctx.c.env, memoryCollection, userText, 5, memoryNamespace || undefined)
+        : [];
 
   const systemParts = [
     String(data.systemPrompt ?? ''),
     saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
-    memorySnippets.length ? `Relevant memory:\n${memorySnippets.join('\n')}` : '',
+    memorySnippets.length
+      ? `Relevant knowledge from the vector store:\n${memorySnippets.join('\n\n')}`
+      : '',
     toolNames.length
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
-    hasGetRagTool
-      ? 'Use get_rag to search the knowledge base before answering. If the user wants SQL, call get_rag first (schema and sqlexample), then return a single read-only SQL query in a fenced sql code block, qualifying tables as schema.table.'
-      : '',
+    memorySnippets.length
+      ? 'Use the retrieved schema and SQL examples. Return a single read-only SQL query in a fenced sql code block, qualifying tables as schema.table. Do not invent tables or columns that are not in the retrieved context.'
+      : hasGetRagTool
+        ? 'No relevant schema was retrieved from the knowledge base. Do not invent tables or columns.'
+        : '',
     hasSaveRagTool && !saveRagSystemPrompt
       ? 'Use save_rag to persist extracted document text into the knowledge base.'
       : '',

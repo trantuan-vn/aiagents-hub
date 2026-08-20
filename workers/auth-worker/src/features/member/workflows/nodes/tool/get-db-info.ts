@@ -3,6 +3,7 @@ export {
   executeGetDbInfo,
   executeGetDbInfoPipeline,
   listDatabaseTables,
+  introspectTableToRagDocuments,
   type DbColumnInfo,
   type DbForeignKey,
   type SqlHistoryEntry,

@@ -9,6 +9,7 @@ import {
   getExecutionByKey,
   updateExecution,
 } from '../execution/execution-store.js';
+import { broadcastWorkflowExecutionProgress } from '../execution/execution-progress.js';
 import { nodePluginRegistry } from '../nodes/index.js';
 import type { NodeContext as PluginNodeContext } from '../nodes/types.js';
 import { buildWebhookItemOutput } from '../nodes/webhook/output.js';
@@ -113,6 +114,8 @@ interface EngineState {
   loopStates?: Record<string, LoopState>;
   /** Pending loop return (set when loop branch feeds back into the loop node). */
   pendingLoopReturn?: { loopNodeId: string; returnOutput: NodeOutput };
+  /** Trigger / entry node that started this run (for live canvas highlighting). */
+  entryNodeId?: string;
   /** @deprecated legacy linear runs — migrated on resume */
   order?: string[];
   cursor?: number;
@@ -253,6 +256,7 @@ interface RunEngineArgs {
   user: { identifier: string };
   userDO: DurableObjectStub<UserDO>;
   persisted: PersistedState;
+  executionKey: string;
   decision?: HumanDecision;
 }
 
@@ -358,9 +362,20 @@ function scheduleDownstream(
  * state in place so the caller can persist it.
  */
 async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
-  const { c, bindingName, user, userDO, persisted } = args;
+  const { c, bindingName, user, userDO, persisted, executionKey } = args;
   const { definition, meta, engine } = persisted;
   let { decision } = args;
+
+  const emitProgress = async (
+    event: Omit<Parameters<typeof broadcastWorkflowExecutionProgress>[1], 'workflowId' | 'executionKey'>,
+  ) => {
+    await broadcastWorkflowExecutionProgress(userDO, {
+      workflowId: meta.workflowId,
+      executionKey,
+      ...event,
+      entryNodeId: event.entryNodeId || engine.entryNodeId,
+    });
+  };
 
   const attr = workflowAttribution({
     workflow: {},
@@ -387,6 +402,9 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   };
 
   migrateEngineState(engine, definition);
+  engine.entryNodeId = engine.entryNodeId || engine.queue[0];
+
+  await emitProgress({ type: 'started', nodeId: engine.entryNodeId, status: 'running' });
 
   while (engine.queue.length > 0) {
     const nodeId = engine.queue.shift()!;
@@ -440,6 +458,8 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       delete engine.runContext._loop;
     }
 
+    await emitProgress({ type: 'node_start', nodeId, status: 'running' });
+
     // --- human review: flow control + pause/resume ---
     if (node.type === 'human_review') {
       const data = (node.data ?? {}) as Record<string, unknown>;
@@ -454,6 +474,8 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
+        await emitProgress({ type: 'node_done', nodeId, status: 'pending_human' });
+        await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
         // Leave cursor pointing at this node so resume re-enters here.
         return { status: 'pending_human', output: log.output, pendingNodeId: nodeId };
       }
@@ -464,6 +486,8 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
+        await emitProgress({ type: 'node_done', nodeId, status: 'skipped' });
+        await emitProgress({ type: 'finished', nodeId, status: 'cancelled' });
         return { status: 'cancelled', output: log.output };
       }
 
@@ -479,6 +503,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
       engine.visited.push(nodeId);
+      await emitProgress({ type: 'node_done', nodeId, status: 'success' });
       scheduleDownstream(definition, node, out, {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
@@ -519,6 +544,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.visited.push(nodeId);
       delete engine.runContext._loop;
       delete engine.runContext._loopStates;
+      await emitProgress({ type: 'node_done', nodeId, status: 'success' });
       scheduleDownstream(definition, node, engine.outputs[nodeId], {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
@@ -530,10 +556,13 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = log.output as NodeOutput;
       engine.finalOutput = log.output;
+      await emitProgress({ type: 'node_done', nodeId, status: 'error' });
+      await emitProgress({ type: 'finished', nodeId, status: 'failed' });
       return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
     }
   }
 
+  await emitProgress({ type: 'finished', status: 'completed' });
   return { status: 'completed', output: engine.finalOutput };
 }
 
@@ -641,6 +670,7 @@ export async function executeWorkflowGraph(
       },
       totalCostVnd: 0,
       loopStates: {},
+      entryNodeId: initialQueue[0],
     },
   };
 
@@ -653,7 +683,7 @@ export async function executeWorkflowGraph(
     state: JSON.stringify(persisted),
   });
 
-  const result = await runEngine({ c, bindingName, user, userDO, persisted });
+  const result = await runEngine({ c, bindingName, user, userDO, persisted, executionKey });
   await persistResult(userDO, record.id, persisted, result);
 
   return {
@@ -702,6 +732,7 @@ export async function resumeWorkflowExecution(params: {
     user,
     userDO,
     persisted,
+    executionKey,
     decision: { nodeId: pendingNodeId, approved, note },
   });
   await persistResult(userDO, record.id, persisted, result);

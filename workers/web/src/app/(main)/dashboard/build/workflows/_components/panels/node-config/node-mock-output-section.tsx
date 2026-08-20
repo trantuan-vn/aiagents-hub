@@ -19,6 +19,7 @@ export type NodeMockOutputSectionProps = {
   onSaveOutput: (output: unknown) => void;
   onUnpinOutput?: () => void;
   onExecute?: () => void;
+  executeNodeId?: string;
   executeLabel?: string;
   emptyLabel?: string;
   defaultMockJson?: string;
@@ -38,6 +39,7 @@ export function NodeMockOutputSection({
   onSaveOutput,
   onUnpinOutput,
   onExecute,
+  executeNodeId,
   executeLabel,
   emptyLabel,
   defaultMockJson = '{\n  "text": "Hello"\n}',
@@ -91,6 +93,7 @@ export function NodeMockOutputSection({
       onEdit={openEditOutput}
       onUnpin={outputPinned && onUnpinOutput ? onUnpinOutput : undefined}
       onExecute={onExecute}
+      executeNodeId={executeNodeId}
       onSetMockData={openEditOutput}
       executeLabel={executeLabel}
       emptyLabel={emptyLabel}

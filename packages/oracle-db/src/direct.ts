@@ -155,152 +155,240 @@ export async function listOracleTablesDirect(
   });
 }
 
-export async function introspectOracleTableDirect(
-  config: OracleConnectConfig,
-  schemaName: string,
-  tableName: string,
-  sampleLimit: number,
-): Promise<{
+export type OracleTableIntrospectResult = {
   columns: DbColumnInfo[];
   primaryKey: string[];
   foreignKeys: DbForeignKey[];
   ddl: string;
   sampleRows: Record<string, unknown>[];
   rowCountEstimate?: number;
-}> {
+};
+
+export type OracleTablesIntrospectResult = OracleTableIntrospectResult & {
+  tableName: string;
+  error?: string;
+};
+
+async function fetchNumRowsEstimates(
+  connection: Connection,
+  oracledb: OracleDbApi,
+  owner: string,
+  tables: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (!tables.length) return out;
+  const binds: Record<string, string> = { owner };
+  const placeholders = tables.map((table, i) => {
+    binds[`t${i}`] = table;
+    return `:t${i}`;
+  });
+  const rows = await executeRows(
+    connection,
+    `SELECT table_name, num_rows FROM all_tables
+      WHERE owner = :owner AND table_name IN (${placeholders.join(', ')})`,
+    binds,
+    oracledb.OUT_FORMAT_OBJECT,
+  );
+  for (const row of rows) {
+    const name = rowStr(row, 'TABLE_NAME');
+    const num = Number(rowVal(row, 'NUM_ROWS'));
+    if (name && Number.isFinite(num)) out.set(name, num);
+  }
+  return out;
+}
+
+async function introspectOracleTableOnConnection(
+  connection: Connection,
+  oracledb: OracleDbApi,
+  schemaName: string,
+  tableName: string,
+  sampleLimit: number,
+  rowCountEstimate?: number,
+): Promise<OracleTableIntrospectResult> {
   const owner = oracleName(schemaName);
   const table = oracleName(tableName);
   const qualified = `${quoteIdent(owner)}.${quoteIdent(table)}`;
   const limit = Math.min(Math.max(1, Math.floor(sampleLimit) || 10), 100);
+  const outFormat = oracledb.OUT_FORMAT_OBJECT;
+  const binds = { owner, table_name: table };
+
+  const columnRows = await executeRows(
+    connection,
+    `SELECT c.column_name, c.data_type, c.data_length, c.data_precision, c.data_scale,
+            c.nullable, c.column_id, cc.comments
+       FROM all_tab_columns c
+       LEFT JOIN all_col_comments cc
+         ON cc.owner = c.owner AND cc.table_name = c.table_name AND cc.column_name = c.column_name
+      WHERE c.owner = :owner AND c.table_name = :table_name
+      ORDER BY c.column_id`,
+    binds,
+    outFormat,
+  );
+
+  let defaults: Record<string, string> = {};
+  try {
+    const defRows = await executeRows(
+      connection,
+      `SELECT column_name, data_default FROM user_tab_columns WHERE table_name = :table_name AND data_default IS NOT NULL`,
+      { table_name: table },
+      outFormat,
+    );
+    for (const row of defRows) {
+      const col = rowStr(row, 'COLUMN_NAME');
+      const def = rowStr(row, 'DATA_DEFAULT').trim();
+      if (col && def) defaults[col] = def.length > 200 ? def.slice(0, 200) + '…' : def;
+    }
+  } catch {
+    /* LONG fetch may fail on some configs — skip defaults */
+  }
+
+  if (!columnRows.length) {
+    throw new Error(`Oracle table ${owner}.${table} not found`);
+  }
+
+  const columns: DbColumnInfo[] = columnRows.map((row) => {
+    const colName = rowStr(row, 'COLUMN_NAME');
+    const def = defaults[colName] ?? null;
+    const comment = rowStr(row, 'COMMENTS');
+    return {
+      name: colName,
+      type: formatOracleType(row),
+      nullable: rowStr(row, 'NULLABLE') !== 'N',
+      ...(def ? { default: def } : {}),
+      ...(comment ? { comment } : {}),
+    };
+  });
+
+  const pkRows = await executeRows(
+    connection,
+    `SELECT a.column_name
+       FROM all_cons_columns a
+       JOIN all_constraints c
+         ON a.constraint_name = c.constraint_name AND a.owner = c.owner
+      WHERE c.constraint_type = 'P'
+        AND c.owner = :owner AND c.table_name = :table_name
+      ORDER BY a.position`,
+    binds,
+    outFormat,
+  );
+  const primaryKey = pkRows.map((row) => rowStr(row, 'COLUMN_NAME')).filter(Boolean);
+
+  const fkRows = await executeRows(
+    connection,
+    `SELECT a.column_name, p.table_name AS ref_table, b.column_name AS ref_column
+       FROM all_cons_columns a
+       JOIN all_constraints c
+         ON a.constraint_name = c.constraint_name AND a.owner = c.owner
+       JOIN all_constraints p
+         ON c.r_constraint_name = p.constraint_name AND c.r_owner = p.owner
+       JOIN all_cons_columns b
+         ON p.constraint_name = b.constraint_name AND p.owner = b.owner
+        AND a.position = b.position
+      WHERE c.constraint_type = 'R'
+        AND c.owner = :owner AND c.table_name = :table_name
+      ORDER BY a.position`,
+    binds,
+    outFormat,
+  );
+  const foreignKeys: DbForeignKey[] = fkRows.map((row) => ({
+    column: rowStr(row, 'COLUMN_NAME'),
+    refTable: rowStr(row, 'REF_TABLE'),
+    refColumn: rowStr(row, 'REF_COLUMN'),
+  }));
+
+  const ddlParts = columns.map(
+    (c) =>
+      `"${c.name}" ${c.type}${c.nullable ? '' : ' NOT NULL'}${c.default != null ? ` DEFAULT ${c.default}` : ''}`,
+  );
+  const ddl = `CREATE TABLE ${qualified} (\n  ${ddlParts.join(',\n  ')}\n);`;
+
+  const SKIP_TYPES = new Set(['CLOB', 'NCLOB', 'BLOB', 'BFILE', 'LONG', 'LONG RAW', 'VECTOR']);
+  const sampleCols = columns.filter((c) => !SKIP_TYPES.has(c.type.split('(')[0].toUpperCase()));
+  const selectList = sampleCols.length
+    ? sampleCols.map((c) => quoteIdent(c.name)).join(', ')
+    : '*';
+  const sampleRaw = await executeRows(
+    connection,
+    `SELECT ${selectList} FROM ${qualified} FETCH FIRST ${limit} ROWS ONLY`,
+    {},
+    outFormat,
+    limit,
+  );
+  const sampleRows = sampleRaw.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) out[key] = normalizeOracleValue(value);
+    return out;
+  });
+
+  return {
+    columns,
+    primaryKey,
+    foreignKeys,
+    ddl,
+    sampleRows,
+    rowCountEstimate,
+  };
+}
+
+export async function introspectOracleTableDirect(
+  config: OracleConnectConfig,
+  schemaName: string,
+  tableName: string,
+  sampleLimit: number,
+): Promise<OracleTableIntrospectResult> {
+  const owner = oracleName(schemaName);
+  const table = oracleName(tableName);
+  return withOracleConnection(config, async (connection, oracledb) => {
+    const estimates = await fetchNumRowsEstimates(connection, oracledb, owner, [table]);
+    return introspectOracleTableOnConnection(
+      connection,
+      oracledb,
+      schemaName,
+      tableName,
+      sampleLimit,
+      estimates.get(table),
+    );
+  });
+}
+
+/** One Oracle session for many tables — avoids reconnect + COUNT(*) full scans. */
+export async function introspectOracleTablesDirect(
+  config: OracleConnectConfig,
+  schemaName: string,
+  tableNames: string[],
+  sampleLimit: number,
+): Promise<OracleTablesIntrospectResult[]> {
+  const unique = [...new Set(tableNames.map(oracleName).filter(Boolean))];
+  if (!unique.length) return [];
+  const owner = oracleName(schemaName);
 
   return withOracleConnection(config, async (connection, oracledb) => {
-    const outFormat = oracledb.OUT_FORMAT_OBJECT;
-    const binds = { owner, table_name: table };
-
-    const columnRows = await executeRows(
-      connection,
-      `SELECT c.column_name, c.data_type, c.data_length, c.data_precision, c.data_scale,
-              c.nullable, c.column_id, cc.comments
-         FROM all_tab_columns c
-         LEFT JOIN all_col_comments cc
-           ON cc.owner = c.owner AND cc.table_name = c.table_name AND cc.column_name = c.column_name
-        WHERE c.owner = :owner AND c.table_name = :table_name
-        ORDER BY c.column_id`,
-      binds,
-      outFormat,
-    );
-
-    let defaults: Record<string, string> = {};
-    try {
-      const defRows = await executeRows(
-        connection,
-        `SELECT column_name, data_default FROM user_tab_columns WHERE table_name = :table_name AND data_default IS NOT NULL`,
-        { table_name: table },
-        outFormat,
-      );
-      for (const row of defRows) {
-        const col = rowStr(row, 'COLUMN_NAME');
-        const def = rowStr(row, 'DATA_DEFAULT').trim();
-        if (col && def) defaults[col] = def.length > 200 ? def.slice(0, 200) + '…' : def;
+    const estimates = await fetchNumRowsEstimates(connection, oracledb, owner, unique);
+    const results: OracleTablesIntrospectResult[] = [];
+    for (const table of unique) {
+      try {
+        const info = await introspectOracleTableOnConnection(
+          connection,
+          oracledb,
+          schemaName,
+          table,
+          sampleLimit,
+          estimates.get(table),
+        );
+        results.push({ tableName: table, ...info });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        results.push({
+          tableName: table,
+          columns: [],
+          primaryKey: [],
+          foreignKeys: [],
+          ddl: '',
+          sampleRows: [],
+          error: message,
+        });
       }
-    } catch {
-      /* LONG fetch may fail on some configs — skip defaults */
     }
-
-    if (!columnRows.length) {
-      throw new Error(`Oracle table ${owner}.${table} not found`);
-    }
-
-    const columns: DbColumnInfo[] = columnRows.map((row) => {
-      const colName = rowStr(row, 'COLUMN_NAME');
-      const def = defaults[colName] ?? null;
-      const comment = rowStr(row, 'COMMENTS');
-      return {
-        name: colName,
-        type: formatOracleType(row),
-        nullable: rowStr(row, 'NULLABLE') !== 'N',
-        ...(def ? { default: def } : {}),
-        ...(comment ? { comment } : {}),
-      };
-    });
-
-    const pkRows = await executeRows(
-      connection,
-      `SELECT a.column_name
-         FROM all_cons_columns a
-         JOIN all_constraints c
-           ON a.constraint_name = c.constraint_name AND a.owner = c.owner
-        WHERE c.constraint_type = 'P'
-          AND c.owner = :owner AND c.table_name = :table_name
-        ORDER BY a.position`,
-      binds,
-      outFormat,
-    );
-    const primaryKey = pkRows.map((row) => rowStr(row, 'COLUMN_NAME')).filter(Boolean);
-
-    const fkRows = await executeRows(
-      connection,
-      `SELECT a.column_name, p.table_name AS ref_table, b.column_name AS ref_column
-         FROM all_cons_columns a
-         JOIN all_constraints c
-           ON a.constraint_name = c.constraint_name AND a.owner = c.owner
-         JOIN all_constraints p
-           ON c.r_constraint_name = p.constraint_name AND c.r_owner = p.owner
-         JOIN all_cons_columns b
-           ON p.constraint_name = b.constraint_name AND p.owner = b.owner
-          AND a.position = b.position
-        WHERE c.constraint_type = 'R'
-          AND c.owner = :owner AND c.table_name = :table_name
-        ORDER BY a.position`,
-      binds,
-      outFormat,
-    );
-    const foreignKeys: DbForeignKey[] = fkRows.map((row) => ({
-      column: rowStr(row, 'COLUMN_NAME'),
-      refTable: rowStr(row, 'REF_TABLE'),
-      refColumn: rowStr(row, 'REF_COLUMN'),
-    }));
-
-    const ddlParts = columns.map(
-      (c) =>
-        `"${c.name}" ${c.type}${c.nullable ? '' : ' NOT NULL'}${c.default != null ? ` DEFAULT ${c.default}` : ''}`,
-    );
-    const ddl = `CREATE TABLE ${qualified} (\n  ${ddlParts.join(',\n  ')}\n);`;
-
-    const SKIP_TYPES = new Set(['CLOB', 'NCLOB', 'BLOB', 'BFILE', 'LONG', 'LONG RAW', 'VECTOR']);
-    const sampleCols = columns.filter((c) => !SKIP_TYPES.has(c.type.split('(')[0].toUpperCase()));
-    const selectList = sampleCols.length
-      ? sampleCols.map((c) => quoteIdent(c.name)).join(', ')
-      : '*';
-    const sampleRaw = await executeRows(
-      connection,
-      `SELECT ${selectList} FROM ${qualified} FETCH FIRST ${limit} ROWS ONLY`,
-      {},
-      outFormat,
-      limit,
-    );
-    const sampleRows = sampleRaw.map((row) => {
-      const out: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(row)) out[key] = normalizeOracleValue(value);
-      return out;
-    });
-
-    const countRows = await executeRows(
-      connection,
-      `SELECT COUNT(*) AS cnt FROM ${qualified}`,
-      {},
-      outFormat,
-      1,
-    );
-    const rowCountEstimate = Number(rowVal(countRows[0] ?? {}, 'CNT'));
-
-    return {
-      columns,
-      primaryKey,
-      foreignKeys,
-      ddl,
-      sampleRows,
-      rowCountEstimate: Number.isFinite(rowCountEstimate) ? rowCountEstimate : undefined,
-    };
+    return results;
   });
 }

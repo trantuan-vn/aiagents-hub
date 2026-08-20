@@ -563,6 +563,7 @@ export function FormNodeConfigPanel({
             onSaveOutput={(parsed) => patch({ _output: parsed, _outputPinned: true })}
             onUnpinOutput={() => patch({ _output: undefined, _outputPinned: false })}
             onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
+            executeNodeId={node.id}
             executeLabel={t("webhook_test_trigger")}
             emptyLabel={t("webhook_no_trigger_output")}
           />

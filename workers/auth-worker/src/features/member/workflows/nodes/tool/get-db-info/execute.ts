@@ -1,6 +1,4 @@
-import { resolveCredential } from '../../../storage/credentials.js';
 import { toolNodeConfig } from '../shared/rag-context.js';
-import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import {
   isOracleConnectionType,
@@ -9,8 +7,8 @@ import {
   resolveOracleSchema,
   type OracleConnectConfig,
 } from './connect-config.js';
-import { ragDocumentsFromDbInfo } from './documents.js';
-import { introspectOracleTable, listOracleTables } from './oracle.js';
+import { ragDocumentsFromDbInfo, type RagDocumentItem } from './documents.js';
+import { introspectOracleTable, introspectOracleTables, listOracleTables } from './oracle.js';
 
 export type DbColumnInfo = {
   name: string;
@@ -38,6 +36,7 @@ export type GetDbInfoInput = {
   schemaName?: string;
   sampleRowLimit?: number;
   sqlHistoryLimit?: number;
+  includeSqlHistory?: boolean;
 };
 
 export type GetDbInfoResult = {
@@ -249,9 +248,8 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
     (Number(config.sqlHistoryLimit ?? limits.sqlHistoryLimit ?? 10) || 10);
   const historySource = String(config.sqlHistorySource ?? 'audit_log');
 
-  const connType = String(
-    connection.type ?? triggerContext.connectionType ?? (oracleConfig ? 'oracle' : 'd1'),
-  );
+  const explicitType = String(connection.type ?? triggerContext.connectionType ?? '').trim().toLowerCase();
+  const connType = explicitType || (oracleConfig ? 'oracle' : '');
 
   let introspection: Omit<GetDbInfoResult, 'dbId' | 'schemaName' | 'tableName' | 'sqlHistory'>;
 
@@ -262,35 +260,20 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
       );
     }
     introspection = await introspectOracleTable(oracleConfig, schemaName, tableName, sampleLimit, env);
-  } else if (connType === 'd1') {
+  } else if (connType === 'd1' || explicitType === 'd1') {
     const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
     if (!db) throw new Error('get_db_info: D1 binding not configured');
     introspection = await introspectD1Table(db, tableName, sampleLimit);
   } else {
-    const credentialKey = String(connection.credentialKey ?? triggerContext.credentialKey ?? '');
-    if (credentialKey) {
-      try {
-        await resolveCredential(
-          {} as DurableObjectStub<UserDO>,
-          env,
-          credentialKey,
-        );
-      } catch {
-        /* credential optional for D1 fallback */
-      }
-    }
-    const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
-    if (db) {
-      introspection = await introspectD1Table(db, tableName, sampleLimit);
-    } else {
-      throw new Error(`get_db_info: unsupported connection type "${connType}"`);
-    }
+    throw new Error(
+      `get_db_info: no database connection for table "${tableName}" (need Oracle user/password/connectString or connection.type=d1 from Form / Get DB Info)`,
+    );
   }
 
-  const sqlHistory =
-    config.includeSqlHistory !== false
-      ? await fetchSqlHistory(env, dbId, tableName, historyLimit, historySource)
-      : [];
+  const includeSqlHistory = input.includeSqlHistory ?? config.includeSqlHistory !== false;
+  const sqlHistory = includeSqlHistory
+    ? await fetchSqlHistory(env, dbId, tableName, historyLimit, historySource)
+    : [];
 
   const sampleRows =
     config.includeSampleRows !== false ? introspection.sampleRows : [];
@@ -357,7 +340,161 @@ function triggerContextFromNodeInput(nodeInput: NodeOutput, data: Record<string,
   };
 }
 
-/** Graph-path execute: introspect table(s) and emit RAG documents as loop `items`. */
+export type TableLoopItem = {
+  tableName: string;
+  schemaName: string;
+};
+
+function buildTableLoopItem(tableName: string, schemaName: string): TableLoopItem {
+  return { tableName, schemaName };
+}
+
+function truncateSampleRows(info: GetDbInfoResult, sampleLimit: number): GetDbInfoResult {
+  info.sampleRows = info.sampleRows.slice(0, sampleLimit).map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(row)) {
+      out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
+    }
+    return out;
+  });
+  return info;
+}
+
+const RAG_SAMPLE_LIMIT = 3;
+
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next++;
+      results[index] = await fn(items[index]!);
+    }
+  }
+  const workers = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => worker());
+  await Promise.all(workers);
+  return results;
+}
+
+/** Introspect one table and emit schema + sqlexample documents for Save RAG. */
+export async function introspectTableToRagDocuments(params: {
+  env: Env;
+  definition: import('../../../domain/domain.js').WorkflowDefinition;
+  agentId: string;
+  triggerContext: Record<string, unknown>;
+  tableName: string;
+  schemaName?: string;
+}): Promise<RagDocumentItem[]> {
+  const limits = asRecord(params.triggerContext.limits);
+  const sampleLimit = Math.min(
+    Number(limits.sampleRowLimit ?? RAG_SAMPLE_LIMIT) || RAG_SAMPLE_LIMIT,
+    RAG_SAMPLE_LIMIT,
+  );
+  const info = await executeGetDbInfo({
+    env: params.env,
+    definition: params.definition,
+    agentId: params.agentId,
+    triggerContext: { ...params.triggerContext, tableName: params.tableName },
+    input: {
+      tableName: params.tableName,
+      schemaName: params.schemaName,
+      sampleRowLimit: sampleLimit,
+      sqlHistoryLimit: 0,
+      includeSqlHistory: false,
+    },
+  });
+  return ragDocumentsFromDbInfo(truncateSampleRows(info, sampleLimit));
+}
+
+/** Batch-introspect many tables for RAG (one Oracle session; skip SQL history). */
+export async function introspectTablesToRagDocuments(params: {
+  env: Env;
+  definition: import('../../../domain/domain.js').WorkflowDefinition;
+  agentId: string;
+  triggerContext: Record<string, unknown>;
+  tables: Array<{ tableName: string; schemaName?: string }>;
+}): Promise<RagDocumentItem[]> {
+  const tables = params.tables
+    .map((t) => ({
+      tableName: String(t.tableName ?? '').trim(),
+      schemaName: String(t.schemaName ?? ''),
+    }))
+    .filter((t) => t.tableName);
+  if (!tables.length) return [];
+  if (tables.length === 1) {
+    return introspectTableToRagDocuments({ ...params, ...tables[0]! });
+  }
+
+  const connection = (params.triggerContext.connection ?? {}) as DbConnection;
+  const oracleConfig = oracleConfigFrom(params.triggerContext, connection);
+  const explicitType = String(connection.type ?? params.triggerContext.connectionType ?? '')
+    .trim()
+    .toLowerCase();
+  const connType = explicitType || (oracleConfig ? 'oracle' : '');
+  const dbId = String(params.triggerContext.dbId ?? params.triggerContext.databaseId ?? '');
+  const sampleLimit = RAG_SAMPLE_LIMIT;
+
+  if (oracleConfig || isOracleConnectionType(connType)) {
+    if (!oracleConfig) {
+      throw new Error(
+        'get_db_info: Oracle user, password, and connectString are required from the previous node',
+      );
+    }
+    const schemaName = resolveOracleSchema(tables[0]!.schemaName, oracleConfig.user);
+    const introspected = await introspectOracleTables(
+      oracleConfig,
+      schemaName,
+      tables.map((t) => t.tableName),
+      sampleLimit,
+      params.env,
+    );
+    const docs: RagDocumentItem[] = [];
+    for (const row of introspected) {
+      if (row.error || !row.columns.length) {
+        console.warn(`[get-db-info] skip table ${row.tableName}: ${row.error || 'no columns'}`);
+        continue;
+      }
+      docs.push(
+        ...ragDocumentsFromDbInfo(
+          truncateSampleRows(
+            {
+              dbId,
+              schemaName,
+              tableName: row.tableName,
+              columns: row.columns,
+              primaryKey: row.primaryKey,
+              foreignKeys: row.foreignKeys,
+              ddl: row.ddl,
+              sampleRows: row.sampleRows,
+              sqlHistory: [],
+              rowCountEstimate: row.rowCountEstimate,
+            },
+            sampleLimit,
+          ),
+        ),
+      );
+    }
+    return docs;
+  }
+
+  if (connType !== 'd1' && explicitType !== 'd1') {
+    throw new Error(
+      `get_db_info: no database connection for ${tables.length} table(s) (need Oracle user/password/connectString from Form / Get DB Info — run those nodes first, or Execute workflow from the form)`,
+    );
+  }
+
+  const nested = await mapPool(tables, 4, (table) =>
+    introspectTableToRagDocuments({
+      ...params,
+      tableName: table.tableName,
+      schemaName: table.schemaName,
+      triggerContext: { ...params.triggerContext, tableName: table.tableName },
+    }),
+  );
+  return nested.flat();
+}
+
+/** Graph-path execute: list tables only — loop items carry connection context for per-table Save RAG. */
 export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const triggerContext = triggerContextFromNodeInput(ctx.nodeInput, data);
@@ -383,38 +520,28 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
 
   const maxTables = 25;
   const selected = tables.slice(0, maxTables);
-  const sampleLimit = Math.min(Number(triggerContext.limits?.sampleRowLimit ?? 3), 5);
-  const infos: GetDbInfoResult[] = [];
-  for (const tableName of selected) {
-    infos.push(
-      await executeGetDbInfo({
-        env: ctx.c.env,
-        definition: ctx.definition,
-        agentId: ctx.node.id,
-        triggerContext: { ...triggerContext, tableName },
-        input: { tableName, schemaName, sampleRowLimit: sampleLimit },
-      }),
-    );
-  }
+  const items = selected.map((tableName) => buildTableLoopItem(tableName, schemaName));
 
-  for (const info of infos) {
-    info.sampleRows = info.sampleRows.slice(0, sampleLimit).map((row) => {
-      const out: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(row)) {
-        out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
-      }
-      return out;
-    });
-  }
+  // Keep connection on the node output (not on each loop item) so Loop / Save RAG can introspect Oracle.
+  const connectionOut = oracleConfig
+    ? { type: 'oracle' as const, ...oracleConfig, ...asRecord(connection) }
+    : asRecord(triggerContext.connection);
 
-  const items = infos.flatMap((info) => ragDocumentsFromDbInfo(info));
   return {
     dbId: String(triggerContext.dbId ?? ''),
     schemaName,
-    tableName: namedTable || selected.join(','),
-    tables,
+    tables: selected,
     items,
     count: items.length,
     tableCount: selected.length,
+    connection: connectionOut,
+    ...(oracleConfig
+      ? {
+          user: oracleConfig.user,
+          password: oracleConfig.password,
+          connectString: oracleConfig.connectString,
+          connectionType: 'oracle',
+        }
+      : {}),
   };
 }

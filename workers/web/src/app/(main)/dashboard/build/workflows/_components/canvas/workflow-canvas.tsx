@@ -11,6 +11,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { useWorkflowCanvasState } from "../hooks/use-workflow-canvas-state";
 import { useWorkflowExecuteEntry } from "../hooks/use-workflow-execute-entry";
+import { useWorkflowExecutionProgress, WorkflowExecutionUiProvider } from "../hooks/workflow-execution-ui";
 import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
 import { WorkflowCanvasWebhookListeningPanel } from "./workflow-canvas-webhook-listening-panel";
 import { WorkflowCanvasEmptyState } from "./workflow-canvas-empty-state";
@@ -212,9 +213,10 @@ function CanvasInnerWithDrawerUi({
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+  const executionProgress = useWorkflowExecutionProgress({ workflowId });
   const {
     executeFromEntry,
-    running,
+    running: executeRunning,
     webhookListening,
     listeningNodeId,
     stopWebhookListen,
@@ -227,7 +229,32 @@ function CanvasInnerWithDrawerUi({
     edges,
     patchNodeDataById: readOnly ? undefined : patchNodeDataById,
     readOnly,
+    startRun: executionProgress.startRun,
+    finishRun: executionProgress.finishRun,
   });
+  executionProgress.bindListeningNodeId(listeningNodeId);
+  const running = executionProgress.running || executeRunning;
+
+  const executionUi = useMemo(
+    () => ({
+      running,
+      entryNodeId: executionProgress.entryNodeId,
+      currentNodeId: executionProgress.currentNodeId,
+      listeningNodeId,
+      statusByNodeId: executionProgress.statusByNodeId,
+      startRun: executionProgress.startRun,
+      finishRun: executionProgress.finishRun,
+    }),
+    [
+      running,
+      executionProgress.entryNodeId,
+      executionProgress.currentNodeId,
+      executionProgress.statusByNodeId,
+      executionProgress.startRun,
+      executionProgress.finishRun,
+      listeningNodeId,
+    ],
+  );
 
   const onMenuActionWrapped = useCallback(
     (nodeId: string, action: string) => {
@@ -286,7 +313,8 @@ function CanvasInnerWithDrawerUi({
   );
 
   return (
-    <WorkflowCanvasUiContext.Provider value={uiValue}>
+    <WorkflowExecutionUiProvider value={executionUi}>
+      <WorkflowCanvasUiContext.Provider value={uiValue}>
       <CanvasSurface
         className={className}
         themeMode={themeMode}
@@ -319,7 +347,8 @@ function CanvasInnerWithDrawerUi({
           onStopListen={stopWebhookListen}
         />
       ) : null}
-    </WorkflowCanvasUiContext.Provider>
+      </WorkflowCanvasUiContext.Provider>
+    </WorkflowExecutionUiProvider>
   );
 }
 

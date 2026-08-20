@@ -71,3 +71,24 @@ export async function proxyIntrospectOracleTable(
 }> {
   return proxyCall(env, { action: 'introspectTable', config, schemaName, tableName, sampleLimit });
 }
+
+export type ProxyTableIntrospection = {
+  tableName: string;
+  columns: DbColumnInfo[];
+  primaryKey: string[];
+  foreignKeys: DbForeignKey[];
+  ddl: string;
+  sampleRows: Record<string, unknown>[];
+  rowCountEstimate?: number;
+  error?: string;
+};
+
+export async function proxyIntrospectOracleTables(
+  env: ProxyEnv,
+  config: OracleConnectConfig,
+  schemaName: string,
+  tableNames: string[],
+  sampleLimit: number,
+): Promise<ProxyTableIntrospection[]> {
+  return proxyCall(env, { action: 'introspectTables', config, schemaName, tableNames, sampleLimit });
+}

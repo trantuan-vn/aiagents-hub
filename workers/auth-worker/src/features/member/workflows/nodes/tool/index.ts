@@ -23,7 +23,7 @@ export type {
   GetRagExecuteParams,
 } from './get-rag/execute.js';
 
-export { executeGetDbInfo, executeGetDbInfoPipeline, listDatabaseTables } from './get-db-info/execute.js';
+export { executeGetDbInfo, executeGetDbInfoPipeline, listDatabaseTables, introspectTableToRagDocuments } from './get-db-info/execute.js';
 export type {
   DbColumnInfo,
   DbForeignKey,
