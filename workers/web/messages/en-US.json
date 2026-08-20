@@ -2914,6 +2914,7 @@
     "webhook_url_test": "Test URL",
     "webhook_url_production": "Production URL",
     "webhook_copy_url": "Copy URL",
+    "webhook_copied": "Webhook URL copied",
     "webhook_copy_failed": "Failed to copy URL",
     "webhook_path": "Path",
     "webhook_authentication": "Authentication",

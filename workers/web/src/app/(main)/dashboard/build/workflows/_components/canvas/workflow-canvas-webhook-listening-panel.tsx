@@ -17,9 +17,12 @@ export function WorkflowCanvasWebhookListeningPanel({
   onStop,
 }: WorkflowCanvasWebhookListeningPanelProps) {
   return (
-    <Panel position="top-center" className="nodrag nopan !m-4 !p-0">
-      <div className="bg-background nodrag nopan w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-xl border shadow-lg">
-        <WebhookListeningPanel testUrl={testUrl} onStop={onStop} receivedOutput={liveOutput} />
+    <Panel position="top-center" className="nodrag nopan !m-3 !p-0">
+      <div
+        className="bg-background nodrag nopan w-[min(22rem,calc(100vw-6rem))] overflow-hidden rounded-lg border shadow-lg"
+        onPointerDown={(event) => event.stopPropagation()}
+      >
+        <WebhookListeningPanel compact testUrl={testUrl} onStop={onStop} receivedOutput={liveOutput} />
       </div>
     </Panel>
   );

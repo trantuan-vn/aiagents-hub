@@ -2916,6 +2916,7 @@
     "webhook_url_test": "URL thử",
     "webhook_url_production": "URL production",
     "webhook_copy_url": "Sao chép URL",
+    "webhook_copied": "Đã sao chép URL webhook",
     "webhook_copy_failed": "Không sao chép được URL",
     "webhook_path": "Đường dẫn",
     "webhook_authentication": "Xác thực",

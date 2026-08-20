@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 
 import { Background, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -388,9 +388,43 @@ const CanvasSurface = memo(function CanvasSurface({
   onNodeDoubleClick?: (event: React.MouseEvent, node: Node) => void;
 }) {
   const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
+  const [listeningOverlayDismissed, setListeningOverlayDismissed] = useState(false);
+  const listeningActive = !!(webhookListening && testUrl && onStopWebhookListen);
+  const showListeningOverlay = listeningActive && !listeningOverlayDismissed;
+
+  useEffect(() => {
+    if (listeningActive) setListeningOverlayDismissed(false);
+  }, [listeningActive]);
+
+  const dismissListeningOverlay = useCallback(() => {
+    setListeningOverlayDismissed(true);
+  }, []);
+
   const onPaneClick = useCallback(() => {
     closeAddNodeDrawer?.();
-  }, [closeAddNodeDrawer]);
+    dismissListeningOverlay();
+  }, [closeAddNodeDrawer, dismissListeningOverlay]);
+
+  useEffect(() => {
+    if (!showListeningOverlay) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      dismissListeningOverlay();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showListeningOverlay, dismissListeningOverlay]);
 
   return (
     <div
@@ -416,6 +450,8 @@ const CanvasSurface = memo(function CanvasSurface({
         proOptions={{ hideAttribution: true }}
         panOnScroll
         onPaneClick={onPaneClick}
+        onNodeClick={dismissListeningOverlay}
+        onEdgeClick={dismissListeningOverlay}
         onNodeDoubleClick={onNodeDoubleClick}
         {...interactionProps}
       >
@@ -427,7 +463,7 @@ const CanvasSurface = memo(function CanvasSurface({
           tidyLayout={tidyLayout}
           onTidyWithFitReady={onTidyWithFitReady}
         />
-        {webhookListening && testUrl && onStopWebhookListen ? (
+        {showListeningOverlay && testUrl && onStopWebhookListen ? (
           <WorkflowCanvasWebhookListeningPanel
             testUrl={testUrl}
             liveOutput={liveOutput}
