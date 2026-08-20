@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
 import { createWorkflowTrigger, listWorkflowCredentials, listWorkflowTriggers, type WorkflowCredential } from "../../../_lib/api";
+import { useNodeExecutionUi } from "../../hooks/workflow-execution-ui";
+import { WorkflowExecuteStepButton } from "../../node-ui/workflow-execute-step-button";
 import { FormBasicCredentialDialog } from "./form-credential-dialog";
 import { buildFormPublicUrl } from "./form-url";
 import { NodeMockOutputSection } from "./node-mock-output-section";
@@ -120,7 +122,8 @@ export function FormNodeConfigPanel({
   const te = useTranslations("WorkflowEditorPage");
   const dashboardUser = useDashboardUser();
   const resolvedOwnerId = ownerId ?? dashboardUser?.id;
-  const isListening = listeningNodeId === node.id;
+  const { isListening: listeningFromUi } = useNodeExecutionUi(node.id);
+  const isListening = listeningNodeId === node.id || listeningFromUi;
 
   const nodeData = (node.data ?? {}) as Record<string, unknown>;
   const path = String(nodeData.formPath ?? defaultPath(node.id));
@@ -294,15 +297,30 @@ export function FormNodeConfigPanel({
                 </TabsTrigger>
               </TabsList>
               {onExecuteStep ? (
-                <Button
-                  type="button"
+                <WorkflowExecuteStepButton
+                  nodeId={node.id}
                   size="sm"
-                  className={cn(ORANGE, "shrink-0 text-xs text-white")}
-                  onClick={() => onExecuteStep(node.id)}
-                >
-                  <Zap className="mr-1.5 size-3.5" />
-                  {t("form_execute_step")}
-                </Button>
+                  className="shrink-0 text-xs"
+                  icon={Zap}
+                  fillIcon={false}
+                  listening={isListening}
+                  listeningLabel={t("form_stop_listening")}
+                  label={t("form_execute_step")}
+                  executingLabel={te("menu_executing_step")}
+                  onClick={() => (isListening ? onStopListen?.() : onExecuteStep(node.id))}
+                />
+              ) : isListening && onStopListen ? (
+                <WorkflowExecuteStepButton
+                  nodeId={node.id}
+                  size="sm"
+                  className="shrink-0 text-xs"
+                  icon={Zap}
+                  fillIcon={false}
+                  listening
+                  listeningLabel={t("form_stop_listening")}
+                  label={t("form_execute_step")}
+                  onClick={onStopListen}
+                />
               ) : null}
             </div>
 
