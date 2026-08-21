@@ -18,11 +18,6 @@ import {
 import { getExecutionByKey, listExecutions } from '../execution/execution-store.js';
 import { createCredential, deleteCredential, listCredentials } from '../storage/credentials.js';
 import {
-  completeGmailOAuth,
-  gmailOAuthPopupHtml,
-  startGmailOAuth,
-} from '../oauth/gmail-oauth.js';
-import {
   createTrigger,
   deleteTrigger,
   findFormTriggerByNodeId,
@@ -103,6 +98,9 @@ const CreateCredentialSchema = z.object({
       oauthMode: z.string().max(40).optional(),
       allowedHttpRequestDomains: z.string().max(500).optional(),
       connected: z.boolean().optional(),
+      authMethod: z.string().max(40).optional(),
+      smtpHost: z.string().max(200).optional(),
+      smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
     })
     .optional(),
 });
@@ -486,58 +484,6 @@ export function createWorkflowRoutes(bindingName: string) {
       return c.json({ success: true });
     }, 'Failed to delete credential'),
   );
-
-  // --- Gmail OAuth2 (Managed) for workflow credentials ---
-  app.get(
-    '/credentials/oauth/gmail/start',
-    createRouteHandler(async (c: any, user: any) => {
-      const oauthMode = String(c.req.query('oauthMode') ?? 'managed');
-      const allowedHttpRequestDomains = String(c.req.query('allowedHttpRequestDomains') ?? 'all');
-      const { url } = await startGmailOAuth(c.env, {
-        identifier: user.identifier,
-        oauthMode,
-        allowedHttpRequestDomains,
-      });
-      return c.json({ url });
-    }, 'Failed to start Gmail OAuth'),
-  );
-
-  app.get('/credentials/oauth/gmail/callback', async (c: any) => {
-    try {
-      const code = c.req.query('code');
-      const state = c.req.query('state');
-      const oauthError = c.req.query('error');
-      if (oauthError) {
-        return c.html(
-          gmailOAuthPopupHtml({
-            ok: false,
-            error: String(c.req.query('error_description') || oauthError),
-          }),
-          400,
-        );
-      }
-      if (!code || !state) {
-        return c.html(gmailOAuthPopupHtml({ ok: false, error: 'Missing OAuth code' }), 400);
-      }
-      const result = await completeGmailOAuth(
-        c.env,
-        (identifier: string) => getUserDO(c, identifier),
-        String(code),
-        String(state),
-      );
-      return c.html(
-        gmailOAuthPopupHtml({
-          ok: true,
-          credentialKey: result.credential.credentialKey,
-          name: result.credential.name,
-          email: result.email,
-        }),
-      );
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Gmail OAuth failed';
-      return c.html(gmailOAuthPopupHtml({ ok: false, error: message }), 400);
-    }
-  });
 
   // --- Triggers (cron + webhook + OpenClaw channels) ---
   const buildTriggerUrl = (

@@ -24,6 +24,12 @@ export interface CredentialMeta {
   allowedHttpRequestDomains?: string;
   /** Whether the OAuth account is connected. */
   connected?: boolean;
+  /** Gmail auth: `oauth` (Gmail API) or `smtp` (email + app password). */
+  authMethod?: string;
+  /** SMTP host for Gmail login credentials. */
+  smtpHost?: string;
+  /** SMTP port for Gmail login credentials. */
+  smtpPort?: number;
 }
 
 export interface ResolvedCredential {

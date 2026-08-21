@@ -319,6 +319,9 @@ export type WorkflowCredentialMeta = {
   oauthMode?: string;
   allowedHttpRequestDomains?: string;
   connected?: boolean;
+  authMethod?: string;
+  smtpHost?: string;
+  smtpPort?: number;
 };
 
 export interface WorkflowCredential {
@@ -346,21 +349,6 @@ export function createWorkflowCredential(body: {
   return apiFetch<{ credential: WorkflowCredential }>(
     "/dashboard/build/workflows/credentials",
     { method: "POST", body: JSON.stringify(body) },
-  );
-}
-
-export function startGmailOAuth(params?: {
-  oauthMode?: string;
-  allowedHttpRequestDomains?: string;
-}) {
-  const q = new URLSearchParams();
-  if (params?.oauthMode) q.set("oauthMode", params.oauthMode);
-  if (params?.allowedHttpRequestDomains) {
-    q.set("allowedHttpRequestDomains", params.allowedHttpRequestDomains);
-  }
-  const qs = q.toString();
-  return apiFetch<{ url: string }>(
-    `/dashboard/build/workflows/credentials/oauth/gmail/start${qs ? `?${qs}` : ""}`,
   );
 }
 

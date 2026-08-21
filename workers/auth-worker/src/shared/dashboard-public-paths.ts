@@ -33,12 +33,5 @@ export function isDashboardPublicPath(path: string, method: string): boolean {
   if (path === '/dashboard/vnpay/vnpay_return') return true;
   if (path === '/dashboard/vnpay/vnpay_ipn') return true;
   if (path === '/dashboard/vnpay/casso_ipn') return true;
-  // Google redirects here after Gmail credential consent (popup).
-  if (
-    method === 'GET' &&
-    path === '/dashboard/build/workflows/credentials/oauth/gmail/callback'
-  ) {
-    return true;
-  }
   return false;
 }

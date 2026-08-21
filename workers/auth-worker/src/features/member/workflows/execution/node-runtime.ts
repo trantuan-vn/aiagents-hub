@@ -1,5 +1,4 @@
 import type { ResolvedCredential } from '../storage/credentials.js';
-import { resolveGmailBearerSecret } from '../oauth/gmail-oauth.js';
 
 /**
  * Runtime helpers for the HTTP Request and Code nodes.
@@ -117,11 +116,24 @@ function applyCredential(
 ): void {
   if (!cred || cred.type === 'none' || !cred.secret) return;
   switch (cred.type) {
-    case 'bearer':
-      headers['Authorization'] = `Bearer ${
-        cred.meta.provider === 'gmail' ? resolveGmailBearerSecret(cred.secret) : cred.secret
-      }`;
+    case 'bearer': {
+      let token = cred.secret;
+      if (cred.meta.provider === 'gmail') {
+        const trimmed = cred.secret.trim();
+        if (trimmed.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(trimmed) as { access_token?: string };
+            if (typeof parsed.access_token === 'string' && parsed.access_token) {
+              token = parsed.access_token;
+            }
+          } catch {
+            /* keep secret */
+          }
+        }
+      }
+      headers['Authorization'] = `Bearer ${token}`;
       break;
+    }
     case 'header':
       if (cred.meta.headerName) headers[cred.meta.headerName] = cred.secret;
       break;

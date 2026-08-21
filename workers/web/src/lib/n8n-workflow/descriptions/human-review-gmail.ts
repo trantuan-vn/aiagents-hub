@@ -13,7 +13,7 @@ export const HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION = mainFlowNode({
       name: "credentialKey",
       type: "string",
       default: "",
-      description: "Gmail OAuth2 credential",
+      description: "Empty = send from noreply@aiagents-hub.vn. Optional Gmail SMTP credential.",
     },
     {
       displayName: "Resource",

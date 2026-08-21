@@ -5,9 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Edge, Node } from "@xyflow/react";
 import { AlertTriangle, CheckCircle2, Plus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { siGoogle } from "simple-icons";
 
-import { SimpleIcon } from "@/components/simple-icon";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -33,8 +31,8 @@ import { GmailCredentialDialog } from "./credential-dialog";
 
 type NamedOption = { id: string; label?: string; name?: string; value: string };
 
-function isGmailCredential(cred: WorkflowCredential): boolean {
-  return cred.meta?.provider === "gmail" || /gmail/i.test(cred.name);
+function isGmailSmtpCredential(cred: WorkflowCredential): boolean {
+  return cred.meta?.authMethod === "smtp" || (cred.meta?.provider === "gmail" && cred.type === "basic");
 }
 
 function RequiredMark({ show }: { show: boolean }) {
@@ -145,7 +143,7 @@ export function GmailHumanReviewConfigPanel({
       try {
         const { credentials } = await listWorkflowCredentials();
         if (!cancelled) {
-          setGmailCredentials(credentials.filter(isGmailCredential));
+          setGmailCredentials(credentials.filter(isGmailSmtpCredential));
         }
       } catch {
         if (!cancelled) setGmailCredentials([]);
@@ -167,6 +165,7 @@ export function GmailHumanReviewConfigPanel({
   );
 
   const openSetup = () => setCredentialDialogOpen(true);
+  const sendFromValue = selectedCredential ? credentialKey : "__platform__";
 
   return (
     <div className="bg-background absolute inset-0 z-50 flex flex-col">
@@ -217,72 +216,41 @@ export function GmailHumanReviewConfigPanel({
             <TabsContent value="parameters" className="mt-0 min-h-0 flex-1 overflow-y-auto p-4">
               <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">{t("gmail_field_credential")}</Label>
-                  {credentialKey ? (
-                    <div className="space-y-2">
-                      <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2.5">
-                        <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-emerald-950 dark:text-emerald-100">
-                            {t("gmail_credential_connected_success")}
-                          </p>
-                          <p className="text-emerald-900/80 dark:text-emerald-100/80 mt-0.5 truncate text-xs">
-                            {selectedCredential?.meta?.username ||
-                              selectedCredential?.name ||
-                              credentialKey}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {gmailCredentials.length > 0 ? (
-                          <Select
-                            value={credentialKey}
-                            onValueChange={(v) => patch({ credentialKey: v === "__none__" ? "" : v })}
-                          >
-                            <SelectTrigger className="h-9 flex-1">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">{t("form_credential_none_yet")}</SelectItem>
-                              {gmailCredentials.map((cred) => (
-                                <SelectItem key={cred.credentialKey} value={cred.credentialKey}>
-                                  {cred.meta?.username
-                                    ? `${cred.name} (${cred.meta.username})`
-                                    : cred.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : null}
-                        <button
-                          type="button"
-                          className="text-[#ff6f00] text-xs font-medium underline-offset-2 hover:underline"
-                          onClick={openSetup}
-                        >
-                          {t("gmail_credential_manage")}
-                        </button>
-                      </div>
+                  <Select
+                    value={sendFromValue}
+                    onValueChange={(v) => patch({ credentialKey: v === "__platform__" ? "" : v })}
+                  >
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__platform__">{t("gmail_send_from_platform")}</SelectItem>
+                      {gmailCredentials.map((cred) => (
+                        <SelectItem key={cred.credentialKey} value={cred.credentialKey}>
+                          {cred.meta?.username
+                            ? `${t("gmail_send_from_gmail")} (${cred.meta.username})`
+                            : cred.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedCredential ? (
+                    <div className="flex items-start gap-2 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2">
+                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                      <p className="text-emerald-950 dark:text-emerald-100 min-w-0 flex-1 truncate text-xs">
+                        {selectedCredential.meta?.username || selectedCredential.name}
+                      </p>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-9 gap-2 bg-white text-xs dark:bg-background"
-                        onClick={openSetup}
-                      >
-                        <SimpleIcon icon={siGoogle} className="size-4" />
-                        {t("gmail_sign_in_google")}
-                      </Button>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
-                        onClick={openSetup}
-                      >
-                        {t("gmail_or_setup_manually")}
-                      </button>
-                    </div>
+                    <p className="text-muted-foreground text-xs">{t("gmail_platform_hint")}</p>
                   )}
+                  <button
+                    type="button"
+                    className="text-[#ff6f00] text-xs font-medium underline-offset-2 hover:underline"
+                    onClick={openSetup}
+                  >
+                    {t("gmail_connect_smtp")}
+                  </button>
                 </div>
 
                 <div className="space-y-1.5">
@@ -425,22 +393,24 @@ export function GmailHumanReviewConfigPanel({
       <GmailCredentialDialog
         open={credentialDialogOpen}
         onOpenChange={setCredentialDialogOpen}
-        initialConnected={
-          credentialKey
-            ? {
-                key: credentialKey,
-                name: selectedCredential?.name,
-                email: selectedCredential?.meta?.username,
-              }
-            : null
-        }
+        initialEmail={selectedCredential?.meta?.username ?? ""}
         onSaved={(key, name, email) => {
           setGmailCredentials((prev) => {
             const exists = prev.some((c) => c.credentialKey === key);
             if (exists) {
               return prev.map((c) =>
                 c.credentialKey === key
-                  ? { ...c, name, meta: { ...c.meta, provider: "gmail", username: email } }
+                  ? {
+                      ...c,
+                      name,
+                      type: "basic",
+                      meta: {
+                        ...c.meta,
+                        provider: "gmail",
+                        username: email,
+                        authMethod: "smtp",
+                      },
+                    }
                   : c,
               );
             }
@@ -450,8 +420,8 @@ export function GmailHumanReviewConfigPanel({
                 id: 0,
                 credentialKey: key,
                 name,
-                type: "bearer",
-                meta: { provider: "gmail", username: email },
+                type: "basic",
+                meta: { provider: "gmail", username: email, authMethod: "smtp" },
               },
             ];
           });

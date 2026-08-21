@@ -1,29 +1,13 @@
 import { interpolate } from '../../../execution/node-runtime.js';
-import {
-  resolveCredential,
-  updateCredentialSecret,
-} from '../../../storage/credentials.js';
-import {
-  refreshGmailAccessToken,
-  resolveGmailBearerSecret,
-} from '../../../oauth/gmail-oauth.js';
+import { resolveCredential } from '../../../storage/credentials.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
-
-type GmailTokenPayload = {
-  access_token?: string;
-  refresh_token?: string | null;
-  expires_at?: number | null;
-};
-
-function parseTokenPayload(secret: string): GmailTokenPayload | null {
-  const trimmed = secret.trim();
-  if (!trimmed.startsWith('{')) return null;
-  try {
-    return JSON.parse(trimmed) as GmailTokenPayload;
-  } catch {
-    return null;
-  }
-}
+import {
+  GMAIL_SMTP_HOST,
+  GMAIL_SMTP_PORT,
+  isGmailSmtpCredential,
+  sendMailViaSmtp,
+} from './smtp.js';
+import { sendViaPlatformEmail } from './platform-email.js';
 
 function encodeRfc2047Subject(subject: string): string {
   if (/^[\x20-\x7E]*$/.test(subject)) return subject;
@@ -31,13 +15,6 @@ function encodeRfc2047Subject(subject: string): string {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
   return `=?UTF-8?B?${btoa(binary)}?=`;
-}
-
-function toBase64Url(raw: string): string {
-  const bytes = new TextEncoder().encode(raw);
-  let binary = '';
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function buildMimeMessage(params: {
@@ -57,55 +34,15 @@ function buildMimeMessage(params: {
   return `${headers.join('\r\n')}\r\n\r\n${params.body}`;
 }
 
-async function sendViaGmailApi(accessToken: string, raw: string): Promise<{ id?: string }> {
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    },
-    body: JSON.stringify({ raw }),
-  });
-  if (res.ok) {
-    return (await res.json()) as { id?: string };
-  }
-  const errText = await res.text();
-  const err = new Error(`Gmail send failed (${res.status}): ${errText.slice(0, 500)}`);
-  (err as Error & { status?: number }).status = res.status;
-  throw err;
-}
-
-async function resolveAccessToken(
-  ctx: NodeContext,
-  credentialKey: string,
-  secret: string,
-): Promise<string> {
-  const payload = parseTokenPayload(secret);
-  const expiresAt = payload?.expires_at ?? null;
-  const refreshToken = payload?.refresh_token;
-  const needsRefresh =
-    typeof expiresAt === 'number' && expiresAt > 0 && Date.now() > expiresAt - 60_000;
-
-  if (needsRefresh && refreshToken) {
-    const refreshed = await refreshGmailAccessToken(ctx.c.env, refreshToken);
-    const nextSecret = JSON.stringify({
-      access_token: refreshed.access_token,
-      refresh_token: refreshed.refresh_token ?? refreshToken,
-      expires_at: refreshed.expires_in
-        ? Date.now() + refreshed.expires_in * 1000
-        : null,
-    });
-    await updateCredentialSecret(ctx.userDO, ctx.c.env, credentialKey, nextSecret);
-    return refreshed.access_token;
-  }
-
-  return resolveGmailBearerSecret(secret);
+function approvalFooter(frontend: string, workflowId: number, responseType: string): string {
+  if (responseType !== 'approval') return '';
+  return `\n\n---\nThis workflow is waiting for your approval.\nOpen Executions in the workflow editor to Approve or Reject:\n${frontend}/dashboard/build/workflows/${workflowId}/edit`;
 }
 
 /**
- * Send a Gmail message for human_review channel=gmail before the engine pauses.
- * "Send and Wait for Response" still pauses after a successful send.
+ * Send a human-review email, then the engine pauses.
+ * Default: platform sender (noreply@aiagents-hub.vn).
+ * Optional: Gmail SMTP with email + app password.
  */
 export async function executeGmailHumanReview(ctx: NodeContext): Promise<NodeOutput> {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
@@ -118,79 +55,59 @@ export async function executeGmailHumanReview(ctx: NodeContext): Promise<NodeOut
     variables: ctx.runContext.variables ?? {},
   };
 
-  const credentialKey = String(data.credentialKey ?? data.credentialId ?? '').trim();
-  if (!credentialKey) {
-    throw new Error('Gmail human review requires a connected Gmail credential');
-  }
-
   const to = String(interpolate(String(data.to ?? ''), scope) ?? '').trim();
   const subject = String(interpolate(String(data.subject ?? ''), scope) ?? '').trim();
   const message = String(interpolate(String(data.message ?? ''), scope) ?? '').trim();
   if (!to) throw new Error('Gmail human review requires a To address');
   if (!subject) throw new Error('Gmail human review requires a Subject');
 
-  const credential = await resolveCredential(ctx.userDO, ctx.c.env, credentialKey);
-  if (!credential?.secret) {
-    throw new Error('Gmail credential not found — reconnect the Gmail account');
-  }
-  if (credential.meta.provider && credential.meta.provider !== 'gmail') {
-    throw new Error('Selected credential is not a Gmail OAuth credential');
-  }
-
   const frontend = String(ctx.c.env.FRONTEND_URL || 'https://aiagents-hub.vn').replace(/\/$/, '');
   const responseType = String(data.responseType ?? 'approval');
-  const footer =
-    responseType === 'approval'
-      ? `\n\n---\nThis workflow is waiting for your approval.\nOpen Executions in the workflow editor to Approve or Reject:\n${frontend}/dashboard/build/workflows/${ctx.meta.workflowId}/edit`
-      : '';
+  const body = `${message}${approvalFooter(frontend, ctx.meta.workflowId, responseType)}`;
 
-  const fromEmail =
-    typeof credential.meta.username === 'string' ? credential.meta.username : undefined;
-  const raw = toBase64Url(
-    buildMimeMessage({
-      to,
-      subject,
-      body: `${message}${footer}`,
-      from: fromEmail,
-    }),
-  );
-
-  let accessToken = await resolveAccessToken(ctx, credentialKey, credential.secret);
-  try {
-    const sent = await sendViaGmailApi(accessToken, raw);
-    return {
-      channel: 'gmail',
-      sent: true,
-      to,
-      subject,
-      messageId: sent.id,
-      responseType,
-    };
-  } catch (e) {
-    const status = (e as Error & { status?: number }).status;
-    const payload = parseTokenPayload(credential.secret);
-    if (status === 401 && payload?.refresh_token) {
-      const refreshed = await refreshGmailAccessToken(ctx.c.env, payload.refresh_token);
-      const nextSecret = JSON.stringify({
-        access_token: refreshed.access_token,
-        refresh_token: refreshed.refresh_token ?? payload.refresh_token,
-        expires_at: refreshed.expires_in
-          ? Date.now() + refreshed.expires_in * 1000
-          : null,
-      });
-      await updateCredentialSecret(ctx.userDO, ctx.c.env, credentialKey, nextSecret);
-      accessToken = refreshed.access_token;
-      const sent = await sendViaGmailApi(accessToken, raw);
+  const credentialKey = String(data.credentialKey ?? data.credentialId ?? '').trim();
+  if (credentialKey) {
+    const credential = await resolveCredential(ctx.userDO, ctx.c.env, credentialKey);
+    if (credential?.secret && isGmailSmtpCredential(credential)) {
+      const fromEmail =
+        typeof credential.meta.username === 'string' ? credential.meta.username.trim() : '';
+      if (!fromEmail) throw new Error('Gmail SMTP credential is missing the sender email');
+      const host =
+        typeof credential.meta.smtpHost === 'string' && credential.meta.smtpHost.trim()
+          ? credential.meta.smtpHost.trim()
+          : GMAIL_SMTP_HOST;
+      const parsedPort = Number(credential.meta.smtpPort);
+      const port = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : GMAIL_SMTP_PORT;
+      const sent = await sendMailViaSmtp(
+        { host, port },
+        {
+          from: fromEmail,
+          to,
+          rawMessage: buildMimeMessage({ to, subject, body, from: fromEmail }),
+          username: fromEmail,
+          password: credential.secret,
+        },
+      );
       return {
         channel: 'gmail',
         sent: true,
+        via: 'smtp',
         to,
         subject,
-        messageId: sent.id,
+        messageId: sent.messageId,
         responseType,
-        refreshedToken: true,
       };
     }
-    throw e;
   }
+
+  const sent = await sendViaPlatformEmail(ctx.c.env, { to, subject, text: body });
+  return {
+    channel: 'gmail',
+    sent: true,
+    via: 'platform',
+    to,
+    subject,
+    messageId: sent.messageId,
+    responseType,
+  };
 }
