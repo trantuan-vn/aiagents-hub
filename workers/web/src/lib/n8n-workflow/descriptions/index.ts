@@ -7,6 +7,7 @@ export { TRIGGER_WEBHOOK_N8N_DESCRIPTION, CORE_WEBHOOK_N8N_DESCRIPTION } from ".
 export { ACTION_IN_APP_N8N_DESCRIPTION } from "./action";
 export { DATA_TRANSFORMATION_N8N_DESCRIPTION } from "./transform";
 export { HUMAN_REVIEW_N8N_DESCRIPTION } from "./human-review";
+export { HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION } from "./human-review-gmail";
 export { SERVICE_NODE_N8N_DESCRIPTION } from "./service-node";
 export { MEMORY_NODE_N8N_DESCRIPTION } from "./memory-node";
 export { TOOL_NODE_N8N_DESCRIPTION } from "./tool-node";

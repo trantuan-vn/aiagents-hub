@@ -47,6 +47,7 @@ export const HUMAN_REVIEW_DEFINITION: WorkflowNodeDefinition = createBuiltin({
 export function createHumanReviewChannelDefinition(
   channel: HumanReviewChannel,
 ): WorkflowNodeDefinition {
+  const isGmail = channel === "gmail";
   return createBuiltin({
     id: `human_review:${channel}`,
     runtimeType: "human_review",
@@ -55,10 +56,23 @@ export function createHumanReviewChannelDefinition(
     descriptionKey: `human_review_channel_${channel}_desc`,
     category: "human",
     icon: "UserCheck",
-    defaultData: {
-      [HUMAN_REVIEW_KIND_FIELD]: channel,
-      label: channel.replace(/_/g, " "),
-    },
+    defaultData: isGmail
+      ? {
+          [HUMAN_REVIEW_KIND_FIELD]: channel,
+          label: "Gmail",
+          reviewMode: "send_and_wait",
+          resource: "message",
+          operation: "sendAndWait",
+          to: "",
+          subject: "",
+          message: "",
+          responseType: "approval",
+          credentialKey: "",
+        }
+      : {
+          [HUMAN_REVIEW_KIND_FIELD]: channel,
+          label: channel.replace(/_/g, " "),
+        },
     sections: [
       defaultInputSection(),
       defaultParametersSection([

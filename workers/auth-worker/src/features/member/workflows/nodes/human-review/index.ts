@@ -4,6 +4,7 @@ import {
 } from '@aiagents-hub/workflow-nodes';
 
 import type { WorkflowNodePlugin } from '../types.js';
+import { executeGmailHumanReview } from './gmail/execute.js';
 
 /** Base human_review — pause/resume is handled in the engine loop. */
 export const humanReviewPlugin: WorkflowNodePlugin = {
@@ -14,6 +15,18 @@ export const humanReviewPlugin: WorkflowNodePlugin = {
 };
 
 export function createHumanReviewChannelPlugin(channel: HumanReviewChannel): WorkflowNodePlugin {
+  if (channel === 'gmail') {
+    return {
+      id: 'human_review:gmail',
+      runtimeType: 'human_review',
+      kind: 'gmail',
+      engineFlowControl: 'human_review',
+      // Engine still pauses; execute() sends the email first.
+      skipExecution: false,
+      execute: executeGmailHumanReview,
+    };
+  }
+
   return {
     id: `human_review:${channel}`,
     runtimeType: 'human_review',

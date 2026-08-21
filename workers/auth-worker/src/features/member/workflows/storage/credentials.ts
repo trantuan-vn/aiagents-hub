@@ -16,6 +16,14 @@ export interface CredentialMeta {
   paramName?: string;
   /** Username for `type: 'basic'`. */
   username?: string;
+  /** Integration provider (e.g. gmail). */
+  provider?: string;
+  /** OAuth mode for managed/custom OAuth2 credentials. */
+  oauthMode?: string;
+  /** Allowed domains for credential-backed HTTP requests. */
+  allowedHttpRequestDomains?: string;
+  /** Whether the OAuth account is connected. */
+  connected?: boolean;
 }
 
 export interface ResolvedCredential {
@@ -125,4 +133,32 @@ export async function resolveCredential(
     secret = await decryptField(row.secretEnc, encryptionSecret);
   }
   return { type: row.type, secret, meta: safeParseMeta(row.meta) };
+}
+
+/** Replace encrypted secret for an existing credential (e.g. OAuth token refresh). */
+export async function updateCredentialSecret(
+  userDO: DurableObjectStub<UserDO>,
+  env: Env,
+  credentialKey: string,
+  secret: string,
+): Promise<void> {
+  if (!credentialKey) throw new Error('credentialKey is required');
+  const rows = await executeUtils.executeDynamicAction(
+    userDO,
+    'select',
+    { where: { field: 'credentialKey', operator: '=', value: credentialKey } },
+    'workflow_credentials',
+  );
+  const row = Array.isArray(rows) ? rows[0] : rows;
+  if (!row?.id) throw new Error('Credential not found');
+
+  const encryptionSecret = await env.ENCRYPTION_SECRET.get();
+  if (!encryptionSecret) throw new Error('ENCRYPTION_SECRET is not configured');
+  const secretEnc = await encryptField(secret, encryptionSecret);
+  await executeUtils.executeDynamicAction(
+    userDO,
+    'update',
+    { id: row.id, secretEnc },
+    'workflow_credentials',
+  );
 }

@@ -265,6 +265,19 @@ export function createAuthRoutes(bindingName: string) {
     // Check for OAuth errors
     const error = c.req.query('error');
     if (error) {
+      const errState = c.req.query('state');
+      if (provider === 'google' && errState) {
+        const { isGmailCredentialOAuthState, gmailOAuthFrontendRedirect, gmailOAuthPopupHtml } =
+          await import('../member/workflows/oauth/gmail-oauth.js');
+        if (await isGmailCredentialOAuthState(c.env, String(errState))) {
+          const message = String(c.req.query('error_description') || error);
+          try {
+            return c.redirect(gmailOAuthFrontendRedirect(c.env, { ok: false, error: message }));
+          } catch {
+            return c.html(gmailOAuthPopupHtml({ ok: false, error: message }), 400);
+          }
+        }
+      }
       throw new Error(`OAuth error: ${error}`);
     }
     
@@ -279,6 +292,44 @@ export function createAuthRoutes(bindingName: string) {
     }    
 
     const applicationService = createApplicationService(c, bindingName);
+
+    // Gmail workflow credential OAuth reuses this registered redirect_uri.
+    // Redirect to the frontend (same origin as the opener) — Google COOP often
+    // nulls window.opener on api.* so an HTML postMessage page stays blank.
+    if (provider === 'google' && state) {
+      const {
+        isGmailCredentialOAuthState,
+        completeGmailOAuth,
+        gmailOAuthFrontendRedirect,
+        gmailOAuthPopupHtml,
+      } = await import('../member/workflows/oauth/gmail-oauth.js');
+      if (await isGmailCredentialOAuthState(c.env, state)) {
+        try {
+          const result = await completeGmailOAuth(
+            c.env,
+            (identifier: string) =>
+              getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>,
+            code,
+            state,
+          );
+          return c.redirect(
+            gmailOAuthFrontendRedirect(c.env, {
+              ok: true,
+              credentialKey: result.credential.credentialKey,
+              name: result.credential.name,
+              email: result.email,
+            }),
+          );
+        } catch (gmailErr) {
+          const message = gmailErr instanceof Error ? gmailErr.message : 'Gmail OAuth failed';
+          try {
+            return c.redirect(gmailOAuthFrontendRedirect(c.env, { ok: false, error: message }));
+          } catch {
+            return c.html(gmailOAuthPopupHtml({ ok: false, error: message }), 400);
+          }
+        }
+      }
+    }
 
     // Exchange code for tokens and connect user (sessionId lấy từ state, không dùng cookie)
     const { userInfo: validatedUserInfo, sessionId: oauthSessionId } = await applicationService.exchangeOAuthCodeUseCase(provider, state, code);

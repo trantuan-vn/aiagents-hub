@@ -510,7 +510,9 @@ export function addNodeToDefinition(
     ? `trigger:${extraData.triggerKind}`
     : extraData?.coreKind
       ? `core:${extraData.coreKind}`
-      : type;
+      : extraData?.channel && type === "human_review"
+        ? `human_review:${extraData.channel}`
+        : type;
   const plugin = resolveUIPluginById(String(pluginId));
   const vectorizeDefaults = type === "memory_node" ? buildVectorizeNodeData(workflowId, id, label) : undefined;
   const baseData = plugin

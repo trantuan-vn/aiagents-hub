@@ -5,8 +5,21 @@ import {
 
 import type { WorkflowNodeUIPlugin } from "../types";
 import { HumanReviewNode } from "./canvas";
+import {
+  GmailHumanReviewConfigPanel,
+  gmailHumanReviewDefaults,
+  HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION,
+  isGmailHumanReviewNode,
+} from "./gmail";
 
 export { HumanReviewNode } from "./canvas";
+export {
+  GmailHumanReviewConfigPanel,
+  GmailCredentialDialog,
+  gmailHumanReviewDefaults,
+  HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION,
+  isGmailHumanReviewNode,
+} from "./gmail";
 
 /** Base family plugin — hidden from catalog; kind plugins are the add-node entries. */
 export const humanReviewUIPlugin: WorkflowNodeUIPlugin = {
@@ -26,6 +39,26 @@ export const humanReviewUIPlugin: WorkflowNodeUIPlugin = {
 export function createHumanReviewChannelUIPlugin(
   channel: HumanReviewChannel,
 ): WorkflowNodeUIPlugin {
+  if (channel === "gmail") {
+    return {
+      id: "human_review:gmail",
+      runtimeType: "human_review",
+      kind: "gmail",
+      Canvas: HumanReviewNode,
+      ConfigPanel: GmailHumanReviewConfigPanel,
+      defaults: () => gmailHumanReviewDefaults(),
+      catalog: {
+        category: "human",
+        labelKey: "human_review_channel_gmail",
+        descriptionKey: "human_review_channel_gmail_desc",
+        icon: "UserCheck",
+        keywords: ["gmail", "email", "human", "review", "approval"],
+      },
+      n8nProperties: HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION.properties,
+      match: isGmailHumanReviewNode,
+    };
+  }
+
   const label = channel.replace(/_/g, " ");
   return {
     id: `human_review:${channel}`,

@@ -466,10 +466,46 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       const matchedDecision = decision && decision.nodeId === nodeId ? decision : undefined;
 
       if (!matchedDecision && !persisted.autoApproveHumanReview) {
+        // Channel side-effects (e.g. Gmail send) run once before pausing.
+        const plugin = nodePluginRegistry.resolve(node);
+        let channelOut: NodeOutput = {};
+        if (plugin?.execute && !plugin.skipExecution) {
+          try {
+            const pluginCtx: PluginNodeContext = {
+              node,
+              nodeInput,
+              definition,
+              outputs: engine.outputs,
+              runContext: engine.runContext,
+              input: persisted.input,
+              c,
+              bindingName,
+              user,
+              userDO,
+              meta,
+              attr,
+              requestMeta: persisted.requestMeta,
+              webhookItem: persisted.webhookItem,
+            };
+            channelOut = await plugin.execute(pluginCtx);
+          } catch (e) {
+            log.status = 'error';
+            log.error = e instanceof Error ? e.message : String(e);
+            log.output = { error: log.error };
+            engine.steps.push({ ...log, durationMs: Date.now() - started });
+            engine.outputs[nodeId] = log.output as NodeOutput;
+            engine.finalOutput = log.output;
+            await emitProgress({ type: 'node_done', nodeId, status: 'error' });
+            await emitProgress({ type: 'finished', nodeId, status: 'failed' });
+            return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
+          }
+        }
+
         log.status = 'pending_human';
         log.output = {
           message: String(data.message ?? 'Awaiting human approval'),
           payload: nodeInput,
+          ...channelOut,
         };
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;

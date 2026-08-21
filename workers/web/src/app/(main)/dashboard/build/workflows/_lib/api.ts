@@ -311,12 +311,22 @@ export function setFormTestListening(
 // --- Credential vault ---
 export type WorkflowCredentialType = "bearer" | "header" | "basic" | "query" | "none";
 
+export type WorkflowCredentialMeta = {
+  headerName?: string;
+  paramName?: string;
+  username?: string;
+  provider?: string;
+  oauthMode?: string;
+  allowedHttpRequestDomains?: string;
+  connected?: boolean;
+};
+
 export interface WorkflowCredential {
   id: number;
   credentialKey: string;
   name: string;
   type: WorkflowCredentialType;
-  meta: { headerName?: string; paramName?: string; username?: string };
+  meta: WorkflowCredentialMeta;
   created_at?: number;
   updated_at?: number;
 }
@@ -331,11 +341,26 @@ export function createWorkflowCredential(body: {
   name: string;
   type: WorkflowCredentialType;
   secret?: string;
-  meta?: { headerName?: string; paramName?: string; username?: string };
+  meta?: WorkflowCredentialMeta;
 }) {
   return apiFetch<{ credential: WorkflowCredential }>(
     "/dashboard/build/workflows/credentials",
     { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export function startGmailOAuth(params?: {
+  oauthMode?: string;
+  allowedHttpRequestDomains?: string;
+}) {
+  const q = new URLSearchParams();
+  if (params?.oauthMode) q.set("oauthMode", params.oauthMode);
+  if (params?.allowedHttpRequestDomains) {
+    q.set("allowedHttpRequestDomains", params.allowedHttpRequestDomains);
+  }
+  const qs = q.toString();
+  return apiFetch<{ url: string }>(
+    `/dashboard/build/workflows/credentials/oauth/gmail/start${qs ? `?${qs}` : ""}`,
   );
 }
 
