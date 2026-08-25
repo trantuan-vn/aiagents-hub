@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useRef, type DragEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type DragEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-import { canAcceptExpressionDrop, insertExpression, readExpressionDrop } from "./workflow-expression-dnd";
+import {
+  canAcceptExpressionDrop,
+  insertExpression,
+  readExpressionDrop,
+  registerExpressionInsertTarget,
+} from "./workflow-expression-dnd";
 
 type ExpressionDropFieldProps = {
   value: string;
@@ -33,6 +38,45 @@ export function ExpressionDropField({
   numeric = false,
 }: ExpressionDropFieldProps) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  const applyExpression = useCallback((expression: string) => {
+    const el = inputRef.current;
+    const start = el?.selectionStart ?? valueRef.current.length;
+    const end = el?.selectionEnd ?? start;
+    const next = insertExpression(valueRef.current, expression, start, end);
+    onChangeRef.current(next);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const caret = start + expression.length;
+      try {
+        el?.setSelectionRange(caret, caret);
+      } catch {
+        /* ignore non-text inputs */
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const target = { insert: applyExpression };
+    const el = inputRef.current;
+    if (!el) return;
+    const onFocus = () => {
+      registerExpressionInsertTarget(target);
+    };
+    el.addEventListener("focus", onFocus);
+    let unregister = () => {};
+    if (document.activeElement === el) {
+      unregister = registerExpressionInsertTarget(target);
+    }
+    return () => {
+      el.removeEventListener("focus", onFocus);
+      unregister();
+    };
+  }, [applyExpression]);
 
   const applyDrop = useCallback(
     (e: DragEvent) => {
@@ -40,13 +84,9 @@ export function ExpressionDropField({
       e.stopPropagation();
       const expression = readExpressionDrop(e.dataTransfer);
       if (!expression) return;
-      const el = inputRef.current;
-      onChange(
-        insertExpression(value, expression, el?.selectionStart, el?.selectionEnd),
-      );
-      requestAnimationFrame(() => el?.focus());
+      applyExpression(expression);
     },
-    [onChange, value],
+    [applyExpression],
   );
 
   const onDragOver = useCallback((e: DragEvent) => {
@@ -67,6 +107,7 @@ export function ExpressionDropField({
     value,
     placeholder,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
+    onFocus: () => registerExpressionInsertTarget({ insert: applyExpression }),
     onDragEnter,
     onDragOver,
     onDrop: applyDrop,

@@ -63,8 +63,17 @@ const SAVE_RAG_FIELDS = [
 ];
 
 const GET_RAG_FIELDS = [
-  { id: "topK", type: "number" as const, labelKey: "field_top_k", defaultValue: 5, order: 4 },
-  { id: "scoreThreshold", type: "number" as const, labelKey: "field_score_threshold", defaultValue: 0.65, order: 5 },
+  {
+    id: "queryField",
+    type: "text" as const,
+    labelKey: "field_query_field",
+    defaultValue: "",
+    order: 3,
+    placeholderKey: "field_query_field_placeholder",
+    supportsExpression: true,
+  },
+  { id: "topK", type: "number" as const, labelKey: "field_top_k", defaultValue: 12, order: 4 },
+  { id: "scoreThreshold", type: "number" as const, labelKey: "field_score_threshold", defaultValue: 0, order: 5 },
   {
     id: "querySource",
     type: "select" as const,
@@ -268,12 +277,13 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     chunkOverlap: 120,
     inputMode: "agent_tool_call",
   },
-  "get-rag": {
+    "get-rag": {
     toolKind: "get-rag",
     toolName: "get_rag",
     toolDescription: "Search the knowledge base for passages relevant to the user question.",
-    topK: 5,
-    scoreThreshold: 0.65,
+    queryField: "",
+    topK: 12,
+    scoreThreshold: 0,
     querySource: "from_agent_input",
     includeMetadata: true,
   },

@@ -2,8 +2,9 @@
 
 import { useCallback, useMemo } from "react";
 
-import { WorkflowCanvas, type WorkflowDefinition } from "../canvas/workflow-canvas";
+import { WorkflowCanvas } from "../canvas/workflow-canvas";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
+import { normalizeWorkflowNodes, type WorkflowDefinition } from "../layout/workflow-definition";
 
 interface WorkflowEditorProps {
   definitionJson: string;
@@ -19,7 +20,7 @@ interface WorkflowEditorProps {
 function parseDef(json: string): WorkflowDefinition {
   try {
     const p = JSON.parse(json) as Partial<WorkflowDefinition> & { nodes?: unknown; edges?: unknown };
-    const nodes = Array.isArray(p.nodes) ? p.nodes : [];
+    const nodes = normalizeWorkflowNodes(Array.isArray(p.nodes) ? (p.nodes as WorkflowDefinition["nodes"]) : []);
     const edges = (Array.isArray(p.edges) ? p.edges : []).map((e) => normalizeWorkflowEdge(e));
     return { nodes, edges, viewport: p.viewport };
   } catch {

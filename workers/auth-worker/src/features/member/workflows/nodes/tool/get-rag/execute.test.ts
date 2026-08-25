@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
-import { executeGetRag, executeGetRagPipeline } from './execute.js';
+import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
 
 const definition: WorkflowDefinition = {
   nodes: [
@@ -55,7 +55,7 @@ describe('executeGetRag', () => {
     expect(result.snippets[0]?.source).toBe('doc-1');
     expect(query).toHaveBeenCalledWith(
       [0.5, 0.6],
-      expect.objectContaining({ topK: 3, filter: { namespace: 'test-ns' } }),
+      expect.objectContaining({ topK: 16, returnMetadata: 'all', filter: { namespace: 'test-ns' } }),
     );
   });
 });
@@ -107,6 +107,113 @@ describe('executeGetRagPipeline', () => {
     expect(out.query).toBe('total revenue last 30 days');
     expect(out.count).toBe(1);
     expect((out.body as { question: string }).question).toBe('total revenue last 30 days');
-    expect(String(out.text)).toContain('CREATE TABLE public.orders');
+    expect(String(out.text)).toBe('total revenue last 30 days');
+    expect(String(out.ragText)).toContain('CREATE TABLE public.orders');
+  });
+
+  it('queries the same workflow namespace Save RAG used when no memory node is attached', async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [{ score: 0.8, metadata: { text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);', namespace: 'uu1/wf1' } }],
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 12 },
+        },
+        {
+          id: 'tool_save',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'save-rag' },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { body: { question: 'list orders' }, query: {}, headers: {} },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.query).toBe('list orders');
+    expect(out.count).toBe(1);
+    expect(query).toHaveBeenCalledWith(
+      [0.5, 0.6],
+      expect.objectContaining({
+        topK: 48,
+        returnMetadata: 'all',
+        filter: { namespace: 'uu1/wf1' },
+      }),
+    );
+  });
+
+  it('reads a plain-string webhook body as the search question', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [{ id: 'tool_get', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { body: 'doanh thu 30 ngay', query: {}, headers: {} },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.query).toBe('doanh thu 30 ngay');
+  });
+});
+
+describe('preferSqlChunks', () => {
+  it('keeps the DDL chunk over a sample-row tail for the same table', () => {
+    const picked = preferSqlChunks(
+      [
+        {
+          score: 0.99,
+          metadata: {
+            text: '"NGAY_MO": "2026-06-24"',
+            tableName: 'TAI_KHOAN_LUU_KY',
+            docType: 'schema',
+            source: 'ADMIN.TAI_KHOAN_LUU_KY.schema.md',
+          },
+        },
+        {
+          score: 0.7,
+          metadata: {
+            text: '## DDL\n```sql\nCREATE TABLE ADMIN.TAI_KHOAN_LUU_KY (SO_TK_LUU_KY VARCHAR2(20));\n```',
+            tableName: 'TAI_KHOAN_LUU_KY',
+            docType: 'schema',
+            source: 'ADMIN.TAI_KHOAN_LUU_KY.schema.md',
+          },
+        },
+      ],
+      5,
+    );
+    expect(picked).toHaveLength(1);
+    expect(picked[0]?.metadata?.text).toContain('CREATE TABLE');
   });
 });

@@ -56,9 +56,22 @@ export function resolveRagResources(
   embedModelOverride?: string,
   scope?: VectorizeScopeContext,
 ): RagResourceContext {
-  const linked = resolveAgentResources(definition, agentId, scope);
   const self = definition.nodes.find((n) => n.id === agentId);
   const selfData = (self?.data ?? {}) as Record<string, unknown>;
+  const selfKind = String(selfData.toolKind ?? '');
+
+  // Get RAG on GENERATE SQL must read the same index Save RAG wrote on GENERATE VECTOR.
+  if (selfKind === 'get-rag') {
+    const save = definition.nodes.find((n) => {
+      if (n.id === agentId || n.type !== 'tool_node') return false;
+      return String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'save-rag';
+    });
+    if (save) {
+      return resolveRagResources(definition, save.id, embedModelOverride, scope);
+    }
+  }
+
+  const linked = resolveAgentResources(definition, agentId, scope);
 
   const linkedMem =
     linked.memoryNodeId != null

@@ -50,6 +50,40 @@ function mapMatch(match: VectorMatch, includeMetadata: boolean): GetRagSnippet {
   return snippet;
 }
 
+function sqlChunkScore(match: VectorMatch): number {
+  const text = matchToSnippet(match);
+  const docType = String(match.metadata?.docType ?? '');
+  let score = 0;
+  if (/CREATE TABLE|## DDL/i.test(text)) score += 4;
+  if (/```sql/i.test(text)) score += 2;
+  if (docType === 'sqlexample') score += 2;
+  if (docType === 'schema') score += 1;
+  return score;
+}
+
+function groupKey(match: VectorMatch): string {
+  return String(
+    match.metadata?.tableName ||
+      match.metadata?.source ||
+      match.metadata?.documentId ||
+      match.id ||
+      matchToSnippet(match).slice(0, 40),
+  );
+}
+
+/** Keep one best chunk per table, preferring DDL / SQL examples over sample-row tails. */
+export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMatch[] {
+  const ranked = [...matches].sort(
+    (a, b) => sqlChunkScore(b) - sqlChunkScore(a) || (b.score ?? 0) - (a.score ?? 0),
+  );
+  const byTable = new Map<string, VectorMatch>();
+  for (const match of ranked) {
+    const key = groupKey(match);
+    if (!byTable.has(key)) byTable.set(key, match);
+  }
+  return [...byTable.values()].slice(0, topK);
+}
+
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
   const { env, definition, agentId, input } = params;
   const config = toolNodeConfig(definition, agentId, 'get-rag') ?? {};
@@ -58,50 +92,78 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     workflowId: params.workflowId,
   });
 
-  const topK = input.topK ?? (Number(config.topK ?? 5) || 5);
+  const topK = input.topK ?? (Number(config.topK ?? 12) || 12);
   const namespace = input.namespace ?? String(config.namespace ?? rag.namespace);
   const docType = input.docType ?? (config.docTypeFilter ? String(config.docTypeFilter) : undefined);
   const scoreThreshold = config.scoreThreshold != null ? Number(config.scoreThreshold) : undefined;
   const includeMetadata = config.includeMetadata !== false;
 
-  const vector = await embedText(env, input.query, rag.embedModel);
-  if (!vector.length) return { snippets: [], count: 0 };
+  try {
+    const vector = await embedText(env, input.query, rag.embedModel);
+    if (!vector.length) return { snippets: [], count: 0 };
 
-  const matches = await queryCollection(env, rag.collection, vector, {
-    topK,
-    namespace: namespace || undefined,
-    docType,
-    scoreThreshold,
-  });
+    const matches = await queryCollection(env, rag.collection, vector, {
+      topK: Math.min(50, Math.max(topK * 4, 16)),
+      namespace: namespace || undefined,
+      docType,
+      scoreThreshold,
+    });
 
-  const snippets = matches.map((m) => mapMatch(m, includeMetadata));
-  return { snippets, count: snippets.length };
+    const snippets = preferSqlChunks(matches, topK).map((m) => mapMatch(m, includeMetadata));
+    return { snippets, count: snippets.length };
+  } catch (e) {
+    const message = String(e instanceof Error ? e.message : e).slice(0, 500);
+    throw new Error(`Get RAG retrieve failed: ${message}`);
+  }
+}
+
+function questionFromRecord(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value !== 'object' || Array.isArray(value)) return '';
+  const rec = value as Record<string, unknown>;
+  const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text ?? rec.message;
+  return q != null ? String(q).trim() : '';
 }
 
 function queryFromInput(ctx: NodeContext): string {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const items = pipelineItems(ctx.nodeInput);
   const item = items[0] ?? ctx.nodeInput;
-  const fromField = resolvePipelineField(data.queryField, item, ctx.nodeInput, [
-    'query',
+
+  const fromField = resolvePipelineField(data.queryField, item, ctx.nodeInput, []);
+  if (fromField.trim() && fromField !== '[object Object]') return fromField.trim();
+
+  const fromBody = questionFromRecord(ctx.nodeInput.body ?? item.body);
+  if (fromBody) return fromBody;
+
+  const fromFallback = resolvePipelineField(undefined, item, ctx.nodeInput, [
     'question',
+    'prompt',
     'text',
   ]);
-  if (fromField.trim()) return fromField;
+  if (fromFallback.trim() && fromFallback !== '[object Object]') return fromFallback.trim();
 
-  const body = (ctx.nodeInput.body ?? item.body) as Record<string, unknown> | undefined;
-  if (body && typeof body === 'object') {
-    const q = body.question ?? body.query ?? body.text;
-    if (q != null) return String(q);
+  if (typeof item.question === 'string' && item.question.trim()) return item.question.trim();
+
+  const raw = String(ctx.input ?? '').trim();
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const fromJson = questionFromRecord(parsed);
+      if (fromJson) return fromJson;
+    } catch {
+      return raw;
+    }
   }
-  return String(ctx.input ?? ctx.nodeInput.text ?? '').trim();
+  return '';
 }
 
 /** Graph-path execute: retrieve snippets for the webhook prompt, then pass through to Agent. */
 export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const query = queryFromInput(ctx);
   if (!query) {
-    return { ...ctx.nodeInput, snippets: [], count: 0, text: '', query: '' };
+    return { ...ctx.nodeInput, snippets: [], count: 0, ragText: '' };
   }
   const result = await executeGetRag({
     env: ctx.c.env,
@@ -111,12 +173,13 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
   });
-  const ragText = result.snippets.map((s) => s.text).join('\n\n');
+  const ragText = result.snippets.map((s) => s.text).filter(Boolean).join('\n\n');
   return {
     ...ctx.nodeInput,
     ...result,
     query,
+    question: query,
     ragText,
-    text: ragText,
+    text: query,
   };
 }

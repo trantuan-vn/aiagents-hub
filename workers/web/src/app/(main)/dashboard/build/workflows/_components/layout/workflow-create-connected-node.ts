@@ -131,7 +131,7 @@ export function applyCreateConnectedNode(
   const nextEdges = addEdge(
     normalizeWorkflowEdge({
       ...conn,
-      animated: true,
+      animated: false,
       style: args.side === "resource" ? { strokeDasharray: "6 4" } : undefined,
     }),
     edges,

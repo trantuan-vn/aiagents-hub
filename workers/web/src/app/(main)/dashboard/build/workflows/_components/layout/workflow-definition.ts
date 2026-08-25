@@ -28,7 +28,9 @@ export function toPersistedDefinition(
       if (n.parentId) base.parentId = n.parentId;
       if (n.extent) base.extent = n.extent;
       if (n.style && Object.keys(n.style).length > 0) base.style = n.style;
-      if (n.zIndex != null) base.zIndex = n.zIndex;
+      // Groups must stay >= 0 — negative z stacks with RF background and ghosts the canvas.
+      if (n.type === "workflow_group") base.zIndex = 0;
+      else if (n.zIndex != null) base.zIndex = n.zIndex;
       return base;
     }),
     edges: edges.map((e) => {
@@ -48,6 +50,15 @@ export function toPersistedDefinition(
     }),
     viewport,
   };
+}
+
+/** Clamp group stacking so loaded workflows with zIndex:-1 do not ghost the viewport. */
+export function normalizeWorkflowNodes(nodes: Node[]): Node[] {
+  return nodes.map((n) => {
+    if (n.type !== "workflow_group") return n;
+    if (n.zIndex === 0) return n;
+    return { ...n, zIndex: 0 };
+  });
 }
 
 export function persistedSignature(nodes: Node[], edges: Edge[]): string {

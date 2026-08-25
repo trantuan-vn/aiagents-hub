@@ -149,17 +149,49 @@ export async function runTextModel(
   }
 }
 
+function firstNonEmptyString(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return '';
+}
+
+function messageFromChoice(choice: Record<string, unknown>): string {
+  const message = choice.message;
+  if (message && typeof message === 'object' && !Array.isArray(message)) {
+    const m = message as Record<string, unknown>;
+    return firstNonEmptyString(m.content, m.reasoning, m.reasoning_content);
+  }
+  return firstNonEmptyString(choice.text, choice.content);
+}
+
+/** Pull assistant text from Workers AI / OpenAI-style payloads. Never stringify the raw JSON. */
 export function extractTextFromAiResponse(response: unknown): string {
-  if (!response || typeof response !== 'object') return String(response ?? '');
+  if (response == null) return '';
+  if (typeof response === 'string') return response;
+  if (typeof response !== 'object') return String(response);
+
   const r = response as Record<string, unknown>;
-  if (typeof r.response === 'string') return r.response;
+  if (typeof r.response === 'string' && r.response.trim()) return r.response;
   const inner = r.response;
   if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
     const desc = (inner as Record<string, unknown>).description;
-    if (typeof desc === 'string') return desc;
+    if (typeof desc === 'string' && desc.trim()) return desc;
   }
-  if (typeof r.result === 'string') return r.result;
-  return JSON.stringify(response);
+  if (typeof r.result === 'string' && r.result.trim()) return r.result;
+
+  const choices = r.choices;
+  if (Array.isArray(choices) && choices[0] && typeof choices[0] === 'object') {
+    return messageFromChoice(choices[0] as Record<string, unknown>);
+  }
+  return '';
+}
+
+export function finishReasonFromAiResponse(response: unknown): string {
+  if (!response || typeof response !== 'object') return '';
+  const choices = (response as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== 'object') return '';
+  return String((choices[0] as { finish_reason?: unknown }).finish_reason ?? '');
 }
 
 export function getModelForService(service: Record<string, unknown>): string {

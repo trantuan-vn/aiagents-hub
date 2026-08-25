@@ -587,7 +587,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       }, engine, nodeById);
     } catch (e) {
       log.status = 'error';
-      log.error = e instanceof Error ? e.message : String(e);
+      log.error = String(e instanceof Error ? e.message : e).slice(0, 2000);
       log.output = { error: log.error };
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = log.output as NodeOutput;
@@ -627,7 +627,10 @@ async function persistResult(
     totalCostVnd: persisted.engine.totalCostVnd,
     stepCount: persisted.engine.steps.length,
     pendingNodeId: result.pendingNodeId ?? '',
-    error: result.status === 'failed' ? String((result.output as any)?.error ?? 'failed') : undefined,
+    error:
+      result.status === 'failed'
+        ? String((result.output as any)?.error ?? 'failed').slice(0, 2000)
+        : undefined,
     finishedAt: terminal ? Date.now() : undefined,
   });
 }
@@ -710,17 +713,41 @@ export async function executeWorkflowGraph(
     },
   };
 
-  const record = await createExecution(userDO, {
-    executionKey,
-    workflowId: resolved.workflowId,
-    workflowOwnerId: resolved.ownerId,
-    workflowName: persisted.meta.workflowName || undefined,
-    input,
-    state: JSON.stringify(persisted),
-  });
+  let record: { id: number };
+  try {
+    record = await createExecution(userDO, {
+      executionKey,
+      workflowId: resolved.workflowId,
+      workflowOwnerId: resolved.ownerId,
+      workflowName: (persisted.meta.workflowName || undefined)?.slice(0, 200),
+      input: typeof input === 'string' ? input.slice(0, 32_000) : undefined,
+      state: capJson(persisted, 'state') ?? '{}',
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return {
+      status: 'failed',
+      executionKey,
+      workflowId: resolved.workflowId,
+      workflowOwnerId: resolved.ownerId,
+      output: { error: message.slice(0, 2000) },
+      steps: [],
+      totalCostVnd: 0,
+    };
+  }
 
-  const result = await runEngine({ c, bindingName, user, userDO, persisted, executionKey });
-  await persistResult(userDO, record.id, persisted, result);
+  let result: RunEngineResult;
+  try {
+    result = await runEngine({ c, bindingName, user, userDO, persisted, executionKey });
+  } catch (e) {
+    const message = String(e instanceof Error ? e.message : e).slice(0, 2000);
+    result = { status: 'failed', output: { error: message } };
+  }
+  try {
+    await persistResult(userDO, record.id, persisted, result);
+  } catch (e) {
+    console.warn('[executeWorkflowGraph] persist failed:', e instanceof Error ? e.message : e);
+  }
 
   return {
     status: result.status,

@@ -36,6 +36,13 @@ import { warnLegacyRuntimeType } from "../../_lib/runtime-type";
 export type { WorkflowDefinition };
 export { toPersistedDefinition };
 
+const DEFAULT_EDGE_OPTIONS = {
+  type: "workflowDeletable" as const,
+  animated: false,
+  markerEnd: WORKFLOW_EDGE_MARKER_END,
+  style: WORKFLOW_EDGE_STYLE,
+};
+
 const workflowEdgeTypes = {
   workflowDeletable: WorkflowDeletableEdge,
 };
@@ -430,7 +437,7 @@ const CanvasSurface = memo(function CanvasSurface({
   return (
     <div
       className={cn(
-        "workflow-canvas-surface dark:bg-muted/15 relative isolate h-full w-full overflow-hidden bg-[#f9f9f9] [transform:translateZ(0)]",
+        "workflow-canvas-surface dark:bg-muted/15 relative h-full w-full overflow-hidden bg-[#f9f9f9]",
         className,
       )}
     >
@@ -441,12 +448,7 @@ const CanvasSurface = memo(function CanvasSurface({
         edges={edges}
         nodeTypes={workflowNodeTypes}
         edgeTypes={workflowEdgeTypes}
-        defaultEdgeOptions={{
-          type: "workflowDeletable",
-          animated: true,
-          markerEnd: WORKFLOW_EDGE_MARKER_END,
-          style: WORKFLOW_EDGE_STYLE,
-        }}
+        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
         connectionRadius={28}
         proOptions={{ hideAttribution: true }}
         panOnScroll

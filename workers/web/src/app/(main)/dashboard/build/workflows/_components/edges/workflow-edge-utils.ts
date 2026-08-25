@@ -27,7 +27,7 @@ export function normalizeWorkflowEdge(edge: Edge | Connection): Edge {
     ...e,
     id: e.id ?? `${edge.source}-${edge.sourceHandle ?? "s"}-${edge.target}-${edge.targetHandle ?? "t"}`,
     type: e.type ?? "workflowDeletable",
-    animated: e.animated ?? true,
+    animated: false,
     markerEnd: WORKFLOW_EDGE_MARKER_END,
     style: {
       ...WORKFLOW_EDGE_STYLE,

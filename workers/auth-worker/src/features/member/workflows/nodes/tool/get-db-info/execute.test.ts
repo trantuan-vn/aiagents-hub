@@ -42,6 +42,7 @@ describe('get-db-info documents', () => {
     expect(items[0]?.metadata.docType).toBe('schema');
     expect(items[1]?.metadata.docType).toBe('sqlexample');
     expect(items[0]?.content).toContain('# Table: public.orders');
+    expect(items[0]?.content.indexOf('## DDL')).toBeLessThan(items[0]!.content.indexOf('## Sample shape'));
     expect(items[1]?.content).toContain('SELECT * FROM public.orders');
   });
 });

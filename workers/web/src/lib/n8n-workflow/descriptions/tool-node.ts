@@ -63,17 +63,27 @@ export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
       displayOptions: { show: { toolKind: ["save-rag"] } },
     },
     {
+      displayName: "Query field",
+      name: "queryField",
+      type: "string",
+      default: "",
+      placeholder: "{{ $json.body.question }}",
+      description:
+        "Expression or path for the search question. Leave empty to auto-read body.question / question from upstream.",
+      displayOptions: { show: { toolKind: ["get-rag"] } },
+    },
+    {
       displayName: "Top K",
       name: "topK",
       type: "number",
-      default: 5,
+      default: 12,
       displayOptions: { show: { toolKind: ["get-rag"] } },
     },
     {
       displayName: "Score threshold",
       name: "scoreThreshold",
       type: "number",
-      default: 0.65,
+      default: 0,
       displayOptions: { show: { toolKind: ["get-rag"] } },
     },
     {

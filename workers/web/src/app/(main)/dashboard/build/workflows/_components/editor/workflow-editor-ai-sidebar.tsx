@@ -30,7 +30,7 @@ export function WorkflowEditorAiSidebar({
   return (
     <aside
       className={cn(
-        "border-border bg-background isolate flex w-[min(100%,400px)] shrink-0 flex-col border-l shadow-sm",
+        "border-border bg-background flex w-[min(100%,400px)] shrink-0 flex-col border-l shadow-sm",
         className,
       )}
     >

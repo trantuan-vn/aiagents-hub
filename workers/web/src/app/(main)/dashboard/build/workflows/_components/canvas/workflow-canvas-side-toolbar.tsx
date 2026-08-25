@@ -90,7 +90,7 @@ export function WorkflowCanvasSideToolbar() {
   return (
     <Panel position="top-right" className="nodrag nopan !m-3 !p-0">
       <div
-        className="nodrag nopan bg-card/95 border-border flex flex-col overflow-hidden rounded-lg border shadow-sm backdrop-blur-sm"
+        className="nodrag nopan bg-card/95 border-border flex flex-col overflow-hidden rounded-lg border shadow-sm"
         role="toolbar"
         aria-label={t("canvas_toolbar")}
       >

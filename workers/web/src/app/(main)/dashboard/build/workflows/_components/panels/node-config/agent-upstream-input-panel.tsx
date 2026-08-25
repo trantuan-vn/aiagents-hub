@@ -13,6 +13,7 @@ import {
   Type,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/workflow-nodes";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,8 @@ import { cn } from "@/lib/utils";
 
 import {
   contextPathToExpression,
+  copyExpressionToClipboard,
+  insertExpressionIntoFocusedField,
   jsonPathToExpression,
   setExpressionDragData,
 } from "./workflow-expression-dnd";
@@ -230,8 +233,19 @@ function DraggableTreeRow({
   valuePreview?: string;
   matchesSearch?: boolean;
 }) {
+  const t = useTranslations("WorkflowNodeRegistry");
+
   const onDragStart = (e: DragEvent) => {
     setExpressionDragData(e.dataTransfer, expression);
+  };
+
+  const onActivate = async () => {
+    if (insertExpressionIntoFocusedField(expression)) {
+      toast.success(t("agent_input_expression_inserted"));
+      return;
+    }
+    const copied = await copyExpressionToClipboard(expression);
+    toast.success(copied ? t("agent_input_expression_copied") : expression);
   };
 
   if (!matchesSearch) return null;
@@ -240,6 +254,18 @@ function DraggableTreeRow({
     <div
       draggable
       onDragStart={onDragStart}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button")) return;
+        void onActivate();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          void onActivate();
+        }
+      }}
+      role="button"
+      tabIndex={0}
       className="hover:bg-muted/60 group flex cursor-grab items-center gap-1.5 rounded py-0.5 pr-1 active:cursor-grabbing"
       style={{ paddingLeft: `${depth * 14 + 4}px` }}
       title={expression}
@@ -467,6 +493,7 @@ export function AgentUpstreamInputPanel({
             {upstream && upstreamTitle ? (
               <>
                 <UpstreamSchemaTree data={upstream} rootLabel={upstreamTitle} search={search} />
+                <p className="text-muted-foreground px-1 text-[10px] leading-relaxed">{t("agent_input_map_hint")}</p>
                 <p className="text-muted-foreground px-1 text-[10px] leading-relaxed">{t("agent_input_refresh_hint")}</p>
               </>
             ) : upstreamNode ? (
@@ -514,7 +541,18 @@ export function AgentUpstreamInputPanel({
                       key={row.path}
                       draggable
                       onDragStart={(e) => setExpressionDragData(e.dataTransfer, jsonPathToExpression(row.path))}
+                      onClick={() => {
+                        const expression = jsonPathToExpression(row.path);
+                        if (insertExpressionIntoFocusedField(expression)) {
+                          toast.success(t("agent_input_expression_inserted"));
+                          return;
+                        }
+                        void copyExpressionToClipboard(expression).then((copied) => {
+                          toast.success(copied ? t("agent_input_expression_copied") : expression);
+                        });
+                      }}
                       className="hover:bg-muted/60 cursor-grab border-t active:cursor-grabbing"
+                      title={jsonPathToExpression(row.path)}
                     >
                       <td className="text-muted-foreground py-1 pr-3 font-mono">{row.path}</td>
                       <td className="max-w-[60%] truncate py-1 font-mono">{row.value}</td>

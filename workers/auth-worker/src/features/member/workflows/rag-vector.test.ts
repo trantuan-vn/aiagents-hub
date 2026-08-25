@@ -67,8 +67,32 @@ describe('rag-vector', () => {
     expect(matches).toHaveLength(1);
     expect(query).toHaveBeenCalledWith([0.1, 0.2], {
       topK: 3,
+      returnMetadata: 'all',
       filter: { namespace: 'kb' },
     });
+  });
+
+  it('falls back to in-memory namespace filter when metadata index query fails', async () => {
+    const query = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('metadata property namespace is not indexed'))
+      .mockResolvedValueOnce({
+        matches: [
+          { score: 0.9, metadata: { text: 'mine', namespace: 'kb' } },
+          { score: 0.8, metadata: { text: 'other', namespace: 'other-wf' } },
+        ],
+      });
+    const env = {
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const matches = await queryCollection(env, 'VECTORIZE', [0.1, 0.2], {
+      topK: 3,
+      namespace: 'kb',
+    });
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.metadata?.text).toBe('mine');
+    expect(query).toHaveBeenCalledTimes(2);
   });
 
   it('upsertVectors calls index upsert', async () => {

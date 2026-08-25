@@ -42,8 +42,10 @@ export function buildSchemaDocument(info: GetDbInfoResult): RagDocumentItem {
 
   const content = `${yamlHeader(info, 'schema')}# Table: ${table}
 
-## Summary
-Schema snapshot for \`${table}\` (${info.rowCountEstimate ?? info.sampleRows.length} rows estimated).
+## DDL
+\`\`\`sql
+${info.ddl}
+\`\`\`
 
 ## Columns
 
@@ -56,11 +58,6 @@ ${info.primaryKey.length ? info.primaryKey.map((k) => `- \`${k}\``).join('\n') :
 
 ## Foreign keys
 ${fks}
-
-## DDL
-\`\`\`sql
-${info.ddl}
-\`\`\`
 
 ## Sample shape (from live data)
 ${sample}

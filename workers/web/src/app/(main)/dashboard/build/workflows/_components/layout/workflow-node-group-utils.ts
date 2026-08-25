@@ -133,7 +133,7 @@ export function groupNodes(nodes: Node[]): Node[] {
     position: groupPosition,
     style: { width: groupWidth, height: groupHeight },
     data: { label: "" },
-    zIndex: -1,
+    zIndex: 0,
     selectable: true,
     draggable: true,
     selected: true,

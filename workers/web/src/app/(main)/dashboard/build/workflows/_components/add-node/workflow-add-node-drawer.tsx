@@ -40,8 +40,10 @@ export function WorkflowAddNodeDrawer() {
     <aside
       className={cn(
         "bg-card border-border pointer-events-none absolute inset-y-0 right-0 z-40 flex w-[min(100%,380px)] flex-col border-l shadow-lg",
-        "transform-gpu transition-transform duration-300 ease-in-out will-change-transform",
-        isOpen ? "pointer-events-auto translate-x-0" : "translate-x-full",
+        "transition-transform duration-300 ease-in-out",
+        isOpen
+          ? "pointer-events-auto translate-x-0"
+          : "translate-x-full",
       )}
       aria-hidden={!isOpen}
       inert={!isOpen ? true : undefined}

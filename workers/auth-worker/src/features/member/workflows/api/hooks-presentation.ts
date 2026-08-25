@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 
+import { extractErrorMessage } from '../../../../shared/http-errors';
 import { handleErrorWithoutIp } from '../../../../shared/utils';
 import {
   formatChannelInput,
@@ -25,6 +26,56 @@ import { validateWebhookApiToken } from '../triggers/webhook-auth.js';
  */
 export function createWorkflowHookRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
+
+  /**
+   * Echo sink for testing HTTP Request nodes.
+   * Auth: same as workflow webhooks (X-Client-ID + Bearer API token with /hooks/workflows).
+   * POST https://api.aiagents-hub.vn/hooks/echo
+   * Body example: { "sql": "SELECT 1 FROM dual" }
+   */
+  app.all('/echo', async (c) => {
+    try {
+      const clientId = c.req.header('X-Client-ID') || c.req.query('client_id');
+      if (!clientId) return c.json({ error: 'Missing X-Client-ID header' }, 401);
+      await validateWebhookApiToken(c, bindingName, String(clientId));
+
+      const contentType = c.req.header('content-type') ?? '';
+      let body: unknown = null;
+      if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+        if (contentType.includes('application/json')) {
+          body = await c.req.json().catch(() => null);
+        } else {
+          const text = await c.req.text().catch(() => '');
+          body = text || null;
+        }
+      }
+
+      const headers: Record<string, string> = {};
+      c.req.raw.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (lower === 'authorization') {
+          headers[key] = 'Bearer ***';
+          return;
+        }
+        headers[key] = value;
+      });
+
+      return c.json({
+        ok: true,
+        echo: true,
+        method: c.req.method,
+        receivedAt: Date.now(),
+        headers,
+        body,
+        sql: body && typeof body === 'object' && !Array.isArray(body)
+          ? String((body as Record<string, unknown>).sql ?? '')
+          : undefined,
+      });
+    } catch (e) {
+      const { errorResponse, status } = await handleErrorWithoutIp(e, 'Echo request failed', c.env);
+      return c.json(errorResponse, status);
+    }
+  });
 
   const workflowHandler = async (c: any) => {
     try {
@@ -85,6 +136,16 @@ export function createWorkflowHookRoutes(bindingName: string) {
       });
     } catch (e) {
       const { errorResponse, status } = await handleErrorWithoutIp(e, 'Webhook execution failed', c.env);
+      if (status >= 500) {
+        return c.json(
+          {
+            status: 'failed',
+            error: errorResponse.error,
+            output: { error: extractErrorMessage(e).slice(0, 2000) },
+          },
+          status,
+        );
+      }
       return c.json(errorResponse, status);
     }
   };
@@ -119,6 +180,16 @@ export function createWorkflowHookRoutes(bindingName: string) {
       });
     } catch (e) {
       const { errorResponse, status } = await handleErrorWithoutIp(e, 'Webhook execution failed', c.env);
+      if (status >= 500) {
+        return c.json(
+          {
+            status: 'failed',
+            error: errorResponse.error,
+            output: { error: extractErrorMessage(e).slice(0, 2000) },
+          },
+          status,
+        );
+      }
       return c.json(errorResponse, status);
     }
   };

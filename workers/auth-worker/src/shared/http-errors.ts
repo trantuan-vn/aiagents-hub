@@ -79,6 +79,13 @@ const OPERATIONAL_MESSAGE_PREFIXES = [
   'Amount must be at least',
   'Voucher for ',
   'AI could not produce a valid workflow (',
+  'Agent node missing',
+  'Agent requires a text generation model',
+  'HTTP request failed',
+  'Failed to execute dynamic',
+  'Entry node not found',
+  'Get RAG',
+  'Unknown node type:',
 ] as const;
 
 /** Missing config, bindings, or internal invariant — always log as error. */

@@ -64,3 +64,33 @@ export function insertExpression(
   const end = selectionEnd ?? start;
   return current.slice(0, start) + expression + current.slice(end);
 }
+
+type ExpressionInsertTarget = {
+  insert: (expression: string) => void;
+};
+
+let lastExpressionInsertTarget: ExpressionInsertTarget | null = null;
+
+/** Register the focused fx field so INPUT click/drag can insert into it. */
+export function registerExpressionInsertTarget(target: ExpressionInsertTarget): () => void {
+  lastExpressionInsertTarget = target;
+  return () => {
+    if (lastExpressionInsertTarget === target) lastExpressionInsertTarget = null;
+  };
+}
+
+/** Insert into the last focused ExpressionDropField. Returns false if none focused. */
+export function insertExpressionIntoFocusedField(expression: string): boolean {
+  if (!lastExpressionInsertTarget) return false;
+  lastExpressionInsertTarget.insert(expression);
+  return true;
+}
+
+export async function copyExpressionToClipboard(expression: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(expression);
+    return true;
+  } catch {
+    return false;
+  }
+}

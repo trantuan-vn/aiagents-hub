@@ -6,6 +6,7 @@ import {
   billAgentUsage,
   ensureWalletBalance,
   extractTextFromAiResponse,
+  finishReasonFromAiResponse,
   getModelForService,
   resolveServiceByEndpoint,
   runTextModel,
@@ -16,7 +17,7 @@ import {
   buildRagToolset,
   retrieveMemory,
 } from '../../execution/agent-runtime.js';
-import { resolveAgentResources } from '../../engine/graph-helpers.js';
+import { isDataFlowEdge, resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
 import { toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
@@ -38,13 +39,26 @@ function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<stri
   return out;
 }
 
+function isReasoningModel(modelId: string): boolean {
+  const id = modelId.toLowerCase();
+  return (
+    id.includes('glm') ||
+    id.includes('think') ||
+    id.includes('reason') ||
+    id.includes('qwq') ||
+    id.includes('deepseek-r1')
+  );
+}
+
 function resolveMaxTokens(
   agentData: Record<string, unknown>,
   serviceOptions?: Record<string, unknown>,
+  modelId = '',
 ): number {
+  const fallback = isReasoningModel(modelId) ? 4096 : 1024;
   const fromService = serviceOptions?.maxTokens;
-  const raw = fromService ?? agentData.maxTokens ?? 1024;
-  return Number(raw) || 1024;
+  const raw = fromService ?? agentData.maxTokens ?? fallback;
+  return Number(raw) || fallback;
 }
 
 /** Embedding models cannot be used with streamText / chat completions. */
@@ -65,19 +79,53 @@ function resolveEmbedModel(service: Record<string, unknown>): string {
 }
 
 function extractQuestionText(nodeInput: Record<string, unknown>, fallbackInput?: string): string {
+  if (typeof nodeInput.query === 'string' && nodeInput.query.trim()) return nodeInput.query.trim();
+  if (typeof nodeInput.question === 'string' && nodeInput.question.trim()) return nodeInput.question.trim();
   const body = nodeInput.body;
   if (body && typeof body === 'object' && !Array.isArray(body)) {
     const rec = body as Record<string, unknown>;
-    const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text;
+    const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text ?? rec.message;
     if (q != null && String(q).trim()) return String(q);
   }
   if (typeof body === 'string' && body.trim()) return body;
-  if (nodeInput.question != null && String(nodeInput.question).trim()) return String(nodeInput.question);
-  if (nodeInput.query != null && String(nodeInput.query).trim()) return String(nodeInput.query);
   if (fallbackInput?.trim()) return fallbackInput;
   const hasSnippets = Array.isArray(nodeInput.snippets) && nodeInput.snippets.length > 0;
   if (!hasSnippets && nodeInput.text != null && String(nodeInput.text).trim()) return String(nodeInput.text);
   return JSON.stringify(nodeInput);
+}
+
+function agentHasUpstreamGetRag(
+  definition: import('../../domain/domain.js').WorkflowDefinition,
+  agentId: string,
+): boolean {
+  return definition.edges.some((edge) => {
+    if (edge.target !== agentId || !isDataFlowEdge(edge)) return false;
+    const source = definition.nodes.find((n) => n.id === edge.source);
+    if (source?.type !== 'tool_node') return false;
+    return String((source.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-rag';
+  });
+}
+
+function extractSql(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('{') && /"choices"\s*:/.test(trimmed)) return '';
+
+  const fenced = trimmed.match(/```sql\s*([\s\S]*?)```/i);
+  if (fenced?.[1]?.trim()) return fenced[1].trim();
+  const generic = trimmed.match(/```\s*([\s\S]*?)```/);
+  if (generic?.[1] && /^\s*(WITH|SELECT|INSERT|UPDATE|DELETE)\b/i.test(generic[1])) {
+    return generic[1].trim();
+  }
+  const select = trimmed.match(/\b((?:WITH|SELECT)\b[\s\S]{12,8000}?)(?:;|$)/i);
+  if (select?.[1]?.trim()) {
+    const sql = select[1].trim();
+    return /;$/.test(sql) ? sql : `${sql};`;
+  }
+  if (/^\s*(WITH|SELECT|INSERT|UPDATE|DELETE)\b/i.test(trimmed) && trimmed.length < 8000) {
+    return trimmed;
+  }
+  return '';
 }
 
 function ragSnippetsFromInput(nodeInput: Record<string, unknown>): string[] {
@@ -190,6 +238,21 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
 
   const hasGetRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
+  const hasUpstreamGetRag = agentHasUpstreamGetRag(ctx.definition, ctx.node.id);
+  const useRetrievedSqlContext = hasGetRagTool || hasUpstreamGetRag;
+  const getRagNodeId = hasUpstreamGetRag
+    ? ctx.definition.edges.find(
+        (edge) =>
+          edge.target === ctx.node.id &&
+          isDataFlowEdge(edge) &&
+          ctx.definition.nodes.some(
+            (n) =>
+              n.id === edge.source &&
+              n.type === 'tool_node' &&
+              String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-rag',
+          ),
+      )?.source
+    : ctx.node.id;
   const ragTools = withoutGetRagTools(
     buildRagToolset(
       {
@@ -211,20 +274,20 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const useToolLoop = toolNames.length > 0;
 
   let ragContext = ragSnippetsFromInput(ctx.nodeInput as Record<string, unknown>);
-  if (!ragContext.length && hasGetRagTool) {
+  if (!ragContext.length && useRetrievedSqlContext) {
     const retrieved = await executeGetRag({
       env: ctx.c.env,
       definition: ctx.definition,
-      agentId: ctx.node.id,
+      agentId: getRagNodeId ?? ctx.node.id,
       input: { query: userText },
-      embedModel,
+      embedModel: DEFAULT_EMBED_MODEL,
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
     });
     ragContext = retrieved.snippets.map((s) => {
       const source = s.source?.trim();
       return source ? `[${source}]\n${s.text}` : s.text;
-    });
+    }).filter(Boolean);
   }
 
   const memorySnippets =
@@ -238,6 +301,9 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   const systemParts = [
     String(data.systemPrompt ?? ''),
+    !String(data.systemPrompt ?? '').trim() && useRetrievedSqlContext
+      ? 'You are a Text-to-SQL assistant. Use the retrieved table schemas and SQL examples to write one read-only SQL query for the user question.'
+      : '',
     saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     memorySnippets.length
@@ -247,8 +313,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
     memorySnippets.length
-      ? 'Use the retrieved schema and SQL examples. Return a single read-only SQL query in a fenced sql code block, qualifying tables as schema.table. Do not invent tables or columns that are not in the retrieved context.'
-      : hasGetRagTool
+      ? 'Use the retrieved schema and SQL examples. Reply with one read-only SQL query in a fenced sql code block, qualifying tables as schema.table. Keep reasoning under 8 short bullets. Do not spend the token budget on analysis — the SQL is the answer. Do not invent tables or columns that are not in the retrieved context.'
+      : hasGetRagTool || hasUpstreamGetRag
         ? 'No relevant schema was retrieved from the knowledge base. Do not invent tables or columns.'
         : '',
     hasSaveRagTool && !saveRagSystemPrompt
@@ -259,7 +325,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       : '',
   ].filter(Boolean);
 
-  const maxTokens = resolveMaxTokens(data, linked.serviceOptions);
+  const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId);
   const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
 
   if (useToolLoop && ctx.c.env.AI) {
@@ -299,7 +365,15 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       },
     );
     ctx.onCost?.(costVnd);
-    return { text, raw: { usage, toolNames }, endpoint };
+    return {
+      text,
+      sql: extractSql(text),
+      query: userText,
+      snippets: ragContext,
+      count: ragContext.length,
+      raw: { usage, toolNames },
+      endpoint,
+    };
   }
 
   const messages = [
@@ -307,8 +381,29 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     { role: 'user', content: userText },
   ];
 
-  const aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams);
-  const text = extractTextFromAiResponse(aiResponse);
+  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams);
+  let text = extractTextFromAiResponse(aiResponse);
+  let sql = extractSql(text);
+
+  if (useRetrievedSqlContext && (!sql || (finishReasonFromAiResponse(aiResponse) === 'length' && !/```sql/i.test(text)))) {
+    const retryTokens = Math.max(maxTokens, 4096);
+    aiResponse = await runTextModel(
+      ctx.c.env,
+      modelId,
+      [
+        ...messages,
+        {
+          role: 'user',
+          content:
+            'Stop analyzing. Output only one read-only SQL query in a fenced sql code block. No explanation.',
+        },
+      ],
+      retryTokens,
+      modelParams,
+    );
+    text = extractTextFromAiResponse(aiResponse) || text;
+    sql = extractSql(text);
+  }
 
   const costVnd = await billAgentUsage(
     ctx.c.env,
@@ -325,5 +420,13 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     },
   );
   ctx.onCost?.(costVnd);
-  return { text, raw: aiResponse, endpoint };
+  return {
+    text,
+    sql,
+    query: userText,
+    snippets: ragContext,
+    count: ragContext.length,
+    raw: aiResponse,
+    endpoint,
+  };
 }

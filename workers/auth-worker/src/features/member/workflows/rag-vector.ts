@@ -11,11 +11,15 @@ export type VectorMatch = {
   metadata?: Record<string, string>;
 };
 
+export type VectorizeQueryOpts = {
+  topK: number;
+  filter?: Record<string, string>;
+  namespace?: string;
+  returnMetadata?: boolean | 'all' | 'indexed' | 'none';
+};
+
 export type VectorizeBinding = {
-  query: (
-    vector: number[],
-    opts: { topK: number; filter?: Record<string, string> },
-  ) => Promise<{ matches?: VectorMatch[] }>;
+  query: (vector: number[], opts: VectorizeQueryOpts) => Promise<{ matches?: VectorMatch[] }>;
   upsert?: (vectors: VectorizeVectorRecord[]) => Promise<{ count?: number }>;
 };
 
@@ -98,8 +102,13 @@ export async function embedTexts(
       });
     } else {
       for (const row of nonempty) {
-        const embed = await env.AI.run(modelId as keyof AiModels, { text: row.text });
-        mapped[row.index] = vectorsFromAiData((embed as { data?: unknown })?.data, 1)[0] ?? [];
+        try {
+          const embed = await env.AI.run(modelId as keyof AiModels, { text: row.text });
+          mapped[row.index] = vectorsFromAiData((embed as { data?: unknown })?.data, 1)[0] ?? [];
+        } catch (e) {
+          const message = String(e instanceof Error ? e.message : e).slice(0, 300);
+          throw new Error(`embed failed: ${message}`);
+        }
       }
     }
     out.push(...mapped);
@@ -115,6 +124,25 @@ export function buildMetadataFilter(opts: Pick<QueryCollectionOptions, 'namespac
   return Object.keys(filter).length ? filter : undefined;
 }
 
+function matchesNamespace(match: VectorMatch, namespace?: string): boolean {
+  if (!namespace) return true;
+  return String(match.metadata?.namespace ?? '') === namespace;
+}
+
+function matchesDocType(match: VectorMatch, docType?: string): boolean {
+  if (!docType) return true;
+  return String(match.metadata?.docType ?? '') === docType;
+}
+
+async function queryIndex(
+  index: VectorizeBinding,
+  queryVector: number[],
+  opts: VectorizeQueryOpts,
+): Promise<VectorMatch[]> {
+  const result = await index.query(queryVector, opts);
+  return result.matches ?? [];
+}
+
 export async function queryCollection(
   env: Env,
   collection: string,
@@ -126,18 +154,38 @@ export async function queryCollection(
 
   const topK = opts.topK ?? 5;
   const filter = buildMetadataFilter(opts);
+  const base: VectorizeQueryOpts = { topK, returnMetadata: 'all' };
 
-  try {
-    const result = await index.query(queryVector, { topK, ...(filter ? { filter } : {}) });
-    let matches = result.matches ?? [];
-    if (opts.scoreThreshold != null) {
-      matches = matches.filter((m) => (m.score ?? 0) >= opts.scoreThreshold!);
+  let matches: VectorMatch[] = [];
+  if (filter) {
+    try {
+      matches = await queryIndex(index, queryVector, { ...base, filter });
+    } catch (e) {
+      console.warn('[rag-vector] metadata filter query failed, falling back:', e);
     }
-    return matches;
-  } catch (e) {
-    console.warn('[rag-vector] query failed:', e);
-    return [];
   }
+
+  if (!matches.length) {
+    try {
+      const fetched = await queryIndex(index, queryVector, {
+        ...base,
+        topK: Math.min(50, Math.max(topK * 5, 20)),
+      });
+      matches = fetched.filter(
+        (m) => matchesNamespace(m, opts.namespace) && matchesDocType(m, opts.docType),
+      );
+    } catch (e) {
+      console.warn('[rag-vector] query failed:', e);
+      return [];
+    }
+  }
+
+  if (opts.scoreThreshold != null && opts.scoreThreshold > 0) {
+    const passed = matches.filter((m) => (m.score ?? 0) >= opts.scoreThreshold!);
+    if (passed.length) matches = passed;
+  }
+
+  return matches.slice(0, topK);
 }
 
 export async function upsertVectors(

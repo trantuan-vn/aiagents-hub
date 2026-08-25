@@ -109,6 +109,81 @@ function assertUrlAllowed(rawUrl: string): URL {
 const MAX_TIMEOUT_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 15_000;
 
+/** Hosts we serve — DO→custom-domain fetch often 522s; short-circuit local sinks. */
+const LOCAL_API_HOSTS = new Set(['api.aiagents-hub.vn']);
+
+function normalizeHeaderSpec(raw: unknown, scope: NodeScope): Record<string, string> {
+  let spec: unknown = raw ?? {};
+  if (typeof spec === 'string') {
+    const interpolated = String(interpolate(spec, scope)).trim();
+    if (!interpolated) return {};
+    try {
+      spec = JSON.parse(interpolated);
+    } catch {
+      return {};
+    }
+  }
+  if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return {};
+
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(spec as Record<string, unknown>)) {
+    if (!k || k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
+    headers[k] = String(interpolate(String(v ?? ''), scope));
+  }
+  return headers;
+}
+
+function parseRequestBody(body: BodyInit | undefined): unknown {
+  if (body == null) return null;
+  const text = typeof body === 'string' ? body : undefined;
+  if (text == null) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return trimmed;
+  }
+}
+
+/** In-process /hooks/echo — avoids Cloudflare 522 when a Durable Object fetches its own API host. */
+function tryLocalEcho(
+  url: URL,
+  method: string,
+  headers: Record<string, string>,
+  body: BodyInit | undefined,
+): HttpRequestResult | null {
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (path !== '/hooks/echo') return null;
+  if (!LOCAL_API_HOSTS.has(url.hostname.toLowerCase())) return null;
+
+  const parsedBody = parseRequestBody(body);
+  const safeHeaders: Record<string, string> = {};
+  for (const [k, v] of Object.entries(headers)) {
+    safeHeaders[k] = k.toLowerCase() === 'authorization' ? 'Bearer ***' : v;
+  }
+  const payload = {
+    ok: true,
+    echo: true,
+    local: true,
+    method,
+    receivedAt: Date.now(),
+    headers: safeHeaders,
+    body: parsedBody,
+    sql:
+      parsedBody && typeof parsedBody === 'object' && !Array.isArray(parsedBody)
+        ? String((parsedBody as Record<string, unknown>).sql ?? '')
+        : undefined,
+  };
+  return {
+    status: 200,
+    ok: true,
+    headers: { 'content-type': 'application/json' },
+    body: payload,
+    data: payload,
+  };
+}
+
 function applyCredential(
   cred: ResolvedCredential | null,
   url: URL,
@@ -167,12 +242,7 @@ export async function runHttpRequest(
   if (!rawUrl) throw new Error('HTTP node missing url');
   const url = assertUrlAllowed(rawUrl);
 
-  const headers: Record<string, string> = {};
-  const headerSpec = (data.headers ?? {}) as Record<string, unknown>;
-  for (const [k, v] of Object.entries(headerSpec)) {
-    headers[k] = String(interpolate(String(v), scope));
-  }
-
+  const headers = normalizeHeaderSpec(data.headers, scope);
   applyCredential(credential, url, headers);
 
   let body: BodyInit | undefined;
@@ -186,6 +256,9 @@ export async function runHttpRequest(
       }
     }
   }
+
+  const localEcho = tryLocalEcho(url, method, headers, body);
+  if (localEcho) return localEcho;
 
   const timeoutMs = Math.min(MAX_TIMEOUT_MS, Number(data.timeoutMs ?? DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
   const controller = new AbortController();

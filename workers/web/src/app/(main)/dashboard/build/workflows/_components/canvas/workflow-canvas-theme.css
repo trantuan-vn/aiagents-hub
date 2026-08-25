@@ -77,12 +77,14 @@
   box-sizing: border-box;
 }
 
+/* Keep groups above the pane/background, below normal nodes (avoid z-index: -1 —
+   that stacks groups with the RF background and causes full-canvas ghosting). */
 .react-flow__node-workflow_group {
-  z-index: -1 !important;
+  z-index: 0 !important;
 }
 
 .react-flow__node-workflow_group.selected {
-  z-index: 0 !important;
+  z-index: 1 !important;
 }
 
 .workflow-handle-diamond {
@@ -117,4 +119,19 @@
       0 0 0 2px #ff6d00,
       0 0 0 10px rgba(255, 109, 0, 0.08);
   }
+}
+
+/* Kill infinite edge/connection animations — continuous SVG paint ghosts the viewport. */
+.workflow-canvas-surface .react-flow__edge.animated path,
+.workflow-canvas-surface .react-flow__connection .animated,
+.workflow-canvas-surface .react-flow__edge path {
+  animation: none !important;
+}
+
+.workflow-canvas-surface .react-flow__viewport,
+.workflow-canvas-surface .react-flow__renderer,
+.workflow-canvas-surface .react-flow__nodes,
+.workflow-canvas-surface .react-flow__edges {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }

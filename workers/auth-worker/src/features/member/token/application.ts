@@ -9,6 +9,7 @@ import {
 } from './domain';
 import { createServiceInfrastructureService } from '../../admin/service/infrastructure';
 import { getPermissionGroups, toServicePermissionRow, isApprovedActiveService } from './permissions';
+import { ERROR_MESSAGES } from './constant';
 
 interface ITokenApplicationService {
   // Token Management
@@ -29,8 +30,16 @@ export function createTokenApplicationService(c: Context, bindingName: string): 
   };
 
   const getTokenServiceByClientId = (clientId: string) => {
-    const userDO = getIdFromString(c, clientId, bindingName) as DurableObjectStub<UserDO>;
-    return createApiTokenService(c.env, userDO);
+    try {
+      const userDO = getIdFromString(c, clientId, bindingName) as DurableObjectStub<UserDO>;
+      return createApiTokenService(c.env, userDO);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (message.includes('Invalid Durable Object ID')) {
+        throw new Error(ERROR_MESSAGES.TOKEN.INVALID_CLIENT_ID);
+      }
+      throw e;
+    }
   };
 
   return {

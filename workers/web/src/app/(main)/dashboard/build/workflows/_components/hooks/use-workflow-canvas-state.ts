@@ -14,7 +14,7 @@ import {
 
 import { isResourceEdge, isValidWorkflowConnection } from "../edges/workflow-connection-utils";
 import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "../layout/workflow-create-connected-node";
-import { persistedSignature, toPersistedDefinition, type WorkflowDefinition } from "../layout/workflow-definition";
+import { persistedSignature, toPersistedDefinition, normalizeWorkflowNodes, type WorkflowDefinition } from "../layout/workflow-definition";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
 import { readEdgeRouteAdjustments, type WorkflowEdgeRouteAdjustments } from "../edges/workflow-edge-route-data";
 import { layoutWorkflowNodes } from "../layout/workflow-layout";
@@ -28,9 +28,9 @@ import {
 
 function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
   return changes.some((c) => {
-    if (c.type === "select") return false;
+    if (c.type === "select" || c.type === "dimensions") return false;
     if (c.type === "position") return "dragging" in c && c.dragging === false;
-    return c.type === "add" || c.type === "remove" || c.type === "replace" || c.type === "dimensions";
+    return c.type === "add" || c.type === "remove" || c.type === "replace";
   });
 }
 
@@ -42,7 +42,7 @@ export function useWorkflowCanvasState(
   externalSyncKey?: number,
   workflowId?: number,
 ) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initial?.nodes ?? []);
+  const [nodes, setNodes, onNodesChange] = useNodesState(normalizeWorkflowNodes(initial?.nodes ?? []));
   const [edges, setEdges, onEdgesChange] = useEdgesState((initial?.edges ?? []).map(normalizeWorkflowEdge));
 
   const onChangeRef = useRef(onChange);
@@ -74,7 +74,7 @@ export function useWorkflowCanvasState(
     if (externalSyncKey === externalSyncKeyRef.current) return;
     externalSyncKeyRef.current = externalSyncKey;
 
-    const extNodes = initial?.nodes ?? [];
+    const extNodes = normalizeWorkflowNodes(initial?.nodes ?? []);
     const extEdges = (initial?.edges ?? []).map(normalizeWorkflowEdge);
     nodesRef.current = extNodes;
     edgesRef.current = extEdges;
@@ -86,8 +86,9 @@ export function useWorkflowCanvasState(
 
   // Merge nodes/edges added via palette (parent JSON) without resetting positions while dragging.
   useEffect(() => {
-    const extNodes = initial?.nodes ?? [];
-    const localNodeIdSet = new Set(nodes.map((n) => n.id));
+    const extNodes = normalizeWorkflowNodes(initial?.nodes ?? []);
+    const localNodes = nodesRef.current;
+    const localNodeIdSet = new Set(localNodes.map((n) => n.id));
     const missingNodes = extNodes.filter((n) => !localNodeIdSet.has(n.id));
     if (missingNodes.length > 0) {
       setNodes((nds) => {
@@ -103,7 +104,7 @@ export function useWorkflowCanvasState(
         deletedEdgeIdsRef.current.delete(id);
       }
     }
-    const localEdgeIdSet = new Set(edges.map((e) => e.id));
+    const localEdgeIdSet = new Set(edgesRef.current.map((e) => e.id));
     const missingEdges = extEdges.filter((e) => !localEdgeIdSet.has(e.id) && !deletedEdgeIdsRef.current.has(e.id));
     if (missingEdges.length > 0) {
       setEdges((eds) => {
@@ -112,7 +113,7 @@ export function useWorkflowCanvasState(
         return merged;
       });
     }
-  }, [initial?.nodes, initial?.edges, nodes, edges, setNodes, setEdges]);
+  }, [initial?.nodes, initial?.edges, setNodes, setEdges]);
 
   const onNodeDragStop = useCallback(() => {
     pushToParent();
@@ -387,7 +388,7 @@ export function useWorkflowCanvasState(
         const next = addEdge(
           normalizeWorkflowEdge({
             ...params,
-            animated: true,
+            animated: false,
             style: resource ? { strokeDasharray: "6 4" } : undefined,
           }),
           eds,
