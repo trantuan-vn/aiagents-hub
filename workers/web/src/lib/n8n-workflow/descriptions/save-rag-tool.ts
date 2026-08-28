@@ -45,7 +45,7 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       name: "serviceEndpoint",
       type: "string",
       default: "",
-      description: "Approved embedding service used to vectorize document chunks.",
+      description: "Approved embedding service used to vectorize document chunks. Use the same service on Get RAG.",
       typeOptions: {
         aiHubServiceSelect: true,
       },

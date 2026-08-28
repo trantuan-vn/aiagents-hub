@@ -1,8 +1,7 @@
-import { embedTexts, upsertVectors, type VectorizeVectorRecord, DEFAULT_EMBED_MODEL } from '../../../rag-vector.js';
-import { resolveServiceByEndpoint } from '../../../billing/billing.js';
+import { embedTexts, upsertVectors, type VectorizeVectorRecord } from '../../../rag-vector.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import {
-  resolveEmbedModelFromService,
+  resolveRagEmbedModel,
   resolveRagResources,
   toolNodeConfig,
 } from '../shared/rag-context.js';
@@ -54,18 +53,6 @@ function vectorId(documentId: string, index: number): string {
   return raw.slice(0, 64 - suffix.length) + suffix;
 }
 
-async function resolveSaveRagEmbedModel(
-  config: Record<string, unknown>,
-  params: Pick<SaveRagExecuteParams, 'embedModel' | 'userDO'>,
-): Promise<string> {
-  const serviceEndpoint = String(config.serviceEndpoint ?? '').trim();
-  if (serviceEndpoint && params.userDO) {
-    const service = await resolveServiceByEndpoint(params.userDO, serviceEndpoint);
-    return resolveEmbedModelFromService(service);
-  }
-  return params.embedModel ?? DEFAULT_EMBED_MODEL;
-}
-
 async function executeSaveRagMany(params: {
   env: Env;
   definition: WorkflowDefinition;
@@ -77,7 +64,7 @@ async function executeSaveRagMany(params: {
   workflowId?: number;
 }): Promise<SaveRagResult[]> {
   const config = toolNodeConfig(params.definition, params.agentId, 'save-rag') ?? {};
-  const embedModel = await resolveSaveRagEmbedModel(config, params);
+  const embedModel = await resolveRagEmbedModel(config, params);
   const rag = resolveRagResources(params.definition, params.agentId, embedModel, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,

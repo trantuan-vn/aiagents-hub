@@ -18,6 +18,16 @@ export const GET_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
         "Drag the question from INPUT (Webhook). Example: body.question → {{ $json.body.question }}",
     },
     {
+      displayName: "Service",
+      name: "serviceEndpoint",
+      type: "string",
+      default: "",
+      description: "Approved embedding service used to vectorize the search query. Use the same service as Save RAG.",
+      typeOptions: {
+        aiHubServiceSelect: true,
+      },
+    },
+    {
       displayName: "Top K",
       name: "topK",
       type: "number",

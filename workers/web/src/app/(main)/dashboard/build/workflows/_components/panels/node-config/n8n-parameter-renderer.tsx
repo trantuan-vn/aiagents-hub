@@ -32,10 +32,16 @@ function N8nPropertyField({
 }) {
   if (property.typeOptions?.aiHubServiceSelect) {
     return (
-      <ServiceEndpointSelect
-        value={typeof value === "string" ? value : ""}
-        onChange={(endpoint) => onChange(endpoint)}
-      />
+      <div className="space-y-1.5">
+        <Label>{property.displayName}</Label>
+        {property.description ? (
+          <p className="text-muted-foreground text-xs">{property.description}</p>
+        ) : null}
+        <ServiceEndpointSelect
+          value={typeof value === "string" ? value : ""}
+          onChange={(endpoint) => onChange(endpoint)}
+        />
+      </div>
     );
   }
 

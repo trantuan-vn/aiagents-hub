@@ -107,6 +107,13 @@ const GET_RAG_FIELDS = [
     placeholderKey: "field_query_field_placeholder",
     supportsExpression: true,
   },
+  {
+    id: "serviceEndpoint",
+    type: "text" as const,
+    labelKey: "field_service",
+    descriptionKey: "field_service_embed_desc",
+    order: 3.5,
+  },
   { id: "topK", type: "number" as const, labelKey: "field_top_k", defaultValue: 12, order: 4 },
   { id: "scoreThreshold", type: "number" as const, labelKey: "field_score_threshold", defaultValue: 0, order: 5 },
   {
@@ -367,11 +374,12 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     chunkOverlap: 120,
     inputMode: "agent_tool_call",
   },
-    "get-rag": {
+  "get-rag": {
     toolKind: "get-rag",
     toolName: "get_rag",
     toolDescription: "Search the knowledge base for passages relevant to the user question.",
     queryField: "{{ $json.body.question }}",
+    serviceEndpoint: "",
     topK: 12,
     scoreThreshold: 0,
     querySource: "from_agent_input",

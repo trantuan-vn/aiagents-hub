@@ -4,6 +4,12 @@ import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
 
+const billingMock = vi.hoisted(() => ({
+  resolveServiceByEndpoint: vi.fn(),
+}));
+
+vi.mock('../../../billing/billing.js', () => billingMock);
+
 const definition: WorkflowDefinition = {
   nodes: [
     { id: 'agent_1', type: 'agent', position: { x: 0, y: 0 }, data: {} },
@@ -57,6 +63,50 @@ describe('executeGetRag', () => {
       [0.5, 0.6],
       expect.objectContaining({ topK: 16, returnMetadata: 'all', filter: { namespace: 'test-ns' } }),
     );
+  });
+
+  it('embeds the query with the selected service model', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const aiRun = vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] });
+    const env = {
+      AI: { run: aiRun },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const withService: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((n) =>
+        n.id === 'tool_get'
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                serviceEndpoint: 'https://ai.example/embed',
+              },
+            }
+          : n,
+      ),
+    };
+
+    billingMock.resolveServiceByEndpoint.mockResolvedValue({
+      catalogId: 'bge-large',
+      embedModel: '@cf/baai/bge-large-en-v1.5',
+      approvalStatus: 'approved',
+    });
+
+    await executeGetRag({
+      env,
+      definition: withService,
+      agentId: 'tool_get',
+      input: { query: 'what is RAG?' },
+      userDO: {} as NodeContext['userDO'],
+    });
+
+    expect(billingMock.resolveServiceByEndpoint).toHaveBeenCalledWith(
+      expect.anything(),
+      'https://ai.example/embed',
+    );
+    expect(aiRun).toHaveBeenCalledWith('@cf/baai/bge-large-en-v1.5', { text: 'what is RAG?' });
   });
 });
 

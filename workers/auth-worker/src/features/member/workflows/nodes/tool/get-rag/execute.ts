@@ -1,3 +1,4 @@
+import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import {
   embedText,
   matchToSnippet,
@@ -6,7 +7,7 @@ import {
 } from '../../../rag-vector.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
-import { resolveRagResources, toolNodeConfig } from '../shared/rag-context.js';
+import { resolveRagEmbedModel, resolveRagResources, toolNodeConfig } from '../shared/rag-context.js';
 
 export type GetRagInput = {
   query: string;
@@ -35,6 +36,7 @@ export type GetRagExecuteParams = {
   agentId: string;
   input: GetRagInput;
   embedModel?: string;
+  userDO?: DurableObjectStub<UserDO>;
   ownerId?: string;
   workflowId?: number;
 };
@@ -87,7 +89,8 @@ export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMat
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
   const { env, definition, agentId, input } = params;
   const config = toolNodeConfig(definition, agentId, 'get-rag') ?? {};
-  const rag = resolveRagResources(definition, agentId, params.embedModel, {
+  const embedModel = await resolveRagEmbedModel(config, params);
+  const rag = resolveRagResources(definition, agentId, embedModel, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
@@ -170,6 +173,7 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     definition: ctx.definition,
     agentId: ctx.node.id,
     input: { query },
+    userDO: ctx.userDO,
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
   });

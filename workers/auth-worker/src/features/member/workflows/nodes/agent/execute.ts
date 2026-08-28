@@ -291,6 +291,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       agentId: getRagNodeId ?? ctx.node.id,
       input: { query: userText },
       embedModel: DEFAULT_EMBED_MODEL,
+      userDO: ctx.userDO,
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
     });

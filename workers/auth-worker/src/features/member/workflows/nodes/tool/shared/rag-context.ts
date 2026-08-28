@@ -1,5 +1,7 @@
+import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
+import { resolveServiceByEndpoint } from '../../../billing/billing.js';
 import { getServiceModel } from '../../../../../admin/service/pricing.js';
 import { DEFAULT_EMBED_MODEL, VECTORIZE_COLLECTION } from '../../../rag-vector.js';
 import {
@@ -103,6 +105,18 @@ export function resolveRagResources(
     serviceEndpoint: String(selfData.serviceEndpoint ?? linked.serviceEndpoint ?? '').trim() || linked.serviceEndpoint,
     memoryNodeId: linked.memoryNodeId ?? fallbackMem?.id,
   };
+}
+
+export async function resolveRagEmbedModel(
+  config: Record<string, unknown> | undefined,
+  params: { embedModel?: string; userDO?: DurableObjectStub<UserDO> },
+): Promise<string> {
+  const serviceEndpoint = String(config?.serviceEndpoint ?? '').trim();
+  if (serviceEndpoint && params.userDO) {
+    const service = await resolveServiceByEndpoint(params.userDO, serviceEndpoint);
+    return resolveEmbedModelFromService(service);
+  }
+  return params.embedModel ?? DEFAULT_EMBED_MODEL;
 }
 
 export function resolveEmbedModelFromService(service: Record<string, unknown>): string {

@@ -156,6 +156,7 @@ export function buildRagToolset(
             agentId,
             input,
             embedModel: ctx.embedModel,
+            userDO: ctx.userDO,
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
           }),

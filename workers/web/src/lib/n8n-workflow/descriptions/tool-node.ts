@@ -63,6 +63,15 @@ export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
       displayOptions: { show: { toolKind: ["save-rag"] } },
     },
     {
+      displayName: "Service",
+      name: "serviceEndpoint",
+      type: "string",
+      default: "",
+      description: "Approved embedding service used to vectorize text.",
+      typeOptions: { aiHubServiceSelect: true },
+      displayOptions: { show: { toolKind: ["save-rag", "get-rag"] } },
+    },
+    {
       displayName: "Query field",
       name: "queryField",
       type: "string",
