@@ -24,6 +24,7 @@ import { buildFormPublicUrl, resolveFormPath } from "../panels/node-config/form-
 import { isFormNode } from "../panels/node-config/form-node-config-panel";
 import { isWebhookNode } from "../panels/node-config/webhook-node-config-panel";
 
+import { applyStepOutputs } from "./apply-step-outputs";
 import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "./use-webhook-listen-ws";
 import { useWorkflowRunFromNode } from "./use-workflow-run-from-node";
 
@@ -77,22 +78,6 @@ function resolveWebhookPath(node: Node): string {
   const custom = String(data.webhookPath ?? "").trim().replace(/^\/+/, "");
   if (custom) return custom;
   return node.id.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 36) || node.id;
-}
-
-function applyStepOutputs(
-  steps: ExecutionStepLog[],
-  patchNodeDataById: (nodeId: string, patch: Record<string, unknown>) => void,
-) {
-  for (const step of steps) {
-    if (step.status === "success" && step.output != null) {
-      patchNodeDataById(step.nodeId, { _output: step.output, _outputPinned: true });
-    } else if (step.status === "error") {
-      patchNodeDataById(step.nodeId, {
-        _output: step.output ?? { error: step.error ?? "Execution failed" },
-        _outputPinned: true,
-      });
-    }
-  }
 }
 
 export function useWorkflowExecuteEntry({

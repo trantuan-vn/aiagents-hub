@@ -6,22 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { executeWorkflow, type ExecutionStepLog } from "../../_lib/api";
-
-function applyStepOutputs(
-  steps: ExecutionStepLog[],
-  patchNodeDataById: (nodeId: string, patch: Record<string, unknown>) => void,
-) {
-  for (const step of steps) {
-    if (step.status === "success" && step.output != null) {
-      patchNodeDataById(step.nodeId, { _output: step.output, _outputPinned: true });
-    } else if (step.status === "error") {
-      patchNodeDataById(step.nodeId, {
-        _output: step.output ?? { error: step.error ?? "Execution failed" },
-        _outputPinned: true,
-      });
-    }
-  }
-}
+import { applyStepOutputs } from "./apply-step-outputs";
 
 function executionErrorMessage(result: { output?: unknown; status: string }, fallback: string): string {
   const output = result.output;
