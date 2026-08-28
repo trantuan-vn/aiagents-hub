@@ -1,4 +1,5 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
+import { interpolate } from '../execution/node-runtime.js';
 import { getOutgoingDataFlowEdges } from './graph-helpers.js';
 
 export interface LoopState {
@@ -34,7 +35,14 @@ export function chunkArray<T>(items: T[], batchSize: number): T[][] {
 }
 
 /** Extract iterable items from upstream node output (n8n item-list shape). */
-export function extractLoopItems(input: NodeOutput): unknown[] {
+export function extractLoopItems(input: NodeOutput, itemsField?: unknown): unknown[] {
+  const expr = String(itemsField ?? '').trim();
+  if (expr) {
+    const resolved = expr.includes('{{')
+      ? interpolate(expr, { ...input, $json: input })
+      : input[expr];
+    if (Array.isArray(resolved)) return resolved;
+  }
   if (Array.isArray(input.items)) return input.items;
   if (Array.isArray(input.data)) return input.data;
   if (Array.isArray(input.json)) return input.json;
@@ -43,6 +51,15 @@ export function extractLoopItems(input: NodeOutput): unknown[] {
   if (Array.isArray(rest)) return rest;
   if (Object.keys(rest).length > 0) return [rest];
   return [];
+}
+
+function flattenCurrentItem(batch: unknown[]): Record<string, unknown> {
+  const first = batch[0];
+  if (first && typeof first === 'object' && !Array.isArray(first)) {
+    return first as Record<string, unknown>;
+  }
+  if (first !== undefined) return { json: first };
+  return {};
 }
 
 /** Forward DB connection fields so Loop → Save RAG still has Oracle/D1 credentials. */
@@ -63,6 +80,8 @@ export function connectionContextFromInput(input: NodeOutput): Record<string, un
     'fields',
     'credentialKey',
     'tables',
+    'tableCount',
+    'count',
     'limits',
   ];
   const out: Record<string, unknown> = {};
@@ -84,7 +103,7 @@ export function executeLoopOverItems(
 
   let state = existingState;
   if (!state) {
-    const items = extractLoopItems(nodeInput);
+    const items = extractLoopItems(nodeInput, data.itemsField);
     const batches = chunkArray(items, batchSize);
     state = {
       items,
@@ -122,10 +141,12 @@ export function executeLoopOverItems(
 
   const batches = chunkArray(state.items, state.batchSize);
   const batch = batches[state.currentBatchIndex] ?? [];
+  const currentItem = flattenCurrentItem(batch);
 
   return {
     output: {
       ...connectionCtx,
+      ...currentItem,
       items: batch,
       batchIndex: state.currentBatchIndex,
       batchSize: state.batchSize,

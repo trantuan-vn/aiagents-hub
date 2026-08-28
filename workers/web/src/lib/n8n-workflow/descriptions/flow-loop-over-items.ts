@@ -16,6 +16,14 @@ export const FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION = mainFlowNode({
       typeOptions: { variant: "warning" },
     },
     {
+      displayName: "Items field",
+      name: "itemsField",
+      type: "string",
+      default: "{{ $json.items }}",
+      placeholder: "{{ $json.items }}",
+      description: "Drag the table list from INPUT (Get DB Info). Example: items → {{ $json.items }}",
+    },
+    {
       displayName: "Batch Size",
       name: "batchSize",
       type: "number",

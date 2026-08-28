@@ -160,6 +160,13 @@ function withoutGetRagTools<T extends Record<string, unknown>>(tools: T): T {
   return out;
 }
 
+function interpolateTemplate(template: string, scope: Record<string, unknown>): string {
+  if (!template.includes('{{')) return template;
+  const resolved = interpolate(template, scope);
+  if (resolved == null) return '';
+  return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
+}
+
 function resolveAgentUserText(
   data: Record<string, unknown>,
   nodeInput: Record<string, unknown>,
@@ -215,7 +222,10 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const saveRagSystemPrompt = String(saveRagConfig?.systemPrompt ?? '').trim();
   const saveRagUserPrompt = String(saveRagConfig?.userPrompt ?? '').trim();
 
-  let userText = resolveAgentUserText(data, ctx.nodeInput as Record<string, unknown>, ctx.input);
+  const nodeInput = (ctx.nodeInput ?? {}) as Record<string, unknown>;
+  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
+  let userText = resolveAgentUserText(data, nodeInput, ctx.input);
+  const systemPrompt = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
 
   const pdfFiles = filesFromWebhookBody(
     (ctx.nodeInput as Record<string, unknown>)?.body ?? ctx.nodeInput,
@@ -300,8 +310,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         : [];
 
   const systemParts = [
-    String(data.systemPrompt ?? ''),
-    !String(data.systemPrompt ?? '').trim() && useRetrievedSqlContext
+    systemPrompt,
+    !systemPrompt.trim() && useRetrievedSqlContext
       ? 'You are a Text-to-SQL assistant. Use the retrieved table schemas and SQL examples to write one read-only SQL query for the user question.'
       : '',
     saveRagSystemPrompt,

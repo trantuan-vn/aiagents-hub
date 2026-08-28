@@ -211,4 +211,43 @@ describe('executeGetDbInfoPipeline', () => {
       connectString,
     });
   });
+
+  it('resolves Oracle credentials from mapped Form expressions', async () => {
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'dbinfo',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: {
+            toolKind: 'get-db-info',
+            userField: '{{ $json.u }}',
+            passwordField: '{{ $json.p }}',
+            connectStringField: '{{ $json.c }}',
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: { u: 'ADMIN', p: 'secret', c: 'dbname_high', tableName: 'ORDERS' },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: {} },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetDbInfoPipeline(ctx);
+    expect(out.user).toBe('ADMIN');
+    expect(out.connection).toMatchObject({
+      type: 'oracle',
+      user: 'ADMIN',
+      password: 'secret',
+      connectString: 'dbname_high',
+    });
+    expect((out.items as Array<{ tableName: string }>)[0]?.tableName).toBe('ORDERS');
+  });
 });

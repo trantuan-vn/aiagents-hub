@@ -10,6 +10,7 @@ import {
   HUMAN_REVIEW_KIND_FIELD,
   type HumanReviewChannel,
 } from "./channels";
+import { VECTOR_GMAIL_MESSAGE, VECTOR_GMAIL_SUBJECT } from "../workflow-presets";
 
 export {
   HUMAN_REVIEW_CHANNELS,
@@ -64,8 +65,8 @@ export function createHumanReviewChannelDefinition(
           resource: "message",
           operation: "sendAndWait",
           to: "",
-          subject: "",
-          message: "",
+          subject: VECTOR_GMAIL_SUBJECT,
+          message: VECTOR_GMAIL_MESSAGE,
           responseType: "approval",
           credentialKey: "",
         }

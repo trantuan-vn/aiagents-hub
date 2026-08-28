@@ -1,4 +1,5 @@
 import { mainFlowNode } from "./common";
+import { SQL_AGENT_PROMPT, SQL_AGENT_SYSTEM_PROMPT } from "@aiagents-hub/workflow-nodes";
 
 /** AI Agent node — n8n-style parameter schema; Service uses repo services (serviceEndpoint). */
 export const AGENT_N8N_DESCRIPTION = mainFlowNode({
@@ -22,8 +23,9 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       name: "prompt",
       type: "string",
       typeOptions: { rows: 5 },
-      default: "",
-      description: "Instructions sent to the AI model",
+      default: SQL_AGENT_PROMPT,
+      description: "Instructions sent to the AI model. Drag query / ragText from INPUT (Get RAG).",
+      placeholder: "{{ $json.query }}",
       displayOptions: {
         show: { promptSource: ["define_below"] },
       },
@@ -33,7 +35,7 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       name: "systemPrompt",
       type: "string",
       typeOptions: { rows: 4 },
-      default: "",
+      default: SQL_AGENT_SYSTEM_PROMPT,
       description: "Optional system instructions prepended to the model context",
       displayOptions: {
         hide: { promptSource: ["define_below", "from_input"] },

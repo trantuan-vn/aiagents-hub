@@ -186,6 +186,39 @@ describe('executeGetRagPipeline', () => {
     const out = await executeGetRagPipeline(ctx);
     expect(out.query).toBe('doanh thu 30 ngay');
   });
+
+  it('uses queryField expression from the previous webhook node', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', queryField: '{{ $json.body.question }}' },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { body: { question: 'liet ke 20 don hang' }, headers: {}, query: {} },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.query).toBe('liet ke 20 don hang');
+  });
 });
 
 describe('preferSqlChunks', () => {

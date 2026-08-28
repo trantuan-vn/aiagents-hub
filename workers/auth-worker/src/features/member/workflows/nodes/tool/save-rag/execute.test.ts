@@ -227,4 +227,10 @@ describe('n8n $json interpolation', () => {
     const scope = { body: { question: 'revenue last 30 days' }, $json: { body: { question: 'revenue last 30 days' } } };
     expect(interpolate('{{ $json.body.question }}', scope)).toBe('revenue last 30 days');
   });
+
+  it('resolves tableName from the current loop item', () => {
+    const item = { tableName: 'ORDERS', schemaName: 'ADMIN' };
+    const scope = { ...item, items: [item], $json: { ...item, items: [item] } };
+    expect(interpolate('{{ $json.tableName }}', scope)).toBe('ORDERS');
+  });
 });

@@ -19,6 +19,7 @@ import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/w
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { isDataFlowEdge } from "../../edges/workflow-connection-utils";
 import {
   contextPathToExpression,
   copyExpressionToClipboard,
@@ -74,17 +75,46 @@ const WORKFLOW_CONTEXT_TREE: ContextTreeNode[] = [
   },
 ];
 
-function isDataFlowEdge(edge: Edge): boolean {
-  const targetHandle = edge.targetHandle ?? "in";
-  if (targetHandle !== "in") return false;
-  const sourceHandle = edge.sourceHandle ?? "out";
-  return sourceHandle === "out" || sourceHandle.startsWith("out_") || sourceHandle === "true" || sourceHandle === "false";
+function getUpstreamDataFlowEdge(nodeId: string, edges: Edge[]): Edge | undefined {
+  return edges.find((e) => e.target === nodeId && isDataFlowEdge(e));
 }
 
 function getUpstreamNode(nodeId: string, nodes: Node[], edges: Edge[]): Node | null {
-  const parentEdge = edges.find((e) => e.target === nodeId && isDataFlowEdge(e));
+  const parentEdge = getUpstreamDataFlowEdge(nodeId, edges);
   if (!parentEdge) return null;
   return nodes.find((n) => n.id === parentEdge.source) ?? null;
+}
+
+function isLoopOverItemsNode(node: Node): boolean {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  return node.type === "flow" && String(d.flowKind ?? "") === "loop_over_items";
+}
+
+/** Schema hints before Loop / done branch has been executed. */
+function buildLoopPreviewOutput(
+  _parent: Node,
+  incomingEdge: Edge | undefined,
+): Record<string, unknown> {
+  const fromDone = incomingEdge?.sourceHandle === "done";
+  if (fromDone) {
+    return {
+      loopCompleted: true,
+      tableCount: 0,
+      count: 0,
+      items: [],
+      tables: [],
+      schemaName: "",
+      connection: { type: "oracle" },
+    };
+  }
+  return {
+    loopCompleted: false,
+    tableName: "",
+    schemaName: "",
+    batchIndex: 0,
+    batchSize: 1,
+    items: [{ tableName: "", schemaName: "" }],
+  };
 }
 
 type FormElementLike = {
@@ -163,6 +193,31 @@ function getUpstreamOutputData(
   }
 
   if (realOutput) return realOutput;
+
+  if (isLoopOverItemsNode(parent)) {
+    return buildLoopPreviewOutput(parent, getUpstreamDataFlowEdge(nodeId, edges));
+  }
+
+  if (parent.type === "tool_node" && String(parentData.toolKind ?? "") === "get-db-info") {
+    return {
+      items: [{ tableName: "", schemaName: "" }],
+      tables: [],
+      tableCount: 0,
+      count: 0,
+      schemaName: "",
+      connection: { type: "oracle" },
+    };
+  }
+
+  if (parent.type === "tool_node" && String(parentData.toolKind ?? "") === "get-rag") {
+    return {
+      body: { question: "" },
+      query: "",
+      snippets: [],
+      ragText: "",
+      count: 0,
+    };
+  }
 
   if (parentData.body != null || parentData.headers != null) {
     return parentData;

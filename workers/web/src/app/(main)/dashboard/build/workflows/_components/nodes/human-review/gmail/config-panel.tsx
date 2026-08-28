@@ -182,7 +182,9 @@ export function GmailHumanReviewConfigPanel({
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-3">
-        <AgentUpstreamInputPanel nodeId={inputNodeId} nodes={nodes} edges={edges} />
+        <div className="border-b lg:min-h-0 lg:border-b-0 lg:border-r">
+          <AgentUpstreamInputPanel nodeId={inputNodeId} nodes={nodes} edges={edges} className="min-h-[14rem] lg:min-h-0" />
+        </div>
 
         <div className="flex min-h-0 flex-col border-r">
           <Tabs defaultValue="parameters" className="flex min-h-0 flex-1 flex-col">
@@ -310,6 +312,7 @@ export function GmailHumanReviewConfigPanel({
                     value={message}
                     multiline
                     rows={4}
+                    placeholder={t("gmail_message_placeholder")}
                     onChange={(v) => patch({ message: v })}
                   />
                 </div>

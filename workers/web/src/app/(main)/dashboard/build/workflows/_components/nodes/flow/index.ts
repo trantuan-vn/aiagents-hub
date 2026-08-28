@@ -34,7 +34,7 @@ export function createFlowKindUIPlugin(kind: FlowKind): WorkflowNodeUIPlugin {
     defaults: () => ({
       label,
       flowKind: kind,
-      ...(kind === "loop_over_items" ? { batchSize: 1 } : {}),
+      ...(kind === "loop_over_items" ? { batchSize: 1, itemsField: "{{ $json.items }}" } : {}),
     }),
     catalog: {
       category: "flow",

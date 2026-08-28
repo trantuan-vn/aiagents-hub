@@ -23,6 +23,9 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
+import { SQL_AGENT_SYSTEM_PROMPT } from "@aiagents-hub/workflow-nodes";
+
+import { isDataFlowEdge } from "../../edges/workflow-connection-utils";
 import { AgentUpstreamInputPanel } from "../../panels/node-config/agent-upstream-input-panel";
 import { ExpressionDropField } from "../../panels/node-config/expression-drop-field";
 import { NodeMockOutputSection } from "../../panels/node-config/node-mock-output-section";
@@ -32,19 +35,12 @@ import type { NodeConfigPanelProps } from "../types";
 const ORANGE = "bg-[#ff6f00] hover:bg-[#e66300]";
 
 const AGENT_EXTRA_OPTIONS = [
-  { id: "systemPrompt", labelKey: "agent_opt_system_message", type: "textarea" as const, defaultValue: "" },
+  { id: "systemPrompt", labelKey: "agent_opt_system_message", type: "textarea" as const, defaultValue: SQL_AGENT_SYSTEM_PROMPT },
   { id: "maxTokens", labelKey: "field_max_tokens", type: "number" as const, defaultValue: 1024 },
   { id: "enableFallbackModel", labelKey: "field_enable_fallback_model", type: "toggle" as const, defaultValue: false },
 ] as const;
 
 type AgentExtraOptionId = (typeof AGENT_EXTRA_OPTIONS)[number]["id"];
-
-function isDataFlowEdge(edge: Edge): boolean {
-  const targetHandle = edge.targetHandle ?? "in";
-  if (targetHandle !== "in") return false;
-  const sourceHandle = edge.sourceHandle ?? "out";
-  return sourceHandle === "out" || sourceHandle.startsWith("out_") || sourceHandle === "true" || sourceHandle === "false";
-}
 
 function getUpstreamNodeId(nodeId: string, edges: Edge[]): string | null {
   const parentEdge = edges.find((e) => e.target === nodeId && isDataFlowEdge(e));
@@ -289,14 +285,14 @@ export function AgentNodeConfigPanel({
                 <div className="space-y-1.5">
                   <Label className="text-xs">{t("field_prompt")}</Label>
                   <ExpressionDropField
-                    value={promptSource === "from_input" && !prompt ? "{{ $json.chatInput }}" : prompt}
+                    value={promptSource === "from_input" && !prompt ? "{{ $json.query }}" : prompt}
                     onChange={(v) => patch({ prompt: v })}
                     multiline={promptSource === "define_below"}
                     rows={promptSource === "define_below" ? 4 : 1}
                     placeholder={
                       promptSource === "define_below"
                         ? t("field_prompt_placeholder")
-                        : "{{ $json.chatInput }}"
+                        : "{{ $json.query }}"
                     }
                     inputClassName={promptSource === "from_input" ? "pr-10" : undefined}
                     trailing={

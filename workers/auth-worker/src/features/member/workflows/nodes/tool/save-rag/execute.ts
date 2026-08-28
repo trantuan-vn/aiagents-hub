@@ -184,9 +184,9 @@ export async function executeSaveRag(params: SaveRagExecuteParams): Promise<Save
   );
 }
 
-function isTableLoopItem(item: Record<string, unknown>): boolean {
-  const tableName = String(item.tableName ?? item.table_name ?? '').trim();
-  if (!tableName) return false;
+function isTableLoopItem(item: Record<string, unknown>, tableName = ''): boolean {
+  const name = tableName || String(item.tableName ?? item.table_name ?? '').trim();
+  if (!name) return false;
   const content = String(item.content ?? item.text ?? item.ddl ?? '').trim();
   return !content;
 }
@@ -271,7 +271,16 @@ function markIndexedTables(runContext: NodeOutput, tableNames: string[]): void {
  * Pull remaining tables from Get DB Info and index them in this invocation.
  */
 function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): Record<string, unknown>[] {
-  const tableItems = items.filter(isTableLoopItem);
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  const tableItems = items
+    .map((item) => {
+      const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, [
+        'tableName',
+        'table_name',
+      ]);
+      return { ...item, ...(tableName ? { tableName } : {}) };
+    })
+    .filter((item) => isTableLoopItem(item, String(item.tableName ?? '')));
   if (!tableItems.length) return [];
 
   const done = indexedTables(ctx.runContext);
@@ -323,7 +332,7 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
   }
 
   const pendingTables = pendingTableItems(ctx, items);
-  if (items.some(isTableLoopItem) && !pendingTables.length) {
+  if (items.some((item) => isTableLoopItem(item, String(item.tableName ?? item.table_name ?? ''))) && !pendingTables.length) {
     return {
       ok: true,
       saved: 0,
@@ -354,7 +363,9 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     );
   }
 
-  const contentItems = items.filter((item) => !isTableLoopItem(item));
+  const contentItems = items.filter(
+    (item) => !isTableLoopItem(item, String(item.tableName ?? item.table_name ?? '')),
+  );
   const contentDocs: Array<{ content: string; documentId: string; source: string; metadata: Record<string, string> }> =
     [];
   for (const item of contentItems) {

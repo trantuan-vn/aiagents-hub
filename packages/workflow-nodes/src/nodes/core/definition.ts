@@ -6,6 +6,7 @@ import {
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
 import { CORE_KIND_FIELD, CORE_KINDS, CORE_OVERRIDE_KINDS, type CoreKind } from "./kinds";
+import { SQL_HTTP_BODY } from "../workflow-presets";
 
 export { CORE_KIND_FIELD, CORE_KINDS, CORE_OVERRIDE_KINDS, type CoreKind } from "./kinds";
 
@@ -80,7 +81,8 @@ export const CORE_HTTP_REQUEST_DEFINITION: WorkflowNodeDefinition = createBuilti
   icon: "Globe",
   defaultData: {
     [CORE_KIND_FIELD]: "http_request",
-    method: "GET",
+    method: "POST",
+    body: SQL_HTTP_BODY,
   },
   sections: [
     defaultInputSection(),
@@ -110,6 +112,7 @@ export const CORE_HTTP_REQUEST_DEFINITION: WorkflowNodeDefinition = createBuilti
         id: "body",
         type: "json",
         labelKey: "field_http_body",
+        placeholderKey: "field_http_body_placeholder",
         supportsExpression: true,
         order: 3,
       },

@@ -1,6 +1,8 @@
 import {
   AGENT_KINDS,
   AGENT_OVERRIDE_KINDS,
+  SQL_AGENT_PROMPT,
+  SQL_AGENT_SYSTEM_PROMPT,
   type AgentKind,
 } from "@aiagents-hub/workflow-nodes";
 
@@ -17,7 +19,13 @@ export const agentUIPlugin: WorkflowNodeUIPlugin = {
   runtimeType: "agent",
   Canvas: AgentWorkflowNode,
   ConfigPanel: AgentNodeConfigPanel,
-  defaults: () => ({ label: "Agent", promptSource: "define_below", agentKind: "tools_agent" }),
+  defaults: () => ({
+    label: "Agent",
+    promptSource: "define_below",
+    prompt: SQL_AGENT_PROMPT,
+    systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
+    agentKind: "tools_agent",
+  }),
   catalog: {
     category: "ai",
     labelKey: "node_agent",
@@ -38,6 +46,8 @@ export function createAgentKindUIPlugin(kind: AgentKind): WorkflowNodeUIPlugin {
     defaults: () => ({
       label: "Agent",
       promptSource: "define_below",
+      prompt: SQL_AGENT_PROMPT,
+      systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
       agentKind: kind,
     }),
     catalog: {

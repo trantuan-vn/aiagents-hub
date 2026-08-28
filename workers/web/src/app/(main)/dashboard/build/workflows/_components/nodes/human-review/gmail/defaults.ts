@@ -1,3 +1,8 @@
+import {
+  VECTOR_GMAIL_MESSAGE,
+  VECTOR_GMAIL_SUBJECT,
+} from "@aiagents-hub/workflow-nodes";
+
 export function gmailHumanReviewDefaults(): Record<string, unknown> {
   return {
     label: "Gmail",
@@ -6,8 +11,8 @@ export function gmailHumanReviewDefaults(): Record<string, unknown> {
     resource: "message",
     operation: "sendAndWait",
     to: "",
-    subject: "",
-    message: "",
+    subject: VECTOR_GMAIL_SUBJECT,
+    message: VECTOR_GMAIL_MESSAGE,
     responseType: "approval",
     credentialKey: "",
     approvalOptions: [] as Array<{ id: string; label: string; value: string }>,

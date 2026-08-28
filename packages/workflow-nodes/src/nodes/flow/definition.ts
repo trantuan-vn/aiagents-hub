@@ -81,18 +81,29 @@ export const FLOW_LOOP_OVER_ITEMS_DEFINITION: WorkflowNodeDefinition = createBui
     defaultData: {
       [FLOW_KIND_FIELD]: "loop_over_items",
       batchSize: 1,
+      itemsField: "{{ $json.items }}",
     },
     sections: [
       defaultInputSection(),
       defaultParametersSection([
         {
+          id: "itemsField",
+          type: "text",
+          labelKey: "field_items_field",
+          descriptionKey: "field_items_field_desc",
+          defaultValue: "{{ $json.items }}",
+          placeholderKey: "field_items_field_placeholder",
+          supportsExpression: true,
+          order: 1,
+        },
+        {
           id: "batchSize",
           type: "number",
           labelKey: "field_batch_size",
           defaultValue: 1,
-        order: 1,
-      },
-    ]),
+          order: 2,
+        },
+      ]),
     defaultOutputSection(true),
   ],
 });

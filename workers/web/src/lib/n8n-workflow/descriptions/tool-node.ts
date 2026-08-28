@@ -66,10 +66,10 @@ export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
       displayName: "Query field",
       name: "queryField",
       type: "string",
-      default: "",
+      default: "{{ $json.body.question }}",
       placeholder: "{{ $json.body.question }}",
       description:
-        "Expression or path for the search question. Leave empty to auto-read body.question / question from upstream.",
+        "Drag the question from INPUT (Webhook). Example: body.question → {{ $json.body.question }}",
       displayOptions: { show: { toolKind: ["get-rag"] } },
     },
     {

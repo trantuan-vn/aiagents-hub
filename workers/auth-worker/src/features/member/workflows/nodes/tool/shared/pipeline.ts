@@ -51,3 +51,18 @@ export function stringifyUnknown(value: unknown): string {
     return String(value);
   }
 }
+
+/** Resolve an expression or path against upstream JSON (may return a non-string, e.g. items[]). */
+export function resolvePipelineValue(
+  template: unknown,
+  nodeInput: NodeOutput,
+  item?: PipelineItem,
+): unknown {
+  const expr = String(template ?? '').trim();
+  if (!expr) return undefined;
+  const merged = { ...nodeInput, ...(item ?? {}) };
+  const scope = { ...merged, $json: merged };
+  if (expr.includes('{{')) return interpolate(expr, scope);
+  if (item && Object.prototype.hasOwnProperty.call(item, expr)) return item[expr];
+  return nodeInput[expr];
+}

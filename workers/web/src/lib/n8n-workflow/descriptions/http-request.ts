@@ -1,4 +1,5 @@
 import { mainFlowNode } from "./common";
+import { SQL_HTTP_BODY } from "@aiagents-hub/workflow-nodes";
 
 export const HTTP_REQUEST_N8N_DESCRIPTION = mainFlowNode({
   displayName: "HTTP Request",
@@ -11,7 +12,7 @@ export const HTTP_REQUEST_N8N_DESCRIPTION = mainFlowNode({
       displayName: "Method",
       name: "method",
       type: "options",
-      default: "GET",
+      default: "POST",
       options: [
         { name: "GET", value: "GET" },
         { name: "POST", value: "POST" },
@@ -39,7 +40,9 @@ export const HTTP_REQUEST_N8N_DESCRIPTION = mainFlowNode({
       displayName: "Body",
       name: "body",
       type: "json",
-      default: "",
+      default: SQL_HTTP_BODY,
+      placeholder: '{"sql":"{{ $json.sql }}"}',
+      description: "Drag fields from INPUT (Agent). Example: sql → {\"sql\":\"{{ $json.sql }}\"}",
       displayOptions: {
         show: { method: ["POST", "PUT", "PATCH", "DELETE"] },
       },

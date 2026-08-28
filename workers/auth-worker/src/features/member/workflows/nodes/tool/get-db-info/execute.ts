@@ -9,6 +9,7 @@ import {
 } from './connect-config.js';
 import { ragDocumentsFromDbInfo, type RagDocumentItem } from './documents.js';
 import { introspectOracleTable, introspectOracleTables, listOracleTables } from './oracle.js';
+import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 
 export type DbColumnInfo = {
   name: string;
@@ -294,9 +295,35 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function mappedFormFields(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
+  const item = pipelineItems(nodeInput)[0] ?? asRecord(nodeInput);
+  const mapped: Record<string, unknown> = {};
+  const user = resolvePipelineField(data.userField, item, nodeInput, []);
+  const password = resolvePipelineField(data.passwordField, item, nodeInput, []);
+  const connectString = resolvePipelineField(data.connectStringField, item, nodeInput, []);
+  const schemaName = resolvePipelineField(data.schemaNameField, item, nodeInput, []);
+  const tableName = resolvePipelineField(data.tableNameField, item, nodeInput, []);
+  if (user) {
+    mapped.user = user;
+    mapped.u = user;
+  }
+  if (password) {
+    mapped.password = password;
+    mapped.p = password;
+  }
+  if (connectString) {
+    mapped.connectString = connectString;
+    mapped.c = connectString;
+  }
+  if (schemaName) mapped.schemaName = schemaName;
+  if (tableName) mapped.tableName = tableName;
+  return mapped;
+}
+
 function triggerContextFromNodeInput(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
   const fields = asRecord(nodeInput.fields);
-  const merged = { ...fields, ...nodeInput, ...data };
+  const mapped = mappedFormFields(nodeInput, data);
+  const merged = { ...fields, ...nodeInput, ...mapped };
   const oracleConfig = resolveOracleConnectConfig(merged);
   const defaultType = oracleConfig ? 'oracle' : 'd1';
   const connectionType = String(
@@ -311,6 +338,7 @@ function triggerContextFromNodeInput(nodeInput: NodeOutput, data: Record<string,
   return {
     ...fields,
     ...nodeInput,
+    ...mapped,
     dbId:
       pickUpstreamString(merged, ['dbId', 'databaseId', 'database_id']) ||
       String(data.databaseId ?? ''),

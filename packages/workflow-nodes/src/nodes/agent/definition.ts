@@ -10,6 +10,10 @@ import {
   AGENT_OVERRIDE_KINDS,
   type AgentKind,
 } from "./kinds";
+import {
+  SQL_AGENT_PROMPT,
+  SQL_AGENT_SYSTEM_PROMPT,
+} from "../workflow-presets";
 
 export {
   AGENT_KIND_FIELD,
@@ -134,6 +138,8 @@ export const AGENT_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   icon: "Bot",
   defaultData: {
     promptSource: "define_below",
+    prompt: SQL_AGENT_PROMPT,
+    systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
     [AGENT_KIND_FIELD]: "tools_agent",
   },
   sections: AGENT_SECTIONS,
@@ -151,6 +157,8 @@ export function createAgentKindDefinition(kind: AgentKind): WorkflowNodeDefiniti
     defaultData: {
       label: "Agent",
       promptSource: "define_below",
+      prompt: SQL_AGENT_PROMPT,
+      systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
       [AGENT_KIND_FIELD]: kind,
     },
     sections: AGENT_SECTIONS,

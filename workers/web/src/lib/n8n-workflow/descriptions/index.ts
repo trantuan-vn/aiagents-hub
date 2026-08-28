@@ -11,4 +11,8 @@ export { HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION } from "./human-review-gmail";
 export { SERVICE_NODE_N8N_DESCRIPTION } from "./service-node";
 export { MEMORY_NODE_N8N_DESCRIPTION } from "./memory-node";
 export { TOOL_NODE_N8N_DESCRIPTION } from "./tool-node";
+export { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./save-rag-tool";
+export { GET_RAG_TOOL_N8N_DESCRIPTION } from "./get-rag-tool";
+export { GET_DB_INFO_TOOL_N8N_DESCRIPTION } from "./get-db-info-tool";
+export { FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION } from "./flow-loop-over-items";
 export { CORE_N8N_DESCRIPTION } from "./core";

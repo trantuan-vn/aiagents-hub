@@ -9,6 +9,38 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
   description: "Embed document chunks and upsert into the agent's knowledge base.",
   properties: [
     {
+      displayName: "Table name field",
+      name: "tableNameField",
+      type: "string",
+      default: "{{ $json.tableName }}",
+      placeholder: "{{ $json.tableName }}",
+      description: "Drag the current loop item table from INPUT. Example: tableName → {{ $json.tableName }}",
+    },
+    {
+      displayName: "Document ID field",
+      name: "documentIdField",
+      type: "string",
+      default: "",
+      placeholder: "{{ $json.documentId }}",
+      description: "Optional. Drag documentId from INPUT when saving extracted text (not table loops).",
+    },
+    {
+      displayName: "Content field",
+      name: "contentField",
+      type: "string",
+      default: "",
+      placeholder: "{{ $json.content }}",
+      description: "Optional. Drag content/text from INPUT when the previous node already has document text.",
+    },
+    {
+      displayName: "Source field",
+      name: "sourceField",
+      type: "string",
+      default: "",
+      placeholder: "{{ $json.source }}",
+      description: "Optional. Drag source/filename from INPUT for vector metadata.",
+    },
+    {
       displayName: "Service",
       name: "serviceEndpoint",
       type: "string",

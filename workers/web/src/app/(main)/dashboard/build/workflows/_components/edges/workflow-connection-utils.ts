@@ -182,7 +182,14 @@ export function getConnectedAgentId(
 
 /** Node id whose upstream data-flow output should populate the INPUT panel. */
 export function resolveInputNodeId(nodeId: string, nodeType: string | undefined, edges: Edge[]): string {
+  const onDataFlow = edges.some((e) => e.target === nodeId && isDataFlowEdge(e));
+  if (onDataFlow) return nodeId;
   return getConnectedAgentId(nodeId, edges, nodeType) ?? nodeId;
+}
+
+/** Incoming data-flow edge for a node (loop / done / out → in). */
+export function getUpstreamDataFlowEdge(nodeId: string, edges: Edge[]): Edge | undefined {
+  return edges.find((e) => e.target === nodeId && isDataFlowEdge(e));
 }
 
 export function edgeUsesHandle(

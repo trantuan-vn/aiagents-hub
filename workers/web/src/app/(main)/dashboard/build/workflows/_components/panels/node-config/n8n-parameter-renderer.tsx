@@ -125,6 +125,7 @@ function N8nPropertyField({
           value={stringValue}
           multiline
           rows={4}
+          placeholder={property.placeholder}
           showFx={!property.noDataExpression}
           onChange={onChange}
         />

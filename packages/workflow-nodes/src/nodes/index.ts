@@ -88,6 +88,13 @@ export {
 export { FORM_DATABASE_TRIGGER_DEFINITION } from "./trigger/form-database";
 export { WEBHOOK_NODE_DEFAULTS, type WebhookNodeData } from "./webhook/schema";
 export {
+  SQL_AGENT_PROMPT,
+  SQL_AGENT_SYSTEM_PROMPT,
+  SQL_HTTP_BODY,
+  VECTOR_GMAIL_SUBJECT,
+  VECTOR_GMAIL_MESSAGE,
+} from "./workflow-presets";
+export {
   buildWebhookItemOutput,
   normalizeWebhookItemOutput,
   buildSchemaTreeRows,

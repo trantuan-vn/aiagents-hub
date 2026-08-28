@@ -32,6 +32,23 @@ describe('loop connection passthrough', () => {
     expect(result.output.connectString).toBe('dsn');
     expect(result.output.tables).toEqual(['ORDERS', 'USERS']);
     expect(result.loopState?.connectionCtx?.password).toBe('secret');
+    expect(result.output.tableName).toBe('ORDERS');
+  });
+
+  it('uses itemsField expression and flattens the current loop item', () => {
+    const result = executeLoopOverItems(
+      { batchSize: 1, itemsField: '{{ $json.items }}' },
+      {
+        items: [{ tableName: 'USERS', schemaName: 'ADMIN' }],
+        user: 'ADMIN',
+      },
+      undefined,
+      false,
+    );
+    expect(result.output.tableName).toBe('USERS');
+    expect(result.output.schemaName).toBe('ADMIN');
+    expect(result.output.items).toEqual([{ tableName: 'USERS', schemaName: 'ADMIN' }]);
+    expect(result.activeHandles.has('loop')).toBe(true);
   });
 });
 

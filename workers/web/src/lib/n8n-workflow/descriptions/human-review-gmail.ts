@@ -1,4 +1,5 @@
 import { mainFlowNode } from "./common";
+import { VECTOR_GMAIL_MESSAGE, VECTOR_GMAIL_SUBJECT } from "@aiagents-hub/workflow-nodes";
 
 /** Gmail human-review channel — n8n-style Send and Wait for Response. */
 export const HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION = mainFlowNode({
@@ -35,23 +36,27 @@ export const HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION = mainFlowNode({
       type: "string",
       default: "",
       required: true,
-      placeholder: "e.g. info@example.com",
+      placeholder: "{{ $json.email }}",
+      description: "Drag an email from INPUT, or type an address.",
     },
     {
       displayName: "Subject",
       name: "subject",
       type: "string",
-      default: "",
+      default: VECTOR_GMAIL_SUBJECT,
       required: true,
-      placeholder: "e.g. Approval required",
+      placeholder: "Indexed {{ $json.totalBatches }} tables",
+      description: "Drag fields from INPUT (Loop done). Example: tableCount → {{ $json.tableCount }}",
     },
     {
       displayName: "Message",
       name: "message",
       type: "string",
       typeOptions: { rows: 4 },
-      default: "",
+      default: VECTOR_GMAIL_MESSAGE,
       required: true,
+      placeholder: "Finished indexing {{ $json.totalBatches }} tables.",
+      description: "Drag fields from INPUT (Loop done) into the message body.",
     },
     {
       displayName: "Response Type",
