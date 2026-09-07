@@ -174,6 +174,7 @@ export function WorkflowNodeConfigPanel({
                       description={n8nDescription}
                       parameters={nodeData as N8nNodeParameters}
                       onChange={handleFieldChange}
+                      clientId={ownerId}
                     />
                   ) : (
                     paramFields.map((field) => (

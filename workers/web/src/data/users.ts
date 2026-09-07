@@ -3,6 +3,8 @@ import { buildTrustedProxyHeaders } from "@/lib/trusted-proxy-headers";
 export interface User {
   id: string;
   identifier: string;
+  /** Durable Object id (64-char hex) — X-Client-ID for workflow hooks / HTTP Request. */
+  clientId?: string;
   role?: "member" | "admin";
   /** Có số dư nhưng chưa bật TOTP / SMS 2FA / passkey — dashboard bị giới hạn đến khi setup. */
   requiresStrongAuthSetup?: boolean;
@@ -11,6 +13,7 @@ export interface User {
 interface UserProfileResponse {
   id?: string;
   identifier?: string;
+  clientId?: string;
   address?: string;
   role?: "member" | "admin";
   requiresStrongAuthSetup?: boolean;
@@ -31,8 +34,9 @@ function buildCookieHeader(
 function parseUserProfile(data: UserProfileResponse): User | null {
   if (data.id && data.identifier) {
     return {
-      id: data.id,
+      id: String(data.id),
       identifier: data.identifier,
+      clientId: typeof data.clientId === "string" && data.clientId ? data.clientId : undefined,
       role: data.role ?? "member",
       requiresStrongAuthSetup: Boolean(data.requiresStrongAuthSetup),
     };

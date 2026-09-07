@@ -987,9 +987,14 @@ export function createAuthRoutes(bindingName: string) {
       const earningsPayoutCurrency = rawCurrency === 'USD' ? 'USD' : 'VND';
       const membershipTier = user.membershipTier ?? user.membership_tier ?? 'member';
       const needsStrongAuthSetup = await requiresStrongAuthSetup(c, bindingName, user);
+      const clientId = (c.env[bindingName as keyof Env] as DurableObjectNamespace)
+        .idFromName(String(user.identifier))
+        .toString();
       return c.json({
         id: user.id,
         identifier: user.identifier,
+        /** Durable Object id — use as X-Client-ID for hooks / HTTP Request auth. */
+        clientId,
         address: user.address,
         role: user.role || "member",
         membershipTier,

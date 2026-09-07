@@ -17,6 +17,8 @@ type ExpressionDropFieldProps = {
   multiline?: boolean;
   rows?: number;
   placeholder?: string;
+  /** When true, focus on an empty field fills it with the placeholder text. */
+  autofillOnFocus?: boolean;
   className?: string;
   inputClassName?: string;
   showFx?: boolean;
@@ -25,12 +27,18 @@ type ExpressionDropFieldProps = {
   numeric?: boolean;
 };
 
+function isEmptyFieldValue(value: string): boolean {
+  const trimmed = value.trim();
+  return !trimmed || trimmed === "{}" || trimmed === "null";
+}
+
 export function ExpressionDropField({
   value,
   onChange,
   multiline = false,
   rows = 4,
   placeholder,
+  autofillOnFocus = false,
   className,
   inputClassName,
   showFx = true,
@@ -42,6 +50,10 @@ export function ExpressionDropField({
   valueRef.current = value;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const placeholderRef = useRef(placeholder);
+  placeholderRef.current = placeholder;
+  const autofillOnFocusRef = useRef(autofillOnFocus);
+  autofillOnFocusRef.current = autofillOnFocus;
 
   const applyExpression = useCallback((expression: string) => {
     const el = inputRef.current;
@@ -59,6 +71,23 @@ export function ExpressionDropField({
       }
     });
   }, []);
+
+  const handleFocus = useCallback(() => {
+    registerExpressionInsertTarget({ insert: applyExpression });
+    if (!autofillOnFocusRef.current) return;
+    const hint = placeholderRef.current?.trim();
+    if (!hint || !isEmptyFieldValue(valueRef.current)) return;
+    onChangeRef.current(hint);
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      try {
+        el.setSelectionRange(0, hint.length);
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [applyExpression]);
 
   useEffect(() => {
     const target = { insert: applyExpression };
@@ -107,7 +136,7 @@ export function ExpressionDropField({
     value,
     placeholder,
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
-    onFocus: () => registerExpressionInsertTarget({ insert: applyExpression }),
+    onFocus: handleFocus,
     onDragEnter,
     onDragOver,
     onDrop: applyDrop,
