@@ -99,6 +99,29 @@ export interface WorkflowExecutionResult {
   pendingNodeId?: string;
 }
 
+export interface WorkflowExecutionGraph {
+  nodes: Array<{
+    id: string;
+    type?: string;
+    position?: { x: number; y: number };
+    data?: Record<string, unknown>;
+    parentId?: string;
+    extent?: "parent";
+    style?: Record<string, unknown>;
+    zIndex?: number;
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    sourceHandle?: string;
+    targetHandle?: string;
+    type?: string;
+    data?: unknown;
+  }>;
+  viewport?: { x: number; y: number; zoom: number };
+}
+
 export interface WorkflowExecutionRecord {
   id: number;
   executionKey: string;
@@ -112,6 +135,10 @@ export interface WorkflowExecutionRecord {
   totalCostVnd: number;
   stepCount: number;
   steps: ExecutionStepLog[];
+  /** Graph snapshot captured at run time (from engine state). */
+  definition?: WorkflowExecutionGraph;
+  /** True when the persisted engine snapshot was too large and was dropped. */
+  truncated?: boolean;
   pendingNodeId?: string;
   startedAt: number;
   finishedAt?: number;

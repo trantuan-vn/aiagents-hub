@@ -37,6 +37,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     backHref,
     backLabel,
     onApplyDefinition,
+    definitionJson,
     saving = false,
     publishing = false,
     onPublish,
@@ -176,7 +177,12 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
 
       {activeTab === "executions" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <WorkflowExecutionsPanel workflowId={workflowId} onApplyDefinition={onApplyDefinition} />
+          <WorkflowExecutionsPanel
+            workflowId={workflowId}
+            fallbackDefinitionJson={definitionJson}
+            onApplyDefinition={onApplyDefinition}
+            onCopiedToEditor={() => setActiveTab("editor")}
+          />
         </div>
       ) : activeTab === "triggers" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">

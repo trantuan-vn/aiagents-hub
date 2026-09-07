@@ -115,11 +115,30 @@ function parseExecutionRow(row: any) {
       return v;
     }
   };
+  const state = safeParse(row.state);
+  const truncated =
+    !!state &&
+    typeof state === 'object' &&
+    !Array.isArray(state) &&
+    (state as { _truncated?: boolean })._truncated === true;
+  const engine =
+    !truncated && state && typeof state === 'object'
+      ? (state as { engine?: { steps?: unknown } }).engine
+      : undefined;
+  const definition =
+    !truncated &&
+    state &&
+    typeof state === 'object' &&
+    Array.isArray((state as { definition?: { nodes?: unknown } }).definition?.nodes)
+      ? (state as { definition: unknown }).definition
+      : undefined;
   return {
     ...row,
     output: safeParse(row.output),
-    // `state` is the internal engine snapshot; expose only the step trace.
-    steps: safeParse(row.state)?.engine?.steps ?? [],
+    steps: Array.isArray(engine?.steps) ? engine.steps : [],
+    definition,
+    truncated,
+    // `state` is the internal engine snapshot; expose step trace + graph.
     state: undefined,
   };
 }

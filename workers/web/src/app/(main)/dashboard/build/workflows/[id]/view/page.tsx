@@ -109,6 +109,7 @@ export default function ViewSharedWorkflowPage() {
         backHref="/dashboard/build/workflows"
         backLabel={tv("back")}
         onExecute={() => {}}
+        definitionJson={view.definition}
       >
         <WorkflowEditor
           workflowId={id}

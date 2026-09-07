@@ -21,6 +21,8 @@ interface WorkflowEditorShellBaseProps {
   backHref?: string;
   backLabel?: string;
   onApplyDefinition?: (definitionJson: string) => void;
+  /** Current editor graph — used as a fallback when a run has no snapshot. */
+  definitionJson?: string;
   saving?: boolean;
   publishing?: boolean;
   onPublish?: () => void;

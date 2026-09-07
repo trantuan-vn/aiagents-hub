@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
 import { useNodeId } from "@xyflow/react";
-import { Check, Loader2, Radio, Zap, X } from "lucide-react";
+import { Check, Clock, Loader2, Minus, Radio, Zap, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
@@ -106,6 +106,34 @@ function ExecutionBadge({
     );
   }
 
+  if (status === "pending_human") {
+    return (
+      <span
+        className={cn(
+          "absolute z-30 flex size-5 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm",
+          compact ? "-top-1.5 -right-1.5" : "-top-2 -right-1",
+        )}
+        title={t("node_status_pending_human")}
+      >
+        <Clock className="size-3" aria-hidden />
+      </span>
+    );
+  }
+
+  if (status === "skipped") {
+    return (
+      <span
+        className={cn(
+          "absolute z-30 flex size-5 items-center justify-center rounded-full bg-muted-foreground/80 text-white shadow-sm",
+          compact ? "-top-1.5 -right-1.5" : "-top-2 -right-1",
+        )}
+        title={t("node_status_skipped")}
+      >
+        <Minus className="size-3" aria-hidden />
+      </span>
+    );
+  }
+
   return null;
 }
 
@@ -179,6 +207,7 @@ export function WorkflowNodeShell({
         !compact && !runningRing && triggerRing && "workflow-node-exec-trigger",
         !compact && !runningRing && status === "error" && "ring-2 ring-red-500/70",
         !compact && !runningRing && status === "success" && "ring-1 ring-emerald-500/50",
+        !compact && !runningRing && status === "pending_human" && "ring-2 ring-amber-500/70",
         deactivated && "opacity-60",
       )}
       aria-busy={runningRing}

@@ -324,6 +324,7 @@ export default function EditWorkflowPage() {
         onExecute={() => {}}
         onAddNode={handleAddNode}
         onAddStickyNote={handleAddStickyNote}
+        definitionJson={definition}
         onApplyDefinition={(json) => {
           record(currentSnapshotRef.current);
           setDefinition(json);
