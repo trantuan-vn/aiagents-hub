@@ -47,7 +47,7 @@ export function WorkflowEditorShellWorkspace({
   }, [readOnly]);
 
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
       <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
         <WorkflowEditorActionsProvider value={actionsValue}>{children}</WorkflowEditorActionsProvider>
         {!readOnly ? <WorkflowAddNodeDrawer /> : null}

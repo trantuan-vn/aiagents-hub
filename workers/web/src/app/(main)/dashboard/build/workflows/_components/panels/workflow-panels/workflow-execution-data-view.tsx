@@ -71,13 +71,13 @@ function SchemaNodeBody({
         <span className="mt-0.5 w-3 shrink-0" />
       )}
       <KindIcon kind={kind} />
-      <span className="text-foreground shrink-0 font-medium">{name}</span>
+      <span className="text-foreground min-w-0 shrink-0 font-medium">{name}</span>
       {expandable ? (
-        <span className="text-muted-foreground truncate">
+        <span className="text-muted-foreground min-w-0 truncate">
           {kind === "array" ? `${childrenCount}` : `${childrenCount} keys`}
         </span>
       ) : (
-        <span className="text-muted-foreground min-w-0 truncate font-mono">{previewValue(value, 200)}</span>
+        <span className="text-muted-foreground min-w-0 flex-1 break-all font-mono">{previewValue(value, 200)}</span>
       )}
     </>
   );
@@ -92,11 +92,11 @@ function SchemaTree({ name, value, depth, query }: { name: string; value: unknow
   if (!subtreeVisible(q, matchesQuery(name, value, q), children)) return null;
 
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 overflow-hidden">
       <button
         type="button"
         className={cn(
-          "hover:bg-muted/60 flex w-full items-start gap-1.5 rounded-sm px-1 py-0.5 text-left text-[11px]",
+          "hover:bg-muted/60 flex w-full min-w-0 items-start gap-1.5 rounded-sm px-1 py-0.5 text-left text-[11px]",
           !expandable && "cursor-default",
         )}
         onClick={() => expandable && setOpen((v) => !v)}
@@ -163,7 +163,7 @@ function DataPaneBody({
   }
   if (mode === "table") return <TableView value={value} query={query} />;
   return (
-    <div className="p-1.5">
+    <div className="min-w-0 p-1.5">
       <SchemaRoots value={value} query={query} />
     </div>
   );
@@ -189,7 +189,7 @@ function TableView({ value, query }: { value: unknown; query: string }) {
         <tbody>
           {fields.map((f) => (
             <tr key={f.path} className="border-b last:border-0">
-              <th className="text-muted-foreground w-[36%] px-2 py-1.5 align-top font-medium">{f.path}</th>
+              <th className="text-muted-foreground w-[36%] px-2 py-1.5 align-top font-medium break-all">{f.path}</th>
               <td className="px-2 py-1.5 font-mono break-all">{previewValue(f.value, 400)}</td>
             </tr>
           ))}
@@ -258,7 +258,7 @@ export function WorkflowExecutionDataPane({
   const empty = value == null || value === "" || (typeof value === "object" && Object.keys(value).length === 0);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col border-r last:border-r-0">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0">
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
         <p className="text-[11px] font-semibold tracking-wide uppercase">{title}</p>
         <div className="ml-auto flex items-center gap-0.5">

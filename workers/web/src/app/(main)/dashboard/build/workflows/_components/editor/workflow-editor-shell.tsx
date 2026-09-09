@@ -175,7 +175,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
       />
 
       {activeTab === "executions" ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <WorkflowExecutionsPanel
             workflowId={workflowId}
             fallbackDefinitionJson={definitionJson}
@@ -184,7 +184,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
           />
         </div>
       ) : activeTab === "evaluations" ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <WorkflowEvaluationsPanel
             onAddEvaluationTrigger={openAddEvaluationTrigger}
             onAddSetOutputsNode={openAddSetOutputsNode}

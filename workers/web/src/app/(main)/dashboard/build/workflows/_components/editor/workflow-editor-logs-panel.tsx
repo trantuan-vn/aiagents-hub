@@ -84,7 +84,7 @@ export function WorkflowEditorLogsPanel({
   }, [workflowId]);
 
   return (
-    <div className={cn("border-border bg-background shrink-0 border-t", className)}>
+    <div className={cn("border-border bg-background min-w-0 w-full shrink-0 overflow-hidden border-t", className)}>
       <div className="flex h-9 items-center justify-between px-3">
         <button
           type="button"
@@ -97,7 +97,7 @@ export function WorkflowEditorLogsPanel({
         </button>
       </div>
       {open ? (
-        <div className={cn("min-h-0 overflow-hidden border-t", hasData ? "h-80" : "h-28")}>
+        <div className={cn("min-h-0 min-w-0 overflow-hidden border-t", hasData ? "h-80" : "h-28")}>
           {hasData ? (
             <WorkflowExecutionIoPanel
               hideHeader

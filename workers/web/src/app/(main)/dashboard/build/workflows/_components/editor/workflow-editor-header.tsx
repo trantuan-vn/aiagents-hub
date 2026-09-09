@@ -75,7 +75,7 @@ export function WorkflowEditorHeader({
   const noopFile = () => undefined;
 
   return (
-    <header className="border-border bg-background flex h-12 shrink-0 items-center gap-2 border-b px-3">
+    <header className="border-border bg-background flex h-12 min-w-0 shrink-0 items-center gap-2 overflow-hidden border-b px-3">
       <WorkflowEditorHeaderLeft
         workflowName={workflowName}
         onWorkflowNameChange={onWorkflowNameChange}

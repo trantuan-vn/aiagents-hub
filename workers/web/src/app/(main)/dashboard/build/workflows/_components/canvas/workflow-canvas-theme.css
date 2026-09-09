@@ -63,6 +63,18 @@
      React Flow canvas to 0px. 3rem offsets the page padding the shell cancels. */
   height: calc(100dvh - 3rem);
   max-height: calc(100dvh - 3rem);
+  /* Cancel dashboard page padding (p-4 / md:p-6) without width: 100%, which
+     left a right gutter after the negative margins. Overflow stays clipped so
+     log payloads cannot expand the page sideways. */
+  min-width: 0;
+  width: calc(100% + 2rem);
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .workflow-editor-shell {
+    width: calc(100% + 3rem);
+  }
 }
 
 .workflow-canvas-surface .react-flow__background {

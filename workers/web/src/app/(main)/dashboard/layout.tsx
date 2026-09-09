@@ -53,7 +53,7 @@ export default async function Layout({ children }: LayoutProps<"/dashboard">) {
       <SidebarInset
         data-content-layout={contentLayout}
         className={cn(
-          "w-full",
+          "min-w-0 w-full",
           // Adds right margin for inset sidebar in centered layout up to 113rem.
           // On wider screens with collapsed sidebar, removes margin and sets margin auto for alignment.
           "max-[113rem]:peer-data-[variant=inset]:!mr-2 min-[101rem]:peer-data-[variant=inset]:peer-data-[state=collapsed]:!mr-auto",
@@ -76,7 +76,7 @@ export default async function Layout({ children }: LayoutProps<"/dashboard">) {
         <DashboardUserProvider user={user}>
           <StrongAuthSetupRedirect />
           <SensitiveStepUpRedirect />
-          <div className="h-full p-4 md:p-6">{children}</div>
+          <div className="h-full min-w-0 overflow-x-hidden p-4 md:p-6">{children}</div>
         </DashboardUserProvider>
       </SidebarInset>
     </SidebarProvider>

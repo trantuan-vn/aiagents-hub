@@ -160,16 +160,24 @@ export function WorkflowExecutionIoPanel({
   const showBody = hideHeader || !collapsed;
 
   return (
-    <div className={cn("bg-background flex min-h-0 flex-col", !hideHeader && "border-t", showBody && "h-full")}>
+    <div
+      className={cn(
+        "bg-background flex min-h-0 min-w-0 w-full flex-col overflow-hidden",
+        !hideHeader && "border-t",
+        showBody && "h-full",
+      )}
+    >
       {hideHeader ? null : (
         <IoPanelHeader collapsed={collapsed} title={title} onToggle={() => onCollapsedChange?.(!collapsed)} />
       )}
       {showBody ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div className="w-56 shrink-0 overflow-y-auto border-r">
             <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
           </div>
-          <IoColumns selectedStep={selectedStep} selectedNodeId={selectedNodeId} />
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <IoColumns selectedStep={selectedStep} selectedNodeId={selectedNodeId} />
+          </div>
         </div>
       ) : null}
     </div>
