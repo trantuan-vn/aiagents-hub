@@ -18,7 +18,6 @@ import {
   workflowAddNodeDrawerActions,
   type WorkflowAddNodeDrawerOpenOptions,
 } from "../add-node/workflow-add-node-drawer-store";
-import { WorkflowTriggersPanel } from "../panels/workflow-panels/workflow-triggers-panel";
 
 export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const {
@@ -183,10 +182,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
             onApplyDefinition={onApplyDefinition}
             onCopiedToEditor={() => setActiveTab("editor")}
           />
-        </div>
-      ) : activeTab === "triggers" ? (
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <WorkflowTriggersPanel workflowId={workflowId} />
         </div>
       ) : activeTab === "evaluations" ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">

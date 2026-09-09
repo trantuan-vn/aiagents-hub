@@ -2543,7 +2543,6 @@
     "menu_delete": "Delete",
     "tab_editor": "Editor",
     "tab_executions": "Executions",
-    "tab_triggers": "Triggers",
     "tab_versions": "Versions",
     "tab_evaluations": "Evaluations",
     "evaluation_title": "Test your AI workflow over multiple inputs",
