@@ -147,3 +147,36 @@
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
+
+/* Panel splitter: 1px line; hit area is enlarged via hitAreaMargins. */
+.workflow-resize-handle {
+  position: relative;
+  z-index: 20;
+  flex-shrink: 0;
+  background: var(--border);
+  outline: none;
+}
+
+.workflow-resize-handle[data-panel-group-direction="vertical"] {
+  height: 1px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.workflow-resize-handle[data-panel-group-direction="horizontal"] {
+  width: 1px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+.workflow-resize-handle:hover,
+.workflow-resize-handle[data-resize-handle-active],
+.workflow-resize-handle[data-resize-handle-state="hover"],
+.workflow-resize-handle[data-resize-handle-state="drag"] {
+  background: color-mix(in oklch, var(--muted-foreground) 45%, var(--border));
+}
+
+.workflow-resize-handle:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}

@@ -20,6 +20,7 @@ interface WorkflowEditorLogsPanelProps {
   workflowId: number;
   definitionJson?: string;
   className?: string;
+  fill?: boolean;
 }
 
 function graphNodesFromDefinition(definitionJson?: string): Node[] {
@@ -38,6 +39,7 @@ export function WorkflowEditorLogsPanel({
   workflowId,
   definitionJson,
   className,
+  fill = false,
 }: WorkflowEditorLogsPanelProps) {
   const t = useTranslations("WorkflowEditorPage");
   const logs = useSyncExternalStore(
@@ -84,8 +86,14 @@ export function WorkflowEditorLogsPanel({
   }, [workflowId]);
 
   return (
-    <div className={cn("border-border bg-background min-w-0 w-full shrink-0 overflow-hidden border-t", className)}>
-      <div className="flex h-9 items-center justify-between px-3">
+    <div
+      className={cn(
+        "border-border bg-background min-w-0 w-full overflow-hidden",
+        fill ? "flex h-full min-h-0 flex-col" : "shrink-0 border-t",
+        className,
+      )}
+    >
+      <div className="flex h-9 shrink-0 items-center justify-between px-3">
         <button
           type="button"
           className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs font-medium transition-colors"
@@ -97,7 +105,7 @@ export function WorkflowEditorLogsPanel({
         </button>
       </div>
       {open ? (
-        <div className={cn("min-h-0 min-w-0 overflow-hidden border-t", hasData ? "h-80" : "h-28")}>
+        <div className={cn("min-h-0 min-w-0 overflow-hidden border-t", fill ? "flex-1" : hasData ? "h-80" : "h-28")}>
           {hasData ? (
             <WorkflowExecutionIoPanel
               hideHeader

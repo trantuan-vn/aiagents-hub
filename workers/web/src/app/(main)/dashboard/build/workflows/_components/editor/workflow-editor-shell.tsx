@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
 import "../canvas/workflow-canvas-theme.css";
@@ -14,6 +15,7 @@ import { resolveWorkflowEditorShellProps, type WorkflowEditorShellProps } from "
 import { WorkflowEditorShellWorkspace } from "./workflow-editor-shell-workspace";
 import { WorkflowExecutionsPanel } from "../panels/workflow-panels/workflow-executions-panel";
 import { WorkflowHistorySheet } from "../panels/workflow-panels/workflow-history-sheet";
+import { WorkflowResizeHandle, workflowResizePanelClassName } from "../layout/workflow-resize-handle";
 import {
   workflowAddNodeDrawerActions,
   type WorkflowAddNodeDrawerOpenOptions,
@@ -192,27 +194,44 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
           />
         </div>
       ) : (
-        <WorkflowEditorShellWorkspace
-          readOnly={readOnly}
-          aiOpen={aiOpen}
-          onAiOpenChange={setAiOpen}
-          onOpenSettings={openSettings}
-          onAddNode={onAddNode}
-          onAddStickyNote={onAddStickyNote}
-          onApplyDefinition={onApplyDefinition}
-        >
-          {children}
-        </WorkflowEditorShellWorkspace>
+        <>
+          <ResizablePanelGroup direction="vertical" className="h-full min-h-0 min-w-0 flex-1">
+            <ResizablePanel id="canvas" order={1} defaultSize={72} minSize={28} className={workflowResizePanelClassName}>
+              <WorkflowEditorShellWorkspace
+                readOnly={readOnly}
+                aiOpen={aiOpen}
+                onAiOpenChange={setAiOpen}
+                onOpenSettings={openSettings}
+                onAddNode={onAddNode}
+                onAddStickyNote={onAddStickyNote}
+                onApplyDefinition={onApplyDefinition}
+              >
+                {children}
+              </WorkflowEditorShellWorkspace>
+            </ResizablePanel>
+            {logsOpen ? <WorkflowResizeHandle /> : null}
+            {logsOpen ? (
+              <ResizablePanel id="logs" order={2} defaultSize={28} minSize={14} className={workflowResizePanelClassName}>
+                <WorkflowEditorLogsPanel
+                  fill
+                  open={logsOpen}
+                  onOpenChange={setLogsOpen}
+                  workflowId={workflowId}
+                  definitionJson={definitionJson}
+                />
+              </ResizablePanel>
+            ) : null}
+          </ResizablePanelGroup>
+          {logsOpen ? null : (
+            <WorkflowEditorLogsPanel
+              open={logsOpen}
+              onOpenChange={setLogsOpen}
+              workflowId={workflowId}
+              definitionJson={definitionJson}
+            />
+          )}
+        </>
       )}
-
-      {activeTab === "editor" ? (
-        <WorkflowEditorLogsPanel
-          open={logsOpen}
-          onOpenChange={setLogsOpen}
-          workflowId={workflowId}
-          definitionJson={definitionJson}
-        />
-      ) : null}
 
       {editSettings ? (
         <WorkflowEditorSettingsSheet

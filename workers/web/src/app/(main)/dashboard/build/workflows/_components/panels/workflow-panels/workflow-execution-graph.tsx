@@ -149,7 +149,7 @@ export function WorkflowExecutionGraph(props: {
   onSelectNode: (nodeId: string | null) => void;
 }) {
   return (
-    <div className="h-full min-h-0 w-full">
+    <div className="h-full min-h-0 w-full flex-1">
       <ReactFlowProvider>
         <GraphInner {...props} />
       </ReactFlowProvider>

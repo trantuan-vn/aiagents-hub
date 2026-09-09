@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, formatUsd } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ import {
   type WorkflowExecutionRecord,
 } from "../../../_lib/api";
 
+import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { WorkflowExecutionGraph } from "./workflow-execution-graph";
 import { WorkflowExecutionIoPanel } from "./workflow-execution-io-panel";
 import { ExecutionStatusGlyph } from "./workflow-execution-list";
@@ -218,8 +219,14 @@ function ExecutionSplit({
 
   return (
     <>
-      <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
-        <ResizablePanel defaultSize={ioCollapsed ? 100 : 62} minSize={28} className="min-h-0">
+      <ResizablePanelGroup direction="vertical" className="h-full min-h-0 flex-1">
+        <ResizablePanel
+          id="graph"
+          order={1}
+          defaultSize={ioCollapsed ? 100 : 62}
+          minSize={28}
+          className={workflowResizePanelClassName}
+        >
           {hasGraph ? (
             <WorkflowExecutionGraph
               key={selected.executionKey}
@@ -236,9 +243,9 @@ function ExecutionSplit({
             </div>
           )}
         </ResizablePanel>
-        {ioCollapsed ? null : <ResizableHandle withHandle />}
+        {ioCollapsed ? null : <WorkflowResizeHandle />}
         {ioCollapsed ? null : (
-          <ResizablePanel defaultSize={38} minSize={18} className="min-h-0">
+          <ResizablePanel id="io" order={2} defaultSize={38} minSize={18} className={workflowResizePanelClassName}>
             <WorkflowExecutionIoPanel
               steps={selected.steps}
               nodes={graphNodes}
@@ -284,7 +291,7 @@ export function WorkflowExecutionWorkspace({
   onReload: () => Promise<void>;
 }) {
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <ExecutionMetaBar selected={selected} onApplyDefinition={onApplyDefinition} onCopiedToEditor={onCopiedToEditor} />
       <ExecutionAlerts
         workflowId={workflowId}

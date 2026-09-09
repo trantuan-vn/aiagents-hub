@@ -2600,6 +2600,7 @@
     "settings_title": "Cài đặt workflow",
     "settings_description": "Tên, ghi chú, chia sẻ và metadata.",
     "logs_title": "Nhật ký",
+    "resize_panels": "Điều chỉnh kích thước",
     "logs_empty": "Chưa có dữ liệu. Nhật ký thực thi sẽ hiển thị tại đây.",
     "logs_running": "Đang chạy. Input và output của từng node sẽ hiện tại đây.",
     "execute_workflow": "Chạy workflow",

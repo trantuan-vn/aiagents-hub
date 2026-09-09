@@ -4,10 +4,12 @@ import type { Node } from "@xyflow/react";
 import { Check, ChevronDown, CircleAlert, Clock, Minus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
 import type { ExecutionStepLog } from "../../../_lib/api";
 
+import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { WorkflowExecutionDataPane } from "./workflow-execution-data-view";
 import { formatDuration, nodeKindLabel, nodeLabel } from "./workflow-execution-utils";
 
@@ -81,18 +83,27 @@ function IoColumns({
   const t = useTranslations("WorkflowEditorPage");
   if (selectedStep) {
     return (
-      <>
-        <WorkflowExecutionDataPane
-          title={t("executions_input")}
-          value={selectedStep.input}
-          emptyLabel={t("executions_no_data")}
-        />
-        <WorkflowExecutionDataPane
-          title={t("executions_output")}
-          value={selectedStep.output}
-          emptyLabel={selectedStep.status === "error" ? t("executions_detail_error") : t("executions_no_data")}
-        />
-      </>
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="workflow-executions-io-columns-v2"
+        className="h-full min-h-0 min-w-0 flex-1"
+      >
+        <ResizablePanel id="input" order={1} defaultSize={50} minSize={22} className={workflowResizePanelClassName}>
+          <WorkflowExecutionDataPane
+            title={t("executions_input")}
+            value={selectedStep.input}
+            emptyLabel={t("executions_no_data")}
+          />
+        </ResizablePanel>
+        <WorkflowResizeHandle />
+        <ResizablePanel id="output" order={2} defaultSize={50} minSize={22} className={workflowResizePanelClassName}>
+          <WorkflowExecutionDataPane
+            title={t("executions_output")}
+            value={selectedStep.output}
+            emptyLabel={selectedStep.status === "error" ? t("executions_detail_error") : t("executions_no_data")}
+          />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     );
   }
   if (selectedNodeId) {
@@ -163,7 +174,7 @@ export function WorkflowExecutionIoPanel({
     <div
       className={cn(
         "bg-background flex min-h-0 min-w-0 w-full flex-col overflow-hidden",
-        !hideHeader && "border-t",
+        !hideHeader && collapsed && "border-t",
         showBody && "h-full",
       )}
     >
@@ -171,14 +182,23 @@ export function WorkflowExecutionIoPanel({
         <IoPanelHeader collapsed={collapsed} title={title} onToggle={() => onCollapsedChange?.(!collapsed)} />
       )}
       {showBody ? (
-        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <div className="w-56 shrink-0 overflow-y-auto border-r">
-            <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
-          </div>
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-            <IoColumns selectedStep={selectedStep} selectedNodeId={selectedNodeId} />
-          </div>
-        </div>
+        <ResizablePanelGroup
+          direction="horizontal"
+          autoSaveId="workflow-executions-io-steps-v2"
+          className="h-full min-h-0 min-w-0 flex-1"
+        >
+          <ResizablePanel id="steps" order={1} defaultSize={22} minSize={12} maxSize={42} className={workflowResizePanelClassName}>
+            <div className="h-full min-h-0 overflow-y-auto">
+              <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+            </div>
+          </ResizablePanel>
+          <WorkflowResizeHandle />
+          <ResizablePanel id="data" order={2} defaultSize={78} minSize={40} className={workflowResizePanelClassName}>
+            <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
+              <IoColumns selectedStep={selectedStep} selectedNodeId={selectedNodeId} />
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       ) : null}
     </div>
   );

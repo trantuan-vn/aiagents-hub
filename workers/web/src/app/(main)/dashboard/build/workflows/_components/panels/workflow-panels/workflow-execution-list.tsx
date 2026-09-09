@@ -140,7 +140,7 @@ export function WorkflowExecutionList({
   }
 
   return (
-    <aside className="bg-background flex w-[280px] shrink-0 flex-col border-r">
+    <aside className="bg-background flex h-full min-h-0 w-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-2 border-b px-3 py-2.5">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold">{t("executions_title")}</h2>

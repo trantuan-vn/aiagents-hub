@@ -258,7 +258,7 @@ export function WorkflowExecutionDataPane({
   const empty = value == null || value === "" || (typeof value === "object" && Object.keys(value).length === 0);
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border-r last:border-r-0">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
         <p className="text-[11px] font-semibold tracking-wide uppercase">{title}</p>
         <div className="ml-auto flex items-center gap-0.5">
