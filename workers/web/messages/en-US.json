@@ -2599,6 +2599,7 @@
     "settings_description": "Name, note, sharing, and metadata.",
     "logs_title": "Logs",
     "logs_empty": "Nothing to display yet. Execution logs will appear here.",
+    "logs_running": "Execution in progress. Node input and output will appear here.",
     "execute_workflow": "Execute workflow",
     "execute_workflow_choose_trigger": "Choose trigger to execute from",
     "execute_running": "Running",

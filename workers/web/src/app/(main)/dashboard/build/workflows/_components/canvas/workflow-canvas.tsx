@@ -9,6 +9,7 @@ import "./workflow-canvas-theme.css";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import { workflowEditorLogsStore } from "../editor/workflow-editor-logs-store";
 import { useWorkflowCanvasState } from "../hooks/use-workflow-canvas-state";
 import { useWorkflowExecuteEntry } from "../hooks/use-workflow-execute-entry";
 import { useWorkflowExecutionProgress, WorkflowExecutionUiProvider } from "../hooks/workflow-execution-ui";
@@ -32,6 +33,7 @@ import { createNodeDataFromPlugin, resolveUIPluginById, workflowNodeTypes } from
 import { webhookNodeDefaults } from "../nodes/webhook/defaults";
 import { buildVectorizeNodeData } from "../layout/vectorize-node-data";
 import { warnLegacyRuntimeType } from "../../_lib/runtime-type";
+import type { ExecutionStepLog } from "../../_lib/api";
 
 export type { WorkflowDefinition };
 export { toPersistedDefinition };
@@ -221,6 +223,20 @@ function CanvasInnerWithDrawerUi({
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
   const executionProgress = useWorkflowExecutionProgress({ workflowId });
+  const startRun = useCallback(
+    (nodeId: string) => {
+      if (workflowId) workflowEditorLogsStore.startRun(workflowId, nodeId);
+      executionProgress.startRun(nodeId);
+    },
+    [workflowId, executionProgress.startRun],
+  );
+  const finishRun = useCallback(
+    (steps?: ExecutionStepLog[]) => {
+      if (workflowId) workflowEditorLogsStore.finishRun(workflowId, steps);
+      executionProgress.finishRun(steps);
+    },
+    [workflowId, executionProgress.finishRun],
+  );
   const {
     executeFromEntry,
     running: executeRunning,
@@ -236,11 +252,15 @@ function CanvasInnerWithDrawerUi({
     edges,
     patchNodeDataById: readOnly ? undefined : patchNodeDataById,
     readOnly,
-    startRun: executionProgress.startRun,
-    finishRun: executionProgress.finishRun,
+    startRun,
+    finishRun,
   });
   executionProgress.bindListeningNodeId(listeningNodeId);
   const running = executionProgress.running || executeRunning;
+
+  useEffect(() => {
+    if (workflowId) workflowEditorLogsStore.bindWorkflow(workflowId);
+  }, [workflowId]);
 
   const executionUi = useMemo(
     () => ({
@@ -249,16 +269,16 @@ function CanvasInnerWithDrawerUi({
       currentNodeId: executionProgress.currentNodeId,
       listeningNodeId,
       statusByNodeId: executionProgress.statusByNodeId,
-      startRun: executionProgress.startRun,
-      finishRun: executionProgress.finishRun,
+      startRun,
+      finishRun,
     }),
     [
       running,
       executionProgress.entryNodeId,
       executionProgress.currentNodeId,
       executionProgress.statusByNodeId,
-      executionProgress.startRun,
-      executionProgress.finishRun,
+      startRun,
+      finishRun,
       listeningNodeId,
     ],
   );
@@ -338,6 +358,7 @@ function CanvasInnerWithDrawerUi({
         liveOutput={liveOutput}
         onStopWebhookListen={stopWebhookListen}
         onExecuteTriggerNode={executeFromEntry}
+        onSelectLogNode={workflowEditorLogsStore.selectNode}
         onNodeDoubleClick={readOnly ? undefined : (_, node) => setConfigNodeId(node.id)}
       />
       {configNode && !readOnly ? (
@@ -376,6 +397,7 @@ const CanvasSurface = memo(function CanvasSurface({
   liveOutput,
   onStopWebhookListen,
   onExecuteTriggerNode,
+  onSelectLogNode,
   onNodeDoubleClick,
 }: {
   className?: string;
@@ -393,6 +415,7 @@ const CanvasSurface = memo(function CanvasSurface({
   liveOutput?: import("@aiagents-hub/workflow-nodes").WebhookItemOutput | null;
   onStopWebhookListen?: () => void;
   onExecuteTriggerNode: (nodeId: string) => void;
+  onSelectLogNode?: (nodeId: string) => void;
   onNodeDoubleClick?: (event: React.MouseEvent, node: Node) => void;
 }) {
   const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
@@ -412,6 +435,14 @@ const CanvasSurface = memo(function CanvasSurface({
     closeAddNodeDrawer?.();
     dismissListeningOverlay();
   }, [closeAddNodeDrawer, dismissListeningOverlay]);
+
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      dismissListeningOverlay();
+      onSelectLogNode?.(node.id);
+    },
+    [dismissListeningOverlay, onSelectLogNode],
+  );
 
   useEffect(() => {
     if (!showListeningOverlay) return;
@@ -453,7 +484,7 @@ const CanvasSurface = memo(function CanvasSurface({
         proOptions={{ hideAttribution: true }}
         panOnScroll
         onPaneClick={onPaneClick}
-        onNodeClick={dismissListeningOverlay}
+        onNodeClick={onNodeClick}
         onEdgeClick={dismissListeningOverlay}
         onNodeDoubleClick={onNodeDoubleClick}
         {...interactionProps}

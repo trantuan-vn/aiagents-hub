@@ -205,7 +205,14 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         </WorkflowEditorShellWorkspace>
       )}
 
-      <WorkflowEditorLogsPanel open={logsOpen} onOpenChange={setLogsOpen} />
+      {activeTab === "editor" ? (
+        <WorkflowEditorLogsPanel
+          open={logsOpen}
+          onOpenChange={setLogsOpen}
+          workflowId={workflowId}
+          definitionJson={definitionJson}
+        />
+      ) : null}
 
       {editSettings ? (
         <WorkflowEditorSettingsSheet

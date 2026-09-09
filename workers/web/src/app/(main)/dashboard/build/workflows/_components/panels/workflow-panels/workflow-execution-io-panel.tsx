@@ -140,33 +140,38 @@ export function WorkflowExecutionIoPanel({
   nodes,
   selectedNodeId,
   onSelectNode,
-  collapsed,
+  collapsed = false,
   onCollapsedChange,
+  hideHeader = false,
 }: {
   steps: ExecutionStepLog[];
   nodes: Node[];
   selectedNodeId: string | null;
   onSelectNode: (nodeId: string) => void;
-  collapsed: boolean;
-  onCollapsedChange: (collapsed: boolean) => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
+  hideHeader?: boolean;
 }) {
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
   const selectedStep = steps.find((s) => s.nodeId === selectedNodeId) ?? null;
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
   const title =
     selectedNode || selectedStep ? nodeLabel(selectedNode, selectedStep?.nodeId ?? selectedNodeId ?? "") : null;
+  const showBody = hideHeader || !collapsed;
 
   return (
-    <div className={cn("bg-background flex min-h-0 flex-col border-t", !collapsed && "h-full")}>
-      <IoPanelHeader collapsed={collapsed} title={title} onToggle={() => onCollapsedChange(!collapsed)} />
-      {collapsed ? null : (
+    <div className={cn("bg-background flex min-h-0 flex-col", !hideHeader && "border-t", showBody && "h-full")}>
+      {hideHeader ? null : (
+        <IoPanelHeader collapsed={collapsed} title={title} onToggle={() => onCollapsedChange?.(!collapsed)} />
+      )}
+      {showBody ? (
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div className="w-56 shrink-0 overflow-y-auto border-r">
             <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
           </div>
           <IoColumns selectedStep={selectedStep} selectedNodeId={selectedNodeId} />
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

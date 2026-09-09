@@ -1,0 +1,92 @@
+import type { ExecutionStepLog } from "../../_lib/api";
+
+export type WorkflowEditorLogsState = {
+  workflowId: number | null;
+  running: boolean;
+  steps: ExecutionStepLog[];
+  selectedNodeId: string | null;
+  openGeneration: number;
+};
+
+const INITIAL: WorkflowEditorLogsState = {
+  workflowId: null,
+  running: false,
+  steps: [],
+  selectedNodeId: null,
+  openGeneration: 0,
+};
+
+let state: WorkflowEditorLogsState = INITIAL;
+const listeners = new Set<() => void>();
+
+function emit() {
+  listeners.forEach((listener) => listener());
+}
+
+function pickSelected(steps: ExecutionStepLog[], prev: string | null): string | null {
+  const error = steps.find((step) => step.status === "error");
+  if (error) return error.nodeId;
+  const pending = steps.find((step) => step.status === "pending_human");
+  if (pending) return pending.nodeId;
+  if (prev && steps.some((step) => step.nodeId === prev)) return prev;
+  return steps[steps.length - 1]?.nodeId ?? null;
+}
+
+export const workflowEditorLogsStore = {
+  getState: (): WorkflowEditorLogsState => state,
+
+  subscribe: (listener: () => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+
+  bindWorkflow: (workflowId: number) => {
+    if (state.workflowId === workflowId) return;
+    state = { ...INITIAL, workflowId };
+    emit();
+  },
+
+  startRun: (workflowId: number, nodeId: string) => {
+    state = {
+      workflowId,
+      running: true,
+      steps: [],
+      selectedNodeId: nodeId,
+      openGeneration: state.openGeneration + 1,
+    };
+    emit();
+  },
+
+  finishRun: (workflowId: number, steps?: ExecutionStepLog[]) => {
+    if (state.workflowId != null && state.workflowId !== workflowId) return;
+    const nextSteps = steps?.length ? steps : state.steps;
+    state = {
+      workflowId,
+      running: false,
+      steps: nextSteps,
+      selectedNodeId: pickSelected(nextSteps, state.selectedNodeId),
+      openGeneration: steps?.length ? state.openGeneration + 1 : state.openGeneration,
+    };
+    emit();
+  },
+
+  selectNode: (nodeId: string) => {
+    if (state.selectedNodeId === nodeId) return;
+    state = { ...state, selectedNodeId: nodeId };
+    emit();
+  },
+
+  hydrate: (workflowId: number, steps: ExecutionStepLog[]) => {
+    if (!steps.length) return;
+    if (state.running) return;
+    if (state.workflowId === workflowId && state.steps.length) return;
+    state = {
+      workflowId,
+      running: false,
+      steps,
+      selectedNodeId: pickSelected(steps, state.selectedNodeId),
+      openGeneration: state.openGeneration + 1,
+    };
+    emit();
+  },
+};

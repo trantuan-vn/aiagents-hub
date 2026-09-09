@@ -270,7 +270,8 @@ export function useWorkflowExecuteEntry({
     deactivateFormListening(node);
     setListeningNodeId(null);
     setLiveOutput(null);
-  }, [deactivateFormListening, listeningNodeId, nodes]);
+    finishRun?.();
+  }, [deactivateFormListening, finishRun, listeningNodeId, nodes]);
 
   const startFormTest = useCallback(
     async (nodeId: string) => {
@@ -289,13 +290,14 @@ export function useWorkflowExecuteEntry({
         const url = buildFormPublicUrl({ workflowId, formPath: path, mode: "test", ownerId: ownerIdForUrl });
         setLiveOutput(null);
         setListeningNodeId(nodeId);
+        startRun?.(nodeId);
         window.open(url, "_blank", "noopener,noreferrer");
         toast.message(tRegistry("form_execute_listening"));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : tExecute("failed"));
       }
     },
-    [ensureFormTrigger, nodes, resolvedOwnerId, tExecute, tRegistry, workflowId],
+    [ensureFormTrigger, nodes, resolvedOwnerId, startRun, tExecute, tRegistry, workflowId],
   );
 
   const startWebhookListen = useCallback(
@@ -306,12 +308,13 @@ export function useWorkflowExecuteEntry({
         await ensureWebhookTrigger(node);
         setLiveOutput(null);
         setListeningNodeId(nodeId);
+        startRun?.(nodeId);
         toast.message(tEditor("webhook_execute_listening"));
       } catch (error) {
         toast.error(error instanceof Error ? error.message : tExecute("failed"));
       }
     },
-    [ensureWebhookTrigger, nodes, tEditor, tExecute],
+    [ensureWebhookTrigger, nodes, startRun, tEditor, tExecute],
   );
 
   const executeFromEntry = useCallback(
