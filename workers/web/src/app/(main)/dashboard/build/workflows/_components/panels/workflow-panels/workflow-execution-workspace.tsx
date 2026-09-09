@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Copy, Download, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -209,6 +209,11 @@ function ExecutionSplit({
 }) {
   const t = useTranslations("WorkflowEditorPage");
   const [ioCollapsed, setIoCollapsed] = useState(false);
+  const [showInput, setShowInput] = useState(true);
+  const [showOutput, setShowOutput] = useState(true);
+  const [syncWithCanvas, setSyncWithCanvas] = useState(true);
+  const [poppedOut, setPoppedOut] = useState(false);
+  const [canvasNodeId, setCanvasNodeId] = useState<string | null>(null);
   const graphNodes = (graphDefinition?.nodes ?? []).map((n) => ({
     id: n.id,
     type: n.type ?? "core",
@@ -216,14 +221,55 @@ function ExecutionSplit({
     data: n.data ?? {},
   }));
   const hasGraph = Boolean(graphDefinition && graphDefinition.nodes.length > 0);
+  const layoutCollapsed = ioCollapsed || poppedOut;
+  const graphSelectedId = syncWithCanvas ? selectedNodeId : canvasNodeId;
+
+  useEffect(() => {
+    setCanvasNodeId(null);
+  }, [selected.executionKey]);
+
+  const onGraphSelect = (nodeId: string | null) => {
+    if (syncWithCanvas) onSelectNode(nodeId);
+    else setCanvasNodeId(nodeId);
+  };
+
+  const onPanelSelect = (nodeId: string) => {
+    onSelectNode(nodeId);
+    if (syncWithCanvas) setCanvasNodeId(nodeId);
+  };
+
+  const ioPanel = (
+    <WorkflowExecutionIoPanel
+      steps={selected.steps}
+      nodes={graphNodes}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={onPanelSelect}
+      collapsed={ioCollapsed && !poppedOut}
+      onCollapsedChange={(next) => {
+        setIoCollapsed(next);
+        if (next) setPoppedOut(false);
+      }}
+      showInput={showInput}
+      showOutput={showOutput}
+      onShowInputChange={setShowInput}
+      onShowOutputChange={setShowOutput}
+      syncWithCanvas={syncWithCanvas}
+      onSyncWithCanvasChange={setSyncWithCanvas}
+      poppedOut={poppedOut}
+      onPoppedOutChange={(next) => {
+        setPoppedOut(next);
+        if (next) setIoCollapsed(false);
+      }}
+    />
+  );
 
   return (
     <>
-      <ResizablePanelGroup direction="vertical" className="h-full min-h-0 flex-1">
+      <ResizablePanelGroup direction="vertical" className="min-h-0 flex-1">
         <ResizablePanel
           id="graph"
           order={1}
-          defaultSize={ioCollapsed ? 100 : 62}
+          defaultSize={layoutCollapsed ? 100 : 62}
           minSize={28}
           className={workflowResizePanelClassName}
         >
@@ -233,9 +279,9 @@ function ExecutionSplit({
               executionKey={selected.executionKey}
               definition={graphDefinition}
               steps={selected.steps}
-              selectedNodeId={selectedNodeId}
+              selectedNodeId={graphSelectedId}
               running={selected.status === "running"}
-              onSelectNode={onSelectNode}
+              onSelectNode={onGraphSelect}
             />
           ) : (
             <div className="flex h-full items-center justify-center p-6">
@@ -243,30 +289,15 @@ function ExecutionSplit({
             </div>
           )}
         </ResizablePanel>
-        {ioCollapsed ? null : <WorkflowResizeHandle />}
-        {ioCollapsed ? null : (
+        {layoutCollapsed ? null : <WorkflowResizeHandle />}
+        {layoutCollapsed ? null : (
           <ResizablePanel id="io" order={2} defaultSize={38} minSize={18} className={workflowResizePanelClassName}>
-            <WorkflowExecutionIoPanel
-              steps={selected.steps}
-              nodes={graphNodes}
-              selectedNodeId={selectedNodeId}
-              onSelectNode={onSelectNode}
-              collapsed={false}
-              onCollapsedChange={setIoCollapsed}
-            />
+            {ioPanel}
           </ResizablePanel>
         )}
       </ResizablePanelGroup>
-      {ioCollapsed ? (
-        <WorkflowExecutionIoPanel
-          steps={selected.steps}
-          nodes={graphNodes}
-          selectedNodeId={selectedNodeId}
-          onSelectNode={onSelectNode}
-          collapsed
-          onCollapsedChange={setIoCollapsed}
-        />
-      ) : null}
+      {ioCollapsed && !poppedOut ? ioPanel : null}
+      {poppedOut ? ioPanel : null}
     </>
   );
 }

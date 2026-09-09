@@ -340,6 +340,24 @@ export function useWorkflowCanvasState(
     applyNodeTransform(clearNodeSelection, false);
   }, [applyNodeTransform]);
 
+  const selectNodeById = useCallback(
+    (nodeId: string) => {
+      setNodes((nds) => {
+        let changed = false;
+        const next = nds.map((node) => {
+          const selected = node.id === nodeId;
+          if (node.selected === selected) return node;
+          changed = true;
+          return { ...node, selected };
+        });
+        if (!changed) return nds;
+        nodesRef.current = next;
+        return next;
+      });
+    },
+    [setNodes],
+  );
+
   const onNodeMenuAction = useCallback(
     (nodeId: string, action: string) => {
       if (readOnly) return;
@@ -469,5 +487,6 @@ export function useWorkflowCanvasState(
     ungroupSelectedNodes,
     selectAllNodesOnCanvas,
     clearSelectionOnCanvas,
+    selectNodeById,
   };
 }

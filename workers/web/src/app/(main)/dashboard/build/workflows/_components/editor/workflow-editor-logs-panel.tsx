@@ -1,18 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import type { Node } from "@xyflow/react";
-import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
 import { getWorkflowExecution, listWorkflowExecutions } from "../../_lib/api";
 import { WorkflowExecutionIoPanel } from "../panels/workflow-panels/workflow-execution-io-panel";
+import { WorkflowIoPanelPopout } from "../panels/workflow-panels/workflow-io-panel-popout";
+import { WorkflowIoPanelToolbar } from "../panels/workflow-panels/workflow-io-panel-toolbar";
 import { parseDefinitionJson } from "../panels/workflow-panels/workflow-execution-utils";
 
 import { workflowEditorLogsStore } from "./workflow-editor-logs-store";
+
+let consumedOpenWorkflowId: number | null = null;
+let consumedOpenGeneration = 0;
+
+function consumeOpenGeneration(workflowId: number, openGeneration: number): boolean {
+  if (consumedOpenWorkflowId !== workflowId) {
+    consumedOpenWorkflowId = workflowId;
+    consumedOpenGeneration = 0;
+  }
+  if (openGeneration <= consumedOpenGeneration) return false;
+  consumedOpenGeneration = openGeneration;
+  return true;
+}
 
 interface WorkflowEditorLogsPanelProps {
   open: boolean;
@@ -47,20 +62,20 @@ export function WorkflowEditorLogsPanel({
     workflowEditorLogsStore.getState,
     workflowEditorLogsStore.getState,
   );
-  const lastOpenGeneration = useRef(0);
   const belongsToWorkflow = logs.workflowId === workflowId;
   const steps = belongsToWorkflow ? logs.steps : [];
   const running = belongsToWorkflow && logs.running;
   const selectedNodeId = belongsToWorkflow ? logs.selectedNodeId : null;
   const nodes = useMemo(() => graphNodesFromDefinition(definitionJson), [definitionJson]);
   const hasData = steps.length > 0;
+  const poppedOut = logs.poppedOut;
+  const showBody = open || poppedOut;
 
   useEffect(() => {
     if (!belongsToWorkflow) return;
-    if (logs.openGeneration <= lastOpenGeneration.current) return;
-    lastOpenGeneration.current = logs.openGeneration;
-    onOpenChange(true);
-  }, [belongsToWorkflow, logs.openGeneration, onOpenChange]);
+    if (!consumeOpenGeneration(workflowId, logs.openGeneration)) return;
+    if (!workflowEditorLogsStore.getState().poppedOut) onOpenChange(true);
+  }, [belongsToWorkflow, logs.openGeneration, onOpenChange, workflowId]);
 
   useEffect(() => {
     if (!workflowId) return;
@@ -85,27 +100,46 @@ export function WorkflowEditorLogsPanel({
     };
   }, [workflowId]);
 
-  return (
+  const panel = (
     <div
       className={cn(
         "border-border bg-background min-w-0 w-full overflow-hidden",
-        fill ? "flex h-full min-h-0 flex-col" : "shrink-0 border-t",
+        poppedOut || fill ? "flex h-full min-h-0 flex-col" : "shrink-0 border-t",
         className,
       )}
     >
-      <div className="flex h-9 shrink-0 items-center justify-between px-3">
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs font-medium transition-colors"
-          onClick={() => onOpenChange(!open)}
-        >
-          {open ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
-          {t("logs_title")}
+      <div className={cn("flex h-9 shrink-0 items-center gap-2 px-3", showBody && "border-b")}>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="text-xs font-medium">{t("logs_title")}</span>
           {running ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
-        </button>
+        </div>
+        <div className="ml-auto">
+          <WorkflowIoPanelToolbar
+            showInput={logs.showInput}
+            showOutput={logs.showOutput}
+            onShowInputChange={workflowEditorLogsStore.setShowInput}
+            onShowOutputChange={workflowEditorLogsStore.setShowOutput}
+            syncWithCanvas={logs.syncWithCanvas}
+            onSyncWithCanvasChange={workflowEditorLogsStore.setSyncWithCanvas}
+            poppedOut={poppedOut}
+            onPoppedOutChange={(next) => {
+              workflowEditorLogsStore.setPoppedOut(next);
+              onOpenChange(next ? false : true);
+            }}
+            collapsed={!open && !poppedOut}
+            onCollapsedChange={() => {
+              if (poppedOut) {
+                workflowEditorLogsStore.setPoppedOut(false);
+                onOpenChange(false);
+                return;
+              }
+              onOpenChange(!open);
+            }}
+          />
+        </div>
       </div>
-      {open ? (
-        <div className={cn("min-h-0 min-w-0 overflow-hidden border-t", fill ? "flex-1" : hasData ? "h-80" : "h-28")}>
+      {showBody ? (
+        <div className={cn("min-h-0 min-w-0 overflow-hidden", poppedOut || fill ? "flex-1" : hasData ? "h-80" : "h-28")}>
           {hasData ? (
             <WorkflowExecutionIoPanel
               hideHeader
@@ -113,6 +147,8 @@ export function WorkflowEditorLogsPanel({
               nodes={nodes}
               selectedNodeId={selectedNodeId}
               onSelectNode={workflowEditorLogsStore.selectNode}
+              showInput={logs.showInput}
+              showOutput={logs.showOutput}
             />
           ) : (
             <div className="text-muted-foreground flex h-full items-center justify-center px-4 text-center text-sm">
@@ -123,4 +159,21 @@ export function WorkflowEditorLogsPanel({
       ) : null}
     </div>
   );
+
+  if (poppedOut) {
+    return (
+      <WorkflowIoPanelPopout
+        open
+        title={t("logs_title")}
+        onClose={() => {
+          workflowEditorLogsStore.setPoppedOut(false);
+          onOpenChange(true);
+        }}
+      >
+        {panel}
+      </WorkflowIoPanelPopout>
+    );
+  }
+
+  return panel;
 }

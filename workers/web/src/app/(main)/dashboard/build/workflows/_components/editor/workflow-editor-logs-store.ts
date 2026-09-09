@@ -6,6 +6,17 @@ export type WorkflowEditorLogsState = {
   steps: ExecutionStepLog[];
   selectedNodeId: string | null;
   openGeneration: number;
+  showInput: boolean;
+  showOutput: boolean;
+  syncWithCanvas: boolean;
+  poppedOut: boolean;
+};
+
+const PREFS = {
+  showInput: true,
+  showOutput: true,
+  syncWithCanvas: true,
+  poppedOut: false,
 };
 
 const INITIAL: WorkflowEditorLogsState = {
@@ -14,6 +25,7 @@ const INITIAL: WorkflowEditorLogsState = {
   steps: [],
   selectedNodeId: null,
   openGeneration: 0,
+  ...PREFS,
 };
 
 let state: WorkflowEditorLogsState = INITIAL;
@@ -21,6 +33,15 @@ const listeners = new Set<() => void>();
 
 function emit() {
   listeners.forEach((listener) => listener());
+}
+
+function prefsOf(current: WorkflowEditorLogsState) {
+  return {
+    showInput: current.showInput,
+    showOutput: current.showOutput,
+    syncWithCanvas: current.syncWithCanvas,
+    poppedOut: current.poppedOut,
+  };
 }
 
 function pickSelected(steps: ExecutionStepLog[], prev: string | null): string | null {
@@ -37,12 +58,14 @@ export const workflowEditorLogsStore = {
 
   subscribe: (listener: () => void) => {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => {
+      listeners.delete(listener);
+    };
   },
 
   bindWorkflow: (workflowId: number) => {
     if (state.workflowId === workflowId) return;
-    state = { ...INITIAL, workflowId };
+    state = { ...INITIAL, workflowId, ...prefsOf(state) };
     emit();
   },
 
@@ -53,6 +76,7 @@ export const workflowEditorLogsStore = {
       steps: [],
       selectedNodeId: nodeId,
       openGeneration: state.openGeneration + 1,
+      ...prefsOf(state),
     };
     emit();
   },
@@ -66,6 +90,7 @@ export const workflowEditorLogsStore = {
       steps: nextSteps,
       selectedNodeId: pickSelected(nextSteps, state.selectedNodeId),
       openGeneration: steps?.length ? state.openGeneration + 1 : state.openGeneration,
+      ...prefsOf(state),
     };
     emit();
   },
@@ -73,6 +98,30 @@ export const workflowEditorLogsStore = {
   selectNode: (nodeId: string) => {
     if (state.selectedNodeId === nodeId) return;
     state = { ...state, selectedNodeId: nodeId };
+    emit();
+  },
+
+  setShowInput: (showInput: boolean) => {
+    if (state.showInput === showInput) return;
+    state = { ...state, showInput };
+    emit();
+  },
+
+  setShowOutput: (showOutput: boolean) => {
+    if (state.showOutput === showOutput) return;
+    state = { ...state, showOutput };
+    emit();
+  },
+
+  setSyncWithCanvas: (syncWithCanvas: boolean) => {
+    if (state.syncWithCanvas === syncWithCanvas) return;
+    state = { ...state, syncWithCanvas };
+    emit();
+  },
+
+  setPoppedOut: (poppedOut: boolean) => {
+    if (state.poppedOut === poppedOut) return;
+    state = { ...state, poppedOut };
     emit();
   },
 
@@ -86,6 +135,7 @@ export const workflowEditorLogsStore = {
       steps,
       selectedNodeId: pickSelected(steps, state.selectedNodeId),
       openGeneration: state.openGeneration + 1,
+      ...prefsOf(state),
     };
     emit();
   },

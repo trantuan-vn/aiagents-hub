@@ -195,7 +195,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         </div>
       ) : (
         <>
-          <ResizablePanelGroup direction="vertical" className="h-full min-h-0 min-w-0 flex-1">
+          <ResizablePanelGroup direction="vertical" className="min-h-0 min-w-0 flex-1">
             <ResizablePanel id="canvas" order={1} defaultSize={72} minSize={28} className={workflowResizePanelClassName}>
               <WorkflowEditorShellWorkspace
                 readOnly={readOnly}

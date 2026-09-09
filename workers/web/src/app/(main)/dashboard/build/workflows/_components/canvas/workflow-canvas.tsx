@@ -105,6 +105,7 @@ function CanvasInner({
     ungroupSelectedNodes,
     selectAllNodesOnCanvas,
     clearSelectionOnCanvas,
+    selectNodeById,
   } = useWorkflowCanvasState(initial, onChange, readOnly, serviceEndpoint, definitionSyncKey, workflowId);
 
   const interactionProps = useMemo(
@@ -169,6 +170,7 @@ function CanvasInner({
       ungroupSelectedNodes={ungroupSelectedNodes}
       selectAllNodesOnCanvas={selectAllNodesOnCanvas}
       clearSelectionOnCanvas={clearSelectionOnCanvas}
+      selectNodeById={selectNodeById}
     />
   );
 }
@@ -196,6 +198,7 @@ function CanvasInnerWithDrawerUi({
   ungroupSelectedNodes,
   selectAllNodesOnCanvas,
   clearSelectionOnCanvas,
+  selectNodeById,
 }: {
   className?: string;
   themeMode: "light" | "dark" | "system";
@@ -219,6 +222,7 @@ function CanvasInnerWithDrawerUi({
   ungroupSelectedNodes: ReturnType<typeof useWorkflowCanvasState>["ungroupSelectedNodes"];
   selectAllNodesOnCanvas: ReturnType<typeof useWorkflowCanvasState>["selectAllNodesOnCanvas"];
   clearSelectionOnCanvas: ReturnType<typeof useWorkflowCanvasState>["clearSelectionOnCanvas"];
+  selectNodeById: ReturnType<typeof useWorkflowCanvasState>["selectNodeById"];
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
@@ -261,6 +265,19 @@ function CanvasInnerWithDrawerUi({
   useEffect(() => {
     if (workflowId) workflowEditorLogsStore.bindWorkflow(workflowId);
   }, [workflowId]);
+
+  useEffect(() => {
+    const apply = () => {
+      const { selectedNodeId, syncWithCanvas } = workflowEditorLogsStore.getState();
+      if (!syncWithCanvas || !selectedNodeId) return;
+      selectNodeById(selectedNodeId);
+    };
+    apply();
+    const unsubscribe = workflowEditorLogsStore.subscribe(apply);
+    return () => {
+      unsubscribe();
+    };
+  }, [selectNodeById]);
 
   const executionUi = useMemo(
     () => ({
@@ -439,7 +456,9 @@ const CanvasSurface = memo(function CanvasSurface({
   const onNodeClick = useCallback(
     (_event: React.MouseEvent, node: Node) => {
       dismissListeningOverlay();
-      onSelectLogNode?.(node.id);
+      if (workflowEditorLogsStore.getState().syncWithCanvas) {
+        onSelectLogNode?.(node.id);
+      }
     },
     [dismissListeningOverlay, onSelectLogNode],
   );
