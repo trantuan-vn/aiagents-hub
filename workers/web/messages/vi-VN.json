@@ -2684,6 +2684,8 @@
     "executions_view_json": "JSON",
     "executions_view_table": "Bảng",
     "executions_search_data": "Tìm trong dữ liệu…",
+    "executions_search_data_shortcut": "Tìm (⌘+F)",
+    "executions_item_count": "{count, plural, one {# mục} other {# mục}}",
     "executions_no_data": "Không có dữ liệu",
     "executions_node_not_run": "Node này không chạy trong lần thực thi này.",
     "executions_select_node": "Chọn một node để xem input và output.",

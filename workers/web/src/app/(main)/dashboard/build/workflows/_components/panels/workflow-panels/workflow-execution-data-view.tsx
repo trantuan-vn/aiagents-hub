@@ -1,20 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Braces, ChevronDown, Hash, List, Table2, Type } from "lucide-react";
+import { Braces, ChevronDown, Hash, List, Search, Table2, Type } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import {
+  countItems,
   flattenFields,
   previewValue,
   schemaKind,
   type IoViewMode,
   type SchemaValueKind,
 } from "./workflow-execution-utils";
+
+const VIEW_MODES = [
+  ["schema", List, "executions_view_schema"],
+  ["table", Table2, "executions_view_table"],
+  ["json", Braces, "executions_view_json"],
+] as const;
 
 function KindIcon({ kind }: { kind: SchemaValueKind }) {
   const className = "size-3 shrink-0";
@@ -233,6 +240,111 @@ function TableView({ value, query }: { value: unknown; query: string }) {
   );
 }
 
+function DataPaneHeader({
+  title,
+  mode,
+  onModeChange,
+  query,
+  onQueryChange,
+  searchOpen,
+  onSearchOpenChange,
+  itemCount,
+}: {
+  title: string;
+  mode: IoViewMode;
+  onModeChange: (mode: IoViewMode) => void;
+  query: string;
+  onQueryChange: (query: string) => void;
+  searchOpen: boolean;
+  onSearchOpenChange: (open: boolean) => void;
+  itemCount: number;
+}) {
+  const t = useTranslations("WorkflowEditorPage");
+  const searchRootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!searchOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (searchRootRef.current?.contains(target)) return;
+      onSearchOpenChange(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [onSearchOpenChange, searchOpen]);
+
+  return (
+    <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
+      <p className="shrink-0 text-[11px] font-semibold tracking-wide uppercase">{title}</p>
+      {searchOpen ? (
+        <div ref={searchRootRef} className="relative min-w-[8rem] flex-1">
+          <Search
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2"
+            aria-hidden
+          />
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => onQueryChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape") return;
+              e.preventDefault();
+              e.stopPropagation();
+              onQueryChange("");
+              onSearchOpenChange(false);
+            }}
+            placeholder={t("executions_search_data_shortcut")}
+            className="h-7 rounded-full border-border bg-background pl-8 text-xs shadow-none focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-foreground/15"
+            aria-label={t("executions_search_data")}
+          />
+        </div>
+      ) : (
+        <div className="min-w-0 flex-1" />
+      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        {searchOpen ? null : (
+          <button
+            type="button"
+            title={t("executions_search_data")}
+            aria-label={t("executions_search_data")}
+            onClick={() => onSearchOpenChange(true)}
+            className={cn(
+              "text-muted-foreground hover:text-foreground flex size-6 items-center justify-center rounded-md",
+              query.trim() && "text-foreground",
+            )}
+          >
+            <Search className="size-3.5" aria-hidden />
+          </button>
+        )}
+        <div className="bg-muted flex items-center rounded-lg p-0.5">
+          {VIEW_MODES.map(([id, Icon, labelKey]) => (
+            <button
+              key={id}
+              type="button"
+              title={t(labelKey)}
+              aria-label={t(labelKey)}
+              aria-pressed={mode === id}
+              onClick={() => onModeChange(id)}
+              className={cn(
+                "flex size-6 items-center justify-center rounded-md transition-colors",
+                mode === id
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden />
+            </button>
+          ))}
+        </div>
+        <span className="text-muted-foreground text-[11px] whitespace-nowrap">
+          {t("executions_item_count", { count: itemCount })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function WorkflowExecutionDataPane({
   title,
   value,
@@ -242,9 +354,10 @@ export function WorkflowExecutionDataPane({
   value: unknown;
   emptyLabel: string;
 }) {
-  const t = useTranslations("WorkflowEditorPage");
   const [mode, setMode] = useState<IoViewMode>("schema");
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const paneRef = useRef<HTMLDivElement>(null);
   const json = useMemo(() => {
     if (value == null) return "";
     if (typeof value === "string") return value;
@@ -256,42 +369,46 @@ export function WorkflowExecutionDataPane({
   }, [value]);
 
   const empty = value == null || value === "" || (typeof value === "object" && Object.keys(value).length === 0);
+  const itemCount = useMemo(() => countItems(value), [value]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "f") return;
+      const pane = paneRef.current;
+      if (!pane?.contains(document.activeElement)) return;
+      event.preventDefault();
+      setSearchOpen(true);
+      requestAnimationFrame(() => {
+        const input = pane.querySelector("input");
+        input?.focus();
+        input?.select();
+      });
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <div className="flex shrink-0 items-center gap-2 border-b px-3 py-1.5">
-        <p className="text-[11px] font-semibold tracking-wide uppercase">{title}</p>
-        <div className="ml-auto flex items-center gap-0.5">
-          {(
-            [
-              ["schema", List, t("executions_view_schema")],
-              ["json", Braces, t("executions_view_json")],
-              ["table", Table2, t("executions_view_table")],
-            ] as const
-          ).map(([id, Icon, label]) => (
-            <button
-              key={id}
-              type="button"
-              title={label}
-              onClick={() => setMode(id)}
-              className={cn(
-                "text-muted-foreground hover:bg-muted hover:text-foreground flex size-6 items-center justify-center rounded",
-                mode === id && "bg-muted text-foreground",
-              )}
-            >
-              <Icon className="size-3.5" aria-hidden />
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="shrink-0 border-b px-2 py-1.5">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("executions_search_data")}
-          className="h-7 text-xs"
-        />
-      </div>
+    <div
+      ref={paneRef}
+      tabIndex={-1}
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden outline-none"
+      onPointerDown={(event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement) || target.closest("input, textarea")) return;
+        paneRef.current?.focus({ preventScroll: true });
+      }}
+    >
+      <DataPaneHeader
+        title={title}
+        mode={mode}
+        onModeChange={setMode}
+        query={query}
+        onQueryChange={setQuery}
+        searchOpen={searchOpen}
+        onSearchOpenChange={setSearchOpen}
+        itemCount={itemCount}
+      />
       <div className="min-h-0 flex-1 overflow-auto">
         <DataPaneBody empty={empty} emptyLabel={emptyLabel} mode={mode} value={value} query={query} json={json} />
       </div>
