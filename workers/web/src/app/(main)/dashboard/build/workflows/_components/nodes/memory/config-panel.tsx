@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 import { Database } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -20,11 +20,9 @@ import {
 import { NodeOutputPanel } from "../../panels/node-config/node-output-panel";
 import type { NodeConfigPanelProps } from "../types";
 
-const METRIC_OPTIONS = [
-  { value: "cosine", labelKey: "metric_cosine" },
-  { value: "euclidean", labelKey: "metric_euclidean" },
-  { value: "dot-product", labelKey: "metric_dot_product" },
-] as const;
+/** Matches the shared `ask-ai-semantic` Vectorize index (BGE-base embeddings). */
+const INDEX_DIMENSIONS = 768;
+const INDEX_METRIC = "cosine";
 
 function ReadOnlyField({
   label,
@@ -44,6 +42,17 @@ function ReadOnlyField({
   );
 }
 
+function connectedHostLabels(nodeId: string, nodes: Node[], edges: Edge[]): string[] {
+  return edges
+    .filter((e) => e.source === nodeId && e.sourceHandle === "memory" && e.targetHandle === "memory")
+    .map((e) => nodes.find((n) => n.id === e.target))
+    .filter((n): n is Node => n != null)
+    .map((n) => {
+      const data = (n.data ?? {}) as Record<string, unknown>;
+      return String(data.label ?? n.id);
+    });
+}
+
 export type VectorizeNodeConfigPanelProps = NodeConfigPanelProps;
 
 export function isVectorizeMemoryNode(node: Node): boolean {
@@ -54,6 +63,8 @@ export function isVectorizeMemoryNode(node: Node): boolean {
 
 export function VectorizeNodeConfigPanel({
   node,
+  nodes = [],
+  edges = [],
   workflowId,
   onClose,
   onPatchData,
@@ -66,9 +77,9 @@ export function VectorizeNodeConfigPanel({
     typeof nodeData.collection === "string" ? nodeData.collection : undefined,
   );
   const namespace = String(nodeData.namespace ?? buildVectorizeNodeScope(workflowId, node.id));
-  const dimensions = Number(nodeData.dimensions ?? 768);
-  const metric = String(nodeData.metric ?? "cosine");
+  const dimensions = INDEX_DIMENSIONS;
   const label = String(nodeData.label ?? te("node_vectorize"));
+  const hosts = useMemo(() => connectedHostLabels(node.id, nodes, edges), [node.id, nodes, edges]);
 
   const patch = useCallback(
     (fields: Record<string, unknown>) => onPatchData(node.id, fields),
@@ -83,8 +94,10 @@ export function VectorizeNodeConfigPanel({
     const updates: Record<string, unknown> = {};
     if (nodeData.namespace !== expectedNamespace) updates.namespace = expectedNamespace;
     if (nodeData.collection !== expectedCollection) updates.collection = expectedCollection;
+    if (Number(nodeData.dimensions) !== INDEX_DIMENSIONS) updates.dimensions = INDEX_DIMENSIONS;
+    if (String(nodeData.metric ?? "") !== INDEX_METRIC) updates.metric = INDEX_METRIC;
     if (Object.keys(updates).length) patch(updates);
-  }, [node.id, nodeData.collection, nodeData.namespace, patch, workflowId]);
+  }, [node.id, nodeData.collection, nodeData.dimensions, nodeData.metric, nodeData.namespace, patch, workflowId]);
 
   const selectedIndex = VECTORIZE_INDEX_OPTIONS.find((opt) => opt.binding === collection) ?? VECTORIZE_INDEX_OPTIONS[0];
 
@@ -162,31 +175,23 @@ export function VectorizeNodeConfigPanel({
                   value={namespace}
                 />
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">{t("field_dimensions")}</Label>
-                  <Input
-                    type="number"
-                    value={String(dimensions)}
-                    className="h-9 text-xs"
-                    onChange={(e) => patch({ dimensions: Number(e.target.value) })}
-                  />
-                </div>
+                <ReadOnlyField
+                  label={t("field_dimensions")}
+                  description={t("field_vectorize_dimensions_desc")}
+                  value={String(dimensions)}
+                />
 
-                <div className="space-y-1.5">
-                  <Label className="text-xs">{t("field_metric")}</Label>
-                  <Select value={metric} onValueChange={(v) => patch({ metric: v })}>
-                    <SelectTrigger className="h-9 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {METRIC_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {t(opt.labelKey)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <ReadOnlyField
+                  label={t("field_metric")}
+                  description={t("field_vectorize_metric_desc")}
+                  value={t("metric_cosine")}
+                />
+
+                <ReadOnlyField
+                  label={t("field_vectorize_connected")}
+                  description={t("field_vectorize_connected_desc")}
+                  value={hosts.length ? hosts.join(", ") : t("field_vectorize_connected_empty")}
+                />
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">{t("field_label")}</Label>

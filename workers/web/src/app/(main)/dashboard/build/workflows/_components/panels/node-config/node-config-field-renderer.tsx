@@ -43,7 +43,9 @@ export function NodeConfigFieldRenderer({ field, value, onChange }: NodeConfigFi
         ? String(value ?? "VECTORIZE")
         : field.id === "namespace"
           ? String(value ?? "")
-          : null;
+          : field.id === "dimensions" || field.id === "metric"
+            ? String(value ?? field.defaultValue ?? "")
+            : null;
     return (
       <div className="bg-muted/50 rounded-md border px-3 py-2 text-xs">
         <p className="font-medium">{label(field.labelKey)}</p>

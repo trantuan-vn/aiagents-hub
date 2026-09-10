@@ -242,6 +242,70 @@ describe('executeGetRag', () => {
     expect(billingMock.billEmbeddingUsage).toHaveBeenCalled();
     expect(onCost).toHaveBeenCalledWith(0.000001);
   });
+
+  it('uses the service and Vectorize memory connected on the Get RAG node', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const aiRun = vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] });
+    const env = {
+      AI: { run: aiRun },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const wired: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 3 },
+        },
+        {
+          id: 'svc_embed',
+          type: 'service_node',
+          position: { x: 0, y: 0 },
+          data: { endpoint: 'https://ai.example/embed', serviceEndpoint: 'https://ai.example/embed' },
+        },
+        {
+          id: 'mem_kb',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: { memoryKind: 'vectorize', collection: 'VECTORIZE', namespace: 'rag-ns' },
+        },
+      ],
+      edges: [
+        { id: 'e-svc', source: 'svc_embed', target: 'tool_get', sourceHandle: 'service', targetHandle: 'service' },
+        { id: 'e-mem', source: 'mem_kb', target: 'tool_get', sourceHandle: 'memory', targetHandle: 'memory' },
+      ],
+    };
+
+    billingMock.resolveServiceByEndpoint.mockResolvedValue({
+      catalogId: 'bge-large',
+      embedModel: '@cf/baai/bge-large-en-v1.5',
+      approvalStatus: 'approved',
+    });
+
+    await executeGetRag({
+      env,
+      definition: wired,
+      agentId: 'tool_get',
+      input: { query: 'orders last month' },
+      userDO: {} as NodeContext['userDO'],
+    });
+
+    expect(billingMock.resolveServiceByEndpoint).toHaveBeenCalledWith(
+      expect.anything(),
+      'https://ai.example/embed',
+    );
+    expect(aiRun).toHaveBeenCalledWith(
+      '@cf/baai/bge-large-en-v1.5',
+      { text: 'orders last month' },
+      { gateway: { id: 'unitoken' } },
+    );
+    expect(query).toHaveBeenCalledWith(
+      [0.1, 0.2],
+      expect.objectContaining({ filter: { namespace: 'rag-ns' } }),
+    );
+  });
 });
 
 describe('executeGetRagPipeline', () => {

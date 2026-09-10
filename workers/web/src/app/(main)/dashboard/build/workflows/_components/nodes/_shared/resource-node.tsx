@@ -31,6 +31,7 @@ export function ResourceNode({
         accentClass={handleAccent}
         shape="diamond"
         showAddNode={false}
+        allowMultipleConnections
       />
       <div className="flex items-center justify-center gap-2 font-medium">
         <Icon className="h-4 w-4 shrink-0 opacity-80" />

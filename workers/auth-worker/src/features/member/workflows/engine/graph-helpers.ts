@@ -195,6 +195,8 @@ export interface AgentResourceContext {
   memoryKind?: string;
   memoryNamespace?: string;
   memoryNodeId?: string;
+  memoryDimensions?: number;
+  memoryMetric?: string;
   tools: Array<Record<string, unknown>>;
 }
 
@@ -211,6 +213,8 @@ export function resolveAgentResources(
   let memoryKind: string | undefined;
   let memoryNamespace: string | undefined;
   let memoryNodeId: string | undefined;
+  let memoryDimensions: number | undefined;
+  let memoryMetric: string | undefined;
 
   for (const edge of definition.edges) {
     if (edge.target !== agentId || !edge.targetHandle) continue;
@@ -232,6 +236,10 @@ export function resolveAgentResources(
       memoryNodeId = source.id;
       memoryKind = String(data.memoryKind ?? 'vectorize');
       memoryCollection = String(data.collection ?? data.memoryCollection ?? 'VECTORIZE');
+      const dims = Number(data.dimensions);
+      if (Number.isFinite(dims) && dims > 0) memoryDimensions = dims;
+      const metric = String(data.metric ?? '').trim();
+      if (metric) memoryMetric = metric;
       const configuredNamespace = String(data.namespace ?? '').trim();
       if (scope?.ownerId && scope.workflowId) {
         memoryNamespace = resolveVectorizeScope(
@@ -255,5 +263,15 @@ export function resolveAgentResources(
     }
   }
 
-  return { serviceEndpoint, serviceOptions, memoryCollection, memoryKind, memoryNamespace, memoryNodeId, tools };
+  return {
+    serviceEndpoint,
+    serviceOptions,
+    memoryCollection,
+    memoryKind,
+    memoryNamespace,
+    memoryNodeId,
+    memoryDimensions,
+    memoryMetric,
+    tools,
+  };
 }

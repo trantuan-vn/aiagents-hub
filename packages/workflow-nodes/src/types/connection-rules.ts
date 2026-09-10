@@ -2,6 +2,11 @@ import type { WorkflowNodeDefinition } from "./node-definition";
 import type { GraphNode } from "./graph";
 
 const RESOURCE_HANDLES = new Set(["service", "memory", "tools"]);
+const RESOURCE_NODE_HANDLE: Record<string, string> = {
+  service_node: "service",
+  memory_node: "memory",
+  tool_node: "tools",
+};
 const BRANCH_SOURCE_HANDLES = new Set(["out", "true", "false", "default", "loop", "done"]);
 
 function isBranchSourceHandle(handle: string | null | undefined): boolean {
@@ -10,12 +15,33 @@ function isBranchSourceHandle(handle: string | null | undefined): boolean {
   return /^case_\d+$/.test(handle);
 }
 
+const RAG_TOOL_KINDS = new Set(["save-rag", "get-rag"]);
+
+function nodeData(node: GraphNode): Record<string, unknown> {
+  return (node.data ?? {}) as Record<string, unknown>;
+}
+
 function resolveNodeKind(node: GraphNode): string | undefined {
-  const data = node.data ?? {};
+  const data = nodeData(node);
   if (typeof data.coreKind === "string") return data.coreKind;
   if (typeof data.flowKind === "string") return data.flowKind;
   if (typeof data.triggerKind === "string") return data.triggerKind;
+  if (typeof data.toolKind === "string") return data.toolKind;
+  if (typeof data.memoryKind === "string") return data.memoryKind;
   return undefined;
+}
+
+function isRagToolNode(node: GraphNode): boolean {
+  return node.type === "tool_node" && RAG_TOOL_KINDS.has(String(nodeData(node).toolKind ?? ""));
+}
+
+function isRagResourceHost(node: GraphNode): boolean {
+  return node.type === "agent" || isRagToolNode(node);
+}
+
+function isVectorizeMemoryNode(node: GraphNode): boolean {
+  if (node.type !== "memory_node") return false;
+  return String(nodeData(node).memoryKind ?? "vectorize") === "vectorize";
 }
 
 function getDefinition(
@@ -45,9 +71,19 @@ export function isValidWorkflowConnection(
     return isBranchSourceHandle(sourceHandle);
   }
 
-  // Resource wiring (service/memory/tools)
+  // Resource wiring (service/memory/tools) ↔ Agent or Get/Save RAG (either drag direction)
   if (sourceHandle === targetHandle && RESOURCE_HANDLES.has(sourceHandle)) {
-    return targetNode.type === "agent";
+    const forward =
+      isRagResourceHost(targetNode) && RESOURCE_NODE_HANDLE[sourceNode.type] === sourceHandle;
+    const reversed =
+      isRagResourceHost(sourceNode) && RESOURCE_NODE_HANDLE[targetNode.type] === targetHandle;
+    if (!forward && !reversed) return false;
+    const host = forward ? targetNode : sourceNode;
+    const resource = forward ? sourceNode : targetNode;
+    if (sourceHandle === "memory" && isRagToolNode(host) && !isVectorizeMemoryNode(resource)) {
+      return false;
+    }
+    return true;
   }
 
   const sourceDef = getDefinition(sourceNode, definitions);

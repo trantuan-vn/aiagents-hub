@@ -2,7 +2,7 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 
-import { Background, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
+import { Background, ConnectionMode, ReactFlow, ReactFlowProvider, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./workflow-canvas-theme.css";
 
@@ -500,6 +500,7 @@ const CanvasSurface = memo(function CanvasSurface({
         edgeTypes={workflowEdgeTypes}
         defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
         connectionRadius={28}
+        connectionMode={ConnectionMode.Loose}
         proOptions={{ hideAttribution: true }}
         panOnScroll
         onPaneClick={onPaneClick}

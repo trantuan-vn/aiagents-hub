@@ -42,7 +42,7 @@ export {
 } from './save-rag/pdf-extract.js';
 export type { PdfFileInput } from './save-rag/pdf-extract.js';
 
-export { resolveRagResources, resolveRagEmbedModel, toolNodeConfig } from './shared/rag-context.js';
+export { resolveRagResources, resolveRagEmbedModel, findRagToolNodeId, toolNodeConfig } from './shared/rag-context.js';
 export type { RagBilling, RagResourceContext } from './shared/rag-context.js';
 
 export { executeToolNode } from './execute.js';

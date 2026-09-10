@@ -24,6 +24,8 @@ function isBranchSourceHandle(handle: string): boolean {
 
 const SINGLE_CONNECTION_HANDLES = new Set<WorkflowHandleId>(["service", "memory"]);
 
+const RAG_TOOL_KINDS = new Set(["save-rag", "get-rag"]);
+
 /** Node type → resource handle it may connect through. */
 export const RESOURCE_NODE_HANDLE: Record<string, WorkflowHandleId> = {
   service_node: "service",
@@ -31,13 +33,28 @@ export const RESOURCE_NODE_HANDLE: Record<string, WorkflowHandleId> = {
   tool_node: "tools",
 };
 
+function nodeData(node: Node | undefined): Record<string, unknown> {
+  return (node?.data ?? {}) as Record<string, unknown>;
+}
+
+/** Get RAG / Save RAG — same service + memory resource hosts as Agent. */
+export function isRagToolNode(node: Node | undefined): boolean {
+  if (!node || node.type !== "tool_node") return false;
+  return RAG_TOOL_KINDS.has(String(nodeData(node).toolKind ?? ""));
+}
+
+export function isRagResourceHost(node: Node | undefined): boolean {
+  return node?.type === "agent" || isRagToolNode(node);
+}
+
+function isVectorizeMemoryNode(node: Node | undefined): boolean {
+  if (!node || node.type !== "memory_node") return false;
+  return String(nodeData(node).memoryKind ?? "vectorize") === "vectorize";
+}
+
 export function isResourceEdge(edge: Pick<Edge, "sourceHandle" | "targetHandle">): boolean {
   const handle = edge.sourceHandle ?? edge.targetHandle;
   return handle != null && RESOURCE_HANDLES.has(handle as WorkflowHandleId);
-}
-
-function nodeTypeForId(nodes: Node[], nodeId: string): string | undefined {
-  return nodes.find((n) => n.id === nodeId)?.type;
 }
 
 function resourceHandleForNodeType(nodeType: string | undefined): WorkflowHandleId | null {
@@ -49,34 +66,34 @@ function edgeId(connection: Connection | Edge): string | undefined {
   return "id" in connection ? connection.id : undefined;
 }
 
-function countAgentHandleConnections(
-  edges: Edge[],
-  agentId: string,
-  handleId: WorkflowHandleId,
-  excludeEdgeId?: string,
-): number {
-  return edges.filter(
-    (e) =>
-      e.id !== excludeEdgeId &&
-      e.target === agentId &&
-      e.targetHandle === handleId &&
-      RESOURCE_HANDLES.has(handleId),
-  ).length;
-}
+/** Resource nodes (service/memory/tools) are sources; Agent / RAG tools are targets. */
+export function normalizeResourceConnection<T extends Connection | Edge>(
+  connection: T,
+  nodes: Node[],
+): T {
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  const targetNode = nodes.find((n) => n.id === connection.target);
+  const sourceHandle = connection.sourceHandle ?? null;
+  const targetHandle = connection.targetHandle ?? null;
+  if (!sourceNode || !targetNode || !sourceHandle || !targetHandle) return connection;
+  if (sourceHandle !== targetHandle) return connection;
+  if (!RESOURCE_HANDLES.has(sourceHandle as WorkflowHandleId)) return connection;
 
-function countResourceNodeConnections(
-  edges: Edge[],
-  resourceNodeId: string,
-  handleId: WorkflowHandleId,
-  excludeEdgeId?: string,
-): number {
-  return edges.filter(
-    (e) =>
-      e.id !== excludeEdgeId &&
-      e.source === resourceNodeId &&
-      e.sourceHandle === handleId &&
-      RESOURCE_HANDLES.has(handleId),
-  ).length;
+  const alreadyResourceToHost =
+    resourceHandleForNodeType(sourceNode.type) === sourceHandle && isRagResourceHost(targetNode);
+  if (alreadyResourceToHost) return connection;
+
+  const reversedHostToResource =
+    isRagResourceHost(sourceNode) && resourceHandleForNodeType(targetNode.type) === targetHandle;
+  if (!reversedHostToResource) return connection;
+
+  return {
+    ...connection,
+    source: connection.target,
+    target: connection.source,
+    sourceHandle: connection.targetHandle,
+    targetHandle: connection.sourceHandle,
+  };
 }
 
 type ParsedWorkflowHandles = { kind: "flow" } | { kind: "resource"; handle: WorkflowHandleId };
@@ -102,36 +119,47 @@ function parseWorkflowConnectionHandles(
 function isValidResourceWorkflowConnection(
   connection: Connection | Edge,
   handle: WorkflowHandleId,
-  edges: Edge[],
   nodes: Node[],
 ): boolean {
-  const excludeId = edgeId(connection);
-  const sourceType = nodeTypeForId(nodes, connection.source);
-  const targetType = nodeTypeForId(nodes, connection.target);
+  const sourceNode = nodes.find((n) => n.id === connection.source);
+  const targetNode = nodes.find((n) => n.id === connection.target);
 
-  if (targetType !== "agent") return false;
+  if (!isRagResourceHost(targetNode)) return false;
 
-  const expectedSourceHandle = resourceHandleForNodeType(sourceType);
+  const expectedSourceHandle = resourceHandleForNodeType(sourceNode?.type);
   if (expectedSourceHandle !== handle) return false;
 
-  if (!SINGLE_CONNECTION_HANDLES.has(handle)) return true;
+  if (handle === "memory" && isRagToolNode(targetNode) && !isVectorizeMemoryNode(sourceNode)) {
+    return false;
+  }
 
-  if (countAgentHandleConnections(edges, connection.target, handle, excludeId) > 0) return false;
-  if (countResourceNodeConnections(edges, connection.source, handle, excludeId) > 0) return false;
-
+  // Service / memory: one incoming per host. A second drag replaces the existing edge in onConnect.
   return true;
 }
 
-/** Data flow uses out→in; resource handles connect when names match (resource node → agent). */
+/** Drop the existing service/memory edge on the host so a new Vectorize/service can take its place. */
+export function withoutReplacedResourceEdge(edges: Edge[], connection: Connection | Edge): Edge[] {
+  const handle = (connection.targetHandle ?? "") as WorkflowHandleId;
+  if (!SINGLE_CONNECTION_HANDLES.has(handle)) return edges;
+  const excludeId = edgeId(connection);
+  return edges.filter(
+    (e) =>
+      e.id === excludeId ||
+      !(e.target === connection.target && e.targetHandle === handle && RESOURCE_HANDLES.has(handle)),
+  );
+}
+
+/** Data flow uses out→in; resource handles connect when names match (resource → Agent / RAG tool). */
 export function isValidWorkflowConnection(
   connection: Connection | Edge,
-  edges: Edge[] = [],
+  _edges: Edge[] = [],
   nodes: Node[] = [],
 ): boolean {
-  const parsed = parseWorkflowConnectionHandles(connection);
+  const normalized = normalizeResourceConnection(connection, nodes);
+  const parsed = parseWorkflowConnectionHandles(normalized);
   if (!parsed) return false;
   if (parsed.kind === "flow") return true;
-  return isValidResourceWorkflowConnection(connection, parsed.handle, edges, nodes);
+  return isValidResourceWorkflowConnection(normalized, parsed.handle, nodes);
 }
 
 /** Data-flow edge (main or branch), excluding resource wiring. */

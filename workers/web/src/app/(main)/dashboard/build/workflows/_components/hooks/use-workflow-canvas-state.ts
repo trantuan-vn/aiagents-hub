@@ -12,7 +12,12 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 
-import { isResourceEdge, isValidWorkflowConnection } from "../edges/workflow-connection-utils";
+import {
+  isResourceEdge,
+  isValidWorkflowConnection,
+  normalizeResourceConnection,
+  withoutReplacedResourceEdge,
+} from "../edges/workflow-connection-utils";
 import { applyCreateConnectedNode, type CreateConnectedNodeArgs } from "../layout/workflow-create-connected-node";
 import { persistedSignature, toPersistedDefinition, normalizeWorkflowNodes, type WorkflowDefinition } from "../layout/workflow-definition";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
@@ -402,14 +407,15 @@ export function useWorkflowCanvasState(
   const onConnect = useCallback(
     (params: Connection) => {
       setEdges((eds) => {
-        const resource = isResourceEdge(params);
+        const normalized = normalizeResourceConnection(params, nodesRef.current);
+        const resource = isResourceEdge(normalized);
         const next = addEdge(
           normalizeWorkflowEdge({
-            ...params,
+            ...normalized,
             animated: false,
             style: resource ? { strokeDasharray: "6 4" } : undefined,
           }),
-          eds,
+          withoutReplacedResourceEdge(eds, normalized),
         );
         edgesRef.current = next;
         lastEmittedRef.current = persistedSignature(nodesRef.current, next);

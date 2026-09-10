@@ -2,6 +2,7 @@
 export {
   resolveRagResources,
   resolveRagEmbedModel,
+  findRagToolNodeId,
   toolNodeConfig,
   type RagResourceContext,
 } from './shared/rag-context.js';

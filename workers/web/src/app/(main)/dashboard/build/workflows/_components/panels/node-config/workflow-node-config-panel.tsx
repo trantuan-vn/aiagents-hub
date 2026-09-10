@@ -3,16 +3,17 @@
 import { useCallback, useMemo } from "react";
 
 import type { Edge, Node } from "@xyflow/react";
-import { X } from "lucide-react";
+import { Check, Database, Server, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { hasN8nNodeDescription, getN8nNodeDescription } from "@/lib/n8n-workflow";
 import { resolveNodeDefinition } from "@/lib/workflow-node-registry";
 import type { N8nNodeParameters } from "@/lib/n8n-workflow/types";
 
-import { resolveInputNodeId, edgeUsesHandle } from "../../edges/workflow-connection-utils";
+import { resolveInputNodeId, edgeUsesHandle, isRagToolNode } from "../../edges/workflow-connection-utils";
 import { useWorkflowNodeRegistry } from "../../hooks/use-workflow-node-registry";
 import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
@@ -35,6 +36,66 @@ type WorkflowNodeConfigPanelProps = {
   onExecuteStep?: (nodeId: string) => void;
   onStopListen?: () => void;
 };
+
+function resourceLabel(node: Node | undefined, fallback: string): string {
+  if (!node) return fallback;
+  const data = (node.data ?? {}) as Record<string, unknown>;
+  return String(data.label ?? data.endpoint ?? data.serviceEndpoint ?? fallback);
+}
+
+function RagResourceChips({
+  nodeId,
+  nodes,
+  edges,
+}: {
+  nodeId: string;
+  nodes: Node[];
+  edges: Edge[];
+}) {
+  const t = useTranslations("WorkflowNodeRegistry");
+  const te = useTranslations("WorkflowEditorPage");
+  const serviceEdge = edges.find((e) => e.target === nodeId && e.targetHandle === "service");
+  const memoryEdge = edges.find((e) => e.target === nodeId && e.targetHandle === "memory");
+  const service = serviceEdge ? nodes.find((n) => n.id === serviceEdge.source) : undefined;
+  const memory = memoryEdge ? nodes.find((n) => n.id === memoryEdge.source) : undefined;
+
+  return (
+    <div className="shrink-0 border-t px-3 py-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div
+          className={cn(
+            "flex min-w-0 flex-col items-center gap-1 rounded-md border px-2 py-2 text-center",
+            service ? "border-emerald-500/40 bg-emerald-500/5" : "border-dashed border-muted-foreground/30",
+          )}
+        >
+          <div className="flex items-center gap-1.5">
+            <Server className="size-3.5 text-[#ff6f00]" />
+            <span className="text-[11px] font-medium">{t("field_service")}</span>
+            {service ? <Check className="size-3 text-emerald-600" /> : null}
+          </div>
+          <span className="text-muted-foreground max-w-full truncate text-[10px]">
+            {service ? resourceLabel(service, t("field_service")) : "—"}
+          </span>
+        </div>
+        <div
+          className={cn(
+            "flex min-w-0 flex-col items-center gap-1 rounded-md border px-2 py-2 text-center",
+            memory ? "border-emerald-500/40 bg-emerald-500/5" : "border-dashed border-muted-foreground/30",
+          )}
+        >
+          <div className="flex items-center gap-1.5">
+            <Database className="size-3.5 text-blue-600" />
+            <span className="text-[11px] font-medium">{te("agent_memory")}</span>
+            {memory ? <Check className="size-3 text-emerald-600" /> : null}
+          </div>
+          <span className="text-muted-foreground max-w-full truncate text-[10px]">
+            {memory ? resourceLabel(memory, te("mem_vectorize")) : "—"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function WorkflowNodeConfigPanel({
   node,
@@ -193,6 +254,7 @@ export function WorkflowNodeConfigPanel({
               </TabsContent>
             </Tabs>
           </div>
+          {isRagToolNode(node) ? <RagResourceChips nodeId={node.id} nodes={nodes} edges={edges} /> : null}
         </div>
 
         {outputSection ? (

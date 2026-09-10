@@ -41,16 +41,6 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       description: "Optional. Drag source/filename from INPUT for vector metadata.",
     },
     {
-      displayName: "Service",
-      name: "serviceEndpoint",
-      type: "string",
-      default: "",
-      description: "Approved embedding service used to vectorize document chunks. Use the same service on Get RAG.",
-      typeOptions: {
-        aiHubServiceSelect: true,
-      },
-    },
-    {
       displayName: "User prompt",
       name: "userPrompt",
       type: "string",

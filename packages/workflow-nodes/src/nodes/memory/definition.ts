@@ -32,21 +32,18 @@ export const VECTORIZE_MEMORY_FIELDS = [
   },
   {
     id: "dimensions",
-    type: "number" as const,
+    type: "info" as const,
     labelKey: "field_dimensions",
+    descriptionKey: "field_vectorize_dimensions_desc",
     defaultValue: 768,
     order: 3,
   },
   {
     id: "metric",
-    type: "select" as const,
+    type: "info" as const,
     labelKey: "field_metric",
+    descriptionKey: "field_vectorize_metric_desc",
     defaultValue: "cosine",
-    options: [
-      { value: "cosine", labelKey: "metric_cosine" },
-      { value: "euclidean", labelKey: "metric_euclidean" },
-      { value: "dot-product", labelKey: "metric_dot_product" },
-    ],
     order: 4,
   },
 ];

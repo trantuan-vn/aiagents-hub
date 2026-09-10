@@ -24,22 +24,62 @@ export type RagResourceContext = {
   embedModel: string;
   serviceEndpoint?: string;
   memoryNodeId?: string;
+  memoryKind?: string;
+  dimensions?: number;
+  metric?: string;
 };
+
+const RAG_TOOL_KINDS = new Set(['save-rag', 'get-rag']);
+
+function toolKindOf(node: WorkflowDefinition['nodes'][number] | undefined): string {
+  return String((node?.data as Record<string, unknown> | undefined)?.toolKind ?? '');
+}
 
 function findLinkedMemoryNode(
   definition: WorkflowDefinition,
-  agentId: string,
+  hostId: string,
 ): WorkflowDefinition['nodes'][number] | undefined {
   return definition.nodes.find((n) => {
     if (n.type !== 'memory_node') return false;
     return definition.edges.some(
-      (e) => e.source === n.id && e.target === agentId && e.targetHandle === 'memory',
+      (e) => e.source === n.id && e.target === hostId && e.targetHandle === 'memory',
     );
   });
 }
 
 function firstMemoryNode(definition: WorkflowDefinition): WorkflowDefinition['nodes'][number] | undefined {
   return definition.nodes.find((n) => n.type === 'memory_node');
+}
+
+function findSaveRagNode(
+  definition: WorkflowDefinition,
+  excludeId?: string,
+): WorkflowDefinition['nodes'][number] | undefined {
+  return definition.nodes.find((n) => {
+    if (n.id === excludeId || n.type !== 'tool_node') return false;
+    return toolKindOf(n) === 'save-rag';
+  });
+}
+
+function findLinkedAgentId(definition: WorkflowDefinition, toolId: string): string | undefined {
+  return definition.edges.find(
+    (e) => e.source === toolId && e.sourceHandle === 'tools' && e.targetHandle === 'tools',
+  )?.target;
+}
+
+/** Resolve the Get/Save RAG tool node from an agent or the tool itself. */
+export function findRagToolNodeId(
+  definition: WorkflowDefinition,
+  hostId: string,
+  toolKind: string,
+): string {
+  const self = definition.nodes.find((n) => n.id === hostId);
+  if (self?.type === 'tool_node' && (!toolKind || toolKindOf(self) === toolKind)) {
+    return hostId;
+  }
+  const linked = resolveAgentResources(definition, hostId);
+  const tool = linked.tools.find((t) => String(t.kind ?? '') === toolKind);
+  return typeof tool?.id === 'string' ? tool.id : hostId;
 }
 
 function workflowNamespace(scope?: VectorizeScopeContext): string {
@@ -60,6 +100,25 @@ function memoryNamespaceFromNode(
   return configured;
 }
 
+function mergeResourceContext(
+  primary: ReturnType<typeof resolveAgentResources>,
+  fallback: ReturnType<typeof resolveAgentResources>,
+): ReturnType<typeof resolveAgentResources> {
+  return {
+    ...fallback,
+    ...primary,
+    serviceEndpoint: primary.serviceEndpoint || fallback.serviceEndpoint,
+    serviceOptions: primary.serviceOptions ?? fallback.serviceOptions,
+    memoryCollection: primary.memoryCollection || fallback.memoryCollection,
+    memoryKind: primary.memoryKind || fallback.memoryKind,
+    memoryNamespace: primary.memoryNamespace || fallback.memoryNamespace,
+    memoryNodeId: primary.memoryNodeId || fallback.memoryNodeId,
+    memoryDimensions: primary.memoryDimensions ?? fallback.memoryDimensions,
+    memoryMetric: primary.memoryMetric || fallback.memoryMetric,
+    tools: primary.tools.length ? primary.tools : fallback.tools,
+  };
+}
+
 export function resolveRagResources(
   definition: WorkflowDefinition,
   agentId: string,
@@ -68,50 +127,74 @@ export function resolveRagResources(
 ): RagResourceContext {
   const self = definition.nodes.find((n) => n.id === agentId);
   const selfData = (self?.data ?? {}) as Record<string, unknown>;
-  const selfKind = String(selfData.toolKind ?? '');
+  const selfKind = toolKindOf(self);
+  const toolId =
+    self?.type === 'tool_node' && RAG_TOOL_KINDS.has(selfKind)
+      ? agentId
+      : findRagToolNodeId(definition, agentId, selfKind === 'get-rag' || selfKind === 'save-rag' ? selfKind : '');
+  const toolNode = definition.nodes.find((n) => n.id === toolId) ?? self;
+  const toolKind = toolKindOf(toolNode);
+  const toolData = (toolNode?.data ?? {}) as Record<string, unknown>;
 
-  // Get RAG on GENERATE SQL must read the same index Save RAG wrote on GENERATE VECTOR.
-  if (selfKind === 'get-rag') {
-    const save = definition.nodes.find((n) => {
-      if (n.id === agentId || n.type !== 'tool_node') return false;
-      return String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'save-rag';
-    });
+  let linked = resolveAgentResources(definition, toolId, scope);
+
+  // Get RAG without its own Vectorize reads the same index Save RAG wrote.
+  if (toolKind === 'get-rag' && !linked.memoryNodeId) {
+    const save = findSaveRagNode(definition, toolId);
     if (save) {
-      return resolveRagResources(definition, save.id, embedModelOverride, scope);
+      const inherited = resolveRagResources(definition, save.id, embedModelOverride, scope);
+      return {
+        ...inherited,
+        serviceEndpoint: linked.serviceEndpoint || inherited.serviceEndpoint,
+      };
     }
   }
 
-  const linked = resolveAgentResources(definition, agentId, scope);
+  if (!linked.memoryNodeId || !linked.serviceEndpoint) {
+    const agentHost = findLinkedAgentId(definition, toolId);
+    if (agentHost) {
+      linked = mergeResourceContext(linked, resolveAgentResources(definition, agentHost, scope));
+    }
+  }
 
   const linkedMem =
     linked.memoryNodeId != null
       ? definition.nodes.find((n) => n.id === linked.memoryNodeId)
-      : findLinkedMemoryNode(definition, agentId);
+      : findLinkedMemoryNode(definition, toolId);
   const fallbackMem = linkedMem ?? firstMemoryNode(definition);
   const memData = (fallbackMem?.data ?? {}) as Record<string, unknown> | undefined;
 
   const collection = normalizeVectorizeCollection(
     String(
-      selfData.collection ??
+      toolData.collection ??
+        selfData.collection ??
         linked.memoryCollection ??
         memData?.collection ??
         VECTORIZE_COLLECTION,
     ).trim(),
   );
 
-  const toolNamespace = String(selfData.namespace ?? '').trim();
+  const toolNamespace = String(toolData.namespace ?? selfData.namespace ?? '').trim();
   const namespace =
     toolNamespace ||
     linked.memoryNamespace ||
     memoryNamespaceFromNode(fallbackMem, scope) ||
     workflowNamespace(scope);
 
+  const dims = Number(linked.memoryDimensions ?? memData?.dimensions);
+  const metric = String(linked.memoryMetric ?? memData?.metric ?? '').trim();
+
   return {
     collection,
     namespace,
     embedModel: embedModelOverride ?? DEFAULT_EMBED_MODEL,
-    serviceEndpoint: String(selfData.serviceEndpoint ?? linked.serviceEndpoint ?? '').trim() || linked.serviceEndpoint,
+    serviceEndpoint:
+      String(linked.serviceEndpoint ?? toolData.serviceEndpoint ?? selfData.serviceEndpoint ?? '').trim() ||
+      undefined,
     memoryNodeId: linked.memoryNodeId ?? fallbackMem?.id,
+    memoryKind: linked.memoryKind ?? (fallbackMem ? String(memData?.memoryKind ?? 'vectorize') : undefined),
+    dimensions: Number.isFinite(dims) && dims > 0 ? dims : undefined,
+    metric: metric || undefined,
   };
 }
 

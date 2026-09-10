@@ -6,6 +6,7 @@ import {
   ragBillingFromNodeContext,
   resolveRagEmbedService,
   resolveRagResources,
+  findRagToolNodeId,
   toolNodeConfig,
   type RagBilling,
 } from '../shared/rag-context.js';
@@ -75,15 +76,19 @@ async function executeSaveRagMany(params: {
   workflowId?: number;
   billing?: RagBilling;
 }): Promise<SaveRagManyResult> {
-  const config = toolNodeConfig(params.definition, params.agentId, 'save-rag') ?? {};
-  const embed = await resolveRagEmbedService(config, {
-    embedModel: params.embedModel,
-    userDO: params.userDO ?? params.billing?.userDO,
-  });
-  const rag = resolveRagResources(params.definition, params.agentId, embed.model, {
+  const toolId = findRagToolNodeId(params.definition, params.agentId, 'save-rag');
+  const config = toolNodeConfig(params.definition, toolId, 'save-rag') ?? toolNodeConfig(params.definition, params.agentId, 'save-rag') ?? {};
+  const rag = resolveRagResources(params.definition, toolId, params.embedModel, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
+  const embed = await resolveRagEmbedService(
+    { ...config, serviceEndpoint: rag.serviceEndpoint ?? config.serviceEndpoint },
+    {
+      embedModel: params.embedModel,
+      userDO: params.userDO ?? params.billing?.userDO,
+    },
+  );
   const chunkSize = Number(config.chunkSize ?? 800) || 800;
   const chunkOverlap = Number(config.chunkOverlap ?? 120) || 120;
 
@@ -134,11 +139,19 @@ async function executeSaveRagMany(params: {
   const { vectors: embeddings, usage: embedUsage } = await embedTextsWithUsage(
     params.env,
     flatTexts,
-    rag.embedModel,
+    embed.model,
   );
   const billedTexts = flatTexts.filter((text, i) => (embeddings[i] ?? []).length > 0 && text.trim());
   const usage = embeddingUsageOrEstimate(billedTexts, embedUsage);
   await billRagEmbeddings(embed, params.billing, billedTexts, usage);
+  if (rag.dimensions) {
+    const mismatch = embeddings.find((values) => values.length > 0 && values.length !== rag.dimensions);
+    if (mismatch) {
+      throw new Error(
+        `Save RAG embedding dimensions (${mismatch.length}) do not match Vectorize index (${rag.dimensions})`,
+      );
+    }
+  }
   const vectors: VectorizeVectorRecord[] = [];
   const savedByDoc = new Map<string, number>();
 

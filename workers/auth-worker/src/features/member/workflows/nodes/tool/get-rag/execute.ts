@@ -13,6 +13,7 @@ import {
   ragBillingFromNodeContext,
   resolveRagEmbedService,
   resolveRagResources,
+  findRagToolNodeId,
   toolNodeConfig,
   type RagBilling,
 } from '../shared/rag-context.js';
@@ -98,15 +99,19 @@ export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMat
 
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
   const { env, definition, agentId, input } = params;
-  const config = toolNodeConfig(definition, agentId, 'get-rag') ?? {};
-  const embed = await resolveRagEmbedService(config, {
-    embedModel: params.embedModel,
-    userDO: params.userDO ?? params.billing?.userDO,
-  });
-  const rag = resolveRagResources(definition, agentId, embed.model, {
+  const toolId = findRagToolNodeId(definition, agentId, 'get-rag');
+  const config = toolNodeConfig(definition, toolId, 'get-rag') ?? toolNodeConfig(definition, agentId, 'get-rag') ?? {};
+  const rag = resolveRagResources(definition, toolId, params.embedModel, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
+  const embed = await resolveRagEmbedService(
+    { ...config, serviceEndpoint: rag.serviceEndpoint ?? config.serviceEndpoint },
+    {
+      embedModel: params.embedModel,
+      userDO: params.userDO ?? params.billing?.userDO,
+    },
+  );
 
   const topK = input.topK ?? (Number(config.topK ?? 12) || 12);
   const namespace = input.namespace ?? String(config.namespace ?? rag.namespace);
@@ -115,8 +120,13 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
   const includeMetadata = config.includeMetadata !== false;
 
   try {
-    const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, rag.embedModel);
+    const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, embed.model);
     if (!vector.length) return { snippets: [], count: 0 };
+    if (rag.dimensions && vector.length !== rag.dimensions) {
+      throw new Error(
+        `Get RAG embedding dimensions (${vector.length}) do not match Vectorize index (${rag.dimensions})`,
+      );
+    }
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 

@@ -5,7 +5,7 @@ export const MEMORY_NODE_N8N_DESCRIPTION = resourceNode({
   name: "memory_node",
   icon: "fa:database",
   group: ["transform"],
-  description: "Vector store for RAG — connect to an Agent node's Memory input.",
+  description: "Vector store for RAG — connect to Get RAG, Save RAG, or an Agent Memory handle.",
   properties: [
     {
       displayName: "Index",
@@ -22,19 +22,14 @@ export const MEMORY_NODE_N8N_DESCRIPTION = resourceNode({
     {
       displayName: "Dimensions",
       name: "dimensions",
-      type: "number",
+      type: "hidden",
       default: 768,
     },
     {
       displayName: "Metric",
       name: "metric",
-      type: "options",
+      type: "hidden",
       default: "cosine",
-      options: [
-        { name: "Cosine", value: "cosine" },
-        { name: "Euclidean", value: "euclidean" },
-        { name: "Dot product", value: "dot-product" },
-      ],
     },
     {
       displayName: "Label",

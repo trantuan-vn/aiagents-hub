@@ -327,6 +327,69 @@ describe('executeSaveRagPipeline', () => {
     );
     expect(onCost).toHaveBeenCalledWith(0.000045);
   });
+
+  it('uses the service and Vectorize memory connected on the Save RAG node', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+    } as unknown as Env;
+
+    billingMock.resolveServiceByEndpoint.mockResolvedValue({
+      catalogId: 'bge-base',
+      embedModel: '@cf/baai/bge-base-en-v1.5',
+      approvalStatus: 'approved',
+    });
+
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'save',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'save-rag', chunkSize: 800 },
+        },
+        {
+          id: 'svc_embed',
+          type: 'service_node',
+          position: { x: 0, y: 0 },
+          data: { endpoint: '/api/ai/baai/bge-base-en-v1.5' },
+        },
+        {
+          id: 'mem_kb',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: { memoryKind: 'vectorize', collection: 'VECTORIZE', namespace: 'kb-ns' },
+        },
+      ],
+      edges: [
+        { id: 'e-svc', source: 'svc_embed', target: 'save', sourceHandle: 'service', targetHandle: 'service' },
+        { id: 'e-mem', source: 'mem_kb', target: 'save', sourceHandle: 'memory', targetHandle: 'memory' },
+      ],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ content: 'CREATE TABLE orders (id TEXT);', documentId: 'doc-1', source: 'orders.md' }],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.ok).toBe(true);
+    expect(billingMock.resolveServiceByEndpoint).toHaveBeenCalledWith(
+      expect.anything(),
+      '/api/ai/baai/bge-base-en-v1.5',
+    );
+    const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
+    expect(vectors[0]?.metadata?.namespace).toBe('uuser-1/kb-ns');
+  });
 });
 
 describe('n8n $json interpolation', () => {
