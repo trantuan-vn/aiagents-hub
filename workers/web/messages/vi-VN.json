@@ -2700,6 +2700,8 @@
     "executions_truncated": "Dữ liệu lần chạy quá lớn nên không lưu đủ. Input/output có thể bị thiếu.",
     "executions_collapse_details": "Ẩn dữ liệu node",
     "executions_expand_details": "Hiện dữ liệu node",
+    "executions_collapse_list": "Ẩn danh sách lần chạy",
+    "executions_expand_list": "Hiện danh sách lần chạy",
     "executions_node_data": "Dữ liệu node",
     "triggers_title": "Trigger",
     "triggers_description": "Tự động chạy workflow theo lịch (cron) hoặc qua webhook.",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Loader2, Minus, RefreshCw, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, Loader2, Minus, RefreshCw, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,27 @@ function executionHeadline(
   return t(`executions_status_${exec.status}`);
 }
 
+export function WorkflowExecutionListRail({ onExpand }: { onExpand: () => void }) {
+  const t = useTranslations("WorkflowEditorPage");
+  return (
+    <aside className="bg-background flex h-full w-9 shrink-0 flex-col items-center border-r py-2">
+      <button
+        type="button"
+        title={t("executions_expand_list")}
+        aria-label={t("executions_expand_list")}
+        aria-expanded={false}
+        onClick={onExpand}
+        className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 items-center justify-center rounded-md"
+      >
+        <ChevronRight className="size-3.5" aria-hidden />
+      </button>
+      <span className="text-muted-foreground mt-2 text-[11px] font-medium tracking-wide [writing-mode:vertical-rl] rotate-180">
+        {t("executions_title")}
+      </span>
+    </aside>
+  );
+}
+
 export function WorkflowExecutionList({
   executions,
   loading,
@@ -71,6 +92,7 @@ export function WorkflowExecutionList({
   onAutoRefreshChange,
   onSelect,
   onRefresh,
+  onCollapse,
 }: {
   executions: WorkflowExecutionRecord[];
   loading: boolean;
@@ -83,6 +105,7 @@ export function WorkflowExecutionList({
   onAutoRefreshChange: (value: boolean) => void;
   onSelect: (key: string) => void;
   onRefresh: () => void;
+  onCollapse?: () => void;
 }) {
   const t = useTranslations("WorkflowEditorPage");
   const q = search.trim().toLowerCase();
@@ -142,12 +165,12 @@ export function WorkflowExecutionList({
   return (
     <aside className="bg-background flex h-full min-h-0 w-full min-w-0 flex-col">
       <div className="flex shrink-0 flex-col gap-2 border-b px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">{t("executions_title")}</h2>
+        <div className="flex items-center gap-1.5">
+          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">{t("executions_title")}</h2>
           <button
             type="button"
             className={cn(
-              "text-muted-foreground hover:bg-muted hover:text-foreground ml-auto flex size-7 items-center justify-center rounded-md",
+              "text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-md",
               searchOpen && "bg-muted text-foreground",
             )}
             aria-label={t("executions_search_placeholder")}
@@ -155,9 +178,21 @@ export function WorkflowExecutionList({
           >
             <Search className="size-3.5" aria-hidden />
           </button>
-          <Button variant="ghost" size="icon" className="size-7" onClick={onRefresh} disabled={loading}>
+          <Button variant="ghost" size="icon" className="size-7 shrink-0" onClick={onRefresh} disabled={loading}>
             <RefreshCw className={cn("size-3.5", loading && "animate-spin")} />
           </Button>
+          {onCollapse ? (
+            <button
+              type="button"
+              title={t("executions_collapse_list")}
+              aria-label={t("executions_collapse_list")}
+              aria-expanded
+              onClick={onCollapse}
+              className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-7 shrink-0 items-center justify-center rounded-md"
+            >
+              <ChevronLeft className="size-3.5" aria-hidden />
+            </button>
+          ) : null}
         </div>
         {searchOpen ? (
           <Input

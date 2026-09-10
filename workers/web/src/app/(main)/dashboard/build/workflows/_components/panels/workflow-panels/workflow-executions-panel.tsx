@@ -1,15 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useTranslations } from "next-intl";
 
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { cn } from "@/lib/utils";
 
 import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { useWorkflowExecutions } from "./use-workflow-executions";
-import { WorkflowExecutionList } from "./workflow-execution-list";
+import { WorkflowExecutionList, WorkflowExecutionListRail } from "./workflow-execution-list";
 import { WorkflowExecutionWorkspace } from "./workflow-execution-workspace";
+
+const LIST_COLLAPSED_KEY = "workflow-executions-list-collapsed";
+
+function readListCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(LIST_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeListCollapsed(collapsed: boolean) {
+  try {
+    window.localStorage.setItem(LIST_COLLAPSED_KEY, collapsed ? "1" : "0");
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 interface WorkflowExecutionsPanelProps {
   workflowId: number;
@@ -27,6 +46,7 @@ export function WorkflowExecutionsPanel({
   const t = useTranslations("WorkflowEditorPage");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [listCollapsed, setListCollapsed] = useState(false);
   const {
     executions,
     loading,
@@ -41,6 +61,41 @@ export function WorkflowExecutionsPanel({
     graphDefinition,
   } = useWorkflowExecutions(workflowId, fallbackDefinitionJson);
 
+  useEffect(() => {
+    setListCollapsed(readListCollapsed());
+  }, []);
+
+  const collapseList = (collapsed: boolean) => {
+    setListCollapsed(collapsed);
+    writeListCollapsed(collapsed);
+  };
+
+  const workspace = selected ? (
+    <WorkflowExecutionWorkspace
+      workflowId={workflowId}
+      selected={selected}
+      graphDefinition={graphDefinition}
+      selectedNodeId={selectedNodeId}
+      onSelectNode={setSelectedNodeId}
+      onApplyDefinition={onApplyDefinition}
+      onCopiedToEditor={onCopiedToEditor}
+      onReload={() => load(true)}
+    />
+  ) : (
+    <div className="flex h-full items-center justify-center">
+      <p className="text-muted-foreground text-xs">{t("executions_select_run")}</p>
+    </div>
+  );
+
+  if (listCollapsed) {
+    return (
+      <div className="flex h-full min-h-0 w-full min-w-0">
+        <WorkflowExecutionListRail onExpand={() => collapseList(false)} />
+        <div className={cn(workflowResizePanelClassName, "flex-1")}>{workspace}</div>
+      </div>
+    );
+  }
+
   return (
     <ResizablePanelGroup
       direction="horizontal"
@@ -51,8 +106,11 @@ export function WorkflowExecutionsPanel({
         id="list"
         order={1}
         defaultSize={22}
-        minSize={14}
+        minSize={8}
         maxSize={42}
+        collapsible
+        collapsedSize={0}
+        onCollapse={() => collapseList(true)}
         className={workflowResizePanelClassName}
       >
         <WorkflowExecutionList
@@ -67,26 +125,12 @@ export function WorkflowExecutionsPanel({
           onAutoRefreshChange={setAutoRefresh}
           onSelect={setSelectedKey}
           onRefresh={() => void load()}
+          onCollapse={() => collapseList(true)}
         />
       </ResizablePanel>
       <WorkflowResizeHandle />
       <ResizablePanel id="workspace" order={2} defaultSize={78} minSize={40} className={workflowResizePanelClassName}>
-        {selected ? (
-          <WorkflowExecutionWorkspace
-            workflowId={workflowId}
-            selected={selected}
-            graphDefinition={graphDefinition}
-            selectedNodeId={selectedNodeId}
-            onSelectNode={setSelectedNodeId}
-            onApplyDefinition={onApplyDefinition}
-            onCopiedToEditor={onCopiedToEditor}
-            onReload={() => load(true)}
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground text-xs">{t("executions_select_run")}</p>
-          </div>
-        )}
+        {workspace}
       </ResizablePanel>
     </ResizablePanelGroup>
   );
