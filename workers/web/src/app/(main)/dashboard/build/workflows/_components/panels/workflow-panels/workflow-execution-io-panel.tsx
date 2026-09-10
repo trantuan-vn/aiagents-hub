@@ -172,7 +172,14 @@ function IoPanelHeader({
 }) {
   const t = useTranslations("WorkflowEditorPage");
   return (
-    <div className={cn("flex h-9 shrink-0 items-center gap-2 px-3", (!collapsed || poppedOut) && "border-b")}>
+    <div
+      data-workflow-io-drag-handle={poppedOut ? true : undefined}
+      className={cn(
+        "flex h-9 shrink-0 items-center gap-2 px-3",
+        (!collapsed || poppedOut) && "border-b",
+        poppedOut && "cursor-grab touch-none select-none active:cursor-grabbing",
+      )}
+    >
       <p className="shrink-0 text-xs font-medium">{t("executions_node_data")}</p>
       {title ? <span className="text-muted-foreground min-w-0 truncate text-[11px]">{title}</span> : null}
       <div className="ml-auto">

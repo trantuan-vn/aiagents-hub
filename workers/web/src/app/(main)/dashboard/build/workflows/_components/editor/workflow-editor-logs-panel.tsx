@@ -108,7 +108,14 @@ export function WorkflowEditorLogsPanel({
         className,
       )}
     >
-      <div className={cn("flex h-9 shrink-0 items-center gap-2 px-3", showBody && "border-b")}>
+      <div
+        data-workflow-io-drag-handle={poppedOut ? true : undefined}
+        className={cn(
+          "flex h-9 shrink-0 items-center gap-2 px-3",
+          showBody && "border-b",
+          poppedOut && "cursor-grab touch-none select-none active:cursor-grabbing",
+        )}
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="text-xs font-medium">{t("logs_title")}</span>
           {running ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : null}
