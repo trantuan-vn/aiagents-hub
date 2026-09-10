@@ -79,7 +79,23 @@ export async function createWorkflowChatStreamResponse(
   const hasGetRagTool = agentHasRagToolKind(resolved.definition, agentNode.id, 'get-rag');
   const httpTools = buildAgentToolset({ env: c.env, userDO }, resolved.definition);
   const ragTools = buildRagToolset(
-    { env: c.env, userDO, ownerId: resolved.ownerId, workflowId: resolved.workflowId },
+    {
+      env: c.env,
+      userDO,
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      billing: {
+        env: c.env,
+        bindingName,
+        userDO,
+        consumerIdentifier: user.identifier,
+        requestMeta: {
+          userAgent: c.req.header('user-agent') ?? undefined,
+          ipAddress: c.req.header('cf-connecting-ip') ?? undefined,
+        },
+        workflowAttribution: attr,
+      },
+    },
     resolved.definition,
     agentNode.id,
   );

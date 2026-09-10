@@ -1,9 +1,13 @@
-import { embedTexts, upsertVectors, type VectorizeVectorRecord } from '../../../rag-vector.js';
+import { embedTextsWithUsage, upsertVectors, type VectorizeVectorRecord } from '../../../rag-vector.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
+import { embeddingUsageOrEstimate, mergeAiUsage, type AiUsage } from '../../../../../admin/service/pricing.js';
 import {
-  resolveRagEmbedModel,
+  billRagEmbeddings,
+  ragBillingFromNodeContext,
+  resolveRagEmbedService,
   resolveRagResources,
   toolNodeConfig,
+  type RagBilling,
 } from '../shared/rag-context.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
@@ -30,6 +34,12 @@ export type SaveRagResult = {
   saved: number;
   documentId: string;
   collection: string;
+  raw?: { usage: AiUsage };
+};
+
+type SaveRagManyResult = {
+  results: SaveRagResult[];
+  usage?: AiUsage;
 };
 
 export type SaveRagExecuteParams = {
@@ -41,6 +51,7 @@ export type SaveRagExecuteParams = {
   userDO?: DurableObjectStub<UserDO>;
   ownerId?: string;
   workflowId?: number;
+  billing?: RagBilling;
 };
 
 const INDEXED_TABLES_KEY = '__saveRagIndexedTables';
@@ -62,10 +73,14 @@ async function executeSaveRagMany(params: {
   userDO?: DurableObjectStub<UserDO>;
   ownerId?: string;
   workflowId?: number;
-}): Promise<SaveRagResult[]> {
+  billing?: RagBilling;
+}): Promise<SaveRagManyResult> {
   const config = toolNodeConfig(params.definition, params.agentId, 'save-rag') ?? {};
-  const embedModel = await resolveRagEmbedModel(config, params);
-  const rag = resolveRagResources(params.definition, params.agentId, embedModel, {
+  const embed = await resolveRagEmbedService(config, {
+    embedModel: params.embedModel,
+    userDO: params.userDO ?? params.billing?.userDO,
+  });
+  const rag = resolveRagResources(params.definition, params.agentId, embed.model, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
@@ -97,12 +112,14 @@ async function executeSaveRagMany(params: {
   }
 
   if (!pending.length) {
-    return params.docs.map((input) => ({
-      ok: false,
-      saved: 0,
-      documentId: String(input.documentId ?? ''),
-      collection: rag.collection,
-    }));
+    return {
+      results: params.docs.map((input) => ({
+        ok: false,
+        saved: 0,
+        documentId: String(input.documentId ?? ''),
+        collection: rag.collection,
+      })),
+    };
   }
 
   const flatTexts: string[] = [];
@@ -114,7 +131,14 @@ async function executeSaveRagMany(params: {
     }
   }
 
-  const embeddings = await embedTexts(params.env, flatTexts, rag.embedModel);
+  const { vectors: embeddings, usage: embedUsage } = await embedTextsWithUsage(
+    params.env,
+    flatTexts,
+    rag.embedModel,
+  );
+  const billedTexts = flatTexts.filter((text, i) => (embeddings[i] ?? []).length > 0 && text.trim());
+  const usage = embeddingUsageOrEstimate(billedTexts, embedUsage);
+  await billRagEmbeddings(embed, params.billing, billedTexts, usage);
   const vectors: VectorizeVectorRecord[] = [];
   const savedByDoc = new Map<string, number>();
 
@@ -144,14 +168,17 @@ async function executeSaveRagMany(params: {
   }
 
   const byId = new Map(pending.map((doc) => [doc.documentId, doc]));
-  return [...byId.keys()].map((documentId) => {
-    const saved = savedByDoc.get(documentId) ?? 0;
-    return { ok: saved > 0, saved, documentId, collection: rag.collection };
-  });
+  return {
+    results: [...byId.keys()].map((documentId) => {
+      const saved = savedByDoc.get(documentId) ?? 0;
+      return { ok: saved > 0, saved, documentId, collection: rag.collection };
+    }),
+    usage,
+  };
 }
 
 export async function executeSaveRag(params: SaveRagExecuteParams): Promise<SaveRagResult> {
-  const [result] = await executeSaveRagMany({
+  const { results, usage } = await executeSaveRagMany({
     env: params.env,
     definition: params.definition,
     agentId: params.agentId,
@@ -160,14 +187,18 @@ export async function executeSaveRag(params: SaveRagExecuteParams): Promise<Save
     userDO: params.userDO,
     ownerId: params.ownerId,
     workflowId: params.workflowId,
+    billing: params.billing,
   });
+  const result = results[0];
   return (
-    result ?? {
-      ok: false,
-      saved: 0,
-      documentId: String(params.input.documentId ?? ''),
-      collection: '',
-    }
+    result
+      ? { ...result, ...(usage ? { raw: { usage } } : {}) }
+      : {
+          ok: false,
+          saved: 0,
+          documentId: String(params.input.documentId ?? ''),
+          collection: '',
+        }
   );
 }
 
@@ -291,9 +322,9 @@ function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): 
 async function saveDocuments(
   ctx: NodeContext,
   docs: Array<{ content: string; documentId: string; source: string; metadata: Record<string, string> }>,
-): Promise<SaveRagResult[]> {
+): Promise<SaveRagManyResult> {
   const filtered = docs.filter((doc) => String(doc.content).trim());
-  if (!filtered.length) return [];
+  if (!filtered.length) return { results: [] };
   return executeSaveRagMany({
     env: ctx.c.env,
     definition: ctx.definition,
@@ -307,6 +338,7 @@ async function saveDocuments(
     userDO: ctx.userDO,
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
+    billing: ragBillingFromNodeContext(ctx),
   });
 }
 
@@ -331,6 +363,7 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
   }
 
   const results: SaveRagResult[] = [];
+  const usages: AiUsage[] = [];
 
   if (pendingTables.length) {
     const docs = await introspectTablesToRagDocuments({
@@ -343,7 +376,9 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
         schemaName: String(item.schemaName ?? ''),
       })),
     });
-    results.push(...(await saveDocuments(ctx, docs)));
+    const batch = await saveDocuments(ctx, docs);
+    results.push(...batch.results);
+    if (batch.usage) usages.push(batch.usage);
     markIndexedTables(
       ctx.runContext,
       pendingTables.map((item) => String(item.tableName ?? '')),
@@ -370,15 +405,19 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     });
   }
   if (contentDocs.length) {
-    results.push(...(await saveDocuments(ctx, contentDocs)));
+    const batch = await saveDocuments(ctx, contentDocs);
+    results.push(...batch.results);
+    if (batch.usage) usages.push(batch.usage);
   }
 
   const saved = results.reduce((sum, r) => sum + r.saved, 0);
+  const usage = mergeAiUsage(...usages);
   return {
     ok: results.some((r) => r.ok),
     saved,
     items: results,
     documentIds: results.map((r) => r.documentId),
     collection: results[0]?.collection,
+    ...(usage ? { raw: { usage } } : {}),
   };
 }

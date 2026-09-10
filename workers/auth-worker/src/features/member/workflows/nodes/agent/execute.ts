@@ -19,7 +19,7 @@ import {
 } from '../../execution/agent-runtime.js';
 import { isDataFlowEdge, resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
-import { toolNodeConfig } from '../tool/shared/rag-context.js';
+import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import { executeGetRag } from '../tool/get-rag/execute.js';
 import type { NodeContext, NodeOutput } from '../types.js';
@@ -263,6 +263,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
           ),
       )?.source
     : ctx.node.id;
+  const billing = ragBillingFromNodeContext(ctx);
   const ragTools = withoutGetRagTools(
     buildRagToolset(
       {
@@ -273,6 +274,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         embedModel,
         ownerId: ctx.meta.ownerId,
         workflowId: ctx.meta.workflowId,
+        billing,
       },
       ctx.definition,
       ctx.node.id,
@@ -294,6 +296,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       userDO: ctx.userDO,
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
+      billing,
     });
     ragContext = retrieved.snippets.map((s) => {
       const source = s.source?.trim();

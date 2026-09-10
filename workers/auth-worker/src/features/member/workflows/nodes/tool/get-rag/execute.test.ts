@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
@@ -6,6 +6,10 @@ import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute
 
 const billingMock = vi.hoisted(() => ({
   resolveServiceByEndpoint: vi.fn(),
+  findApprovedServiceByEndpoint: vi.fn().mockResolvedValue(null),
+  findApprovedServiceByModel: vi.fn().mockResolvedValue(null),
+  billEmbeddingUsage: vi.fn().mockResolvedValue(0),
+  ensureWalletBalance: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../billing/billing.js', () => billingMock);
@@ -33,6 +37,13 @@ const definition: WorkflowDefinition = {
 };
 
 describe('executeGetRag', () => {
+  beforeEach(() => {
+    billingMock.resolveServiceByEndpoint.mockReset();
+    billingMock.findApprovedServiceByEndpoint.mockReset().mockResolvedValue(null);
+    billingMock.findApprovedServiceByModel.mockReset().mockResolvedValue(null);
+    billingMock.billEmbeddingUsage.mockReset().mockResolvedValue(0);
+    billingMock.ensureWalletBalance.mockReset().mockResolvedValue(undefined);
+  });
   it('returns snippets from mocked vectorize', async () => {
     const query = vi.fn().mockResolvedValue({
       matches: [
@@ -44,7 +55,16 @@ describe('executeGetRag', () => {
     });
     const env = {
       AI: {
-        run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }),
+        run: vi.fn().mockResolvedValue({
+          data: [[0.5, 0.6]],
+          usage: {
+            prompt_tokens: 8,
+            completion_tokens: 0,
+            total_tokens: 8,
+            neurons: 0.21,
+            prompt_tokens_details: { cached_tokens: 0 },
+          },
+        }),
       },
       VECTORIZE: { query, upsert: vi.fn() },
     } as unknown as Env;
@@ -59,6 +79,13 @@ describe('executeGetRag', () => {
     expect(result.count).toBe(1);
     expect(result.snippets[0]?.text).toBe('answer snippet');
     expect(result.snippets[0]?.source).toBe('doc-1');
+    expect(result.raw?.usage).toMatchObject({
+      prompt_tokens: 8,
+      completion_tokens: 0,
+      total_tokens: 8,
+      neurons: 0.21,
+      prompt_tokens_details: { cached_tokens: 0 },
+    });
     expect(query).toHaveBeenCalledWith(
       [0.5, 0.6],
       expect.objectContaining({ topK: 16, returnMetadata: 'all', filter: { namespace: 'test-ns' } }),
@@ -106,7 +133,114 @@ describe('executeGetRag', () => {
       expect.anything(),
       'https://ai.example/embed',
     );
-    expect(aiRun).toHaveBeenCalledWith('@cf/baai/bge-large-en-v1.5', { text: 'what is RAG?' });
+    expect(aiRun).toHaveBeenCalledWith(
+      '@cf/baai/bge-large-en-v1.5',
+      { text: 'what is RAG?' },
+      { gateway: { id: 'unitoken' } },
+    );
+  });
+
+  it('bills embedding tokens and reports cost on the Get RAG node', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const service = {
+      id: 9,
+      endpoint: '/api/ai/baai/bge-base-en-v1.5',
+      model: '@cf/baai/bge-base-en-v1.5',
+      catalogId: 'bge-base',
+      approvalStatus: 'approved',
+      priceInput: 0.067,
+      priceOutput: 0,
+    };
+    billingMock.resolveServiceByEndpoint.mockResolvedValue(service);
+    billingMock.billEmbeddingUsage.mockResolvedValue(0.00001234);
+
+    const onCost = vi.fn();
+    const withService: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((n) =>
+        n.id === 'tool_get'
+          ? { ...n, data: { ...n.data, serviceEndpoint: '/api/ai/baai/bge-base-en-v1.5' } }
+          : n,
+      ),
+    };
+
+    await executeGetRag({
+      env,
+      definition: withService,
+      agentId: 'tool_get',
+      input: { query: 'what is RAG?' },
+      userDO: {} as NodeContext['userDO'],
+      billing: {
+        env,
+        bindingName: 'USER_DO',
+        userDO: {} as NodeContext['userDO'],
+        consumerIdentifier: 'user@example.com',
+        workflowAttribution: { workflowId: 19, workflowOwnerId: 'owner-1' },
+        onCost,
+      },
+    });
+
+    expect(billingMock.ensureWalletBalance).toHaveBeenCalled();
+    expect(billingMock.billEmbeddingUsage).toHaveBeenCalledWith(
+      env,
+      'USER_DO',
+      expect.anything(),
+      'user@example.com',
+      service,
+      expect.objectContaining({
+        endpoint: '/api/ai/baai/bge-base-en-v1.5',
+        promptTokens: expect.any(Number),
+        workflowAttribution: { workflowId: 19, workflowOwnerId: 'owner-1' },
+      }),
+    );
+    expect(onCost).toHaveBeenCalledWith(0.00001234);
+  });
+
+  it('bills the default BGE service when Get RAG has no serviceEndpoint', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const service = {
+      id: 9,
+      endpoint: '/api/ai/baai/bge-base-en-v1.5',
+      model: '@cf/baai/bge-base-en-v1.5',
+      approvalStatus: 'approved',
+      priceInput: 0.067,
+      priceOutput: 0,
+    };
+    billingMock.findApprovedServiceByEndpoint.mockResolvedValue(service);
+    billingMock.billEmbeddingUsage.mockResolvedValue(0.000001);
+
+    const onCost = vi.fn();
+    await executeGetRag({
+      env,
+      definition,
+      agentId: 'tool_get',
+      input: { query: 'orders' },
+      userDO: {} as NodeContext['userDO'],
+      billing: {
+        env,
+        bindingName: 'USER_DO',
+        userDO: {} as NodeContext['userDO'],
+        consumerIdentifier: 'user@example.com',
+        onCost,
+      },
+    });
+
+    expect(billingMock.findApprovedServiceByEndpoint).toHaveBeenCalledWith(
+      expect.anything(),
+      '/api/ai/baai/bge-base-en-v1.5',
+    );
+    expect(billingMock.billEmbeddingUsage).toHaveBeenCalled();
+    expect(onCost).toHaveBeenCalledWith(0.000001);
   });
 });
 

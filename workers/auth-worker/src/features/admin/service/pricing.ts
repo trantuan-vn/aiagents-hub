@@ -96,6 +96,73 @@ export function convertUsdToVnd(usdAmount: number, usdVndRate: number): number {
   return Math.round(usdAmount * rate);
 }
 
+/** Approximate BGE/BERT tokens when Workers AI embeddings omit `usage`. */
+export function estimateEmbeddingPromptTokens(texts: string[]): number {
+  let tokens = 0;
+  for (const text of texts) {
+    const trimmed = text.trim();
+    if (!trimmed) continue;
+    tokens += Math.max(1, Math.ceil(trimmed.length / 4));
+  }
+  return tokens;
+}
+
+export type AiUsage = Record<string, unknown> & {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  neurons?: number;
+  prompt_tokens_details?: { cached_tokens?: number };
+};
+
+function cachedTokensOf(usage: AiUsage): number {
+  const details = usage.prompt_tokens_details;
+  if (details && typeof details === 'object') {
+    return Number((details as { cached_tokens?: unknown }).cached_tokens ?? 0);
+  }
+  return 0;
+}
+
+export function mergeAiUsage(...parts: Array<AiUsage | null | undefined>): AiUsage | undefined {
+  const list = parts.filter((u): u is AiUsage => Boolean(u && typeof u === 'object'));
+  if (!list.length) return undefined;
+  if (list.length === 1) return { ...list[0] };
+
+  const prompt = list.reduce((sum, u) => sum + Number(u.prompt_tokens ?? 0), 0);
+  const completion = list.reduce((sum, u) => sum + Number(u.completion_tokens ?? 0), 0);
+  const reportedTotal = list.reduce((sum, u) => sum + Number(u.total_tokens ?? 0), 0);
+  const neurons = list.reduce((sum, u) => sum + Number(u.neurons ?? 0), 0);
+  const cached = list.reduce((sum, u) => sum + cachedTokensOf(u), 0);
+  const usage: AiUsage = {
+    prompt_tokens: prompt,
+    completion_tokens: completion,
+    total_tokens: reportedTotal || prompt + completion,
+  };
+  if (neurons) usage.neurons = Math.round(neurons * 1e6) / 1e6;
+  if (cached || list.some((u) => u.prompt_tokens_details)) {
+    usage.prompt_tokens_details = { cached_tokens: cached };
+  }
+  return usage;
+}
+
+/** Prefer gateway usage; otherwise estimate prompt tokens from the embedded texts. */
+export function embeddingUsageOrEstimate(texts: string[], actual?: AiUsage | null): AiUsage {
+  const prompt = Number(actual?.prompt_tokens ?? 0);
+  if (actual && prompt > 0) {
+    return {
+      ...actual,
+      completion_tokens: Number(actual.completion_tokens ?? 0),
+      total_tokens: Number(actual.total_tokens ?? 0) || prompt + Number(actual.completion_tokens ?? 0),
+    };
+  }
+  const estimated = estimateEmbeddingPromptTokens(texts);
+  return {
+    prompt_tokens: estimated,
+    completion_tokens: 0,
+    total_tokens: estimated,
+  };
+}
+
 /** Token charge with fee% applied (USD). */
 export function computeUsageChargeUsd(
   service: Record<string, unknown>,

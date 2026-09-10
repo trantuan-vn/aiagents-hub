@@ -9,7 +9,16 @@ function mockAi() {
   return {
     run: vi.fn().mockImplementation(async (_model: string, input: { text: string | string[] }) => {
       const n = Array.isArray(input.text) ? input.text.length : 1;
-      return { data: Array.from({ length: n }, () => [0.1, 0.2]) };
+      return {
+        data: Array.from({ length: n }, () => [0.1, 0.2]),
+        usage: {
+          prompt_tokens: n * 4,
+          completion_tokens: 0,
+          total_tokens: n * 4,
+          neurons: n * 0.05,
+          prompt_tokens_details: { cached_tokens: 0 },
+        },
+      };
     }),
   };
 }
@@ -34,6 +43,19 @@ function d1Stub(columns = [
     })),
   };
 }
+
+const billingMock = vi.hoisted(() => ({
+  resolveServiceByEndpoint: vi.fn(),
+  findApprovedServiceByEndpoint: vi.fn().mockResolvedValue(null),
+  findApprovedServiceByModel: vi.fn().mockResolvedValue(null),
+  billEmbeddingUsage: vi.fn().mockResolvedValue(0),
+  ensureWalletBalance: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../billing/billing.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../billing/billing.js')>();
+  return { ...actual, ...billingMock };
+});
 
 describe('executeSaveRagPipeline', () => {
   it('embeds and upserts each loop item', async () => {
@@ -77,6 +99,15 @@ describe('executeSaveRagPipeline', () => {
     const out = await executeSaveRagPipeline(ctx);
     expect(out.ok).toBe(true);
     expect(out.saved).toBe(1);
+    expect(out.raw).toMatchObject({
+      usage: {
+        prompt_tokens: expect.any(Number),
+        completion_tokens: 0,
+        total_tokens: expect.any(Number),
+        neurons: expect.any(Number),
+        prompt_tokens_details: { cached_tokens: 0 },
+      },
+    });
     expect(upsert).toHaveBeenCalled();
     const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
     expect(vectors[0]?.metadata?.namespace).toBe('uuser-1/wf42');
@@ -219,6 +250,82 @@ describe('executeSaveRagPipeline', () => {
     expect(second.skipped).toBe(true);
     expect(second.saved).toBe(0);
     expect(upsert).toHaveBeenCalledTimes(1);
+  });
+
+  it('bills embedding tokens and reports cost on the Save RAG node', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+    } as unknown as Env;
+
+    const service = {
+      id: 9,
+      endpoint: '/api/ai/baai/bge-base-en-v1.5',
+      model: '@cf/baai/bge-base-en-v1.5',
+      catalogId: 'bge-base',
+      approvalStatus: 'approved',
+      priceInput: 0.067,
+      priceOutput: 0,
+    };
+    billingMock.resolveServiceByEndpoint.mockResolvedValue(service);
+    billingMock.billEmbeddingUsage.mockResolvedValue(0.000045);
+
+    const onCost = vi.fn();
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'save',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: {
+            toolKind: 'save-rag',
+            chunkSize: 800,
+            serviceEndpoint: '/api/ai/baai/bge-base-en-v1.5',
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [
+          {
+            content: 'CREATE TABLE orders (id TEXT);',
+            documentId: 'db.public.orders.schema',
+            source: 'orders.schema.md',
+            metadata: { docType: 'schema', tableName: 'orders' },
+          },
+        ],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+      attr: { workflowId: 42, workflowOwnerId: 'owner-1' },
+      onCost,
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.ok).toBe(true);
+    expect(billingMock.billEmbeddingUsage).toHaveBeenCalledWith(
+      env,
+      'USER_DO',
+      expect.anything(),
+      'user@example.com',
+      service,
+      expect.objectContaining({
+        endpoint: '/api/ai/baai/bge-base-en-v1.5',
+        promptTokens: expect.any(Number),
+      }),
+    );
+    expect(onCost).toHaveBeenCalledWith(0.000045);
   });
 });
 

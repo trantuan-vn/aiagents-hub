@@ -18,6 +18,58 @@ export interface BillAgentUsageOptions {
   workflowAttribution?: { workflowId: number; workflowOwnerId: string };
 }
 
+function serviceApprovalStatus(service: Record<string, unknown>): string {
+  return String(service.approvalStatus ?? service.approval_status ?? 'approved');
+}
+
+export async function findApprovedServiceByEndpoint(
+  userDO: DurableObjectStub<UserDO>,
+  endpoint: string,
+): Promise<Record<string, unknown> | null> {
+  if (!endpoint.trim()) return null;
+  const rows = await executeUtils.executeDynamicAction(
+    userDO,
+    'select',
+    {
+      where: [
+        { field: 'endpoint', operator: '=', value: endpoint },
+        { field: 'isActive', operator: '=', value: 1 },
+      ],
+    },
+    'services',
+  );
+  const service = Array.isArray(rows) ? rows[0] : rows;
+  if (!service || typeof service !== 'object') return null;
+  const record = service as Record<string, unknown>;
+  if (serviceApprovalStatus(record) !== 'approved') return null;
+  return record;
+}
+
+export async function findApprovedServiceByModel(
+  userDO: DurableObjectStub<UserDO>,
+  modelId: string,
+): Promise<Record<string, unknown> | null> {
+  if (!modelId.trim()) return null;
+  const rows = await executeUtils.executeDynamicAction(
+    userDO,
+    'select',
+    {
+      where: [
+        { field: 'model', operator: '=', value: modelId },
+        { field: 'isActive', operator: '=', value: 1 },
+      ],
+    },
+    'services',
+  );
+  const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const record = row as Record<string, unknown>;
+    if (serviceApprovalStatus(record) === 'approved') return record;
+  }
+  return null;
+}
+
 export async function resolveServiceByEndpoint(
   userDO: DurableObjectStub<UserDO>,
   endpoint: string,
@@ -35,14 +87,11 @@ export async function resolveServiceByEndpoint(
   );
   const service = Array.isArray(rows) ? rows[0] : rows;
   if (!service) throw new Error(`Service not found for endpoint: ${endpoint}`);
-  const status =
-    (service as Record<string, unknown>).approvalStatus ??
-    (service as Record<string, unknown>).approval_status ??
-    'approved';
-  if (status !== 'approved') {
+  const record = service as Record<string, unknown>;
+  if (serviceApprovalStatus(record) !== 'approved') {
     throw new Error(`Service is not approved yet: ${endpoint}`);
   }
-  return service;
+  return record;
 }
 
 export async function ensureWalletBalance(userDO: DurableObjectStub<UserDO>): Promise<void> {
@@ -119,6 +168,24 @@ export async function billAgentUsage(
   }
 
   return amountUsd;
+}
+
+export async function billEmbeddingUsage(
+  env: Env,
+  bindingName: string,
+  userDO: DurableObjectStub<UserDO>,
+  consumerIdentifier: string,
+  service: Record<string, unknown>,
+  options: Omit<BillAgentUsageOptions, 'aiResponse'> & { promptTokens: number },
+): Promise<number> {
+  if (options.promptTokens <= 0) return 0;
+  return billAgentUsage(env, bindingName, userDO, consumerIdentifier, service, {
+    endpoint: options.endpoint,
+    aiResponse: { usage: { prompt_tokens: options.promptTokens, completion_tokens: 0 } },
+    userAgent: options.userAgent,
+    ipAddress: options.ipAddress,
+    workflowAttribution: options.workflowAttribution,
+  });
 }
 
 export async function runTextModel(

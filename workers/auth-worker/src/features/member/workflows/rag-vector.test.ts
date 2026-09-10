@@ -4,6 +4,7 @@ import {
   DEFAULT_EMBED_MODEL,
   embedText,
   embedTexts,
+  embedTextsWithUsage,
   queryCollection,
   upsertVectors,
   buildMetadataFilter,
@@ -28,7 +29,7 @@ describe('rag-vector', () => {
 
     const vector = await embedText(env, 'hello world', DEFAULT_EMBED_MODEL);
     expect(vector).toEqual([0.1, 0.2, 0.3]);
-    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: 'hello world' });
+    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: 'hello world' }, { gateway: { id: 'unitoken' } });
   });
 
   it('embedTexts batches multiple strings in one AI call', async () => {
@@ -49,7 +50,32 @@ describe('rag-vector', () => {
       [0.3, 0.4],
     ]);
     expect(env.AI.run).toHaveBeenCalledTimes(1);
-    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: ['alpha', 'beta'] });
+    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: ['alpha', 'beta'] }, { gateway: { id: 'unitoken' } });
+  });
+
+  it('captures usage from the AI Gateway embed response', async () => {
+    const env = {
+      AI: {
+        run: vi.fn().mockResolvedValue({
+          data: [[0.1, 0.2]],
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 0,
+            total_tokens: 12,
+            neurons: 0.42,
+            prompt_tokens_details: { cached_tokens: 0 },
+          },
+        }),
+      },
+    } as unknown as Env;
+
+    const { usage } = await embedTextsWithUsage(env as Env, ['hello world'], DEFAULT_EMBED_MODEL);
+    expect(usage).toMatchObject({
+      prompt_tokens: 12,
+      completion_tokens: 0,
+      total_tokens: 12,
+      neurons: 0.42,
+    });
   });
 
   it('queryCollection queries vectorize index', async () => {

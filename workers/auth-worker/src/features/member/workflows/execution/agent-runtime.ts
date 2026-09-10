@@ -15,6 +15,7 @@ import {
   executeGetRag,
   executeSaveRag,
 } from '../nodes/tool/index.js';
+import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -35,6 +36,7 @@ interface AgentToolContext {
   embedModel?: string;
   ownerId?: string;
   workflowId?: number;
+  billing?: RagBilling;
 }
 
 function sanitizeToolName(raw: string, fallback: string): string {
@@ -159,6 +161,7 @@ export function buildRagToolset(
             userDO: ctx.userDO,
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
+            billing: ctx.billing,
           }),
       });
     }
@@ -184,6 +187,7 @@ export function buildRagToolset(
             userDO: ctx.userDO,
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
+            billing: ctx.billing,
           }),
       });
     }

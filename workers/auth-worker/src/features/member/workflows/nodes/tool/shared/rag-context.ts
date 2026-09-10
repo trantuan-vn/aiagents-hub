@@ -1,14 +1,22 @@
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
+import { modelIdToServiceEndpoint } from '../../../../../admin/service/model-search.js';
+import { estimateEmbeddingPromptTokens, getServiceModel, type AiUsage } from '../../../../../admin/service/pricing.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
+import {
+  billEmbeddingUsage,
+  ensureWalletBalance,
+  findApprovedServiceByEndpoint,
+  findApprovedServiceByModel,
+  resolveServiceByEndpoint,
+} from '../../../billing/billing.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
-import { resolveServiceByEndpoint } from '../../../billing/billing.js';
-import { getServiceModel } from '../../../../../admin/service/pricing.js';
 import { DEFAULT_EMBED_MODEL, VECTORIZE_COLLECTION } from '../../../rag-vector.js';
 import {
   normalizeVectorizeCollection,
   resolveVectorizeScope,
   type VectorizeScopeContext,
 } from '../../../vectorize-scope.js';
+import type { NodeContext, WorkflowAttribution } from '../../types.js';
 
 export type RagResourceContext = {
   collection: string;
@@ -107,16 +115,103 @@ export function resolveRagResources(
   };
 }
 
+export type RagBilling = {
+  env: Env;
+  bindingName: string;
+  userDO: DurableObjectStub<UserDO>;
+  consumerIdentifier: string;
+  requestMeta?: { userAgent?: string; ipAddress?: string };
+  workflowAttribution?: WorkflowAttribution;
+  onCost?: (usd: number) => void;
+};
+
+export type ResolvedRagEmbed = {
+  model: string;
+  service?: Record<string, unknown>;
+  endpoint: string;
+};
+
+export function ragBillingFromNodeContext(ctx: NodeContext): RagBilling | undefined {
+  if (!ctx.userDO || !ctx.bindingName || !ctx.user?.identifier) return undefined;
+  return {
+    env: ctx.c.env,
+    bindingName: ctx.bindingName,
+    userDO: ctx.userDO,
+    consumerIdentifier: ctx.user.identifier,
+    requestMeta: ctx.requestMeta,
+    workflowAttribution: ctx.attr,
+    onCost: ctx.onCost,
+  };
+}
+
+export async function resolveRagEmbedService(
+  config: Record<string, unknown> | undefined,
+  params: { embedModel?: string; userDO?: DurableObjectStub<UserDO> },
+): Promise<ResolvedRagEmbed> {
+  const configuredEndpoint = String(config?.serviceEndpoint ?? '').trim();
+  if (configuredEndpoint && params.userDO) {
+    const service = await resolveServiceByEndpoint(params.userDO, configuredEndpoint);
+    return {
+      model: resolveEmbedModelFromService(service),
+      service,
+      endpoint: configuredEndpoint,
+    };
+  }
+
+  const model = params.embedModel ?? DEFAULT_EMBED_MODEL;
+  const fallbackEndpoint = modelIdToServiceEndpoint(model);
+  if (params.userDO) {
+    const service =
+      (await findApprovedServiceByEndpoint(params.userDO, fallbackEndpoint)) ??
+      (await findApprovedServiceByModel(params.userDO, model));
+    if (service) {
+      return {
+        model: resolveEmbedModelFromService(service) || model,
+        service,
+        endpoint: String(service.endpoint ?? fallbackEndpoint),
+      };
+    }
+  }
+  return { model, endpoint: fallbackEndpoint };
+}
+
 export async function resolveRagEmbedModel(
   config: Record<string, unknown> | undefined,
   params: { embedModel?: string; userDO?: DurableObjectStub<UserDO> },
 ): Promise<string> {
-  const serviceEndpoint = String(config?.serviceEndpoint ?? '').trim();
-  if (serviceEndpoint && params.userDO) {
-    const service = await resolveServiceByEndpoint(params.userDO, serviceEndpoint);
-    return resolveEmbedModelFromService(service);
+  return (await resolveRagEmbedService(config, params)).model;
+}
+
+export async function billRagEmbeddings(
+  embed: ResolvedRagEmbed,
+  billing: RagBilling | undefined,
+  texts: string[],
+  usage?: AiUsage,
+): Promise<number> {
+  if (!billing) return 0;
+  const promptTokens = Number(usage?.prompt_tokens ?? 0) || estimateEmbeddingPromptTokens(texts);
+  if (promptTokens <= 0) return 0;
+  if (!embed.service || !embed.endpoint) {
+    console.warn('[rag] embedding ran but no approved embedding service was found to bill');
+    return 0;
   }
-  return params.embedModel ?? DEFAULT_EMBED_MODEL;
+  await ensureWalletBalance(billing.userDO);
+  const costUsd = await billEmbeddingUsage(
+    billing.env,
+    billing.bindingName,
+    billing.userDO,
+    billing.consumerIdentifier,
+    embed.service,
+    {
+      endpoint: embed.endpoint,
+      promptTokens,
+      userAgent: billing.requestMeta?.userAgent,
+      ipAddress: billing.requestMeta?.ipAddress,
+      workflowAttribution: billing.workflowAttribution,
+    },
+  );
+  billing.onCost?.(costUsd);
+  return costUsd;
 }
 
 export function resolveEmbedModelFromService(service: Record<string, unknown>): string {

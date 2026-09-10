@@ -1,13 +1,21 @@
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import {
-  embedText,
+  embedTextWithUsage,
   matchToSnippet,
   queryCollection,
   type VectorMatch,
 } from '../../../rag-vector.js';
+import { embeddingUsageOrEstimate, type AiUsage } from '../../../../../admin/service/pricing.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
-import { resolveRagEmbedModel, resolveRagResources, toolNodeConfig } from '../shared/rag-context.js';
+import {
+  billRagEmbeddings,
+  ragBillingFromNodeContext,
+  resolveRagEmbedService,
+  resolveRagResources,
+  toolNodeConfig,
+  type RagBilling,
+} from '../shared/rag-context.js';
 
 export type GetRagInput = {
   query: string;
@@ -28,6 +36,7 @@ export type GetRagSnippet = {
 export type GetRagResult = {
   snippets: GetRagSnippet[];
   count: number;
+  raw?: { usage: AiUsage };
 };
 
 export type GetRagExecuteParams = {
@@ -39,6 +48,7 @@ export type GetRagExecuteParams = {
   userDO?: DurableObjectStub<UserDO>;
   ownerId?: string;
   workflowId?: number;
+  billing?: RagBilling;
 };
 
 function mapMatch(match: VectorMatch, includeMetadata: boolean): GetRagSnippet {
@@ -89,8 +99,11 @@ export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMat
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
   const { env, definition, agentId, input } = params;
   const config = toolNodeConfig(definition, agentId, 'get-rag') ?? {};
-  const embedModel = await resolveRagEmbedModel(config, params);
-  const rag = resolveRagResources(definition, agentId, embedModel, {
+  const embed = await resolveRagEmbedService(config, {
+    embedModel: params.embedModel,
+    userDO: params.userDO ?? params.billing?.userDO,
+  });
+  const rag = resolveRagResources(definition, agentId, embed.model, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
@@ -102,8 +115,10 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
   const includeMetadata = config.includeMetadata !== false;
 
   try {
-    const vector = await embedText(env, input.query, rag.embedModel);
+    const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, rag.embedModel);
     if (!vector.length) return { snippets: [], count: 0 };
+    const usage = embeddingUsageOrEstimate([input.query], embedUsage);
+    await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
     const matches = await queryCollection(env, rag.collection, vector, {
       topK: Math.min(50, Math.max(topK * 4, 16)),
@@ -113,7 +128,7 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     });
 
     const snippets = preferSqlChunks(matches, topK).map((m) => mapMatch(m, includeMetadata));
-    return { snippets, count: snippets.length };
+    return { snippets, count: snippets.length, raw: { usage } };
   } catch (e) {
     const message = String(e instanceof Error ? e.message : e).slice(0, 500);
     throw new Error(`Get RAG retrieve failed: ${message}`);
@@ -176,6 +191,7 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     userDO: ctx.userDO,
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
+    billing: ragBillingFromNodeContext(ctx),
   });
   const ragText = result.snippets.map((s) => s.text).filter(Boolean).join('\n\n');
   return {

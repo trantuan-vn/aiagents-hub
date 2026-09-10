@@ -1,9 +1,15 @@
 /** Shared Vectorize helpers for RAG — embed, query, upsert. */
 
 import { normalizeVectorizeCollection, VECTORIZE_COLLECTION } from './vectorize-scope.js';
+import {
+  extractUsageFromAiResponse,
+  mergeAiUsage,
+  type AiUsage,
+} from '../../admin/service/pricing.js';
 
 export { VECTORIZE_COLLECTION };
 export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
+const AI_GATEWAY_ID = 'unitoken';
 
 export type VectorMatch = {
   id?: string;
@@ -44,6 +50,10 @@ export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBi
   return named ?? fallback;
 }
 
+async function runEmbed(env: Env, modelId: string, text: string | string[]): Promise<unknown> {
+  return env.AI.run(modelId as keyof AiModels, { text }, { gateway: { id: AI_GATEWAY_ID } });
+}
+
 function vectorsFromAiData(data: unknown, expected: number): number[][] {
   if (!Array.isArray(data) || !data.length) return Array.from({ length: expected }, () => []);
   if (typeof data[0] === 'number') {
@@ -55,14 +65,28 @@ function vectorsFromAiData(data: unknown, expected: number): number[][] {
   });
 }
 
+export type EmbedBatchResult = {
+  vectors: number[][];
+  usage?: AiUsage;
+};
+
 export async function embedText(
   env: Env,
   text: string,
   modelId = DEFAULT_EMBED_MODEL,
 ): Promise<number[]> {
-  if (!text.trim() || !env.AI) return [];
-  const [vector] = await embedTexts(env, [text], modelId);
-  return vector ?? [];
+  const { vector } = await embedTextWithUsage(env, text, modelId);
+  return vector;
+}
+
+export async function embedTextWithUsage(
+  env: Env,
+  text: string,
+  modelId = DEFAULT_EMBED_MODEL,
+): Promise<{ vector: number[]; usage?: AiUsage }> {
+  if (!text.trim() || !env.AI) return { vector: [] };
+  const { vectors, usage } = await embedTextsWithUsage(env, [text], modelId);
+  return { vector: vectors[0] ?? [], usage };
 }
 
 /** Batch embed. Workers AI BGE accepts `text: string[]` — fallback to one-by-one. */
@@ -71,9 +95,18 @@ export async function embedTexts(
   texts: string[],
   modelId = DEFAULT_EMBED_MODEL,
 ): Promise<number[][]> {
-  if (!env.AI || !texts.length) return texts.map(() => []);
+  return (await embedTextsWithUsage(env, texts, modelId)).vectors;
+}
+
+export async function embedTextsWithUsage(
+  env: Env,
+  texts: string[],
+  modelId = DEFAULT_EMBED_MODEL,
+): Promise<EmbedBatchResult> {
+  if (!env.AI || !texts.length) return { vectors: texts.map(() => []) };
   const BATCH = 8;
   const out: number[][] = [];
+  const usages: AiUsage[] = [];
 
   for (let i = 0; i < texts.length; i += BATCH) {
     const slice = texts.slice(i, i + BATCH);
@@ -87,10 +120,12 @@ export async function embedTexts(
     const payload = nonempty.length === 1 ? nonempty[0]!.text : nonempty.map((row) => row.text);
     let batchVectors: number[][] | undefined;
     try {
-      const embed = await env.AI.run(modelId as keyof AiModels, { text: payload });
+      const embed = await runEmbed(env, modelId, payload);
       const rows = vectorsFromAiData((embed as { data?: unknown })?.data, nonempty.length);
       if (rows.length === nonempty.length && rows.every((row) => row.length)) {
         batchVectors = rows;
+        const usage = extractUsageFromAiResponse(embed);
+        if (usage) usages.push(usage);
       }
     } catch {
       /* batch unsupported — fall through */
@@ -103,8 +138,10 @@ export async function embedTexts(
     } else {
       for (const row of nonempty) {
         try {
-          const embed = await env.AI.run(modelId as keyof AiModels, { text: row.text });
+          const embed = await runEmbed(env, modelId, row.text);
           mapped[row.index] = vectorsFromAiData((embed as { data?: unknown })?.data, 1)[0] ?? [];
+          const usage = extractUsageFromAiResponse(embed);
+          if (usage) usages.push(usage);
         } catch (e) {
           const message = String(e instanceof Error ? e.message : e).slice(0, 300);
           throw new Error(`embed failed: ${message}`);
@@ -114,7 +151,7 @@ export async function embedTexts(
     out.push(...mapped);
   }
 
-  return out;
+  return { vectors: out, usage: mergeAiUsage(...usages) };
 }
 
 export function buildMetadataFilter(opts: Pick<QueryCollectionOptions, 'namespace' | 'docType'>): Record<string, string> | undefined {
