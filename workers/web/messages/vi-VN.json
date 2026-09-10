@@ -2698,6 +2698,7 @@
     "executions_select_run": "Chọn một lần chạy để xem graph và dữ liệu từng node.",
     "executions_no_graph": "Lần chạy này không lưu graph. Mở tab Editor hoặc chạy lại workflow.",
     "executions_truncated": "Dữ liệu lần chạy quá lớn nên không lưu đủ. Input/output có thể bị thiếu.",
+    "executions_io_compacted": "Trường này ~{kb} KB nên không lưu đủ. Chạy lại workflow để xem input/output đầy đủ.",
     "executions_collapse_details": "Ẩn dữ liệu node",
     "executions_expand_details": "Hiện dữ liệu node",
     "executions_collapse_list": "Ẩn danh sách lần chạy",

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import {
   countItems,
   flattenFields,
+  ioTruncationStub,
   previewValue,
   schemaKind,
   type IoViewMode,
@@ -159,6 +160,11 @@ function DataPaneBody({
   json: string;
 }) {
   const t = useTranslations("WorkflowEditorPage");
+  const stub = ioTruncationStub(value);
+  if (stub) {
+    const kb = Math.max(1, Math.round(stub.byteLength / 1024));
+    return <p className="text-muted-foreground p-3 text-xs">{t("executions_io_compacted", { kb })}</p>;
+  }
   if (empty) return <p className="text-muted-foreground p-3 text-xs">{emptyLabel}</p>;
   if (mode === "json") {
     const hit = !query.trim() || json.toLowerCase().includes(query.trim().toLowerCase());

@@ -120,13 +120,17 @@ function parseExecutionRow(row: any) {
     !!state &&
     typeof state === 'object' &&
     !Array.isArray(state) &&
-    (state as { _truncated?: boolean })._truncated === true;
+    ((state as { _truncated?: boolean })._truncated === true ||
+      (state as { ioTruncated?: boolean }).ioTruncated === true);
+  const stub =
+    truncated &&
+    !(state as { engine?: unknown }).engine;
   const engine =
-    !truncated && state && typeof state === 'object'
+    !stub && state && typeof state === 'object'
       ? (state as { engine?: { steps?: unknown } }).engine
       : undefined;
   const definition =
-    !truncated &&
+    !stub &&
     state &&
     typeof state === 'object' &&
     Array.isArray((state as { definition?: { nodes?: unknown } }).definition?.nodes)

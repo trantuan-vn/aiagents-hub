@@ -8,6 +8,7 @@ import {
   createExecution,
   getExecutionByKey,
   updateExecution,
+  type ExecutionRow,
 } from '../execution/execution-store.js';
 import { broadcastWorkflowExecutionProgress } from '../execution/execution-progress.js';
 import { nodePluginRegistry } from '../nodes/index.js';
@@ -33,9 +34,15 @@ import {
   isMergeFlowNode,
   isNonExecutableNode,
   mergeMode,
-  mergeParentsReady,
   parseWorkflowExecuteInput,
 } from './graph-helpers.js';
+import {
+  hasRunnableSiblingWork,
+  queueAfterHumanReviewPause,
+  queueAfterHumanReviewResume,
+} from './human-review-queue.js';
+import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
+import { resolveWorkflow } from '../execution/workflow-context.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -130,6 +137,10 @@ interface PersistedState {
   requestMeta?: { userAgent?: string; ipAddress?: string };
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
   engine: EngineState;
+  /** Oversized node I/O was compacted; resume still has queue/visited. */
+  ioTruncated?: boolean;
+  /** Graph was dropped to fit storage; resume reloads the live workflow. */
+  definitionOmitted?: boolean;
 }
 
 export interface HumanDecision {
@@ -276,9 +287,13 @@ function migrateEngineState(engine: EngineState, definition: WorkflowDefinition)
     engine.queue = remaining.filter((id) => !engine.visited.includes(id));
     return;
   }
+  // An in-flight snapshot (pause/resume) must not restart from entry nodes —
+  // that would re-run Get DB Info after Approve on a terminal Gmail review.
+  if (engine.visited.length || engine.steps?.length) {
+    engine.queue = [];
+    return;
+  }
   engine.queue = getWorkflowEntryNodeIds(definition);
-  engine.visited = engine.visited ?? [];
-  engine.skipped = engine.skipped ?? [];
 }
 
 function enqueueNode(engine: EngineState, nodeId: string): void {
@@ -402,7 +417,10 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   };
 
   migrateEngineState(engine, definition);
-  engine.entryNodeId = engine.entryNodeId || engine.queue[0];
+  if (decision?.nodeId) {
+    engine.queue = queueAfterHumanReviewResume(engine.queue, decision.nodeId, nodeById);
+  }
+  engine.entryNodeId = engine.entryNodeId || engine.queue[0] || decision?.nodeId;
 
   await emitProgress({ type: 'started', nodeId: engine.entryNodeId, status: 'running' });
 
@@ -456,6 +474,23 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       };
     } else {
       delete engine.runContext._loop;
+    }
+
+    // Send-and-wait must not pause while sibling nodes (Get DB Info / Save RAG) can still run.
+    if (
+      node.type === 'human_review' &&
+      !(decision && decision.nodeId === nodeId) &&
+      !persisted.autoApproveHumanReview &&
+      hasRunnableSiblingWork({
+        queue: engine.queue,
+        definition,
+        nodeById,
+        engine,
+        exceptNodeId: nodeId,
+      })
+    ) {
+      engine.queue.push(nodeId);
+      continue;
     }
 
     await emitProgress({ type: 'node_start', nodeId, status: 'running' });
@@ -512,7 +547,9 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.finalOutput = log.output;
         await emitProgress({ type: 'node_done', nodeId, status: 'pending_human' });
         await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
-        // Leave cursor pointing at this node so resume re-enters here.
+        // Keep other human_review waits; drop leftover siblings so Approve
+        // only continues nodes wired after this one.
+        engine.queue = queueAfterHumanReviewPause(engine.queue, nodeById);
         return { status: 'pending_human', output: log.output, pendingNodeId: nodeId };
       }
 
@@ -603,10 +640,11 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
 }
 
 /** Persist the latest engine snapshot + result onto the execution record. */
-const MAX_PERSIST_BYTES = 256_000;
-
 function capJson(value: unknown, label: string): string | undefined {
   if (value === undefined) return undefined;
+  if (label === 'state' && value && typeof value === 'object') {
+    return serializePersistedState(value as Record<string, unknown>);
+  }
   const json = JSON.stringify(value);
   if (json.length <= MAX_PERSIST_BYTES) return json;
   console.warn(`[persistResult] ${label} too large (${json.length} bytes), truncating`);
@@ -761,9 +799,76 @@ export async function executeWorkflowGraph(
   };
 }
 
+async function resolvePersistedForResume(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  record: ExecutionRow;
+  rawState: unknown;
+  pendingNodeId: string;
+}): Promise<PersistedState> {
+  const { c, bindingName, user, record, rawState, pendingNodeId } = params;
+  const stub = isTruncatedStub(rawState);
+  const parsed = !stub && rawState && typeof rawState === 'object' ? (rawState as PersistedState) : undefined;
+  const hasGraph = Array.isArray(parsed?.definition?.nodes) && parsed.definition.nodes.length > 0;
+  const hasEngine = !!parsed?.engine;
+
+  if (parsed && hasEngine && hasGraph) return parsed;
+
+  console.warn(
+    `[resume] reconstructing snapshot from live workflow ${record.workflowId}` +
+      (stub ? ' (legacy truncated stub)' : parsed?.definitionOmitted ? ' (definition omitted)' : ' (incomplete snapshot)'),
+  );
+
+  const resolved = await resolveWorkflow(
+    c,
+    bindingName,
+    user.identifier,
+    record.workflowId,
+    record.workflowOwnerId,
+  );
+
+  if (parsed?.engine && parsed.definitionOmitted) {
+    parsed.definition = resolved.definition;
+    parsed.meta = parsed.meta ?? {
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      isOwnedByUser: resolved.isOwnedByUser,
+      workflowName: String(resolved.workflow.name ?? ''),
+    };
+    parsed.variables = parsed.variables ?? {};
+    parsed.autoApproveHumanReview = parsed.autoApproveHumanReview ?? false;
+    return parsed;
+  }
+
+  return {
+    definition: resolved.definition,
+    meta: {
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      isOwnedByUser: resolved.isOwnedByUser,
+      workflowName: String(resolved.workflow.name ?? ''),
+    },
+    input: record.input,
+    variables: {},
+    autoApproveHumanReview: false,
+    engine: {
+      queue: [pendingNodeId],
+      visited: [],
+      skipped: [],
+      outputs: {},
+      steps: [],
+      runContext: { input: record.input ?? '', variables: {} },
+      totalCostVnd: record.totalCostVnd ?? 0,
+      loopStates: {},
+    },
+  };
+}
+
 /**
- * Resume a paused (pending_human) execution with an approve/reject decision,
- * continuing from the persisted engine snapshot.
+ * Resume a paused (pending_human) execution with an approve/reject decision.
+ * If the stored snapshot was compacted or replaced by a legacy size stub,
+ * reload the live workflow graph so Approve can still finish.
  */
 export async function resumeWorkflowExecution(params: {
   c: any;
@@ -782,9 +887,18 @@ export async function resumeWorkflowExecution(params: {
     throw new Error(`Execution is not awaiting review (status: ${record.status})`);
   }
 
-  const persisted = JSON.parse(record.state) as PersistedState;
+  const rawState = JSON.parse(record.state || '{}') as unknown;
   const pendingNodeId = record.pendingNodeId;
   if (!pendingNodeId) throw new Error('Execution has no pending node to resume');
+
+  const persisted = await resolvePersistedForResume({
+    c,
+    bindingName,
+    user,
+    record,
+    rawState,
+    pendingNodeId,
+  });
 
   // Mark the run as active again while we continue.
   await updateExecution(userDO, record.id, { status: 'running', pendingNodeId: '' });

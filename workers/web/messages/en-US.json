@@ -2696,6 +2696,7 @@
     "executions_select_run": "Select a run to inspect the graph and node data.",
     "executions_no_graph": "No workflow graph is stored for this run. Open the Editor tab or re-run the workflow.",
     "executions_truncated": "This run’s payload was too large to store in full. Input/output may be incomplete.",
+    "executions_io_compacted": "This field was {kb} KB and was not stored in full. Re-run the workflow to capture the complete input/output.",
     "executions_collapse_details": "Hide node data",
     "executions_expand_details": "Show node data",
     "executions_collapse_list": "Hide execution list",

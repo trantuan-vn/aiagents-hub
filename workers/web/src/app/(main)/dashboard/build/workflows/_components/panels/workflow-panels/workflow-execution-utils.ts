@@ -94,6 +94,16 @@ export function nodeKindLabel(node: Node | undefined, nodeType: string): string 
   return nodeType.replace(/_/g, " ");
 }
 
+/** Legacy compact stub: `{ _truncated: true, byteLength }` with no real payload. */
+export function ioTruncationStub(value: unknown): { byteLength: number } | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const rec = value as { _truncated?: unknown; byteLength?: unknown };
+  if (rec._truncated !== true || typeof rec.byteLength !== "number") return null;
+  const keys = Object.keys(rec);
+  if (keys.some((key) => key !== "_truncated" && key !== "byteLength" && key !== "preview")) return null;
+  return { byteLength: rec.byteLength };
+}
+
 export function countItems(value: unknown): number {
   if (value == null) return 0;
   if (Array.isArray(value)) return value.length;
