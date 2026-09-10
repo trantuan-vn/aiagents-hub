@@ -276,7 +276,7 @@ export function createToolKindDefinition(kind: ToolKind): WorkflowNodeDefinition
     nameKey: toolNameKey(kind),
     descriptionKey: toolDescKey(kind),
     category: "resource",
-    icon: "Wrench",
+    icon: kind === "save-rag" || kind === "get-rag" || kind === "get-db-info" ? "Oracle" : "Wrench",
     defaultData: {
       label: kind.replace(/-/g, " "),
       [TOOL_KIND_FIELD]: kind,
@@ -299,7 +299,7 @@ export const SAVE_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   nameKey: "tool_save_rag",
   descriptionKey: "tool_save_rag_desc",
   category: "resource",
-  icon: "Upload",
+  icon: "Oracle",
   defaultData: {
     toolKind: "save-rag",
     toolName: "save_rag",
@@ -319,7 +319,7 @@ export const GET_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   nameKey: "tool_get_rag",
   descriptionKey: "tool_get_rag_desc",
   category: "resource",
-  icon: "Search",
+  icon: "Oracle",
   defaultData: {
     toolKind: "get-rag",
     toolName: "get_rag",
@@ -339,7 +339,7 @@ export const GET_DB_INFO_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin
   nameKey: "tool_get_db_info",
   descriptionKey: "tool_get_db_info_desc",
   category: "resource",
-  icon: "TableProperties",
+  icon: "Oracle",
   defaultData: {
     toolKind: "get-db-info",
     toolName: "get_db_info",

@@ -128,6 +128,42 @@ describe('executeGetDbInfoPipeline', () => {
     expect(sqlCalls.some((s) => s.includes('PRAGMA'))).toBe(false);
   });
 
+  it('skips D1 tables whose names contain $', async () => {
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (..._args: unknown[]) => ({
+          all: async () => ({ results: [] }),
+          first: async () => ({ cnt: 0 }),
+        }),
+        all: async () => {
+          if (sql.includes('sqlite_master')) {
+            return { results: [{ name: 'orders' }, { name: 'sys$tmp' }, { name: 'users' }] };
+          }
+          return { results: [] };
+        },
+        first: async () => ({ cnt: 0 }),
+      })),
+    };
+
+    const definition: WorkflowDefinition = {
+      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: { dbId: 'analytics-db', schemaName: 'public', connection: { type: 'd1' } },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: { D1DB: db } },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetDbInfoPipeline(ctx);
+    expect(out.tables).toEqual(['orders', 'users']);
+  });
+
   it('connects to OCI Oracle using user, password, and connectString from the previous node', async () => {
     const definition: WorkflowDefinition = {
       nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
@@ -210,6 +246,72 @@ describe('executeGetDbInfoPipeline', () => {
       password: 'secret',
       connectString,
     });
+  });
+
+  it('skips Oracle system-generated tables whose names contain $', async () => {
+    directMock.listOracleTablesDirect.mockResolvedValueOnce([
+      'ORDERS',
+      'BIN$abc123',
+      'AQ$_ORDERS_T',
+      'MLOG$_USERS',
+      'CUSTOMERS',
+    ]);
+
+    const definition: WorkflowDefinition = {
+      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        status: 200,
+        data: {
+          user: 'ADMIN',
+          password: 'secret',
+          connectString: 'dbname_high',
+        },
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: {} },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetDbInfoPipeline(ctx);
+    expect(out.tables).toEqual(['ORDERS', 'CUSTOMERS']);
+    expect((out.items as Array<{ tableName: string }>).map((i) => i.tableName)).toEqual([
+      'ORDERS',
+      'CUSTOMERS',
+    ]);
+  });
+
+  it('does not list a named table when the name contains $', async () => {
+    const definition: WorkflowDefinition = {
+      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        status: 200,
+        data: {
+          user: 'ADMIN',
+          password: 'secret',
+          connectString: 'dbname_high',
+          tableName: 'BIN$recycle',
+        },
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: {} },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    await expect(executeGetDbInfoPipeline(ctx)).rejects.toThrow(/no tables found/i);
   });
 
   it('resolves Oracle credentials from mapped Form expressions', async () => {

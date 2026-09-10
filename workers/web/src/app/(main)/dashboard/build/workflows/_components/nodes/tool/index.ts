@@ -37,6 +37,17 @@ function toolDescKey(kind: ToolKind): string {
   return `${toolLabelKey(kind)}_desc`;
 }
 
+function toolCatalogIcon(kind: ToolKind): string {
+  switch (kind) {
+    case "save-rag":
+    case "get-rag":
+    case "get-db-info":
+      return "Oracle";
+    default:
+      return "Wrench";
+  }
+}
+
 /** Base tool_node — hidden; kind plugins are catalog entries. */
 export const toolUIPlugin: WorkflowNodeUIPlugin = {
   id: "tool_node",
@@ -68,7 +79,7 @@ export function createToolKindUIPlugin(kind: ToolKind): WorkflowNodeUIPlugin {
       category: "tool",
       labelKey: toolLabelKey(kind),
       descriptionKey: toolDescKey(kind),
-      icon: "Wrench",
+      icon: toolCatalogIcon(kind),
       keywords: [kind, "tool"],
     },
   };

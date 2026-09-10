@@ -72,7 +72,9 @@ type DbConnection = {
 
 async function listD1Tables(db: D1Database): Promise<string[]> {
   const { results } = await db
-    .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+    .prepare(
+      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%$%' ORDER BY name`,
+    )
     .all<{ name: string }>();
   return (results ?? []).map((r) => r.name);
 }
@@ -211,18 +213,24 @@ export async function listDatabaseTables(
   return filterTables([], tableFilter);
 }
 
+/** Oracle-generated objects (recycle bin, AQ, MV logs, Text indexes) include `$`. */
+function isSystemGeneratedTable(name: string): boolean {
+  return name.includes('$');
+}
+
 function filterTables(tables: string[], tableFilter: string): string[] {
+  const realTables = tables.filter((t) => !isSystemGeneratedTable(t));
   const filter = tableFilter.trim();
-  if (!filter || filter === '*') return tables;
+  if (!filter || filter === '*') return realTables;
   if (filter.includes(',')) {
     const allowed = new Set(filter.split(',').map((s) => s.trim()).filter(Boolean));
-    return tables.filter((t) => allowed.has(t));
+    return realTables.filter((t) => allowed.has(t));
   }
   if (filter.includes('*')) {
     const re = new RegExp(`^${filter.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
-    return tables.filter((t) => re.test(t));
+    return realTables.filter((t) => re.test(t));
   }
-  return tables.filter((t) => t === filter);
+  return realTables.filter((t) => t === filter);
 }
 
 export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<GetDbInfoResult> {
@@ -447,7 +455,7 @@ export async function introspectTablesToRagDocuments(params: {
       tableName: String(t.tableName ?? '').trim(),
       schemaName: String(t.schemaName ?? ''),
     }))
-    .filter((t) => t.tableName);
+    .filter((t) => t.tableName && !isSystemGeneratedTable(t.tableName));
   if (!tables.length) return [];
   if (tables.length === 1) {
     return introspectTableToRagDocuments({ ...params, ...tables[0]! });
@@ -535,7 +543,7 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
   const namedTable = String(triggerContext.tableName ?? '').trim();
 
   const tables = namedTable
-    ? [namedTable]
+    ? filterTables([namedTable], tableFilter)
     : await listDatabaseTables(ctx.c.env, connection, schemaName, tableFilter);
 
   if (!tables.length) {

@@ -146,7 +146,10 @@ export async function listOracleTablesDirect(
     const owner = oracleName(schemaName);
     const rows = await executeRows(
       connection,
-      `SELECT table_name FROM all_tables WHERE owner = :owner ORDER BY table_name`,
+      `SELECT table_name FROM all_tables
+        WHERE owner = :owner
+          AND table_name NOT LIKE '%$%'
+        ORDER BY table_name`,
       { owner },
       oracledb.OUT_FORMAT_OBJECT,
       2000,

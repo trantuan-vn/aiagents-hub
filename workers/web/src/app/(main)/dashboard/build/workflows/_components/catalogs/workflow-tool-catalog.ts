@@ -6,13 +6,13 @@ import {
   Globe,
   Link2,
   LogIn,
-  Search,
-  TableProperties,
-  Upload,
   type LucideIcon,
 } from "lucide-react";
+import type { ComponentType } from "react";
 import type { SimpleIcon } from "simple-icons";
 import { siMongodb, siSupabase } from "simple-icons";
+
+import { OracleIcon } from "../nodes/tool/oracle-icon";
 
 export type WorkflowAgentToolKind =
   | "agent"
@@ -180,7 +180,7 @@ export type WorkflowAgentBuiltinTool = {
   id: WorkflowAgentBuiltinToolId;
   nameKey: "tool_save_rag" | "tool_get_rag" | "tool_get_db_info";
   descKey: "tool_save_rag_desc" | "tool_get_rag_desc" | "tool_get_db_info_desc";
-  icon: LucideIcon;
+  icon: ComponentType<{ className?: string }>;
 };
 
 export const WORKFLOW_AGENT_BUILTIN_TOOLS: WorkflowAgentBuiltinTool[] = [
@@ -188,19 +188,19 @@ export const WORKFLOW_AGENT_BUILTIN_TOOLS: WorkflowAgentBuiltinTool[] = [
     id: "save-rag",
     nameKey: "tool_save_rag",
     descKey: "tool_save_rag_desc",
-    icon: Upload,
+    icon: OracleIcon,
   },
   {
     id: "get-rag",
     nameKey: "tool_get_rag",
     descKey: "tool_get_rag_desc",
-    icon: Search,
+    icon: OracleIcon,
   },
   {
     id: "get-db-info",
     nameKey: "tool_get_db_info",
     descKey: "tool_get_db_info_desc",
-    icon: TableProperties,
+    icon: OracleIcon,
   },
 ];
 

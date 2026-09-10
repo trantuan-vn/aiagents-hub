@@ -7,9 +7,13 @@ import { Wrench } from "lucide-react";
 
 import { ConnectionHandle } from "../../edges/connection-handle";
 import { WorkflowNodeShell } from "../../node-ui/workflow-node-shell";
+import { OracleIcon } from "./oracle-icon";
+
+const ORACLE_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
 
 function ToolNode({ data, selected }: NodeProps) {
-  const d = data as { label?: string; deactivated?: boolean };
+  const d = data as { label?: string; deactivated?: boolean; toolKind?: string };
+  const showOracle = ORACLE_TOOL_KINDS.has(String(d.toolKind ?? ""));
 
   return (
     <WorkflowNodeShell selected={selected} accent="border-amber-500/40" deactivated={d.deactivated} pill>
@@ -24,7 +28,11 @@ function ToolNode({ data, selected }: NodeProps) {
         clusterClass="absolute left-1/2 top-0 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-0.5"
       />
       <div className="flex items-center justify-center gap-2 font-medium">
-        <Wrench className="h-4 w-4 shrink-0 opacity-80" />
+        {showOracle ? (
+          <OracleIcon className="h-4 w-4" />
+        ) : (
+          <Wrench className="h-4 w-4 shrink-0 opacity-80" />
+        )}
         <span className="max-w-[160px] truncate">{d.label ?? "Tool"}</span>
       </div>
       <ConnectionHandle handleId="out" type="source" position={Position.Right} accentClass="!bg-amber-500" />
