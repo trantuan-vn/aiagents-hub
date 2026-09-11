@@ -355,6 +355,41 @@ export async function listTriggers(
   return results ?? [];
 }
 
+export interface WorkflowActiveCronSummary {
+  cronCount: number;
+  cronExpr: string;
+  nextRunAt: number | null;
+}
+
+/** One summary per workflow that has at least one enabled cron row. */
+export function summarizeEnabledCrons(
+  rows: Array<Pick<WorkflowTriggerRow, 'workflowId' | 'type' | 'enabled' | 'cronExpr' | 'nextRunAt'>>,
+): Map<number, WorkflowActiveCronSummary> {
+  const byWorkflow = new Map<number, Array<{ cronExpr: string; nextRunAt: number | null }>>();
+  for (const row of rows) {
+    if (row.type !== 'cron' || row.enabled !== 1) continue;
+    const expr = row.cronExpr?.trim();
+    if (!expr) continue;
+    const list = byWorkflow.get(row.workflowId) ?? [];
+    list.push({ cronExpr: expr, nextRunAt: row.nextRunAt });
+    byWorkflow.set(row.workflowId, list);
+  }
+  const out = new Map<number, WorkflowActiveCronSummary>();
+  for (const [workflowId, list] of byWorkflow) {
+    const soonest = list.reduce((best, cur) => {
+      if (best.nextRunAt == null) return cur;
+      if (cur.nextRunAt == null) return best;
+      return cur.nextRunAt < best.nextRunAt ? cur : best;
+    });
+    out.set(workflowId, {
+      cronCount: list.length,
+      cronExpr: soonest.cronExpr,
+      nextRunAt: soonest.nextRunAt,
+    });
+  }
+  return out;
+}
+
 export async function getTrigger(
   db: D1Database,
   ownerId: string,

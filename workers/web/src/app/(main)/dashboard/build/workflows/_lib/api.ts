@@ -29,6 +29,11 @@ export interface AgentWorkflow {
   totalEarningsUsd?: number;
   status?: "draft" | "published";
   user_id?: string;
+  /** True when this workflow has at least one enabled D1 cron trigger. */
+  hasActiveCron?: boolean;
+  cronExpr?: string | null;
+  cronCount?: number;
+  cronNextRunAt?: number | null;
 }
 
 export function listMyWorkflows() {

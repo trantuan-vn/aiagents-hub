@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 
 import { defaultScheduleRule, scheduleRuleToCron } from '@aiagents-hub/workflow-nodes';
 
-import { cronJitterMs, cronMatches, cronQueueDelaySeconds, minuteKey, nextCronOccurrence, resolveAlarmTime } from './triggers.js';
+import {
+  cronJitterMs,
+  cronMatches,
+  cronQueueDelaySeconds,
+  minuteKey,
+  nextCronOccurrence,
+  resolveAlarmTime,
+  summarizeEnabledCrons,
+} from './triggers.js';
 
 describe('nextCronOccurrence', () => {
   it('returns the next minute for * * * * *', () => {
@@ -90,5 +98,51 @@ describe('default schedule', () => {
     const rule = defaultScheduleRule();
     expect(rule.field).toBe('hours');
     expect(scheduleRuleToCron(rule)).toBe('0 */1 * * *');
+  });
+});
+
+describe('summarizeEnabledCrons', () => {
+  const row = (
+    partial: Partial<{
+      workflowId: number;
+      type: 'cron' | 'webhook';
+      enabled: number;
+      cronExpr: string | null;
+      nextRunAt: number | null;
+    }>,
+  ) => ({
+    workflowId: 1,
+    type: 'cron' as const,
+    enabled: 1,
+    cronExpr: '0 * * * *',
+    nextRunAt: 1000,
+    ...partial,
+  });
+
+  it('ignores disabled, non-cron, and empty expressions', () => {
+    const map = summarizeEnabledCrons([
+      row({ enabled: 0 }),
+      row({ type: 'webhook', cronExpr: null }),
+      row({ cronExpr: '  ' }),
+    ]);
+    expect(map.size).toBe(0);
+  });
+
+  it('picks the soonest nextRunAt when a workflow has several crons', () => {
+    const map = summarizeEnabledCrons([
+      row({ cronExpr: '0 0 * * *', nextRunAt: 5000 }),
+      row({ cronExpr: '*/15 * * * *', nextRunAt: 2000 }),
+      row({ workflowId: 2, cronExpr: '0 8 * * 1', nextRunAt: null }),
+    ]);
+    expect(map.get(1)).toEqual({
+      cronCount: 2,
+      cronExpr: '*/15 * * * *',
+      nextRunAt: 2000,
+    });
+    expect(map.get(2)).toEqual({
+      cronCount: 1,
+      cronExpr: '0 8 * * 1',
+      nextRunAt: null,
+    });
   });
 });

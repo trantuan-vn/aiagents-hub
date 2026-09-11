@@ -22,7 +22,9 @@ import {
   deleteTrigger,
   findFormTriggerByNodeId,
   findWebhookTriggerByNodeId,
+  isChannelTriggerType,
   listTriggers,
+  summarizeEnabledCrons,
   syncCronTriggersForWorkflow,
   syncWebhookTriggersForWorkflow,
   updateTrigger,
@@ -37,7 +39,6 @@ import {
   buildExecutionObservability,
   computeExecutionStats,
 } from '../execution/execution-observability.js';
-import { isChannelTriggerType } from '../triggers/triggers.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -281,7 +282,29 @@ export function createWorkflowRoutes(bindingName: string) {
       const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
         orderBy: { field: 'updated_at', direction: 'DESC' },
       }, 'agent_workflows');
-      return c.json({ workflows: rows ?? [] });
+      const workflows = Array.isArray(rows) ? rows : [];
+      const db = c.env.D1DB;
+      if (!db) return c.json({ workflows });
+      try {
+        const ownerId = getUserId(c, user.identifier);
+        const crons = summarizeEnabledCrons(await listTriggers(db, ownerId));
+        return c.json({
+          workflows: workflows.map((wf: { id?: number }) => {
+            const cron = typeof wf.id === 'number' ? crons.get(wf.id) : undefined;
+            if (!cron) return { ...wf, hasActiveCron: false };
+            return {
+              ...wf,
+              hasActiveCron: true,
+              cronExpr: cron.cronExpr,
+              cronCount: cron.cronCount,
+              cronNextRunAt: cron.nextRunAt,
+            };
+          }),
+        });
+      } catch (e) {
+        console.error('[workflows] cron summary failed:', e);
+        return c.json({ workflows });
+      }
     }, 'Failed to list workflows'),
   );
 

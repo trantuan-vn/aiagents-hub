@@ -15,6 +15,7 @@ import { formatUsd } from "@/lib/utils";
 import { deleteWorkflow, listMyWorkflows, type AgentWorkflow } from "../../_lib/api";
 
 import { StarDisplay } from "./star-display";
+import { WorkflowCronBadge } from "./workflow-cron-badge";
 import { WorkflowExecuteDialog } from "../panels/workflow-panels/workflow-execute-dialog";
 
 export function MyWorkflowsTab() {
@@ -65,7 +66,16 @@ export function MyWorkflowsTab() {
           <Card key={wf.id}>
             <CardHeader className="pb-2">
               <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-base">{wf.name}</CardTitle>
+                <div className="min-w-0 space-y-1.5">
+                  <CardTitle className="text-base">{wf.name}</CardTitle>
+                  {wf.hasActiveCron ? (
+                    <WorkflowCronBadge
+                      cronExpr={wf.cronExpr}
+                      cronCount={wf.cronCount}
+                      cronNextRunAt={wf.cronNextRunAt}
+                    />
+                  ) : null}
+                </div>
                 <Badge variant={wf.status === "published" ? "default" : "secondary"}>
                   {wf.status === "published" ? t("status_published") : t("status_draft")}
                 </Badge>

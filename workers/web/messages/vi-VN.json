@@ -2151,7 +2151,10 @@
     "your_rating": "Đánh giá của bạn",
     "rater_count": "{count, plural, =0 {Chưa có đánh giá} other {{count} người đã đánh giá}}",
     "rating_saved": "Đã lưu đánh giá",
-    "rating_error": "Không lưu được đánh giá"
+    "rating_error": "Không lưu được đánh giá",
+    "cron_active": "Cron đang chạy",
+    "cron_next_run": "Lần chạy tiếp: {time}",
+    "cron_more": "+{count}"
   },
   "WorkflowViewPage": {
     "back": "Quay lại cộng đồng",
