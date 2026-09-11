@@ -10,7 +10,7 @@ import {
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
-import { executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
+import { cancelWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
 import {
   findFormDatabaseTriggerNode,
   runFormDatabaseTrigger,
@@ -468,6 +468,20 @@ export function createWorkflowRoutes(bindingName: string) {
       });
       return c.json(result);
     }, 'Failed to resume execution'),
+  );
+
+  app.post(
+    '/executions/:executionKey/cancel',
+    createRouteHandler(async (c: any, user: any) => {
+      const executionKey = c.req.param('executionKey');
+      const result = await cancelWorkflowExecution({
+        c,
+        bindingName,
+        user,
+        executionKey,
+      });
+      return c.json(result);
+    }, 'Failed to stop execution'),
   );
 
   // --- Integration presets catalog ---

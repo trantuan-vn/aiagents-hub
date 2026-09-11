@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Copy, Download, Wand2 } from "lucide-react";
+import { Copy, Download, Square, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -36,10 +36,14 @@ function exportExecution(selected: WorkflowExecutionRecord) {
 
 function ExecutionMetaBar({
   selected,
+  stopping,
+  onStop,
   onApplyDefinition,
   onCopiedToEditor,
 }: {
   selected: WorkflowExecutionRecord;
+  stopping?: boolean;
+  onStop?: () => void;
   onApplyDefinition?: (definitionJson: string) => void;
   onCopiedToEditor?: () => void;
 }) {
@@ -82,6 +86,18 @@ function ExecutionMetaBar({
         {t("executions_col_cost")}: {formatUsd(selected.totalCostVnd)}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        {selected.status === "running" && onStop ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs text-red-600 hover:bg-red-500/10 hover:text-red-600"
+            onClick={onStop}
+            disabled={stopping}
+          >
+            <Square className="size-3 fill-current" />
+            {stopping ? t("executions_stopping") : t("executions_stop")}
+          </Button>
+        ) : null}
         {onApplyDefinition && selected.definition ? (
           <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onCopyToEditor}>
             {t("executions_copy_to_editor")}
@@ -308,23 +324,33 @@ export function WorkflowExecutionWorkspace({
   selected,
   graphDefinition,
   selectedNodeId,
+  stopping,
   onSelectNode,
   onApplyDefinition,
   onCopiedToEditor,
   onReload,
+  onStop,
 }: {
   workflowId: number;
   selected: WorkflowExecutionRecord;
   graphDefinition: ExecutionGraph | undefined;
   selectedNodeId: string | null;
+  stopping?: boolean;
   onSelectNode: (nodeId: string | null) => void;
   onApplyDefinition?: (definitionJson: string) => void;
   onCopiedToEditor?: () => void;
   onReload: () => Promise<void>;
+  onStop?: () => void;
 }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-      <ExecutionMetaBar selected={selected} onApplyDefinition={onApplyDefinition} onCopiedToEditor={onCopiedToEditor} />
+      <ExecutionMetaBar
+        selected={selected}
+        stopping={stopping}
+        onStop={onStop}
+        onApplyDefinition={onApplyDefinition}
+        onCopiedToEditor={onCopiedToEditor}
+      />
       <ExecutionAlerts
         workflowId={workflowId}
         selected={selected}

@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
+
+import { cancelWorkflowExecution } from "../../../_lib/api";
 
 import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { useWorkflowExecutions } from "./use-workflow-executions";
@@ -47,6 +50,7 @@ export function WorkflowExecutionsPanel({
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [listCollapsed, setListCollapsed] = useState(false);
+  const [stoppingKey, setStoppingKey] = useState<string | null>(null);
   const {
     executions,
     loading,
@@ -60,6 +64,19 @@ export function WorkflowExecutionsPanel({
     load,
     graphDefinition,
   } = useWorkflowExecutions(workflowId, fallbackDefinitionJson);
+
+  const onStop = async (executionKey: string) => {
+    setStoppingKey(executionKey);
+    try {
+      await cancelWorkflowExecution(executionKey);
+      toast.success(t("executions_stop_done"));
+      await load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("executions_stop_failed"));
+    } finally {
+      setStoppingKey(null);
+    }
+  };
 
   useEffect(() => {
     setListCollapsed(readListCollapsed());
@@ -77,10 +94,12 @@ export function WorkflowExecutionsPanel({
       selected={selected}
       graphDefinition={graphDefinition}
       selectedNodeId={selectedNodeId}
+      stopping={stoppingKey === selected.executionKey}
       onSelectNode={setSelectedNodeId}
       onApplyDefinition={onApplyDefinition}
       onCopiedToEditor={onCopiedToEditor}
       onReload={() => load(true)}
+      onStop={() => void onStop(selected.executionKey)}
     />
   ) : (
     <div className="flex h-full items-center justify-center">
@@ -121,11 +140,13 @@ export function WorkflowExecutionsPanel({
           search={search}
           searchOpen={searchOpen}
           autoRefresh={autoRefresh}
+          stoppingKey={stoppingKey}
           onSearchChange={setSearch}
           onSearchOpenChange={setSearchOpen}
           onAutoRefreshChange={setAutoRefresh}
           onSelect={setSelectedKey}
           onRefresh={() => void load()}
+          onStop={(key) => void onStop(key)}
           onCollapse={() => collapseList(true)}
         />
       </ResizablePanel>

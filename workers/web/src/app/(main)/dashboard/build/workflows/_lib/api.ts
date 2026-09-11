@@ -260,6 +260,13 @@ export function resumeWorkflowExecution(
   );
 }
 
+export function cancelWorkflowExecution(executionKey: string) {
+  return apiFetch<WorkflowExecutionResult>(
+    `/dashboard/build/workflows/executions/${executionKey}/cancel`,
+    { method: "POST" },
+  );
+}
+
 // --- Triggers (cron + webhook) ---
 export type WorkflowTriggerType = "cron" | "webhook" | "form" | "telegram" | "slack" | "discord";
 

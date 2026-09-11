@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Clock, Loader2, Minus, RefreshCw, Search, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock, Loader2, Minus, RefreshCw, Search, Square, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,13 @@ export function ExecutionStatusGlyph({ status }: { status: WorkflowExecutionStat
       </span>
     );
   }
+  if (status === "cancelled") {
+    return (
+      <span className="flex size-5 items-center justify-center rounded-full bg-zinc-500 text-white">
+        <Square className="size-2.5 fill-current" aria-hidden />
+      </span>
+    );
+  }
   return (
     <span className="bg-muted text-muted-foreground flex size-5 items-center justify-center rounded-full">
       <Minus className="size-3" aria-hidden />
@@ -56,6 +63,7 @@ function executionHeadline(
   if (exec.status === "completed") return t("executions_headline_completed", { duration: dur });
   if (exec.status === "failed") return t("executions_headline_failed", { duration: dur });
   if (exec.status === "running") return t("executions_headline_running", { duration: dur });
+  if (exec.status === "cancelled") return t("executions_headline_cancelled", { duration: dur });
   return t(`executions_status_${exec.status}`);
 }
 
@@ -87,11 +95,13 @@ export function WorkflowExecutionList({
   search,
   searchOpen,
   autoRefresh,
+  stoppingKey,
   onSearchChange,
   onSearchOpenChange,
   onAutoRefreshChange,
   onSelect,
   onRefresh,
+  onStop,
   onCollapse,
 }: {
   executions: WorkflowExecutionRecord[];
@@ -100,11 +110,13 @@ export function WorkflowExecutionList({
   search: string;
   searchOpen: boolean;
   autoRefresh: boolean;
+  stoppingKey?: string | null;
   onSearchChange: (value: string) => void;
   onSearchOpenChange: (open: boolean) => void;
   onAutoRefreshChange: (value: boolean) => void;
   onSelect: (key: string) => void;
   onRefresh: () => void;
+  onStop?: (executionKey: string) => void;
   onCollapse?: () => void;
 }) {
   const t = useTranslations("WorkflowEditorPage");
@@ -138,23 +150,43 @@ export function WorkflowExecutionList({
           const started = new Date(exec.startedAt);
           return (
             <li key={exec.executionKey}>
-              <button
-                type="button"
-                onClick={() => onSelect(exec.executionKey)}
+              <div
                 className={cn(
-                  "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors",
+                  "flex w-full items-start gap-1 px-2 py-2.5 transition-colors",
                   selectedKey === exec.executionKey ? "bg-muted" : "hover:bg-muted/50",
                 )}
               >
-                <ExecutionStatusGlyph status={exec.status} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12px] font-medium">{executionHeadline(exec, t)}</span>
-                  <span className="text-muted-foreground mt-0.5 block text-[11px]">
-                    {started.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                <button
+                  type="button"
+                  onClick={() => onSelect(exec.executionKey)}
+                  className="flex min-w-0 flex-1 items-start gap-2.5 px-1 text-left"
+                >
+                  <ExecutionStatusGlyph status={exec.status} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[12px] font-medium">{executionHeadline(exec, t)}</span>
+                    <span className="text-muted-foreground mt-0.5 block text-[11px]">
+                      {started.toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}
+                    </span>
+                    <span className="text-muted-foreground block text-[11px]">{started.toLocaleTimeString()}</span>
                   </span>
-                  <span className="text-muted-foreground block text-[11px]">{started.toLocaleTimeString()}</span>
-                </span>
-              </button>
+                </button>
+                {exec.status === "running" && onStop ? (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:bg-background hover:text-red-600 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md"
+                    title={t("executions_stop")}
+                    aria-label={t("executions_stop")}
+                    disabled={stoppingKey === exec.executionKey}
+                    onClick={() => onStop(exec.executionKey)}
+                  >
+                    {stoppingKey === exec.executionKey ? (
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    ) : (
+                      <Square className="size-3 fill-current" aria-hidden />
+                    )}
+                  </button>
+                ) : null}
+              </div>
             </li>
           );
         })}

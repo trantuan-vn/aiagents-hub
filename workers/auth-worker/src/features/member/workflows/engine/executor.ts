@@ -42,6 +42,7 @@ import {
   queueAfterHumanReviewResume,
 } from './human-review-queue.js';
 import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
+import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
 import { resolveWorkflow } from '../execution/workflow-context.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
@@ -425,6 +426,12 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   await emitProgress({ type: 'started', nodeId: engine.entryNodeId, status: 'running' });
 
   while (engine.queue.length > 0) {
+    const live = await getExecutionByKey(userDO, executionKey);
+    if (live?.status === 'cancelled') {
+      await emitProgress({ type: 'finished', status: 'cancelled' });
+      return { status: 'cancelled', output: engine.finalOutput ?? { stopped: true } };
+    }
+
     const nodeId = engine.queue.shift()!;
     if (engine.visited.includes(nodeId) || engine.skipped.includes(nodeId)) continue;
 
@@ -656,20 +663,23 @@ async function persistResult(
   executionId: number,
   persisted: PersistedState,
   result: RunEngineResult,
+  executionKey: string,
 ): Promise<void> {
-  const terminal = result.status !== 'pending_human';
+  const current = await getExecutionByKey(userDO, executionKey);
+  const status = persistStatusHonoringCancel(current?.status, result.status);
+  const terminal = status !== 'pending_human';
   await updateExecution(userDO, executionId, {
-    status: result.status,
+    status,
     state: capJson(persisted, 'state') ?? '{}',
     output: capJson(result.output, 'output'),
     totalCostVnd: persisted.engine.totalCostVnd,
     stepCount: persisted.engine.steps.length,
-    pendingNodeId: result.pendingNodeId ?? '',
+    pendingNodeId: status === 'cancelled' ? '' : (result.pendingNodeId ?? ''),
     error:
-      result.status === 'failed'
+      status === 'failed'
         ? String((result.output as any)?.error ?? 'failed').slice(0, 2000)
         : undefined,
-    finishedAt: terminal ? Date.now() : undefined,
+    finishedAt: terminal ? (current?.finishedAt || Date.now()) : undefined,
   });
 }
 
@@ -782,7 +792,7 @@ export async function executeWorkflowGraph(
     result = { status: 'failed', output: { error: message } };
   }
   try {
-    await persistResult(userDO, record.id, persisted, result);
+    await persistResult(userDO, record.id, persisted, result, executionKey);
   } catch (e) {
     console.warn('[executeWorkflowGraph] persist failed:', e instanceof Error ? e.message : e);
   }
@@ -912,7 +922,7 @@ export async function resumeWorkflowExecution(params: {
     executionKey,
     decision: { nodeId: pendingNodeId, approved, note },
   });
-  await persistResult(userDO, record.id, persisted, result);
+  await persistResult(userDO, record.id, persisted, result, executionKey);
 
   return {
     status: result.status,
@@ -923,5 +933,68 @@ export async function resumeWorkflowExecution(params: {
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
     pendingNodeId: result.pendingNodeId,
+  };
+}
+
+/**
+ * Stop a running or paused execution. Marks the record cancelled immediately
+ * (covers zombie runs whose worker already died). A still-live engine notices
+ * the flag between nodes and exits without overwriting the status.
+ */
+export async function cancelWorkflowExecution(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  executionKey: string;
+}): Promise<WorkflowExecutionResult> {
+  const { c, bindingName, user, executionKey } = params;
+  const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+
+  const record = await getExecutionByKey(userDO, executionKey);
+  if (!record) throw new Error('Execution not found');
+
+  if (record.status === 'cancelled') {
+    return {
+      status: 'cancelled',
+      executionKey,
+      workflowId: record.workflowId,
+      workflowOwnerId: record.workflowOwnerId,
+      steps: [],
+      totalCostVnd: record.totalCostVnd ?? 0,
+    };
+  }
+
+  if (!isStoppableExecutionStatus(record.status)) {
+    throw new Error(`Execution cannot be stopped (status: ${record.status})`);
+  }
+
+  await updateExecution(userDO, record.id, {
+    status: 'cancelled',
+    pendingNodeId: '',
+    finishedAt: Date.now(),
+  });
+  await broadcastWorkflowExecutionProgress(userDO, {
+    workflowId: record.workflowId,
+    executionKey,
+    type: 'finished',
+    status: 'cancelled',
+  });
+
+  let steps: ExecutionStepLog[] = [];
+  try {
+    const parsed = JSON.parse(record.state || '{}') as PersistedState;
+    if (Array.isArray(parsed.engine?.steps)) steps = parsed.engine.steps;
+  } catch {
+    /* keep empty steps */
+  }
+
+  return {
+    status: 'cancelled',
+    executionKey,
+    workflowId: record.workflowId,
+    workflowOwnerId: record.workflowOwnerId,
+    output: { stopped: true },
+    steps,
+    totalCostVnd: record.totalCostVnd ?? 0,
   };
 }
