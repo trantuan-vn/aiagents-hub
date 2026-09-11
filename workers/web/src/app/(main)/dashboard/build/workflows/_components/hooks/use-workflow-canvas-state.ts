@@ -30,6 +30,7 @@ import {
   selectAllNodes,
   ungroupNodes,
 } from "../layout/workflow-node-group-utils";
+import { isScheduleTriggerNodeLike, pruneOrphanCronTriggers, removeNodeCronTriggers } from "../nodes/trigger/sync-schedule-cron";
 
 function shouldPersistNodeChanges(changes: NodeChange[]): boolean {
   return changes.some((c) => {
@@ -62,6 +63,11 @@ export function useWorkflowCanvasState(
   edgesRef.current = edges;
   const deletedEdgeIdsRef = useRef(new Set<string>());
   const externalSyncKeyRef = useRef(externalSyncKey ?? 0);
+
+  useEffect(() => {
+    if (readOnly || !workflowId || Number.isNaN(workflowId)) return;
+    void pruneOrphanCronTriggers(workflowId, nodesRef.current);
+  }, [readOnly, workflowId]);
 
   const pushToParent = useCallback(() => {
     if (readOnly) return;
@@ -124,8 +130,20 @@ export function useWorkflowCanvasState(
     pushToParent();
   }, [pushToParent]);
 
+  const dropCronTriggersForNodes = useCallback(
+    (deleted: Node[]) => {
+      if (!workflowId || Number.isNaN(workflowId)) return;
+      for (const node of deleted) {
+        if (!isScheduleTriggerNodeLike(node)) continue;
+        void removeNodeCronTriggers(workflowId, node.id);
+      }
+    },
+    [workflowId],
+  );
+
   const onNodesDelete = useCallback(
     (deleted: Node[]) => {
+      dropCronTriggersForNodes(deleted);
       const deletedIds = new Set(deleted.map((n) => n.id));
       const deletedGroups = new Map(
         deleted.filter((node) => isWorkflowGroupNode(node)).map((node) => [node.id, node]),
@@ -156,7 +174,7 @@ export function useWorkflowCanvasState(
       edgesRef.current = nextEdges;
       setEdges(nextEdges);
     },
-    [setNodes, setEdges],
+    [dropCronTriggersForNodes, setNodes, setEdges],
   );
 
   const onEdgesDelete = useCallback((deleted: Edge[]) => {
@@ -210,6 +228,7 @@ export function useWorkflowCanvasState(
       if (readOnly) return;
       const target = nodesRef.current.find((node) => node.id === nodeId);
       if (!target) return;
+      dropCronTriggersForNodes([target]);
 
       if (isWorkflowGroupNode(target)) {
         setNodes((nds) => {
@@ -243,7 +262,7 @@ export function useWorkflowCanvasState(
       lastEmittedRef.current = persistedSignature(nextNodes, nextEdges);
       onChangeRef.current?.(toPersistedDefinition(nextNodes, nextEdges, viewportRef.current));
     },
-    [readOnly, setNodes, setEdges],
+    [dropCronTriggersForNodes, readOnly, setNodes, setEdges],
   );
 
   const toggleNodeActive = useCallback(

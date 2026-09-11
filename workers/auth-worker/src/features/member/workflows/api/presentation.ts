@@ -23,6 +23,7 @@ import {
   findFormTriggerByNodeId,
   findWebhookTriggerByNodeId,
   listTriggers,
+  syncCronTriggersForWorkflow,
   syncWebhookTriggersForWorkflow,
   updateTrigger,
   workflowDefinitionHasWebhookTrigger,
@@ -702,12 +703,15 @@ export function createWorkflowRoutes(bindingName: string) {
               ? body.definition
               : ((updated as { definition?: string })?.definition ?? '{"nodes":[],"edges":[]}');
           const definition = parseWorkflowDefinition(defRaw);
-          if (db && workflowDefinitionHasWebhookTrigger(definition)) {
+          if (db) {
             const ownerId = getUserId(c, user.identifier);
-            await syncWebhookTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
+            await syncCronTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
+            if (workflowDefinitionHasWebhookTrigger(definition)) {
+              await syncWebhookTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
+            }
           }
         } catch (e) {
-          console.error('[workflows] webhook trigger sync failed:', e);
+          console.error('[workflows] trigger sync failed:', e);
         }
       }
       return c.json({ workflow: updated });

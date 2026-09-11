@@ -646,6 +646,60 @@ export async function resolveOwnedWorkflow(
   };
 }
 
+/** Canvas node ids for `triggerKind: schedule`. */
+export function listScheduleTriggerNodeIds(definition: WorkflowDefinition): string[] {
+  return definition.nodes
+    .filter((node) => {
+      const data = (node.data ?? {}) as { triggerKind?: string };
+      return node.type === 'trigger' && data.triggerKind === 'schedule';
+    })
+    .map((node) => node.id);
+}
+
+/** True when a D1 cron row no longer has a matching Schedule node on the canvas. */
+export function isOrphanCronTrigger(
+  trigger: Pick<WorkflowTriggerRow, 'type' | 'nodeId'>,
+  definition: WorkflowDefinition,
+): boolean {
+  if (trigger.type !== 'cron') return false;
+  const scheduleIds = listScheduleTriggerNodeIds(definition);
+  if (trigger.nodeId) return !scheduleIds.includes(trigger.nodeId);
+  return scheduleIds.length === 0;
+}
+
+/** Drop D1 cron rows whose Schedule node was deleted from the canvas. */
+export async function syncCronTriggersForWorkflow(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+): Promise<number> {
+  let resolved: ResolvedWorkflow;
+  try {
+    resolved = await resolveOwnedWorkflow(env, bindingName, ownerId, workflowId);
+  } catch {
+    return 0;
+  }
+
+  await ensureTriggerTable(db);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'cron'`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+
+  let removed = 0;
+  for (const row of results ?? []) {
+    if (!isOrphanCronTrigger(row, resolved.definition)) continue;
+    await deleteTrigger(db, ownerId, row.triggerId);
+    removed += 1;
+  }
+  return removed;
+}
+
 /** Scan D1 for cron triggers due this minute and run them. Called from `scheduled`. */
 export async function runDueCronTriggers(env: Env, bindingName: string): Promise<number> {
   const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
@@ -656,6 +710,11 @@ export async function runDueCronTriggers(env: Env, bindingName: string): Promise
   await Promise.all(
     due.map(async (t) => {
       try {
+        const resolved = await resolveOwnedWorkflow(env, bindingName, t.ownerId, t.workflowId);
+        if (isOrphanCronTrigger(t, resolved.definition)) {
+          await deleteTrigger(db, t.ownerId, t.triggerId);
+          return;
+        }
         const result = await runTrigger(env, bindingName, t);
         await markTriggerRun(db, t.triggerId, key, result.status);
       } catch {
@@ -664,6 +723,20 @@ export async function runDueCronTriggers(env: Env, bindingName: string): Promise
     }),
   );
   return due.length;
+}
+
+/**
+ * Scope a trigger run to its canvas node. Cron used to omit this, so the engine
+ * queued every disconnected trigger (manual + webhook + form) as one extra execution.
+ */
+export function entryNodeIdsForTrigger(
+  trigger: Pick<WorkflowTriggerRow, 'type' | 'nodeId'>,
+  definition: WorkflowDefinition,
+): string[] | undefined {
+  if (trigger.nodeId) return [trigger.nodeId];
+  if (trigger.type !== 'cron') return undefined;
+  const scheduleIds = listScheduleTriggerNodeIds(definition);
+  return scheduleIds.length ? scheduleIds : undefined;
 }
 
 /** Execute a workflow on behalf of its owner from a trigger (cron/webhook). */
@@ -675,10 +748,20 @@ export async function runTrigger(
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams,
 ) {
   const resolved = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
-  const entryNodeIds =
-    (trigger.type === 'webhook' || trigger.type === 'form') && trigger.nodeId
-      ? [trigger.nodeId]
-      : undefined;
+  const entryNodeIds = entryNodeIdsForTrigger(trigger, resolved.definition);
+  // Cron without a canvas node used to omit entryNodeIds, so the engine started
+  // every disconnected trigger (manual + webhook + form) as a second execution.
+  if (trigger.type === 'cron' && !entryNodeIds?.length) {
+    return {
+      status: 'failed',
+      executionKey: crypto.randomUUID(),
+      workflowId: resolved.workflowId,
+      workflowOwnerId: resolved.ownerId,
+      output: { error: 'Schedule trigger node not found' },
+      steps: [],
+      totalCostVnd: 0,
+    };
+  }
   return executeWorkflowGraph({
     c: { env } as any,
     bindingName,
