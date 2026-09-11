@@ -3,6 +3,7 @@ import {
   embedTextWithUsage,
   matchToSnippet,
   queryCollection,
+  VECTORIZE_ALL_METADATA_TOPK,
   type VectorMatch,
 } from '../../../rag-vector.js';
 import { embeddingUsageOrEstimate, type AiUsage } from '../../../../../admin/service/pricing.js';
@@ -131,7 +132,7 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
     const matches = await queryCollection(env, rag.collection, vector, {
-      topK: Math.min(50, Math.max(topK * 4, 16)),
+      topK: Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(topK * 4, 16)),
       namespace: namespace || undefined,
       docType,
       scoreThreshold,
@@ -187,11 +188,15 @@ function queryFromInput(ctx: NodeContext): string {
   return '';
 }
 
+function withRagOutput(nodeInput: NodeOutput, rag: Record<string, unknown>): NodeOutput {
+  return { ...rag, ...nodeInput, ...rag };
+}
+
 /** Graph-path execute: retrieve snippets for the webhook prompt, then pass through to Agent. */
 export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const query = queryFromInput(ctx);
   if (!query) {
-    return { ...ctx.nodeInput, snippets: [], count: 0, ragText: '' };
+    return withRagOutput(ctx.nodeInput, { ragText: '', snippets: [], count: 0, query: '' });
   }
   const result = await executeGetRag({
     env: ctx.c.env,
@@ -204,12 +209,13 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     billing: ragBillingFromNodeContext(ctx),
   });
   const ragText = result.snippets.map((s) => s.text).filter(Boolean).join('\n\n');
-  return {
-    ...ctx.nodeInput,
-    ...result,
+  return withRagOutput(ctx.nodeInput, {
+    ragText,
+    snippets: result.snippets,
+    count: result.count,
     query,
     question: query,
-    ragText,
     text: query,
-  };
+    ...result,
+  });
 }

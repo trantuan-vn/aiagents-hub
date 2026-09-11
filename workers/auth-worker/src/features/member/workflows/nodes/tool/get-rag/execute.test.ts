@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
+import { toVectorizeNativeNamespace } from '../../../rag-vector.js';
 
 const billingMock = vi.hoisted(() => ({
   resolveServiceByEndpoint: vi.fn(),
@@ -88,7 +89,7 @@ describe('executeGetRag', () => {
     });
     expect(query).toHaveBeenCalledWith(
       [0.5, 0.6],
-      expect.objectContaining({ topK: 16, returnMetadata: 'all', filter: { namespace: 'test-ns' } }),
+      expect.objectContaining({ topK: 16, returnMetadata: 'all', namespace: 'test-ns' }),
     );
   });
 
@@ -303,7 +304,51 @@ describe('executeGetRag', () => {
     );
     expect(query).toHaveBeenCalledWith(
       [0.1, 0.2],
-      expect.objectContaining({ filter: { namespace: 'rag-ns' } }),
+      expect.objectContaining({ namespace: 'rag-ns' }),
+    );
+  });
+
+  it('hashes a Durable Object owner id into the Vectorize native namespace', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+    const ownerId = 'a'.repeat(64);
+    const wired: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 5 },
+        },
+        {
+          id: 'mem_kb',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: { memoryKind: 'vectorize', collection: 'VECTORIZE', namespace: 'wf19/nmem_kb' },
+        },
+      ],
+      edges: [
+        { id: 'e-mem', source: 'mem_kb', target: 'tool_get', sourceHandle: 'memory', targetHandle: 'memory' },
+      ],
+    };
+
+    await executeGetRag({
+      env,
+      definition: wired,
+      agentId: 'tool_get',
+      input: { query: 'liet ke don hang' },
+      ownerId,
+      workflowId: 19,
+    });
+
+    const scope = `u${ownerId}/wf19/nmem_kb`;
+    const nativeNs = await toVectorizeNativeNamespace(scope);
+    expect(query).toHaveBeenCalledWith(
+      [0.1, 0.2],
+      expect.objectContaining({ namespace: nativeNs }),
     );
   });
 });
@@ -402,9 +447,9 @@ describe('executeGetRagPipeline', () => {
     expect(query).toHaveBeenCalledWith(
       [0.5, 0.6],
       expect.objectContaining({
-        topK: 48,
+        topK: 20,
         returnMetadata: 'all',
-        filter: { namespace: 'uu1/wf1' },
+        namespace: 'uu1/wf1',
       }),
     );
   });

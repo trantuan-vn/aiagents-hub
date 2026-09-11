@@ -109,8 +109,9 @@ describe('executeSaveRagPipeline', () => {
       },
     });
     expect(upsert).toHaveBeenCalled();
-    const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
+    const vectors = upsert.mock.calls[0]?.[0] as Array<{ namespace?: string; metadata?: Record<string, string> }>;
     expect(vectors[0]?.metadata?.namespace).toBe('uuser-1/wf42');
+    expect(vectors[0]?.namespace).toBe('uuser-1/wf42');
     expect(vectors[0]?.metadata?.docType).toBe('schema');
   });
 
@@ -387,8 +388,9 @@ describe('executeSaveRagPipeline', () => {
       expect.anything(),
       '/api/ai/baai/bge-base-en-v1.5',
     );
-    const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
+    const vectors = upsert.mock.calls[0]?.[0] as Array<{ namespace?: string; metadata?: Record<string, string> }>;
     expect(vectors[0]?.metadata?.namespace).toBe('uuser-1/kb-ns');
+    expect(vectors[0]?.namespace).toBe('uuser-1/kb-ns');
   });
 });
 

@@ -8,6 +8,7 @@ import {
   queryCollection,
   upsertVectors,
   buildMetadataFilter,
+  toVectorizeNativeNamespace,
 } from './rag-vector.js';
 import { chunkText } from './nodes/tool/save-rag/chunk.js';
 
@@ -94,14 +95,45 @@ describe('rag-vector', () => {
     expect(query).toHaveBeenCalledWith([0.1, 0.2], {
       topK: 3,
       returnMetadata: 'all',
-      filter: { namespace: 'kb' },
+      namespace: 'kb',
     });
   });
 
-  it('falls back to in-memory namespace filter when metadata index query fails', async () => {
+  it('caps topK at 20 when returning full metadata', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    await queryCollection(env, 'VECTORIZE', [0.1, 0.2], { topK: 50, namespace: 'kb' });
+    expect(query).toHaveBeenCalledWith(
+      [0.1, 0.2],
+      expect.objectContaining({ topK: 20, returnMetadata: 'all', namespace: 'kb' }),
+    );
+  });
+
+  it('hashes namespaces longer than 64 bytes for the Vectorize native partition', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [{ score: 0.9, metadata: { text: 'snippet' } }] });
+    const env = {
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+    const ownerId = 'a'.repeat(64);
+    const scope = `u${ownerId}/wf19/nmem_kb`;
+
+    await queryCollection(env, 'VECTORIZE', [0.1, 0.2], { topK: 5, namespace: scope });
+    const nativeNs = await toVectorizeNativeNamespace(scope);
+    expect(nativeNs).toHaveLength(64);
+    expect(query).toHaveBeenCalledWith(
+      [0.1, 0.2],
+      expect.objectContaining({ namespace: nativeNs, returnMetadata: 'all' }),
+    );
+    expect(query.mock.calls[0]?.[1]).not.toHaveProperty('filter');
+  });
+
+  it('falls back to default-namespace rows filtered by metadata.namespace', async () => {
     const query = vi
       .fn()
-      .mockRejectedValueOnce(new Error('metadata property namespace is not indexed'))
+      .mockResolvedValueOnce({ matches: [] })
       .mockResolvedValueOnce({
         matches: [
           { score: 0.9, metadata: { text: 'mine', namespace: 'kb' } },
@@ -119,6 +151,15 @@ describe('rag-vector', () => {
     expect(matches).toHaveLength(1);
     expect(matches[0]?.metadata?.text).toBe('mine');
     expect(query).toHaveBeenCalledTimes(2);
+    expect(query).toHaveBeenNthCalledWith(1, [0.1, 0.2], {
+      topK: 3,
+      returnMetadata: 'all',
+      namespace: 'kb',
+    });
+    expect(query).toHaveBeenNthCalledWith(2, [0.1, 0.2], {
+      topK: 3,
+      returnMetadata: 'all',
+    });
   });
 
   it('upsertVectors calls index upsert', async () => {
@@ -131,11 +172,14 @@ describe('rag-vector', () => {
     } as unknown as Env;
 
     const saved = await upsertVectors(env, 'VECTORIZE', [
-      { id: 'a', values: [1, 2], metadata: { text: 'a' } },
-      { id: 'b', values: [3, 4], metadata: { text: 'b' } },
+      { id: 'a', values: [1, 2], metadata: { text: 'a', namespace: 'kb' } },
+      { id: 'b', values: [3, 4], metadata: { text: 'b', namespace: 'kb' } },
     ]);
     expect(saved).toBe(2);
     expect(upsert).toHaveBeenCalled();
+    const vectors = upsert.mock.calls[0]?.[0] as Array<{ namespace?: string }>;
+    expect(vectors[0]?.namespace).toBe('kb');
+    expect(vectors[1]?.namespace).toBe('kb');
   });
 });
 

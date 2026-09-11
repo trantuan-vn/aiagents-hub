@@ -32,8 +32,13 @@ export type VectorizeBinding = {
 export type VectorizeVectorRecord = {
   id: string;
   values: number[];
+  namespace?: string;
   metadata?: Record<string, string>;
 };
+
+/** `returnMetadata: "all"` drops max topK from 100 to 20. */
+export const VECTORIZE_ALL_METADATA_TOPK = 20;
+const VECTORIZE_NAMESPACE_MAX_BYTES = 64;
 
 export type QueryCollectionOptions = {
   topK?: number;
@@ -161,6 +166,19 @@ export function buildMetadataFilter(opts: Pick<QueryCollectionOptions, 'namespac
   return Object.keys(filter).length ? filter : undefined;
 }
 
+/**
+ * Vectorize native namespace is max 64 bytes. Owner DO ids are 64 hex chars, so
+ * `u{ownerId}/wf{id}/n{nodeId}` must be hashed or query/upsert silently miss.
+ */
+export async function toVectorizeNativeNamespace(scope: string): Promise<string> {
+  const trimmed = scope.trim();
+  if (!trimmed) return '';
+  const encoded = new TextEncoder().encode(trimmed);
+  if (encoded.byteLength <= VECTORIZE_NAMESPACE_MAX_BYTES) return trimmed;
+  const digest = await crypto.subtle.digest('SHA-256', encoded);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 function matchesNamespace(match: VectorMatch, namespace?: string): boolean {
   if (!namespace) return true;
   return String(match.metadata?.namespace ?? '') === namespace;
@@ -189,32 +207,32 @@ export async function queryCollection(
   const index = resolveVectorizeIndex(env, normalizeVectorizeCollection(collection));
   if (!index?.query || !queryVector.length) return [];
 
-  const topK = opts.topK ?? 5;
-  const filter = buildMetadataFilter(opts);
+  const topK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(1, opts.topK ?? 5));
+  const nativeNs = await toVectorizeNativeNamespace(opts.namespace ?? '');
   const base: VectorizeQueryOpts = { topK, returnMetadata: 'all' };
 
   let matches: VectorMatch[] = [];
-  if (filter) {
+  try {
+    matches = await queryIndex(index, queryVector, {
+      ...base,
+      ...(nativeNs ? { namespace: nativeNs } : {}),
+    });
+  } catch (e) {
+    console.warn('[rag-vector] namespaced query failed:', e);
+  }
+
+  // Legacy rows were written to the default namespace with metadata.namespace only.
+  if (!matches.length && nativeNs) {
     try {
-      matches = await queryIndex(index, queryVector, { ...base, filter });
+      const fetched = await queryIndex(index, queryVector, base);
+      matches = fetched.filter((m) => matchesNamespace(m, opts.namespace));
     } catch (e) {
-      console.warn('[rag-vector] metadata filter query failed, falling back:', e);
+      console.warn('[rag-vector] default-namespace fallback failed:', e);
     }
   }
 
-  if (!matches.length) {
-    try {
-      const fetched = await queryIndex(index, queryVector, {
-        ...base,
-        topK: Math.min(50, Math.max(topK * 5, 20)),
-      });
-      matches = fetched.filter(
-        (m) => matchesNamespace(m, opts.namespace) && matchesDocType(m, opts.docType),
-      );
-    } catch (e) {
-      console.warn('[rag-vector] query failed:', e);
-      return [];
-    }
+  if (opts.docType) {
+    matches = matches.filter((m) => matchesDocType(m, opts.docType));
   }
 
   if (opts.scoreThreshold != null && opts.scoreThreshold > 0) {
@@ -233,8 +251,15 @@ export async function upsertVectors(
   const index = resolveVectorizeIndex(env, normalizeVectorizeCollection(collection));
   if (!index?.upsert || !vectors.length) return 0;
   try {
-    const result = await index.upsert(vectors);
-    return result.count ?? vectors.length;
+    const prepared = await Promise.all(
+      vectors.map(async (vector) => {
+        if (vector.namespace) return vector;
+        const nativeNs = await toVectorizeNativeNamespace(String(vector.metadata?.namespace ?? ''));
+        return nativeNs ? { ...vector, namespace: nativeNs } : vector;
+      }),
+    );
+    const result = await index.upsert(prepared);
+    return result.count ?? prepared.length;
   } catch (e) {
     console.warn('[rag-vector] upsert failed:', e);
     throw e;
