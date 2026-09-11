@@ -1,6 +1,6 @@
 # Node: Save RAG (`tool_node:save-rag`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "save-rag"`  
 > **Liên kết:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-pdf--vectorize) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md)
 
@@ -15,7 +15,7 @@ Tool **ghi knowledge** vào Vectorize: nhận chunk + embedding (hoặc raw text
 | **ID** | `tool_node` (variant `save-rag`) |
 | **Category** | `resource` |
 | **Vai trò** | Tool callable của Agent — persist vectors + metadata |
-| **Loại plugin** | Resource + tool executor (Phase 2) |
+| **Loại plugin** | Resource + execute pipeline (data-flow) + Agent tool |
 | **Nối tới Agent** | `tool_node.tools` → `agent.tools` (đứt nét, có thể nhiều tool) |
 | **Phụ thuộc** | [`service.md`](./service.md) (embed), [`vectorize.md`](./vectorize.md) (store) |
 
@@ -73,7 +73,7 @@ Tool **ghi knowledge** vào Vectorize: nhận chunk + embedding (hoặc raw text
 | Value | Hành vi |
 |-------|---------|
 | `agent_tool_call` | Agent quyết định gọi tool sau khi xử lý PDF (mặc định — khớp bài toán 1) |
-| `pipeline_auto` | Sau Agent nhận webhook, runtime tự chunk+embed+save không cần LLM gọi tool (Phase 3) |
+| `pipeline_auto` | Graph execute `executeSaveRagPipeline` — chunk + embed + upsert, không cần LLM gọi tool |
 
 ---
 
@@ -94,14 +94,15 @@ Tool **ghi knowledge** vào Vectorize: nhận chunk + embedding (hoặc raw text
 }
 ```
 
-**Execute (Phase 2 — `nodes/tool/save-rag.ts`):**
+**Execute** (`nodes/tool/save-rag/execute.ts`):
 
-1. Resolve `collection`, `namespace` từ Agent memory resource ([`vectorize.md`](./vectorize.md))
-2. Resolve embed endpoint từ Agent service resource ([`service.md`](./service.md))
-3. Split `content` nếu chưa có `chunks`
-4. Embed từng chunk → vector
-5. `vectorize.upsert([{ id, values, metadata }])`
-6. Return `{ saved: number, documentId, collection }`
+1. Resolve `collection`, `namespace` từ Agent/memory (`resolveRagResources`)
+2. Embed endpoint từ service (`resolveRagEmbedService`)
+3. PDF: `extractTextFromPdfFiles` nếu input là files
+4. Split `content` (`chunk.ts`) nếu chưa có `chunks`
+5. `embedTextsWithUsage` → `upsertVectors`
+6. Return `{ ok, saved, documentId, collection }`
+7. BT3: có thể `introspectTablesToRagDocuments` khi input là DB catalog
 
 **Output tool:**
 
@@ -130,16 +131,19 @@ Chi tiết graph mẫu: [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-
 
 ---
 
-## 7. File map (mục tiêu)
+## 7. File map
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/tool/save-rag.ts` | Registry definition |
-| `workers/auth-worker/.../nodes/tool/save-rag.ts` | Tool executor + register |
-| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset()` — gom save/get |
-| `workers/web/.../nodes/tool/save-rag/` | UI plugin + defaults |
+| `packages/workflow-nodes/src/nodes/tool/definition.ts` | `SAVE_RAG_TOOL_DEFINITION` |
+| `workers/auth-worker/.../nodes/tool/save-rag/execute.ts` | Pipeline + tool execute |
+| `workers/auth-worker/.../nodes/tool/save-rag/chunk.ts` | Text chunking |
+| `workers/auth-worker/.../nodes/tool/save-rag/pdf-extract.ts` | PDF → text |
+| `workers/auth-worker/.../nodes/tool/index.ts` | `toolSaveRagPlugin` (`execute: executeToolNode`) |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset` |
+| `workers/web/.../nodes/tool/` | `toolSaveRagUIPlugin` |
 
-**Hiện tại:** `toolKind` chỉ có `http-request` \| `code` trong `builtins.ts` — cần thêm `save-rag`.
+`TOOL_OVERRIDE_KINDS` = `save-rag`, `get-rag`, `get-db-info`.
 
 ---
 
@@ -147,4 +151,4 @@ Chi tiết graph mẫu: [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — save-rag tool variant |
+| 0.2 | 2026-09-11 | Execute + PDF + pipeline live |

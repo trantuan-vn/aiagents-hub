@@ -1,3 +1,6 @@
+> **Phạm vi:** Sơ đồ vòng lặp **Cursor IDE** (context engine / tools) — **không** mô tả workflow engine trong repo này.  
+> Workflow hub: [`docs/workflow-architecture.md`](../../../workflow-architecture.md).
+
 ```mermaid
 flowchart TD
     %% Định nghĩa style

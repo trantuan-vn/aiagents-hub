@@ -10,12 +10,13 @@ import {
   resolveServiceByEndpoint,
 } from '../../../billing/billing.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
-import { DEFAULT_EMBED_MODEL, VECTORIZE_COLLECTION } from '../../../rag-vector.js';
 import {
+  DEFAULT_EMBED_MODEL,
+  VECTORIZE_COLLECTION,
   normalizeVectorizeCollection,
   resolveVectorizeScope,
   type VectorizeScopeContext,
-} from '../../../vectorize-scope.js';
+} from '../../../rag/index.js';
 import type { NodeContext, WorkflowAttribution } from '../../types.js';
 
 export type RagResourceContext = {

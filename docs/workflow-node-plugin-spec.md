@@ -1,8 +1,8 @@
 # Workflow Node Plugin Architecture — Spec
 
-> **Trạng thái:** Draft  
-> **Phiên bản:** 0.2  
-> **Ngày:** 2026-06-12  
+> **Trạng thái:** Implemented (còn catalog dual-write + align runtimeType)  
+> **Phiên bản:** 0.3  
+> **Ngày:** 2026-09-11  
 > **Phạm vi:** Backend (`auth-worker`), Frontend (`web`), Shared package (`packages/workflow-nodes`)
 
 Tài liệu **spec chính** mô tả kiến trúc **Node Plugin** — cách tổ chức lại workflow system để mỗi node là một module độc lập, dễ phát triển và bảo trì. Webhook node là **reference implementation** đầu tiên.
@@ -31,21 +31,21 @@ Tài liệu **spec chính** mô tả kiến trúc **Node Plugin** — cách tổ
 
 ## 1. Mục tiêu
 
-### 1.1 Vấn đề cần giải quyết
+### 1.1 Đã làm / còn lại
 
-Logic của một node hiện bị **phân tán** qua nhiều lớp và thư mục:
+Kiến trúc plugin **đã triển khai**. Executor không còn switch-case; shared package là SSOT.
 
-| Lớp | Vị trí hiện tại | Vấn đề |
-|-----|-----------------|--------|
-| Executor | `engine/executor.ts` | Thêm node = đăng ký plugin (đang migrate từ switch-case) |
-| Schema / Registry | `default-nodes.ts` × 2 (web + auth-worker) | Duplicate, dễ lệch |
-| Add-node catalog | `catalogs/*.ts` (hardcoded) | Không đồng bộ registry; nhiều item chưa implement |
-| Canvas UI | `nodes/workflow-nodes.tsx` | Tất cả node trong một file |
-| Config panel | `panels/node-config/` + custom (webhook) | Không có pattern thống nhất |
-| Trigger / Hook | `triggers/triggers.ts`, `api/hooks-presentation.ts` | Tách rời khỏi node canvas |
-| Connection rules | `engine/graph-helpers.ts` + `edges/workflow-connection-utils.ts` | Node không khai báo handles rõ ràng |
+| Lớp | Hiện tại | Còn lại |
+|-----|----------|---------|
+| Executor | `engine/executor.ts` → `nodePluginRegistry.resolve` | Kind if/else **trong** plugin (flow, tool) |
+| Schema / Registry | `@aiagents-hub/workflow-nodes`; web `default-nodes.ts` là shim | Auth-worker không còn duplicate `default-nodes.ts` |
+| Add-node catalog | `catalogs/*.ts` **vẫn** drive drawer | `NODE_CATALOG` từ UI plugins chưa wired vào add-node |
+| Canvas UI | `nodes/<name>/canvas.tsx`; `workflow-nodes.tsx` shim | Không có FE folder `http-request/` / `code/` |
+| Config panel | Router + `plugin.ConfigPanel` (webhook, form, agent, service, memory, gmail) | — |
+| Trigger / Hook | `nodes/webhook/trigger.ts`; form `form-hooks-presentation.ts` | Production webhook auth = API token, không phải `node.data.webhookAuth` |
+| Connection rules | Shared package + FE/BE helpers | `handles[]` chưa đủ mọi family |
 
-**Hệ quả:** Thêm node built-in mới cần sửa **~12 file** ở **4+ thư mục**, không có checklist rõ ràng.
+**Hệ quả hiện tại:** Thêm kind mới = shared `kinds.ts` + factory plugin (hoặc override folder) + **vẫn** thêm dòng `catalogs/*.ts` nếu muốn hiện trên add-node.
 
 ### 1.2 Mục tiêu thiết kế
 
@@ -57,10 +57,9 @@ Logic của một node hiện bị **phân tán** qua nhiều lớp và thư m�
 
 ### 1.3 Non-goals
 
-- Thay đổi format lưu workflow graph trên D1 (`agent_workflows.definition`).
-- Thay đổi Node Registry KV key hoặc admin CRUD API.
-- Implement execute-step thật cho từng node (roadmap riêng).
-- Third-party node plugins từ npm (chỉ built-in + admin custom trong repo).
+- Đổi format JSON graph.
+- Third-party node plugins từ npm.
+- Xóa `catalogs/*.ts` trước khi add-node chuyển sang `NODE_CATALOG`.
 
 ---
 
@@ -201,7 +200,7 @@ Node plugin chỉ **khai báo handles**; engine (backend + frontend) validate v�
 | `workers/auth-worker` | definitions, types, connection rules |
 | Admin workflow-nodes | definitions làm defaults |
 
-**Migration:** `default-nodes.ts` ở web và auth-worker re-export từ package cho đến khi xóa hẳn.
+**Migration:** web `default-nodes.ts` re-export từ package. Auth-worker không còn file duplicate.
 
 ---
 
@@ -213,44 +212,19 @@ Node plugin chỉ **khai báo handles**; engine (backend + frontend) validate v�
 workers/auth-worker/src/features/member/workflows/
 ├── api/
 │   ├── presentation.ts             # CRUD, execute, collab (auth)
-│   └── hooks-presentation.ts       # Delegate → nodes/<name>/trigger.ts
+│   ├── hooks-presentation.ts       # /hooks/workflows/:workflowId/:path
+│   └── form-hooks-presentation.ts
 ├── domain/
-│   ├── domain.ts                   # Zod schemas, WorkflowNodeType
-│   └── constant.ts
 ├── execution/
-│   ├── workflow-context.ts
-│   ├── execution-store.ts
-│   ├── execution-observability.ts
-│   ├── node-runtime.ts             # Shared helpers (HTTP, code transform)
-│   └── agent-runtime.ts
-├── engine/
-│   ├── executor.ts                 # Orchestration: queue, scheduleDownstream, pause/resume
-│   ├── graph-helpers.ts            # Entry nodes, resource edges, merge inputs
-│   ├── flow-helpers.ts             # IF/switch/filter branch evaluation
-│   └── index.ts
+├── engine/                         # executor, graph/flow/loop, HITL, persist
 ├── nodes/
-│   ├── index.ts                    # registerAllNodes() → NodePluginRegistry
-│   ├── types.ts                    # WorkflowNodePlugin, NodeContext
-│   ├── _template/
-│   │   ├── README.md
-│   │   ├── index.ts
-│   │   └── execute.ts
-│   └── <name>/
-│       ├── index.ts
-│       ├── execute.ts              # optional
-│       └── trigger.ts              # optional
-├── triggers/
-│   ├── triggers.ts                 # Orchestrator: gọi plugin.trigger.*
-│   ├── channel-hooks.ts
-│   ├── webhook-auth.ts
-│   └── webhook-notify.ts
-├── billing/                        # Service pricing, royalties
-├── collab/                         # Collab, chat, AI authoring
-├── storage/                        # Credentials, version snapshots
-├── integrations/
-├── executor.ts                     # Re-export → engine/executor
-├── graph-helpers.ts                # Re-export → engine/graph-helpers
-└── flow-helpers.ts                 # Re-export → engine/flow-helpers
+│   ├── index.ts                    # BUILTIN_PLUGINS (family → factory → override)
+│   ├── types.ts
+│   └── <name>/                     # execute.ts | trigger.ts | skipExecution
+├── triggers/                       # D1, cron, form-trigger-runner, webhook-auth
+├── rag/                            # Vectorize embed / query / upsert
+├── billing/, collab/, storage/, integrations/
+└── README.md
 ```
 
 ### 4.2 Plugin Contract
@@ -305,7 +279,7 @@ async function executeNodeLogic(node, nodeInput, ctx, onCost) {
 ```
 
 **Trước refactor:** `switch (node.type) { case 'http_request': ... }`  
-**Sau refactor:** registry lookup; mỗi node tự register.
+**Hiện tại:** registry lookup; mỗi node tự register. Kind dispatch còn lại nằm **trong** plugin (vd. `flow/execute.ts`, `tool/execute.ts`).
 
 ### 4.4 Trigger Routing
 
@@ -316,16 +290,17 @@ return plugin.trigger.handle(request, trigger);
 
 ### 4.5 Mapping file hiện tại → plugin
 
-| Logic hiện tại | File nguồn | Plugin đích |
-|----------------|------------|-------------|
-| HTTP Request | `engine/executor.ts` + `execution/node-runtime.ts` | `nodes/http-request/execute.ts` |
-| Code | `engine/executor.ts` + `execution/node-runtime.ts` | `nodes/code/execute.ts` |
-| Agent | `engine/executor.ts` + `execution/agent-runtime.ts` | `nodes/agent/execute.ts` |
-| Flow (if/switch/merge) | `engine/executor.ts` + `engine/flow-helpers.ts` | `nodes/flow/execute.ts` |
-| Trigger pass-through | `engine/executor.ts` case `trigger` | `nodes/trigger/execute.ts` |
-| Webhook HTTP ingress | `api/hooks-presentation.ts`, `triggers/triggers.ts` | `nodes/webhook/trigger.ts` |
-| Human review pause | `engine/executor.ts` (engine loop) | `nodes/human-review/` |
-| Resource nodes | `engine/graph-helpers.ts` | `nodes/service-node/`, … (`skipExecution`) |
+| Logic | File hiện tại |
+|-------|----------------|
+| HTTP Request | `nodes/http-request/execute.ts` (+ `core:http_request` plugin) |
+| Code | `nodes/code/execute.ts` |
+| Agent | `nodes/agent/execute.ts` + `execution/agent-runtime.ts` |
+| Flow | `nodes/flow/execute.ts` + `engine/flow-helpers.ts` / `loop-helpers.ts` |
+| Trigger pass-through | `nodes/trigger/execute.ts` |
+| Webhook HTTP ingress | `nodes/webhook/trigger.ts` ← `api/hooks-presentation.ts` |
+| Human review pause | engine loop + `nodes/human-review/` (gmail execute) |
+| RAG tools | `nodes/tool/save-rag/`, `get-rag/`, `get-db-info/` |
+| Resource nodes | `nodes/service-node/`, `memory-node/` (`skipExecution`) |
 
 ---
 
@@ -363,13 +338,13 @@ workers/web/src/app/(main)/dashboard/build/workflows/
 │   │   │   ├── workflow-node-config-panel.tsx   # Router
 │   │   │   └── generic-config-panel.tsx
 │   │   └── workflow-panels/        # Build, executions, triggers, versions
-│   ├── catalogs/                   # Add-node catalog (sẽ xóa dần)
+│   ├── catalogs/                   # Add-node drawer (vẫn dùng)
 │   ├── hooks/                      # State, undo, collab, integrations
 │   └── engine/                     # Re-exports edges & layout helpers
 └── _lib/
 ```
 
-**Xóa dần:** `catalogs/workflow-*-catalog.ts` → catalog sinh từ UI plugins.
+**Hai catalog:** `catalogs/*.ts` vẫn drive add-node. `NODE_CATALOG` từ UI plugins **chưa** thay catalogs. Admin flags: `packages/workflow-nodes/src/catalog/entries.ts`.
 
 ### 5.2 Plugin Contract
 
@@ -416,13 +391,13 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 
 ### 5.5 Mapping file hiện tại → plugin
 
-| File hiện tại | Plugin đích |
-|---------------|-------------|
-| `panels/node-config/webhook-node-config-panel.tsx` | `nodes/webhook/config-panel.tsx` |
-| `lib/n8n-workflow/descriptions/webhook.ts` | `nodes/webhook/n8n-properties.ts` |
-| `canvas/workflow-canvas.tsx` → `webhookNodeDefaults()` | `nodes/webhook/defaults.ts` |
-| `catalogs/workflow-trigger-catalog.ts` | `nodes/webhook/index.ts` → `catalog` |
-| `nodes/workflow-nodes.tsx` | Tách per-node `canvas.tsx` |
+| File hiện tại | Ghi chú |
+|---------------|---------|
+| `nodes/webhook/config-panel.tsx` | Custom panel (shim cũ `panels/node-config/webhook-node-config-panel.tsx` nếu còn) |
+| `nodes/webhook/n8n-properties.ts` | n8n INodeProperties |
+| `nodes/webhook/defaults.ts` | Defaults trigger/core |
+| `catalogs/workflow-trigger-catalog.ts` | **Vẫn** dùng cho add-node |
+| `nodes/workflow-nodes.tsx` | Re-export shim |
 
 ---
 
@@ -437,7 +412,7 @@ Tóm tắt:
 | Khía cạnh | Canvas node | D1 `workflow_triggers` |
 |-----------|-------------|------------------------|
 | Lưu trữ | `definition.nodes[].data` | Bảng `workflow_triggers` |
-| HTTP entry | Không | `/hooks/workflows/:ownerId/:token` |
+| HTTP entry | Không | Canonical `/hooks/workflows/:workflowId/:path` (API token). Legacy `/:ownerId/:token` |
 | Plugin sở hữu | Config UI | `trigger.ts` (create/handle) |
 
 ---
@@ -488,18 +463,18 @@ Kind-expanded families use a **factory** to generate `{runtimeType}:{kind}` defi
 - [ ] Tạo `docs/workflow-nodes/<name>.md` theo template
 - [ ] Cập nhật `docs/workflow-nodes/README.md`
 
-### 8.2 Shared package (Phase 2+)
+### 8.2 Shared package
 
 - [ ] `packages/workflow-nodes/src/nodes/<name>/definition.ts`
-- [ ] `packages/workflow-nodes/src/nodes/<name>/schema.ts`
-- [ ] Export + handles
+- [ ] `kinds.ts` nếu family có nhiều variant
+- [ ] Export từ `nodes/index.ts` + `builtins.ts` nếu cần
 
 ### 8.3 Backend
 
 - [ ] `nodes/<name>/execute.ts` (nếu executable)
 - [ ] `nodes/<name>/trigger.ts` (nếu external trigger)
 - [ ] `nodes/<name>/index.ts` — register plugin
-- [ ] Register trong `nodes/index.ts`
+- [ ] Register trong `nodes/index.ts` (family / factory / override last)
 
 ### 8.4 Frontend
 
@@ -507,6 +482,7 @@ Kind-expanded families use a **factory** to generate `{runtimeType}:{kind}` defi
 - [ ] `nodes/<name>/defaults.ts`
 - [ ] `nodes/<name>/config-panel.tsx` (nếu generic không đủ)
 - [ ] Register trong `nodes/index.ts`
+- [ ] **Add-node:** thêm entry `catalogs/*.ts` (drawer chưa đọc `NODE_CATALOG`)
 - [ ] i18n: `messages/en-US.json`, `messages/vi-VN.json`
 
 ### 8.5 Verify
@@ -521,40 +497,15 @@ Kind-expanded families use a **factory** to generate `{runtimeType}:{kind}` defi
 
 ## 9. Lộ trình Migration
 
-### Phase 1 — Webhook module (1–2 tuần)
+| Phase | Mục tiêu | Trạng thái |
+|-------|----------|------------|
+| **1** | Webhook module | **Done** |
+| **2** | Shared package | **Done** — `@aiagents-hub/workflow-nodes` |
+| **3** | Backend plugin registry + `engine/` | **Done** |
+| **4** | Frontend plugin + auto catalog | **Partial** — plugins xong; add-node vẫn catalogs |
+| **5** | Align `runtimeType` | **Partial** — `http_request`/`code` dual shape |
 
-- [ ] Tạo `nodes/webhook/` backend + frontend
-- [ ] Move webhook panels, n8n properties, defaults
-- [ ] `nodes/_template/README.md` + checklist
-- [ ] Re-export shims (backward compatible)
-- [ ] Spec: [`workflow-nodes/webhook.md`](./workflow-nodes/webhook.md)
-
-**Không làm:** Shared package, executor refactor, xóa catalogs.
-
-### Phase 2 — Shared package (1 tuần)
-
-- [ ] Tạo `packages/workflow-nodes`
-- [ ] Move types, merge, resolve, builtin definitions
-- [ ] Web + auth-worker import từ package
-- [ ] `default-nodes.ts` → re-export shim
-
-### Phase 3 — Backend plugin registry (2 tuần)
-
-- [ ] Tách `engine/` từ monolith
-- [ ] Migrate: `http_request`, `code`, `agent`, `flow`, `trigger`, `human_review`
-- [ ] Executor chỉ dispatch qua registry
-
-### Phase 4 — Frontend plugin + auto catalog (2 tuần)
-
-- [ ] Tách `engine/` (canvas infrastructure)
-- [ ] Migrate canvas → `nodes/<name>/canvas.tsx`
-- [ ] Config panel router; `NODE_CATALOG` từ plugins
-- [ ] Generic `addNode(pluginId)`
-
-### Phase 5 — Align runtimeType (ongoing)
-
-- [ ] Migration graph: `core + coreKind` → `type` trực tiếp
-- [ ] Deprecation warnings trong editor
+**Không làm tiếp theo kiểu Phase 1:** Move webhook lần nữa. Việc còn: wire `NODE_CATALOG` vào add-node, thu hẹp catalog-only stubs.
 
 ---
 
@@ -616,9 +567,9 @@ workers/auth-worker/src/features/member/workflows/
 ├── execution/               # context, store, node-runtime, agent-runtime
 ├── engine/                  # executor, graph-helpers, flow-helpers
 ├── nodes/                   # plugin registry
+├── rag/                     # Vectorize embed / query / upsert
 ├── triggers/                # triggers.ts, channel-hooks, webhook-auth
 ├── billing/, collab/, storage/, integrations/
-├── executor.ts              # re-export → engine/executor
 └── README.md
 ```
 
@@ -634,11 +585,11 @@ workers/web/.../build/workflows/_components/
 ├── add-node/                # drawer, panel
 ├── edges/                   # connection-handle, edge utils
 ├── layout/                  # definition, placement
-├── nodes/                   # workflow-nodes.tsx + plugin registry
+├── nodes/                   # UI plugin registry (`workflow-nodes.tsx` = shim)
 ├── panels/
-│   ├── node-config/         # config panel router + webhook panels
+│   ├── node-config/         # config panel router
 │   └── workflow-panels/     # executions, triggers, versions, …
-├── catalogs/                # add-node catalog (sẽ xóa dần)
+├── catalogs/                # add-node drawer (vẫn dùng; chưa xóa)
 └── hooks/                   # canvas state, undo, collab
 ```
 
@@ -652,18 +603,18 @@ workers/web/.../build/workflows/_components/
 
 ```
 Đọc docs/workflow-node-plugin-spec.md và docs/workflow-nodes/<name>.md.
-Implement node theo kiến trúc plugin (nodes/<name>/ BE + FE).
+Implement plugin nodes/<name>/ (BE + FE) + definition trong packages/workflow-nodes.
+Thêm catalogs/*.ts nếu node phải hiện trên add-node drawer.
 Tham chiếu docs/workflow-nodes/webhook.md nếu cần trigger/custom panel.
-Giữ re-export backward compatible.
+Không thêm switch-case vào engine/executor.ts.
 ```
 
-**Phase 1 webhook:**
+**Webhook (đã có module — chỉ sửa khi cần):**
 
 ```
-Implement Phase 1 webhook module theo:
-- docs/workflow-node-plugin-spec.md
-- docs/workflow-nodes/webhook.md
-Move code hiện có, không refactor executor monolith.
+Webhook plugin đã ở nodes/webhook/ (BE + FE).
+Canonical URL: /hooks/workflows/:workflowId/:path + API token.
+Đọc docs/workflow-nodes/webhook.md trước khi đổi ingress.
 ```
 
 **Hiểu luồng runtime:**
@@ -678,6 +629,7 @@ Move code hiện có, không refactor executor monolith.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3 | 2026-09-11 | Spec phản ánh plugin layout đã live; remaining = catalogs + runtimeType align |
 | 0.1 | 2026-06-12 | Initial draft (monolithic) |
 | 0.2 | 2026-06-12 | Tách spec node sang `docs/workflow-nodes/`; thêm `workflow-how-it-works.md` |
 | 0.2.1 | 2026-06-12 | Tạo lại file spec chính với bản đồ tài liệu |

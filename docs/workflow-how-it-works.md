@@ -28,30 +28,32 @@ flowchart LR
   end
 
   subgraph Storage["2. Lưu trữ"]
-    D1_WF["D1: agent_workflows.definition"]
+    DO_WF["UserDO: agent_workflows.definition"]
+    D1_WF["D1: agent_workflows (sync listing/shared)"]
     D1_TRG["D1: workflow_triggers"]
-    KV["KV: node registry overrides"]
+    KV["KV / D1: node catalog overrides"]
   end
 
   subgraph Runtime["3. Runtime (auth-worker)"]
-    Hook["/hooks/workflows/..."]
+    Hook["/hooks/workflows/:workflowId/:path"]
     Exec["engine/executor.ts"]
   end
 
-  Canvas --> D1_WF
-  Config --> D1_WF
+  Canvas --> DO_WF
+  Config --> DO_WF
   Config --> D1_TRG
   Registry --> KV
   Hook --> Exec
-  D1_WF --> Exec
+  DO_WF --> Exec
+  D1_WF -.->|"shared / marketplace"| Exec
   D1_TRG --> Hook
 ```
 
 | Lớp | Vai trò |
 |-----|---------|
 | **Builder** | Vẽ graph, cấu hình từng node trên canvas |
-| **Lưu trữ** | Graph JSON, trigger records, registry schema |
-| **Runtime** | Nhận HTTP/cron → duyệt graph → chạy từng node |
+| **Lưu trữ** | Graph JSON trên **UserDO** (D1 mirror listing); trigger D1; catalog seeds |
+| **Runtime** | Nhận HTTP/cron/form → duyệt graph → chạy plugin từng node |
 
 ---
 
@@ -64,7 +66,7 @@ User vào `/dashboard/build/workflows/[id]/edit`.
 Frontend load:
 
 - **Definition** từ API: `{ nodes: [...], edges: [...] }`
-- **Node Registry** từ `GET /dashboard/admin/workflow-nodes` (defaults + admin overrides trong `SYSTEM_CONFIG_KV`)
+- **Node Registry** từ `@aiagents-hub/workflow-nodes` (defaults) + admin catalog overrides (`SYSTEM_CONFIG_KV` / D1 catalog)
 
 Code tham chiếu:
 
@@ -103,7 +105,7 @@ Frontend tạo node mới trên canvas, ví dụ:
 Code tham chiếu:
 
 - Add node: `add-node/workflow-add-node-panel.tsx`, `catalogs/workflow-trigger-catalog.ts`
-- Defaults webhook: `canvas/workflow-canvas.tsx` → `nodes/webhook/defaults.ts`
+- Defaults webhook: `nodes/webhook/defaults.ts` (UI plugin `webhookTriggerUIPlugin`)
 
 ### Bước 3: Kéo dây nối (edges)
 
@@ -148,7 +150,7 @@ User chỉnh field (vd. `httpMethod`, `webhookAuth`) → `onPatchData` cập nh�
 
 User save → API cập nhật `definition` JSON.
 
-Backend ghi vào D1 bảng `agent_workflows.definition` — **đây là nguồn sự thật của graph**.
+Backend ghi vào **UserDO** bảng `agent_workflows` — **đây là nguồn sự thật editor**. `queue-worker` sync sang D1 cho listing / shared / marketplace. Shared run đọc D1 (`isShared = 1`).
 
 Code tham chiếu: `workers/auth-worker/.../workflows/api/presentation.ts`
 
@@ -169,7 +171,7 @@ flowchart TB
   end
 
   subgraph URL["URL công khai"]
-    PUB["GET/POST /hooks/workflows/:ownerId/:token"]
+    PUB["GET/POST /hooks/workflows/:workflowId/:path"]
   end
 
   WH_NODE -.->|"Config panel hiển thị URL"| TRG
@@ -180,10 +182,12 @@ flowchart TB
 |-----------|--------------------|-----------------------|
 | **Lưu ở đâu** | `definition.nodes[].data` | Bảng `workflow_triggers` |
 | **Mục đích** | UI cấu hình trên graph | HTTP entry point thật |
-| **URL production** | Hiển thị trong config panel | `/hooks/workflows/:ownerId/:token` |
-| **Khi graph chạy** | Pass-through input | `runTrigger()` khởi động cả graph |
+| **URL production** | Hiển thị trong config panel | `/hooks/workflows/:workflowId/:webhookPath` |
+| **Khi graph chạy** | Pass-through (`skipExecution`) | `runTrigger()` khởi động cả graph |
 
-**Tạo trigger** (từ Triggers panel hoặc qua config webhook):
+**Auth production:** `X-Client-ID` (owner DO id) + `Authorization: Bearer utk_…` với permission `/hooks/workflows`. Field canvas `webhookAuth` (none/basic/header/jwt) là UI n8n-style — **runtime canonical dùng API token**, không đọc `webhookAuth` trên node.
+
+**Tạo trigger** (từ Triggers panel, config webhook, hoặc **sync khi save** graph có webhook node):
 
 ```http
 POST /dashboard/build/workflows/:id/triggers
@@ -194,11 +198,11 @@ Content-Type: application/json
 
 Backend (`triggers/triggers.ts`):
 
-1. Sinh `webhookToken` ngẫu nhiên
-2. Insert row vào D1
-3. Trả về `webhookUrl` đầy đủ (`api/presentation.ts` → `buildTriggerUrl()`)
+1. Sinh `webhookToken` / `webhookPath` (path = segment URL, thường = node id)
+2. Insert row vào D1 `workflow_triggers`
+3. Trả về `webhookUrl` = `${BASE_URL}/hooks/workflows/${workflowId}/${path}` (`buildTriggerUrl()`)
 
-> HTTP từ bên ngoài **không** đọc trực tiếp `node.data` trên canvas. Nó lookup token trong D1.
+> HTTP từ bên ngoài **không** đọc trực tiếp `node.data` trên canvas. Canonical lookup: `workflowId` + `webhookPath`. Legacy `/hooks/workflows/:ownerId/:token` vẫn mount.
 
 Chi tiết webhook: [`workflow-nodes/webhook.md`](./workflow-nodes/webhook.md)
 
@@ -209,7 +213,9 @@ Chi tiết webhook: [`workflow-nodes/webhook.md`](./workflow-nodes/webhook.md)
 ### Bước 6: Client gọi webhook URL
 
 ```http
-POST https://your-api/hooks/workflows/user_123/abc-token-xyz
+POST https://your-api/hooks/workflows/42/ingest-pdf
+X-Client-ID: <owner-do-id>
+Authorization: Bearer utk_...
 Content-Type: application/json
 
 {"message": "hello"}
@@ -217,20 +223,22 @@ Content-Type: application/json
 
 ### Bước 7: Route công khai xử lý
 
-`api/hooks-presentation.ts` — mounted tại `/hooks` (không cần auth user; bảo mật bằng token trong URL):
+`api/hooks-presentation.ts` — mounted tại `/hooks` (không dùng session dashboard; bảo mật bằng API token):
 
 ```
-1. Parse ownerId + token từ URL
-2. findWebhookTrigger(db, ownerId, token)
-3. Đọc query ?input=... hoặc body raw text làm input
-4. runTrigger(env, bindingName, trigger, input)
+1. Parse workflowId + optional webhookPath từ URL
+2. validateWebhookApiToken (X-Client-ID + Bearer)
+3. syncWebhookTriggersForWorkflow rồi findWebhookTriggerByWorkflowId
+4. parseWebhookRequest → runTrigger → executeWorkflowGraph
 ```
+
+Nhiều webhook trên một workflow mà không gửi `:webhookPath` → `400`.
 
 ### Bước 8: runTrigger → executeWorkflowGraph
 
 `triggers/triggers.ts` → `runTrigger()`:
 
-1. Load workflow từ D1 theo `trigger.workflowId`
+1. Load workflow owned từ UserDO (hoặc D1 nếu shared)
 2. Parse `definition` JSON
 3. Gọi `executeWorkflowGraph({ input, resolved, ... })`
 
@@ -283,19 +291,21 @@ Mỗi vòng lặp:
 
 ### Bước 11: Logic từng loại node
 
-`executeNodeLogic` trong `engine/executor.ts` — dispatch qua node plugin registry:
+`executeNodeLogic` trong `engine/executor.ts` — **chỉ** `nodePluginRegistry.resolve(node)` (không switch-case):
 
-| `node.type` | Hành vi runtime |
-|-------------|-----------------|
-| `trigger` | Pass-through: `{ triggeredAt, text: input, data: ... }` |
-| `agent` | Gọi LLM; đọc service/memory/tools từ resource edges |
-| `http_request` | Gọi HTTP API (`execution/node-runtime.ts`) |
-| `code` | Transform JSON / template |
-| `flow` | IF / switch / merge — quyết định nhánh active |
-| `human_review` | **Dừng** workflow, chờ approve/reject |
+| `node.type` / kind | Hành vi runtime |
+|--------------------|-----------------|
+| `trigger:webhook` | `skipExecution` — HTTP đã xử lý ở hook; output từ webhook item |
+| `trigger` (khác) | Pass-through: `{ triggeredAt, text: input, data: ... }` |
+| `agent` | LLM + tool loop; đọc service/memory/tools từ resource edges |
+| `http_request` / `core:http_request` | Gọi HTTP API (`nodes/http-request/`) |
+| `code` / `core:code` | Transform JSON / template |
+| `flow` | IF / switch / merge / loop — quyết định nhánh active |
+| `human_review` | **Dừng** workflow (gmail có execute riêng) |
 | `data_transformation` | Parse JSON, pick field |
-| `service_node`, `memory_node`, `tool_node` | **Bỏ qua** trong main chain |
-| `sticky_note` | Bỏ qua (chỉ ghi chú trên canvas) |
+| `tool_node:save-rag` / `get-rag` / `get-db-info` | Execute pipeline nếu nằm trên data-flow; `skipExecution` khi chỉ là Agent tool |
+| `service_node`, `memory_node`, tool còn lại | `skipExecution` |
+| `sticky_note`, `workflow_group` | Bỏ qua (canvas-only) |
 
 **Webhook trigger node** khi tới lượt chỉ forward input — HTTP đã được xử lý ở Bước 7.
 
@@ -374,11 +384,9 @@ Code: `workers/web/src/lib/workflow-node-registry/`
 
 ---
 
-## 8. Phần G — Kiến trúc plugin (hướng đi)
+## 8. Phần G — Kiến trúc plugin (đã triển khai)
 
-**Hiện tại:** logic mỗi node rải nhiều file; `engine/executor.ts` đang migrate sang plugin registry.
-
-**Mục tiêu (spec):** mỗi node là module `nodes/<name>/`; executor chỉ dispatch qua registry.
+Executor **chỉ** dispatch qua registry. Mỗi family/kind là module `nodes/<name>/` (BE + FE) + definition trong `@aiagents-hub/workflow-nodes`.
 
 ```mermaid
 flowchart TB
@@ -393,7 +401,7 @@ flowchart TB
   Panel["config router"] -->|"plugin.ConfigPanel"| CFG
 ```
 
-**Luồng runtime giữ nguyên** (queue → execute → schedule) — chỉ thay đổi cách tổ chức code.
+**Còn lại (không chặn runtime):** add-node drawer vẫn đọc `catalogs/*.ts` (song song `NODE_CATALOG` từ UI plugins); một số kind catalog-only chưa có execute.
 
 Xem: [`workflow-node-plugin-architecture.md`](./workflow-node-plugin-architecture.md)
 
@@ -407,10 +415,11 @@ Ngoài webhook public URL, workflow có thể start từ:
 |------|-------|------|
 | **Manual run** | Nút Run trên editor | `api/presentation.ts` → `executeWorkflowGraph` |
 | **Cron** | Cloudflare `scheduled` | `triggers/triggers.ts` → `runDueCronTriggers` |
+| **Form / DB** | `/form/:workflowId/:path` | `form-hooks-presentation.ts` + `form-trigger-runner.ts` |
 | **Telegram / Slack / Discord** | `/hooks/channels/:ch/:ownerId/:token` | `api/hooks-presentation.ts` + `triggers/channel-hooks.ts` |
 | **Resume human review** | Approve/reject API | `resumeWorkflowExecution` |
 
-Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã lưu trên D1.
+Tất cả hội tụ về `executeWorkflowGraph`. Definition owned lấy từ **UserDO**; shared/marketplace từ D1.
 
 ---
 
@@ -419,11 +428,11 @@ Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã
 | # | Giai đoạn | Điều gì xảy ra |
 |---|-----------|----------------|
 | 1 | **Design** | User vẽ graph trên React Flow, config `node.data` |
-| 2 | **Save** | Definition JSON → D1 `agent_workflows` |
-| 3 | **Trigger setup** | Tạo row `workflow_triggers` → có public URL |
-| 4 | **HTTP in** | `/hooks/...` lookup token → `runTrigger` |
+| 2 | **Save** | Definition JSON → UserDO `agent_workflows` (D1 sync) |
+| 3 | **Trigger setup** | Row `workflow_triggers` + sync path khi save webhook |
+| 4 | **HTTP in** | `/hooks/workflows/:workflowId/:path` + API token → `runTrigger` |
 | 5 | **Execute init** | `executeWorkflowGraph` — queue = entry nodes |
-| 6 | **Per node** | Input từ parent → `executeNodeLogic` → output |
+| 6 | **Per node** | Input từ parent → plugin `execute` → output |
 | 7 | **Traverse** | `scheduleDownstream` theo edge active |
 | 8 | **Done** | Persist execution log + trả response |
 
@@ -440,10 +449,13 @@ Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã
 | Graph helpers | `workers/auth-worker/.../workflows/engine/graph-helpers.ts` |
 | Flow branches | `workers/auth-worker/.../workflows/engine/flow-helpers.ts` |
 | Canvas | `workers/web/.../build/workflows/_components/canvas/workflow-canvas.tsx` |
-| Node components | `workers/web/.../build/workflows/_components/nodes/workflow-nodes.tsx` |
+| UI node plugins | `workers/web/.../build/workflows/_components/nodes/` (`workflow-nodes.tsx` = shim) |
 | Config panel router | `workers/web/.../build/workflows/_components/panels/node-config/workflow-node-config-panel.tsx` |
-| Webhook config | `workers/web/.../build/workflows/_components/panels/node-config/webhook-node-config-panel.tsx` |
-| Node Registry | `workers/web/src/lib/workflow-node-registry/` |
+| Form hooks | `workers/auth-worker/.../workflows/api/form-hooks-presentation.ts` |
+| Webhook plugin | `workers/auth-worker/.../workflows/nodes/webhook/` |
+| Webhook config | `workers/web/.../build/workflows/_components/nodes/webhook/config-panel.tsx` |
+| Node Registry | `packages/workflow-nodes/` (`workers/web/.../default-nodes.ts` là shim) |
+| RAG vector | `workers/auth-worker/.../workflows/rag/` |
 
 ---
 
@@ -451,5 +463,6 @@ Tất cả đều hội tụ về `executeWorkflowGraph` với `definition` đã
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3 | 2026-09-11 | UserDO-first save; webhook URL `/:workflowId/:path` + API token; plugin registry live |
 | 0.2 | 2026-06-14 | Cập nhật đường dẫn theo cấu trúc thư mục workflows mới |
 | 0.1 | 2026-06-12 | Initial — giải thích luồng vận hành từng bước |

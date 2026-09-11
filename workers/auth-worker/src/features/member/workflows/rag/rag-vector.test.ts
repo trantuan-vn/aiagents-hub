@@ -10,7 +10,7 @@ import {
   buildMetadataFilter,
   toVectorizeNativeNamespace,
 } from './rag-vector.js';
-import { chunkText } from './nodes/tool/save-rag/chunk.js';
+import { chunkText } from '../nodes/tool/save-rag/chunk.js';
 
 describe('rag-vector', () => {
   it('buildMetadataFilter includes namespace and docType', () => {

@@ -9,7 +9,7 @@ import {
   embedText,
   matchesToSnippets,
   queryCollection,
-} from '../rag-vector.js';
+} from '../rag/index.js';
 import {
   executeGetDbInfo,
   executeGetRag,

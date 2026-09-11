@@ -1,3 +1,5 @@
+> **Phạm vi:** Sequence vòng lặp Cursor IDE — không phải `engine/executor.ts` của AIAgents Hub.
+
 ```mermaid
 sequenceDiagram
     participant User

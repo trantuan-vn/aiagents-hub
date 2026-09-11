@@ -10,7 +10,7 @@ import {
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
-import { executeWorkflowGraph, resumeWorkflowExecution } from '../executor.js';
+import { executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
 import {
   findFormDatabaseTriggerNode,
   runFormDatabaseTrigger,

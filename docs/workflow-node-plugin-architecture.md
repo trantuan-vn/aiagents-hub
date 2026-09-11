@@ -1,8 +1,8 @@
 # Workflow Node Plugin — Kiến trúc khung
 
-> **Trạng thái:** Draft  
-> **Phiên bản:** 0.2  
-> **Ngày:** 2026-06-12  
+> **Trạng thái:** Implemented (còn việc catalog dual-write)  
+> **Phiên bản:** 0.3  
+> **Ngày:** 2026-09-11  
 > **Phạm vi:** Backend (`auth-worker`), Frontend (`web`), Shared package (`packages/workflow-nodes`)
 
 Tài liệu **rút gọn** kiến trúc khung. **Spec chính đầy đủ:** [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md).
@@ -23,21 +23,21 @@ Tài liệu **rút gọn** kiến trúc khung. **Spec chính đầy đủ:** [`w
 
 ## 1. Mục tiêu
 
-### 1.1 Vấn đề cần giải quyết
+### 1.1 Đã làm / còn lại
 
-Logic của một node hiện bị **phân tán** qua nhiều lớp:
+Plugin layout **đã chạy**. Executor không còn switch-case.
 
-| Lớp | Vị trí hiện tại | Vấn đề |
-|-----|-----------------|--------|
-| Executor | `engine/executor.ts` | Thêm node = đăng ký plugin (đang migrate từ switch-case) |
-| Schema / Registry | `default-nodes.ts` × 2 | Duplicate web ↔ auth-worker |
-| Add-node catalog | `catalogs/*.ts` | Hardcoded, không đồng bộ registry |
-| Canvas UI | `nodes/workflow-nodes.tsx` | Tất cả node trong một file |
-| Config panel | `panels/node-config/` + custom | Không có pattern thống nhất |
-| Trigger / Hook | `triggers/triggers.ts`, `api/hooks-presentation.ts` | Tách rời khỏi node canvas |
-| Connection rules | `engine/graph-helpers.ts` + `edges/workflow-connection-utils.ts` | Node không khai báo handles rõ ràng |
+| Lớp | Hiện tại | Còn lại |
+|-----|----------|---------|
+| Executor | `engine/executor.ts` → `nodePluginRegistry.resolve` | — |
+| Schema / Registry | `@aiagents-hub/workflow-nodes`; `default-nodes.ts` là shim | — |
+| Add-node catalog | `catalogs/*.ts` **vẫn** drive drawer | `NODE_CATALOG` từ UI plugins chưa thay catalogs |
+| Canvas UI | `nodes/<name>/canvas.tsx`; `workflow-nodes.tsx` shim | FE không có folder `http-request/` / `code/` (factory `core`) |
+| Config panel | Router + custom `ConfigPanel` trên plugin | Generic đủ cho hầu hết kind |
+| Trigger / Hook | `nodes/webhook/trigger.ts` + `triggers/` orchestrator | Canvas `webhookAuth` ≠ production API token |
+| Connection rules | Shared `connection-rules.ts` + FE/BE helpers | `handles[]` mới khai báo đầy đủ trên webhook |
 
-**Hệ quả:** Thêm node mới cần sửa ~12 file ở 4+ thư mục, không có checklist rõ ràng.
+**Thêm node mới:** shared definition + BE plugin + FE plugin (xem §7). Add-node item vẫn cần `catalogs/*.ts` cho đến khi drawer chuyển sang `NODE_CATALOG`.
 
 ### 1.2 Mục tiêu thiết kế
 
@@ -49,10 +49,9 @@ Logic của một node hiện bị **phân tán** qua nhiều lớp:
 
 ### 1.3 Non-goals
 
-- Thay đổi format lưu graph trên D1 (`agent_workflows.definition`).
-- Thay đổi Node Registry KV key hoặc admin CRUD API.
-- Execute-step thật cho từng node (roadmap riêng).
+- Đổi format JSON graph (`WorkflowDefinition`).
 - Third-party node plugins từ npm.
+- Xóa `catalogs/*.ts` trước khi add-node đọc `NODE_CATALOG`.
 
 ---
 
@@ -121,24 +120,22 @@ docs/
 ### 3.1 Cấu trúc thư mục
 
 ```
-packages/workflow-nodes/
+packages/workflow-nodes/          # @aiagents-hub/workflow-nodes
 ├── package.json
 ├── tsconfig.json
 └── src/
     ├── index.ts
-    ├── types/
-    │   ├── node-definition.ts
-    │   ├── graph.ts
-    │   ├── handles.ts
-    │   └── connection-rules.ts
-    ├── registry/
-    │   ├── merge.ts
-    │   └── resolve.ts
+    ├── types/                    # node-definition, graph, handles, connection-rules
+    ├── registry/                 # merge.ts, resolve.ts
+    ├── catalog/                  # WORKFLOW_NODE_CATALOG_SEEDS (admin active flags)
     └── nodes/
-        ├── index.ts
-        └── <name>/
+        ├── builtins.ts
+        ├── create-builtin.ts
+        ├── workflow-presets.ts
+        └── <family>/
             ├── definition.ts
-            └── schema.ts
+            ├── kinds.ts          # hoặc channels.ts (human_review)
+            └── schema.ts         # optional (webhook)
 ```
 
 ### 3.2 Node Definition
@@ -192,38 +189,18 @@ Node plugin chỉ **khai báo handles**; engine validate và render.
 workers/auth-worker/src/features/member/workflows/
 ├── api/
 │   ├── presentation.ts
-│   └── hooks-presentation.ts       # delegate → nodes/<name>/trigger.ts
+│   ├── hooks-presentation.ts       # /hooks/workflows/:workflowId/:path + channels
+│   └── form-hooks-presentation.ts  # /form, /form-test
 ├── domain/
-│   ├── domain.ts
-│   └── constant.ts
 ├── execution/
-│   ├── workflow-context.ts
-│   ├── execution-store.ts
-│   ├── node-runtime.ts
-│   └── agent-runtime.ts
-├── engine/
-│   ├── executor.ts
-│   ├── graph-helpers.ts
-│   ├── flow-helpers.ts
-│   └── index.ts
+├── engine/                         # executor, graph/flow/loop helpers, HITL, persist
 ├── nodes/
-│   ├── index.ts                    # registerAllNodes()
-│   ├── types.ts                    # WorkflowNodePlugin, NodeContext
-│   ├── _template/
-│   │   ├── README.md
-│   │   ├── index.ts
-│   │   └── execute.ts
-│   └── <name>/
-│       ├── index.ts
-│       ├── execute.ts              # optional
-│       └── trigger.ts              # optional
-├── triggers/
-│   ├── triggers.ts
-│   ├── channel-hooks.ts
-│   ├── webhook-auth.ts
-│   └── webhook-notify.ts
+│   ├── index.ts                    # BUILTIN_PLUGINS + Registry
+│   ├── types.ts
+│   └── <name>/                     # family, factory kinds, hoặc override
+├── triggers/                       # D1 rows, cron, form-trigger-runner, webhook-auth
+├── rag/                            # Vectorize embed / query / upsert
 ├── billing/, collab/, storage/, integrations/
-├── executor.ts                     # re-export → engine/executor
 └── README.md
 ```
 
@@ -294,13 +271,13 @@ workers/web/src/app/(main)/dashboard/build/workflows/
 │   │   │   ├── workflow-node-config-panel.tsx   # router
 │   │   │   └── generic-config-panel.tsx
 │   │   └── workflow-panels/
-│   ├── catalogs/                   # sẽ xóa dần
+│   ├── catalogs/                   # add-node drawer (vẫn dùng)
 │   ├── hooks/
 │   └── engine/                     # re-exports edges & layout
 └── _lib/
 ```
 
-**Xóa dần:** `catalogs/workflow-*-catalog.ts` → catalog sinh từ UI plugins.
+**Hai catalog:** `catalogs/*.ts` vẫn là nguồn add-node drawer. `NODE_CATALOG` sinh từ UI plugins nhưng **chưa** được add-node dùng. Admin active/inactive: `packages/workflow-nodes/src/catalog/entries.ts`.
 
 ### 5.2 Plugin Contract
 
@@ -389,18 +366,17 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 - [ ] Tạo `docs/workflow-nodes/<name>.md` theo template
 - [ ] Cập nhật index trong `docs/workflow-nodes/README.md`
 
-### 7.2 Shared package (Phase 2+)
+### 7.2 Shared package
 
 - [ ] `packages/workflow-nodes/src/nodes/<name>/definition.ts`
-- [ ] `packages/workflow-nodes/src/nodes/<name>/schema.ts`
-- [ ] Export + handles
+- [ ] `kinds.ts` nếu family có nhiều variant
+- [ ] Export + `builtins.ts` / catalog seed nếu cần
 
 ### 7.3 Backend
 
 - [ ] `nodes/<name>/execute.ts` (nếu executable)
 - [ ] `nodes/<name>/trigger.ts` (nếu external trigger)
-- [ ] `nodes/<name>/index.ts` — register plugin
-- [ ] Register trong `nodes/index.ts`
+- [ ] Register trong `nodes/index.ts` (override last)
 
 ### 7.4 Frontend
 
@@ -408,6 +384,7 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 - [ ] `nodes/<name>/defaults.ts`
 - [ ] `nodes/<name>/config-panel.tsx` (nếu generic không đủ)
 - [ ] Register trong `nodes/index.ts`
+- [ ] Add-node: `catalogs/*.ts` (drawer chưa đọc `NODE_CATALOG`)
 - [ ] i18n keys
 
 ### 7.5 Verify
@@ -422,13 +399,13 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 
 ## 8. Lộ trình Migration
 
-| Phase | Mục tiêu | Spec node |
-|-------|----------|-----------|
-| **1** | Webhook module làm mẫu | [`webhook.md`](./workflow-nodes/webhook.md) |
-| **2** | Shared package `packages/workflow-nodes` | — |
-| **3** | Backend plugin registry + tách `engine/` | — |
-| **4** | Frontend plugin + auto catalog | — |
-| **5** | Align `runtimeType` trên graph | — |
+| Phase | Mục tiêu | Trạng thái |
+|-------|----------|------------|
+| **1** | Webhook module | **Done** — `nodes/webhook/` BE + FE |
+| **2** | Shared package `@aiagents-hub/workflow-nodes` | **Done** |
+| **3** | Backend plugin registry + `engine/` | **Done** — không còn switch-case |
+| **4** | Frontend plugin + auto catalog | **Partial** — UI plugins xong; add-node vẫn `catalogs/*.ts` |
+| **5** | Align `runtimeType` trên graph | **Partial** — `http_request`/`code` vừa first-class vừa `coreKind` |
 
 ---
 
@@ -480,5 +457,6 @@ Catalog pick → resolveUIPlugin(id) → createNode({ type, data: defaults() }) 
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3 | 2026-09-11 | Đánh dấu plugin layout đã live; catalogs dual-write còn lại |
 | 0.1 | 2026-06-12 | Initial draft (monolithic spec) |
 | 0.2 | 2026-06-12 | Tách khung; spec node chuyển sang `docs/workflow-nodes/` |

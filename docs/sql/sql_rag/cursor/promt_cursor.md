@@ -1,3 +1,5 @@
+> **Phạm vi:** Prompt mẫu cho Cursor IDE (ví dụ Google Login / Next.js) — không phải system prompt workflow Agent trong repo.
+
 # PROMPTS FOR AI AGENT WORKFLOW
 # Thêm Google Login vào Next.js
 

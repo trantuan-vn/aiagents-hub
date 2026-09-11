@@ -5,7 +5,7 @@ import {
   queryCollection,
   VECTORIZE_ALL_METADATA_TOPK,
   type VectorMatch,
-} from '../../../rag-vector.js';
+} from '../../../rag/index.js';
 import { embeddingUsageOrEstimate, type AiUsage } from '../../../../../admin/service/pricing.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';

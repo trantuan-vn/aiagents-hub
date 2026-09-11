@@ -5,9 +5,8 @@ import {
   extractUsageFromAiResponse,
   mergeAiUsage,
   type AiUsage,
-} from '../../admin/service/pricing.js';
+} from '../../../admin/service/pricing.js';
 
-export { VECTORIZE_COLLECTION };
 export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
 const AI_GATEWAY_ID = 'unitoken';
 

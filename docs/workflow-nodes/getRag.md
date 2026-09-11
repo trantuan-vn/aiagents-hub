@@ -1,6 +1,6 @@
 # Node: Get RAG (`tool_node:get-rag`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "get-rag"`  
 > **Liên kết:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--retrieve--generate)
 
@@ -15,7 +15,7 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 | **ID** | `tool_node` (variant `get-rag`) |
 | **Category** | `resource` |
 | **Vai trò** | Tool callable — semantic search trên Vectorize |
-| **Loại plugin** | Resource + tool executor (Phase 2) |
+| **Loại plugin** | Resource + execute pipeline + Agent tool |
 | **Nối tới Agent** | `tool_node.tools` → `agent.tools` |
 | **Phụ thuộc** | [`service.md`](./service.md) (embed query), [`vectorize.md`](./vectorize.md) (index) |
 
@@ -69,7 +69,7 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 | Value | Hành vi |
 |-------|---------|
 | `from_tool_args` | Agent truyền `query` khi gọi tool (mặc định) |
-| `from_agent_input` | Lấy text từ upstream INPUT (câu hỏi webhook) — auto-call Phase 3 |
+| `from_agent_input` | Lấy text từ upstream INPUT (câu hỏi webhook) — pipeline auto |
 
 ---
 
@@ -85,12 +85,13 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 }
 ```
 
-**Execute (Phase 2 — `nodes/tool/get-rag.ts`):**
+**Execute** (`nodes/tool/get-rag/execute.ts`):
 
-1. Resolve `collection`, `namespace` từ Agent memory ([`vectorize.md`](./vectorize.md))
-2. Embed `query` qua Service ([`service.md`](./service.md)) — cùng model ingest
-3. `vectorize.query(vector, { topK, filter })`
-4. Map matches → `{ snippets, sources, count }`
+1. Resolve collection/namespace (`resolveRagResources`)
+2. Embed `query` (`embedTextWithUsage`)
+3. `queryCollection` (Vectorize top-K + metadata filter `docType` / `tableName`)
+4. Map matches → `{ snippets, count }`
+5. SQL RAG: boost `schema` / `sqlexample` chunks (`sqlChunkScore`)
 
 **Output tool:**
 
@@ -112,7 +113,7 @@ Agent merge snippets vào system/user message rồi gọi chat model từ Servic
 | Cách | Khi nào | Code hiện tại |
 |------|---------|---------------|
 | **Implicit** | Memory nối Agent, không có getRag tool | `executeAgent` pre-fetch `queryVectorMemory` vào system prompt |
-| **Explicit (getRag)** | Agent tool-calling — model chủ động search | ⚠️ Phase 2 — `buildRagToolset` |
+| **Explicit (getRag)** | Tool hoặc data-flow `tool_node:get-rag` | ✅ `buildRagToolset` + `executeGetRag`; agent bỏ tool khỏi loop nếu đã có upstream get-rag |
 
 Spec khuyến nghị **bài toán 2** dùng **getRag explicit** để model quyết định có search hay không; vẫn **bắt buộc** nối [`vectorize.md`](./vectorize.md) để bind collection.
 
@@ -133,15 +134,15 @@ Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--
 
 ---
 
-## 8. File map (mục tiêu)
+## 8. File map
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/tool/get-rag.ts` | Registry |
-| `workers/auth-worker/.../nodes/tool/get-rag.ts` | Tool executor |
-| `workers/auth-worker/.../execution/agent-runtime.ts` | `retrieveMemory` (shared) |
-
-**Hiện tại:** tương tự [`saveRag.md`](./saveRag.md) — `get-rag` chưa có trong registry.
+| `packages/workflow-nodes/src/nodes/tool/definition.ts` | `GET_RAG_TOOL_DEFINITION` |
+| `workers/auth-worker/.../nodes/tool/get-rag/execute.ts` | Query + snippet mapping |
+| `workers/auth-worker/.../nodes/tool/index.ts` | `toolGetRagPlugin` |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset` |
+| `workers/web/.../nodes/tool/` | `toolGetRagUIPlugin` |
 
 ---
 
@@ -149,4 +150,4 @@ Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — get-rag tool variant |
+| 0.2 | 2026-09-11 | Execute + agent upstream snippets live |

@@ -1,6 +1,6 @@
 # Node: AI Agent (`agent`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done (runtime + UI plugin)  
 > **Spec chính:** [`workflow-node-plugin-spec.md`](../workflow-node-plugin-spec.md)  
 > **Kiến trúc khung:** [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)  
 > **Luồng vận hành:** [`workflow-how-it-works.md`](../workflow-how-it-works.md)
@@ -81,7 +81,7 @@ Resource edge **không** đi theo luồng `out → in`; chỉ inject config vào
 - Main flow: `out` / `true` / `false` / `case_N` → `in`
 - Resource: `service`/`memory`/`tools` source phải nối vào cùng tên handle trên **agent**
 
-> **Gap hiện tại:** `AGENT_NODE` trong `builtins.ts` chưa khai báo `handles[]` — canvas hardcode trong `AgentWorkflowNode`; connection rules dùng fallback `out → in`.
+> **Handles:** Canvas `AgentWorkflowNode` hardcode `in`/`out`/`service`/`memory`/`tools`. Shared `AGENT_NODE_DEFINITION` **chưa** khai báo `handles[]` (khác webhook). Connection rules dùng fallback resource → agent.
 
 ---
 
@@ -218,7 +218,7 @@ Registry section `output`: `showExecuteStep: true`, field `mockData` (json).
 | `endpoint` | string | — | Alias legacy của `serviceEndpoint` | — | ✅ |
 | `memoryCollection` | string | `"vectorize-default"` | Memory backend | Parameters (Memory slot) | ✅ |
 | `maxTokens` | number | `1024` | Max output tokens | Options | ✅ |
-| `tools` | array | `[]` | Tool configs (resource edges) | Parameters (Tool slot) | ⚠️ metadata |
+| `tools` | array | `[]` | Tool configs (resource edges) | Parameters (Tool slot) | ✅ invoked via AI SDK |
 | `requireOutputFormat` | boolean | `false` | Require Specific Output Format | Parameters | ❌ |
 | `enableFallbackModel` | boolean | `false` | Enable Fallback Model | Parameters | ❌ |
 | `options` | object | `{}` | Options group | Parameters | ❌ |
@@ -240,7 +240,7 @@ Agent chỉ chạy khi executor đến lượt node theo data-flow — input lu�
 
 | | File | Tool calling | Billing |
 |---|------|:------------:|:-------:|
-| Graph execute | `nodes/agent/execute.ts` | ❌ (single-shot LLM) | `billAgentUsage` |
+| Graph execute | `nodes/agent/execute.ts` | ✅ `streamText` + `buildAgentToolset` / `buildRagToolset` | `billAgentUsage` |
 
 ```mermaid
 flowchart LR
@@ -290,43 +290,18 @@ Resource nodes đăng ký `skipExecution: true` — không bao giờ vào execut
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/builtins.ts` | Registry schema `AGENT_NODE` (sections, fields) |
-| `packages/workflow-nodes/src/types/connection-rules.ts` | Validate resource → agent connections |
-| `workers/auth-worker/.../nodes/agent/execute.ts` | Graph execute logic |
-| `workers/auth-worker/.../nodes/index.ts` | Register `{ id: 'agent', execute: executeAgent }` |
+| `packages/workflow-nodes/src/nodes/agent/definition.ts` | `AGENT_NODE_DEFINITION` + `agent:tools_agent` |
+| `packages/workflow-nodes/src/nodes/agent/kinds.ts` | `AGENT_KINDS` = `tools_agent` |
+| `packages/workflow-nodes/src/types/connection-rules.ts` | Resource → agent |
+| `workers/auth-worker/.../nodes/agent/execute.ts` | LLM + PDF extract + RAG + tool loop |
+| `workers/auth-worker/.../nodes/agent/index.ts` | `agentPlugin`, `AGENT_KIND_PLUGINS` |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildAgentToolset`, `buildRagToolset`, `retrieveMemory` |
 | `workers/auth-worker/.../engine/graph-helpers.ts` | `resolveAgentResources()` |
 | `workers/auth-worker/.../billing/billing.ts` | Service resolve, `runTextModel`, `billAgentUsage` |
-| `workers/web/.../nodes/workflow-nodes.tsx` | `AgentWorkflowNode` — handles + warning UI |
-| `workers/web/.../nodes/index.ts` | UI plugin `agent` → `AgentWorkflowNode` |
+| `workers/web/.../nodes/agent/` | UI plugin + canvas + `config-panel.tsx` |
 | `workers/web/.../layout/workflow-create-connected-node.ts` | Defaults khi add agent + service |
-| `workers/web/.../layout/workflow-resource-layout.ts` | Đặt resource nodes dưới agent |
-| `workers/web/.../edges/workflow-connection-utils.ts` | Resource edge helpers |
-| `workers/web/.../_lib/definition-utils.ts` | Merge sidebar `serviceEndpoint` vào agents |
-| `workers/web/.../editor/workflow-editor-sidebar.tsx` | Global service endpoint picker |
-| `workers/web/.../panels/node-config/generic-config-panel.tsx` | Generic 3-column config (agent dùng registry) |
-| `workers/web/src/lib/n8n-workflow/descriptions/agent.ts` | n8n INodeProperties (legacy) |
-| `workers/web/messages/en-US.json`, `vi-VN.json` | i18n keys |
 
-### Mục tiêu (sau migration)
-
-```
-packages/workflow-nodes/src/nodes/agent/
-├── definition.ts          # AGENT_NODE + handles metadata
-└── schema.ts              # Zod validate node.data (optional)
-
-workers/auth-worker/src/features/member/workflows/nodes/agent/
-├── index.ts               # agentPlugin export
-├── execute.ts             # (đã có)
-└── resources.ts           # tách resolveAgentResources (optional)
-
-workers/web/.../build/workflows/_components/nodes/agent/
-├── index.ts               # agentUIPlugin
-├── canvas.tsx             # move từ workflow-nodes.tsx AgentNode
-├── defaults.ts            # agentNodeDefaults()
-└── n8n-properties.ts      # move từ lib/n8n-workflow/descriptions/agent.ts
-```
-
-**Không cần custom config panel** trong Phase 1 — generic registry panel đủ cho hầu hết fields; resource wiring qua canvas handles.
+Custom config panel **đã có** (`nodes/agent/config-panel.tsx`); generic registry vẫn dùng cho nhiều field.
 
 ---
 
@@ -362,67 +337,17 @@ workers/web/.../build/workflows/_components/nodes/agent/
 
 ### 10.2 Config panel
 
-- **Generic 3-column** từ registry — xem [§4 Config panel](#4-config-panel--3-cột)
-- Cột INPUT: upstream output tree (Schema / Table / JSON)
-- Cột Parameters: fields §4.2; resource slots **Service** / Memory / Tool
-- Cột OUTPUT: execute step + mock data
-- `resource-link` type cho Service/Memory/Tool — hướng dẫn nối canvas, không phải dropdown model
+- Custom `nodes/agent/config-panel.tsx` + generic 3-column từ registry
+- Resource slots **Service** / Memory / Tool map handle đứt nét
+- `resource-link` type — nối canvas, không dropdown model
 
 ### 10.3 Defaults khi add node
 
-```typescript
-// nodes/agent/defaults.ts (mục tiêu)
-export function agentNodeDefaults(
-  id: string,
-  workflowServiceEndpoint?: string,
-): Record<string, unknown> {
-  return {
-    label: "Agent",
-    promptSource: "from_input",
-    prompt: "",
-    systemPrompt: "",
-    serviceEndpoint: workflowServiceEndpoint ?? "",
-    memoryCollection: "vectorize-default",
-    maxTokens: 1024,
-    requireOutputFormat: false,
-    enableFallbackModel: false,
-    tools: [],
-  };
-}
-```
-
-**Hiện tại:** `layout/workflow-create-connected-node.ts` seed `serviceEndpoint`, `memoryCollection`, `tools: []` khi add từ canvas có sidebar endpoint.
+`layout/workflow-create-connected-node.ts` seed `serviceEndpoint`, `memoryCollection`, `tools: []`, `agentKind: tools_agent`. Default prompt trong shared definition dùng `SQL_AGENT_PROMPT` / `SQL_AGENT_SYSTEM_PROMPT` (workflow presets).
 
 ### 10.4 Add node
 
-```typescript
-// Hiện tại
-onPick({ type: "agent", label: t("node_agent") });
-
-// Mục tiêu
-addNode("agent");
-```
-
-Catalog: `catalogs/workflow-add-node-catalog.ts`, `catalogs/workflow-node-palette.ts` — category `ai`.
-
-### 10.5 UI plugin (mục tiêu)
-
-```typescript
-export const agentUIPlugin: WorkflowNodeUIPlugin = {
-  id: "agent",
-  runtimeType: "agent",
-  catalog: {
-    category: "ai",
-    labelKey: "node_agent",
-    descriptionKey: "node_agent_desc",
-    icon: "Bot",
-  },
-  match: (node) => node.type === "agent",
-  Canvas: AgentWorkflowNode,
-  defaults: () => agentNodeDefaults(""),
-  // ConfigPanel: undefined → generic
-};
-```
+Add-node catalogs category `ai`. UI plugin `agentUIPlugin` + `AGENT_KIND_UI_PLUGINS` (`agent:tools_agent`).
 
 ---
 
@@ -477,44 +402,28 @@ Files: `workers/web/messages/en-US.json`, `workers/web/messages/vi-VN.json`
 
 ---
 
-## 13. Quyết định cần review (open questions)
+## 13. Open questions (còn mở)
 
-Trước khi implement Phase 2, cần chốt:
-
-| # | Câu hỏi | Option A | Option B |
-|---|---------|----------|----------|
-| 1 | **Tool nodes vs asTool** | Graph execute gọi `tool_node` qua AI SDK | Chỉ `http_request` + `asTool` |
-| 2 | **Memory warning** | Chỉ warn thiếu `service` | Giữ warn cả `memory` (hiện tại) |
-| 3 | **requireOutputFormat** | Implement output parser node + edge | Xóa khỏi UI đến khi có parser |
-| 4 | **enableFallbackModel** | Implement fallback service edge | Xóa / ẩn cho đến khi có spec |
-| 5 | **Rename `chatModel` → `service` trong registry** | Đổi id + i18n ngay | Giữ id cũ, chỉ đổi label |
-| 6 | **Handles trong shared package** | Thêm `handles[]` vào `definition.ts` | Tiếp tục hardcode canvas |
+| # | Câu hỏi | Hiện trạng |
+|---|---------|------------|
+| 1 | Tool nodes vs asTool | **Done:** HTTP `asTool` + RAG tools trong `streamText` loop |
+| 2 | Memory warning | Canvas vẫn có thể warn thiếu memory; runtime memory optional |
+| 3 | `requireOutputFormat` | Field UI; runtime chưa parser |
+| 4 | `enableFallbackModel` | Field UI; runtime chưa fallback |
+| 5 | Registry `chatModel` id | Vẫn id `chatModel`, label i18n **Service** |
+| 6 | `handles[]` shared | Chưa — canvas hardcode |
 
 ---
 
-## 14. Checklist triển khai
+## 14. Checklist (đã xong phần runtime)
 
-### Phase 1 — Tổ chức code (không đổi behavior)
-
-- [ ] INPUT panel hiển thị upstream output tree (Webhook → headers/params/query/body)
-- [ ] Đổi registry `chatModel` → `service` + i18n **Service**
-- [ ] OUTPUT panel: Execute step + Set mock data
-- [ ] Tạo `packages/workflow-nodes/src/nodes/agent/definition.ts` — move từ `builtins.ts`
-- [ ] Tạo `workers/web/.../nodes/agent/` — move canvas + defaults
-- [ ] Register UI plugin; re-export shims từ `workflow-nodes.tsx`
-- [ ] (Optional) `nodes/agent/index.ts` backend — gom export plugin
-
-### Phase 2 — Runtime alignment
-
-- [ ] Implement hoặc remove `requireOutputFormat` / `enableFallbackModel`
-- [ ] Tool execution trong graph (nếu chốt Option A)
-- [ ] `handles[]` trong shared definition
-
-### Docs & verify
-
-- [ ] Manual: Webhook → Agent → HTTP — billing + output chain
-- [ ] Manual: Agent thiếu service → error rõ ràng
-- [ ] Unit: `resolveAgentResources`, `executeAgent` prompt branches
+- [x] Plugin BE + FE `nodes/agent/`
+- [x] Tool loop (HTTP + RAG)
+- [x] PDF extract khi webhook có files
+- [x] Implicit RAG + explicit get-rag
+- [ ] `handles[]` trên shared definition
+- [ ] `requireOutputFormat` / `enableFallbackModel` runtime
+- [ ] Add-node chuyển sang `NODE_CATALOG`
 
 ---
 
@@ -524,10 +433,10 @@ Trước khi implement Phase 2, cần chốt:
 
 1. Đọc [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md).
 2. Đọc spec này — agent chỉ execute trong graph, input từ upstream.
-3. Logic execute nằm trong `nodes/agent/execute.ts` — không thêm case `agent` vào executor monolith.
-4. Resource nodes giữ `skipExecution: true`.
-5. Billing luôn qua `billAgentUsage` — không gọi `env.AI.run` trực tiếp ngoài billing layer.
-6. Giữ re-export shims cho đến hết migration.
+3. Logic execute nằm trong `nodes/agent/execute.ts` — không thêm case `agent` vào executor.
+4. Resource nodes giữ `skipExecution: true` (trừ RAG tools trên data-flow).
+5. Billing luôn qua `billAgentUsage` / `billRagEmbeddings`.
+6. Duplicate registry — dùng `@aiagents-hub/workflow-nodes`.
 
 ### Prompt gợi ý
 
@@ -570,10 +479,10 @@ Resolve open questions #1–#2 trước nếu task bao gồm runtime alignment.
 
 1. **Nhiều agent trên graph:** Executor chạy từng agent theo topology; mỗi agent nhận input từ parent tương ứng.
 2. **Sidebar serviceEndpoint:** `mergeAgentServiceEndpoint` ghi đè tất cả agent nodes khi save — có thể conflict với per-agent service từ resource edge.
-3. **Tool list trong execute:** Hiện chỉ inject text vào system prompt — **không** invoke tools trong graph run.
-4. **Vectorize binding:** `memoryCollection` có thể là tên binding trên `env` hoặc fallback `VECTORIZE`.
-5. **Shared workflow billing:** `workflowAttribution` → royalty khi consumer chạy workflow của owner khác.
-6. **Deactivated agent:** Canvas hiển thị trạng thái; executor behavior cần verify (có skip không).
+3. **Tool list:** HTTP + RAG tools được invoke trong `streamText` khi nối `tool_node`. Get-rag trên data-flow thì agent đọc `snippets` từ upstream (bỏ tool `get_rag` khỏi loop).
+4. **Vectorize binding:** `memoryCollection` / namespace từ memory resource; `rag/rag-vector.ts` + `rag/vectorize-scope.ts`.
+5. **Shared workflow billing:** `workflowAttribution` → royalty.
+6. **Deactivated agent:** Canvas `deactivated`; executor skip theo `data.retry` / deactivated cần verify per run.
 
 ---
 
@@ -581,6 +490,6 @@ Resolve open questions #1–#2 trước nếu task bao gồm runtime alignment.
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.3 | 2026-06-13 | Config panel 3 cột; link resource/RAG specs |
+| 0.4 | 2026-09-11 | Tool loop + RAG/PDF live; file map khớp `nodes/agent/` |
 | 0.2 | 2026-06-13 | Loại bỏ khái niệm agent là entry point Workflow Chat |
 | 0.1 | 2026-06-13 | Draft spec cho review |

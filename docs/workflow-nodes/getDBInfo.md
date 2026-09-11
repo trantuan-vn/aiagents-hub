@@ -1,6 +1,6 @@
 # Node: Get DB Info (`tool_node:get-db-info`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "get-db-info"`  
 > **Liên kết:** [`trigger.md`](./trigger.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`agent.md`](./agent.md)
 
@@ -115,21 +115,33 @@ Agent **bắt buộc** gọi `get_db_info` đầu pipeline ingest BT3 (trước 
 
 ---
 
-## 5. Execute (mục tiêu)
+## 5. Execute
 
-**File:** `workers/auth-worker/.../nodes/tool/get-db-info.ts`
+**File:** `workers/auth-worker/.../nodes/tool/get-db-info/execute.ts`
 
-1. Resolve connection từ trigger payload + `credentials.ts`
-2. `INFORMATION_SCHEMA` / dialect-specific introspection → `columns`, `ddl`, FK
-3. `SELECT * FROM table LIMIT N` → `sampleRows` (read-only, SSRF-safe allowlist)
-4. Query audit / stat → `sqlHistory` (filter SQL chứa `tableName` hoặc parsed AST)
-5. Return JSON → Agent INPUT context (tool result)
+1. Resolve connection từ trigger payload + `connect-config.ts` (Oracle) / credentials
+2. **D1:** `sqlite_master` + `PRAGMA` / sample `SELECT`
+3. **Oracle:** `oracle.ts` + `oracle-proxy-client.ts` → `services/oracle-proxy` (hoặc `@aiagents-hub/oracle-db`)
+4. `documents.ts` → artifact schema / sqlexample cho save-rag
+5. `listDatabaseTables` dùng bởi `form-trigger-runner.ts`
 
 **Bảo mật:**
 
-- Chỉ SELECT / metadata — không DDL/DML từ tool này
+- Introspect + SELECT mẫu — không chạy SQL tùy ý từ user qua tool này
 - Credential không log plain text
-- Rate limit per `dbId`
+- Oracle đi qua proxy HTTP, không mở TCP trực tiếp từ Worker
+
+## 6. File map
+
+| File | Vai trò |
+|------|---------|
+| `packages/workflow-nodes/src/nodes/tool/definition.ts` | `GET_DB_INFO_TOOL_DEFINITION` |
+| `nodes/tool/get-db-info/execute.ts` | Introspect D1 + Oracle |
+| `nodes/tool/get-db-info/oracle.ts` | Oracle metadata |
+| `nodes/tool/get-db-info/oracle-proxy-client.ts` | HTTP tới oracle-proxy |
+| `nodes/tool/get-db-info/connect-config.ts` | Resolve connect string / credential |
+| `nodes/tool/get-db-info/documents.ts` | RAG documents (schema + sqlexample) |
+| `services/oracle-proxy/` | Node Hono proxy `oracledb` |
 
 ---
 
@@ -149,4 +161,4 @@ trigger:form (tableName=orders)
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — get-db-info tool |
+| 0.2 | 2026-09-11 | D1 + Oracle proxy execute live |

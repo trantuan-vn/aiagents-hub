@@ -10,28 +10,30 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 
 ## Node specs
 
-| Node | Spec | Module folders | Ghi chú |
-|------|------|----------------|---------|
-| Webhook | [`webhook.md`](./webhook.md) | `nodes/webhook/` (shared + FE + BE) | Reference Lego module |
-| Agent | [`agent.md`](./agent.md) | `nodes/agent/` | Family + `agentKind` factory (`tools_agent`) |
-| Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` | Family + `triggerKind` factory (overrides: webhook/form) |
-| Flow | — | `nodes/flow/` | Family + `flowKind` factory (override: loop_over_items) |
-| Core | — | `nodes/core/` | Family + `coreKind` factory (overrides: http/code/webhook) |
-| Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | Resource attach only (not under AI add-node) |
-| Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` | Family + `memoryKind` factory (override: vectorize panel) |
-| Tool | — | `nodes/tool/` | Family + `toolKind` factory (overrides: save/get-rag, get-db-info) |
-| Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | `toolKind: save-rag` |
-| Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | `toolKind: get-rag` |
-| Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | SQL introspect |
-| Human review | — | `nodes/human-review/` | Family + channel factory (`channel`) |
+| Node | Spec | Module folders | Trạng thái |
+|------|------|----------------|------------|
+| Webhook | [`webhook.md`](./webhook.md) | `nodes/webhook/` (shared + FE + BE) | **Done** — HTTP ingress + canvas |
+| Agent | [`agent.md`](./agent.md) | `nodes/agent/` | **Done** — execute + tool loop |
+| Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` + FE `nodes/form/` | **Done** — `form` + `form-trigger-runner` |
+| Flow | — | `nodes/flow/` | Family + `flowKind` (override: loop_over_items) |
+| Core | — | `nodes/core/` + BE `http-request/`, `code/` | Factory; dedicated BE for http/code |
+| Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | **Done** — resource, skipExecution |
+| Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` | **Done** — resource + Vectorize |
+| Tool | — | `nodes/tool/` | Factory; RAG overrides có execute |
+| Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | **Done** — pipeline + PDF extract |
+| Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Done** — query Vectorize |
+| Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | **Done** — D1 + Oracle (oracle-proxy) |
+| Human review | — | `nodes/human-review/` | Family + channel factory (gmail execute) |
 | Action in app | — | `nodes/action-in-app/` | Integration actions |
 | Data transform | — | `nodes/data-transformation/` | Family + `transformKind` factory |
 | Sticky note | — | `nodes/sticky-note/` | Canvas-only |
 | Workflow group | — | `nodes/workflow-group/` | Canvas-only |
-| **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | — | Graph mẫu ingest PDF + Q&A |
-| **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | — | Kế hoạch chia phase |
+| **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | — | Graph mẫu ingest PDF + Q&A + BT3 |
+| **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | — | Phases P0–P10 — runtime đã xong; docs giữ lịch sử |
 | schema.md | [`schema.md`](./schema.md) | — | Artifact — table schema |
 | sqlexample.md | [`sqlexample.md`](./sqlexample.md) | — | Artifact — SQL examples |
+
+Add-node drawer **vẫn** đọc `workers/web/.../catalogs/*.ts`. UI `NODE_CATALOG` chưa thay catalogs.
 
 ### Module layout (mỗi node = 1 Lego)
 
@@ -175,7 +177,7 @@ export function <name>NodeDefaults(id: string): Record<string, unknown> {
 
 Sections: input | parameters | output
 
-(Key fields liệt kê hoặc link tới default-nodes.ts)
+(Key fields liệt kê hoặc link tới `@aiagents-hub/workflow-nodes`)
 
 ## 9. i18n keys
 
@@ -203,8 +205,8 @@ Khi implement node này, Cursor nên:
 1. Đọc [kiến trúc khung](../workflow-node-plugin-architecture.md) trước.
 2. Đọc spec này.
 3. (Nếu có) tham chiếu node mẫu: [webhook.md](./webhook.md).
-4. Không sửa executor monolith — tạo plugin trong `nodes/<name>/`.
-5. Giữ re-export ở path cũ cho đến hết migration.
+5. Không sửa `engine/executor.ts` để thêm case type — tạo plugin trong `nodes/<name>/`.
+6. Add-node drawer vẫn cần `catalogs/*.ts` cho đến khi chuyển sang `NODE_CATALOG`.
 
 Prompt gợi ý:
 

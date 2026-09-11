@@ -3,7 +3,7 @@ import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { parseWorkflowDefinition } from '../execution/workflow-context.js';
-import { executeWorkflowGraph } from '../executor.js';
+import { executeWorkflowGraph } from '../engine/executor.js';
 import { listFormSubmissionNodes } from './form-submission.js';
 
 /** Channel types align with OpenClaw multi-channel support (Telegram/Slack/Discord). */

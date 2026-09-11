@@ -1,3 +1,5 @@
+> **Phạm vi:** Sơ đồ RAG **Cursor IDE** — không phải Vectorize / `rag-vector.ts` của AIAgents Hub.
+
 ```mermaid
 flowchart TD
     %% Định nghĩa style cho các nhóm

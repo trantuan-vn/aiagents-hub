@@ -1,8 +1,26 @@
 # RAG Workflow — Kế hoạch chia phase coding (Cursor)
 
-> **Mục đích:** Hướng dẫn triển khai từng session Cursor — scope nhỏ, test được, tránh trộn refactor + feature.  
+> **Mục đích:** Lịch sử chia phase khi implement RAG. **Runtime đã có** (`rag-vector.ts`, tool execute, agent tool loop, form fan-out, Oracle get-db-info).  
 > **Spec liên quan:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`saveRag.md`](./saveRag.md) · [`getRag.md`](./getRag.md) · [`rag-recipes.md`](./rag-recipes.md)  
 > **Kiến trúc:** [`workflow-node-plugin-architecture.md`](../workflow-node-plugin-architecture.md)
+
+## Trạng thái hiện tại (2026-09-11)
+
+| Phase | Mục tiêu | Repo |
+|-------|----------|------|
+| **P0** | `rag-vector.ts` embed/query/upsert | **Done** |
+| **P1** | Registry `save-rag` / `get-rag` / vectorize fields | **Done** |
+| **P2** | get-rag execute | **Done** |
+| **P3** | Agent tool loop | **Done** (`streamText` + RAG/HTTP tools) |
+| **P4** | save-rag execute | **Done** |
+| **P5** | INPUT panel upstream | **Done** (generic I/O panel) |
+| **P6** | PDF ingest | **Done** (`save-rag/pdf-extract.ts`) |
+| **P7** | Plugin folders | **Done** — không cần làm lại |
+| **P8** | `trigger:form` fan-out | **Done** (`form-trigger-runner.ts`) |
+| **P9** | get-db-info | **Done** (D1 + Oracle proxy) |
+| **P10** | BT3 E2E Text-to-SQL | **Done** (agent SQL extract + get-rag schema/sqlexample) |
+
+Phần dưới giữ nguyên prompt/acceptance **lịch sử** — đừng implement lại P0–P7.
 
 ---
 
@@ -12,16 +30,16 @@
 |---|------------|-------|
 | 1 | **Một session = một deliverable test được** | Cursor diff ổn định hơn khi có acceptance criteria rõ (~5–15 file) |
 | 2 | **Foundation trước, feature sau** | Gom embed / query / upsert trước khi làm tool RAG |
-| 3 | **Không trộn refactor plugin + runtime RAG** | Tránh regression trên executor monolith |
+| 3 | **Không trộn refactor plugin + runtime RAG** | Plugin + RAG đã tách; đừng gộp lại vào executor |
 | 4 | **Vertical slice theo bài toán** | BT2 (Q&A, read-only) trước BT1 (ingest, write) |
 | 5 | **Mỗi phase có prompt copy-paste** | Giảm scope creep giữa các lần chat |
 
-### Không làm trong bất kỳ phase RAG nào (trừ khi phase riêng)
+### Không làm (trừ khi task riêng)
 
-- Refactor toàn bộ `engine/executor.ts` (đang migrate từ switch-case monolith)
+- Refactor lại `engine/executor.ts` (đã registry; không còn switch-case)
 - Gộp `workflow-chat.ts` với graph execute
-- Đổi schema D1 `agent_workflows.definition`
-- Migration plugin folder (Phase 7) song song với runtime RAG
+- Đổi schema JSON `WorkflowDefinition` trên UserDO
+- Tạo lại plugin folders (P7 đã xong)
 
 ---
 
@@ -502,9 +520,9 @@ Copy vào đầu mỗi task:
 - [ ] Scope = đúng 1 phase trong rag-implementation-phases.md
 - [ ] ≤ 15 file thay đổi (trừ i18n/generated)
 - [ ] Có unit test HOẶC manual steps trong PR
-- [ ] Không sửa workflow-chat
-- [ ] Không refactor executor monolith
-- [ ] Không đổi D1 agent_workflows schema
+- [ ] Không gộp workflow-chat với graph execute
+- [ ] Không thêm switch-case vào executor (dùng plugin)
+- [ ] Không đổi format `WorkflowDefinition` JSON
 ```
 
 ---
@@ -524,5 +542,5 @@ Copy vào đầu mỗi task:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.2 | 2026-06-13 | P8–P10 Bài toán 3 (trigger form, get-db-info, Text-to-SQL) |
+| 0.3 | 2026-09-11 | Đánh dấu P0–P10 đã implement trong repo |
 | 0.1 | 2026-06-13 | Initial — 8 phases + MVP shortcut + Cursor prompts |

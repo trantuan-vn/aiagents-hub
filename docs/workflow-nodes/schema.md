@@ -1,7 +1,7 @@
 # Artifact: `schema.md` (table schema document)
 
 > **Loại:** Document artifact — **không phải** canvas node  
-> **Sinh bởi:** Agent (sau [`getDBInfo`](./getDBInfo.md))  
+> **Sinh bởi:** Agent hoặc `get-db-info/documents.ts` (sau [`getDBInfo`](./getDBInfo.md))  
 > **Lưu bởi:** [`saveRag`](./saveRag.md) → [`vectorize`](./vectorize.md)  
 > **Dùng lại:** [`getRag`](./getRag.md) + Agent (BT3 query — Text-to-SQL)
 

@@ -1,6 +1,6 @@
 # Node: Service (`service_node`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done  
 > **Liên kết:** [`agent.md`](./agent.md) · [`vectorize.md`](./vectorize.md) · [`saveRag.md`](./saveRag.md) · [`getRag.md`](./getRag.md) · [`rag-recipes.md`](./rag-recipes.md)  
 > **Spec chính:** [`workflow-node-plugin-spec.md`](../workflow-node-plugin-spec.md)
 
@@ -88,7 +88,7 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 | Node tự execute trong graph | ❌ `skipExecution: true` |
 | Inject `serviceEndpoint` vào Agent | ✅ `engine/graph-helpers.ts` |
 | Billing | Qua Agent → `billAgentUsage` |
-| Embed PDF/chunk | ⚠️ Phase 2 — Agent/tool gọi model embed từ service này |
+| Embed PDF/chunk | ✅ `save-rag` + `rag/rag-vector.ts` (`embedTextsWithUsage`) |
 
 **Embedding trong RAG ingest:** Service có capability `embed` (vd. Workers AI `@cf/baai/bge-base-en-v1.5` hoặc embedding service trên catalog) được Agent / [`saveRag`](./saveRag.md) dùng để vector hóa chunk trước khi ghi Vectorize.
 
@@ -100,9 +100,9 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/builtins.ts` | Registry `service_node` |
-| `workers/web/.../nodes/workflow-nodes.tsx` | `ServiceWorkflowNode` canvas |
-| `workers/web/src/lib/n8n-workflow/descriptions/service-node.ts` | n8n properties |
+| `packages/workflow-nodes/src/nodes/service/definition.ts` | `SERVICE_NODE_DEFINITION` |
+| `workers/web/.../nodes/service/` | UI plugin + canvas + config-panel |
+| `workers/auth-worker/.../nodes/service-node/index.ts` | `skipExecution: true` |
 | `workers/auth-worker/.../engine/graph-helpers.ts` | `resolveAgentResources` |
 | `workers/auth-worker/.../billing/billing.ts` | `resolveServiceByEndpoint`, `runTextModel` |
 
@@ -124,4 +124,4 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — tương thích agent.md + RAG recipes |
+| 0.2 | 2026-09-11 | File map plugin; embed qua save-rag |

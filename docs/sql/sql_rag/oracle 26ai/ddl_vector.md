@@ -1,3 +1,6 @@
+> **Phạm vi:** Thiết kế RAG **trong Oracle 26ai** (vector index + PL/SQL), **không** phải runtime Cloudflare Vectorize của AIAgents Hub.  
+> Hub dùng `workers/auth-worker/.../workflows/rag/` + tool `get-db-info` / `save-rag`. File này là artifact Oracle-side song song.
+
 ```mermaid
 flowchart TD
     subgraph SETUP["🔧 KHỞI TẠO HỆ THỐNG"]

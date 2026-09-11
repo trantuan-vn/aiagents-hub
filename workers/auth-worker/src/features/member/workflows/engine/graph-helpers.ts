@@ -1,5 +1,5 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
-import { resolveVectorizeScope, type VectorizeScopeContext } from '../vectorize-scope.js';
+import { resolveVectorizeScope, type VectorizeScopeContext } from '../rag/index.js';
 import { isBranchSourceHandle } from './flow-helpers.js';
 
 export type { VectorizeScopeContext };

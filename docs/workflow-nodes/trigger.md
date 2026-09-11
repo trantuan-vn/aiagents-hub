@@ -1,6 +1,6 @@
 # Node: Database Form Trigger (`trigger:form`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done (form database + fan-out)  
 > **Runtime type:** `trigger` · **Kind:** `triggerKind: "form"` · **Form variant:** `formKind: "database"`  
 > **Liên kết:** [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`rag-recipes.md`](./rag-recipes.md#bài-toán-3-db-schema-ingest--text-to-sql)  
 > **Spec chính:** [`workflow-node-plugin-spec.md`](../workflow-node-plugin-spec.md)
@@ -17,7 +17,7 @@ Trigger **form** khai báo kết nối database và tham số chạy workflow. V
 | **Category** | `trigger` |
 | **Vai trò** | Entry point — cấu hình DB + fan-out theo bảng |
 | **Loại plugin** | Trigger + form config UI |
-| **Khác webhook** | Không HTTP public — chạy từ editor / schedule / API nội bộ |
+| **Khác webhook** | Public URL `/form/:workflowId/:path` (+ `/form-test`); fan-out `per_table` |
 | **Fan-out** | `executionMode: per_table` → **n executions** cho n bảng |
 
 ---
@@ -77,7 +77,7 @@ Trigger **form** khai báo kết nối database và tham số chạy workflow. V
 | **Trigger kind** | `triggerKind` | select | `"form"` |
 | **Form kind** | `formKind` | select | `"database"` |
 | **Credential** | `credentialKey` | credential-picker | Workflow credential (DSN / token) — [`workflow credentials`](../workflow-how-it-works.md) |
-| **Connection type** | `connectionType` | select | `d1` \| `hyperdrive` \| `postgres` \| `mysql` |
+| **Connection type** | `connectionType` | select | `d1` \| `oracle` \| `hyperdrive` \| `postgres` \| `mysql` |
 | **Database ID** | `databaseId` | text | Logical id (namespace Vectorize + audit) |
 | **Schema name** | `schemaName` | text | `public`, `dbo`, … |
 
@@ -155,15 +155,20 @@ sequenceDiagram
 
 ---
 
-## 7. Runtime (mục tiêu)
+## 7. Runtime (đã implement)
 
-| Bước | File đích |
-|------|-----------|
-| Form validate + list tables | `nodes/trigger/form-database.ts` |
-| Spawn per-table executions | `triggers/triggers.ts` hoặc `form-trigger-runner.ts` |
-| Credential resolve | `storage/credentials.ts` |
+| Bước | File |
+|------|------|
+| Form plugin FE | `workers/web/.../nodes/form/` (canvas, config-panel, defaults) |
+| Form plugin BE | `nodes/trigger/` → `triggerFormPlugin` |
+| Form HTTP | `api/form-hooks-presentation.ts` — `/form`, `/form-test` |
+| Fan-out per table | `triggers/form-trigger-runner.ts` → `runFormDatabaseTrigger` |
+| List tables | `nodes/tool/get-db-info` (`listDatabaseTables` / Oracle) |
+| Credential | `storage/credentials.ts` + Oracle connect-config |
 
-**Hiện tại:** `triggerKind` trong registry chỉ có `manual` \| `webhook` \| `schedule` — cần thêm `form`.
+`TRIGGER_KINDS` gồm `manual`, `webhook`, `form`, `schedule`, … Overrides: `webhook`, `form`.
+
+**URL:** `${BASE_URL}/form/${workflowId}/${path}` (`buildTriggerUrl` type `form`).
 
 ---
 
@@ -182,4 +187,4 @@ Chi tiết graph: [`rag-recipes.md` §3](./rag-recipes.md).
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — trigger form database + per_table fan-out |
+| 0.2 | 2026-09-11 | Form runner + `/form` routes + Oracle; `triggerKind: form` trong kinds |

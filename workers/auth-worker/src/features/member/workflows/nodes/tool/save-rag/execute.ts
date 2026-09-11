@@ -1,4 +1,4 @@
-import { embedTextsWithUsage, upsertVectors, type VectorizeVectorRecord } from '../../../rag-vector.js';
+import { embedTextsWithUsage, upsertVectors, type VectorizeVectorRecord } from '../../../rag/index.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import { embeddingUsageOrEstimate, mergeAiUsage, type AiUsage } from '../../../../../admin/service/pricing.js';
 import {

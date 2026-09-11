@@ -1,7 +1,7 @@
 # RAG Workflow Recipes
 
 > Cấu hình graph mẫu cho **3 bài toán RAG** — dùng cùng bộ resource node với [`agent.md`](./agent.md).  
-> **Trạng thái:** Draft — runtime RAG + BT3 cần implement theo [`rag-implementation-phases.md`](./rag-implementation-phases.md).
+> **Trạng thái:** Runtime đã implement (save/get-rag, PDF extract, form fan-out, get-db-info, agent tool loop). Recipe JSON dưới đây vẫn là mẫu canvas — đối chiếu `node.data` với definition hiện tại trong `@aiagents-hub/workflow-nodes`.
 
 | # | Bài toán | Trigger | Artifact / Output |
 |---|----------|---------|-------------------|

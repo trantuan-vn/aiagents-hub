@@ -1,5 +1,5 @@
 import type { ExecutionRow } from './execution-store.js';
-import type { ExecutionStepLog } from '../executor.js';
+import type { ExecutionStepLog } from '../engine/executor.js';
 
 export interface ExecutionStats {
   total: number;

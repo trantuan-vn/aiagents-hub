@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
-import { toVectorizeNativeNamespace } from '../../../rag-vector.js';
+import { toVectorizeNativeNamespace } from '../../../rag/index.js';
 
 const billingMock = vi.hoisted(() => ({
   resolveServiceByEndpoint: vi.fn(),

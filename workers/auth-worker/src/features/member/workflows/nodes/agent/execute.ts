@@ -18,7 +18,7 @@ import {
   retrieveMemory,
 } from '../../execution/agent-runtime.js';
 import { isDataFlowEdge, resolveAgentResources } from '../../engine/graph-helpers.js';
-import { DEFAULT_EMBED_MODEL } from '../../rag-vector.js';
+import { DEFAULT_EMBED_MODEL } from '../../rag/index.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import { executeGetRag } from '../tool/get-rag/execute.js';

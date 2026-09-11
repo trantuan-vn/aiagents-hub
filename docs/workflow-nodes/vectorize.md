@@ -1,6 +1,6 @@
 # Node: Vectorize (`memory_node:vectorize`)
 
-> **Trạng thái:** Draft (review)  
+> **Trạng thái:** Done  
 > **Runtime type:** `memory_node` · **Kind:** `memoryKind: "vectorize"`  
 > **Liên kết:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`saveRag.md`](./saveRag.md) · [`getRag.md`](./getRag.md) · [`rag-recipes.md`](./rag-recipes.md)
 
@@ -84,7 +84,7 @@ Vectorize là **memory resource node** — khai báo index Vectorize mà Agent v
 | Node tự execute | ❌ `skipExecution: true` |
 | Inject collection vào Agent | ✅ `resolveAgentResources` → `memoryCollection`, `memoryKind` |
 | Agent pre-fetch RAG (implicit) | ✅ `executeAgent` → `queryVectorMemory` khi có collection |
-| Tool save/get RAG | ⚠️ Phase 2 — đọc cùng collection từ Agent memory edge |
+| Tool save/get RAG | ✅ Cùng collection qua `resolveRagResources` / Agent memory edge |
 
 **Metadata vector (chuẩn RAG):**
 
@@ -134,12 +134,13 @@ Tool RAG **không** nối trực tiếp dashed edge tới Vectorize — lấy `m
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/builtins.ts` | Registry `memory_node` |
-| `workers/web/.../nodes/workflow-nodes.tsx` | `MemoryWorkflowNode` |
-| `workers/web/src/lib/n8n-workflow/descriptions/memory-node.ts` | n8n properties |
-| `workers/auth-worker/.../engine/graph-helpers.ts` | Resolve memory |
-| `workers/auth-worker/.../nodes/agent/execute.ts` | `queryVectorMemory` |
-| `workers/auth-worker/.../execution/agent-runtime.ts` | `retrieveMemory` |
+| `packages/workflow-nodes/src/nodes/memory/definition.ts` | Family + `VECTORIZE_MEMORY_DEFINITION` |
+| `workers/web/.../nodes/memory/` | UI plugin + vectorize `config-panel.tsx` |
+| `workers/auth-worker/.../nodes/memory-node/` | `skipExecution` + `memoryVectorizePlugin` |
+| `workers/auth-worker/.../rag/rag-vector.ts` | embed / query / upsert |
+| `workers/auth-worker/.../rag/vectorize-scope.ts` | Namespace / owner scope |
+| `workers/auth-worker/.../nodes/agent/execute.ts` | Implicit `retrieveMemory` |
+| `workers/auth-worker/.../execution/agent-runtime.ts` | `retrieveMemory`, RAG toolset |
 
 ---
 
@@ -147,4 +148,4 @@ Tool RAG **không** nối trực tiếp dashed edge tới Vectorize — lấy `m
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.1 | 2026-06-13 | Draft — Vectorize variant của memory_node |
+| 0.2 | 2026-09-11 | Plugin memory + rag-vector live |
