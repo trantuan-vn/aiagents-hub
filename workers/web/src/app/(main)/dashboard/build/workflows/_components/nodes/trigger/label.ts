@@ -8,6 +8,20 @@ const GENERIC_MANUAL_LABELS = new Set([
   "Khi bấm 'Execute workflow'",
 ]);
 
+const GENERIC_SCHEDULE_LABELS = new Set([
+  "",
+  "schedule",
+  "On a schedule",
+  "Theo lịch",
+  "Schedule Trigger",
+  "Trigger theo lịch",
+]);
+
 export function isGenericManualTriggerLabel(label: string | undefined): boolean {
   return GENERIC_MANUAL_LABELS.has((label ?? "").trim());
 }
+
+export function isGenericScheduleTriggerLabel(label: string | undefined): boolean {
+  return GENERIC_SCHEDULE_LABELS.has((label ?? "").trim());
+}
+

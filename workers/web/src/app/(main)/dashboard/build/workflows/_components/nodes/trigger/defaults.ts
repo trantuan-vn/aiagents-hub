@@ -1,3 +1,5 @@
+import { scheduleTriggerDefaultData } from "@aiagents-hub/workflow-nodes";
+
 export function triggerDefaults(idSuffix?: string): Record<string, unknown> {
   return {
     label: "When clicking 'Execute workflow'",
@@ -5,3 +7,8 @@ export function triggerDefaults(idSuffix?: string): Record<string, unknown> {
     ...(idSuffix ? { _seed: idSuffix } : {}),
   };
 }
+
+export function scheduleTriggerDefaults(): Record<string, unknown> {
+  return scheduleTriggerDefaultData();
+}
+

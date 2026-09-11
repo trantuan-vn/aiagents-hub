@@ -1,3 +1,5 @@
+import { buildScheduleTriggerOutput, parseScheduleRules, scheduleRuleToCron } from '@aiagents-hub/workflow-nodes';
+
 import type { NodeContext, NodeOutput } from '../types.js';
 
 export async function executeTrigger(ctx: NodeContext): Promise<NodeOutput> {
@@ -32,6 +34,19 @@ export async function executeTrigger(ctx: NodeContext): Promise<NodeOutput> {
       executionTotal: runContext.executionTotal ?? 1,
     };
     return merged;
+  }
+
+  if (triggerKind === 'schedule') {
+    const rules = parseScheduleRules(data.scheduleRules);
+    const cronExpr =
+      typeof data.cronExpr === 'string' && data.cronExpr.trim()
+        ? data.cronExpr.trim()
+        : (scheduleRuleToCron(rules[0]) ?? '0 0 * * *');
+    return {
+      ...base,
+      ...buildScheduleTriggerOutput(new Date()),
+      cronExpr,
+    };
   }
 
   if (triggerKind === 'form') {

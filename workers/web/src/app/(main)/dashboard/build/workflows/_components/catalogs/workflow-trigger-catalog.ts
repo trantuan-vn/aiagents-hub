@@ -27,7 +27,7 @@ export type WorkflowTriggerCatalogItem = {
   nameKey: `trigger_kind_${WorkflowTriggerKindId}`;
   descKey: `trigger_kind_${WorkflowTriggerKindId}_desc`;
   /** Canvas / config title when it differs from the catalog name. */
-  nodeLabelKey?: "trigger_manual_node_label";
+  nodeLabelKey?: "trigger_manual_node_label" | "trigger_schedule_node_label";
   icon: LucideIcon;
   hasSubmenu?: boolean;
 };
@@ -51,6 +51,7 @@ export const WORKFLOW_TRIGGER_CATALOG: WorkflowTriggerCatalogItem[] = [
     id: "schedule",
     nameKey: "trigger_kind_schedule",
     descKey: "trigger_kind_schedule_desc",
+    nodeLabelKey: "trigger_schedule_node_label",
     icon: Clock,
   },
   {

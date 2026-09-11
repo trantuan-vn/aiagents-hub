@@ -16,7 +16,7 @@ import {
 import { ConnectionHandle } from "../../edges/connection-handle";
 import { useNodeExecutionUi } from "../../hooks/workflow-execution-ui";
 import { WorkflowNodeShell } from "../../node-ui/workflow-node-shell";
-import { isGenericManualTriggerLabel } from "./label";
+import { isGenericManualTriggerLabel, isGenericScheduleTriggerLabel } from "./label";
 
 const TRIGGER_ICONS = new Map(WORKFLOW_TRIGGER_CATALOG.map((item) => [item.id, item.icon]));
 
@@ -74,7 +74,9 @@ function TriggerNodeInner({ data, selected, type }: NodeProps) {
   const label =
     kind === "manual" && isGenericManualTriggerLabel(storedLabel)
       ? t("trigger_manual_node_label")
-      : storedLabel || "Trigger";
+      : kind === "schedule" && isGenericScheduleTriggerLabel(storedLabel)
+        ? t("trigger_schedule_node_label")
+        : storedLabel || "Trigger";
   const showExecuteHover = kind === "manual" && !ui?.readOnly && !d.deactivated;
 
   return (

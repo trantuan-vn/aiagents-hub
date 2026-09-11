@@ -27,7 +27,11 @@ import {
 } from "./memory/definition";
 import { SERVICE_NODE_DEFINITION } from "./service/definition";
 import { FORM_DATABASE_TRIGGER_DEFINITION } from "./trigger/form-database";
-import { TRIGGER_KIND_DEFINITIONS, TRIGGER_NODE_DEFINITION } from "./trigger/definition";
+import {
+  TRIGGER_KIND_DEFINITIONS,
+  TRIGGER_NODE_DEFINITION,
+  TRIGGER_SCHEDULE_DEFINITION,
+} from "./trigger/definition";
 import {
   GET_DB_INFO_TOOL_DEFINITION,
   GET_RAG_TOOL_DEFINITION,
@@ -46,6 +50,7 @@ export const DEFAULT_WORKFLOW_NODE_REGISTRY: WorkflowNodeRegistry = {
     ...AGENT_KIND_DEFINITIONS,
     TRIGGER_NODE_DEFINITION,
     ...TRIGGER_KIND_DEFINITIONS,
+    TRIGGER_SCHEDULE_DEFINITION,
     FLOW_NODE_DEFINITION,
     ...FLOW_KIND_DEFINITIONS,
     FLOW_LOOP_OVER_ITEMS_DEFINITION,

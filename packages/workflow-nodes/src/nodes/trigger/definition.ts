@@ -18,6 +18,19 @@ export {
   TRIGGER_OVERRIDE_KINDS,
   type TriggerKind,
 } from "./kinds";
+export {
+  TRIGGER_SCHEDULE_DEFINITION,
+  SCHEDULE_INTERVALS,
+  buildScheduleTriggerOutput,
+  collectScheduleCronExprs,
+  defaultScheduleRule,
+  normalizeScheduleRule,
+  parseScheduleRules,
+  scheduleRuleToCron,
+  scheduleTriggerDefaultData,
+  type ScheduleInterval,
+  type ScheduleRule,
+} from "./schedule";
 
 /** Base family definition — fallback when no triggerKind is set. */
 export const TRIGGER_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({

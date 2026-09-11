@@ -25,7 +25,12 @@ import {
   toolGetRagPlugin,
   toolGetDbInfoPlugin,
 } from './tool/index.js';
-import { triggerPlugin, TRIGGER_KIND_PLUGINS, triggerFormPlugin } from './trigger/index.js';
+import {
+  triggerPlugin,
+  TRIGGER_KIND_PLUGINS,
+  triggerFormPlugin,
+  triggerSchedulePlugin,
+} from './trigger/index.js';
 import { coreWebhookPlugin, webhookTriggerPlugin } from './webhook/index.js';
 import { workflowGroupPlugin } from './workflow-group/index.js';
 
@@ -59,6 +64,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   // Kind factories
   ...TRIGGER_KIND_PLUGINS,
   triggerFormPlugin,
+  triggerSchedulePlugin,
   ...FLOW_KIND_PLUGINS,
   flowLoopOverItemsPlugin,
   ...CORE_KIND_PLUGINS,

@@ -9,7 +9,7 @@ import { TOOL_KINDS, TOOL_OVERRIDE_KINDS } from "../nodes/tool/kinds";
 import { TRIGGER_KINDS } from "../nodes/trigger/kinds";
 
 /** Sub-kinds with dedicated backend handlers (auth-worker node plugins). */
-const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
+const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule"]);
 const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>([]);
@@ -18,7 +18,7 @@ const BACKEND_MEMORY_KINDS = new Set(["vectorize"]);
 const BACKEND_AGENT_KINDS = new Set(["tools_agent"]);
 
 /** Sub-kinds with dedicated frontend config / canvas plugins. */
-const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form"]);
+const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule"]);
 const FRONTEND_FLOW_KINDS = new Set(["if", "merge", "filter", "switch", "loop_over_items"]);
 const FRONTEND_CORE_KINDS = new Set(["http_request", "code"]);
 const FRONTEND_TRANSFORM_KINDS = new Set<string>([]);

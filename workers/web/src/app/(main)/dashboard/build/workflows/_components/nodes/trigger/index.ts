@@ -7,11 +7,13 @@ import {
 import type { WorkflowNodeUIPlugin } from "../types";
 import { TriggerNode } from "./canvas";
 import { isManualTriggerNode, ManualTriggerConfigPanel } from "./config-panel";
-import { triggerDefaults } from "./defaults";
+import { scheduleTriggerDefaults, triggerDefaults } from "./defaults";
+import { isScheduleTriggerNode, ScheduleTriggerConfigPanel } from "./schedule-config-panel";
 
-export { TriggerNode } from "./canvas";
-export { triggerDefaults } from "./defaults";
-export { isManualTriggerNode, ManualTriggerConfigPanel } from "./config-panel";
+export { TriggerNode };
+export { scheduleTriggerDefaults, triggerDefaults };
+export { isManualTriggerNode, ManualTriggerConfigPanel };
+export { isScheduleTriggerNode, ScheduleTriggerConfigPanel };
 
 /** Base family plugin — hidden from catalog; kind plugins are the add-node entries. */
 export const triggerUIPlugin: WorkflowNodeUIPlugin = {
@@ -45,6 +47,23 @@ export const manualTriggerUIPlugin: WorkflowNodeUIPlugin = {
   match: (node) => isManualTriggerNode(node),
 };
 
+export const scheduleTriggerUIPlugin: WorkflowNodeUIPlugin = {
+  id: "trigger:schedule",
+  runtimeType: "trigger",
+  kind: "schedule",
+  Canvas: TriggerNode,
+  ConfigPanel: ScheduleTriggerConfigPanel,
+  defaults: () => scheduleTriggerDefaults(),
+  catalog: {
+    category: "trigger",
+    labelKey: "trigger_kind_schedule",
+    descriptionKey: "trigger_kind_schedule_desc",
+    icon: "Clock",
+    keywords: ["schedule", "cron", "interval", "trigger"],
+  },
+  match: (node) => isScheduleTriggerNode(node),
+};
+
 export function createTriggerKindUIPlugin(kind: TriggerKind): WorkflowNodeUIPlugin {
   const label = kind.replace(/_/g, " ");
   return {
@@ -66,7 +85,7 @@ export function createTriggerKindUIPlugin(kind: TriggerKind): WorkflowNodeUIPlug
   };
 }
 
-/** Factory plugins for kinds without dedicated override modules (skips webhook/form/manual). */
+/** Factory plugins for kinds without dedicated override modules (skips webhook/form/manual/schedule). */
 export const TRIGGER_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TRIGGER_KINDS.filter(
   (kind) => !TRIGGER_OVERRIDE_KINDS.has(kind) && kind !== "manual",
 ).map(createTriggerKindUIPlugin);

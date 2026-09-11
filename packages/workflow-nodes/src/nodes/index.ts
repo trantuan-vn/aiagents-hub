@@ -14,11 +14,22 @@ export {
 export {
   TRIGGER_NODE_DEFINITION,
   TRIGGER_KIND_DEFINITIONS,
+  TRIGGER_SCHEDULE_DEFINITION,
   createTriggerKindDefinition,
   TRIGGER_KINDS,
   TRIGGER_KIND_FIELD,
   TRIGGER_OVERRIDE_KINDS,
+  SCHEDULE_INTERVALS,
+  buildScheduleTriggerOutput,
+  collectScheduleCronExprs,
+  defaultScheduleRule,
+  normalizeScheduleRule,
+  parseScheduleRules,
+  scheduleRuleToCron,
+  scheduleTriggerDefaultData,
   type TriggerKind,
+  type ScheduleInterval,
+  type ScheduleRule,
 } from "./trigger/definition";
 export {
   FLOW_NODE_DEFINITION,

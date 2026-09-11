@@ -25,7 +25,7 @@ import {
   toolGetRagUIPlugin,
   toolGetDbInfoUIPlugin,
 } from "./tool";
-import { triggerUIPlugin, TRIGGER_KIND_UI_PLUGINS, manualTriggerUIPlugin } from "./trigger";
+import { triggerUIPlugin, TRIGGER_KIND_UI_PLUGINS, manualTriggerUIPlugin, scheduleTriggerUIPlugin } from "./trigger";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
 import { workflowGroupUIPlugin } from "./workflow-group";
 
@@ -76,6 +76,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   toolGetDbInfoUIPlugin,
   // Overrides (dedicated modules — registered last so resolve-by-id wins)
   manualTriggerUIPlugin,
+  scheduleTriggerUIPlugin,
   webhookTriggerUIPlugin,
   coreWebhookUIPlugin,
   formTriggerUIPlugin,

@@ -25,7 +25,7 @@ export function createTriggerKindPlugin(kind: TriggerKind): WorkflowNodePlugin {
   };
 }
 
-/** Factory plugins for kinds without dedicated override modules (skips webhook + form). */
+/** Factory plugins for kinds without dedicated override modules (skips webhook, form, schedule). */
 export const TRIGGER_KIND_PLUGINS: WorkflowNodePlugin[] = TRIGGER_KINDS.filter(
   (kind) => !TRIGGER_OVERRIDE_KINDS.has(kind),
 ).map(createTriggerKindPlugin);
@@ -38,5 +38,13 @@ export const triggerFormPlugin: WorkflowNodePlugin = {
   id: 'trigger:form',
   runtimeType: 'trigger',
   kind: 'form',
+  execute: executeTrigger,
+};
+
+/** Schedule override — same execute; FE owns the n8n-style rules panel. */
+export const triggerSchedulePlugin: WorkflowNodePlugin = {
+  id: 'trigger:schedule',
+  runtimeType: 'trigger',
+  kind: 'schedule',
   execute: executeTrigger,
 };
