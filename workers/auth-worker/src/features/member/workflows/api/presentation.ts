@@ -51,6 +51,7 @@ import { getWorkflowEarningsMonthlySummary } from '../billing/earnings-monthly.j
 import { parseWorkflowDefinition, resolveWorkflow } from '../execution/workflow-context.js';
 import { touchUserCronAlarm } from '../triggers/cron-alarm.js';
 import { createWorkflowChatStreamResponse } from '../collab/workflow-chat.js';
+import { createWorkflowNodeCatalogMemberRoutes } from '../../../admin/workflow-node-catalog/presentation';
 
 const CreateWorkflowSchema = AgentWorkflowSchema;
 const UpdateWorkflowSchema = AgentWorkflowSchema.partial();
@@ -386,6 +387,9 @@ export function createWorkflowRoutes(bindingName: string) {
       return c.json({ royalties, period: days });
     }, 'Failed to list earnings'),
   );
+
+  // Static paths must be registered before /:id so names like "node-catalog" are not parsed as ids.
+  app.route('/node-catalog', createWorkflowNodeCatalogMemberRoutes(bindingName));
 
   // Chat & execute (before generic :id routes that might conflict — these are more specific paths below)
 

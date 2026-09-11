@@ -22,11 +22,11 @@ export async function getCollabState(
   workflowId: number,
 ): Promise<WorkflowCollabState | null> {
   const res = await userDO.fetch(
-    new Request(`http://user.internal/workflow/collab/get?workflowId=${workflowId}`),
+    new Request(`http://do/workflow/collab/get?workflowId=${workflowId}`),
   );
   if (!res.ok) return null;
-  const data = (await res.json()) as { state: WorkflowCollabState | null };
-  return data.state ?? null;
+  const data = (await res.json().catch(() => null)) as { state: WorkflowCollabState | null } | null;
+  return data?.state ?? null;
 }
 
 export type PublishCollabInput = Omit<WorkflowCollabState, 'updatedAt'>;
@@ -36,7 +36,7 @@ export async function publishCollabState(
   state: PublishCollabInput,
 ): Promise<WorkflowCollabState> {
   const res = await userDO.fetch(
-    new Request('http://user.internal/workflow/collab/publish', {
+    new Request('http://do/workflow/collab/publish', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state),

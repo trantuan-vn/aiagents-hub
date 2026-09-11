@@ -90,8 +90,9 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/token', createTokenRoutes(bindingName)); 
   routes.route('/dashboard/order', createOrderRoutes(bindingName));  
   routes.route('/dashboard/assistant', createAssistantRoutes(bindingName));
-  routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
+  // Static /node-catalog must be registered before /:id on the workflows router.
   routes.route('/dashboard/build/workflows/node-catalog', createWorkflowNodeCatalogMemberRoutes(bindingName));
+  routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));

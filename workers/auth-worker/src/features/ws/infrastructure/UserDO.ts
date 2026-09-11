@@ -308,10 +308,10 @@ export class UserDO extends DurableObject {
       }
 
       const url = new URL(request.url);
-      if (url.hostname === 'user.internal') {
-        return await this.handleInternalMessage(request);
-      }
 
+      // Match path handlers before the user.internal JSON-message branch.
+      // GET /workflow/collab/get has an empty body; treating it as an internal JSON
+      // message throws "Unexpected end of JSON input".
       const routeHandlers: Record<string, (req: Request) => Promise<Response>> = {
         '/status': () => this.getWebsocketStatus(),
         '/subscriptions': () => this.getSubscriptionList(),
@@ -338,6 +338,10 @@ export class UserDO extends DurableObject {
       const handler = routeHandlers[url.pathname];
       if (handler) {
         return await handler(request);
+      }
+
+      if (url.hostname === 'user.internal') {
+        return await this.handleInternalMessage(request);
       }
 
       throw new Error(`Unknown path: ${url.pathname}`);
@@ -1538,7 +1542,10 @@ export class UserDO extends DurableObject {
       return this.jsonResponse({ success: true });
     }
 
-    const message = await request.json() as { type: string; [key: string]: any };
+    const message = (await request.json().catch(() => null)) as { type: string; [key: string]: any } | null;
+    if (!message || typeof message.type !== 'string') {
+      return this.jsonResponse({ success: false, error: 'Unknown internal path' }, 404);
+    }
     if (message.type === 'broadcast') {
       await this.handleDirectBroadcast(message);
     } else if (message.type === 'storePendingFirstLoginNotification') {
