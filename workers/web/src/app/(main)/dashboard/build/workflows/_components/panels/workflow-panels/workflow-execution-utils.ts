@@ -15,6 +15,21 @@ export interface FlattenedField {
   kind: SchemaValueKind;
 }
 
+/** Keep previously fetched I/O when a list refresh returns a stub without steps. */
+export function mergeListedExecution(
+  listed: WorkflowExecutionRecord,
+  cached: WorkflowExecutionRecord | undefined,
+): WorkflowExecutionRecord {
+  if (!cached || cached.executionKey !== listed.executionKey) return listed;
+  if (listed.steps.length > 0 || cached.steps.length === 0) return listed;
+  return {
+    ...listed,
+    steps: cached.steps,
+    definition: listed.definition ?? cached.definition,
+    output: listed.output ?? cached.output,
+  };
+}
+
 export function parseDefinitionJson(json: string | undefined): WorkflowExecutionGraph | undefined {
   if (!json) return undefined;
   try {

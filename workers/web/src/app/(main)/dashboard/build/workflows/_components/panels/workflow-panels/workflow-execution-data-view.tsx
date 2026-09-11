@@ -177,7 +177,7 @@ function DataPaneBody({
   if (mode === "table") return <TableView value={value} query={query} />;
   return (
     <div className="min-w-0 p-1.5">
-      <SchemaRoots value={value} query={query} />
+      <SchemaRoots key={`${json.length}:${json.slice(0, 120)}`} value={value} query={query} />
     </div>
   );
 }

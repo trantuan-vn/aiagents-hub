@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { toast } from "sonner";
 
 import { getWorkflowExecution, listWorkflowExecutions, type WorkflowExecutionRecord } from "../../../_lib/api";
 
-import { parseDefinitionJson } from "./workflow-execution-utils";
+import { mergeListedExecution, parseDefinitionJson } from "./workflow-execution-utils";
 
 const AUTO_REFRESH_MS = 4000;
 
@@ -16,6 +16,7 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const detailFetchGen = useRef(0);
 
   const load = useCallback(
     async (silent = false) => {
@@ -23,7 +24,10 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
       if (!silent) setLoading(true);
       try {
         const { executions: rows } = await listWorkflowExecutions(workflowId);
-        setExecutions(rows);
+        setExecutions((prev) => {
+          const prevByKey = new Map(prev.map((row) => [row.executionKey, row]));
+          return rows.map((row) => mergeListedExecution(row, prevByKey.get(row.executionKey)));
+        });
         setSelectedKey((prev) => {
           if (prev && rows.some((r) => r.executionKey === prev)) return prev;
           return rows[0]?.executionKey ?? null;
@@ -47,24 +51,30 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
     return () => window.clearInterval(id);
   }, [autoRefresh, load]);
 
-  const selected = executions.find((e) => e.executionKey === selectedKey) ?? null;
+  const selected = useMemo(
+    () => executions.find((e) => e.executionKey === selectedKey) ?? null,
+    [executions, selectedKey],
+  );
 
   useEffect(() => {
     if (!selectedKey) return;
-    let cancelled = false;
-    void getWorkflowExecution(selectedKey)
+    const requestedKey = selectedKey;
+    const gen = ++detailFetchGen.current;
+    void getWorkflowExecution(requestedKey)
       .then(({ execution }) => {
-        if (cancelled) return;
-        setExecutions((prev) => prev.map((row) => (row.executionKey === execution.executionKey ? execution : row)));
+        if (detailFetchGen.current !== gen) return;
+        if (execution.executionKey !== requestedKey) return;
+        setExecutions((prev) =>
+          prev.map((row) => (row.executionKey === execution.executionKey ? execution : row)),
+        );
       })
       .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
   }, [selectedKey]);
 
+  const stepNodeIds = selected?.steps.map((step) => step.nodeId).join("\0") ?? "";
+
   useEffect(() => {
-    if (!selected) {
+    if (!selectedKey || !selected) {
       setSelectedNodeId(null);
       return;
     }
@@ -73,7 +83,7 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
       if (selected.steps[0]) return selected.steps[0].nodeId;
       return selected.pendingNodeId ?? null;
     });
-  }, [selected]);
+  }, [selected, selectedKey, stepNodeIds]);
 
   const fallbackDefinition = useMemo(() => parseDefinitionJson(fallbackDefinitionJson), [fallbackDefinitionJson]);
 

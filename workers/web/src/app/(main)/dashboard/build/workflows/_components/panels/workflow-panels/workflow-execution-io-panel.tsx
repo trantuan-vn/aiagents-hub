@@ -76,11 +76,13 @@ function StepList({
 }
 
 function IoColumns({
+  dataKey,
   selectedStep,
   selectedNodeId,
   showInput,
   showOutput,
 }: {
+  dataKey: string;
   selectedStep: ExecutionStepLog | null;
   selectedNodeId: string | null;
   showInput: boolean;
@@ -97,6 +99,7 @@ function IoColumns({
         >
           <ResizablePanel id="input" order={1} defaultSize={50} minSize={22} className={workflowResizePanelClassName}>
             <WorkflowExecutionDataPane
+              key={`${dataKey}:input`}
               title={t("executions_input")}
               value={selectedStep.input}
               emptyLabel={t("executions_no_data")}
@@ -105,6 +108,7 @@ function IoColumns({
           <WorkflowResizeHandle />
           <ResizablePanel id="output" order={2} defaultSize={50} minSize={22} className={workflowResizePanelClassName}>
             <WorkflowExecutionDataPane
+              key={`${dataKey}:output`}
               title={t("executions_output")}
               value={selectedStep.output}
               emptyLabel={selectedStep.status === "error" ? t("executions_detail_error") : t("executions_no_data")}
@@ -116,6 +120,7 @@ function IoColumns({
     if (showInput) {
       return (
         <WorkflowExecutionDataPane
+          key={`${dataKey}:input`}
           title={t("executions_input")}
           value={selectedStep.input}
           emptyLabel={t("executions_no_data")}
@@ -124,6 +129,7 @@ function IoColumns({
     }
     return (
       <WorkflowExecutionDataPane
+        key={`${dataKey}:output`}
         title={t("executions_output")}
         value={selectedStep.output}
         emptyLabel={selectedStep.status === "error" ? t("executions_detail_error") : t("executions_no_data")}
@@ -201,6 +207,7 @@ function IoPanelHeader({
 }
 
 export function WorkflowExecutionIoPanel({
+  executionKey,
   steps,
   nodes,
   selectedNodeId,
@@ -217,6 +224,7 @@ export function WorkflowExecutionIoPanel({
   poppedOut = false,
   onPoppedOutChange,
 }: {
+  executionKey?: string;
   steps: ExecutionStepLog[];
   nodes: Node[];
   selectedNodeId: string | null;
@@ -241,6 +249,7 @@ export function WorkflowExecutionIoPanel({
     selectedNode || selectedStep ? nodeLabel(selectedNode, selectedStep?.nodeId ?? selectedNodeId ?? "") : null;
   const showBody = hideHeader || poppedOut || !collapsed;
   const showIo = showInput || showOutput;
+  const dataKey = `${executionKey ?? "run"}:${selectedNodeId ?? "none"}:${selectedStep?.status ?? ""}:${selectedStep?.durationMs ?? ""}`;
 
   const body = !showBody ? null : !showIo ? (
     <div className="h-full min-h-0 flex-1 overflow-y-auto">
@@ -261,6 +270,8 @@ export function WorkflowExecutionIoPanel({
       <ResizablePanel id="data" order={2} defaultSize={78} minSize={40} className={workflowResizePanelClassName}>
         <div className="flex h-full min-h-0 min-w-0 overflow-hidden">
           <IoColumns
+            key={dataKey}
+            dataKey={dataKey}
             selectedStep={selectedStep}
             selectedNodeId={selectedNodeId}
             showInput={showInput}

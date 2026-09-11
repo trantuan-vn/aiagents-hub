@@ -72,6 +72,7 @@ export function WorkflowExecutionsPanel({
 
   const workspace = selected ? (
     <WorkflowExecutionWorkspace
+      key={selected.executionKey}
       workflowId={workflowId}
       selected={selected}
       graphDefinition={graphDefinition}

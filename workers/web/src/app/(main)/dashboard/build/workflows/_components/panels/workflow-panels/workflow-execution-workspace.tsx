@@ -240,6 +240,7 @@ function ExecutionSplit({
 
   const ioPanel = (
     <WorkflowExecutionIoPanel
+      executionKey={selected.executionKey}
       steps={selected.steps}
       nodes={graphNodes}
       selectedNodeId={selectedNodeId}
@@ -332,6 +333,7 @@ export function WorkflowExecutionWorkspace({
         onReload={onReload}
       />
       <ExecutionSplit
+        key={selected.executionKey}
         selected={selected}
         graphDefinition={graphDefinition}
         selectedNodeId={selectedNodeId}

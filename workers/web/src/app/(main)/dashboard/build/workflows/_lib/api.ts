@@ -172,6 +172,7 @@ export function executeWorkflow(
 export function listWorkflowExecutions(id: number, limit = 50) {
   return apiFetch<{ executions: WorkflowExecutionRecord[] }>(
     `/dashboard/build/workflows/${id}/executions?limit=${limit}`,
+    { cache: "no-store" },
   );
 }
 
@@ -222,7 +223,7 @@ export function getWorkflowExecution(executionKey: string) {
   return apiFetch<{
     execution: WorkflowExecutionRecord;
     observability: WorkflowExecutionObservability;
-  }>(`/dashboard/build/workflows/executions/${executionKey}`);
+  }>(`/dashboard/build/workflows/executions/${executionKey}`, { cache: "no-store" });
 }
 
 export interface WorkflowCollabState {
