@@ -28,6 +28,7 @@ export type NodeOutputPanelProps = {
   onSetMockData?: () => void;
   executeLabel?: string;
   emptyLabel?: string;
+  emptyIcon?: ReactNode;
   defaultViewMode?: IoViewMode;
   headerExtra?: ReactNode;
   formatJson?: (data: Record<string, unknown>) => string;
@@ -89,6 +90,7 @@ export function NodeOutputPanel({
   onSetMockData,
   executeLabel,
   emptyLabel,
+  emptyIcon,
   defaultViewMode = "table",
   headerExtra,
   formatJson,
@@ -215,7 +217,7 @@ export function NodeOutputPanel({
       <div className={cn("min-h-0 flex-1 overflow-y-auto", compact ? "max-h-48 p-2" : "p-3")}>
         {!hasData ? (
           <div className="flex h-full min-h-[12rem] flex-col items-center justify-center gap-3 p-6 text-center">
-            <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />
+            {emptyIcon ?? <ArrowRightFromLine className="text-muted-foreground/40 size-10 stroke-[1.5]" />}
             <p className="text-sm font-semibold">{emptyLabel ?? t("no_output_data")}</p>
             {onExecute && executeNodeId ? (
               <WorkflowExecuteStepButton

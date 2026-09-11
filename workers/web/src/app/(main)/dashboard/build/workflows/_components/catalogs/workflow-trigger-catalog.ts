@@ -4,8 +4,8 @@ import {
   ClipboardList,
   Clock,
   FolderOpen,
-  Hand,
   MessageCircle,
+  MousePointerClick,
   Radio,
   Webhook,
   type LucideIcon,
@@ -26,6 +26,8 @@ export type WorkflowTriggerCatalogItem = {
   id: WorkflowTriggerKindId;
   nameKey: `trigger_kind_${WorkflowTriggerKindId}`;
   descKey: `trigger_kind_${WorkflowTriggerKindId}_desc`;
+  /** Canvas / config title when it differs from the catalog name. */
+  nodeLabelKey?: "trigger_manual_node_label";
   icon: LucideIcon;
   hasSubmenu?: boolean;
 };
@@ -35,7 +37,8 @@ export const WORKFLOW_TRIGGER_CATALOG: WorkflowTriggerCatalogItem[] = [
     id: "manual",
     nameKey: "trigger_kind_manual",
     descKey: "trigger_kind_manual_desc",
-    icon: Hand,
+    nodeLabelKey: "trigger_manual_node_label",
+    icon: MousePointerClick,
   },
   {
     id: "app_event",

@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, type ReactNode } from "react";
 
-import { useNodeId } from "@xyflow/react";
+import { NodeToolbar, Position, useNodeId } from "@xyflow/react";
 import { Check, Clock, Loader2, Minus, Radio, Zap, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -20,6 +20,8 @@ interface WorkflowNodeShellProps {
   pill?: boolean;
   /** Minimal chrome — for compact nodes (e.g. n8n-style loop). */
   compact?: boolean;
+  /** Hover control rendered to the left of the node (e.g. Execute workflow). */
+  hoverLeft?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
 }
@@ -143,6 +145,7 @@ export function WorkflowNodeShell({
   deactivated,
   pill,
   compact,
+  hoverLeft,
   children,
   footer,
 }: WorkflowNodeShellProps) {
@@ -214,6 +217,19 @@ export function WorkflowNodeShell({
       onPointerEnter={onToolbarZoneEnter}
       onPointerLeave={onToolbarZoneLeave}
     >
+      {hoverLeft ? (
+        <NodeToolbar
+          isVisible={toolbarVisible || menuOpen}
+          position={Position.Left}
+          align="center"
+          offset={16}
+          className="nodrag nopan -translate-y-3"
+          onPointerEnter={onToolbarZoneEnter}
+          onPointerLeave={onToolbarZoneLeave}
+        >
+          {hoverLeft}
+        </NodeToolbar>
+      ) : null}
       <WorkflowNodeToolbar
         nodeId={nodeId}
         deactivated={deactivated}

@@ -657,7 +657,7 @@ export function WorkflowAddNodePanel({
       setView("trigger_other");
       return;
     }
-    pickTrigger(item.id, t(item.nameKey));
+    pickTrigger(item.id, t(item.nodeLabelKey ?? item.nameKey));
   };
 
   const pickTriggerApp = (app: WorkflowTriggerAppEventItem) => {

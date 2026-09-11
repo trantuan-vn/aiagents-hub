@@ -1,6 +1,6 @@
 export function triggerDefaults(idSuffix?: string): Record<string, unknown> {
   return {
-    label: "Trigger",
+    label: "When clicking 'Execute workflow'",
     triggerKind: "manual",
     ...(idSuffix ? { _seed: idSuffix } : {}),
   };

@@ -22,6 +22,7 @@ export type NodeMockOutputSectionProps = {
   executeNodeId?: string;
   executeLabel?: string;
   emptyLabel?: string;
+  emptyIcon?: ReactNode;
   defaultMockJson?: string;
   className?: string;
   headerExtra?: ReactNode;
@@ -42,6 +43,7 @@ export function NodeMockOutputSection({
   executeNodeId,
   executeLabel,
   emptyLabel,
+  emptyIcon,
   defaultMockJson = '{\n  "text": "Hello"\n}',
   className,
   headerExtra,
@@ -97,6 +99,7 @@ export function NodeMockOutputSection({
       onSetMockData={openEditOutput}
       executeLabel={executeLabel}
       emptyLabel={emptyLabel}
+      emptyIcon={emptyIcon}
       className={className}
       headerExtra={headerExtra}
     />

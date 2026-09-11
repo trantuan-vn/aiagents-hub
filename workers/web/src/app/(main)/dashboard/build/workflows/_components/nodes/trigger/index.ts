@@ -6,10 +6,12 @@ import {
 
 import type { WorkflowNodeUIPlugin } from "../types";
 import { TriggerNode } from "./canvas";
+import { isManualTriggerNode, ManualTriggerConfigPanel } from "./config-panel";
 import { triggerDefaults } from "./defaults";
 
 export { TriggerNode } from "./canvas";
 export { triggerDefaults } from "./defaults";
+export { isManualTriggerNode, ManualTriggerConfigPanel } from "./config-panel";
 
 /** Base family plugin — hidden from catalog; kind plugins are the add-node entries. */
 export const triggerUIPlugin: WorkflowNodeUIPlugin = {
@@ -24,6 +26,23 @@ export const triggerUIPlugin: WorkflowNodeUIPlugin = {
     icon: "Play",
     visible: false,
   },
+};
+
+export const manualTriggerUIPlugin: WorkflowNodeUIPlugin = {
+  id: "trigger:manual",
+  runtimeType: "trigger",
+  kind: "manual",
+  Canvas: TriggerNode,
+  ConfigPanel: ManualTriggerConfigPanel,
+  defaults: () => triggerDefaults(),
+  catalog: {
+    category: "trigger",
+    labelKey: "trigger_kind_manual",
+    descriptionKey: "trigger_kind_manual_desc",
+    icon: "MousePointerClick",
+    keywords: ["manual", "trigger", "execute"],
+  },
+  match: (node) => isManualTriggerNode(node),
 };
 
 export function createTriggerKindUIPlugin(kind: TriggerKind): WorkflowNodeUIPlugin {
@@ -47,7 +66,7 @@ export function createTriggerKindUIPlugin(kind: TriggerKind): WorkflowNodeUIPlug
   };
 }
 
-/** Factory plugins for kinds without dedicated override modules (skips webhook). */
+/** Factory plugins for kinds without dedicated override modules (skips webhook/form/manual). */
 export const TRIGGER_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TRIGGER_KINDS.filter(
-  (kind) => !TRIGGER_OVERRIDE_KINDS.has(kind),
+  (kind) => !TRIGGER_OVERRIDE_KINDS.has(kind) && kind !== "manual",
 ).map(createTriggerKindUIPlugin);

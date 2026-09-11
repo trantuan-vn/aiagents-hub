@@ -57,7 +57,7 @@ export function createTriggerKindDefinition(kind: TriggerKind): WorkflowNodeDefi
     icon: "Play",
     defaultData: {
       [TRIGGER_KIND_FIELD]: kind,
-      label: kind.replace(/_/g, " "),
+      label: kind === "manual" ? "When clicking 'Execute workflow'" : kind.replace(/_/g, " "),
     },
     sections: [
       defaultInputSection(),
