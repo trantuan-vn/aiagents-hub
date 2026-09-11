@@ -4,8 +4,16 @@ import { z } from 'zod';
 import { UserDODatabase, TableOptions } from '../../../shared/database/index.js';
 import { createLogger } from '../../../shared/logger.js';
 import { getIPAndUserAgent, handleErrorWithoutIp } from '../../../shared/utils.js';
+import {
+  backfillCronNextRunAtForOwner,
+  dispatchDueCronTriggersForOwner,
+  earliestCronNextRunAtForOwner,
+  ensureTriggerTable,
+  resolveAlarmTime,
+} from '../../member/workflows/triggers/triggers.js';
 
 const doLog = createLogger('auth-worker', 'user-do');
+const CRON_NEXT_RUN_AT_KEY = 'cron:nextRunAt';
 
 import { 
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
@@ -293,6 +301,7 @@ export class UserDO extends DurableObject {
 
   // ========== FETCH HANDLER ==========
   async fetch(request: Request): Promise<Response> {
+    this.state.waitUntil(this.ensureAlarmArmed());
     try {
       if (request.headers.get('Upgrade') === 'websocket') {
         return await this.handleWebSocketUpgrade(request);
@@ -359,7 +368,7 @@ export class UserDO extends DurableObject {
     if (await this.shouldFlushTable(tableName)) {
       this.state.waitUntil(this.flushPendingRecords(tableName));
     }
-    await this.scheduleQueueAlarmIfNeeded();
+    await this.reschedule();
 
     return this.jsonResponse({ 
       success: true, 
@@ -383,7 +392,7 @@ export class UserDO extends DurableObject {
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      await this.scheduleQueueAlarmIfNeeded();
+      await this.reschedule();
       return this.jsonResponse({ 
         success: true, 
         data: result,
@@ -414,7 +423,7 @@ export class UserDO extends DurableObject {
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      await this.scheduleQueueAlarmIfNeeded();
+      await this.reschedule();
       return this.jsonResponse({ 
         success: true, 
         data: result,
@@ -479,7 +488,7 @@ export class UserDO extends DurableObject {
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
       }
-      await this.scheduleQueueAlarmIfNeeded();
+      await this.reschedule();
       return this.jsonResponse({ 
         success: true, 
         data: results,
@@ -533,7 +542,7 @@ export class UserDO extends DurableObject {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
     }
-    await this.scheduleQueueAlarmIfNeeded();
+    await this.reschedule();
     return this.jsonResponse({ success: true, data: result });
   }
 
@@ -573,7 +582,7 @@ export class UserDO extends DurableObject {
     if (await this.shouldFlushTable(table)) {
       this.state.waitUntil(this.flushPendingRecords(table));
     }
-    await this.scheduleQueueAlarmIfNeeded();
+    await this.reschedule();
     return this.jsonResponse({ 
       success: true, 
       data: result,
@@ -989,22 +998,86 @@ export class UserDO extends DurableObject {
 
   // ========== ALARM HANDLER ==========
   async alarm() {
+    const hasWebSockets = this.state.getWebSockets().length > 0;
+    const hasPending = this.hasPendingQueueWork();
     try {
-      await Promise.all([
-        this.sendHeartbeat(),
-        this.flushAllPendingRecords(),
-        this.cleanupOldProcessedRecords()
-      ]);
-
-      // Re-schedule alarm only when there is a reason to wake again (WS or pending queue). Otherwise DO goes idle.
-      const hasWebSockets = this.state.getWebSockets().length > 0;
-      const hasPending = this.hasPendingQueueWork();
+      const tasks: Promise<unknown>[] = [];
       if (hasWebSockets || hasPending) {
-        const config = await this.getAuthQueueConfig();
-        await this.storage.setAlarm(Date.now() + config.RETRY_ALARM_INTERVAL);
+        tasks.push(this.sendHeartbeat(), this.flushAllPendingRecords(), this.cleanupOldProcessedRecords());
       }
+      tasks.push(this.dispatchDueWorkflowCrons());
+      await Promise.all(tasks);
     } catch (error) {
       handleErrorWithoutIp(error, "Alarm execution error");
+    }
+    try {
+      await this.reschedule();
+    } catch (error) {
+      handleErrorWithoutIp(error, "Alarm reschedule error");
+    }
+  }
+
+  /** Recompute this user's next wake: cron nextRunAt and/or WS/queue retry. */
+  async touchCronSchedule(): Promise<void> {
+    await this.refreshCronWakeCache();
+    await this.reschedule();
+  }
+
+  private async dispatchDueWorkflowCrons(): Promise<void> {
+    try {
+      const sent = await dispatchDueCronTriggersForOwner(this.env, this.userId);
+      if (sent > 0) await this.refreshCronWakeCache();
+    } catch (error) {
+      handleErrorWithoutIp(error, "Workflow cron dispatch error");
+    }
+  }
+
+  private async refreshCronWakeCache(): Promise<number | null> {
+    const db = this.env.D1DB;
+    if (!db) {
+      await this.storage.put(CRON_NEXT_RUN_AT_KEY, null);
+      return null;
+    }
+    try {
+      await ensureTriggerTable(db);
+      await backfillCronNextRunAtForOwner(db, this.userId);
+      const next = await earliestCronNextRunAtForOwner(db, this.userId);
+      await this.storage.put(CRON_NEXT_RUN_AT_KEY, next);
+      return next;
+    } catch (error) {
+      handleErrorWithoutIp(error, "Workflow cron cache refresh error");
+      return (await this.storage.get<number | null>(CRON_NEXT_RUN_AT_KEY)) ?? null;
+    }
+  }
+
+  private async cronWakeAt(): Promise<number | null> {
+    const cached = await this.storage.get<number | null>(CRON_NEXT_RUN_AT_KEY);
+    if (cached !== undefined) return cached;
+    return this.refreshCronWakeCache();
+  }
+
+  private async reschedule(): Promise<void> {
+    const hasWebSockets = this.state.getWebSockets().length > 0;
+    const hasPending = this.hasPendingQueueWork();
+    let queueWake: number | null = null;
+    if (hasWebSockets || hasPending) {
+      const config = await this.getAuthQueueConfig();
+      queueWake = Date.now() + config.RETRY_ALARM_INTERVAL;
+    }
+    const target = resolveAlarmTime(await this.cronWakeAt(), queueWake ?? undefined);
+    if (target == null) {
+      await this.storage.deleteAlarm();
+      return;
+    }
+    await this.storage.setAlarm(target);
+  }
+
+  private async ensureAlarmArmed(): Promise<void> {
+    try {
+      if ((await this.storage.getAlarm()) != null) return;
+      await this.reschedule();
+    } catch (error) {
+      handleErrorWithoutIp(error, "Ensure alarm armed error");
     }
   }
 
@@ -1087,19 +1160,6 @@ export class UserDO extends DurableObject {
     await this.updateTableState(tableName, { pendingCount });
   }
 
-  /** Set alarm only when DO has active reason to wake: WebSocket(s) or pending queue work. Otherwise DO stays idle. */
-  private async scheduleQueueAlarmIfNeeded(): Promise<void> {
-    const hasWebSockets = this.state.getWebSockets().length > 0;
-    const hasPending = this.hasPendingQueueWork();
-    if (!hasWebSockets && !hasPending) return;
-
-    const currentAlarm = await this.storage.getAlarm();
-    if (currentAlarm === null) {
-      const config = await this.getAuthQueueConfig();
-      await this.storage.setAlarm(Date.now() + config.RETRY_ALARM_INTERVAL);
-    }
-  }
-
   private jsonResponse(data: any, status: number = 200): Response {
     return new Response(JSON.stringify(data), {
       status,
@@ -1148,7 +1208,7 @@ export class UserDO extends DurableObject {
         this.sendPendingFirstLoginNotificationIfAny()
       ]));
 
-      await this.scheduleQueueAlarmIfNeeded();
+      await this.reschedule();
 
       return new Response(null, {
         status: 101,
@@ -1242,8 +1302,7 @@ export class UserDO extends DurableObject {
           await this.unregisterUser();
         }
       }
-      await this.storage.deleteAlarm();
-      await this.scheduleQueueAlarmIfNeeded();
+      await this.reschedule();
     } catch (e) {
       handleErrorWithoutIp(e, "UserDO WebSocket closed error");
     }

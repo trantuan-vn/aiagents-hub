@@ -414,7 +414,7 @@ Ngoài webhook public URL, workflow có thể start từ:
 | Cách | Entry | Code |
 |------|-------|------|
 | **Manual run** | Nút Run trên editor | `api/presentation.ts` → `executeWorkflowGraph` |
-| **Cron** | Cloudflare `scheduled` | `triggers/triggers.ts` → `runDueCronTriggers` |
+| **Cron** | UserDO alarm → queue | `UserDO.alarm` → `consumeWorkflowCronRun` |
 | **Form / DB** | `/form/:workflowId/:path` | `form-hooks-presentation.ts` + `form-trigger-runner.ts` |
 | **Telegram / Slack / Discord** | `/hooks/channels/:ch/:ownerId/:token` | `api/hooks-presentation.ts` + `triggers/channel-hooks.ts` |
 | **Resume human review** | Approve/reject API | `resumeWorkflowExecution` |

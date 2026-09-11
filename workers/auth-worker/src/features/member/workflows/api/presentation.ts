@@ -48,6 +48,7 @@ import {
 } from '../infrastructure/infrastructure';
 import { getWorkflowEarningsMonthlySummary } from '../billing/earnings-monthly.js';
 import { parseWorkflowDefinition, resolveWorkflow } from '../execution/workflow-context.js';
+import { touchUserCronAlarm } from '../triggers/cron-alarm.js';
 import { createWorkflowChatStreamResponse } from '../collab/workflow-chat.js';
 
 const CreateWorkflowSchema = AgentWorkflowSchema;
@@ -169,6 +170,14 @@ export function createWorkflowRoutes(bindingName: string) {
   const getUserId = (c: any, identifier: string) =>
     (c.env[bindingName] as DurableObjectNamespace).idFromName(identifier).toString();
 
+  const touchScheduler = async (env: Env, ownerId: string) => {
+    try {
+      await touchUserCronAlarm(env, ownerId);
+    } catch (e) {
+      console.error('[workflows] cron alarm touch failed:', e);
+    }
+  };
+
   const runExecute = async (
     c: any,
     user: any,
@@ -206,6 +215,7 @@ export function createWorkflowRoutes(bindingName: string) {
         lastRunMinute: null,
         lastRunAt: null,
         lastStatus: null,
+        nextRunAt: null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -605,6 +615,7 @@ export function createWorkflowRoutes(bindingName: string) {
         }
       }
       const trigger = await createTrigger(db, { ownerId, workflowId: id, ...body });
+      if (trigger.type === 'cron') await touchScheduler(c.env, ownerId);
       return c.json(
         { trigger: enrichTrigger(c, ownerId, trigger) },
         201,
@@ -641,6 +652,7 @@ export function createWorkflowRoutes(bindingName: string) {
       const ownerId = getUserId(c, user.identifier);
       const trigger = await updateTrigger(db, ownerId, triggerId, body);
       if (!trigger) return c.json({ error: 'Trigger not found' }, 404);
+      if (trigger.type === 'cron') await touchScheduler(c.env, ownerId);
       return c.json({
         trigger: enrichTrigger(c, ownerId, trigger),
       });
@@ -655,6 +667,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (!db) throw new Error('D1 database binding not configured');
       const ownerId = getUserId(c, user.identifier);
       await deleteTrigger(db, ownerId, triggerId);
+      await touchScheduler(c.env, ownerId);
       return c.json({ success: true });
     }, 'Failed to delete trigger'),
   );
@@ -720,6 +733,7 @@ export function createWorkflowRoutes(bindingName: string) {
           if (db) {
             const ownerId = getUserId(c, user.identifier);
             await syncCronTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
+            await touchScheduler(c.env, ownerId);
             if (workflowDefinitionHasWebhookTrigger(definition)) {
               await syncWebhookTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
             }

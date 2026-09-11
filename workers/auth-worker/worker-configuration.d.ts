@@ -28,6 +28,7 @@ declare namespace Cloudflare {
 		BROADCAST_SERVICE_DO: DurableObjectNamespace /* BroadcastServiceDO from auth-worker */;
 		USER_SHARD_DO: DurableObjectNamespace /* UserShardDO from auth-worker */;
 		USER_DO: DurableObjectNamespace /* UserDO from auth-worker */;
+		WORKFLOW_CRON_QUEUE: Queue;
 		R2_VERSION_BUCKET: R2Bucket;
 		R2_EKYC_BUCKET: R2Bucket;
 		D1DB: D1Database;

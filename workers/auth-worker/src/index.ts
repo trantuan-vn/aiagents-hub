@@ -23,7 +23,7 @@ import { createAssistantRoutes } from './features/assistant/presentation';
 import { createWorkflowRoutes } from './features/member/workflows/api/presentation';
 import { createWorkflowHookRoutes } from './features/member/workflows/api/hooks-presentation';
 import { createFormHookRoutes } from './features/member/workflows/api/form-hooks-presentation';
-import { runDueCronTriggers } from './features/member/workflows/triggers/triggers';
+import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -160,20 +160,40 @@ async function warmupBroadcastServiceDO(env: Env): Promise<void> {
   return warmupPromise;
 }
 
+export type WorkflowCronRunMessage = {
+  type: 'workflow-cron-run';
+  ownerId: string;
+  triggerId: string;
+  workflowId: number;
+  dueMinute: string;
+};
+
 // III. CREATE MAIN APP
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   },
-  // Cron trigger (every minute): run workflow cron triggers that are due now.
-  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    ctx.waitUntil(
-      runDueCronTriggers(env, "USER_DO").catch((err) => {
-        log.warn('cron.workflow_triggers_failed', {
+  // Cloudflare can keep delivering ScheduledEvent for up to ~15 minutes after
+  // `triggers.crons = []` is deployed. Ignore leftover Worker cron ticks.
+  async scheduled(): Promise<void> {},
+  async queue(batch: MessageBatch<WorkflowCronRunMessage>, env: Env): Promise<void> {
+    for (const message of batch.messages) {
+      try {
+        const body = message.body;
+        if (!body || body.type !== 'workflow-cron-run' || !body.ownerId || !body.triggerId) {
+          log.warn('cron.queue_invalid_message', { body });
+          message.ack();
+          continue;
+        }
+        await consumeWorkflowCronRun(env, body);
+        message.ack();
+      } catch (err) {
+        log.warn('cron.queue_consume_failed', {
           error: err instanceof Error ? err.message : String(err),
         });
-      }),
-    );
+        message.retry();
+      }
+    }
   },
-} satisfies ExportedHandler<Env, Error>;
+} satisfies ExportedHandler<Env, WorkflowCronRunMessage>;

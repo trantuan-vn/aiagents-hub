@@ -32,6 +32,8 @@ export interface WorkflowTriggerRow {
   lastRunMinute: string | null;
   lastRunAt: number | null;
   lastStatus: string | null;
+  /** Unix ms of the next matching minute; null until backfilled or for non-cron rows. */
+  nextRunAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -115,6 +117,123 @@ export function minuteKey(date: Date): string {
   return date.toISOString().slice(0, 16);
 }
 
+const MAX_CRON_LOOKAHEAD_MINUTES = 366 * 24 * 60;
+
+/** Next UTC minute after `from` that matches `expr`. Same AND semantics as `cronMatches`. */
+export function nextCronOccurrence(expr: string, from: Date): Date | null {
+  if (expr.trim().split(/\s+/).length !== 5) return null;
+  const cursor = new Date(from);
+  cursor.setUTCSeconds(0, 0);
+  cursor.setUTCMilliseconds(0);
+  cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+  for (let i = 0; i < MAX_CRON_LOOKAHEAD_MINUTES; i++) {
+    if (cronMatches(expr, cursor)) return new Date(cursor);
+    cursor.setUTCMinutes(cursor.getUTCMinutes() + 1);
+  }
+  return null;
+}
+
+function nextRunAtMs(
+  expr: string | null | undefined,
+  from: Date = new Date(),
+  seed?: { ownerId: string; triggerId: string },
+): number | null {
+  if (!expr) return null;
+  const next = nextCronOccurrence(expr, from)?.getTime();
+  if (next == null) return null;
+  return seed ? next + cronJitterMs(expr, seed.ownerId, seed.triggerId) : next;
+}
+
+/** Stable 0–15s jitter for sub-hour crons, 0–2min otherwise — spreads midnight stampedes. */
+export function cronJitterMs(expr: string, ownerId: string, triggerId: string): number {
+  const max = isHighFrequencyCron(expr) ? 15_000 : 120_000;
+  return fnv1a(`${ownerId}:${triggerId}`) % max;
+}
+
+export function cronQueueDelaySeconds(ownerId: string, triggerId: string): number {
+  return fnv1a(`${ownerId}:${triggerId}:q`) % 31;
+}
+
+function isHighFrequencyCron(expr: string): boolean {
+  const minute = expr.trim().split(/\s+/)[0] ?? '*';
+  if (minute === '*') return true;
+  if (minute.startsWith('*/')) {
+    const n = parseInt(minute.slice(2), 10);
+    return Number.isFinite(n) && n > 0 && n < 30;
+  }
+  return minute.includes(',');
+}
+
+function fnv1a(input: string): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/** Earliest alarm timestamp from nextRunAt plus an optional pull-in hint. */
+export function resolveAlarmTime(
+  earliestNextRunAt: number | null,
+  hintMs?: number,
+  now = Date.now(),
+): number | null {
+  const candidates: number[] = [];
+  if (typeof earliestNextRunAt === 'number' && Number.isFinite(earliestNextRunAt)) {
+    candidates.push(earliestNextRunAt);
+  }
+  if (typeof hintMs === 'number' && Number.isFinite(hintMs)) {
+    candidates.push(hintMs);
+  }
+  if (!candidates.length) return null;
+  return Math.max(Math.min(...candidates), now);
+}
+
+export async function earliestCronNextRunAtForOwner(
+  db: D1Database,
+  ownerId: string,
+): Promise<number | null> {
+  try {
+    const row = await db
+      .prepare(
+        `SELECT MIN(nextRunAt) as nextRunAt FROM workflow_triggers
+         WHERE type = 'cron' AND enabled = 1 AND ownerId = ? AND nextRunAt IS NOT NULL`,
+      )
+      .bind(ownerId)
+      .first<{ nextRunAt: number | null }>();
+    return typeof row?.nextRunAt === 'number' ? row.nextRunAt : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function backfillCronNextRunAtForOwner(
+  db: D1Database,
+  ownerId: string,
+  from: Date = new Date(),
+): Promise<number> {
+  let rows: Array<{ triggerId: string; cronExpr: string | null }> = [];
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT triggerId, cronExpr FROM workflow_triggers
+         WHERE type = 'cron' AND enabled = 1 AND ownerId = ? AND nextRunAt IS NULL`,
+      )
+      .bind(ownerId)
+      .all<{ triggerId: string; cronExpr: string | null }>();
+    rows = results ?? [];
+  } catch {
+    return 0;
+  }
+  await Promise.all(
+    rows.map((row) =>
+      markNextRunAt(db, row.triggerId, nextRunAtMs(row.cronExpr, from, { ownerId, triggerId: row.triggerId })),
+    ),
+  );
+  return rows.length;
+}
+
 // ---------------------------------------------------------------------------
 // D1 store (managed directly by auth-worker, decoupled from the queue pipeline)
 // ---------------------------------------------------------------------------
@@ -138,6 +257,7 @@ export async function ensureTriggerTable(db: D1Database): Promise<void> {
         lastRunMinute TEXT,
         lastRunAt INTEGER,
         lastStatus TEXT,
+        nextRunAt INTEGER,
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL
       )`,
@@ -151,8 +271,11 @@ export async function ensureTriggerTable(db: D1Database): Promise<void> {
   for (const sql of [
     `ALTER TABLE workflow_triggers ADD COLUMN nodeId TEXT`,
     `ALTER TABLE workflow_triggers ADD COLUMN webhookPath TEXT`,
+    `ALTER TABLE workflow_triggers ADD COLUMN nextRunAt INTEGER`,
     `CREATE INDEX IF NOT EXISTS idx_wt_webhook_path ON workflow_triggers(ownerId, workflowId, webhookPath)`,
     `CREATE INDEX IF NOT EXISTS idx_wt_webhook_node ON workflow_triggers(ownerId, workflowId, nodeId)`,
+    `CREATE INDEX IF NOT EXISTS idx_wt_cron_due ON workflow_triggers(nextRunAt) WHERE type = 'cron' AND enabled = 1`,
+    `CREATE INDEX IF NOT EXISTS idx_wt_cron_owner_due ON workflow_triggers(ownerId, nextRunAt) WHERE type = 'cron' AND enabled = 1`,
   ]) {
     try {
       await db.prepare(sql).run();
@@ -185,24 +308,30 @@ export async function createTrigger(
   const webhookToken = CHANNEL_TYPES.includes(input.type)
     ? crypto.randomUUID().replace(/-/g, '')
     : null;
+  const enabled = input.enabled === false ? 0 : 1;
+  const nextRunAt =
+    input.type === 'cron' && enabled === 1
+      ? nextRunAtMs(input.cronExpr, new Date(), { ownerId: input.ownerId, triggerId })
+      : null;
   await db
     .prepare(
       `INSERT INTO workflow_triggers
-        (triggerId, ownerId, workflowId, type, enabled, cronExpr, webhookToken, nodeId, webhookPath, input, autoApproveHumanReview, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (triggerId, ownerId, workflowId, type, enabled, cronExpr, webhookToken, nodeId, webhookPath, input, autoApproveHumanReview, nextRunAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       triggerId,
       input.ownerId,
       input.workflowId,
       input.type,
-      input.enabled === false ? 0 : 1,
+      enabled,
       input.cronExpr ?? null,
       webhookToken,
       input.nodeId ?? null,
       input.webhookPath ?? null,
       input.input ?? null,
       input.autoApproveHumanReview === false ? 0 : 1,
+      nextRunAt,
       now,
       now,
     )
@@ -277,6 +406,17 @@ export async function updateTrigger(
   if (patch.nodeId !== undefined) {
     sets.push('nodeId = ?');
     binds.push(patch.nodeId);
+  }
+  if (patch.cronExpr !== undefined || patch.enabled !== undefined) {
+    const existing = await getTrigger(db, ownerId, triggerId);
+    const expr = patch.cronExpr !== undefined ? patch.cronExpr : existing?.cronExpr;
+    const enabled = patch.enabled !== undefined ? patch.enabled : existing?.enabled === 1;
+    sets.push('nextRunAt = ?');
+    binds.push(
+      enabled && existing?.type === 'cron'
+        ? nextRunAtMs(expr, new Date(), { ownerId, triggerId })
+        : null,
+    );
   }
   if (sets.length) {
     sets.push('updatedAt = ?');
@@ -590,19 +730,49 @@ export async function findChannelTrigger(
     .first<WorkflowTriggerRow>();
 }
 
-/** Enabled cron triggers whose expression matches `now` and haven't run this minute. */
-export async function listDueCronTriggers(
+interface CronCandidateLoad {
+  rows: WorkflowTriggerRow[];
+}
+
+async function loadCronCandidatesForOwner(
   db: D1Database,
+  ownerId: string,
+  now: Date,
+): Promise<CronCandidateLoad> {
+  const ts = now.getTime();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT * FROM workflow_triggers
+         WHERE type = 'cron' AND enabled = 1 AND ownerId = ?
+           AND (nextRunAt IS NULL OR nextRunAt <= ?)`,
+      )
+      .bind(ownerId, ts)
+      .all<WorkflowTriggerRow>();
+    return { rows: results ?? [] };
+  } catch {
+    try {
+      const { results } = await db
+        .prepare(
+          `SELECT * FROM workflow_triggers WHERE type = 'cron' AND enabled = 1 AND ownerId = ?`,
+        )
+        .bind(ownerId)
+        .all<WorkflowTriggerRow>();
+      return { rows: results ?? [] };
+    } catch {
+      return { rows: [] };
+    }
+  }
+}
+
+/** This owner's enabled cron rows whose `nextRunAt` is due. */
+export async function listDueCronTriggersForOwner(
+  db: D1Database,
+  ownerId: string,
   now: Date,
 ): Promise<WorkflowTriggerRow[]> {
-  await ensureTriggerTable(db);
-  const { results } = await db
-    .prepare(`SELECT * FROM workflow_triggers WHERE type = 'cron' AND enabled = 1`)
-    .all<WorkflowTriggerRow>();
-  const key = minuteKey(now);
-  return (results ?? []).filter(
-    (t) => t.cronExpr && t.lastRunMinute !== key && cronMatches(t.cronExpr, now),
-  );
+  const { rows } = await loadCronCandidatesForOwner(db, ownerId, now);
+  return rows.filter((t) => !!t.cronExpr);
 }
 
 export async function markTriggerRun(
@@ -610,11 +780,42 @@ export async function markTriggerRun(
   triggerId: string,
   key: string,
   status: string,
+  nextRunAt?: number | null,
 ): Promise<void> {
+  if (nextRunAt !== undefined) {
+    try {
+      await db
+        .prepare(
+          `UPDATE workflow_triggers
+           SET lastRunMinute = ?, lastRunAt = ?, lastStatus = ?, nextRunAt = ?
+           WHERE triggerId = ?`,
+        )
+        .bind(key, Date.now(), status, nextRunAt, triggerId)
+        .run();
+      return;
+    } catch {
+      /* nextRunAt column may not exist yet */
+    }
+  }
   await db
     .prepare(`UPDATE workflow_triggers SET lastRunMinute = ?, lastRunAt = ?, lastStatus = ? WHERE triggerId = ?`)
     .bind(key, Date.now(), status, triggerId)
     .run();
+}
+
+async function markNextRunAt(
+  db: D1Database,
+  triggerId: string,
+  nextRunAt: number | null,
+): Promise<void> {
+  try {
+    await db
+      .prepare(`UPDATE workflow_triggers SET nextRunAt = ? WHERE triggerId = ?`)
+      .bind(nextRunAt, triggerId)
+      .run();
+  } catch {
+    /* nextRunAt column may not exist yet */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -700,29 +901,69 @@ export async function syncCronTriggersForWorkflow(
   return removed;
 }
 
-/** Scan D1 for cron triggers due this minute and run them. Called from `scheduled`. */
-export async function runDueCronTriggers(env: Env, bindingName: string): Promise<number> {
-  const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
-  if (!db) return 0;
+/** Enqueue due cron jobs for one owner. Does not run the workflow graph. */
+export async function dispatchDueCronTriggersForOwner(env: Env, ownerId: string): Promise<number> {
+  const db = env.D1DB;
+  const queue = env.WORKFLOW_CRON_QUEUE;
+  if (!db || !queue) return 0;
   const now = new Date();
+  const due = await listDueCronTriggersForOwner(db, ownerId, now);
+  if (!due.length) return 0;
   const key = minuteKey(now);
-  const due = await listDueCronTriggers(db, now);
-  await Promise.all(
-    due.map(async (t) => {
-      try {
-        const resolved = await resolveOwnedWorkflow(env, bindingName, t.ownerId, t.workflowId);
-        if (isOrphanCronTrigger(t, resolved.definition)) {
-          await deleteTrigger(db, t.ownerId, t.triggerId);
-          return;
-        }
-        const result = await runTrigger(env, bindingName, t);
-        await markTriggerRun(db, t.triggerId, key, result.status);
-      } catch {
-        await markTriggerRun(db, t.triggerId, key, 'failed');
-      }
-    }),
-  );
-  return due.length;
+  let sent = 0;
+  for (const t of due) {
+    if (!t.cronExpr) continue;
+    const nextRunAt = nextRunAtMs(t.cronExpr, now, { ownerId, triggerId: t.triggerId });
+    try {
+      await markNextRunAt(db, t.triggerId, nextRunAt);
+      await markTriggerRun(db, t.triggerId, key, 'queued');
+      await queue.send(
+        {
+          type: 'workflow-cron-run' as const,
+          ownerId,
+          triggerId: t.triggerId,
+          workflowId: t.workflowId,
+          dueMinute: key,
+        },
+        { delaySeconds: cronQueueDelaySeconds(ownerId, t.triggerId) },
+      );
+      sent += 1;
+    } catch {
+      /* nextRunAt already advanced; the following occurrence will retry */
+    }
+  }
+  return sent;
+}
+
+/** Run one queued cron trigger. Queue retries on throw. */
+export async function consumeWorkflowCronRun(
+  env: Env,
+  body: {
+    ownerId: string;
+    triggerId: string;
+    dueMinute?: string;
+  },
+): Promise<void> {
+  const db = env.D1DB;
+  if (!db) throw new Error('D1 database binding not configured');
+  const trigger = await getTrigger(db, body.ownerId, body.triggerId);
+  if (!trigger || trigger.type !== 'cron' || trigger.enabled !== 1) return;
+  const key = body.dueMinute || minuteKey(new Date());
+  if (
+    trigger.lastRunMinute === key &&
+    trigger.lastStatus &&
+    trigger.lastStatus !== 'queued' &&
+    trigger.lastStatus !== 'running'
+  ) {
+    return;
+  }
+  const resolved = await resolveOwnedWorkflow(env, 'USER_DO', trigger.ownerId, trigger.workflowId);
+  if (isOrphanCronTrigger(trigger, resolved.definition)) {
+    await deleteTrigger(db, trigger.ownerId, trigger.triggerId);
+    return;
+  }
+  const result = await runTrigger(env, 'USER_DO', trigger);
+  await markTriggerRun(db, trigger.triggerId, key, result.status);
 }
 
 /**

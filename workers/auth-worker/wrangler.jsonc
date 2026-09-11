@@ -38,6 +38,14 @@
 		{
 			"tag": "v3",
 			"deleted_classes": []
+		},
+		{
+			"tag": "v4",
+			"new_sqlite_classes": ["WorkflowSchedulerDO"]
+		},
+		{
+			"tag": "v5",
+			"deleted_classes": ["WorkflowSchedulerDO"]
 		}
 	],
 	"durable_objects": {
@@ -62,9 +70,10 @@
 	"observability": {
 		"enabled": true
 	},
-	// Runs every minute; the scheduled handler fans out to due workflow cron triggers.
+	// Empty array deletes previously deployed Worker cron triggers.
+	// Omitting `triggers` leaves the old `* * * * *` schedule in place.
 	"triggers": {
-		"crons": ["* * * * *"]
+		"crons": []
 	},
 	"images": {
 		"binding": "IMAGES" // i.e. available in your Worker on env.IMAGES
@@ -102,7 +111,21 @@
 		{
 			"binding": "WS_BROADCAST_QUEUE",
 			"queue": "aiagents-hub-ws-broadcast-queue"
+		},
+		{
+			"binding": "WORKFLOW_CRON_QUEUE",
+			"queue": "aiagents-hub-workflow-cron-queue"
 		}
+		],
+		"consumers": [
+			{
+				"queue": "aiagents-hub-workflow-cron-queue",
+				"max_batch_size": 5,
+				"max_batch_timeout": 5,
+				"max_retries": 3,
+				"dead_letter_queue": "aiagents-hub-workflow-cron-dlq",
+				"retry_delay": 30
+			}
 		]
 	},
 

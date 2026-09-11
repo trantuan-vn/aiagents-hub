@@ -59,7 +59,8 @@ workflows/
 | `createWorkflowRoutes` | `api/presentation.ts` |
 | `createWorkflowHookRoutes` | `api/hooks-presentation.ts` |
 | `createFormHookRoutes` | `api/form-hooks-presentation.ts` |
-| `runDueCronTriggers` | `triggers/triggers.ts` |
+| `dispatchDueCronTriggersForOwner` | `triggers/triggers.ts` — UserDO alarm enqueue |
+| `consumeWorkflowCronRun` | `triggers/triggers.ts` — queue consumer |
 | `executeWorkflowGraph` | `engine/executor.ts` |
 | `WorkflowDefinitionSchema` | `domain/domain.ts` |
 | Vectorize helpers | `rag/index.ts` |

@@ -78,9 +78,8 @@ function asNumber(value: unknown, fallback: number): number {
 
 export function defaultScheduleRule(): ScheduleRule {
   return {
-    field: "days",
-    daysInterval: 1,
-    triggerAtHour: 0,
+    field: "hours",
+    hoursInterval: 1,
     triggerAtMinute: 0,
   };
 }

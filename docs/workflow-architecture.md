@@ -211,7 +211,7 @@ Tất cả đường vào hội tụ về **`runTrigger` → `executeWorkflowGra
 | Trigger | Ingress |
 |---------|---------|
 | Webhook | Canonical: `GET/POST /hooks/workflows/:workflowId/:path` (Bearer API token + `X-Client-ID`). Legacy: `/hooks/workflows/:ownerId/:token` |
-| Cron | Worker `scheduled` mỗi phút → `runDueCronTriggers` |
+| Cron | `UserDO` alarm → Queue → `consumeWorkflowCronRun` |
 | Channels | Telegram / Slack / Discord qua `/hooks/channels/:ch/:ownerId/:token` |
 | Form / DB | `/form/:workflowId/:path` (+ `/form-test/...`) → `form-trigger-runner.ts` (fan-out `per_table`) |
 | Manual | Authenticated execute trên presentation API |
@@ -305,7 +305,7 @@ npm run dev:consumer  # WS fan-out
 | `/hooks/workflows/:workflowId/:path` | Webhook (API token + `X-Client-ID`) |
 | `/hooks/echo` | Echo sink test HTTP Request node |
 | `/form/:workflowId/:path` | Form trigger công khai |
-| Cron `* * * * *` | `runDueCronTriggers` |
+| Cron queue | `UserDO` `setAlarm(min(cron, WS/queue))` → `WORKFLOW_CRON_QUEUE` |
 
 ---
 
