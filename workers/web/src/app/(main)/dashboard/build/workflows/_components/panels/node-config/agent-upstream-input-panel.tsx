@@ -130,6 +130,23 @@ function isFormSubmissionNode(node: Node): boolean {
   return (d.triggerKind === "form" && d.formKind !== "database") || node.type === "form";
 }
 
+function isChatTriggerNode(node: Node): boolean {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  return d.triggerKind === "chat";
+}
+
+function buildChatPreviewOutput(): Record<string, unknown> {
+  return {
+    triggerKind: "chat",
+    sessionId: "",
+    action: "sendMessage",
+    chatInput: "",
+    query: "",
+    chatUrl: "",
+    executionMode: "test",
+  };
+}
+
 function sampleValueForFieldType(type: string | undefined, multiple?: boolean): unknown {
   switch (type) {
     case "number":
@@ -190,6 +207,11 @@ function getUpstreamOutputData(
       ...((realOutput.fields as Record<string, unknown> | undefined) ?? {}),
     };
     return { ...preview, ...realOutput, fields: mergedFields };
+  }
+
+  if (isChatTriggerNode(parent)) {
+    const preview = buildChatPreviewOutput();
+    return realOutput ? { ...preview, ...realOutput } : preview;
   }
 
   if (realOutput) return realOutput;

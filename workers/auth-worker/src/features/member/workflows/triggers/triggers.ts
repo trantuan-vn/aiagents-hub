@@ -5,9 +5,10 @@ import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { parseWorkflowDefinition } from '../execution/workflow-context.js';
 import { executeWorkflowGraph } from '../engine/executor.js';
 import { listFormSubmissionNodes } from './form-submission.js';
+import { listChatTriggerNodes } from './chat-submission.js';
 
 /** Channel types align with OpenClaw multi-channel support (Telegram/Slack/Discord). */
-export type TriggerType = 'cron' | 'webhook' | 'form' | 'telegram' | 'slack' | 'discord';
+export type TriggerType = 'cron' | 'webhook' | 'form' | 'chat' | 'telegram' | 'slack' | 'discord';
 
 const CHANNEL_TYPES: TriggerType[] = ['webhook', 'telegram', 'slack', 'discord'];
 
@@ -627,6 +628,120 @@ export async function syncFormTriggersForWorkflow(
     }
     if (row.webhookPath !== node.formPath) {
       await updateTrigger(db, ownerId, row.triggerId, { webhookPath: node.formPath });
+    }
+  }
+
+  return nodes;
+}
+
+/** Enabled chat triggers for a workflow (owner-scoped). */
+export async function listChatTriggersForWorkflow(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+): Promise<WorkflowTriggerRow[]> {
+  await ensureTriggerTable(db);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'chat' AND enabled = 1
+       ORDER BY createdAt ASC`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  return results ?? [];
+}
+
+export async function findChatTriggerByNodeId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string,
+  nodeId: string,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  return db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'chat' AND nodeId = ?
+       LIMIT 1`,
+    )
+    .bind(workflowId, ownerId, nodeId)
+    .first<WorkflowTriggerRow>();
+}
+
+export async function findChatTriggerByWorkflowId(
+  db: D1Database,
+  workflowId: number,
+  ownerId: string | undefined,
+  chatPath: string,
+): Promise<WorkflowTriggerRow | null> {
+  await ensureTriggerTable(db);
+  const normalized = chatPath.trim().replace(/^\/+/, '');
+  if (ownerId) {
+    const chats = await listChatTriggersForWorkflow(db, workflowId, ownerId);
+    return chats.find((t) => t.webhookPath === normalized || t.nodeId === normalized) ?? null;
+  }
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND type = 'chat' AND enabled = 1`,
+    )
+    .bind(workflowId)
+    .all<WorkflowTriggerRow>();
+  const chats = results ?? [];
+  return chats.find((t) => t.webhookPath === normalized || t.nodeId === normalized) ?? null;
+}
+
+/** Keep D1 chat trigger rows in sync with canvas chat nodes. */
+export async function syncChatTriggersForWorkflow(
+  env: Env,
+  bindingName: string,
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+): Promise<Array<{ nodeId: string; chatPath: string }>> {
+  let resolved: ResolvedWorkflow;
+  try {
+    resolved = await resolveOwnedWorkflow(env, bindingName, ownerId, workflowId);
+  } catch {
+    return [];
+  }
+
+  const nodes = listChatTriggerNodes(resolved.definition);
+  const { results } = await db
+    .prepare(
+      `SELECT * FROM workflow_triggers
+       WHERE workflowId = ? AND ownerId = ? AND type = 'chat'`,
+    )
+    .bind(workflowId, ownerId)
+    .all<WorkflowTriggerRow>();
+  const existing = results ?? [];
+  const nodeIds = new Set(nodes.map((n) => n.nodeId));
+
+  for (const row of existing) {
+    if (row.nodeId && !nodeIds.has(row.nodeId)) {
+      await deleteTrigger(db, ownerId, row.triggerId);
+    }
+  }
+
+  const byNodeId = new Map(
+    existing.filter((r) => r.nodeId).map((r) => [r.nodeId!, r]),
+  );
+
+  for (const node of nodes) {
+    const row = byNodeId.get(node.nodeId);
+    if (!row) {
+      await createTrigger(db, {
+        ownerId,
+        workflowId,
+        type: 'chat',
+        nodeId: node.nodeId,
+        webhookPath: node.chatPath,
+      });
+      continue;
+    }
+    if (row.webhookPath !== node.chatPath) {
+      await updateTrigger(db, ownerId, row.triggerId, { webhookPath: node.chatPath });
     }
   }
 

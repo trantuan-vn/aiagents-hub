@@ -20,6 +20,7 @@ import { createCredential, deleteCredential, listCredentials } from '../storage/
 import {
   createTrigger,
   deleteTrigger,
+  findChatTriggerByNodeId,
   findFormTriggerByNodeId,
   findWebhookTriggerByNodeId,
   isChannelTriggerType,
@@ -31,6 +32,7 @@ import {
   workflowDefinitionHasWebhookTrigger,
 } from '../triggers/triggers.js';
 import { setFormTestListening } from '../triggers/form-submission.js';
+import { setChatTestListening } from '../triggers/chat-submission.js';
 import { WORKFLOW_INTEGRATIONS } from '../integrations/integrations.js';
 import { getVersionByKey, listVersions, snapshotVersion } from '../storage/version-store.js';
 import { autofixWorkflowDefinition, generateWorkflowDefinition } from '../collab/ai-authoring.js';
@@ -70,7 +72,7 @@ const ResumeBodySchema = z.object({
 
 const CreateTriggerSchema = z
   .object({
-    type: z.enum(['cron', 'webhook', 'form', 'telegram', 'slack', 'discord']),
+    type: z.enum(['cron', 'webhook', 'form', 'chat', 'telegram', 'slack', 'discord']),
     cronExpr: z.string().min(1).max(120).optional(),
     input: z.string().max(10000).optional(),
     enabled: z.boolean().optional(),
@@ -578,6 +580,10 @@ export function createWorkflowRoutes(bindingName: string) {
       const pathSeg = webhookPath ? `/${encodeURIComponent(webhookPath)}` : '';
       return `${base}/form/${workflowId}${pathSeg}`;
     }
+    if (type === 'chat') {
+      const pathSeg = webhookPath ? `/${encodeURIComponent(webhookPath)}` : '';
+      return `${base}/chat/${workflowId}${pathSeg}`;
+    }
     if (!token) return undefined;
     if (isChannelTriggerType(type)) return `${base}/hooks/channels/${type}/${ownerId}/${token}`;
     return undefined;
@@ -641,6 +647,15 @@ export function createWorkflowRoutes(bindingName: string) {
           );
         }
       }
+      if (body.type === 'chat' && body.nodeId) {
+        const existing = await findChatTriggerByNodeId(db, id, ownerId, body.nodeId);
+        if (existing) {
+          return c.json(
+            { trigger: enrichTrigger(c, ownerId, existing) },
+            200,
+          );
+        }
+      }
       const trigger = await createTrigger(db, { ownerId, workflowId: id, ...body });
       if (trigger.type === 'cron') await touchScheduler(c.env, ownerId);
       return c.json(
@@ -667,6 +682,23 @@ export function createWorkflowRoutes(bindingName: string) {
       await setFormTestListening(c.env.NONCE_KV, ownerId, id, formPath, body.active !== false);
       return c.json({ ok: true, active: body.active !== false });
     }, 'Failed to set form test listening'),
+  );
+
+  app.post(
+    '/:id/chat-test-listen',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const body = (await c.req.json().catch(() => ({}))) as {
+        chatPath?: string;
+        active?: boolean;
+      };
+      const chatPath = String(body.chatPath ?? '').trim().replace(/^\/+/, '');
+      if (!chatPath) throw new Error('Missing chatPath');
+      const ownerId = getUserId(c, user.identifier);
+      await setChatTestListening(c.env.NONCE_KV, ownerId, id, chatPath, body.active !== false);
+      return c.json({ ok: true, active: body.active !== false });
+    }, 'Failed to set chat test listening'),
   );
 
   app.put(

@@ -18,6 +18,6 @@ export const TRIGGER_KIND_FIELD = "triggerKind" as const;
 
 /**
  * Kinds with dedicated override definitions/plugins (not factory-generated).
- * `webhook` → `nodes/webhook/`; `form` → FE `nodes/form/`; `schedule` → FE `nodes/trigger/` panel.
+ * `webhook` → `nodes/webhook/`; `form` → FE `nodes/form/`; `schedule` → FE `nodes/trigger/` panel; `chat` → FE `nodes/chat/`.
  */
-export const TRIGGER_OVERRIDE_KINDS = new Set<TriggerKind>(["webhook", "form", "schedule"]);
+export const TRIGGER_OVERRIDE_KINDS = new Set<TriggerKind>(["webhook", "form", "schedule", "chat"]);

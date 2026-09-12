@@ -17,9 +17,13 @@ import {
   createWorkflowTrigger,
   getWorkflowExecution,
   listWorkflowTriggers,
+  setChatTestListening,
   setFormTestListening,
   type ExecutionStepLog,
 } from "../../_lib/api";
+import { workflowEditorChatStore } from "../editor/workflow-editor-chat-store";
+import { buildChatApiUrl, resolveChatPath } from "../panels/node-config/chat-url";
+import { isChatTriggerNode } from "../panels/node-config/chat-node-config-panel";
 import { buildFormPublicUrl, resolveFormPath } from "../panels/node-config/form-url";
 import { isFormNode } from "../panels/node-config/form-node-config-panel";
 import { isWebhookNode } from "../panels/node-config/webhook-node-config-panel";
@@ -127,6 +131,16 @@ export function useWorkflowExecuteEntry({
     [workflowId],
   );
 
+  const deactivateChatListening = useCallback(
+    (node: Node | undefined) => {
+      if (!workflowId || !node || !isChatTriggerNode(node)) return;
+      const path = resolveChatPath((node.data ?? {}) as Record<string, unknown>, node.id);
+      void setChatTestListening(workflowId, { chatPath: path, active: false }).catch(() => {});
+      workflowEditorChatStore.close();
+    },
+    [workflowId],
+  );
+
   const listeningNode = useMemo(
     () => (listeningNodeId ? nodes.find((node) => node.id === listeningNodeId) : undefined),
     [listeningNodeId, nodes],
@@ -137,6 +151,9 @@ export function useWorkflowExecuteEntry({
     if (isFormNode(listeningNode)) {
       return resolveFormPath((listeningNode.data ?? {}) as Record<string, unknown>, listeningNode.id);
     }
+    if (isChatTriggerNode(listeningNode)) {
+      return resolveChatPath((listeningNode.data ?? {}) as Record<string, unknown>, listeningNode.id);
+    }
     return resolveWebhookPath(listeningNode);
   }, [listeningNode]);
 
@@ -146,6 +163,14 @@ export function useWorkflowExecuteEntry({
       return buildFormPublicUrl({
         workflowId,
         formPath: listenPath,
+        mode: "test",
+        ownerId: formOwnerId ?? resolvedOwnerId,
+      });
+    }
+    if (isChatTriggerNode(listeningNode)) {
+      return buildChatApiUrl({
+        workflowId,
+        chatPath: listenPath,
         mode: "test",
         ownerId: formOwnerId ?? resolvedOwnerId,
       });
@@ -194,12 +219,34 @@ export function useWorkflowExecuteEntry({
     [workflowId],
   );
 
+  const ensureChatTrigger = useCallback(
+    async (node: Node): Promise<string | undefined> => {
+      if (!workflowId) return undefined;
+      const path = resolveChatPath((node.data ?? {}) as Record<string, unknown>, node.id);
+      const { triggers } = await listWorkflowTriggers(workflowId);
+      const existing = triggers.find(
+        (trigger) =>
+          trigger.type === "chat" &&
+          (trigger.nodeId === node.id || trigger.webhookPath === path),
+      );
+      if (existing) return existing.ownerId || undefined;
+      const { trigger } = await createWorkflowTrigger(workflowId, {
+        type: "chat",
+        nodeId: node.id,
+        webhookPath: path,
+      });
+      return trigger?.ownerId || undefined;
+    },
+    [workflowId],
+  );
+
   const applyTriggerEvent = useCallback(
     async (event: WorkflowWebhookWsEvent) => {
       if (!listeningNodeId || !patchNodeDataById || !listeningNode) return;
 
       const isForm = isFormNode(listeningNode);
-      const output = isForm
+      const isChat = isChatTriggerNode(listeningNode);
+      const output = isForm || isChat
         ? (event.output ?? (() => {
             try {
               return JSON.parse(event.input);
@@ -230,19 +277,21 @@ export function useWorkflowExecuteEntry({
           applyStepOutputs(record.steps, patchNodeDataById);
           finishRun?.(record.steps);
         }
-        if (record.status === "completed") toast.success(tExecute("completed"));
-        else if (record.status === "pending_human") toast.message(tExecute("pending_human"));
+        if (record.status === "completed") {
+          if (!isChat) toast.success(tExecute("completed"));
+        } else if (record.status === "pending_human") toast.message(tExecute("pending_human"));
         else if (record.status === "cancelled") toast.message(tExecute("cancelled"));
         else if (record.status === "failed") {
           toast.error(String(record.error ?? tExecute("failed")));
+        } else if (!isChat) {
+          toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
         }
-        else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
       } catch {
         finishRun?.();
-        if (event.status === "completed") {
+        if (event.status === "failed") toast.error(tExecute("failed"));
+        else if (!isChat) {
           toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
-        } else if (event.status === "failed") toast.error(tExecute("failed"));
-        else toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
+        }
       }
 
       // n8n behaviour: a test form deactivates after the first submission.
@@ -268,10 +317,11 @@ export function useWorkflowExecuteEntry({
   const stopListen = useCallback(() => {
     const node = listeningNodeId ? nodes.find((entry) => entry.id === listeningNodeId) : undefined;
     deactivateFormListening(node);
+    deactivateChatListening(node);
     setListeningNodeId(null);
     setLiveOutput(null);
     finishRun?.();
-  }, [deactivateFormListening, finishRun, listeningNodeId, nodes]);
+  }, [deactivateChatListening, deactivateFormListening, finishRun, listeningNodeId, nodes]);
 
   const startFormTest = useCallback(
     async (nodeId: string) => {
@@ -298,6 +348,41 @@ export function useWorkflowExecuteEntry({
       }
     },
     [ensureFormTrigger, nodes, resolvedOwnerId, startRun, tExecute, tRegistry, workflowId],
+  );
+
+  const startChatTest = useCallback(
+    async (nodeId: string) => {
+      const node = nodes.find((entry) => entry.id === nodeId);
+      if (!node || !isChatTriggerNode(node) || !workflowId) return;
+      try {
+        const triggerOwnerId = await ensureChatTrigger(node);
+        const ownerIdForUrl = triggerOwnerId ?? resolvedOwnerId;
+        if (!ownerIdForUrl) {
+          toast.error(tRegistry("chat_owner_required"));
+          return;
+        }
+        if (triggerOwnerId) setFormOwnerId(triggerOwnerId);
+        const path = resolveChatPath((node.data ?? {}) as Record<string, unknown>, node.id);
+        await setChatTestListening(workflowId, { chatPath: path, active: true });
+        const url = buildChatApiUrl({ workflowId, chatPath: path, mode: "test", ownerId: ownerIdForUrl });
+        const nodeData = (node.data ?? {}) as Record<string, unknown>;
+        const options = (nodeData.chatOptions ?? {}) as Record<string, unknown>;
+        setLiveOutput(null);
+        setListeningNodeId(nodeId);
+        workflowEditorChatStore.open({
+          workflowId,
+          nodeId,
+          endpointUrl: url,
+          initialMessages: String(nodeData.initialMessages ?? ""),
+          inputPlaceholder: String(options.inputPlaceholder ?? ""),
+          title: String(options.title ?? nodeData.label ?? ""),
+        });
+        toast.message(tRegistry("chat_execute_listening"));
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : tExecute("failed"));
+      }
+    },
+    [ensureChatTrigger, nodes, resolvedOwnerId, tExecute, tRegistry, workflowId],
   );
 
   const startWebhookListen = useCallback(
@@ -336,9 +421,17 @@ export function useWorkflowExecuteEntry({
         await startFormTest(nodeId);
         return;
       }
+      if (node && isChatTriggerNode(node)) {
+        if (listeningNodeId === nodeId) {
+          workflowEditorChatStore.show();
+          return;
+        }
+        await startChatTest(nodeId);
+        return;
+      }
       await runFromNode(nodeId, upstreamExecuteInput(nodeId, nodes, edges));
     },
-    [listeningNodeId, nodes, edges, runFromNode, startFormTest, startWebhookListen, stopListen],
+    [listeningNodeId, nodes, edges, runFromNode, startChatTest, startFormTest, startWebhookListen, stopListen],
   );
 
   return {
@@ -349,5 +442,6 @@ export function useWorkflowExecuteEntry({
     stopWebhookListen: stopListen,
     testUrl,
     liveOutput: liveOutput as WebhookItemOutput | null,
+    chatListening: !!listeningNode && isChatTriggerNode(listeningNode),
   };
 }

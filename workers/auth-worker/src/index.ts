@@ -23,6 +23,7 @@ import { createAssistantRoutes } from './features/assistant/presentation';
 import { createWorkflowRoutes } from './features/member/workflows/api/presentation';
 import { createWorkflowHookRoutes } from './features/member/workflows/api/hooks-presentation';
 import { createFormHookRoutes } from './features/member/workflows/api/form-hooks-presentation';
+import { createChatHookRoutes } from './features/member/workflows/api/chat-hooks-presentation';
 import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
@@ -123,6 +124,7 @@ function createRoutes(bindingName: string) {
   // III. PUBLIC WEBHOOKS (workflow webhooks: Bearer API token + X-Client-ID)
   routes.route('/hooks', createWorkflowHookRoutes(bindingName));
   routes.route('/', createFormHookRoutes(bindingName));
+  routes.route('/', createChatHookRoutes(bindingName));
 
   return routes;
 }

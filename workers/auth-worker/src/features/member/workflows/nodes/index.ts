@@ -30,6 +30,7 @@ import {
   TRIGGER_KIND_PLUGINS,
   triggerFormPlugin,
   triggerSchedulePlugin,
+  triggerChatPlugin,
 } from './trigger/index.js';
 import { coreWebhookPlugin, webhookTriggerPlugin } from './webhook/index.js';
 import { workflowGroupPlugin } from './workflow-group/index.js';
@@ -65,6 +66,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   ...TRIGGER_KIND_PLUGINS,
   triggerFormPlugin,
   triggerSchedulePlugin,
+  triggerChatPlugin,
   ...FLOW_KIND_PLUGINS,
   flowLoopOverItemsPlugin,
   ...CORE_KIND_PLUGINS,

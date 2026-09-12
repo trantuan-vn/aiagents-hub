@@ -273,7 +273,7 @@ export function cancelWorkflowExecution(executionKey: string) {
 }
 
 // --- Triggers (cron + webhook) ---
-export type WorkflowTriggerType = "cron" | "webhook" | "form" | "telegram" | "slack" | "discord";
+export type WorkflowTriggerType = "cron" | "webhook" | "form" | "chat" | "telegram" | "slack" | "discord";
 
 export interface WorkflowTrigger {
   triggerId: string;
@@ -344,6 +344,17 @@ export function setFormTestListening(
 ) {
   return apiFetch<{ ok: boolean; active: boolean }>(
     `/dashboard/build/workflows/${workflowId}/form-test-listen`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+/** Toggle the test-chat listening window for a chat trigger node's public URL. */
+export function setChatTestListening(
+  workflowId: number,
+  body: { chatPath: string; active: boolean },
+) {
+  return apiFetch<{ ok: boolean; active: boolean }>(
+    `/dashboard/build/workflows/${workflowId}/chat-test-listen`,
     { method: "POST", body: JSON.stringify(body) },
   );
 }

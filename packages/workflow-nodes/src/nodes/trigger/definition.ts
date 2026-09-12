@@ -31,6 +31,16 @@ export {
   type ScheduleInterval,
   type ScheduleRule,
 } from "./schedule";
+export {
+  TRIGGER_CHAT_DEFINITION,
+  CHAT_TRIGGER_DEFAULT_INITIAL_MESSAGES,
+  CHAT_TRIGGER_NODE_LABEL,
+  buildChatTriggerOutput,
+  chatTriggerDefaultData,
+  type ChatTriggerAuth,
+  type ChatTriggerMode,
+  type ChatTriggerNodeData,
+} from "./chat";
 
 /** Base family definition — fallback when no triggerKind is set. */
 export const TRIGGER_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { Panel } from "@xyflow/react";
 import type { Edge, Node } from "@xyflow/react";
@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { WORKFLOW_TRIGGER_CATALOG, type WorkflowTriggerKindId } from "../catalogs/workflow-trigger-catalog";
+import { workflowEditorChatStore } from "../editor/workflow-editor-chat-store";
 import { useWorkflowExecutionUi } from "../hooks/workflow-execution-ui";
 import {
   entryPointNeedsNodeLabel,
@@ -43,6 +44,7 @@ interface WorkflowCanvasExecutePanelProps {
   edges: Edge[];
   running?: boolean;
   webhookListening?: boolean;
+  chatListening?: boolean;
   onExecuteTriggerNode: (nodeId: string) => void;
 }
 
@@ -74,9 +76,15 @@ export function WorkflowCanvasExecutePanel({
   edges,
   running = false,
   webhookListening = false,
+  chatListening = false,
   onExecuteTriggerNode,
 }: WorkflowCanvasExecutePanelProps) {
   const t = useTranslations("WorkflowEditorPage");
+  const chat = useSyncExternalStore(
+    workflowEditorChatStore.subscribe,
+    workflowEditorChatStore.getState,
+    workflowEditorChatStore.getState,
+  );
   const execution = useWorkflowExecutionUi();
   const entryPoints = useMemo(() => getWorkflowTriggerEntryPoints(nodes, edges), [nodes, edges]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
@@ -151,8 +159,9 @@ export function WorkflowCanvasExecutePanel({
 
   return (
     <Panel position="bottom-center" className="nodrag nopan !m-4 !p-0">
+      <div className="nodrag nopan flex items-center gap-2">
       <div
-        className="nodrag nopan inline-flex overflow-hidden rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        className="inline-flex overflow-hidden rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
         role="group"
         aria-label={t("execute_workflow")}
       >
@@ -197,6 +206,17 @@ export function WorkflowCanvasExecutePanel({
         ) : (
           mainButton
         )}
+      </div>
+      {chatListening && chat.open ? (
+        <button
+          type="button"
+          onClick={() => workflowEditorChatStore.hide()}
+          onPointerDown={(event) => event.stopPropagation()}
+          className="bg-[#ff6d00] hover:bg-[#f57c00] flex h-10 items-center rounded-full px-4 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        >
+          {t("chat_hide")}
+        </button>
+      ) : null}
       </div>
     </Panel>
   );

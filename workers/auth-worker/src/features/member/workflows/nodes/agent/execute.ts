@@ -79,8 +79,10 @@ function resolveEmbedModel(service: Record<string, unknown>): string {
 }
 
 function extractQuestionText(nodeInput: Record<string, unknown>, fallbackInput?: string): string {
+  if (typeof nodeInput.chatInput === 'string' && nodeInput.chatInput.trim()) return nodeInput.chatInput.trim();
   if (typeof nodeInput.query === 'string' && nodeInput.query.trim()) return nodeInput.query.trim();
   if (typeof nodeInput.question === 'string' && nodeInput.question.trim()) return nodeInput.question.trim();
+  if (typeof nodeInput.message === 'string' && nodeInput.message.trim()) return nodeInput.message.trim();
   const body = nodeInput.body;
   if (body && typeof body === 'object' && !Array.isArray(body)) {
     const rec = body as Record<string, unknown>;

@@ -10,6 +10,7 @@ import {
 } from "./data-transformation";
 import { flowUIPlugin, FLOW_KIND_UI_PLUGINS, flowLoopOverItemsUIPlugin } from "./flow";
 import { formTriggerUIPlugin } from "./form";
+import { chatTriggerUIPlugin } from "./chat";
 import { humanReviewUIPlugin, HUMAN_REVIEW_CHANNEL_UI_PLUGINS } from "./human-review";
 import {
   memoryUIPlugin,
@@ -32,6 +33,7 @@ import { workflowGroupUIPlugin } from "./workflow-group";
 export * from "./types";
 export * from "./agent";
 export * from "./form";
+export * from "./chat";
 export * from "./memory";
 export * from "./service";
 export * from "./webhook";
@@ -80,6 +82,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   webhookTriggerUIPlugin,
   coreWebhookUIPlugin,
   formTriggerUIPlugin,
+  chatTriggerUIPlugin,
 ];
 
 export type NodeCatalogCategory = WorkflowNodeUIPlugin["catalog"]["category"];

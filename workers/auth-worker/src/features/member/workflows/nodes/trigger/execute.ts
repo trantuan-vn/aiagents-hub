@@ -49,6 +49,21 @@ export async function executeTrigger(ctx: NodeContext): Promise<NodeOutput> {
     };
   }
 
+  if (triggerKind === 'chat') {
+    const runContext = ctx.runContext as Record<string, unknown>;
+    const chatInput = String(runContext.chatInput ?? ctx.input ?? '');
+    return {
+      ...base,
+      sessionId: runContext.sessionId ?? '',
+      action: runContext.action ?? 'sendMessage',
+      chatInput,
+      query: chatInput,
+      chatUrl: runContext.chatUrl ?? '',
+      executionMode: runContext.executionMode ?? 'test',
+      text: chatInput,
+    };
+  }
+
   if (triggerKind === 'form') {
     const runContext = ctx.runContext as Record<string, unknown>;
     const fields =

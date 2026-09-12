@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type RefObject } from "react";
 
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,8 @@ import "../canvas/workflow-canvas-theme.css";
 
 import { WorkflowEditorHeader, type WorkflowEditorTab } from "./workflow-editor-header";
 import { WorkflowEvaluationsPanel } from "../panels/workflow-panels/workflow-evaluations-panel";
+import { WorkflowEditorChatPanel } from "./workflow-editor-chat-panel";
+import { workflowEditorChatStore } from "./workflow-editor-chat-store";
 import { WorkflowEditorLogsPanel } from "./workflow-editor-logs-panel";
 import { WorkflowEditorSettingsSheet } from "./workflow-editor-settings-sheet";
 import { resolveWorkflowEditorShellProps, type WorkflowEditorShellProps } from "./workflow-editor-shell-props";
@@ -55,6 +57,13 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const [activeTab, setActiveTab] = useState<WorkflowEditorTab>("editor");
   const [aiOpen, setAiOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const chat = useSyncExternalStore(
+    workflowEditorChatStore.subscribe,
+    workflowEditorChatStore.getState,
+    workflowEditorChatStore.getState,
+  );
+  const chatOpen = chat.open && chat.workflowId === workflowId;
+  const bottomOpen = logsOpen || chatOpen;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const localNameRef = useRef<HTMLInputElement>(null) as RefObject<HTMLInputElement>;
@@ -90,6 +99,10 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     pendingDrawerRef.current = options;
     setActiveTab("editor");
   };
+
+  useEffect(() => {
+    if (chatOpen) setLogsOpen(true);
+  }, [chatOpen]);
 
   useEffect(() => {
     if (activeTab !== "editor" || !pendingDrawerRef.current) return;
@@ -209,20 +222,50 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
                 {children}
               </WorkflowEditorShellWorkspace>
             </ResizablePanel>
-            {logsOpen ? <WorkflowResizeHandle /> : null}
-            {logsOpen ? (
-              <ResizablePanel id="logs" order={2} defaultSize={28} minSize={14} className={workflowResizePanelClassName}>
-                <WorkflowEditorLogsPanel
-                  fill
-                  open={logsOpen}
-                  onOpenChange={setLogsOpen}
-                  workflowId={workflowId}
-                  definitionJson={definitionJson}
-                />
+            {bottomOpen ? <WorkflowResizeHandle /> : null}
+            {bottomOpen ? (
+              <ResizablePanel
+                id="logs"
+                order={2}
+                defaultSize={chatOpen ? 34 : 28}
+                minSize={14}
+                className={workflowResizePanelClassName}
+              >
+                {chatOpen ? (
+                  <ResizablePanelGroup direction="horizontal" className="min-h-0 min-w-0 flex-1">
+                    <ResizablePanel
+                      id="chat"
+                      order={1}
+                      defaultSize={38}
+                      minSize={22}
+                      className={workflowResizePanelClassName}
+                    >
+                      <WorkflowEditorChatPanel workflowId={workflowId} />
+                    </ResizablePanel>
+                    <WorkflowResizeHandle />
+                    <ResizablePanel id="execution-logs" order={2} defaultSize={62} minSize={28} className={workflowResizePanelClassName}>
+                      <WorkflowEditorLogsPanel
+                        fill
+                        open={logsOpen}
+                        onOpenChange={setLogsOpen}
+                        workflowId={workflowId}
+                        definitionJson={definitionJson}
+                      />
+                    </ResizablePanel>
+                  </ResizablePanelGroup>
+                ) : (
+                  <WorkflowEditorLogsPanel
+                    fill
+                    open={logsOpen}
+                    onOpenChange={setLogsOpen}
+                    workflowId={workflowId}
+                    definitionJson={definitionJson}
+                  />
+                )}
               </ResizablePanel>
             ) : null}
           </ResizablePanelGroup>
-          {logsOpen ? null : (
+          {bottomOpen ? null : (
             <WorkflowEditorLogsPanel
               open={logsOpen}
               onOpenChange={setLogsOpen}

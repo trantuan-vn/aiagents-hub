@@ -48,3 +48,10 @@ export const triggerSchedulePlugin: WorkflowNodePlugin = {
   kind: 'schedule',
   execute: executeTrigger,
 };
+
+export const triggerChatPlugin: WorkflowNodePlugin = {
+  id: 'trigger:chat',
+  runtimeType: 'trigger',
+  kind: 'chat',
+  execute: executeTrigger,
+};

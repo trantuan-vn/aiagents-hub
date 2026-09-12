@@ -249,6 +249,7 @@ function CanvasInnerWithDrawerUi({
     stopWebhookListen,
     testUrl,
     liveOutput,
+    chatListening,
   } = useWorkflowExecuteEntry({
     workflowId,
     ownerId,
@@ -371,6 +372,7 @@ function CanvasInnerWithDrawerUi({
         workflowId={workflowId}
         running={running}
         webhookListening={webhookListening}
+        chatListening={chatListening}
         testUrl={testUrl}
         liveOutput={liveOutput}
         onStopWebhookListen={stopWebhookListen}
@@ -410,6 +412,7 @@ const CanvasSurface = memo(function CanvasSurface({
   workflowId,
   running,
   webhookListening,
+  chatListening,
   testUrl,
   liveOutput,
   onStopWebhookListen,
@@ -428,6 +431,7 @@ const CanvasSurface = memo(function CanvasSurface({
   workflowId?: number;
   running?: boolean;
   webhookListening?: boolean;
+  chatListening?: boolean;
   testUrl?: string;
   liveOutput?: import("@aiagents-hub/workflow-nodes").WebhookItemOutput | null;
   onStopWebhookListen?: () => void;
@@ -437,7 +441,7 @@ const CanvasSurface = memo(function CanvasSurface({
 }) {
   const closeAddNodeDrawer = useWorkflowCanvasUi()?.closeAddNodeDrawer;
   const [listeningOverlayDismissed, setListeningOverlayDismissed] = useState(false);
-  const listeningActive = !!(webhookListening && testUrl && onStopWebhookListen);
+  const listeningActive = !!(webhookListening && testUrl && onStopWebhookListen && !chatListening);
   const showListeningOverlay = listeningActive && !listeningOverlayDismissed;
 
   useEffect(() => {
@@ -529,7 +533,8 @@ const CanvasSurface = memo(function CanvasSurface({
             nodes={nodes}
             edges={edges}
             running={running}
-            webhookListening={webhookListening}
+            webhookListening={webhookListening && !chatListening}
+            chatListening={chatListening}
             onExecuteTriggerNode={onExecuteTriggerNode}
           />
         ) : null}

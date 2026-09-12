@@ -8,6 +8,7 @@ const definition: WorkflowDefinition = {
     { id: 'manual', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'manual' } },
     { id: 'webhook', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'webhook' } },
     { id: 'form', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'form' } },
+    { id: 'chat', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'chat' } },
     { id: 'schedule', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'schedule' } },
   ],
   edges: [],
@@ -32,6 +33,9 @@ describe('entryNodeIdsForTrigger', () => {
     expect(
       entryNodeIdsForTrigger({ type: 'form', nodeId: 'form' }, definition),
     ).toEqual(['form']);
+    expect(
+      entryNodeIdsForTrigger({ type: 'chat', nodeId: 'chat' }, definition),
+    ).toEqual(['chat']);
   });
 
   it('falls back to schedule nodes when a legacy cron row has no nodeId', () => {
