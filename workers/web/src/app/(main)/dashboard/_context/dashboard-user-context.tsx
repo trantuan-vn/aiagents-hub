@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { User } from "@/data/users";
+import { writeLastLoginEmail } from "@/lib/last-login-email";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -34,6 +35,10 @@ export function DashboardUserProvider({ user: initialUser, children }: { user: U
   React.useEffect(() => {
     setUser(initialUser);
   }, [initialUser]);
+
+  React.useEffect(() => {
+    writeLastLoginEmail(user?.identifier);
+  }, [user?.identifier]);
 
   const refreshUser = React.useCallback(async () => {
     const requiresStrongAuthSetup = await fetchRequiresStrongAuthSetup();

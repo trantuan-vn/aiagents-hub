@@ -21,6 +21,7 @@ import { FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/comp
 import { Input } from "@/components/ui/input";
 import { formatAuthApiErrorMessage } from "@/lib/auth-api-error";
 import { buildAuthClientHeaders } from "@/lib/auth-client-headers";
+import { readLastLoginEmail, writeLastLoginEmail } from "@/lib/last-login-email";
 
 type AuthOptionsJSON = Parameters<typeof startAuthentication>[0];
 
@@ -401,6 +402,21 @@ export function LoginForm() {
     mode: "onChange",
   });
 
+  const finishLogin = useCallback(
+    (emailValue?: string) => {
+      writeLastLoginEmail(emailValue || identifier || form.getValues("email"));
+      form.reset();
+      navigateAfterLogin();
+    },
+    [form, identifier, navigateAfterLogin],
+  );
+
+  useEffect(() => {
+    const lastEmail = readLastLoginEmail();
+    if (!lastEmail || form.getValues("email")) return;
+    form.setValue("email", lastEmail, { shouldValidate: true, shouldDirty: false });
+  }, [form]);
+
   useEffect(() => {
     return () => {
       isMounted.current = false;
@@ -519,8 +535,7 @@ export function LoginForm() {
         }
         if (!verifyData.ok) throw new Error(t("passkey_error"));
 
-        form.reset();
-        navigateAfterLogin();
+        finishLogin(email);
       } catch (error) {
         if (isMounted.current) {
           const msg = error instanceof Error ? error.message : t("passkey_error");
@@ -538,7 +553,7 @@ export function LoginForm() {
         }
       }
     },
-    [form, passkeySupported, router, t],
+    [finishLogin, form, passkeySupported, t],
   );
 
   const handleOtpVerify = useCallback(
@@ -577,8 +592,7 @@ export function LoginForm() {
           toast.success(t("sms_required"));
         } else if (response.ok) {
           setShowOtpPopup(false);
-          form.reset();
-          navigateAfterLogin();
+          finishLogin(identifier);
         } else {
           throw new Error(
             formatAuthApiErrorMessage(data, t("otp_verify_error"), t, response.status),
@@ -590,7 +604,7 @@ export function LoginForm() {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [identifier, form, refFromUrl, router, t],
+    [finishLogin, identifier, refFromUrl, t],
   );
 
   const handleSmsVerify = useCallback(
@@ -612,15 +626,14 @@ export function LoginForm() {
           throw new Error(formatAuthApiErrorMessage(err, t("sms_verify_error"), t, response.status));
         }
         setShowSmsPopup(false);
-        form.reset();
-        navigateAfterLogin();
+        finishLogin(identifier);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("sms_verify_error"));
       } finally {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [form, router, t],
+    [finishLogin, identifier, t],
   );
 
   const handleTotpVerify = useCallback(
@@ -642,15 +655,14 @@ export function LoginForm() {
           throw new Error(formatAuthApiErrorMessage(err, t("totp_verify_error"), t, response.status));
         }
         setShowTotpPopup(false);
-        form.reset();
-        navigateAfterLogin();
+        finishLogin(identifier);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("totp_verify_error"));
       } finally {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [form, router, t],
+    [finishLogin, identifier, t],
   );
 
   const handleBackupCodeVerify = useCallback(async () => {
@@ -675,14 +687,13 @@ export function LoginForm() {
       setShowTotpPopup(false);
       setShowSmsPopup(false);
       setBackupCode("");
-      form.reset();
-      navigateAfterLogin();
+      finishLogin(identifier);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
     } finally {
       if (isMounted.current) setIsLoading(false);
     }
-  }, [backupCode, form, router, t]);
+  }, [backupCode, finishLogin, identifier, t]);
 
   const handleUseBackupCode = useCallback(() => {
     setShowTotpPopup(false);
@@ -735,15 +746,14 @@ export function LoginForm() {
         await captcha.onRequestSuccess();
         setShowRecoverSection(false);
         setRecoverBackupCode("");
-        form.reset();
-        navigateAfterLogin();
+        finishLogin(email);
       } catch (error) {
         toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
       } finally {
         if (isMounted.current) setIsLoading(false);
       }
     },
-    [recoverBackupCode, form, router, t, captcha],
+    [recoverBackupCode, finishLogin, form, t, captcha],
   );
 
   const onSubmit = useCallback(
@@ -825,9 +835,12 @@ export function LoginForm() {
                   id="email"
                   type="email"
                   placeholder={t("email_placeholder")}
-                  autoComplete="email webauthn"
                   aria-required="true"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   {...field}
+                  autoComplete="username"
                 />
               </FormControl>
               <FormMessage />
