@@ -1,5 +1,7 @@
-import { stepCountIs, streamText } from 'ai';
+import { generateText, stepCountIs } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
+
+import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
 
 import { interpolate } from '../../execution/node-runtime.js';
 import {
@@ -59,7 +61,7 @@ function resolveMaxTokens(
   return Number(raw) || fallback;
 }
 
-/** Embedding models cannot be used with streamText / chat completions. */
+/** Embedding models cannot be used with generateText / chat completions. */
 function assertTextGenerationModel(modelId: string): void {
   const id = modelId.toLowerCase();
   if (id.includes('bge') || id.includes('embed')) {
@@ -230,26 +232,27 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
 
   if (useToolLoop && ctx.c.env.AI) {
-    const workersAI = createWorkersAI({
-      binding: ctx.c.env.AI,
-      gateway: { id: 'unitoken' },
+    const result = await withAiCapacityRetry(async () => {
+      const workersAI = createWorkersAI({
+        binding: ctx.c.env.AI,
+        gateway: WORKERS_AI_GATEWAY,
+      });
+      return generateText({
+        model: workersAI(modelId as never),
+        system: systemParts.join('\n\n'),
+        messages: [{ role: 'user', content: userText }],
+        maxOutputTokens: maxTokens,
+        temperature: modelParams.temperature as number | undefined,
+        topP: modelParams.top_p as number | undefined,
+        frequencyPenalty: modelParams.frequency_penalty as number | undefined,
+        presencePenalty: modelParams.presence_penalty as number | undefined,
+        tools,
+        stopWhen: stepCountIs(5),
+      });
     });
 
-    const result = streamText({
-      model: workersAI(modelId as never),
-      system: systemParts.join('\n\n'),
-      messages: [{ role: 'user', content: userText }],
-      maxOutputTokens: maxTokens,
-      temperature: modelParams.temperature as number | undefined,
-      topP: modelParams.top_p as number | undefined,
-      frequencyPenalty: modelParams.frequency_penalty as number | undefined,
-      presencePenalty: modelParams.presence_penalty as number | undefined,
-      tools,
-      stopWhen: stepCountIs(5),
-    });
-
-    const text = await result.text;
-    const usage = await result.usage;
+    const text = result.text;
+    const usage = result.totalUsage ?? result.usage;
 
     const costVnd = await billAgentUsage(
       ctx.c.env,

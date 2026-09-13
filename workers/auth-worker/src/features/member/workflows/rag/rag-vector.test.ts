@@ -11,6 +11,7 @@ import {
   toVectorizeNativeNamespace,
 } from './rag-vector.js';
 import { chunkText } from '../nodes/tool/save-rag/chunk.js';
+import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 describe('rag-vector', () => {
   it('buildMetadataFilter includes namespace and docType', () => {
@@ -30,7 +31,11 @@ describe('rag-vector', () => {
 
     const vector = await embedText(env, 'hello world', DEFAULT_EMBED_MODEL);
     expect(vector).toEqual([0.1, 0.2, 0.3]);
-    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: 'hello world' }, { gateway: { id: 'unitoken' } });
+    expect(env.AI.run).toHaveBeenCalledWith(
+      DEFAULT_EMBED_MODEL,
+      { text: 'hello world' },
+      { gateway: WORKERS_AI_GATEWAY },
+    );
   });
 
   it('embedTexts batches multiple strings in one AI call', async () => {
@@ -51,7 +56,11 @@ describe('rag-vector', () => {
       [0.3, 0.4],
     ]);
     expect(env.AI.run).toHaveBeenCalledTimes(1);
-    expect(env.AI.run).toHaveBeenCalledWith(DEFAULT_EMBED_MODEL, { text: ['alpha', 'beta'] }, { gateway: { id: 'unitoken' } });
+    expect(env.AI.run).toHaveBeenCalledWith(
+      DEFAULT_EMBED_MODEL,
+      { text: ['alpha', 'beta'] },
+      { gateway: WORKERS_AI_GATEWAY },
+    );
   });
 
   it('captures usage from the AI Gateway embed response', async () => {
@@ -180,6 +189,27 @@ describe('rag-vector', () => {
     const vectors = upsert.mock.calls[0]?.[0] as Array<{ namespace?: string }>;
     expect(vectors[0]?.namespace).toBe('kb');
     expect(vectors[1]?.namespace).toBe('kb');
+  });
+
+  it('retries embed on Workers AI 3040 capacity errors', async () => {
+    vi.useFakeTimers();
+    const env = {
+      AI: {
+        run: vi
+          .fn()
+          .mockRejectedValueOnce(new Error('3040: Capacity temporarily exceeded, please try again.'))
+          .mockResolvedValueOnce({ data: [[0.1, 0.2, 0.3]] }),
+      },
+    } as unknown as Env;
+
+    try {
+      const pending = embedText(env, 'hello world', DEFAULT_EMBED_MODEL);
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toEqual([0.1, 0.2, 0.3]);
+      expect(env.AI.run).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

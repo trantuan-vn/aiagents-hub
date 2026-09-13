@@ -2,11 +2,19 @@
 
 import { useEffect, useRef } from "react";
 
-import { useNodesInitialized, useReactFlow } from "@xyflow/react";
+import { useNodesInitialized, useReactFlow, useStore } from "@xyflow/react";
 
-export const WORKFLOW_FIT_VIEW_OPTIONS = { padding: 0.2, duration: 200 } as const;
+export const WORKFLOW_FIT_VIEW_OPTIONS = { padding: 0.2, duration: 200, minZoom: 0.2 } as const;
 
-/** Fit once the graph and viewport are ready — each time the editor canvas mounts. */
+const MIN_PANE_PX = 32;
+const LAYOUT_IDLE_MS = 80;
+const MAX_ATTEMPTS = 16;
+
+function hasUsableBounds(bounds: { width: number; height: number }) {
+  return Number.isFinite(bounds.width) && Number.isFinite(bounds.height) && bounds.width > 0 && bounds.height > 0;
+}
+
+/** Fit after the graph, viewport, and surrounding chrome have finished laying out. */
 export function WorkflowCanvasInitialFit({
   enabled,
   resetKey,
@@ -14,8 +22,12 @@ export function WorkflowCanvasInitialFit({
   enabled: boolean;
   resetKey?: number | string;
 }) {
-  const { fitView, viewportInitialized } = useReactFlow();
+  const rf = useReactFlow();
+  const rfRef = useRef(rf);
+  rfRef.current = rf;
   const nodesInitialized = useNodesInitialized();
+  const width = useStore((s) => s.width);
+  const height = useStore((s) => s.height);
   const didFitRef = useRef(false);
   const lastResetKeyRef = useRef(resetKey);
 
@@ -24,40 +36,48 @@ export function WorkflowCanvasInitialFit({
     didFitRef.current = false;
   }
 
+  const paneReady = width >= MIN_PANE_PX && height >= MIN_PANE_PX;
+  const viewportInitialized = rf.viewportInitialized;
+
   useEffect(() => {
-    if (!enabled || !nodesInitialized || !viewportInitialized || didFitRef.current) return;
+    if (!enabled || !paneReady || !viewportInitialized || didFitRef.current) return;
 
     let cancelled = false;
     let attempts = 0;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
-    let innerFrame = 0;
 
     const tryFit = () => {
       if (cancelled || didFitRef.current) return;
-      void Promise.resolve(fitView(WORKFLOW_FIT_VIEW_OPTIONS)).then((fitted) => {
-        if (cancelled) return;
-        if (fitted) {
-          didFitRef.current = true;
-          return;
-        }
-        if (attempts < 8) {
-          attempts += 1;
-          retryTimer = setTimeout(tryFit, 50);
-        }
-      });
+      const { getNodes, getNodesBounds, fitBounds, fitView } = rfRef.current;
+      const nodes = getNodes();
+      if (nodes.length === 0) return;
+
+      const bounds = getNodesBounds(nodes);
+      if (hasUsableBounds(bounds)) {
+        didFitRef.current = true;
+        void fitBounds(bounds, { padding: 0.2, duration: 200 });
+        return;
+      }
+
+      if (nodesInitialized) {
+        didFitRef.current = true;
+        void fitView(WORKFLOW_FIT_VIEW_OPTIONS);
+        return;
+      }
+
+      if (attempts < MAX_ATTEMPTS) {
+        attempts += 1;
+        retryTimer = setTimeout(tryFit, LAYOUT_IDLE_MS);
+      }
     };
 
-    const outerFrame = requestAnimationFrame(() => {
-      innerFrame = requestAnimationFrame(tryFit);
-    });
+    retryTimer = setTimeout(tryFit, LAYOUT_IDLE_MS);
 
     return () => {
       cancelled = true;
-      cancelAnimationFrame(outerFrame);
-      cancelAnimationFrame(innerFrame);
       if (retryTimer !== undefined) clearTimeout(retryTimer);
     };
-  }, [enabled, nodesInitialized, viewportInitialized, fitView, resetKey]);
+  }, [enabled, paneReady, viewportInitialized, nodesInitialized, resetKey]);
 
   return null;
 }

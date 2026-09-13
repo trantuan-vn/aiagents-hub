@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input";
 import { formatUsd } from "@/lib/utils";
 
 import type { AgentWorkflow } from "../../_lib/api";
-import { sharedWorkflowChatHref, sharedWorkflowViewHref } from "../../_lib/shared-workflow-utils";
+import { sharedWorkflowViewHref } from "../../_lib/shared-workflow-utils";
 
 import { StarDisplay } from "./star-display";
 import { StarRatingInput } from "./star-rating-input";
+import { WorkflowCardActions } from "./workflow-card-actions";
 
 export interface SharedWorkflowCardProps {
   wf: AgentWorkflow;
@@ -27,7 +28,6 @@ export interface SharedWorkflowCardProps {
   ratingBusy: boolean;
   onDraftChange: (value: string) => void;
   onRate: (starCount: number) => void;
-  onExecute: () => void;
   onToggleComments: () => void;
   onSubmitComment: () => void;
 }
@@ -43,7 +43,6 @@ export function SharedWorkflowCard({
   ratingBusy,
   onDraftChange,
   onRate,
-  onExecute,
   onToggleComments,
   onSubmitComment,
 }: SharedWorkflowCardProps) {
@@ -82,12 +81,7 @@ export function SharedWorkflowCard({
           <Button size="sm" variant="outline" asChild>
             <Link href={viewHref}>{t("view")}</Link>
           </Button>
-          <Button size="sm" asChild>
-            <Link href={sharedWorkflowChatHref(wf)}>{t("open_chat")}</Link>
-          </Button>
-          <Button size="sm" variant="outline" onClick={onExecute}>
-            {t("execute")}
-          </Button>
+          <WorkflowCardActions wf={wf} ownerId={wf.user_id} />
           <Button size="sm" variant="outline" onClick={onToggleComments}>
             {t("comments")}
           </Button>

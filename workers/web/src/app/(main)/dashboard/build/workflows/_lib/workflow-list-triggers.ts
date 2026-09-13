@@ -2,11 +2,15 @@ import { buildChatPublicUrl, resolveChatPath } from "../_components/panels/node-
 import { buildFormPublicUrl, resolveFormPath } from "../_components/panels/node-config/form-url";
 import { buildWebhookPublicUrl, resolveWebhookPath } from "../_components/panels/node-config/webhook-url";
 
+import type { AgentWorkflow, WorkflowListTriggerSummary } from "./api";
+
 type WorkflowListNode = {
   id?: string;
   type?: string;
   data?: Record<string, unknown>;
 };
+
+export type { WorkflowListTriggerSummary };
 
 export type WorkflowListChatAction = {
   public: boolean;
@@ -66,58 +70,92 @@ function isWebhookTriggerNode(node: WorkflowListNode): boolean {
   return data.coreKind === "webhook" || data.triggerKind === "webhook" || node.type === "webhook";
 }
 
+function summarizeWorkflowListTriggers(definitionJson: string | undefined): WorkflowListTriggerSummary {
+  const nodes = parseNodes(definitionJson).filter((node) => typeof node.id === "string" && node.id);
+
+  const chats = nodes.filter(isChatNode).map((node) => {
+    const data = nodeData(node);
+    return {
+      public: data.chatPublic !== false,
+      path: resolveChatPath(data, String(node.id)),
+      hosted: String(data.chatMode ?? "hostedChat") !== "webhook",
+    };
+  });
+
+  return {
+    chat: chats.find((entry) => entry.public) ?? chats.at(0) ?? null,
+    forms: nodes.filter(isFormTriggerNode).map((node) => {
+      const data = nodeData(node);
+      const nodeId = String(node.id);
+      return {
+        nodeId,
+        label: nodeLabel(node, "Form"),
+        path: resolveFormPath(data, nodeId),
+      };
+    }),
+    webhooks: nodes.filter(isWebhookTriggerNode).map((node) => {
+      const data = nodeData(node);
+      const nodeId = String(node.id);
+      return {
+        nodeId,
+        label: nodeLabel(node, "Webhook"),
+        path: resolveWebhookPath(data, nodeId),
+      };
+    }),
+  };
+}
+
+export function hydrateWorkflowListTriggerActions(
+  summary: WorkflowListTriggerSummary,
+  params: { workflowId: number; ownerId?: string },
+): WorkflowListTriggerActions {
+  const workflowId = params.workflowId;
+  const ownerId = params.ownerId;
+
+  return {
+    chat: summary.chat
+      ? {
+          public: summary.chat.public,
+          url: buildChatPublicUrl({
+            workflowId,
+            chatPath: summary.chat.path,
+            mode: "production",
+            ownerId,
+            hosted: summary.chat.hosted,
+          }),
+        }
+      : null,
+    forms: summary.forms.map((form) => ({
+      nodeId: form.nodeId,
+      label: form.label,
+      url: buildFormPublicUrl({
+        workflowId,
+        formPath: form.path,
+        mode: "production",
+        ownerId,
+      }),
+    })),
+    webhooks: summary.webhooks.map((webhook) => ({
+      nodeId: webhook.nodeId,
+      label: webhook.label,
+      path: webhook.path,
+      url: buildWebhookPublicUrl({ workflowId, webhookPath: webhook.path }),
+    })),
+  };
+}
+
 export function parseWorkflowListTriggerActions(
   definitionJson: string | undefined,
   params: { workflowId: number; ownerId?: string },
 ): WorkflowListTriggerActions {
-  const nodes = parseNodes(definitionJson).filter((node) => typeof node.id === "string" && node.id);
-  const workflowId = params.workflowId;
-  const ownerId = params.ownerId;
+  return hydrateWorkflowListTriggerActions(summarizeWorkflowListTriggers(definitionJson), params);
+}
 
-  const chats = nodes.filter(isChatNode).map((node) => {
-    const data = nodeData(node);
-    const chatPath = resolveChatPath(data, String(node.id));
-    const chatPublic = data.chatPublic !== false;
-    const hosted = String(data.chatMode ?? "hostedChat") !== "webhook";
-    return {
-      public: chatPublic,
-      url: buildChatPublicUrl({
-        workflowId,
-        chatPath,
-        mode: "production",
-        ownerId,
-        hosted,
-      }),
-    };
-  });
-  const chat = chats.find((entry) => entry.public) ?? chats.at(0) ?? null;
-
-  const forms = nodes.filter(isFormTriggerNode).map((node) => {
-    const data = nodeData(node);
-    const nodeId = String(node.id);
-    return {
-      nodeId,
-      label: nodeLabel(node, "Form"),
-      url: buildFormPublicUrl({
-        workflowId,
-        formPath: resolveFormPath(data, nodeId),
-        mode: "production",
-        ownerId,
-      }),
-    };
-  });
-
-  const webhooks = nodes.filter(isWebhookTriggerNode).map((node) => {
-    const data = nodeData(node);
-    const nodeId = String(node.id);
-    const path = resolveWebhookPath(data, nodeId);
-    return {
-      nodeId,
-      label: nodeLabel(node, "Webhook"),
-      path,
-      url: buildWebhookPublicUrl({ workflowId, webhookPath: path }),
-    };
-  });
-
-  return { chat, forms, webhooks };
+export function resolveWorkflowListTriggerActions(
+  wf: Pick<AgentWorkflow, "id" | "definition" | "triggers">,
+  ownerId?: string,
+): WorkflowListTriggerActions {
+  const params = { workflowId: wf.id ?? 0, ownerId };
+  if (wf.triggers) return hydrateWorkflowListTriggerActions(wf.triggers, params);
+  return parseWorkflowListTriggerActions(wf.definition, params);
 }

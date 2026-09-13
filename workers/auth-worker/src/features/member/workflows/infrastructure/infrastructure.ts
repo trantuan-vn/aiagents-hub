@@ -1,3 +1,8 @@
+import {
+  summarizeWorkflowListTriggers,
+  type SharedWorkflowTriggerSummary,
+} from './list-trigger-summary.js';
+
 export interface SharedWorkflowFilters {
   limit?: number;
   offset?: number;
@@ -25,6 +30,8 @@ export interface SharedWorkflowRow {
   communityStarAvg?: number;
   /** Number of users who rated this workflow. */
   communityStarCount?: number;
+  /** Compact trigger metadata for list-page Open chat / Execute buttons. */
+  triggers?: SharedWorkflowTriggerSummary;
 }
 
 export interface WorkflowCommunityStarStats {
@@ -77,7 +84,7 @@ export async function listSharedWorkflowsFromD1(
   }
 
   const whereClause = conditions.join(' AND ');
-  const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.isShared, w.starCount, w.starLabel,
+  const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.definition, w.isShared, w.starCount, w.starLabel,
       w.usageCount, w.totalEarningsUsd, w.status, w.created_at,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
       COALESCE(star_stats.rater_count, 0) AS communityStarCount
@@ -96,7 +103,11 @@ export async function listSharedWorkflowsFromD1(
   const result = await db.prepare(sql).bind(...params).all<SharedWorkflowRow>();
   const rows = result.results ?? [];
   const hasMore = rows.length > limit;
-  return { workflows: rows.slice(0, limit), hasMore };
+  const workflows = rows.slice(0, limit).map(({ definition, ...rest }) => ({
+    ...rest,
+    triggers: summarizeWorkflowListTriggers(definition),
+  }));
+  return { workflows, hasMore };
 }
 
 export interface WorkflowUserStarRow {

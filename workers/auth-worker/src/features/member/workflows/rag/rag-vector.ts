@@ -6,9 +6,13 @@ import {
   mergeAiUsage,
   type AiUsage,
 } from '../../../admin/service/pricing.js';
+import {
+  isAiCapacityError,
+  withAiCapacityRetry,
+  WORKERS_AI_GATEWAY,
+} from '../ai/workers-ai.js';
 
 export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
-const AI_GATEWAY_ID = 'unitoken';
 
 export type VectorMatch = {
   id?: string;
@@ -55,7 +59,9 @@ export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBi
 }
 
 async function runEmbed(env: Env, modelId: string, text: string | string[]): Promise<unknown> {
-  return env.AI.run(modelId as keyof AiModels, { text }, { gateway: { id: AI_GATEWAY_ID } });
+  return withAiCapacityRetry(() =>
+    env.AI.run(modelId as keyof AiModels, { text }, { gateway: WORKERS_AI_GATEWAY }),
+  );
 }
 
 function vectorsFromAiData(data: unknown, expected: number): number[][] {
@@ -131,7 +137,8 @@ export async function embedTextsWithUsage(
         const usage = extractUsageFromAiResponse(embed);
         if (usage) usages.push(usage);
       }
-    } catch {
+    } catch (e) {
+      if (isAiCapacityError(e)) throw e;
       /* batch unsupported — fall through */
     }
     const mapped = new Array<number[]>(slice.length).fill([]);

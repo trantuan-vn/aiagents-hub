@@ -74,7 +74,7 @@ export function WorkflowVersionsPanel({ workflowId, onApplyDefinition }: Workflo
     setBusy(true);
     try {
       const res = await restoreWorkflowVersion(workflowId, version.versionKey);
-      onApplyDefinition?.(res.workflow.definition);
+      onApplyDefinition?.(res.workflow.definition ?? '{"nodes":[],"edges":[]}');
       toast.success(t("versions_restore_done", { version: version.version }));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("versions_restore_error"));

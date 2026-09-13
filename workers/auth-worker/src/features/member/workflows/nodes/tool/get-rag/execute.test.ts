@@ -4,6 +4,7 @@ import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
 import { toVectorizeNativeNamespace } from '../../../rag/index.js';
+import { WORKERS_AI_GATEWAY } from '../../../ai/workers-ai.js';
 
 const billingMock = vi.hoisted(() => ({
   resolveServiceByEndpoint: vi.fn(),
@@ -137,7 +138,7 @@ describe('executeGetRag', () => {
     expect(aiRun).toHaveBeenCalledWith(
       '@cf/baai/bge-large-en-v1.5',
       { text: 'what is RAG?' },
-      { gateway: { id: 'unitoken' } },
+      { gateway: WORKERS_AI_GATEWAY },
     );
   });
 
@@ -300,7 +301,7 @@ describe('executeGetRag', () => {
     expect(aiRun).toHaveBeenCalledWith(
       '@cf/baai/bge-large-en-v1.5',
       { text: 'orders last month' },
-      { gateway: { id: 'unitoken' } },
+      { gateway: WORKERS_AI_GATEWAY },
     );
     expect(query).toHaveBeenCalledWith(
       [0.1, 0.2],

@@ -6,8 +6,8 @@ import {
   roundUsdAmount,
 } from '../../../admin/service/pricing.js';
 import { recordWorkflowRoyalty } from './royalty.js';
+import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
-const AI_GATEWAY_ID = 'unitoken';
 const DEFAULT_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
 export interface BillAgentUsageOptions {
@@ -198,10 +198,12 @@ export async function runTextModel(
   const id = (modelId || DEFAULT_TEXT_MODEL) as keyof AiModels;
 
   const run = () =>
-    env.AI.run(
-      id,
-      { messages, max_tokens: maxTokens, ...extra },
-      { gateway: { id: AI_GATEWAY_ID } },
+    withAiCapacityRetry(() =>
+      env.AI.run(
+        id,
+        { messages, max_tokens: maxTokens, ...extra },
+        { gateway: WORKERS_AI_GATEWAY },
+      ),
     );
 
   try {

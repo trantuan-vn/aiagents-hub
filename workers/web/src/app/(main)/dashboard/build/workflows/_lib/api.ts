@@ -13,13 +13,21 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface WorkflowListTriggerSummary {
+  chat: { public: boolean; path: string; hosted: boolean } | null;
+  forms: Array<{ nodeId: string; label: string; path: string }>;
+  webhooks: Array<{ nodeId: string; label: string; path: string }>;
+}
+
 export interface AgentWorkflow {
   id?: number;
   name: string;
   description?: string;
   /** JSON string array of tag labels. */
   tags?: string;
-  definition: string;
+  definition?: string;
+  /** Compact trigger metadata from the shared list API (no full graph). */
+  triggers?: WorkflowListTriggerSummary;
   isShared?: boolean;
   starCount?: number;
   starLabel?: string;

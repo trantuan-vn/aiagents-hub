@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 import type { AgentWorkflow } from "../../_lib/api";
 import {
-  parseWorkflowListTriggerActions,
+  resolveWorkflowListTriggerActions,
   type WorkflowListFormAction,
   type WorkflowListWebhookAction,
 } from "../../_lib/workflow-list-triggers";
@@ -106,20 +106,19 @@ function WorkflowOpenChatButton({ publicChat, url }: { publicChat: boolean; url:
 
 interface WorkflowCardActionsProps {
   wf: AgentWorkflow;
+  /** Workflow owner — required for shared/community cards so public URLs resolve. */
+  ownerId?: string;
 }
 
-export function WorkflowCardActions({ wf }: WorkflowCardActionsProps) {
+export function WorkflowCardActions({ wf, ownerId }: WorkflowCardActionsProps) {
   const user = useDashboardUser();
-  const ownerId = user?.clientId ?? user?.id;
+  const callerId = user?.clientId ?? user?.id;
+  const urlOwnerId = ownerId ?? callerId;
   const [webhookOpen, setWebhookOpen] = useState(false);
 
   const actions = useMemo(
-    () =>
-      parseWorkflowListTriggerActions(wf.definition, {
-        workflowId: wf.id ?? 0,
-        ownerId,
-      }),
-    [ownerId, wf.definition, wf.id],
+    () => resolveWorkflowListTriggerActions(wf, urlOwnerId),
+    [urlOwnerId, wf.definition, wf.id, wf.triggers],
   );
 
   const form = actions.forms.at(0);
@@ -131,7 +130,7 @@ export function WorkflowCardActions({ wf }: WorkflowCardActionsProps) {
       {actions.chat ? <WorkflowOpenChatButton publicChat={actions.chat.public} url={actions.chat.url} /> : null}
       <WorkflowWebhookIntegrateDialog
         webhook={webhook ?? null}
-        clientId={ownerId}
+        clientId={callerId}
         open={webhookOpen}
         onOpenChange={setWebhookOpen}
       />

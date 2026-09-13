@@ -61,8 +61,6 @@ interface WorkflowCanvasProps {
 }
 
 const READONLY_FLOW_PROPS = {
-  onNodesChange: undefined,
-  onEdgesChange: undefined,
   onConnect: undefined,
   onNodeDragStop: undefined,
   onNodesDelete: undefined,
@@ -111,7 +109,12 @@ function CanvasInner({
   const interactionProps = useMemo(
     () =>
       readOnly
-        ? READONLY_FLOW_PROPS
+        ? {
+            ...READONLY_FLOW_PROPS,
+            // Keep change handlers so React Flow can flush fitView / node measurements.
+            onNodesChange,
+            onEdgesChange,
+          }
         : {
             onNodesChange,
             onEdgesChange,
@@ -506,6 +509,8 @@ const CanvasSurface = memo(function CanvasSurface({
         connectionRadius={28}
         connectionMode={ConnectionMode.Loose}
         proOptions={{ hideAttribution: true }}
+        minZoom={0.2}
+        maxZoom={2}
         panOnScroll
         onPaneClick={onPaneClick}
         onNodeClick={onNodeClick}
@@ -513,7 +518,10 @@ const CanvasSurface = memo(function CanvasSurface({
         onNodeDoubleClick={onNodeDoubleClick}
         {...interactionProps}
       >
-        <WorkflowCanvasInitialFit enabled={nodes.length > 0} resetKey={workflowId} />
+        <WorkflowCanvasInitialFit
+          enabled={nodes.length > 0}
+          resetKey={`${workflowId ?? ""}:${readOnly ? "view" : "edit"}`}
+        />
         <WorkflowEdgeMarkers />
         <Background gap={20} size={1} />
         <WorkflowCanvasTidyBridge

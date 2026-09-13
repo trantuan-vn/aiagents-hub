@@ -19,6 +19,7 @@ import {
 } from '../billing/billing.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { findPrimaryAgentNode, workflowAttribution } from '../execution/workflow-context.js';
+import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 function extractLatestUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -63,7 +64,7 @@ export async function createWorkflowChatStreamResponse(
 
   const workersAI = createWorkersAI({
     binding: c.env.AI,
-    gateway: { id: 'unitoken' },
+    gateway: WORKERS_AI_GATEWAY,
   });
 
   const wfName = String(resolved.workflow.name ?? 'Workflow');

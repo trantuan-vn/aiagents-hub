@@ -19,7 +19,6 @@ import {
 import { workflowKey } from "../../_lib/shared-workflow-utils";
 
 import { SharedWorkflowCard } from "./shared-workflow-card";
-import { WorkflowExecuteDialog } from "../panels/workflow-panels/workflow-execute-dialog";
 
 async function fetchMyStarsForWorkflows(workflows: AgentWorkflow[]): Promise<Map<string, number>> {
   const entries = await Promise.all(
@@ -43,7 +42,6 @@ export function SharedWorkflowsTab() {
   const [search, setSearch] = useState("");
   const [starFilter, setStarFilter] = useState<number | undefined>();
   const [loading, setLoading] = useState(true);
-  const [executeTarget, setExecuteTarget] = useState<{ id: number; ownerId: string } | null>(null);
   const [commentDraft, setCommentDraft] = useState<Map<string, string>>(() => new Map());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [comments, setComments] = useState<Map<string, Record<string, unknown>[]>>(() => new Map());
@@ -111,12 +109,6 @@ export function SharedWorkflowsTab() {
 
   return (
     <div className="space-y-4">
-      <WorkflowExecuteDialog
-        workflowId={executeTarget?.id ?? 0}
-        ownerId={executeTarget?.ownerId}
-        open={executeTarget != null}
-        onOpenChange={(open) => !open && setExecuteTarget(null)}
-      />
       <div className="flex flex-wrap gap-2">
         <Input
           placeholder={t("search")}
@@ -161,7 +153,6 @@ export function SharedWorkflowsTab() {
                 ratingBusy={ratingBusy === k}
                 onDraftChange={(value) => setCommentDraft((prev) => new Map(prev).set(k, value))}
                 onRate={(n) => void rateWorkflow(wf, n)}
-                onExecute={() => wf.id && wf.user_id && setExecuteTarget({ id: wf.id, ownerId: wf.user_id })}
                 onToggleComments={() => void loadCommentsFor(wf)}
                 onSubmitComment={() => void submitComment(wf)}
               />
