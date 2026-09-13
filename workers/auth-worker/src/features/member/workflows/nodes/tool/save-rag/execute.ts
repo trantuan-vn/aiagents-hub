@@ -14,7 +14,7 @@ import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { introspectTablesToRagDocuments } from '../get-db-info/execute.js';
 import { resolveOracleConnectConfig } from '../get-db-info/connect-config.js';
-import { pipelineItems, resolvePipelineField, stringifyUnknown } from '../shared/pipeline.js';
+import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 import { chunkText } from './chunk.js';
 
 export type SaveRagChunkInput = {
@@ -215,13 +215,6 @@ export async function executeSaveRag(params: SaveRagExecuteParams): Promise<Save
   );
 }
 
-function isTableLoopItem(item: Record<string, unknown>, tableName = ''): boolean {
-  const name = tableName || String(item.tableName ?? item.table_name ?? '').trim();
-  if (!name) return false;
-  const content = String(item.content ?? item.text ?? item.ddl ?? '').trim();
-  return !content;
-}
-
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -232,29 +225,14 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
 }
 
-function findGetDbInfoNodeId(definition: WorkflowDefinition): string | undefined {
-  return definition.nodes.find((n) => {
-    if (n.type !== 'tool_node') return false;
-    return String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-db-info';
-  })?.id;
-}
-
-/** Loop items are table names only; Oracle/D1 connection comes from Get DB Info / form output. */
+/** Loop output (current item + forwarded predecessor fields) is the only input. */
 function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>): Record<string, unknown> {
-  const dbInfoId = findGetDbInfoNodeId(ctx.definition);
-  const merged: Record<string, unknown> = {};
-  for (const [id, out] of Object.entries(ctx.outputs)) {
-    if (id === dbInfoId) continue;
-    Object.assign(merged, asRecord(out));
-  }
-  if (dbInfoId) Object.assign(merged, asRecord(ctx.outputs[dbInfoId]));
-  Object.assign(merged, asRecord(ctx.nodeInput));
-  const firstPipelineItem = pipelineItems(ctx.nodeInput)[0];
-  if (firstPipelineItem) Object.assign(merged, firstPipelineItem);
-  Object.assign(merged, item);
-
-  const tableName = String(item.tableName ?? item.table_name ?? merged.tableName ?? '').trim();
-  const schemaName = String(item.schemaName ?? item.schema_name ?? merged.schemaName ?? '');
+  const merged: Record<string, unknown> = {
+    ...asRecord(ctx.nodeInput),
+    ...item,
+  };
+  const tableName = String(item.tableName ?? merged.tableName ?? '').trim();
+  const schemaName = String(item.schemaName ?? merged.schemaName ?? '');
   const connection = {
     ...asRecord(merged.connection),
     ...asRecord(item.connection),
@@ -297,39 +275,19 @@ function markIndexedTables(runContext: NodeOutput, tableNames: string[]): void {
   runContext[INDEXED_TABLES_KEY] = [...next];
 }
 
-/**
- * Loop defaults to batchSize 1, so Save RAG would otherwise introspect+embed 20 times.
- * Pull remaining tables from Get DB Info and index them in this invocation.
- */
 function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): Record<string, unknown>[] {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
-  const tableItems = items
-    .map((item) => {
-      const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, [
-        'tableName',
-        'table_name',
-      ]);
-      return { ...item, ...(tableName ? { tableName } : {}) };
-    })
-    .filter((item) => isTableLoopItem(item, String(item.tableName ?? '')));
-  if (!tableItems.length) return [];
-
   const done = indexedTables(ctx.runContext);
-  const dbInfoId = findGetDbInfoNodeId(ctx.definition);
-  const dbOut = asRecord(dbInfoId ? ctx.outputs[dbInfoId] : {});
-  const schemaName = String(
-    tableItems[0]?.schemaName ??
-      tableItems[0]?.schema_name ??
-      dbOut.schemaName ??
-      ctx.nodeInput.schemaName ??
-      '',
-  );
-  const listed = asStringArray(dbOut.tables);
-  const fromInput = asStringArray(ctx.nodeInput.tables);
-  const names = (listed.length ? listed : fromInput.length ? fromInput : null) ??
-    tableItems.map((item) => String(item.tableName ?? item.table_name ?? '').trim()).filter(Boolean);
-
-  return names.filter((tableName) => !done.has(tableName)).map((tableName) => ({ tableName, schemaName }));
+  return items
+    .map((item) => {
+      const content = resolvePipelineField(data.contentField, item, ctx.nodeInput, []);
+      if (String(content).trim()) return null;
+      const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, []);
+      if (!tableName.trim()) return null;
+      return { ...item, tableName, schemaName: String(item.schemaName ?? ctx.nodeInput.schemaName ?? '') };
+    })
+    .filter((item): item is Record<string, unknown> => item != null)
+    .filter((item) => !done.has(String(item.tableName ?? '')));
 }
 
 async function saveDocuments(
@@ -364,16 +322,7 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
   }
 
   const pendingTables = pendingTableItems(ctx, items);
-  if (items.some((item) => isTableLoopItem(item, String(item.tableName ?? item.table_name ?? ''))) && !pendingTables.length) {
-    return {
-      ok: true,
-      saved: 0,
-      skipped: true,
-      reason: 'tables already indexed this run',
-      items: [],
-      documentIds: [],
-    };
-  }
+  const tableNameSet = new Set(pendingTables.map((item) => String(item.tableName ?? '')));
 
   const results: SaveRagResult[] = [];
   const usages: AiUsage[] = [];
@@ -382,7 +331,7 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     const docs = await introspectTablesToRagDocuments({
       env: ctx.c.env,
       definition: ctx.definition,
-      agentId: findGetDbInfoNodeId(ctx.definition) ?? ctx.node.id,
+      agentId: ctx.node.id,
       triggerContext: triggerContextForTable(ctx, pendingTables[0]!),
       tables: pendingTables.map((item) => ({
         tableName: String(item.tableName ?? ''),
@@ -398,18 +347,15 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     );
   }
 
-  const contentItems = items.filter(
-    (item) => !isTableLoopItem(item, String(item.tableName ?? item.table_name ?? '')),
-  );
   const contentDocs: Array<{ content: string; documentId: string; source: string; metadata: Record<string, string> }> =
     [];
-  for (const item of contentItems) {
-    const content =
-      resolvePipelineField(data.contentField, item, ctx.nodeInput, ['content', 'text', 'ddl']) ||
-      stringifyUnknown(item.content ?? item.text ?? item);
+  for (const item of items) {
+    const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, []);
+    if (tableNameSet.has(tableName) || indexedTables(ctx.runContext).has(tableName)) continue;
+    const content = resolvePipelineField(data.contentField, item, ctx.nodeInput, []);
     if (!String(content).trim()) continue;
-    const documentId = resolvePipelineField(data.documentIdField, item, ctx.nodeInput, ['documentId', 'id']);
-    const source = resolvePipelineField(data.sourceField, item, ctx.nodeInput, ['source']);
+    const documentId = resolvePipelineField(data.documentIdField, item, ctx.nodeInput, []);
+    const source = resolvePipelineField(data.sourceField, item, ctx.nodeInput, []);
     contentDocs.push({
       content,
       documentId: documentId || crypto.randomUUID(),

@@ -7,6 +7,14 @@ export * from "./registry/resolve";
 export * from "./nodes";
 export * from "./catalog";
 export {
+  ExpressionError,
+  evaluateExpression,
+  interpolate,
+  interpolateDeep,
+  parseExpression,
+  type ExpressionScope,
+} from "./expression";
+export {
   defaultInputSection,
   defaultOutputSection,
   defaultParametersSection,

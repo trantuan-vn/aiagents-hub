@@ -146,15 +146,6 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
   }
 }
 
-function questionFromRecord(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value.trim();
-  if (typeof value !== 'object' || Array.isArray(value)) return '';
-  const rec = value as Record<string, unknown>;
-  const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text ?? rec.message;
-  return q != null ? String(q).trim() : '';
-}
-
 function queryFromInput(ctx: NodeContext): string {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const items = pipelineItems(ctx.nodeInput);
@@ -162,29 +153,6 @@ function queryFromInput(ctx: NodeContext): string {
 
   const fromField = resolvePipelineField(data.queryField, item, ctx.nodeInput, []);
   if (fromField.trim() && fromField !== '[object Object]') return fromField.trim();
-
-  const fromBody = questionFromRecord(ctx.nodeInput.body ?? item.body);
-  if (fromBody) return fromBody;
-
-  const fromFallback = resolvePipelineField(undefined, item, ctx.nodeInput, [
-    'question',
-    'prompt',
-    'text',
-  ]);
-  if (fromFallback.trim() && fromFallback !== '[object Object]') return fromFallback.trim();
-
-  if (typeof item.question === 'string' && item.question.trim()) return item.question.trim();
-
-  const raw = String(ctx.input ?? '').trim();
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      const fromJson = questionFromRecord(parsed);
-      if (fromJson) return fromJson;
-    } catch {
-      return raw;
-    }
-  }
   return '';
 }
 

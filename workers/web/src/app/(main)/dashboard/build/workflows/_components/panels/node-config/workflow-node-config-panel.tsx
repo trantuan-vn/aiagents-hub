@@ -161,6 +161,8 @@ export function WorkflowNodeConfigPanel({
     return te("loop_no_loop_output_connected");
   }, [kind, node, edges, te]);
 
+  const loopItemsUnmapped = kind === "loop_over_items" && !String(nodeData.itemsField ?? "").trim();
+
   if (!node || (!definition && !n8nDescription)) return null;
 
   warnLegacyRuntimeType(node);
@@ -221,6 +223,11 @@ export function WorkflowNodeConfigPanel({
               </TabsList>
               <TabsContent value="parameters" className="mt-0">
                 <div className="max-h-[calc(100vh-12rem)] space-y-4 overflow-y-auto p-3">
+                  {loopItemsUnmapped ? (
+                    <p className="rounded-md border border-[#ff6f00]/40 bg-orange-500/5 px-2 py-1.5 text-[11px] leading-snug text-[#c2410c]">
+                      {te("loop_items_field_unmapped")}
+                    </p>
+                  ) : null}
                   {onExecuteStep ? (
                     <WorkflowExecuteStepButton
                       nodeId={node.id}
@@ -265,6 +272,7 @@ export function WorkflowNodeConfigPanel({
             onUnpinOutput={() => onPatchData(node.id, { _output: undefined, _outputPinned: false })}
             onExecute={outputSection.showExecuteStep && onExecuteStep ? () => onExecuteStep(node.id) : undefined}
             executeNodeId={node.id}
+            node={node}
             headerExtra={
               loopOutputWarning ? (
                 <p className="text-muted-foreground text-[11px] leading-snug">{loopOutputWarning}</p>

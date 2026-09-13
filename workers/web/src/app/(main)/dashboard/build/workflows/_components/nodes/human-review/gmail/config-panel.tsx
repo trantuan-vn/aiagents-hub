@@ -390,6 +390,7 @@ export function GmailHumanReviewConfigPanel({
           onUnpinOutput={() => onPatchData(node.id, { _output: undefined, _outputPinned: false })}
           onExecute={onExecuteStep ? () => onExecuteStep(node.id) : undefined}
           executeNodeId={node.id}
+          node={node}
         />
       </div>
 

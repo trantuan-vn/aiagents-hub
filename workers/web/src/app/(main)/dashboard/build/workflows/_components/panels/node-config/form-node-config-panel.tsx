@@ -584,6 +584,7 @@ export function FormNodeConfigPanel({
             executeNodeId={node.id}
             executeLabel={t("webhook_test_trigger")}
             emptyLabel={t("webhook_no_trigger_output")}
+            node={node}
           />
         </div>
       </div>

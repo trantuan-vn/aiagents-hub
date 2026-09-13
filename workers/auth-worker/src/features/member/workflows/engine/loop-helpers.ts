@@ -34,23 +34,14 @@ export function chunkArray<T>(items: T[], batchSize: number): T[][] {
   return batches;
 }
 
-/** Extract iterable items from upstream node output (n8n item-list shape). */
+/** Extract iterable items from the mapped itemsField expression only. */
 export function extractLoopItems(input: NodeOutput, itemsField?: unknown): unknown[] {
   const expr = String(itemsField ?? '').trim();
-  if (expr) {
-    const resolved = expr.includes('{{')
-      ? interpolate(expr, { ...input, $json: input })
-      : input[expr];
-    if (Array.isArray(resolved)) return resolved;
-  }
-  if (Array.isArray(input.items)) return input.items;
-  if (Array.isArray(input.data)) return input.data;
-  if (Array.isArray(input.json)) return input.json;
-
-  const { parents, ...rest } = input;
-  if (Array.isArray(rest)) return rest;
-  if (Object.keys(rest).length > 0) return [rest];
-  return [];
+  if (!expr) return [];
+  const resolved = expr.includes('{{')
+    ? interpolate(expr, { ...input, $json: input })
+    : input[expr];
+  return Array.isArray(resolved) ? resolved : [];
 }
 
 function flattenCurrentItem(batch: unknown[]): Record<string, unknown> {
@@ -62,33 +53,10 @@ function flattenCurrentItem(batch: unknown[]): Record<string, unknown> {
   return {};
 }
 
-/** Forward DB connection fields so Loop → Save RAG still has Oracle/D1 credentials. */
+/** Forward the previous node's output (minus the iterated list) onto each loop batch. */
 export function connectionContextFromInput(input: NodeOutput): Record<string, unknown> {
-  const keys = [
-    'connection',
-    'connectionType',
-    'user',
-    'password',
-    'connectString',
-    'username',
-    'u',
-    'p',
-    'c',
-    'dbId',
-    'databaseId',
-    'schemaName',
-    'fields',
-    'credentialKey',
-    'tables',
-    'tableCount',
-    'count',
-    'limits',
-  ];
-  const out: Record<string, unknown> = {};
-  for (const key of keys) {
-    if (input[key] != null) out[key] = input[key];
-  }
-  return out;
+  const { items, parents, ...rest } = input;
+  return rest;
 }
 
 export function executeLoopOverItems(

@@ -1,4 +1,12 @@
-/** Recommended expression defaults for GENERATE SQL / GENERATE VECTOR recipes. */
+/** Recommended expression defaults. Alternate predecessors use || (JS first-truthy). */
+
+export const GET_RAG_QUERY_FIELD = "{{ $json.body.question || $json.chatInput }}";
+
+export const GET_DB_INFO_USER_FIELD = "{{ $json.u || $json.fields.u || $json.user }}";
+export const GET_DB_INFO_PASSWORD_FIELD = "{{ $json.p || $json.fields.p || $json.password }}";
+export const GET_DB_INFO_CONNECT_STRING_FIELD = "{{ $json.c || $json.fields.c || $json.connectString }}";
+
+export const LOOP_ITEMS_FIELD = "{{ $json.items }}";
 
 export const SQL_AGENT_PROMPT = `Question: {{ $json.query }}
 

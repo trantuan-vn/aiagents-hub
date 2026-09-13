@@ -1,8 +1,12 @@
+import {
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_USER_FIELD,
+} from '@aiagents-hub/workflow-nodes';
 import { toolNodeConfig } from '../shared/rag-context.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import {
   isOracleConnectionType,
-  pickUpstreamString,
   resolveOracleConnectConfig,
   resolveOracleSchema,
   type OracleConnectConfig,
@@ -196,21 +200,9 @@ export async function listDatabaseTables(
     return filterTables(tables, tableFilter);
   }
 
-  const metaDb = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
-  if (metaDb) {
-    try {
-      const { results } = await metaDb
-        .prepare(`SELECT table_name FROM workflow_db_tables WHERE db_id = ? AND schema_name = ?`)
-        .bind(connection.databaseId ?? '', schemaName)
-        .all<{ table_name: string }>();
-      const names = (results ?? []).map((r) => r.table_name);
-      if (names.length) return filterTables(names, tableFilter);
-    } catch {
-      /* table may not exist */
-    }
-  }
-
-  return filterTables([], tableFilter);
+  throw new Error(
+    'get_db_info: Oracle user, password, and connectString are required from the previous node (map u / p / c). Will not list the platform database.',
+  );
 }
 
 /** Oracle-generated objects (recycle bin, AQ, MV logs, Text indexes) include `$`. */
@@ -306,9 +298,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 function mappedFormFields(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
   const item = pipelineItems(nodeInput)[0] ?? asRecord(nodeInput);
   const mapped: Record<string, unknown> = {};
-  const user = resolvePipelineField(data.userField, item, nodeInput, []);
-  const password = resolvePipelineField(data.passwordField, item, nodeInput, []);
-  const connectString = resolvePipelineField(data.connectStringField, item, nodeInput, []);
+  const user = resolvePipelineField(data.userField || GET_DB_INFO_USER_FIELD, item, nodeInput, []);
+  const password = resolvePipelineField(data.passwordField || GET_DB_INFO_PASSWORD_FIELD, item, nodeInput, []);
+  const connectString = resolvePipelineField(
+    data.connectStringField || GET_DB_INFO_CONNECT_STRING_FIELD,
+    item,
+    nodeInput,
+    [],
+  );
   const schemaName = resolvePipelineField(data.schemaNameField, item, nodeInput, []);
   const tableName = resolvePipelineField(data.tableNameField, item, nodeInput, []);
   if (user) {
@@ -329,47 +326,31 @@ function mappedFormFields(nodeInput: NodeOutput, data: Record<string, unknown>):
 }
 
 function triggerContextFromNodeInput(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
-  const fields = asRecord(nodeInput.fields);
   const mapped = mappedFormFields(nodeInput, data);
-  const merged = { ...fields, ...nodeInput, ...mapped };
-  const oracleConfig = resolveOracleConnectConfig(merged);
-  const defaultType = oracleConfig ? 'oracle' : 'd1';
-  const connectionType = String(
-    nodeInput.connectionType ?? fields.connectionType ?? data.connectionType ?? defaultType,
-  );
-  const incomingConnection = asRecord(nodeInput.connection);
-  const tableName =
-    pickUpstreamString(merged, ['tableName', 'table_name']) || String(data.tableName ?? '');
-  const schemaName =
-    pickUpstreamString(merged, ['schemaName', 'schema_name', 'owner', 'schema']) ||
-    String(data.schemaName ?? 'public');
+  const input = asRecord(nodeInput);
+  const incomingConnection = asRecord(input.connection);
+  const oracleConfig = resolveOracleConnectConfig(mapped) ?? resolveOracleConnectConfig(input);
+  const explicitType = String(incomingConnection.type ?? input.connectionType ?? '')
+    .trim()
+    .toLowerCase();
+  const connectionType = oracleConfig ? 'oracle' : explicitType === 'd1' ? 'd1' : '';
   return {
-    ...fields,
-    ...nodeInput,
     ...mapped,
-    dbId:
-      pickUpstreamString(merged, ['dbId', 'databaseId', 'database_id']) ||
-      String(data.databaseId ?? ''),
-    databaseId:
-      pickUpstreamString(merged, ['databaseId', 'dbId', 'database_id']) ||
-      String(data.databaseId ?? ''),
-    schemaName,
-    tableName,
-    tableFilter:
-      pickUpstreamString(merged, ['tableFilter', 'table_filter']) || String(data.tableFilter ?? '*'),
+    dbId: String(mapped.dbId ?? input.dbId ?? ''),
+    databaseId: String(mapped.databaseId ?? input.databaseId ?? ''),
+    schemaName: String(mapped.schemaName ?? input.schemaName ?? ''),
+    tableName: String(mapped.tableName ?? input.tableName ?? ''),
+    tableFilter: String(mapped.tableFilter ?? input.tableFilter ?? '*'),
     connectionType,
-    credentialKey: nodeInput.credentialKey ?? fields.credentialKey ?? data.credentialKey ?? '',
     connection: {
-      type: String(incomingConnection.type ?? connectionType),
-      credentialKey: String(
-        incomingConnection.credentialKey ?? nodeInput.credentialKey ?? fields.credentialKey ?? data.credentialKey ?? '',
-      ),
-      databaseId: String(
-        incomingConnection.databaseId ?? nodeInput.databaseId ?? nodeInput.dbId ?? fields.databaseId ?? data.databaseId ?? '',
-      ),
-      ...(oracleConfig ?? {}),
+      ...(incomingConnection ?? {}),
+      ...(oracleConfig
+        ? { type: 'oracle', ...oracleConfig }
+        : connectionType
+          ? { type: connectionType }
+          : {}),
     },
-    limits: nodeInput.limits ?? {
+    limits: {
       sampleRowLimit: data.sampleRowLimit ?? 10,
       sqlHistoryLimit: data.sqlHistoryLimit ?? 10,
     },
@@ -550,7 +531,7 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
     throw new Error(
       oracleConfig
         ? `get_db_info: no tables found in Oracle schema ${schemaName} (set tableName on the form, or check the user can see ALL_TABLES)`
-        : 'get_db_info: no tables found (previous node must provide user/password/connectString or u/p/c, and tableName)',
+        : 'get_db_info: Oracle user, password, and connectString are required from the previous node (map u / p / c). Will not list the platform database.',
     );
   }
 

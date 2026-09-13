@@ -25,6 +25,7 @@ export function WebhookOutputPanel({ item, onEdit, onUnpin, compact, className }
       className={className}
       formatJson={(data) => JSON.stringify([data], null, 2)}
       showCopy
+      recommendedPaths={["body.question"]}
       headerExtra={
         <span className="text-muted-foreground text-[10px]">{t("webhook_output_item_count", { count: 1 })}</span>
       }

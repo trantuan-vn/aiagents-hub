@@ -1,4 +1,9 @@
 import { resourceNode } from "./common";
+import {
+  GET_DB_INFO_USER_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+} from "@aiagents-hub/workflow-nodes";
 
 /** Get DB Info — map Form credentials into Oracle/D1 connection fields. */
 export const GET_DB_INFO_TOOL_N8N_DESCRIPTION = resourceNode({
@@ -12,25 +17,25 @@ export const GET_DB_INFO_TOOL_N8N_DESCRIPTION = resourceNode({
       displayName: "User field",
       name: "userField",
       type: "string",
-      default: "{{ $json.u }}",
-      placeholder: "{{ $json.u }}",
-      description: "Drag the Oracle user from INPUT (Form). Example: u → {{ $json.u }}",
+      default: GET_DB_INFO_USER_FIELD,
+      placeholder: GET_DB_INFO_USER_FIELD,
+      description: "Drop INPUT fields here. A second drop joins with ||; edit for ??, &&, or ternary. Example: {{ $json.u || $json.fields.u || $json.user }}",
     },
     {
       displayName: "Password field",
       name: "passwordField",
       type: "string",
-      default: "{{ $json.p }}",
-      placeholder: "{{ $json.p }}",
-      description: "Drag the Oracle password from INPUT (Form). Example: p → {{ $json.p }}",
+      default: GET_DB_INFO_PASSWORD_FIELD,
+      placeholder: GET_DB_INFO_PASSWORD_FIELD,
+      description: "Drop INPUT fields here. A second drop joins with ||. Example: {{ $json.p || $json.password }}",
     },
     {
       displayName: "Connect string field",
       name: "connectStringField",
       type: "string",
-      default: "{{ $json.c }}",
-      placeholder: "{{ $json.c }}",
-      description: "Drag the Oracle connect string from INPUT (Form). Example: c → {{ $json.c }}",
+      default: GET_DB_INFO_CONNECT_STRING_FIELD,
+      placeholder: GET_DB_INFO_CONNECT_STRING_FIELD,
+      description: "Drop INPUT fields here. A second drop joins with ||. Example: {{ $json.c || $json.connectString }}",
     },
     {
       displayName: "Schema name field",

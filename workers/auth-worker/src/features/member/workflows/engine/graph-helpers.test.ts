@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { WorkflowDefinition } from '../domain/domain.js';
 import {
+  gatherMainFlowInputs,
   getWorkflowEntryNodeIds,
   isEmptyNodeInput,
   isNonExecutableNode,
@@ -13,7 +14,7 @@ import { extractLoopItems, executeLoopOverItems } from './loop-helpers.js';
 describe('loop connection passthrough', () => {
   it('forwards Oracle credentials onto each batch output', () => {
     const result = executeLoopOverItems(
-      { batchSize: 1 },
+      { batchSize: 1, itemsField: '{{ $json.items }}' },
       {
         items: [{ tableName: 'ORDERS' }, { tableName: 'USERS' }],
         schemaName: 'ADMIN',
@@ -49,6 +50,17 @@ describe('loop connection passthrough', () => {
     expect(result.output.schemaName).toBe('ADMIN');
     expect(result.output.items).toEqual([{ tableName: 'USERS', schemaName: 'ADMIN' }]);
     expect(result.activeHandles.has('loop')).toBe(true);
+  });
+
+  it('does not iterate until itemsField is mapped', () => {
+    const result = executeLoopOverItems(
+      { batchSize: 1, flowKind: 'loop_over_items' },
+      { items: [{ tableName: 'ORDERS' }], tableCount: 1 },
+      undefined,
+      false,
+    );
+    expect(result.activeHandles.has('done')).toBe(true);
+    expect(result.output.loopCompleted).toBe(true);
   });
 });
 
@@ -103,16 +115,49 @@ describe('GENERATE VECTOR / GENERATE SQL graph wiring', () => {
   });
 
   it('loop extracts table items from Get DB Info output', () => {
-    const items = extractLoopItems({
-      items: [
-        { tableName: 'orders', schemaName: 'public' },
-        { tableName: 'users', schemaName: 'public' },
-      ],
-      tableCount: 2,
-      parents: {},
-    });
+    const items = extractLoopItems(
+      {
+        items: [
+          { tableName: 'orders', schemaName: 'public' },
+          { tableName: 'users', schemaName: 'public' },
+        ],
+        tableCount: 2,
+        parents: {},
+      },
+      '{{ $json.items }}',
+    );
     expect(items).toHaveLength(2);
     expect((items[0] as { tableName: string }).tableName).toBe('orders');
+  });
+});
+
+describe('gatherMainFlowInputs', () => {
+  it('merges output variables from every predecessor onto $json', () => {
+    const definition: WorkflowDefinition = {
+      nodes: [
+        { id: 'chat', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'chat' } },
+        { id: 'wh', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'webhook' } },
+        { id: 'getrag', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag' } },
+      ],
+      edges: [
+        { id: 'e1', source: 'chat', target: 'getrag', sourceHandle: 'out', targetHandle: 'in' },
+        { id: 'e2', source: 'wh', target: 'getrag', sourceHandle: 'out', targetHandle: 'in' },
+      ],
+    };
+
+    const merged = gatherMainFlowInputs('getrag', definition.edges, {
+      chat: { chatInput: 'list orders', query: 'list orders' },
+    });
+    expect(merged.chatInput).toBe('list orders');
+    expect(merged.body).toBeUndefined();
+    expect((merged.parents as Record<string, unknown>).chat).toMatchObject({ chatInput: 'list orders' });
+    expect((merged.parents as Record<string, unknown>).wh).toEqual({});
+
+    const webhookRun = gatherMainFlowInputs('getrag', definition.edges, {
+      wh: { body: { question: 'revenue' }, headers: {} },
+    });
+    expect(webhookRun.chatInput).toBeUndefined();
+    expect((webhookRun.body as { question: string }).question).toBe('revenue');
   });
 });
 

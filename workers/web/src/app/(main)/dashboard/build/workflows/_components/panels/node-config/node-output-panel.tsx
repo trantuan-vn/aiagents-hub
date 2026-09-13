@@ -2,8 +2,13 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 
-import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/workflow-nodes";
-import { ArrowRightFromLine, Copy, Pencil, PinOff, Search } from "lucide-react";
+import {
+  buildSchemaTreeRows,
+  flattenWebhookItemForTable,
+  isPrimaryOutputAncestor,
+  isPrimaryOutputPath,
+} from "@aiagents-hub/workflow-nodes";
+import { ArrowRightFromLine, Copy, MousePointerClick, Pencil, PinOff, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -33,6 +38,7 @@ export type NodeOutputPanelProps = {
   headerExtra?: ReactNode;
   formatJson?: (data: Record<string, unknown>) => string;
   showCopy?: boolean;
+  recommendedPaths?: string[];
 };
 
 function typeBadgeClass(type: string): string {
@@ -79,6 +85,30 @@ function IoViewSwitcher({
   );
 }
 
+function OutputPrimaryChips({ paths }: { paths: string[] }) {
+  const t = useTranslations("WorkflowNodeRegistry");
+  if (!paths.length) return null;
+
+  return (
+    <div className="mb-1 space-y-1.5 rounded-md border border-[#ff6f00]/30 bg-orange-500/5 px-2 py-2">
+      <p className="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-[#c2410c] uppercase">
+        <MousePointerClick className="size-3" />
+        {t("io_primary_output")}
+      </p>
+      <div className="flex flex-wrap gap-1">
+        {paths.map((path) => (
+          <span
+            key={path}
+            className="inline-flex items-center rounded-full border border-[#ff6f00]/40 bg-background px-2 py-0.5 font-mono text-[10px] font-medium text-[#c2410c]"
+          >
+            {path}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function NodeOutputPanel({
   data,
   className,
@@ -95,6 +125,7 @@ export function NodeOutputPanel({
   headerExtra,
   formatJson,
   showCopy,
+  recommendedPaths = [],
 }: NodeOutputPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const te = useTranslations("WorkflowEditorPage");
@@ -245,48 +276,94 @@ export function NodeOutputPanel({
           filteredSchemaRows.length === 0 ? (
             <p className="text-muted-foreground py-6 text-center text-xs">{t("no_data")}</p>
           ) : (
-            <div className="space-y-0.5 font-mono text-xs">
-              {filteredSchemaRows.map((row) => (
-                <div
-                  key={row.path}
-                  className="hover:bg-muted/50 flex items-center gap-2 rounded px-1 py-0.5"
-                  style={{ paddingLeft: `${row.depth * 12 + 4}px` }}
-                >
-                  <span className="truncate">{row.name}</span>
-                  <span className={cn("ml-auto shrink-0 text-[10px]", typeBadgeClass(row.type))}>{row.type}</span>
-                  {row.value !== undefined ? (
-                    <span className="text-muted-foreground max-w-[40%] truncate text-[10px]">{String(row.value)}</span>
-                  ) : null}
-                </div>
-              ))}
+            <div className="space-y-2">
+              <OutputPrimaryChips paths={recommendedPaths} />
+              <div className="space-y-0.5 font-mono text-xs">
+                {filteredSchemaRows.map((row) => {
+                  const recommended = isPrimaryOutputPath(row.path, recommendedPaths);
+                  const ancestor = isPrimaryOutputAncestor(row.path, recommendedPaths);
+                  return (
+                    <div
+                      key={row.path}
+                      className={cn(
+                        "flex items-center gap-2 rounded px-1 py-0.5",
+                        recommended
+                          ? "bg-orange-500/10 ring-1 ring-inset ring-[#ff6f00]/50"
+                          : ancestor
+                            ? "bg-orange-500/5"
+                            : "hover:bg-muted/50",
+                      )}
+                      style={{ paddingLeft: `${row.depth * 12 + 4}px` }}
+                      title={recommended ? t("io_primary_output") : undefined}
+                    >
+                      <span className={cn("truncate", recommended && "font-semibold text-[#c2410c]")}>{row.name}</span>
+                      {recommended ? (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#ff6f00] px-1.5 py-px text-[9px] font-semibold tracking-wide text-white uppercase">
+                          {t("io_drag_badge")}
+                        </span>
+                      ) : null}
+                      <span className={cn("ml-auto shrink-0 text-[10px]", typeBadgeClass(row.type))}>{row.type}</span>
+                      {row.value !== undefined ? (
+                        <span className="text-muted-foreground max-w-[40%] truncate text-[10px]">{String(row.value)}</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )
         ) : viewMode === "table" ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="text-muted-foreground pb-2 pr-3 font-medium">{t("webhook_output_field")}</th>
-                  <th className="text-muted-foreground pb-2 font-medium">{t("webhook_output_value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTableRows.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="text-muted-foreground py-6 text-center">
-                      {t("no_data")}
-                    </td>
+          <div className="space-y-2">
+            <OutputPrimaryChips paths={recommendedPaths} />
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="text-muted-foreground pb-2 pr-3 font-medium">{t("webhook_output_field")}</th>
+                    <th className="text-muted-foreground pb-2 font-medium">{t("webhook_output_value")}</th>
                   </tr>
-                ) : (
-                  filteredTableRows.map((row) => (
-                    <tr key={row.path} className="border-b border-dashed last:border-0">
-                      <td className="text-muted-foreground py-1.5 pr-3 align-top font-mono">{row.path}</td>
-                      <td className="py-1.5 align-top font-mono break-all">{row.value}</td>
+                </thead>
+                <tbody>
+                  {filteredTableRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} className="text-muted-foreground py-6 text-center">
+                        {t("no_data")}
+                      </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                  ) : (
+                    filteredTableRows.map((row) => {
+                      const recommended = isPrimaryOutputPath(row.path, recommendedPaths);
+                      return (
+                        <tr
+                          key={row.path}
+                          className={cn(
+                            "border-b border-dashed last:border-0",
+                            recommended && "bg-orange-500/10",
+                          )}
+                        >
+                          <td
+                            className={cn(
+                              "py-1.5 pr-3 align-top font-mono",
+                              recommended ? "font-semibold text-[#c2410c]" : "text-muted-foreground",
+                            )}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {row.path}
+                              {recommended ? (
+                                <span className="inline-flex items-center rounded-full bg-[#ff6f00] px-1.5 py-px text-[9px] font-semibold tracking-wide text-white uppercase">
+                                  {t("io_drag_badge")}
+                                </span>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td className="py-1.5 align-top font-mono break-all">{row.value}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : (
           <pre className="bg-muted/30 overflow-auto rounded-md border p-3 text-left font-mono text-xs leading-relaxed">

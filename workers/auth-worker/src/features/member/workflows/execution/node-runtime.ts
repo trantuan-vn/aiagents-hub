@@ -1,71 +1,18 @@
+import { interpolate, interpolateDeep } from '@aiagents-hub/workflow-nodes';
+
 import type { ResolvedCredential } from '../storage/credentials.js';
 
 /**
  * Runtime helpers for the HTTP Request and Code nodes.
  *
- * NOTE: Cloudflare Workers forbid `eval`/`new Function`, so the Code node does
- * NOT run arbitrary JavaScript. It performs safe template interpolation and
- * JSON shaping instead. A full JS sandbox (via a container/isolate) is a later
- * enhancement.
+ * NOTE: Cloudflare Workers forbid `eval`/`new Function`. Templates use a
+ * sandboxed expression language (no arbitrary JS) shared with workflow-nodes.
  */
 
 export type NodeScope = Record<string, unknown>;
 type Json = unknown;
 
-// ---------------------------------------------------------------------------
-// Template interpolation: resolves {{ path.to.value }} against a scope object.
-// ---------------------------------------------------------------------------
-
-function normalizeTemplatePath(path: string): string {
-  const trimmed = path.trim();
-  if (trimmed === '$json') return '';
-  if (trimmed.startsWith('$json.')) return trimmed.slice('$json.'.length);
-  return trimmed;
-}
-
-function resolvePath(scope: NodeScope, path: string): unknown {
-  const normalized = normalizeTemplatePath(path);
-  if (!normalized) return scope;
-  const parts = normalized
-    .replace(/\[(\d+)\]/g, '.$1')
-    .split('.')
-    .filter(Boolean);
-  let cur: unknown = scope;
-  for (const part of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined;
-    cur = (cur as Record<string, unknown>)[part];
-  }
-  return cur;
-}
-
-const TEMPLATE_RE = /\{\{\s*([^}]+?)\s*\}\}/g;
-
-/**
- * Interpolate a template string. If the whole string is a single expression
- * (e.g. "{{ data }}"), the raw resolved value is returned (may be non-string).
- */
-export function interpolate(template: string, scope: NodeScope): unknown {
-  const single = template.match(/^\s*\{\{\s*([^}]+?)\s*\}\}\s*$/);
-  if (single) return resolvePath(scope, single[1]);
-
-  return template.replace(TEMPLATE_RE, (_m, expr) => {
-    const value = resolvePath(scope, String(expr));
-    if (value == null) return '';
-    return typeof value === 'string' ? value : JSON.stringify(value);
-  });
-}
-
-/** Deep-interpolate every string leaf of a JSON value. */
-export function interpolateDeep(value: Json, scope: NodeScope): Json {
-  if (typeof value === 'string') return interpolate(value, scope);
-  if (Array.isArray(value)) return value.map((v) => interpolateDeep(v, scope));
-  if (value && typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(value)) out[k] = interpolateDeep(v, scope);
-    return out;
-  }
-  return value;
-}
+export { interpolate, interpolateDeep };
 
 // ---------------------------------------------------------------------------
 // SSRF guard

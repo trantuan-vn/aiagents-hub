@@ -129,8 +129,8 @@ export function resolveOracleConnectConfig(
   };
 }
 
-export function isOracleConnectionType(type: string): boolean {
-  return ORACLE_TYPES.has(type.trim().toLowerCase());
+export function isOracleConnectionType(type: string | undefined | null): boolean {
+  return ORACLE_TYPES.has(String(type ?? "").trim().toLowerCase());
 }
 
 export function pickUpstreamString(source: Record<string, unknown>, keys: string[]): string {

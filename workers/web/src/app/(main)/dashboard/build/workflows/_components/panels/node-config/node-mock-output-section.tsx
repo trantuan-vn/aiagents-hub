@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
+import { primaryOutputPathsForDisplay, type WorkflowNodeLike } from "@aiagents-hub/workflow-nodes";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ export type NodeMockOutputSectionProps = {
   defaultMockJson?: string;
   className?: string;
   headerExtra?: ReactNode;
+  node?: WorkflowNodeLike;
 };
 
 export function hasOutputData(output: unknown): output is Record<string, unknown> {
@@ -47,10 +49,12 @@ export function NodeMockOutputSection({
   defaultMockJson = '{\n  "text": "Hello"\n}',
   className,
   headerExtra,
+  node,
 }: NodeMockOutputSectionProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const [editingOutput, setEditingOutput] = useState(false);
   const [outputDraft, setOutputDraft] = useState("");
+  const recommendedPaths = useMemo(() => (node ? primaryOutputPathsForDisplay(node) : []), [node]);
 
   const openEditOutput = () => {
     setOutputDraft(hasOutputData(output) ? JSON.stringify(output, null, 2) : defaultMockJson);
@@ -102,6 +106,7 @@ export function NodeMockOutputSection({
       emptyIcon={emptyIcon}
       className={className}
       headerExtra={headerExtra}
+      recommendedPaths={recommendedPaths}
     />
   );
 }

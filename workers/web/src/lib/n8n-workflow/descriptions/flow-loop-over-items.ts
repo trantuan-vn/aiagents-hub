@@ -8,20 +8,21 @@ export const FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION = mainFlowNode({
   description: "Split incoming data into batches and iterate over each batch.",
   properties: [
     {
-      displayName:
-        "You may not need this node — workflow nodes automatically run once for each input item.",
+      displayName: "Map the list from the previous node",
       name: "autoIterateNotice",
       type: "notice",
       default: "",
       typeOptions: { variant: "warning" },
+      description:
+        "Focus Items field, then drag the orange list chip from INPUT (previous node output). Loop only iterates the array you map — not counts like tableCount.",
     },
     {
       displayName: "Items field",
       name: "itemsField",
       type: "string",
-      default: "{{ $json.items }}",
+      default: "",
       placeholder: "{{ $json.items }}",
-      description: "Drag the table list from INPUT (Get DB Info). Example: items → {{ $json.items }}",
+      description: "Drag the list field from INPUT. Example: items → {{ $json.items }}",
     },
     {
       displayName: "Batch Size",

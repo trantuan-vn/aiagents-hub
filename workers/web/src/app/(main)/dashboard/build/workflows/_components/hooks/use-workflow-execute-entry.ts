@@ -31,51 +31,9 @@ import { isWebhookNode } from "../panels/node-config/webhook-node-config-panel";
 import { applyStepOutputs } from "./apply-step-outputs";
 import { useWebhookListenWs, type WorkflowWebhookWsEvent } from "./use-webhook-listen-ws";
 import { useWorkflowRunFromNode } from "./use-workflow-run-from-node";
+import { upstreamExecuteInput } from "./upstream-execute-input";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
-
-function isExecuteDataFlowEdge(edge: Edge): boolean {
-  const targetHandle = edge.targetHandle ?? "in";
-  if (targetHandle !== "in") return false;
-  const sourceHandle = edge.sourceHandle ?? "out";
-  return sourceHandle === "out" || sourceHandle === "true" || sourceHandle === "false" || sourceHandle === "loop" || sourceHandle === "done" || sourceHandle.startsWith("out_");
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : null;
-}
-
-/** Merge pinned ancestor outputs so mid-graph Execute step keeps Form/Get DB Info credentials. */
-function upstreamExecuteInput(nodeId: string, nodes: Node[], edges: Edge[]): string | undefined {
-  const chain: string[] = [];
-  let cursor: string | undefined = nodeId;
-  const seen = new Set<string>();
-  while (cursor && !seen.has(cursor)) {
-    seen.add(cursor);
-    const parentEdge = edges.find((e) => e.target === cursor && isExecuteDataFlowEdge(e));
-    if (!parentEdge) break;
-    chain.unshift(parentEdge.source);
-    cursor = parentEdge.source;
-  }
-  if (!chain.length) return undefined;
-
-  const merged: Record<string, unknown> = {};
-  for (const id of chain) {
-    const node = nodes.find((n) => n.id === id);
-    const output = asRecord((node?.data as Record<string, unknown> | undefined)?._output);
-    if (!output) continue;
-    Object.assign(merged, output);
-  }
-
-  if (!Object.keys(merged).length) return undefined;
-  try {
-    return JSON.stringify(merged);
-  } catch {
-    return undefined;
-  }
-}
 
 function resolveWebhookPath(node: Node): string {
   const data = (node.data ?? {}) as Record<string, unknown>;

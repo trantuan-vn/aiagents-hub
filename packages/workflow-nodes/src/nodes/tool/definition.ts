@@ -2,6 +2,12 @@ import { defaultInputSection, defaultOutputSection, defaultParametersSection } f
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
 import { TOOL_KIND_FIELD, TOOL_KINDS, TOOL_OVERRIDE_KINDS, type ToolKind } from "./kinds";
+import {
+  GET_RAG_QUERY_FIELD,
+  GET_DB_INFO_USER_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+} from "../workflow-presets";
 
 export {
   TOOL_KIND_FIELD,
@@ -95,7 +101,7 @@ const GET_RAG_FIELDS = [
     type: "text" as const,
     labelKey: "field_query_field",
     descriptionKey: "field_query_field_desc",
-    defaultValue: "{{ $json.body.question }}",
+    defaultValue: GET_RAG_QUERY_FIELD,
     order: 3,
     placeholderKey: "field_query_field_placeholder",
     supportsExpression: true,
@@ -122,7 +128,7 @@ const GET_DB_INFO_FIELDS = [
     type: "text" as const,
     labelKey: "field_user_field",
     descriptionKey: "field_user_field_desc",
-    defaultValue: "{{ $json.u }}",
+    defaultValue: GET_DB_INFO_USER_FIELD,
     placeholderKey: "field_user_field_placeholder",
     supportsExpression: true,
     order: 3.1,
@@ -132,7 +138,7 @@ const GET_DB_INFO_FIELDS = [
     type: "text" as const,
     labelKey: "field_password_field",
     descriptionKey: "field_password_field_desc",
-    defaultValue: "{{ $json.p }}",
+    defaultValue: GET_DB_INFO_PASSWORD_FIELD,
     placeholderKey: "field_password_field_placeholder",
     supportsExpression: true,
     order: 3.2,
@@ -142,7 +148,7 @@ const GET_DB_INFO_FIELDS = [
     type: "text" as const,
     labelKey: "field_connect_string_field",
     descriptionKey: "field_connect_string_field_desc",
-    defaultValue: "{{ $json.c }}",
+    defaultValue: GET_DB_INFO_CONNECT_STRING_FIELD,
     placeholderKey: "field_connect_string_field_placeholder",
     supportsExpression: true,
     order: 3.3,
@@ -309,7 +315,7 @@ export const GET_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   defaultData: {
     toolKind: "get-rag",
     toolName: "get_rag",
-    queryField: "{{ $json.body.question }}",
+    queryField: GET_RAG_QUERY_FIELD,
   },
   sections: [
     defaultInputSection(),
@@ -329,9 +335,9 @@ export const GET_DB_INFO_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin
   defaultData: {
     toolKind: "get-db-info",
     toolName: "get_db_info",
-    userField: "{{ $json.u }}",
-    passwordField: "{{ $json.p }}",
-    connectStringField: "{{ $json.c }}",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
   },
   sections: [
     defaultInputSection(),
@@ -363,7 +369,7 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolKind: "get-rag",
     toolName: "get_rag",
     toolDescription: "Search the knowledge base for passages relevant to the user question.",
-    queryField: "{{ $json.body.question }}",
+    queryField: GET_RAG_QUERY_FIELD,
     topK: 12,
     scoreThreshold: 0,
     querySource: "from_agent_input",
@@ -373,9 +379,9 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolKind: "get-db-info",
     toolName: "get_db_info",
     toolDescription: "List tables in the connected database. The loop + Save RAG node introspects each table.",
-    userField: "{{ $json.u }}",
-    passwordField: "{{ $json.p }}",
-    connectStringField: "{{ $json.c }}",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
     schemaNameField: "",
     tableNameField: "",
     includeSampleRows: true,

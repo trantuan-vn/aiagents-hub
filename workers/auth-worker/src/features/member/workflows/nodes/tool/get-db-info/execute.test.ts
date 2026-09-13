@@ -66,7 +66,12 @@ describe('executeGetDbInfoPipeline', () => {
     };
 
     const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      nodes: [{
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: { toolKind: 'get-db-info', tableNameField: '{{ $json.tableName }}' },
+      }],
       edges: [],
     };
 
@@ -166,7 +171,18 @@ describe('executeGetDbInfoPipeline', () => {
 
   it('connects to OCI Oracle using user, password, and connectString from the previous node', async () => {
     const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      nodes: [{
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: {
+          toolKind: 'get-db-info',
+          userField: '{{ $json.data.user }}',
+          passwordField: '{{ $json.data.password }}',
+          connectStringField: '{{ $json.data.connectString }}',
+          tableNameField: '{{ $json.data.tableName }}',
+        },
+      }],
       edges: [],
     };
 
@@ -203,7 +219,17 @@ describe('executeGetDbInfoPipeline', () => {
 
   it('lists Oracle tables without introspecting when tableName is omitted', async () => {
     const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      nodes: [{
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: {
+          toolKind: 'get-db-info',
+          userField: '{{ $json.data.user }}',
+          passwordField: '{{ $json.data.password }}',
+          connectStringField: '{{ $json.data.connectString }}',
+        },
+      }],
       edges: [],
     };
 
@@ -258,7 +284,17 @@ describe('executeGetDbInfoPipeline', () => {
     ]);
 
     const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      nodes: [{
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: {
+          toolKind: 'get-db-info',
+          userField: '{{ $json.data.user }}',
+          passwordField: '{{ $json.data.password }}',
+          connectStringField: '{{ $json.data.connectString }}',
+        },
+      }],
       edges: [],
     };
 
@@ -289,7 +325,18 @@ describe('executeGetDbInfoPipeline', () => {
 
   it('does not list a named table when the name contains $', async () => {
     const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      nodes: [{
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: {
+          toolKind: 'get-db-info',
+          userField: '{{ $json.data.user }}',
+          passwordField: '{{ $json.data.password }}',
+          connectStringField: '{{ $json.data.connectString }}',
+          tableNameField: '{{ $json.data.tableName }}',
+        },
+      }],
       edges: [],
     };
 
@@ -326,6 +373,7 @@ describe('executeGetDbInfoPipeline', () => {
             userField: '{{ $json.u }}',
             passwordField: '{{ $json.p }}',
             connectStringField: '{{ $json.c }}',
+            tableNameField: '{{ $json.tableName }}',
           },
         },
       ],
@@ -351,5 +399,62 @@ describe('executeGetDbInfoPipeline', () => {
       connectString: 'dbname_high',
     });
     expect((out.items as Array<{ tableName: string }>)[0]?.tableName).toBe('ORDERS');
+  });
+
+  it('uses default u/p/c expressions when the node did not persist field mappings', async () => {
+    const definition: WorkflowDefinition = {
+      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: { u: 'ADMIN', p: 'secret', c: 'dbname_high', fields: { u: 'ADMIN', p: 'secret', c: 'dbname_high' } },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: {} },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetDbInfoPipeline(ctx);
+    expect(out.connection).toMatchObject({ type: 'oracle', user: 'ADMIN', connectString: 'dbname_high' });
+    expect(directMock.listOracleTablesDirect).toHaveBeenCalled();
+  });
+
+  it('does not list the platform D1 database when Oracle credentials are missing', async () => {
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (..._args: unknown[]) => ({
+          all: async () => ({ results: [] }),
+          first: async () => ({ cnt: 0 }),
+        }),
+        all: async () => {
+          if (sql.includes('sqlite_master')) {
+            return { results: [{ name: '_cf_KV' }, { name: 'agent_workflows' }] };
+          }
+          return { results: [] };
+        },
+        first: async () => ({ cnt: 0 }),
+      })),
+    };
+
+    const definition: WorkflowDefinition = {
+      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
+      edges: [],
+    };
+
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: { triggerKind: 'form', fields: {} },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env: { D1DB: db } },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    await expect(executeGetDbInfoPipeline(ctx)).rejects.toThrow(/will not list the platform database/i);
+    expect(db.prepare).not.toHaveBeenCalled();
   });
 });

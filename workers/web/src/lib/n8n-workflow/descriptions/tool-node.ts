@@ -1,4 +1,5 @@
 import { resourceNode } from "./common";
+import { GET_RAG_QUERY_FIELD } from "@aiagents-hub/workflow-nodes";
 
 export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
   displayName: "Tool",
@@ -66,10 +67,10 @@ export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
       displayName: "Query field",
       name: "queryField",
       type: "string",
-      default: "{{ $json.body.question }}",
-      placeholder: "{{ $json.body.question }}",
+      default: GET_RAG_QUERY_FIELD,
+      placeholder: GET_RAG_QUERY_FIELD,
       description:
-        "Drag the question from INPUT (Webhook). Example: body.question → {{ $json.body.question }}",
+        "Expression for the search query. Drop a second INPUT field to join with ||. You can edit to ??, &&, or a ternary.",
       displayOptions: { show: { toolKind: ["get-rag"] } },
     },
     {

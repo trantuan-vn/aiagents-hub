@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   Hash,
+  MousePointerClick,
   Search,
   ToggleLeft,
   Type,
@@ -15,18 +16,29 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { buildSchemaTreeRows, flattenWebhookItemForTable } from "@aiagents-hub/workflow-nodes";
+import { buildSchemaTreeRows, flattenWebhookItemForTable, primaryOutputPaths, primaryPathsPresentInData, isPrimaryOutputPath, isPrimaryOutputAncestor } from "@aiagents-hub/workflow-nodes";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 import { isDataFlowEdge } from "../../edges/workflow-connection-utils";
+import { hasPinnedOutput } from "../../hooks/upstream-execute-input";
 import {
   contextPathToExpression,
   copyExpressionToClipboard,
   insertExpressionIntoFocusedField,
   jsonPathToExpression,
+  jsonPathsToOrExpression,
   setExpressionDragData,
 } from "./workflow-expression-dnd";
+
+type UpstreamSource = {
+  node: Node;
+  title: string;
+  data: Record<string, unknown>;
+  sourceHandle?: string | null;
+  primaryPaths: string[];
+  executed: boolean;
+};
 
 type IoViewMode = "schema" | "table" | "json";
 
@@ -75,14 +87,8 @@ const WORKFLOW_CONTEXT_TREE: ContextTreeNode[] = [
   },
 ];
 
-function getUpstreamDataFlowEdge(nodeId: string, edges: Edge[]): Edge | undefined {
-  return edges.find((e) => e.target === nodeId && isDataFlowEdge(e));
-}
-
-function getUpstreamNode(nodeId: string, nodes: Node[], edges: Edge[]): Node | null {
-  const parentEdge = getUpstreamDataFlowEdge(nodeId, edges);
-  if (!parentEdge) return null;
-  return nodes.find((n) => n.id === parentEdge.source) ?? null;
+function getUpstreamDataFlowEdges(nodeId: string, edges: Edge[]): Edge[] {
+  return edges.filter((e) => e.target === nodeId && isDataFlowEdge(e));
 }
 
 function isLoopOverItemsNode(node: Node): boolean {
@@ -101,6 +107,7 @@ function buildLoopPreviewOutput(
       loopCompleted: true,
       tableCount: 0,
       count: 0,
+      totalBatches: 0,
       items: [],
       tables: [],
       schemaName: "",
@@ -182,14 +189,24 @@ function buildFormPreviewOutput(parentData: Record<string, unknown>): Record<str
   };
 }
 
-function getUpstreamOutputData(
-  nodeId: string,
-  nodes: Node[],
-  edges: Edge[],
-): Record<string, unknown> | null {
-  const parent = getUpstreamNode(nodeId, nodes, edges);
-  if (!parent) return null;
+function isWebhookTriggerNode(node: Node): boolean {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  return d.triggerKind === "webhook" || d.coreKind === "webhook" || node.type === "webhook";
+}
 
+function buildWebhookPreviewOutput(): Record<string, unknown> {
+  return {
+    headers: {},
+    params: {},
+    query: {},
+    body: { question: "" },
+    webhookUrl: "",
+    executionMode: "test",
+    triggerKind: "webhook",
+  };
+}
+
+function previewOutputForParent(parent: Node, incomingEdge: Edge | undefined): Record<string, unknown> | null {
   const parentData = (parent.data ?? {}) as Record<string, unknown>;
   const output = parentData._output;
   const realOutput =
@@ -197,8 +214,6 @@ function getUpstreamOutputData(
       ? (output as Record<string, unknown>)
       : null;
 
-  // Form triggers expose their configured fields as the downstream schema even
-  // before execution; real run values (if any) are merged on top.
   if (isFormSubmissionNode(parent)) {
     const preview = buildFormPreviewOutput(parentData);
     if (!realOutput) return preview;
@@ -214,10 +229,15 @@ function getUpstreamOutputData(
     return realOutput ? { ...preview, ...realOutput } : preview;
   }
 
+  if (isWebhookTriggerNode(parent)) {
+    const preview = buildWebhookPreviewOutput();
+    return realOutput ? { ...preview, ...realOutput } : preview;
+  }
+
   if (realOutput) return realOutput;
 
   if (isLoopOverItemsNode(parent)) {
-    return buildLoopPreviewOutput(parent, getUpstreamDataFlowEdge(nodeId, edges));
+    return buildLoopPreviewOutput(parent, incomingEdge);
   }
 
   if (parent.type === "tool_node" && String(parentData.toolKind ?? "") === "get-db-info") {
@@ -228,12 +248,16 @@ function getUpstreamOutputData(
       count: 0,
       schemaName: "",
       connection: { type: "oracle" },
+      user: "",
+      password: "",
+      connectString: "",
     };
   }
 
   if (parent.type === "tool_node" && String(parentData.toolKind ?? "") === "get-rag") {
     return {
       body: { question: "" },
+      chatInput: "",
       query: "",
       snippets: [],
       ragText: "",
@@ -241,11 +265,64 @@ function getUpstreamOutputData(
     };
   }
 
+  if (parent.type === "agent") {
+    return { text: "", sql: "", query: "", snippets: [], count: 0 };
+  }
+
   if (parentData.body != null || parentData.headers != null) {
     return parentData;
   }
 
   return null;
+}
+
+function getUpstreamSources(
+  nodeId: string,
+  nodes: Node[],
+  edges: Edge[],
+  titleFor: (node: Node) => string,
+): UpstreamSource[] {
+  const incoming = getUpstreamDataFlowEdges(nodeId, edges);
+  const sources: UpstreamSource[] = [];
+  for (const edge of incoming) {
+    const parent = nodes.find((n) => n.id === edge.source);
+    if (!parent) continue;
+    const data = previewOutputForParent(parent, edge);
+    if (!data) continue;
+    const primaryPaths = primaryOutputPaths(parent, { sourceHandle: edge.sourceHandle });
+    sources.push({
+      node: parent,
+      title: titleFor(parent),
+      data,
+      sourceHandle: edge.sourceHandle,
+      primaryPaths,
+      executed: hasPinnedOutput(parent),
+    });
+  }
+  return sources;
+}
+
+function mergeUpstreamData(sources: UpstreamSource[]): Record<string, unknown> | null {
+  if (!sources.length) return null;
+  const merged: Record<string, unknown> = {};
+  for (const source of sources) {
+    Object.assign(merged, source.data);
+  }
+  return merged;
+}
+
+function getUpstreamOutputData(
+  nodeId: string,
+  nodes: Node[],
+  edges: Edge[],
+): Record<string, unknown> | null {
+  return mergeUpstreamData(getUpstreamSources(nodeId, nodes, edges, () => ""));
+}
+
+function getUpstreamNode(nodeId: string, nodes: Node[], edges: Edge[]): Node | null {
+  const edge = getUpstreamDataFlowEdges(nodeId, edges)[0];
+  if (!edge) return null;
+  return nodes.find((n) => n.id === edge.source) ?? null;
 }
 
 function upstreamNodeTitle(node: Node, te: (key: string) => string): string {
@@ -299,6 +376,8 @@ function DraggableTreeRow({
   onToggle,
   valuePreview,
   matchesSearch,
+  recommended,
+  recommendedAncestor,
 }: {
   name: string;
   type: string;
@@ -309,6 +388,8 @@ function DraggableTreeRow({
   onToggle?: () => void;
   valuePreview?: string;
   matchesSearch?: boolean;
+  recommended?: boolean;
+  recommendedAncestor?: boolean;
 }) {
   const t = useTranslations("WorkflowNodeRegistry");
 
@@ -343,9 +424,16 @@ function DraggableTreeRow({
       }}
       role="button"
       tabIndex={0}
-      className="hover:bg-muted/60 group flex cursor-grab items-center gap-1.5 rounded py-0.5 pr-1 active:cursor-grabbing"
+      className={cn(
+        "group flex cursor-grab items-center gap-1.5 rounded py-0.5 pr-1 active:cursor-grabbing",
+        recommended
+          ? "bg-orange-500/10 ring-1 ring-inset ring-[#ff6f00]/50 hover:bg-orange-500/15"
+          : recommendedAncestor
+            ? "bg-orange-500/5 hover:bg-orange-500/10"
+            : "hover:bg-muted/60",
+      )}
       style={{ paddingLeft: `${depth * 14 + 4}px` }}
-      title={expression}
+      title={recommended ? t("io_drag_field_hint") : expression}
     >
       {hasChildren ? (
         <button
@@ -363,7 +451,15 @@ function DraggableTreeRow({
         <span className="inline-block w-4 shrink-0" />
       )}
       <TypeBadge type={type} />
-      <span className="truncate font-mono text-[11px]">{name}</span>
+      <span className={cn("truncate font-mono text-[11px]", recommended && "font-semibold text-[#c2410c]")}>
+        {name}
+      </span>
+      {recommended ? (
+        <span className="ml-0.5 inline-flex shrink-0 items-center gap-0.5 rounded-full bg-[#ff6f00] px-1.5 py-px text-[9px] font-semibold tracking-wide text-white uppercase">
+          <MousePointerClick className="size-2.5" />
+          {t("io_drag_badge")}
+        </span>
+      ) : null}
       {valuePreview != null && valuePreview !== "" ? (
         <span className="text-muted-foreground ml-auto max-w-[45%] truncate font-mono text-[10px] opacity-0 transition-opacity group-hover:opacity-100">
           {valuePreview}
@@ -377,11 +473,16 @@ function UpstreamSchemaTree({
   data,
   rootLabel,
   search,
+  primaryPaths,
+  executed,
 }: {
   data: Record<string, unknown>;
   rootLabel: string;
   search: string;
+  primaryPaths: string[];
+  executed: boolean;
 }) {
+  const t = useTranslations("WorkflowNodeRegistry");
   const rows = useMemo(() => buildSchemaTreeRows(data), [data]);
   const q = search.trim().toLowerCase();
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -415,9 +516,10 @@ function UpstreamSchemaTree({
   }, [collapsed, filteredRows, q, rootOpen]);
 
   const itemCount = rows.filter((r) => r.depth === 0).length || 1;
+  const recommendedCount = primaryPathsPresentInData(data, primaryPaths).length;
 
   return (
-    <div className="space-y-0.5">
+    <div className={cn("space-y-0.5", !executed && "opacity-70")}>
       <div
         className="hover:bg-muted/60 flex items-center gap-1.5 rounded py-1 pr-1"
         style={{ paddingLeft: "4px" }}
@@ -430,9 +532,22 @@ function UpstreamSchemaTree({
           {rootOpen ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
         </button>
         <span className="text-[11px] font-semibold">{rootLabel}</span>
-        <span className="text-muted-foreground text-[10px]">
-          ({itemCount} {itemCount === 1 ? "item" : "items"})
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-1.5 py-px text-[9px] font-semibold tracking-wide uppercase",
+            executed ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground",
+          )}
+        >
+          {executed ? t("io_source_last_run") : t("io_source_schema")}
         </span>
+        <span className="text-muted-foreground text-[10px]">
+          ({t("io_schema_fields", { count: itemCount })})
+        </span>
+        {recommendedCount > 0 ? (
+          <span className="ml-auto inline-flex items-center gap-0.5 rounded-full bg-[#ff6f00]/15 px-1.5 py-px text-[9px] font-semibold text-[#c2410c]">
+            {t("io_drag_count", { count: recommendedCount })}
+          </span>
+        ) : null}
       </div>
 
       {visibleRows.map((row) => {
@@ -451,9 +566,92 @@ function UpstreamSchemaTree({
             onToggle={() => toggle(row.path)}
             valuePreview={preview}
             matchesSearch
+            recommended={isPrimaryOutputPath(row.path, primaryPaths)}
+            recommendedAncestor={isPrimaryOutputAncestor(row.path, primaryPaths)}
           />
         );
       })}
+    </div>
+  );
+}
+
+function DragTheseChips({
+  chips,
+}: {
+  chips: { path: string; sourceTitle: string }[];
+}) {
+  const t = useTranslations("WorkflowNodeRegistry");
+  if (!chips.length) return null;
+
+  const grouped = chips.reduce<Record<string, string[]>>((acc, chip) => {
+    acc[chip.sourceTitle] = acc[chip.sourceTitle] ?? [];
+    acc[chip.sourceTitle].push(chip.path);
+    return acc;
+  }, {});
+  const combined = jsonPathsToOrExpression(chips.map((chip) => chip.path));
+  const showBoth = chips.length > 1;
+
+  const applyCombined = () => {
+    if (insertExpressionIntoFocusedField(combined)) {
+      toast.success(t("agent_input_expression_inserted"));
+      return;
+    }
+    void copyExpressionToClipboard(combined).then((copied) => {
+      toast.success(copied ? t("agent_input_expression_copied") : combined);
+    });
+  };
+
+  return (
+    <div className="border-border/70 mb-3 space-y-2 rounded-md border border-[#ff6f00]/30 bg-orange-500/5 px-2 py-2">
+      <p className="flex items-center gap-1 text-[10px] font-semibold tracking-wide text-[#c2410c] uppercase">
+        <MousePointerClick className="size-3" />
+        {t("io_drag_these")}
+      </p>
+      {showBoth ? <p className="text-[10px] leading-snug text-[#c2410c]/80">{t("io_map_both_hint")}</p> : null}
+      <div className="space-y-2">
+        {Object.entries(grouped).map(([title, paths]) => (
+          <div key={title} className="space-y-1">
+            <p className="text-muted-foreground text-[10px] font-medium">{title}</p>
+            <div className="flex flex-wrap gap-1">
+              {paths.map((path) => {
+                const expression = jsonPathToExpression(path);
+                return (
+                  <button
+                    key={path}
+                    type="button"
+                    draggable
+                    onDragStart={(e) => setExpressionDragData(e.dataTransfer, expression)}
+                    onClick={() => {
+                      if (insertExpressionIntoFocusedField(expression)) {
+                        toast.success(t("agent_input_expression_inserted"));
+                        return;
+                      }
+                      void copyExpressionToClipboard(expression).then((copied) => {
+                        toast.success(copied ? t("agent_input_expression_copied") : expression);
+                      });
+                    }}
+                    className="inline-flex cursor-grab items-center gap-1 rounded-full border border-[#ff6f00]/40 bg-background px-2 py-0.5 font-mono text-[10px] font-medium text-[#c2410c] hover:bg-orange-500/10 active:cursor-grabbing"
+                    title={expression}
+                  >
+                    {path}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      {showBoth ? (
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => setExpressionDragData(e.dataTransfer, combined)}
+          onClick={applyCombined}
+          className="w-full rounded-md border border-[#ff6f00]/50 bg-[#ff6f00] px-2 py-1 text-[11px] font-semibold text-white hover:bg-[#e66300]"
+        >
+          {t("io_map_both")}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -519,18 +717,45 @@ export function AgentUpstreamInputPanel({
   const [viewMode, setViewMode] = useState<IoViewMode>("schema");
   const [search, setSearch] = useState("");
 
-  const upstreamNode = useMemo(() => getUpstreamNode(nodeId, nodes, edges), [nodeId, nodes, edges]);
-  const upstream = useMemo(
-    () => getUpstreamOutputData(nodeId, nodes, edges),
-    [nodeId, nodes, edges],
+  const upstreamSources = useMemo(
+    () => getUpstreamSources(nodeId, nodes, edges, (n) => upstreamNodeTitle(n, te)),
+    [nodeId, nodes, edges, te],
   );
-  const upstreamTitle = upstreamNode ? upstreamNodeTitle(upstreamNode, te) : null;
+  const hasParentEdge = useMemo(
+    () => getUpstreamDataFlowEdges(nodeId, edges).length > 0,
+    [nodeId, edges],
+  );
+  const upstream = useMemo(() => mergeUpstreamData(upstreamSources), [upstreamSources]);
 
   const tableRows = useMemo(
     () => (upstream ? flattenWebhookItemForTable(upstream as never) : []),
     [upstream],
   );
   const jsonText = useMemo(() => (upstream ? JSON.stringify(upstream, null, 2) : ""), [upstream]);
+  const allPrimaryPaths = useMemo(() => {
+    const seen = new Set<string>();
+    const paths: string[] = [];
+    for (const source of upstreamSources) {
+      for (const path of source.primaryPaths) {
+        if (seen.has(path)) continue;
+        seen.add(path);
+        paths.push(path);
+      }
+    }
+    return paths;
+  }, [upstreamSources]);
+  const dragChips = useMemo(() => {
+    const seen = new Set<string>();
+    const chips: { path: string; sourceTitle: string }[] = [];
+    for (const source of upstreamSources) {
+      for (const path of primaryPathsPresentInData(source.data, source.primaryPaths)) {
+        if (seen.has(path)) continue;
+        seen.add(path);
+        chips.push({ path, sourceTitle: source.title });
+      }
+    }
+    return chips;
+  }, [upstreamSources]);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
@@ -567,13 +792,26 @@ export function AgentUpstreamInputPanel({
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
         {viewMode === "schema" ? (
           <div className="space-y-4">
-            {upstream && upstreamTitle ? (
+            {upstreamSources.length ? (
               <>
-                <UpstreamSchemaTree data={upstream} rootLabel={upstreamTitle} search={search} />
+                <DragTheseChips chips={dragChips} />
+                {upstreamSources.map((source) => (
+                  <UpstreamSchemaTree
+                    key={`${source.node.id}:${source.sourceHandle ?? ""}`}
+                    data={source.data}
+                    rootLabel={source.title}
+                    search={search}
+                    primaryPaths={source.primaryPaths}
+                    executed={source.executed}
+                  />
+                ))}
+                {upstreamSources.filter((source) => source.executed).length >= 2 ? (
+                  <p className="text-muted-foreground px-1 text-[10px] leading-relaxed">{t("io_stale_runs_hint")}</p>
+                ) : null}
                 <p className="text-muted-foreground px-1 text-[10px] leading-relaxed">{t("agent_input_map_hint")}</p>
                 <p className="text-muted-foreground px-1 text-[10px] leading-relaxed">{t("agent_input_refresh_hint")}</p>
               </>
-            ) : upstreamNode ? (
+            ) : hasParentEdge ? (
               <div className="space-y-2 px-1 py-4 text-center">
                 <p className="text-muted-foreground text-xs">{t("no_upstream_output")}</p>
                 {onExecutePrevious && executePreviousLabel ? (
@@ -603,40 +841,65 @@ export function AgentUpstreamInputPanel({
           !upstream ? (
             <p className="text-muted-foreground text-center text-xs">{t("no_upstream_output")}</p>
           ) : (
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr>
-                  <th className="text-muted-foreground pb-2 pr-3 font-medium">{t("webhook_output_field")}</th>
-                  <th className="text-muted-foreground pb-2 font-medium">{t("webhook_output_value")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableRows
-                  .filter((row) => !search.trim() || row.path.toLowerCase().includes(search.trim().toLowerCase()))
-                  .map((row) => (
-                    <tr
-                      key={row.path}
-                      draggable
-                      onDragStart={(e) => setExpressionDragData(e.dataTransfer, jsonPathToExpression(row.path))}
-                      onClick={() => {
-                        const expression = jsonPathToExpression(row.path);
-                        if (insertExpressionIntoFocusedField(expression)) {
-                          toast.success(t("agent_input_expression_inserted"));
-                          return;
-                        }
-                        void copyExpressionToClipboard(expression).then((copied) => {
-                          toast.success(copied ? t("agent_input_expression_copied") : expression);
-                        });
-                      }}
-                      className="hover:bg-muted/60 cursor-grab border-t active:cursor-grabbing"
-                      title={jsonPathToExpression(row.path)}
-                    >
-                      <td className="text-muted-foreground py-1 pr-3 font-mono">{row.path}</td>
-                      <td className="max-w-[60%] truncate py-1 font-mono">{row.value}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <>
+              <DragTheseChips chips={dragChips} />
+              <table className="w-full text-left text-[11px]">
+                <thead>
+                  <tr>
+                    <th className="text-muted-foreground pb-2 pr-3 font-medium">{t("webhook_output_field")}</th>
+                    <th className="text-muted-foreground pb-2 font-medium">{t("webhook_output_value")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tableRows
+                    .filter((row) => !search.trim() || row.path.toLowerCase().includes(search.trim().toLowerCase()))
+                    .map((row) => {
+                      const recommended = isPrimaryOutputPath(row.path, allPrimaryPaths);
+                      return (
+                        <tr
+                          key={row.path}
+                          draggable
+                          onDragStart={(e) => setExpressionDragData(e.dataTransfer, jsonPathToExpression(row.path))}
+                          onClick={() => {
+                            const expression = jsonPathToExpression(row.path);
+                            if (insertExpressionIntoFocusedField(expression)) {
+                              toast.success(t("agent_input_expression_inserted"));
+                              return;
+                            }
+                            void copyExpressionToClipboard(expression).then((copied) => {
+                              toast.success(copied ? t("agent_input_expression_copied") : expression);
+                            });
+                          }}
+                          className={cn(
+                            "cursor-grab border-t active:cursor-grabbing",
+                            recommended
+                              ? "bg-orange-500/10 ring-1 ring-inset ring-[#ff6f00]/40 hover:bg-orange-500/15"
+                              : "hover:bg-muted/60",
+                          )}
+                          title={recommended ? t("io_drag_field_hint") : jsonPathToExpression(row.path)}
+                        >
+                          <td
+                            className={cn(
+                              "py-1 pr-3 font-mono",
+                              recommended ? "font-semibold text-[#c2410c]" : "text-muted-foreground",
+                            )}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {row.path}
+                              {recommended ? (
+                                <span className="inline-flex items-center rounded-full bg-[#ff6f00] px-1.5 py-px text-[9px] font-semibold tracking-wide text-white uppercase">
+                                  {t("io_drag_badge")}
+                                </span>
+                              ) : null}
+                            </span>
+                          </td>
+                          <td className="max-w-[60%] truncate py-1 font-mono">{row.value}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </>
           )
         ) : !upstream ? (
           <p className="text-muted-foreground text-center text-xs">{t("no_upstream_output")}</p>

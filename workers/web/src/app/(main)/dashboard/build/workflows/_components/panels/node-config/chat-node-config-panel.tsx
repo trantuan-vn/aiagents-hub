@@ -545,6 +545,7 @@ export function ChatTriggerConfigPanel({
             emptyLabel={t("webhook_no_trigger_output")}
             emptyIcon={<Zap className="text-muted-foreground/40 size-10 stroke-[1.5]" />}
             defaultMockJson={CHAT_MOCK_JSON}
+            node={node}
           />
         </div>
       </div>

@@ -71,7 +71,7 @@ describe('executeSaveRagPipeline', () => {
           id: 'save',
           type: 'tool_node',
           position: { x: 0, y: 0 },
-          data: { toolKind: 'save-rag', chunkSize: 800 },
+          data: { toolKind: 'save-rag', chunkSize: 800, contentField: '{{ $json.content }}' },
         },
       ],
       edges: [],
@@ -127,7 +127,7 @@ describe('executeSaveRagPipeline', () => {
     const definition: WorkflowDefinition = {
       nodes: [
         { id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } },
-        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag', chunkSize: 800 } },
+        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag', chunkSize: 800, tableNameField: '{{ $json.tableName }}' } },
       ],
       edges: [],
     };
@@ -174,19 +174,21 @@ describe('executeSaveRagPipeline', () => {
       nodes: [
         { id: 'form', type: 'trigger', position: { x: 0, y: 0 }, data: { triggerKind: 'form' } },
         { id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } },
-        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag' } },
+        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag', tableNameField: '{{ $json.tableName }}' } },
       ],
       edges: [],
     };
 
     const ctx = {
       node: definition.nodes[2],
-      nodeInput: { items: [{ tableName: 'orders', schemaName: 'public' }] },
-      definition,
-      outputs: {
-        form: { connection: { type: 'd1' }, dbId: 'analytics-db' },
-        dbinfo: { schemaName: 'public', tables: ['orders'], items: [{ tableName: 'orders', schemaName: 'public' }] },
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public' }],
+        schemaName: 'public',
+        connection: { type: 'd1' },
+        dbId: 'analytics-db',
       },
+      definition,
+      outputs: {},
       runContext: {},
       c: { env },
       meta: { ownerId: 'user-1', workflowId: 42 },
@@ -197,9 +199,9 @@ describe('executeSaveRagPipeline', () => {
     expect(out.saved).toBe(2);
   });
 
-  it('indexes every Get DB Info table on the first loop tick, then skips the rest', async () => {
+  it('indexes only the current loop table from INPUT', async () => {
     const db = d1Stub();
-    const upsert = vi.fn().mockResolvedValue({ count: 4 });
+    const upsert = vi.fn().mockResolvedValue({ count: 2 });
     const env = {
       AI: mockAi(),
       VECTORIZE: { query: vi.fn(), upsert },
@@ -209,48 +211,33 @@ describe('executeSaveRagPipeline', () => {
     const definition: WorkflowDefinition = {
       nodes: [
         { id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } },
-        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag' } },
+        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag', tableNameField: '{{ $json.tableName }}' } },
       ],
       edges: [],
     };
 
-    const runContext: Record<string, unknown> = {};
     const ctx = {
       node: definition.nodes[1],
-      nodeInput: { items: [{ tableName: 'orders', schemaName: 'public' }] },
-      definition,
-      outputs: {
-        dbinfo: {
-          schemaName: 'public',
-          tables: ['orders', 'invoices'],
-          items: [
-            { tableName: 'orders', schemaName: 'public' },
-            { tableName: 'invoices', schemaName: 'public' },
-          ],
-          connection: { type: 'd1' },
-          dbId: 'analytics-db',
-        },
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public' }],
+        schemaName: 'public',
+        connection: { type: 'd1' },
+        dbId: 'analytics-db',
+        tables: ['orders', 'invoices'],
       },
-      runContext,
+      definition,
+      outputs: {},
+      runContext: {},
       c: { env },
       meta: { ownerId: 'user-1', workflowId: 42 },
     } as unknown as NodeContext;
 
     const first = await executeSaveRagPipeline(ctx);
     expect(first.ok).toBe(true);
-    expect(first.saved).toBe(4);
-    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(first.saved).toBe(2);
     const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
     const tables = new Set(vectors.map((v) => v.metadata?.tableName));
-    expect(tables).toEqual(new Set(['orders', 'invoices']));
-
-    const second = await executeSaveRagPipeline({
-      ...ctx,
-      nodeInput: { items: [{ tableName: 'invoices', schemaName: 'public' }] },
-    } as unknown as NodeContext);
-    expect(second.skipped).toBe(true);
-    expect(second.saved).toBe(0);
-    expect(upsert).toHaveBeenCalledTimes(1);
+    expect(tables).toEqual(new Set(['orders']));
   });
 
   it('bills embedding tokens and reports cost on the Save RAG node', async () => {
@@ -283,6 +270,7 @@ describe('executeSaveRagPipeline', () => {
             toolKind: 'save-rag',
             chunkSize: 800,
             serviceEndpoint: '/api/ai/baai/bge-base-en-v1.5',
+            contentField: '{{ $json.content }}',
           },
         },
       ],
@@ -348,7 +336,7 @@ describe('executeSaveRagPipeline', () => {
           id: 'save',
           type: 'tool_node',
           position: { x: 0, y: 0 },
-          data: { toolKind: 'save-rag', chunkSize: 800 },
+          data: { toolKind: 'save-rag', chunkSize: 800, contentField: '{{ $json.content }}' },
         },
         {
           id: 'svc_embed',

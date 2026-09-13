@@ -36,10 +36,7 @@ export const AGENT_N8N_DESCRIPTION = mainFlowNode({
       type: "string",
       typeOptions: { rows: 4 },
       default: SQL_AGENT_SYSTEM_PROMPT,
-      description: "Optional system instructions prepended to the model context",
-      displayOptions: {
-        hide: { promptSource: ["define_below", "from_input"] },
-      },
+      description: "Optional system instructions. Drag fields from INPUT if needed.",
     },
     {
       displayName: "Require Specific Output Format",

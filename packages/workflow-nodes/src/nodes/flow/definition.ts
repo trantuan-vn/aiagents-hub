@@ -6,6 +6,7 @@ import {
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
 import { FLOW_KIND_FIELD, FLOW_KINDS, FLOW_OVERRIDE_KINDS, type FlowKind } from "./kinds";
+import { LOOP_ITEMS_FIELD } from "../workflow-presets";
 
 export { FLOW_KIND_FIELD, FLOW_KINDS, FLOW_OVERRIDE_KINDS, type FlowKind } from "./kinds";
 
@@ -81,7 +82,7 @@ export const FLOW_LOOP_OVER_ITEMS_DEFINITION: WorkflowNodeDefinition = createBui
     defaultData: {
       [FLOW_KIND_FIELD]: "loop_over_items",
       batchSize: 1,
-      itemsField: "{{ $json.items }}",
+      itemsField: LOOP_ITEMS_FIELD,
     },
     sections: [
       defaultInputSection(),
@@ -91,7 +92,7 @@ export const FLOW_LOOP_OVER_ITEMS_DEFINITION: WorkflowNodeDefinition = createBui
           type: "text",
           labelKey: "field_items_field",
           descriptionKey: "field_items_field_desc",
-          defaultValue: "{{ $json.items }}",
+          defaultValue: "",
           placeholderKey: "field_items_field_placeholder",
           supportsExpression: true,
           order: 1,

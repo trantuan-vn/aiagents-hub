@@ -112,6 +112,11 @@ export {
   SQL_HTTP_BODY,
   VECTOR_GMAIL_SUBJECT,
   VECTOR_GMAIL_MESSAGE,
+  GET_RAG_QUERY_FIELD,
+  GET_DB_INFO_USER_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+  LOOP_ITEMS_FIELD,
 } from "./workflow-presets";
 export {
   buildWebhookItemOutput,
@@ -123,3 +128,11 @@ export {
   type SchemaTreeRow,
   type TableRow,
 } from "./webhook/output";
+export {
+  primaryOutputPaths,
+  primaryOutputPathsForDisplay,
+  primaryPathsPresentInData,
+  isPrimaryOutputPath,
+  isPrimaryOutputAncestor,
+  type WorkflowNodeLike,
+} from "./primary-io";

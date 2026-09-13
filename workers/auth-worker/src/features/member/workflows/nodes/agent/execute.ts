@@ -15,13 +15,11 @@ import {
   agentHasRagToolKind,
   buildAgentToolset,
   buildRagToolset,
-  retrieveMemory,
 } from '../../execution/agent-runtime.js';
-import { isDataFlowEdge, resolveAgentResources } from '../../engine/graph-helpers.js';
+import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag/index.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
-import { executeGetRag } from '../tool/get-rag/execute.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 
 function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<string, unknown> {
@@ -78,34 +76,22 @@ function resolveEmbedModel(service: Record<string, unknown>): string {
   return model || DEFAULT_EMBED_MODEL;
 }
 
-function extractQuestionText(nodeInput: Record<string, unknown>, fallbackInput?: string): string {
-  if (typeof nodeInput.chatInput === 'string' && nodeInput.chatInput.trim()) return nodeInput.chatInput.trim();
-  if (typeof nodeInput.query === 'string' && nodeInput.query.trim()) return nodeInput.query.trim();
-  if (typeof nodeInput.question === 'string' && nodeInput.question.trim()) return nodeInput.question.trim();
-  if (typeof nodeInput.message === 'string' && nodeInput.message.trim()) return nodeInput.message.trim();
-  const body = nodeInput.body;
-  if (body && typeof body === 'object' && !Array.isArray(body)) {
-    const rec = body as Record<string, unknown>;
-    const q = rec.question ?? rec.query ?? rec.prompt ?? rec.text ?? rec.message;
-    if (q != null && String(q).trim()) return String(q);
-  }
-  if (typeof body === 'string' && body.trim()) return body;
-  if (fallbackInput?.trim()) return fallbackInput;
-  const hasSnippets = Array.isArray(nodeInput.snippets) && nodeInput.snippets.length > 0;
-  if (!hasSnippets && nodeInput.text != null && String(nodeInput.text).trim()) return String(nodeInput.text);
-  return JSON.stringify(nodeInput);
-}
+function resolveAgentUserText(
+  data: Record<string, unknown>,
+  nodeInput: Record<string, unknown>,
+  fallbackInput?: string,
+): string {
+  const prompt = String(data.prompt ?? '');
+  const scope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: fallbackInput ?? '' };
 
-function agentHasUpstreamGetRag(
-  definition: import('../../domain/domain.js').WorkflowDefinition,
-  agentId: string,
-): boolean {
-  return definition.edges.some((edge) => {
-    if (edge.target !== agentId || !isDataFlowEdge(edge)) return false;
-    const source = definition.nodes.find((n) => n.id === edge.source);
-    if (source?.type !== 'tool_node') return false;
-    return String((source.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-rag';
-  });
+  if (prompt.includes('{{')) {
+    const resolved = interpolate(prompt, scope);
+    if (resolved != null && String(resolved).trim()) return String(resolved);
+    return '';
+  }
+
+  if (prompt.trim()) return prompt;
+  return '';
 }
 
 function extractSql(text: string): string {
@@ -130,27 +116,6 @@ function extractSql(text: string): string {
   return '';
 }
 
-function ragSnippetsFromInput(nodeInput: Record<string, unknown>): string[] {
-  const snippets = nodeInput.snippets;
-  if (Array.isArray(snippets) && snippets.length) {
-    return snippets
-      .map((s) => {
-        if (typeof s === 'string') return s.trim();
-        if (s && typeof s === 'object' && !Array.isArray(s)) {
-          const rec = s as Record<string, unknown>;
-          const text = String(rec.text ?? '').trim();
-          const source = rec.source != null ? String(rec.source).trim() : '';
-          if (!text) return '';
-          return source ? `[${source}]\n${text}` : text;
-        }
-        return '';
-      })
-      .filter(Boolean);
-  }
-  const ragText = String(nodeInput.ragText ?? '').trim();
-  return ragText ? [ragText] : [];
-}
-
 function withoutGetRagTools<T extends Record<string, unknown>>(tools: T): T {
   const out = { ...tools };
   for (const key of Object.keys(out)) {
@@ -167,28 +132,6 @@ function interpolateTemplate(template: string, scope: Record<string, unknown>): 
   const resolved = interpolate(template, scope);
   if (resolved == null) return '';
   return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
-}
-
-function resolveAgentUserText(
-  data: Record<string, unknown>,
-  nodeInput: Record<string, unknown>,
-  fallbackInput?: string,
-): string {
-  const promptSource = String(data.promptSource ?? 'define_below');
-  const prompt = String(data.prompt ?? '');
-  const scope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: fallbackInput ?? '' };
-
-  if (prompt.includes('{{')) {
-    const resolved = interpolate(prompt, scope);
-    if (resolved != null && String(resolved).trim()) return String(resolved);
-  }
-
-  if (promptSource === 'from_input') {
-    return extractQuestionText(nodeInput, fallbackInput);
-  }
-
-  if (prompt.trim()) return prompt;
-  return extractQuestionText(nodeInput, fallbackInput);
 }
 
 function extractTriggerContext(ctx: NodeContext): Record<string, unknown> {
@@ -244,27 +187,6 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     userText = userText ? `${saveRagUserPrompt}\n\n${userText}` : saveRagUserPrompt;
   }
 
-  const memoryCollection = String(
-    data.memoryCollection ?? linked.memoryCollection ?? '',
-  ).trim();
-  const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
-
-  const hasGetRagTool = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
-  const hasUpstreamGetRag = agentHasUpstreamGetRag(ctx.definition, ctx.node.id);
-  const useRetrievedSqlContext = hasGetRagTool || hasUpstreamGetRag;
-  const getRagNodeId = hasUpstreamGetRag
-    ? ctx.definition.edges.find(
-        (edge) =>
-          edge.target === ctx.node.id &&
-          isDataFlowEdge(edge) &&
-          ctx.definition.nodes.some(
-            (n) =>
-              n.id === edge.source &&
-              n.type === 'tool_node' &&
-              String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-rag',
-          ),
-      )?.source
-    : ctx.node.id;
   const billing = ragBillingFromNodeContext(ctx);
   const ragTools = withoutGetRagTools(
     buildRagToolset(
@@ -286,53 +208,16 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const tools = { ...httpTools, ...ragTools };
   const toolNames = Object.keys(tools);
   const useToolLoop = toolNames.length > 0;
-
-  let ragContext = ragSnippetsFromInput(ctx.nodeInput as Record<string, unknown>);
-  if (!ragContext.length && useRetrievedSqlContext) {
-    const retrieved = await executeGetRag({
-      env: ctx.c.env,
-      definition: ctx.definition,
-      agentId: getRagNodeId ?? ctx.node.id,
-      input: { query: userText },
-      embedModel: DEFAULT_EMBED_MODEL,
-      userDO: ctx.userDO,
-      ownerId: ctx.meta.ownerId,
-      workflowId: ctx.meta.workflowId,
-      billing,
-    });
-    ragContext = retrieved.snippets.map((s) => {
-      const source = s.source?.trim();
-      return source ? `[${source}]\n${s.text}` : s.text;
-    }).filter(Boolean);
-  }
-
-  const memorySnippets =
-    ragContext.length
-      ? ragContext
-      : memoryCollection &&
-          linked.memoryKind !== 'r2' &&
-          linked.memoryKind !== 'd1'
-        ? await retrieveMemory(ctx.c.env, memoryCollection, userText, 5, memoryNamespace || undefined)
-        : [];
+  const ragSnippets = Array.isArray(nodeInput.snippets) ? nodeInput.snippets : [];
+  const useRetrievedSqlContext = Boolean(String(nodeInput.ragText ?? '').trim() || ragSnippets.length);
 
   const systemParts = [
     systemPrompt,
-    !systemPrompt.trim() && useRetrievedSqlContext
-      ? 'You are a Text-to-SQL assistant. Use the retrieved table schemas and SQL examples to write one read-only SQL query for the user question.'
-      : '',
     saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
-    memorySnippets.length
-      ? `Relevant knowledge from the vector store:\n${memorySnippets.join('\n\n')}`
-      : '',
     toolNames.length
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
-    memorySnippets.length
-      ? 'Use the retrieved schema and SQL examples. Reply with one read-only SQL query in a fenced sql code block, qualifying tables as schema.table. Keep reasoning under 8 short bullets. Do not spend the token budget on analysis — the SQL is the answer. Do not invent tables or columns that are not in the retrieved context.'
-      : hasGetRagTool || hasUpstreamGetRag
-        ? 'No relevant schema was retrieved from the knowledge base. Do not invent tables or columns.'
-        : '',
     hasSaveRagTool && !saveRagSystemPrompt
       ? 'Use save_rag to persist extracted document text into the knowledge base.'
       : '',
@@ -385,8 +270,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       text,
       sql: extractSql(text),
       query: userText,
-      snippets: ragContext,
-      count: ragContext.length,
+      snippets: ragSnippets,
+      count: ragSnippets.length,
       raw: { usage, toolNames },
       endpoint,
     };
@@ -440,8 +325,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     text,
     sql,
     query: userText,
-    snippets: ragContext,
-    count: ragContext.length,
+    snippets: ragSnippets,
+    count: ragSnippets.length,
     raw: aiResponse,
     endpoint,
   };

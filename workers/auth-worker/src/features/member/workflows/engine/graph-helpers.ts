@@ -144,7 +144,7 @@ export function topologicalMainFlowOrder(definition: WorkflowDefinition): string
   return order;
 }
 
-/** Merge outputs from main-flow parent nodes (out → in). */
+/** Merge outputs from every main-flow parent (out → in) onto `$json`. */
 export function gatherMainFlowInputs(
   nodeId: string,
   edges: WorkflowDefinition['edges'],
@@ -156,15 +156,19 @@ export function gatherMainFlowInputs(
 
   if (!parents.length) return {};
 
-  const merged: NodeOutput = { parents: {} as Record<string, NodeOutput> };
-  const parentMap = merged.parents as Record<string, NodeOutput>;
+  const parentMap: Record<string, NodeOutput> = {};
+  const merged: NodeOutput = {};
 
   for (const p of parents) {
-    parentMap[p] = outputs[p] ?? {};
+    const raw = outputs[p] ?? {};
+    const out: NodeOutput = { ...raw };
+    delete out.parents;
+    parentMap[p] = out;
+    Object.assign(merged, out);
   }
 
-  const lastParent = outputs[parents[parents.length - 1]] ?? {};
-  return { ...lastParent, ...merged };
+  merged.parents = parentMap;
+  return merged;
 }
 
 export function parseWorkflowExecuteInput(input?: string): NodeOutput {

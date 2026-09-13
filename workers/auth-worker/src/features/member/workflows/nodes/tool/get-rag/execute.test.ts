@@ -374,7 +374,7 @@ describe('executeGetRagPipeline', () => {
           id: 'tool_get',
           type: 'tool_node',
           position: { x: 0, y: 0 },
-          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 3 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 3, queryField: '{{ $json.body.question || $json.chatInput }}' },
         },
         {
           id: 'mem_kb',
@@ -419,7 +419,7 @@ describe('executeGetRagPipeline', () => {
           id: 'tool_get',
           type: 'tool_node',
           position: { x: 0, y: 0 },
-          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 12 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 12, queryField: '{{ $json.body.question || $json.chatInput }}' },
         },
         {
           id: 'tool_save',
@@ -462,7 +462,7 @@ describe('executeGetRagPipeline', () => {
     } as unknown as Env;
 
     const pipelineDefinition: WorkflowDefinition = {
-      nodes: [{ id: 'tool_get', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag' } }],
+      nodes: [{ id: 'tool_get', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag', queryField: '{{ $json.body }}' } }],
       edges: [],
     };
 
@@ -511,6 +511,39 @@ describe('executeGetRagPipeline', () => {
 
     const out = await executeGetRagPipeline(ctx);
     expect(out.query).toBe('liet ke 20 don hang');
+  });
+
+  it('uses OR queryField when only chatInput is present', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', queryField: '{{ $json.body.question || $json.chatInput }}' },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { chatInput: 'doanh thu thang nay', query: 'doanh thu thang nay', text: 'doanh thu thang nay' },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.query).toBe('doanh thu thang nay');
   });
 });
 
