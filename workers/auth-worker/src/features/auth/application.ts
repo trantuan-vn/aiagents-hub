@@ -644,12 +644,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       // Passkey verify already proves possession + device unlock; no TOTP/SMS or novel-device step-up.
-
+      // Bind last-used device after session create so the new-device email still fires.
+      const result = await createUserSession(repository, user, 'passkey', ipAddress, userAgent, country, dForPending);
       if (passkeyCredentialId && dForPending && c.env.NONCE_KV) {
         await bindPasskeyDeviceId(c.env.NONCE_KV, normalizedId, passkeyCredentialId, dForPending);
       }
-
-      return await createUserSession(repository, user, 'passkey', ipAddress, userAgent, country, dForPending);
+      return result;
     },
 
     // IV. Common

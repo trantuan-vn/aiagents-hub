@@ -12,7 +12,7 @@ import {
 } from '@simplewebauthn/server';
 import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import { getIdFromName } from '../../shared/utils';
-import { bindPasskeyDeviceId } from '../auth/device-trust';
+import { bindPasskeyDeviceId, markKnownDevice } from '../auth/device-trust';
 import { createPasskeyRepository } from './infrastructure';
 import type { PasskeyStatus, PasskeyCredentialListItem, IPasskeyRepository } from './domain';
 import type { UserDO } from '../ws/infrastructure/UserDO';
@@ -146,6 +146,7 @@ export function createAccountPasskeyApplication(
 
       if (deviceId) {
         await bindPasskeyDeviceId(c.env.NONCE_KV, identifier, credentialIdB64, deviceId);
+        await markKnownDevice(c.env.NONCE_KV, identifier, deviceId);
       }
     },
 

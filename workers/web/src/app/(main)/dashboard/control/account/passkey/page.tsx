@@ -36,6 +36,20 @@ interface PasskeyCredentialItem {
   createdAt?: string;
 }
 
+function isPasskeyAlreadyRegisteredError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { name?: string; message?: string; code?: string };
+  if (err.name === "InvalidStateError") return true;
+  if (err.code === "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED") return true;
+  return typeof err.message === "string" && err.message.toLowerCase().includes("previously registered");
+}
+
+function isPasskeyCancelledError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const err = error as { name?: string; code?: string };
+  return err.name === "NotAllowedError" || err.code === "ERROR_CEREMONY_ABORTED";
+}
+
 export default function PasskeyPage() {
   const t = useTranslations("AccountPage.passkey");
   const { toast } = useToast();
@@ -128,6 +142,17 @@ export default function PasskeyPage() {
       void refreshUser();
       void fetchCredentials();
     } catch (e) {
+      if (isPasskeyCancelledError(e)) {
+        toast({ title: t("error_cancelled") });
+        return;
+      }
+      if (isPasskeyAlreadyRegisteredError(e)) {
+        toast({
+          title: t("error_already_registered"),
+          description: t("error_already_registered_desc"),
+        });
+        return;
+      }
       const msg = e instanceof Error ? e.message : t("error_verify");
       toast({ title: msg, variant: "destructive" });
     } finally {
@@ -192,6 +217,9 @@ export default function PasskeyPage() {
               {adding ? t("loading") : t("add")}
             </Button>
           </div>
+          {credentials.length > 0 ? (
+            <p className="text-muted-foreground text-sm">{t("icloud_hint")}</p>
+          ) : null}
 
           {credentials.length === 0 ? (
             <p className="bg-muted/30 text-muted-foreground rounded-lg border p-4 text-sm">{t("no_passkeys")}</p>

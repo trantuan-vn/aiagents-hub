@@ -58,6 +58,7 @@
     "use_passkey": "Sign in with passkey",
     "passkey_authenticating": "Authenticating...",
     "passkey_error": "Passkey authentication failed",
+    "passkey_device_mismatch": "This passkey is already synced to this Apple account. Sign-in on iPhone should work with Face ID — try again, or use OTP if it still fails.",
     "passkey_cancelled": "Passkey authentication cancelled",
     "passkey_not_supported": "Passkeys are not supported in this browser",
     "passkey_no_credentials": "No passkey for this account. Use OTP to sign in.",
@@ -3700,6 +3701,10 @@
       "error_options": "Failed to start registration",
       "error_verify": "Failed to add passkey. Please try again.",
       "error_remove": "Failed to remove passkey",
+      "error_already_registered": "This passkey is already on this Apple account",
+      "error_already_registered_desc": "The passkey you added on Mac already syncs to iPhone through iCloud Keychain. You can sign in with Face ID — no need to add another one.",
+      "error_cancelled": "Passkey registration was cancelled.",
+      "icloud_hint": "Apple passkeys sync across your devices via iCloud Keychain. If you already added one on a Mac signed into the same Apple ID, it will work on this iPhone without adding it again.",
       "not_supported": "Passkeys are not supported in this browser."
     },
     "sessions": {

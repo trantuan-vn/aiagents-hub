@@ -32,6 +32,11 @@ function authJsonHeaders(): Record<string, string> {
   return { ...buildAuthClientHeaders(), "Content-Type": "application/json" };
 }
 
+function localizePasskeyError(message: string, t: (key: "passkey_error" | "passkey_device_mismatch") => string): string {
+  if (message === "Device mismatch for passkey") return t("passkey_device_mismatch");
+  return message;
+}
+
 function debounce<T extends (...args: never[]) => void>(func: T, wait: number): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
   return (...args: Parameters<T>) => {
@@ -538,7 +543,10 @@ export function LoginForm() {
         finishLogin(email);
       } catch (error) {
         if (isMounted.current) {
-          const msg = error instanceof Error ? error.message : t("passkey_error");
+          const msg = localizePasskeyError(
+            error instanceof Error ? error.message : t("passkey_error"),
+            t,
+          );
           const isCancel = msg.includes("cancel") || msg.includes("abort") || msg.includes("NotAllowed");
           if (isCancel) {
             toast.info(t("passkey_cancelled"));

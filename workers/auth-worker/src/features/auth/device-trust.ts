@@ -137,24 +137,21 @@ export async function getPasskeyBoundDeviceId(
   return normalizeDeviceId(await kv.get(passkeyDeviceKvKey(identifier, credentialId)));
 }
 
-/** Passkey login: enforce server-bound device_id; bind on first use. */
+/**
+ * Passkey login tags the current browser device_id for session tracking.
+ * Do not pin a credential to the first browser UUID: synced passkeys (iCloud Keychain,
+ * Google Password Manager) are the same authenticator on every device that can assert them.
+ */
 export async function resolvePasskeyLoginDeviceId(
-  kv: KVNamespace,
-  identifier: string,
-  credentialId: string,
+  _kv: KVNamespace,
+  _identifier: string,
+  _credentialId: string,
   rawDeviceId: string | null | undefined,
 ): Promise<string | null> {
-  const d = normalizeDeviceId(rawDeviceId);
-  const bound = await getPasskeyBoundDeviceId(kv, identifier, credentialId);
-  if (bound) {
-    if (!d || d !== bound) {
-      throw new Error('Device mismatch for passkey');
-    }
-    return d;
-  }
-  return d;
+  return normalizeDeviceId(rawDeviceId);
 }
 
+/** Last-used browser UUID for this credential. Does not mark the device known — that must wait until after new-session email. */
 export async function bindPasskeyDeviceId(
   kv: KVNamespace,
   identifier: string,
@@ -166,7 +163,6 @@ export async function bindPasskeyDeviceId(
   await kv.put(passkeyDeviceKvKey(identifier, credentialId), d, {
     expirationTtl: KNOWN_DEVICE_TTL_SEC,
   });
-  await markKnownDevice(kv, identifier, d);
 }
 
 /**

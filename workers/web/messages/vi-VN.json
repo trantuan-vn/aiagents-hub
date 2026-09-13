@@ -58,6 +58,7 @@
     "use_passkey": "Đăng nhập bằng passkey",
     "passkey_authenticating": "Đang xác thực...",
     "passkey_error": "Xác thực passkey thất bại",
+    "passkey_device_mismatch": "Passkey đã đồng bộ trên tài khoản Apple này. iPhone đăng nhập bằng Face ID được — thử lại, hoặc dùng OTP nếu vẫn lỗi.",
     "passkey_cancelled": "Đã hủy xác thực passkey",
     "passkey_not_supported": "Trình duyệt không hỗ trợ passkey",
     "passkey_no_credentials": "Tài khoản chưa có passkey. Dùng OTP để đăng nhập.",
@@ -3702,6 +3703,10 @@
       "error_options": "Không thể bắt đầu đăng ký",
       "error_verify": "Không thể thêm passkey. Vui lòng thử lại.",
       "error_remove": "Không thể xóa passkey",
+      "error_already_registered": "Passkey này đã có trên tài khoản Apple của bạn",
+      "error_already_registered_desc": "Passkey tạo trên Mac đã đồng bộ sang iPhone qua iCloud Keychain. Bạn có thể đăng nhập bằng Face ID — không cần thêm passkey mới.",
+      "error_cancelled": "Đã hủy đăng ký passkey.",
+      "icloud_hint": "Passkey Apple đồng bộ giữa các thiết bị qua iCloud Keychain. Nếu bạn đã thêm trên Mac cùng Apple ID, iPhone đã dùng được passkey đó mà không cần thêm lần nữa.",
       "not_supported": "Trình duyệt này không hỗ trợ passkey."
     },
     "sessions": {
