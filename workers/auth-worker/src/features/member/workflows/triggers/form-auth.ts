@@ -20,8 +20,9 @@ function formAccessCookieName(workflowId: number, formPath: string): string {
 }
 
 export function normalizeFormAuth(value: unknown): FormAuthMode {
-  const raw = String(value ?? 'none');
-  if (raw === 'basic' || raw === 'hub_users' || raw === 'header') return raw === 'header' ? 'hub_users' : raw;
+  const raw = String(value ?? 'none').trim();
+  if (raw === 'basic' || raw === 'basicAuth') return 'basic';
+  if (raw === 'hub_users' || raw === 'header' || raw === 'n8nUserAuth') return 'hub_users';
   return 'none';
 }
 
@@ -212,6 +213,7 @@ export async function handleBasicAuthLoginPost(
     formTitle?: string;
     username: string;
     password: string;
+    respondJson?: boolean;
   },
 ): Promise<Response> {
   const ok = await validateBasicAuthLogin(
@@ -223,6 +225,9 @@ export async function handleBasicAuthLoginPost(
     params.password,
   );
   if (!ok) {
+    if (params.respondJson) {
+      return c.json({ error: 'Invalid username or password', auth: 'basic' }, 401);
+    }
     return c.html(
       renderFormBasicLoginHtml({
         title: params.formTitle || 'Sign in',
@@ -233,5 +238,8 @@ export async function handleBasicAuthLoginPost(
     );
   }
   await grantFormAccess(c, params.workflowId, params.formPath, params.ownerId);
+  if (params.respondJson) {
+    return c.json({ ok: true }, 200);
+  }
   return c.redirect(params.returnUrl, 302);
 }

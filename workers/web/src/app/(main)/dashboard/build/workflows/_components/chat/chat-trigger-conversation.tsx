@@ -8,6 +8,8 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+import { parseChatAuthChallenge, type ChatAuthChallenge } from "./chat-auth";
+
 export type ChatTriggerRole = "user" | "assistant" | "error";
 
 export type ChatTriggerMessage = {
@@ -38,6 +40,16 @@ export function newChatSessionId(): string {
   return `session-${Date.now()}`;
 }
 
+export class ChatAuthRequiredError extends Error {
+  challenge: ChatAuthChallenge;
+
+  constructor(challenge: ChatAuthChallenge) {
+    super("Authentication required");
+    this.name = "ChatAuthRequiredError";
+    this.challenge = challenge;
+  }
+}
+
 export async function postChatTriggerMessage(params: {
   endpointUrl: string;
   sessionId: string;
@@ -54,6 +66,10 @@ export async function postChatTriggerMessage(params: {
     }),
   });
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const challenge = parseChatAuthChallenge(res.status, data);
+  if (challenge) {
+    throw new ChatAuthRequiredError(challenge);
+  }
   if (!res.ok) {
     throw new Error(String(data.error ?? `Request failed (${res.status})`));
   }
@@ -97,6 +113,7 @@ export function ChatTriggerConversation({
   sending,
   onSendingChange,
   onSendStart,
+  onAuthRequired,
   onReply,
   header,
   className,
@@ -111,6 +128,7 @@ export function ChatTriggerConversation({
   sending?: boolean;
   onSendingChange?: (sending: boolean) => void;
   onSendStart?: () => void;
+  onAuthRequired?: (challenge: ChatAuthChallenge) => void;
   onReply?: (result: { output: string; executionKey?: string; status?: string }) => void;
   header?: ReactNode;
   className?: string;
@@ -157,19 +175,22 @@ export function ChatTriggerConversation({
         ]);
         onReply?.(result);
       } catch (error) {
+        if (error instanceof ChatAuthRequiredError) {
+          onAuthRequired?.(error.challenge);
+        }
         onMessagesChange([
           ...next,
           {
             id: `error-${Date.now()}`,
             role: "error",
-            content: error instanceof Error ? error.message : t("chat_send_failed"),
+            content: error instanceof ChatAuthRequiredError ? t("chat_auth_required") : error instanceof Error ? error.message : t("chat_send_failed"),
           },
         ]);
       } finally {
         onSendingChange?.(false);
       }
     },
-    [busy, endpointUrl, messages, onMessagesChange, onReply, onSendStart, onSendingChange, sessionId, t],
+    [busy, endpointUrl, messages, onAuthRequired, onMessagesChange, onReply, onSendStart, onSendingChange, sessionId, t],
   );
 
   const onSubmit = (event: FormEvent) => {

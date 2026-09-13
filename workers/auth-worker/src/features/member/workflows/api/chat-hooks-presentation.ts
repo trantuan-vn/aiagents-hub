@@ -7,6 +7,8 @@ import {
   isFormAccessGranted,
   normalizeFormAuth,
   renderFormBasicLoginHtml,
+  verifyHubUserSession,
+  type FormAuthMode,
 } from '../triggers/form-auth.js';
 import {
   broadcastChatResult,
@@ -44,6 +46,55 @@ function buildChatActionUrl(
   const url = new URL(base);
   url.searchParams.set('owner_id', ownerId);
   return url.toString();
+}
+
+function buildFrontendChatPageUrl(
+  frontend: string,
+  mode: ChatMode,
+  workflowId: number,
+  chatPath: string,
+  ownerId: string,
+): string {
+  const page = `${frontend.replace(/\/+$/, '')}/${chatSegment(mode)}/${workflowId}/${encodeURIComponent(chatPath)}`;
+  const redirectUrl = new URL(page);
+  redirectUrl.searchParams.set('owner_id', ownerId);
+  return redirectUrl.toString();
+}
+
+function withHubAuthReturn(pageUrl: string): string {
+  const url = new URL(pageUrl);
+  url.searchParams.set('hub_auth', '1');
+  return url.toString();
+}
+
+function unauthenticatedChatResponse(
+  c: any,
+  params: {
+    json: boolean;
+    method: string;
+    chatAuth: FormAuthMode;
+    chatTitle: string;
+    actionUrl: string;
+    pageUrl: string;
+    frontend: string;
+    headers: Record<string, string>;
+  },
+) {
+  const { json, method, chatAuth, chatTitle, actionUrl, pageUrl, frontend, headers } = params;
+  if (chatAuth === 'hub_users') {
+    const loginUrl = buildHubLoginRedirectUrl(frontend, withHubAuthReturn(pageUrl));
+    if (json || method !== 'GET') {
+      return c.json({ error: 'Authentication required', auth: 'hub_users', loginUrl }, 401, headers);
+    }
+    return c.redirect(loginUrl, 302);
+  }
+  if (chatAuth === 'basic') {
+    if (json || method !== 'GET') {
+      return c.json({ error: 'Authentication required', auth: 'basic' }, 401, headers);
+    }
+    return c.html(renderFormBasicLoginHtml({ title: chatTitle, actionUrl }));
+  }
+  return c.json({ error: 'Authentication required' }, 401, headers);
 }
 
 function corsHeaders(originHeader: string | undefined, allowedOrigins: string): Record<string, string> {
@@ -191,6 +242,9 @@ async function handleChatRequest(
   const chatTitle = String(options.title || data?.label || 'Chat');
   const credentialKey = String(data?.chatCredentialKey ?? '');
 
+  const frontend = (c.env.FRONTEND_URL as string) || 'https://aiagents-hub.vn';
+  const pageUrl = buildFrontendChatPageUrl(frontend, mode, workflowId, ctx.chatPath, ctx.ownerId);
+
   if (c.req.method === 'POST' && chatAuth === 'basic') {
     const contentType = c.req.header('content-type') ?? '';
     if (contentType.includes('application/x-www-form-urlencoded')) {
@@ -202,35 +256,40 @@ async function handleChatRequest(
           formPath: ctx.chatPath,
           ownerId: ctx.ownerId,
           credentialKey,
-          returnUrl: actionUrl,
+          returnUrl: pageUrl,
           formTitle: chatTitle,
           username: params.get('username') ?? '',
           password: params.get('password') ?? '',
+          respondJson: json,
         });
       }
     }
   }
 
-  const accessGranted = await isFormAccessGranted(c, bindingName, {
+  let accessGranted = await isFormAccessGranted(c, bindingName, {
     formAuth: chatAuth,
     workflowId,
     formPath: ctx.chatPath,
     ownerId: ctx.ownerId,
     credentialKey,
   });
+  // Editor listen URLs are already gated; allow the signed-in author to test
+  // without completing the public Basic Auth / hub-user gate first.
+  if (!accessGranted && mode === 'test') {
+    accessGranted = await verifyHubUserSession(c, bindingName);
+  }
 
   if (!accessGranted) {
-    if (chatAuth === 'hub_users') {
-      const frontend = (c.env.FRONTEND_URL as string) || 'https://aiagents-hub.vn';
-      const loginUrl = buildHubLoginRedirectUrl(frontend, actionUrl);
-      return c.redirect(loginUrl, 302);
-    }
-    if (chatAuth === 'basic') {
-      if (c.req.method === 'GET') {
-        return c.html(renderFormBasicLoginHtml({ title: chatTitle, actionUrl }));
-      }
-      return c.json({ error: 'Authentication required' }, 401, headers);
-    }
+    return unauthenticatedChatResponse(c, {
+      json,
+      method: c.req.method,
+      chatAuth,
+      chatTitle,
+      actionUrl,
+      pageUrl,
+      frontend,
+      headers,
+    });
   }
 
   const hosted = String(data?.chatMode ?? 'hostedChat') !== 'webhook';
@@ -253,11 +312,7 @@ async function handleChatRequest(
         headers,
       );
     }
-    const frontend = (c.env.FRONTEND_URL as string) || 'https://aiagents-hub.vn';
-    const page = `${frontend.replace(/\/+$/, '')}/${chatSegment(mode)}/${workflowId}/${encodeURIComponent(ctx.chatPath)}`;
-    const redirectUrl = new URL(page);
-    redirectUrl.searchParams.set('owner_id', ctx.ownerId);
-    return c.redirect(redirectUrl.toString(), 302);
+    return c.redirect(pageUrl, 302);
   }
 
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
