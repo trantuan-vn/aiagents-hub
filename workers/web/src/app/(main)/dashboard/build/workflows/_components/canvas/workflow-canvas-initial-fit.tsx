@@ -1,27 +1,63 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-import { useReactFlow } from "@xyflow/react";
+import { useNodesInitialized, useReactFlow } from "@xyflow/react";
 
-const FIT_VIEW_OPTIONS = { padding: 0.2, duration: 0 } as const;
+export const WORKFLOW_FIT_VIEW_OPTIONS = { padding: 0.2, duration: 200 } as const;
 
-let didInitialFit = false;
+/** Fit once the graph and viewport are ready — each time the editor canvas mounts. */
+export function WorkflowCanvasInitialFit({
+  enabled,
+  resetKey,
+}: {
+  enabled: boolean;
+  resetKey?: number | string;
+}) {
+  const { fitView, viewportInitialized } = useReactFlow();
+  const nodesInitialized = useNodesInitialized();
+  const didFitRef = useRef(false);
+  const lastResetKeyRef = useRef(resetKey);
 
-/** One-time fit after React Flow init — no store subscription (avoids extra React Flow repaints). */
-export function WorkflowCanvasInitialFit({ enabled }: { enabled: boolean }) {
-  const { fitView } = useReactFlow();
+  if (lastResetKeyRef.current !== resetKey) {
+    lastResetKeyRef.current = resetKey;
+    didFitRef.current = false;
+  }
 
   useEffect(() => {
-    if (!enabled || didInitialFit) return;
+    if (!enabled || !nodesInitialized || !viewportInitialized || didFitRef.current) return;
 
-    const frame = requestAnimationFrame(() => {
-      void fitView(FIT_VIEW_OPTIONS);
-      didInitialFit = true;
+    let cancelled = false;
+    let attempts = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let innerFrame = 0;
+
+    const tryFit = () => {
+      if (cancelled || didFitRef.current) return;
+      void Promise.resolve(fitView(WORKFLOW_FIT_VIEW_OPTIONS)).then((fitted) => {
+        if (cancelled) return;
+        if (fitted) {
+          didFitRef.current = true;
+          return;
+        }
+        if (attempts < 8) {
+          attempts += 1;
+          retryTimer = setTimeout(tryFit, 50);
+        }
+      });
+    };
+
+    const outerFrame = requestAnimationFrame(() => {
+      innerFrame = requestAnimationFrame(tryFit);
     });
 
-    return () => cancelAnimationFrame(frame);
-  }, [enabled, fitView]);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(outerFrame);
+      cancelAnimationFrame(innerFrame);
+      if (retryTimer !== undefined) clearTimeout(retryTimer);
+    };
+  }, [enabled, nodesInitialized, viewportInitialized, fitView, resetKey]);
 
   return null;
 }

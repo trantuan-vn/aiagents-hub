@@ -9,6 +9,8 @@ import { useTranslations } from "next-intl";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+import { WORKFLOW_FIT_VIEW_OPTIONS } from "./workflow-canvas-initial-fit";
+
 interface WorkflowCanvasControlsProps {
   readOnly?: boolean;
   onTidy?: () => void;
@@ -69,7 +71,7 @@ export function WorkflowCanvasControls({ readOnly, onTidy }: WorkflowCanvasContr
   }, [getViewport, setViewport]);
 
   const handleFitView = useCallback(() => {
-    void fitView({ padding: 0.2, duration: 200 });
+    void fitView(WORKFLOW_FIT_VIEW_OPTIONS);
   }, [fitView]);
 
   const handleTidy = useCallback(() => {

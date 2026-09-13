@@ -513,7 +513,7 @@ const CanvasSurface = memo(function CanvasSurface({
         onNodeDoubleClick={onNodeDoubleClick}
         {...interactionProps}
       >
-        <WorkflowCanvasInitialFit enabled={nodes.length > 0} />
+        <WorkflowCanvasInitialFit enabled={nodes.length > 0} resetKey={workflowId} />
         <WorkflowEdgeMarkers />
         <Background gap={20} size={1} />
         <WorkflowCanvasTidyBridge
