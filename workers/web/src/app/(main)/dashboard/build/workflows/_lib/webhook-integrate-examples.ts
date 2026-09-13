@@ -1,7 +1,7 @@
-const SAMPLE_BODY = { message: "Hello" };
+const SAMPLE_BODY = { question: "Your question here" };
 const SAMPLE_BODY_JSON = JSON.stringify(SAMPLE_BODY);
 
-export type WebhookIntegrateLang = "curl" | "javascript" | "python" | "java";
+export type WebhookIntegrateLang = "curl" | "javascript" | "python" | "java" | "go" | "rust";
 
 export type WebhookIntegrateExampleParams = {
   url: string;
@@ -63,5 +63,48 @@ HttpRequest request = HttpRequest.newBuilder()
     .build();
 HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 System.out.println(response.body());`,
+    go: `package main
+
+import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+func main() {
+	body := []byte(\`${SAMPLE_BODY_JSON}\`)
+	req, err := http.NewRequest(http.MethodPost, "${url}", bytes.NewReader(body))
+	if err != nil {
+		panic(err)
+	}
+	req.Header.Set("Authorization", "Bearer ${token}")
+	req.Header.Set("X-Client-ID", "${clientId}")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	fmt.Println(string(data))
+}`,
+    rust: `use reqwest::Client;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new();
+    let response = client
+        .post("${url}")
+        .header("Authorization", "Bearer ${token}")
+        .header("X-Client-ID", "${clientId}")
+        .header("Content-Type", "application/json")
+        .body(r#"${SAMPLE_BODY_JSON}"#)
+        .send()
+        .await?;
+    println!("{}", response.text().await?);
+    Ok(())
+}`,
   };
 }

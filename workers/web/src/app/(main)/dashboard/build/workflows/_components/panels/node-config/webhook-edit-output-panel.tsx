@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 
+import { buildWebhookItemOutput, normalizeWebhookItemOutput } from "@aiagents-hub/workflow-nodes";
 import { Info } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-import {
-  buildWebhookItemOutput,
-  normalizeWebhookItemOutput,
-} from "@aiagents-hub/workflow-nodes";
 
 import { JsonCodeEditor } from "./json-code-editor";
 
@@ -29,7 +25,7 @@ export const DEFAULT_MOCK_OUTPUT_JSON = JSON.stringify(
       },
       params: {},
       query: {},
-      body: { message: "Hello" },
+      body: { question: "Hello" },
       executionMode: "test",
     }),
   ],
@@ -43,14 +39,14 @@ export function outputToEditorText(output: unknown, webhookUrl?: string): string
   if (output == null) {
     if (webhookUrl) {
       return JSON.stringify(
-        [buildWebhookItemOutput({ webhookUrl, body: { message: "Hello" }, executionMode: "test" })],
+        [buildWebhookItemOutput({ webhookUrl, body: { question: "Hello" }, executionMode: "test" })],
         null,
         2,
       );
     }
     return DEFAULT_MOCK_OUTPUT_JSON;
   }
-  if (typeof output === "object" && Object.keys(output as object).length === 0) {
+  if (typeof output === "object" && Object.keys(output).length === 0) {
     return DEFAULT_MOCK_OUTPUT_JSON;
   }
   return JSON.stringify(output, null, 2);
@@ -63,12 +59,7 @@ type WebhookEditOutputPanelProps = {
   onCancel: () => void;
 };
 
-export function WebhookEditOutputPanel({
-  initialOutput,
-  webhookUrl,
-  onSave,
-  onCancel,
-}: WebhookEditOutputPanelProps) {
+export function WebhookEditOutputPanel({ initialOutput, webhookUrl, onSave, onCancel }: WebhookEditOutputPanelProps) {
   const t = useTranslations("WorkflowNodeRegistry");
   const [text, setText] = useState(() => outputToEditorText(initialOutput, webhookUrl));
 

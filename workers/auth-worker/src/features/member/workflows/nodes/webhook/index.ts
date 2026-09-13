@@ -11,6 +11,8 @@ export {
 export {
   buildWebhookItemOutput,
   normalizeWebhookItemOutput,
+  normalizeWebhookIngressBody,
+  resolveWebhookQuestion,
   parseWebhookRequest,
   type WebhookItemOutput,
   type BuildWebhookItemParams,

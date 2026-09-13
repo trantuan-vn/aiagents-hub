@@ -13,6 +13,8 @@ export type WebhookItemOutput = {
   files?: WebhookFileOutput[];
   webhookUrl: string;
   executionMode: "test" | "production";
+  /** Copied from body.question (and aliases) for `$json.chatInput`. */
+  chatInput?: string;
 };
 
 export type BuildWebhookItemParams = {
@@ -28,15 +30,42 @@ export type BuildWebhookItemParams = {
 
 const WEBHOOK_ITEM_KEYS = ["headers", "params", "query", "body", "webhookUrl", "executionMode"] as const;
 
+const WEBHOOK_QUESTION_KEYS = ["question", "message", "query", "text", "chatInput", "input"] as const;
+
+/** Read the user question from webhook JSON aliases (`question`, `message`, …). */
+export function resolveWebhookQuestion(body: unknown): string {
+  if (typeof body === "string" && body.trim()) return body.trim();
+  if (!body || typeof body !== "object" || Array.isArray(body)) return "";
+  const rec = body as Record<string, unknown>;
+  for (const key of WEBHOOK_QUESTION_KEYS) {
+    const value = rec[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+/** Ensure `$json.body.question` is set so Get RAG / Agent can read the payload. */
+export function normalizeWebhookIngressBody(body: unknown): unknown {
+  const question = resolveWebhookQuestion(body);
+  if (!question) return body ?? {};
+  if (!body || typeof body !== "object" || Array.isArray(body)) return { question };
+  const rec = { ...(body as Record<string, unknown>) };
+  if (typeof rec.question !== "string" || !String(rec.question).trim()) rec.question = question;
+  return rec;
+}
+
 export function buildWebhookItemOutput(params: BuildWebhookItemParams): WebhookItemOutput {
+  const body = normalizeWebhookIngressBody(params.body);
+  const question = resolveWebhookQuestion(body);
   return {
     headers: params.headers ?? {},
     params: params.params ?? {},
     query: params.query ?? {},
-    body: params.body ?? {},
+    body,
     ...(params.files?.length ? { files: params.files } : {}),
     webhookUrl: params.webhookUrl,
     executionMode: params.executionMode ?? "test",
+    ...(question ? { chatInput: question } : {}),
   };
 }
 
@@ -52,14 +81,14 @@ export function normalizeWebhookItemOutput(raw: unknown, fallbackUrl?: string): 
   const obj = value as Record<string, unknown>;
 
   if (WEBHOOK_ITEM_KEYS.every((k) => k in obj)) {
-    return {
+    return buildWebhookItemOutput({
       headers: asStringRecord(obj.headers),
       params: asStringRecord(obj.params),
       query: asStringRecord(obj.query),
       body: obj.body ?? {},
       webhookUrl: String(obj.webhookUrl ?? fallbackUrl ?? ""),
       executionMode: obj.executionMode === "production" ? "production" : "test",
-    };
+    });
   }
 
   if ("body" in obj || "method" in obj) {
@@ -253,6 +282,18 @@ export async function parseWebhookRequest(
   if (!input) {
     input = trigger.input ?? "";
   }
+
+  const fromQuery: Record<string, unknown> = {};
+  for (const key of WEBHOOK_QUESTION_KEYS) {
+    if (query[key]) fromQuery[key] = query[key];
+  }
+  const mergedBody =
+    typeof body === "object" && body !== null && !Array.isArray(body)
+      ? { ...fromQuery, ...(body as Record<string, unknown>) }
+      : Object.keys(fromQuery).length
+        ? fromQuery
+        : body;
+  body = normalizeWebhookIngressBody(mergedBody);
 
   return {
     input,

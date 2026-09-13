@@ -22,12 +22,16 @@ const LANGS: {
     | "webhook_integrate_lang_curl"
     | "webhook_integrate_lang_javascript"
     | "webhook_integrate_lang_python"
-    | "webhook_integrate_lang_java";
+    | "webhook_integrate_lang_java"
+    | "webhook_integrate_lang_go"
+    | "webhook_integrate_lang_rust";
 }[] = [
   { id: "curl", labelKey: "webhook_integrate_lang_curl" },
   { id: "javascript", labelKey: "webhook_integrate_lang_javascript" },
   { id: "python", labelKey: "webhook_integrate_lang_python" },
   { id: "java", labelKey: "webhook_integrate_lang_java" },
+  { id: "go", labelKey: "webhook_integrate_lang_go" },
+  { id: "rust", labelKey: "webhook_integrate_lang_rust" },
 ];
 
 function exampleForLang(examples: Record<WebhookIntegrateLang, string>, lang: WebhookIntegrateLang): string {
@@ -40,11 +44,22 @@ function exampleForLang(examples: Record<WebhookIntegrateLang, string>, lang: We
       return examples.python;
     case "java":
       return examples.java;
+    case "go":
+      return examples.go;
+    case "rust":
+      return examples.rust;
   }
 }
 
 function isWebhookIntegrateLang(value: string): value is WebhookIntegrateLang {
-  return value === "curl" || value === "javascript" || value === "python" || value === "java";
+  return (
+    value === "curl" ||
+    value === "javascript" ||
+    value === "python" ||
+    value === "java" ||
+    value === "go" ||
+    value === "rust"
+  );
 }
 
 function CopyIconButton({
@@ -183,6 +198,9 @@ export function WorkflowWebhookIntegrateDialog({
                 <p>
                   <span className="text-muted-foreground">Content-Type:</span> application/json
                 </p>
+                <p>
+                  <span className="text-muted-foreground">Body:</span> {`{ "question": "..." }`}
+                </p>
               </div>
             </section>
 
@@ -198,8 +216,8 @@ export function WorkflowWebhookIntegrateDialog({
                   }}
                   className="gap-0"
                 >
-                  <div className="bg-muted/50 flex items-center justify-between gap-2 border-b px-2 py-1.5">
-                    <TabsList className="h-8">
+                  <div className="bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-2 py-1.5">
+                    <TabsList className="h-auto flex-wrap">
                       {LANGS.map((lang) => (
                         <TabsTrigger key={lang.id} value={lang.id} className="px-2.5 text-xs">
                           {t(lang.labelKey)}

@@ -67,7 +67,7 @@ export async function handleWebhookRequestByWorkflowId(
   const trigger = await findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
   if (!trigger) return { notFound: true };
 
-  const { input, itemParams } = await parseWebhookRequest(request, trigger, { executionMode: 'test' });
+  const { input, itemParams } = await parseWebhookRequest(request, trigger, { executionMode: 'production' });
   const webhookItem = buildWebhookItemOutput(itemParams);
   const result = await runTrigger(env, bindingName, trigger, input, itemParams);
 
