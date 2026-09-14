@@ -75,8 +75,9 @@ export default async function Layout({ children }: LayoutProps<"/dashboard">) {
         </header>
         <DashboardUserProvider user={user}>
           <StrongAuthSetupRedirect />
-          <SensitiveStepUpRedirect />
-          <div className="h-full min-w-0 overflow-x-hidden p-4 md:p-6">{children}</div>
+          <SensitiveStepUpRedirect>
+            <div className="h-full min-w-0 overflow-x-hidden p-4 md:p-6">{children}</div>
+          </SensitiveStepUpRedirect>
         </DashboardUserProvider>
       </SidebarInset>
     </SidebarProvider>

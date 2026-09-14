@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { CreatePolicyDialog } from "./_components/create-policy-dialog";
 import { PolicyList } from "./_components/policy-list";
@@ -35,8 +36,9 @@ export default function PolicyPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
+        const errBody = await parseDashboardApiError(response);
+        if (isStepUpRequired(errBody)) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       const data: PricePolicy[] = await response.json();

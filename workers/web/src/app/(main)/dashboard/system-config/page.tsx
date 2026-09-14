@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { ConfigCard } from "./_components/config-card";
 import { getAuthFields, getBillingFields, getD1tor2Fields, getQueueFields } from "./_components/field-definitions";
@@ -21,14 +22,6 @@ import type {
 } from "./_components/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
-
-function parseErrorResponse(data: unknown, defaultMsg: string): string {
-  if (data && typeof data === "object" && "error" in data) {
-    const err = (data as { error?: string }).error;
-    return typeof err === "string" ? err : defaultMsg;
-  }
-  return defaultMsg;
-}
 
 export default function SystemConfigPage() {
   const t = useTranslations("SystemConfigPage");
@@ -49,8 +42,9 @@ export default function SystemConfigPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(parseErrorResponse(errData, t("fetch_error")));
+        const errBody = await parseDashboardApiError(response);
+        if (isStepUpRequired(errBody)) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       interface ApiResponse {
@@ -94,8 +88,8 @@ export default function SystemConfigPage() {
       });
 
       if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(parseErrorResponse(errData, t("save_error")));
+        const errBody = await parseDashboardApiError(response);
+        throw new Error(dashboardApiErrorMessage(errBody, t("save_error")));
       }
 
       toast({

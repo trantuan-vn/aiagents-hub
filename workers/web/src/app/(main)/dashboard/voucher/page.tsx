@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { CreateVoucherDialog } from "./_components/create-voucher-dialog";
 import { type CreateVoucher, type Voucher } from "./_components/schema";
@@ -35,8 +36,9 @@ export default function VoucherPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
+        const errBody = await parseDashboardApiError(response);
+        if (isStepUpRequired(errBody)) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       const data: Voucher[] = await response.json();
@@ -70,8 +72,8 @@ export default function VoucherPage() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("create_error"));
+      const errBody = await parseDashboardApiError(response);
+      throw new Error(dashboardApiErrorMessage(errBody, t("create_error")));
     }
 
     const result = await response.json();
@@ -90,8 +92,8 @@ export default function VoucherPage() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("delete_error"));
+      const errBody = await parseDashboardApiError(response);
+      throw new Error(dashboardApiErrorMessage(errBody, t("delete_error")));
     }
 
     void fetchVouchers(); // Refresh the list

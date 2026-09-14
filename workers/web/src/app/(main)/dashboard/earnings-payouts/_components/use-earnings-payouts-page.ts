@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import type { PayoutItem } from "./earnings-payout-table";
 
@@ -63,7 +64,11 @@ export function useEarningsPayoutsPage(isAdmin: boolean) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errBody = await parseDashboardApiError(res);
+        if (isStepUpRequired(errBody)) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("load_error")));
+      }
       const data: {
         items?: PayoutItem[];
         accruingItems?: PayoutItem[];

@@ -20,3 +20,7 @@ export function dashboardApiErrorMessage(body: DashboardApiErrorBody | null, fal
   const msg = body?.error?.trim();
   return msg || fallback;
 }
+
+export function isStepUpRequired(body: DashboardApiErrorBody | null | undefined): boolean {
+  return Boolean(body?.stepUpRequired);
+}

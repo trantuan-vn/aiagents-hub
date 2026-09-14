@@ -57,7 +57,6 @@ export default function StepUpPage() {
     scope: "session",
     envFallbackSiteKey: ENV_TURNSTILE_SITE_KEY,
   });
-  const didAutoLoadRef = useRef(false);
   const pendingWalletVerifyRef = useRef(false);
   const walletVerifyInFlightRef = useRef(false);
 
@@ -205,18 +204,20 @@ export default function StepUpPage() {
     [requestStepUpFromUser, requesting, resetChallenge],
   );
 
+  const loadAvailableMethodsRef = useRef(loadAvailableMethods);
+  const requestStepUpRef = useRef(requestStepUp);
+  loadAvailableMethodsRef.current = loadAvailableMethods;
+  requestStepUpRef.current = requestStepUp;
+
   useEffect(() => {
-    if (didAutoLoadRef.current) return;
     if (!captcha.configLoaded) return;
-    if (captcha.needsTokenBeforeSubmit) return;
-    didAutoLoadRef.current = true;
     let cancelled = false;
     void (async () => {
       try {
-        const methods = await loadAvailableMethods();
+        const methods = await loadAvailableMethodsRef.current();
         if (cancelled) return;
         if (methods.length === 1) {
-          await requestStepUp(methods[0]!);
+          await requestStepUpRef.current(methods[0]!);
         } else {
           setLoading(false);
         }
@@ -233,7 +234,7 @@ export default function StepUpPage() {
     return () => {
       cancelled = true;
     };
-  }, [captcha.configLoaded, captcha.needsTokenBeforeSubmit, loadAvailableMethods, requestStepUp, t, toast]);
+  }, [captcha.configLoaded]); // eslint-disable-line react-hooks/exhaustive-deps -- callbacks via refs
 
   const verifyWalletStepUp = useCallback(async () => {
     if (!walletNonce) throw new Error(t("wallet_challenge_missing"));

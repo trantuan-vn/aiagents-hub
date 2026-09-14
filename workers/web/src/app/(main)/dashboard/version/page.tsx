@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { dashboardApiErrorMessage, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { SaveVersionDialog } from "./_components/save-version-dialog";
 import type { VersionData, VersionInfo, VersionListResponse, VersionSaveResponse } from "./_components/schema";
@@ -35,8 +36,9 @@ export default function VersionPage() {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || t("fetch_error"));
+        const errBody = await parseDashboardApiError(response);
+        if (errBody?.stepUpRequired) return;
+        throw new Error(dashboardApiErrorMessage(errBody, t("fetch_error")));
       }
 
       const data: VersionListResponse = await response.json();
@@ -69,8 +71,8 @@ export default function VersionPage() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("save_error"));
+      const errBody = await parseDashboardApiError(response);
+      throw new Error(dashboardApiErrorMessage(errBody, t("save_error")));
     }
 
     const result = await response.json();
@@ -88,8 +90,8 @@ export default function VersionPage() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("view_error"));
+      const errBody = await parseDashboardApiError(response);
+      throw new Error(dashboardApiErrorMessage(errBody, t("view_error")));
     }
 
     return await response.json();
@@ -105,8 +107,8 @@ export default function VersionPage() {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || t("upgrade_error"));
+      const errBody = await parseDashboardApiError(response);
+      throw new Error(dashboardApiErrorMessage(errBody, t("upgrade_error")));
     }
 
     void fetchVersions(); // Refresh the list
