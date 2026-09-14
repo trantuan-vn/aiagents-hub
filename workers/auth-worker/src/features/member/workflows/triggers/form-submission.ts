@@ -1,6 +1,11 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { executeWorkflowGraph } from '../engine/executor.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
+import {
+  bindResolvedToActor,
+  ownerRunActor,
+  type WorkflowRunActor,
+} from '../execution/workflow-runner.js';
 import { broadcastWorkflowWebhookResult } from './webhook-notify.js';
 
 export type FormElementConfig = {
@@ -336,21 +341,27 @@ export async function runFormSubmissionTrigger(params: {
   formUrl: string;
   executionMode: 'test' | 'production';
   autoApproveHumanReview?: boolean;
+  actor?: WorkflowRunActor;
 }): Promise<Awaited<ReturnType<typeof executeWorkflowGraph>>> {
   const output = buildFormSubmissionOutput(params.fields, {
     formUrl: params.formUrl,
     executionMode: params.executionMode,
   });
   const input = JSON.stringify(params.fields);
+  const binding = (params.env as unknown as Record<string, unknown>)[
+    params.bindingName
+  ] as DurableObjectNamespace;
+  const actor = params.actor ?? ownerRunActor(params.ownerId);
+  const resolved = bindResolvedToActor(params.resolved, actor, binding);
 
   return executeWorkflowGraph({
     c: { env: params.env } as any,
     bindingName: params.bindingName,
-    user: { identifier: params.ownerId },
-    resolved: params.resolved,
+    user: { identifier: actor.identifier },
+    resolved,
     input,
     autoApproveHumanReview: params.autoApproveHumanReview ?? true,
-    runnerDoIdString: params.ownerId,
+    runnerDoIdString: actor.runnerDoIdString,
     requestMeta: { userAgent: 'trigger:form' },
     entryNodeIds: [params.node.id],
     runContextOverride: output,

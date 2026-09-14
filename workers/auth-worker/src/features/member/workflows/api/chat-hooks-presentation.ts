@@ -8,6 +8,7 @@ import {
   normalizeFormAuth,
   renderFormBasicLoginHtml,
   verifyHubUserSession,
+  resolveHubSessionIdentifier,
   type FormAuthMode,
 } from '../triggers/form-auth.js';
 import {
@@ -27,6 +28,10 @@ import {
   resolveOwnedWorkflow,
   syncChatTriggersForWorkflow,
 } from '../triggers/triggers.js';
+import {
+  actorForPublicTrigger,
+  progressDoIdForActor,
+} from '../execution/workflow-runner.js';
 
 type ChatMode = 'test' | 'production';
 
@@ -292,6 +297,27 @@ async function handleChatRequest(
     });
   }
 
+  const binding = c.env[bindingName] as DurableObjectNamespace;
+  const sessionIdentifier = await resolveHubSessionIdentifier(c, bindingName);
+  const gated = actorForPublicTrigger({
+    binding,
+    mode,
+    resolved: ctx.resolved,
+    sessionIdentifier,
+  });
+  if ('needLogin' in gated) {
+    return unauthenticatedChatResponse(c, {
+      json,
+      method: c.req.method,
+      chatAuth: 'hub_users',
+      chatTitle,
+      actionUrl,
+      pageUrl,
+      frontend,
+      headers,
+    });
+  }
+
   const hosted = String(data?.chatMode ?? 'hostedChat') !== 'webhook';
 
   if (c.req.method === 'GET') {
@@ -326,7 +352,7 @@ async function handleChatRequest(
     env: c.env,
     bindingName,
     ownerId: ctx.ownerId,
-    resolved: ctx.resolved,
+    resolved: gated.resolved,
     node: ctx.node,
     sessionId: parsed.sessionId,
     chatInput: parsed.chatInput,
@@ -334,20 +360,26 @@ async function handleChatRequest(
     chatUrl,
     executionMode: mode,
     autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
+    actor: gated.actor,
   });
 
-  await broadcastChatResult(c.env, bindingName, ctx.ownerId, {
-    workflowId,
-    nodeId: ctx.node.id,
-    chatPath: ctx.chatPath,
-    executionKey: result.executionKey,
-    status: result.status,
-    sessionId: parsed.sessionId,
-    chatInput: parsed.chatInput,
-    action: parsed.action,
-    chatUrl,
-    executionMode: mode,
-  });
+  await broadcastChatResult(
+    c.env,
+    bindingName,
+    progressDoIdForActor(gated.actor, binding, ctx.ownerId),
+    {
+      workflowId,
+      nodeId: ctx.node.id,
+      chatPath: ctx.chatPath,
+      executionKey: result.executionKey,
+      status: result.status,
+      sessionId: parsed.sessionId,
+      chatInput: parsed.chatInput,
+      action: parsed.action,
+      chatUrl,
+      executionMode: mode,
+    },
+  );
 
   if (result.status === 'failed') {
     const error =

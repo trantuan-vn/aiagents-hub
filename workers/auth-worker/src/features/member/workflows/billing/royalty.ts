@@ -1,6 +1,7 @@
 import { roundUsdAmount } from '../../../admin/service/pricing.js';
 import { executeUtils } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
+import { runnerDoIdFromIdentifier } from '../execution/workflow-runner.js';
 import { getWorkflowRoyaltyPercentFromEnv } from './get-royalty-percent.js';
 
 export interface WorkflowRoyaltyContext {
@@ -23,7 +24,7 @@ export async function recordWorkflowRoyalty(
   if (!baseCostUsd || baseCostUsd <= 0) return null;
   if (!workflowOwnerId || !workflowId) return null;
   const binding = env[bindingName as keyof Env] as DurableObjectNamespace;
-  const consumerDoId = binding.idFromName(consumerIdentifier).toString();
+  const consumerDoId = runnerDoIdFromIdentifier(binding, consumerIdentifier);
   if (consumerDoId === workflowOwnerId) return null;
   const royaltyPercent = await getWorkflowRoyaltyPercentFromEnv(env);
   const royaltyAmountUsd = roundUsdAmount((baseCostUsd * royaltyPercent) / 100);
@@ -46,7 +47,6 @@ export async function recordWorkflowRoyalty(
   if (!ownerUser?.id) return null;
   const currentEarnings =
     Number(wf.totalEarningsUsd ?? wf.totalEarningsVnd ?? wf.total_earnings_usd ?? wf.total_earnings_vnd ?? 0) || 0;
-  const usageCount = Number(wf.usageCount ?? wf.usage_count ?? 0) || 0;
   const operations: Array<{
     table: string;
     operation: 'insert' | 'update';
@@ -60,7 +60,6 @@ export async function recordWorkflowRoyalty(
       data: {
         ...wf,
         totalEarningsUsd: currentEarnings + royaltyAmountUsd,
-        usageCount: usageCount + 1,
       },
     },
     {
@@ -82,4 +81,31 @@ export async function recordWorkflowRoyalty(
   await executeUtils.executeDynamicAction(ownerDO, 'multi-table', { operations });
 
   return { royaltyAmountUsd, royaltyPercent };
+}
+
+/** Count one consumer run of a shared workflow (independent of billable AI steps). */
+export async function incrementSharedWorkflowUsage(
+  env: Env,
+  bindingName: string,
+  workflowId: number,
+  workflowOwnerId: string,
+): Promise<void> {
+  if (!workflowId || !workflowOwnerId) return;
+  const binding = env[bindingName as keyof Env] as DurableObjectNamespace;
+  const ownerDO = binding.get(binding.idFromString(workflowOwnerId)) as DurableObjectStub<UserDO>;
+  const workflows = await executeUtils.executeDynamicAction(
+    ownerDO,
+    'select',
+    { where: { field: 'id', operator: '=', value: workflowId } },
+    'agent_workflows',
+  );
+  const wf = Array.isArray(workflows) ? workflows[0] : workflows;
+  if (!wf) return;
+  const usageCount = Number(wf.usageCount ?? wf.usage_count ?? 0) || 0;
+  await executeUtils.executeDynamicAction(
+    ownerDO,
+    'update',
+    { id: wf.id, ...wf, usageCount: usageCount + 1 },
+    'agent_workflows',
+  );
 }

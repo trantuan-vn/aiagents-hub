@@ -1,7 +1,7 @@
 import type { WorkflowDefinition, WorkflowNodeTypeSchema } from '../domain/domain.js';
 import type { z } from 'zod';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
-import { workflowAttribution } from '../execution/workflow-context.js';
+import { workflowAttribution, resolveWorkflow } from '../execution/workflow-context.js';
 import { getIdFromName } from '../../../../shared/utils.js';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import {
@@ -43,7 +43,7 @@ import {
 } from './human-review-queue.js';
 import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
 import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
-import { resolveWorkflow } from '../execution/workflow-context.js';
+import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -795,6 +795,17 @@ export async function executeWorkflowGraph(
     await persistResult(userDO, record.id, persisted, result, executionKey);
   } catch (e) {
     console.warn('[executeWorkflowGraph] persist failed:', e instanceof Error ? e.message : e);
+  }
+
+  if (!resolved.isOwnedByUser) {
+    try {
+      await incrementSharedWorkflowUsage(c.env, bindingName, resolved.workflowId, resolved.ownerId);
+    } catch (e) {
+      console.warn(
+        '[executeWorkflowGraph] usage count failed:',
+        e instanceof Error ? e.message : e,
+      );
+    }
   }
 
   return {

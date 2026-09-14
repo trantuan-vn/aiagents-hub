@@ -10,12 +10,11 @@ import {
 import { handleWebhookRequest, handleWebhookRequestByWorkflowId } from '../nodes/webhook/trigger.js';
 import {
   findChannelTrigger,
-  findWebhookTriggerByWorkflowId,
-  listWebhookTriggersForWorkflow,
+  resolveWebhookTriggerForCaller,
   runTrigger,
-  syncWebhookTriggersForWorkflow,
 } from '../triggers/triggers.js';
 import { validateWebhookApiToken } from '../triggers/webhook-auth.js';
+import { consumerRunActor } from '../execution/workflow-runner.js';
 
 /**
  * Public webhook endpoints that fire workflows. Mounted OUTSIDE the
@@ -93,39 +92,36 @@ export function createWorkflowHookRoutes(bindingName: string) {
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
 
-      const auth = await validateWebhookApiToken(c, bindingName, String(clientId));
-
-      await syncWebhookTriggersForWorkflow(c.env, bindingName, db, String(clientId), workflowId);
-
-      const trigger = await findWebhookTriggerByWorkflowId(
+      const callerId = String(clientId);
+      const auth = await validateWebhookApiToken(c, bindingName, callerId);
+      const resolvedTrigger = await resolveWebhookTriggerForCaller({
+        env: c.env,
+        bindingName,
         db,
         workflowId,
-        String(clientId),
+        callerId,
         webhookPath,
-      );
-      if (!trigger) {
-        const count = (await listWebhookTriggersForWorkflow(db, workflowId, String(clientId))).length;
-        if (count > 1 && !webhookPath) {
-          return c.json(
-            {
-              error:
-                'Multiple webhooks in this workflow — use /hooks/workflows/:workflowId/:webhookPath',
-            },
-            400,
-          );
-        }
-        return c.json({ error: 'Webhook not found' }, 404);
+        ownerHint: c.req.query('owner_id') ?? undefined,
+      });
+      if ('error' in resolvedTrigger) {
+        return c.json({ error: resolvedTrigger.error }, resolvedTrigger.status);
       }
+
+      const actor =
+        resolvedTrigger.ownerId !== callerId
+          ? consumerRunActor(String(auth.identifier ?? callerId), callerId)
+          : undefined;
 
       const result = await handleWebhookRequestByWorkflowId(
         c.env,
         bindingName,
         db,
         workflowId,
-        String(clientId),
+        resolvedTrigger.ownerId,
         webhookPath,
         c.req.raw,
         auth,
+        actor,
       );
       if (result.notFound) return c.json({ error: 'Webhook not found' }, 404);
 

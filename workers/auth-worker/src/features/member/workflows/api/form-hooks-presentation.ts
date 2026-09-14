@@ -7,6 +7,7 @@ import {
   isFormAccessGranted,
   normalizeFormAuth,
   renderFormBasicLoginHtml,
+  resolveHubSessionIdentifier,
 } from '../triggers/form-auth.js';
 import {
   broadcastFormSubmissionResult,
@@ -28,6 +29,10 @@ import {
   resolveOwnedWorkflow,
   syncFormTriggersForWorkflow,
 } from '../triggers/triggers.js';
+import {
+  actorForPublicTrigger,
+  progressDoIdForActor,
+} from '../execution/workflow-runner.js';
 
 type FormMode = 'test' | 'production';
 
@@ -193,6 +198,21 @@ async function handleFormRequest(
     }
   }
 
+  const binding = c.env[bindingName] as DurableObjectNamespace;
+  const sessionIdentifier = await resolveHubSessionIdentifier(c, bindingName);
+  const gated = actorForPublicTrigger({
+    binding,
+    mode,
+    resolved: ctx.resolved,
+    sessionIdentifier,
+  });
+  if ('needLogin' in gated) {
+    const frontend = (c.env.FRONTEND_URL as string) || 'https://aiagents-hub.vn';
+    const loginUrl = buildHubLoginRedirectUrl(frontend, actionUrl);
+    if (c.req.method === 'GET') return c.redirect(loginUrl, 302);
+    return c.json({ error: 'Authentication required', auth: 'hub_users', loginUrl }, 401);
+  }
+
   if (c.req.method === 'GET') {
     const html = renderFormPageHtml({
       title: formTitle,
@@ -216,24 +236,30 @@ async function handleFormRequest(
         env: c.env,
         bindingName,
         ownerId: ctx.ownerId,
-        resolved: ctx.resolved,
+        resolved: gated.resolved,
         node: ctx.node,
         fields,
         formUrl,
         executionMode: mode,
         autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
+        actor: gated.actor,
       });
 
-      await broadcastFormSubmissionResult(c.env, bindingName, ctx.ownerId, {
-        workflowId,
-        nodeId: ctx.node.id,
-        formPath: ctx.formPath,
-        executionKey: result.executionKey,
-        status: result.status,
-        fields,
-        formUrl,
-        executionMode: mode,
-      });
+      await broadcastFormSubmissionResult(
+        c.env,
+        bindingName,
+        progressDoIdForActor(gated.actor, binding, ctx.ownerId),
+        {
+          workflowId,
+          nodeId: ctx.node.id,
+          formPath: ctx.formPath,
+          executionKey: result.executionKey,
+          status: result.status,
+          fields,
+          formUrl,
+          executionMode: mode,
+        },
+      );
     } catch (e) {
       console.error('[form-hook] background workflow failed', e instanceof Error ? e.message : String(e));
     } finally {

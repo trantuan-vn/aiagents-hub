@@ -3,7 +3,17 @@ import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { parseWorkflowDefinition } from '../execution/workflow-context.js';
+import {
+  bindResolvedToActor,
+  isDurableObjectId,
+  ownerRunActor,
+  type WorkflowRunActor,
+} from '../execution/workflow-runner.js';
 import { executeWorkflowGraph } from '../engine/executor.js';
+import {
+  findUniquePublishedSharedWorkflowOwner,
+  getPublishedSharedWorkflow,
+} from '../infrastructure/infrastructure.js';
 import { listFormSubmissionNodes } from './form-submission.js';
 import { listChatTriggerNodes } from './chat-submission.js';
 
@@ -1130,15 +1140,19 @@ export function entryNodeIdsForTrigger(
   return scheduleIds.length ? scheduleIds : undefined;
 }
 
-/** Execute a workflow on behalf of its owner from a trigger (cron/webhook). */
+/** Execute a workflow from a trigger. Cron/owner credentials stay owner-run; pass `actor` for a consumer. */
 export async function runTrigger(
   env: Env,
   bindingName: string,
   trigger: WorkflowTriggerRow,
   inputOverride?: string,
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams,
+  actor?: WorkflowRunActor,
 ) {
-  const resolved = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
+  const resolvedOwned = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
+  const binding = (env as unknown as Record<string, unknown>)[bindingName] as DurableObjectNamespace;
+  const runActor = actor ?? ownerRunActor(trigger.ownerId);
+  const resolved = bindResolvedToActor(resolvedOwned, runActor, binding);
   const entryNodeIds = entryNodeIdsForTrigger(trigger, resolved.definition);
   // Cron without a canvas node used to omit entryNodeIds, so the engine started
   // every disconnected trigger (manual + webhook + form) as a second execution.
@@ -1156,13 +1170,62 @@ export async function runTrigger(
   return executeWorkflowGraph({
     c: { env } as any,
     bindingName,
-    user: { identifier: trigger.ownerId },
+    user: { identifier: runActor.identifier },
     resolved,
     input: inputOverride ?? trigger.input ?? '',
     autoApproveHumanReview: trigger.autoApproveHumanReview === 1,
-    runnerDoIdString: trigger.ownerId,
+    runnerDoIdString: runActor.runnerDoIdString,
     requestMeta: { userAgent: `trigger:${trigger.type}` },
     entryNodeIds,
     webhookItem,
   });
+}
+
+export async function resolveWebhookTriggerForCaller(params: {
+  env: Env;
+  bindingName: string;
+  db: D1Database;
+  workflowId: number;
+  callerId: string;
+  webhookPath?: string;
+  ownerHint?: string;
+}): Promise<
+  | { trigger: WorkflowTriggerRow; ownerId: string }
+  | { error: string; status: 400 | 404 }
+> {
+  const { env, bindingName, db, workflowId, callerId, webhookPath } = params;
+  const ownerHint =
+    params.ownerHint && isDurableObjectId(params.ownerHint) ? params.ownerHint : undefined;
+
+  const tryOwner = async (ownerId: string) => {
+    await syncWebhookTriggersForWorkflow(env, bindingName, db, ownerId, workflowId);
+    return findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
+  };
+
+  const notFound = async (ownerId: string) => {
+    const count = (await listWebhookTriggersForWorkflow(db, workflowId, ownerId)).length;
+    if (count > 1 && !webhookPath) {
+      return {
+        error: 'Multiple webhooks in this workflow — use /hooks/workflows/:workflowId/:webhookPath',
+        status: 400 as const,
+      };
+    }
+    return { error: 'Webhook not found', status: 404 as const };
+  };
+
+  const owned = await tryOwner(callerId);
+  if (owned) return { trigger: owned, ownerId: callerId };
+
+  const sharedOwner =
+    ownerHint && ownerHint !== callerId
+      ? ownerHint
+      : await findUniquePublishedSharedWorkflowOwner(db, workflowId);
+  if (!sharedOwner || sharedOwner === callerId) return notFound(callerId);
+
+  const shared = await getPublishedSharedWorkflow(db, sharedOwner, workflowId);
+  if (!shared) return notFound(callerId);
+
+  const sharedTrigger = await tryOwner(sharedOwner);
+  if (!sharedTrigger) return notFound(sharedOwner);
+  return { trigger: sharedTrigger, ownerId: sharedOwner };
 }

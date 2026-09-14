@@ -90,12 +90,12 @@ export function buildHubLoginRedirectUrl(frontendUrl: string, returnUrl: string)
   return login.toString();
 }
 
-export async function verifyHubUserSession(
+export async function resolveHubSessionIdentifier(
   c: { req: { raw: Request }; env: Env },
   bindingName: string,
-): Promise<boolean> {
+): Promise<string | null> {
   const sessionId = getCookie(c as any, 'sessionId');
-  if (!sessionId) return false;
+  if (!sessionId) return null;
   try {
     const { ipAddress, userAgent } = getClientIpAndUserAgentForSession(c.req.raw, c.env);
     const country = (c.req.raw as Request & { cf?: { country?: string } }).cf?.country;
@@ -106,10 +106,19 @@ export async function verifyHubUserSession(
       userAgent,
       country,
     );
-    return result.ok;
+    if (!result.ok) return null;
+    const identifier = String(result.user?.identifier ?? '').trim();
+    return identifier || null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function verifyHubUserSession(
+  c: { req: { raw: Request }; env: Env },
+  bindingName: string,
+): Promise<boolean> {
+  return (await resolveHubSessionIdentifier(c, bindingName)) != null;
 }
 
 export async function hasFormAccessCookie(

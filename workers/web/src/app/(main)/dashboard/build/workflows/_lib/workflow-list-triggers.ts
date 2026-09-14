@@ -139,7 +139,7 @@ export function hydrateWorkflowListTriggerActions(
       nodeId: webhook.nodeId,
       label: webhook.label,
       path: webhook.path,
-      url: buildWebhookPublicUrl({ workflowId, webhookPath: webhook.path }),
+      url: buildWebhookPublicUrl({ workflowId, webhookPath: webhook.path, ownerId }),
     })),
   };
 }

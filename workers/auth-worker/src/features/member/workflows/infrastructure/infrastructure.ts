@@ -149,6 +149,29 @@ export async function getWorkflowCommentsFromD1(
   return { comments: rows.slice(0, limit), hasMore };
 }
 
+export async function getPublishedSharedWorkflow(
+  db: D1Database,
+  ownerId: string,
+  workflowId: number,
+): Promise<{ id: number; user_id: string } | null> {
+  const sql = `SELECT id, user_id FROM agent_workflows
+    WHERE user_id = ? AND id = ? AND "isShared" = 1 AND status = 'published' LIMIT 1`;
+  return (await db.prepare(sql).bind(ownerId, workflowId).first<{ id: number; user_id: string }>()) ?? null;
+}
+
+export async function findUniquePublishedSharedWorkflowOwner(
+  db: D1Database,
+  workflowId: number,
+): Promise<string | null> {
+  const sql = `SELECT user_id FROM agent_workflows
+    WHERE id = ? AND "isShared" = 1 AND status = 'published' LIMIT 2`;
+  const result = await db.prepare(sql).bind(workflowId).all<{ user_id?: string }>();
+  const rows = result.results ?? [];
+  if (rows.length !== 1) return null;
+  const ownerId = String(rows[0]?.user_id ?? '').trim();
+  return ownerId || null;
+}
+
 export interface RoyaltyStatsRow {
   date: string;
   total: number;

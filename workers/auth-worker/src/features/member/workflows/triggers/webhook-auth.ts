@@ -11,8 +11,9 @@ export type ValidatedWebhookToken = {
 };
 
 /**
- * Validate Bearer API token for a workflow webhook (same model as eKYC:
- * X-Client-ID = workflow owner DO id, Authorization: Bearer utk_…).
+ * Validate Bearer API token for a workflow webhook.
+ * X-Client-ID is the caller (consumer or owner). Shared workflows may be invoked
+ * with the consumer's client id; owner-only webhooks still require the owner's id.
  */
 export async function validateWebhookApiToken(
   c: Context,

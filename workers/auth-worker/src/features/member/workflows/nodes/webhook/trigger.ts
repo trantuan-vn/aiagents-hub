@@ -5,6 +5,8 @@ import {
   type WorkflowTriggerRow,
 } from '../../triggers/triggers.js';
 import type { ValidatedWebhookToken } from '../../triggers/webhook-auth.js';
+import type { WorkflowRunActor } from '../../execution/workflow-runner.js';
+import { ownerRunActor } from '../../execution/workflow-runner.js';
 import { broadcastWorkflowWebhookResult } from '../../triggers/webhook-notify.js';
 import {
   buildWebhookItemOutput,
@@ -53,7 +55,7 @@ export async function handleWebhookRequest(
   };
 }
 
-/** Handle webhook by workflow id after API token auth (owner resolved from D1). */
+/** Handle webhook by workflow id after API token auth. */
 export async function handleWebhookRequestByWorkflowId(
   env: Env,
   bindingName: string,
@@ -63,15 +65,17 @@ export async function handleWebhookRequestByWorkflowId(
   webhookPath: string | undefined,
   request: Request,
   _auth: ValidatedWebhookToken,
+  actor?: WorkflowRunActor,
 ): Promise<WebhookHandleResult> {
   const trigger = await findWebhookTriggerByWorkflowId(db, workflowId, ownerId, webhookPath);
   if (!trigger) return { notFound: true };
 
   const { input, itemParams } = await parseWebhookRequest(request, trigger, { executionMode: 'production' });
   const webhookItem = buildWebhookItemOutput(itemParams);
-  const result = await runTrigger(env, bindingName, trigger, input, itemParams);
+  const runActor = actor ?? ownerRunActor(ownerId);
+  const result = await runTrigger(env, bindingName, trigger, input, itemParams, runActor);
 
-  await broadcastWorkflowWebhookResult(env, bindingName, ownerId, {
+  await broadcastWorkflowWebhookResult(env, bindingName, runActor.runnerDoIdString ?? ownerId, {
     workflowId,
     nodeId: trigger.nodeId,
     webhookPath: trigger.webhookPath ?? webhookPath ?? null,
