@@ -11,8 +11,11 @@ import { canBypassStepUpOnce, isSensitiveDashboardPath, STEP_UP_SESSION_KEY } fr
 /** Survives Strict Mode remount after the one-shot sessionStorage bypass is consumed. */
 let unlockedSensitivePath: string | null = null;
 
-function clientPath(): string {
-  return `${window.location.pathname}${window.location.search}`;
+function returnToFor(pathname: string): string {
+  if (typeof window !== "undefined" && window.location.pathname === pathname) {
+    return `${pathname}${window.location.search}`;
+  }
+  return pathname;
 }
 
 export function SensitiveStepUpRedirect({ children }: { children: ReactNode }) {
@@ -20,9 +23,14 @@ export function SensitiveStepUpRedirect({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [hydrated, setHydrated] = useState(false);
+  // React state (not only the module var) so unlocking after a failed first paint re-renders.
+  const [unlockedPath, setUnlockedPath] = useState<string | null>(null);
 
   useEffect(() => {
     setHydrated(true);
+    if (unlockedSensitivePath) {
+      setUnlockedPath(unlockedSensitivePath);
+    }
   }, []);
 
   const needsGate =
@@ -30,16 +38,11 @@ export function SensitiveStepUpRedirect({ children }: { children: ReactNode }) {
     !user?.requiresStrongAuthSetup &&
     isSensitiveDashboardPath(pathname ?? "", user?.role);
 
-  const currentPath = typeof window !== "undefined" ? clientPath() : (pathname ?? "");
   const sessionBypass =
     typeof window !== "undefined" &&
-    canBypassStepUpOnce(
-      Date.now(),
-      window.sessionStorage.getItem(STEP_UP_SESSION_KEY),
-      window.location.pathname,
-      window.location.search,
-    );
-  const allowed = !needsGate || unlockedSensitivePath === currentPath || sessionBypass;
+    canBypassStepUpOnce(Date.now(), window.sessionStorage.getItem(STEP_UP_SESSION_KEY), pathname ?? "");
+  const allowed =
+    !needsGate || unlockedPath === pathname || unlockedSensitivePath === pathname || sessionBypass;
 
   useEffect(() => {
     if (!pathname) return;
@@ -47,34 +50,41 @@ export function SensitiveStepUpRedirect({ children }: { children: ReactNode }) {
     // account security setup screens without being blocked by sensitive step-up.
     if (user?.requiresStrongAuthSetup) {
       unlockedSensitivePath = null;
+      setUnlockedPath(null);
       return;
     }
     if (!isSensitiveDashboardPath(pathname, user?.role)) {
       unlockedSensitivePath = null;
+      setUnlockedPath(null);
       return;
     }
 
-    const path = clientPath();
     const bypass = canBypassStepUpOnce(
       Date.now(),
       window.sessionStorage.getItem(STEP_UP_SESSION_KEY),
-      window.location.pathname,
-      window.location.search,
+      pathname,
     );
-    if (unlockedSensitivePath === path || bypass) {
+    if (unlockedSensitivePath === pathname || bypass) {
       if (bypass) {
         window.sessionStorage.removeItem(STEP_UP_SESSION_KEY);
       }
-      unlockedSensitivePath = path;
+      unlockedSensitivePath = pathname;
+      setUnlockedPath(pathname);
       return;
     }
 
-    router.replace(`/dashboard/step-up?returnTo=${encodeURIComponent(path)}`);
+    router.replace(`/dashboard/step-up?returnTo=${encodeURIComponent(returnToFor(pathname))}`);
   }, [pathname, router, user?.role, user?.requiresStrongAuthSetup]);
 
   // Do not keep a sticky "unlocked" flag across client navigations: the layout stays
   // mounted, so the previous page's unlocked=true would let sensitive children fetch
   // once before the redirect effect runs.
-  if (needsGate && (!hydrated || !allowed)) return null;
+  if (needsGate && (!hydrated || !allowed)) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center" aria-busy="true">
+        <div className="size-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+      </div>
+    );
+  }
   return children;
 }

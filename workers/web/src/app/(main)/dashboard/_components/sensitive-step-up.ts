@@ -42,19 +42,25 @@ export function isSensitiveDashboardPath(pathname: string, role?: "member" | "ad
   return false;
 }
 
+export function pathnameOnly(path: string): string {
+  const q = path.indexOf("?");
+  return q === -1 ? path : path.slice(0, q);
+}
+
 export function canBypassStepUpOnce(
   now: number,
   payloadRaw: string | null,
   pathname: string,
-  search: string,
+  search: string = "",
 ): boolean {
   if (!payloadRaw) return false;
   try {
     const payload = JSON.parse(payloadRaw) as { path?: string; at?: number };
     if (!payload?.path || typeof payload.at !== "number") return false;
     if (now - payload.at >= STEP_UP_ONCE_TTL_MS) return false;
-    const currentPath = `${pathname}${search}`;
-    return payload.path === currentPath;
+    // Compare pathnames only: after router.replace(), Next.js pathname updates
+    // before window.location, so a full path+search match would fail and blank the page.
+    return pathnameOnly(payload.path) === pathnameOnly(`${pathname}${search}`);
   } catch {
     return false;
   }
