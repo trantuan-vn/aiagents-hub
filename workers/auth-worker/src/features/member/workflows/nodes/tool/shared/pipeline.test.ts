@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { GET_RAG_QUERY_FIELD, REASONING_AGENT_PROMPT } from '@aiagents-hub/workflow-nodes';
 
-import { resolveAgentUserText } from '../../agent/shared.js';
-import { resolveConfiguredText } from './pipeline.js';
+import { resolveAgentUserText, resolveMaxTokens } from '../../agent/shared.js';
+import {
+  resolveConfiguredNumber,
+  resolveConfiguredRaw,
+  resolveConfiguredText,
+} from './pipeline.js';
 
 describe('resolveConfiguredText', () => {
   it('uses the mapped Query field from a webhook body', () => {
@@ -23,6 +27,33 @@ describe('resolveConfiguredText', () => {
 
   it('reads a plain-string webhook body when Query field is $json.body', () => {
     expect(resolveConfiguredText('{{ $json.body }}', { body: 'list orders' })).toBe('list orders');
+  });
+});
+
+describe('resolveConfiguredRaw / number', () => {
+  it('keeps a literal panel number and only interpolates mapped fields', () => {
+    expect(resolveConfiguredRaw(2, {})).toBe(2);
+    expect(resolveConfiguredNumber(2, {})).toBe(2);
+    expect(resolveConfiguredNumber('{{ $json.retries }}', { retries: 5 })).toBe(5);
+    expect(resolveConfiguredNumber('{{ $json.retries }}', {})).toBeUndefined();
+    expect(resolveConfiguredNumber(undefined, {})).toBeUndefined();
+  });
+});
+
+describe('resolveMaxTokens', () => {
+  it('prefers the agent panel maxTokens over the service option', () => {
+    expect(resolveMaxTokens({ maxTokens: 1024 }, { maxTokens: 4096 }, '@cf/zai-org/glm-4.7-flash')).toBe(
+      1024,
+    );
+  });
+
+  it('resolves a mapped maxTokens expression then falls back', () => {
+    expect(
+      resolveMaxTokens({ maxTokens: '{{ $json.maxTokens }}' }, {}, '@cf/meta/llama-3.1-8b-instruct', {
+        maxTokens: 2048,
+      }),
+    ).toBe(2048);
+    expect(resolveMaxTokens({}, {}, '@cf/meta/llama-3.1-8b-instruct')).toBe(1024);
   });
 });
 

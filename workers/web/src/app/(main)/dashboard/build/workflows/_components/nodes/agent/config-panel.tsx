@@ -23,7 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-import { SQL_AGENT_SYSTEM_PROMPT } from "@aiagents-hub/workflow-nodes";
+import { REASONING_AGENT_DEFAULTS, SQL_AGENT_SYSTEM_PROMPT } from "@aiagents-hub/workflow-nodes";
 
 import { isDataFlowEdge } from "../../edges/workflow-connection-utils";
 import { AgentUpstreamInputPanel } from "../../panels/node-config/agent-upstream-input-panel";
@@ -60,7 +60,21 @@ const AGENT_EXTRA_OPTIONS = [
     id: "maxReflectRetries",
     labelKey: "agent_opt_max_reflect_retries",
     type: "number" as const,
-    defaultValue: 2,
+    defaultValue: REASONING_AGENT_DEFAULTS.maxReflectRetries,
+    kinds: ["reasoning_agent"],
+  },
+  {
+    id: "noImprovementLimit",
+    labelKey: "agent_opt_no_improvement_limit",
+    type: "number" as const,
+    defaultValue: REASONING_AGENT_DEFAULTS.noImprovementLimit,
+    kinds: ["reasoning_agent"],
+  },
+  {
+    id: "maxActSteps",
+    labelKey: "agent_opt_max_act_steps",
+    type: "number" as const,
+    defaultValue: REASONING_AGENT_DEFAULTS.maxActSteps,
     kinds: ["reasoning_agent"],
   },
   {

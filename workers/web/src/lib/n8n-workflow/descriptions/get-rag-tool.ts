@@ -19,6 +19,15 @@ export const GET_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
         "Expression for the search query. Drop a second INPUT field to join with ||. You can edit to ??, &&, or a ternary.",
     },
     {
+      displayName: "Group related docs by",
+      name: "groupByField",
+      type: "string",
+      default: "tableName",
+      placeholder: "tableName",
+      description:
+        "Metadata key Save RAG stored (e.g. tableName). Get RAG expands each related value with every stored document type (schema + data). Drop an INPUT field if the key name comes from the previous node.",
+    },
+    {
       displayName: "Top K",
       name: "topK",
       type: "number",

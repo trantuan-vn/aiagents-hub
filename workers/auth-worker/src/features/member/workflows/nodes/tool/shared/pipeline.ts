@@ -111,6 +111,60 @@ export function resolvePipelineField(
   return resolveConfiguredText(template, merged, '', keys);
 }
 
+/** Literal config, or `{{ }}` against INPUT. Empty/missing → undefined so the caller can fallback. */
+export function resolveConfiguredRaw(
+  template: unknown,
+  input: Record<string, unknown>,
+): unknown {
+  if (template == null) return undefined;
+  if (typeof template === 'boolean' || typeof template === 'number') return template;
+  if (typeof template !== 'string') return template;
+  const expr = template.trim();
+  if (!expr) return undefined;
+  if (!expr.includes('{{')) return template;
+  try {
+    const value = interpolate(expr, expressionScope(input, { input: String(input.input ?? '') }));
+    if (value == null || value === '') return undefined;
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+export function resolveConfiguredNumber(
+  template: unknown,
+  input: Record<string, unknown>,
+): number | undefined {
+  const raw = resolveConfiguredRaw(template, input);
+  if (raw == null || raw === '') return undefined;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export function resolveConfiguredFlag(
+  template: unknown,
+  input: Record<string, unknown>,
+  fallback: boolean,
+): boolean {
+  const raw = resolveConfiguredRaw(template, input);
+  if (raw === undefined) return fallback;
+  if (typeof raw === 'boolean') return raw;
+  const s = String(raw).trim().toLowerCase();
+  if (s === 'true' || s === '1') return true;
+  if (s === 'false' || s === '0') return false;
+  return fallback;
+}
+
+export function resolveConfiguredChoice(
+  template: unknown,
+  input: Record<string, unknown>,
+): string | undefined {
+  const raw = resolveConfiguredRaw(template, input);
+  if (raw == null || raw === '') return undefined;
+  const text = String(raw).trim();
+  return text || undefined;
+}
+
 export function stringifyUnknown(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string') return value;

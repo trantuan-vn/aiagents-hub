@@ -131,7 +131,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       : '',
   ].filter(Boolean);
 
-  const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId);
+  const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId, nodeInput);
   const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
   const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
   const historyMessages = simpleMemory.history.map((m) => ({ role: m.role, content: m.content }));

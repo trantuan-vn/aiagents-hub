@@ -1,4 +1,6 @@
+import { extractSql } from '../shared.js';
 import { claimsNeedCitations, parseCitationIds } from './cite.js';
+import { looksLikeSqlTask } from './quality.js';
 import type { AgentCitation, TaskFrame, ToolObservation } from './types.js';
 
 export type ReflectVerdict = {
@@ -13,6 +15,8 @@ export function reflectHeuristics(args: {
   observations: ToolObservation[];
   frame: TaskFrame;
   requireCitations: boolean;
+  userText?: string;
+  snippets?: string[];
 }): ReflectVerdict {
   const issues: string[] = [];
   const text = String(args.text ?? '').trim();
@@ -36,6 +40,11 @@ export function reflectHeuristics(args: {
     issues.push('overconfident_after_tool_error');
   }
 
+  const snippets = args.snippets ?? [];
+  if (looksLikeSqlTask(args.userText ?? '', snippets) && !extractSql(text)) {
+    issues.push('missing_sql');
+  }
+
   return { pass: issues.length === 0, issues };
 }
 
@@ -49,4 +58,4 @@ export function parseReflect(raw: Record<string, unknown> | null, fallback: Refl
 
 export const REFLECT_PROMPT = `Critique the draft answer. Reply with JSON only:
 {"pass":true,"issues":[],"rewritten":""}
-Fail if claims lack [n] citations when sources were provided, if missing slots remain, or if the answer contradicts tool results. Put a corrected answer in rewritten when pass is false.`;
+Fail if claims lack [n] citations when sources were provided, if missing slots remain, if a schema/SQL task has no executable SQL, or if the answer contradicts tool results. Put a corrected answer in rewritten when pass is false. Set pass true only when the draft is complete and cannot be improved.`;

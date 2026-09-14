@@ -35,6 +35,7 @@ import {
 import {
   buildCitations,
   formatCitationBlock,
+  formatRagContext,
   groundedTextOrFallback,
 } from './reasoning/cite.js';
 import {
@@ -72,6 +73,21 @@ import type {
   ToolObservation,
 } from './reasoning/types.js';
 import { ASK_USER_TOOL, DEFAULT_ACT_STEPS, RETRIEVE_MEMORY_TOOL } from './reasoning/types.js';
+import {
+  DEFAULT_NO_IMPROVEMENT_LIMIT,
+  DEFAULT_REFLECT_RETRIES,
+  MAX_REFLECT_RETRIES,
+  MIN_QUALITY_DELTA,
+  draftsEquivalent,
+  scoreDraft,
+  shouldStopImproving,
+} from './reasoning/quality.js';
+import {
+  resolveConfiguredChoice,
+  resolveConfiguredFlag,
+  resolveConfiguredNumber,
+  resolveConfiguredRaw,
+} from '../tool/shared/pipeline.js';
 
 export type ReasoningLlmCall = (args: {
   purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect';
@@ -88,14 +104,28 @@ export type ReasoningLlmCall = (args: {
   askedUser?: { questions: string[]; why?: string };
 }>;
 
-function readOptions(data: Record<string, unknown>): ReasoningOptions {
-  const retries = Number(data.maxReflectRetries);
+export function readReasoningOptions(
+  data: Record<string, unknown>,
+  input: Record<string, unknown> = {},
+): ReasoningOptions {
+  const retries = resolveConfiguredNumber(data.maxReflectRetries, input);
+  const patience = resolveConfiguredNumber(data.noImprovementLimit, input);
+  const mode = resolveConfiguredChoice(data.clarificationMode, input);
+  const planner = resolveConfiguredRaw(data.enablePlanner ?? data.requirePlan, input);
+  const safety = resolveConfiguredChoice(data.safetyLevel, input);
   return {
-    clarificationMode: data.clarificationMode === 'best_effort' ? 'best_effort' : 'ask',
-    requireCitations: data.requireCitations !== false,
-    maxReflectRetries: Number.isFinite(retries) ? Math.min(2, Math.max(0, Math.floor(retries))) : 2,
-    enablePlanner: normalizePlannerMode(data.enablePlanner ?? data.requirePlan),
-    safetyLevel: data.safetyLevel === 'strict' ? 'strict' : 'standard',
+    clarificationMode: mode === 'best_effort' ? 'best_effort' : 'ask',
+    requireCitations: resolveConfiguredFlag(data.requireCitations, input, true),
+    maxReflectRetries:
+      retries != null
+        ? Math.min(MAX_REFLECT_RETRIES, Math.max(0, Math.floor(retries)))
+        : DEFAULT_REFLECT_RETRIES,
+    noImprovementLimit:
+      patience != null
+        ? Math.min(4, Math.max(1, Math.floor(patience)))
+        : DEFAULT_NO_IMPROVEMENT_LIMIT,
+    enablePlanner: normalizePlannerMode(planner ?? 'auto'),
+    safetyLevel: safety === 'strict' ? 'strict' : 'standard',
   };
 }
 
@@ -291,7 +321,6 @@ export async function executeReasoningAgent(
   deps?: { llm?: ReasoningLlmCall },
 ): Promise<NodeOutput> {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
-  const options = readOptions(data);
   const linked = resolveAgentResources(ctx.definition, ctx.node.id, {
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
@@ -312,6 +341,9 @@ export async function executeReasoningAgent(
     };
     userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
   }
+
+  const optionScope = { ...nodeInput, input: ctx.input ?? '' };
+  const options = readReasoningOptions(data, optionScope);
 
   const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
   const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
@@ -359,7 +391,7 @@ export async function executeReasoningAgent(
     createDefaultLlm({
       ctx,
       modelId,
-      maxTokens: resolveMaxTokens(data, linked.serviceOptions, modelId),
+      maxTokens: resolveMaxTokens(data, linked.serviceOptions, modelId, optionScope),
       temperature: aiParamsFromServiceOptions(linked.serviceOptions).temperature as number | undefined,
       topP: aiParamsFromServiceOptions(linked.serviceOptions).top_p as number | undefined,
       frequencyPenalty: aiParamsFromServiceOptions(linked.serviceOptions).frequency_penalty as number | undefined,
@@ -516,7 +548,7 @@ export async function executeReasoningAgent(
       : `If you lack required details, say so and ask. Do not guess.`,
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-    formatCitationBlock(citationSeed) ? `Source snippets (cite as [n]):\n${formatCitationBlock(citationSeed)}` : '',
+    formatRagContext(snippets) ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}` : '',
     options.requireCitations && citationSeed.length
       ? 'Every factual claim must include [n] citations that match the source list.'
       : '',
@@ -528,7 +560,45 @@ export async function executeReasoningAgent(
   let draft = '';
   let lastIssues = '';
   let observations: ToolObservation[] = [];
-  const stopSteps = maxActSteps(data.maxActSteps ?? DEFAULT_ACT_STEPS);
+  const stopSteps = maxActSteps(
+    resolveConfiguredNumber(data.maxActSteps, optionScope) ?? DEFAULT_ACT_STEPS,
+  );
+  let bestText = '';
+  let bestScore = Number.NEGATIVE_INFINITY;
+  let bestCitations: AgentCitation[] = [];
+  let stagnant = 0;
+
+  const finish = async (text: string, cites: AgentCitation[]) => {
+    const outText = groundedTextOrFallback(text, cites);
+    const outputSafety = ruleClassify(outText);
+    if (outputSafety.action === 'refuse') {
+      return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), {
+        query: userText,
+        snippets,
+        endpoint,
+      });
+    }
+    const result: ReasoningResult = {
+      status: 'ok',
+      text: outText,
+      citations: cites,
+      plan: plan?.steps,
+      confidence: frame.confidence,
+      frame,
+    };
+    await saveSessionMemory(ctx.userDO, {
+      workflowId: ctx.meta.workflowId,
+      sessionId,
+      agentId: ctx.node.id,
+      summary: outText.slice(0, 240),
+      status: result.status,
+    });
+    if (memoryCollection) {
+      await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
+    }
+    await simpleMemory.persist(outText);
+    return toNodeOutput(result, { query: userText, snippets, endpoint });
+  };
 
   for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {
     const act = await llm({
@@ -537,7 +607,7 @@ export async function executeReasoningAgent(
       user:
         attempt === 0
           ? userText
-          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nKeep citations as [n].`,
+          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.\nKeep citations as [n].`,
       tools: policyNames.length ? policyTools : undefined,
       toolChoice: policyNames.length ? initialToolChoice(policyNames, plan, snippets.length > 0) : undefined,
       stopSteps,
@@ -570,88 +640,87 @@ export async function executeReasoningAgent(
       observations,
       frame,
       requireCitations: options.requireCitations,
+      userText,
+      snippets,
     });
-    if (heuristic.pass || attempt === options.maxReflectRetries) {
-      const outText = groundedTextOrFallback(draft, citations);
-      const outputSafety = ruleClassify(outText);
-      if (outputSafety.action === 'refuse') {
-        return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), {
-          query: userText,
-          snippets,
-          endpoint,
-        });
-      }
-      const result: ReasoningResult = {
-        status: 'ok',
-        text: outText,
-        citations,
-        plan: plan?.steps,
-        confidence: frame.confidence,
-        frame,
-      };
-      await saveSessionMemory(ctx.userDO, {
-        workflowId: ctx.meta.workflowId,
-        sessionId,
-        agentId: ctx.node.id,
-        summary: outText.slice(0, 240),
-        status: result.status,
-      });
-      if (memoryCollection) {
-        await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
-      }
-      await simpleMemory.persist(outText);
-      return toNodeOutput(result, { query: userText, snippets, endpoint });
+    const quality = scoreDraft({
+      text: draft,
+      issues: heuristic.issues,
+      citations,
+      observations,
+      snippets,
+      userText,
+    });
+    if (quality > bestScore + MIN_QUALITY_DELTA && !draftsEquivalent(draft, bestText)) {
+      bestScore = quality;
+      bestText = draft;
+      bestCitations = citations;
+      stagnant = 0;
+    } else {
+      stagnant += 1;
+    }
+
+    const stop = shouldStopImproving({
+      pass: heuristic.pass,
+      score: Math.max(quality, bestScore),
+      bestScore,
+      stagnant,
+      patience: options.noImprovementLimit,
+      isLastAttempt: attempt === options.maxReflectRetries,
+    });
+    if (stop) {
+      return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
     }
 
     const critique = await llm({
       purpose: 'reflect',
       system: REFLECT_PROMPT,
       user: `Draft:\n${draft}\nSources:\n${formatCitationBlock(citations)}\nTool results:\n${observations.map((o) => `${o.tool}: ${o.output}`).join('\n')}`,
-      maxTokens: 400,
+      maxTokens: 800,
     });
     await maybeBill(critique.usage, critique.text);
     const parsed = parseReflect(parseJsonObject(critique.text), heuristic);
     lastIssues = parsed.issues.join(', ');
-    if (parsed.rewritten) draft = parsed.rewritten;
-    if (parsed.pass) {
-      const citations = buildCitations({ snippets, observations, sessionSummary: session.summary });
-      const outText = groundedTextOrFallback(draft, citations);
-      const result: ReasoningResult = {
-        status: 'ok',
-        text: outText,
-        citations,
-        plan: plan?.steps,
-        confidence: frame.confidence,
+    if (parsed.rewritten) {
+      draft = parsed.rewritten;
+      const rewrittenCitations = buildCitations({ snippets, observations, sessionSummary: session.summary });
+      const rewrittenHeuristic = reflectHeuristics({
+        text: draft,
+        citations: rewrittenCitations,
+        observations,
         frame,
-      };
-      await saveSessionMemory(ctx.userDO, {
-        workflowId: ctx.meta.workflowId,
-        sessionId,
-        agentId: ctx.node.id,
-        summary: outText.slice(0, 240),
-        status: result.status,
+        requireCitations: options.requireCitations,
+        userText,
+        snippets,
       });
-      if (memoryCollection) {
-        await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
+      const rewrittenScore = scoreDraft({
+        text: draft,
+        issues: rewrittenHeuristic.issues,
+        citations: rewrittenCitations,
+        observations,
+        snippets,
+        userText,
+      });
+      if (rewrittenScore > bestScore + MIN_QUALITY_DELTA) {
+        bestScore = rewrittenScore;
+        bestText = draft;
+        bestCitations = rewrittenCitations;
+        stagnant = 0;
       }
-      await simpleMemory.persist(outText);
-      return toNodeOutput(result, { query: userText, snippets, endpoint });
+      if (
+        shouldStopImproving({
+          pass: rewrittenHeuristic.pass,
+          score: Math.max(rewrittenScore, bestScore),
+          bestScore,
+          stagnant,
+          patience: options.noImprovementLimit,
+          isLastAttempt: attempt === options.maxReflectRetries,
+        })
+      ) {
+        return finish(bestText || draft, bestCitations.length ? bestCitations : rewrittenCitations);
+      }
     }
   }
 
-  const citations: AgentCitation[] = buildCitations({
-    snippets,
-    observations,
-    sessionSummary: session.summary,
-  });
-  const result: ReasoningResult = {
-    status: 'ok',
-    text: groundedTextOrFallback(draft, citations),
-    citations,
-    plan: plan?.steps,
-    confidence: frame.confidence,
-    frame,
-  };
-  await simpleMemory.persist(result.text);
-  return toNodeOutput(result, { query: userText, snippets, endpoint });
+  return finish(bestText || draft, bestCitations);
 }

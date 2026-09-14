@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import { claimsNeedCitations, parseCitationIds, buildCitations, groundedTextOrFallback } from './cite.js';
+import { claimsNeedCitations, parseCitationIds, buildCitations, groundedTextOrFallback, formatRagContext } from './cite.js';
 import { inferMissingSlots, shouldAskClarification, parseTaskFrame } from './frame.js';
 import { shouldPlan, parsePlan, normalizePlannerMode } from './plan.js';
 import { ruleClassify, parseLlmSafety } from './safety.js';
 import { classifyToolName, filterToolsForPolicy, initialToolChoice } from './tools.js';
 import { reflectHeuristics } from './reflect.js';
 import { memoryKey, resolveSessionId } from './memory.js';
+import {
+  COMPLETE_QUALITY_SCORE,
+  draftsEquivalent,
+  looksLikeSqlTask,
+  scoreDraft,
+  shouldStopImproving,
+} from './quality.js';
 
 describe('reasoning safety', () => {
   it('refuses bomb-making and jailbreaks', () => {
@@ -118,16 +125,26 @@ describe('reasoning citations and reflect', () => {
     expect(groundedTextOrFallback('Answer', citations)).toContain('[1]');
   });
 
-  it('fails reflection when citations are required and missing', () => {
+  it('keeps full schema and sample rows in RAG context', () => {
+    const block = formatRagContext([
+      '# ORDERS\n\n## schema\nCREATE TABLE orders (id text);\n```json\n[{ "id": "1" }]\n```',
+    ]);
+    expect(block).toContain('CREATE TABLE orders');
+    expect(block).toContain('"id": "1"');
+  });
+
+  it('fails reflection when a schema task has no SQL', () => {
     const verdict = reflectHeuristics({
-      text: 'The table has 12 columns.',
-      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      text: 'Use the orders table [1].',
+      citations: [{ id: 1, source: 'memory', snippet: 'CREATE TABLE orders (id text)' }],
       observations: [],
-      frame: { goal: 'x', knownFacts: [], missingSlots: [], confidence: 0.8, canUseTools: false },
+      frame: { goal: 'sql', knownFacts: [], missingSlots: [], confidence: 0.8, canUseTools: false },
       requireCitations: true,
+      userText: 'write a select query',
+      snippets: ['CREATE TABLE orders (id text)'],
     });
     expect(verdict.pass).toBe(false);
-    expect(verdict.issues).toContain('missing_citations');
+    expect(verdict.issues).toContain('missing_sql');
   });
 });
 
@@ -135,5 +152,75 @@ describe('session memory keys', () => {
   it('builds a stable memory key and reads sessionId from body', () => {
     expect(memoryKey(9, 'abc', 'agent_1')).toBe('9:abc:agent_1');
     expect(resolveSessionId({ body: { sessionId: 's1' } })).toBe('s1');
+  });
+});
+
+describe('reasoning quality', () => {
+  it('detects SQL tasks from schema snippets without hardcoded table names', () => {
+    expect(looksLikeSqlTask('liet ke', ['## schema\nCREATE TABLE t (id int)'])).toBe(true);
+    expect(looksLikeSqlTask('hello', ['plain prose'])).toBe(false);
+  });
+
+  it('scores SQL drafts higher than citation-only stubs', () => {
+    const stub = scoreDraft({
+      text: 'See the table [1].',
+      issues: ['missing_sql'],
+      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      observations: [],
+      snippets: ['CREATE TABLE orders (id text)'],
+      userText: 'write sql',
+    });
+    const sql = scoreDraft({
+      text: '```sql\nSELECT id FROM orders WHERE id IS NOT NULL\n``` [1]',
+      issues: [],
+      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      observations: [],
+      snippets: ['CREATE TABLE orders (id text)'],
+      userText: 'write sql',
+    });
+    expect(sql).toBeGreaterThan(stub);
+    expect(sql).toBeGreaterThanOrEqual(COMPLETE_QUALITY_SCORE);
+  });
+
+  it('stops after a non-improving draft once quality is already complete, not on the first complete pass', () => {
+    expect(
+      shouldStopImproving({
+        pass: true,
+        score: COMPLETE_QUALITY_SCORE,
+        bestScore: COMPLETE_QUALITY_SCORE,
+        stagnant: 0,
+        patience: 1,
+        isLastAttempt: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldStopImproving({
+        pass: true,
+        score: 40,
+        bestScore: 40,
+        stagnant: 1,
+        patience: 1,
+        isLastAttempt: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldStopImproving({
+        pass: true,
+        score: COMPLETE_QUALITY_SCORE,
+        bestScore: COMPLETE_QUALITY_SCORE,
+        stagnant: 1,
+        patience: 1,
+        isLastAttempt: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('treats whitespace-normalized SQL as equivalent', () => {
+    expect(
+      draftsEquivalent(
+        '```sql\nSELECT id FROM t\n```',
+        '```sql\nSELECT   id   FROM   t\n```',
+      ),
+    ).toBe(true);
   });
 });

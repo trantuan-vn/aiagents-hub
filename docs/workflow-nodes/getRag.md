@@ -59,7 +59,8 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 | **Tool kind** | `toolKind` | select | `"get-rag"` | Cố định variant |
 | **Tool name** | `toolName` | text | `"get_rag"` | Tên function AI SDK |
 | **Description** | `toolDescription` | textarea | — | Hướng dẫn model khi nào gọi search |
-| **Top K** | `topK` | number | `5` | Số snippet trả về |
+| **Top K** | `topK` | number | `12` | Số **nhóm liên quan** (bảng/document) cần hydrate đủ schema + data |
+| **Group related docs by** | `groupByField` | text / expression | `"tableName"` | Metadata key Save RAG đã ghi; hoặc expression lấy tên key từ INPUT |
 | **Score threshold** | `scoreThreshold` | number | `0.65` | Lọc match score tối thiểu |
 | **Query source** | `querySource` | select | `"from_tool_args"` | Nguồn câu query |
 | **Include metadata** | `includeMetadata` | toggle | `true` | Trả thêm `source`, `documentId` |
@@ -91,7 +92,7 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 2. Embed `query` (`embedTextWithUsage`)
 3. `queryCollection` (Vectorize top-K + metadata filter `docType` / `tableName`)
 4. Map matches → `{ snippets, count }`
-5. SQL RAG: boost `schema` / `sqlexample` chunks (`sqlChunkScore`)
+5. SQL RAG: gom theo metadata key user chọn (`groupByField`, mặc định `tableName`) rồi **hydrate đủ document** của mỗi bảng liên quan (schema + data/sqlexample), ghép chunk theo `chunkIndex`.
 
 **Output tool:**
 
@@ -150,4 +151,4 @@ Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.2 | 2026-09-11 | Execute + agent upstream snippets live |
+| 0.3 | 2026-09-14 | Hydrate related groups from user `groupByField`; stitch schema + data into agent context |

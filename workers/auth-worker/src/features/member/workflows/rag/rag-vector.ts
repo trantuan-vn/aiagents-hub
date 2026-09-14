@@ -30,6 +30,7 @@ export type VectorizeQueryOpts = {
 export type VectorizeBinding = {
   query: (vector: number[], opts: VectorizeQueryOpts) => Promise<{ matches?: VectorMatch[] }>;
   upsert?: (vectors: VectorizeVectorRecord[]) => Promise<{ count?: number }>;
+  getByIds?: (ids: string[]) => Promise<Array<{ id?: string; metadata?: Record<string, string> }>>;
 };
 
 export type VectorizeVectorRecord = {
@@ -48,6 +49,8 @@ export type QueryCollectionOptions = {
   namespace?: string;
   docType?: string;
   scoreThreshold?: number;
+  /** Extra metadata equals-filters (e.g. tableName from Save RAG). */
+  filter?: Record<string, string>;
 };
 
 export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBinding | undefined {
@@ -165,8 +168,10 @@ export async function embedTextsWithUsage(
   return { vectors: out, usage: mergeAiUsage(...usages) };
 }
 
-export function buildMetadataFilter(opts: Pick<QueryCollectionOptions, 'namespace' | 'docType'>): Record<string, string> | undefined {
-  const filter: Record<string, string> = {};
+export function buildMetadataFilter(
+  opts: Pick<QueryCollectionOptions, 'namespace' | 'docType' | 'filter'>,
+): Record<string, string> | undefined {
+  const filter: Record<string, string> = { ...(opts.filter ?? {}) };
   if (opts.namespace) filter.namespace = opts.namespace;
   if (opts.docType) filter.docType = opts.docType;
   return Object.keys(filter).length ? filter : undefined;
@@ -195,6 +200,15 @@ function matchesDocType(match: VectorMatch, docType?: string): boolean {
   return String(match.metadata?.docType ?? '') === docType;
 }
 
+function matchesMetaFilter(match: VectorMatch, filter?: Record<string, string>): boolean {
+  if (!filter) return true;
+  for (const [key, value] of Object.entries(filter)) {
+    if (!value) continue;
+    if (String(match.metadata?.[key] ?? '') !== value) return false;
+  }
+  return true;
+}
+
 async function queryIndex(
   index: VectorizeBinding,
   queryVector: number[],
@@ -215,7 +229,12 @@ export async function queryCollection(
 
   const topK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(1, opts.topK ?? 5));
   const nativeNs = await toVectorizeNativeNamespace(opts.namespace ?? '');
-  const base: VectorizeQueryOpts = { topK, returnMetadata: 'all' };
+  const metaFilter = opts.filter && Object.keys(opts.filter).length ? opts.filter : undefined;
+  const base: VectorizeQueryOpts = {
+    topK,
+    returnMetadata: 'all',
+    ...(metaFilter ? { filter: metaFilter } : {}),
+  };
 
   let matches: VectorMatch[] = [];
   try {
@@ -225,16 +244,31 @@ export async function queryCollection(
     });
   } catch (e) {
     console.warn('[rag-vector] namespaced query failed:', e);
+    if (metaFilter) {
+      try {
+        matches = await queryIndex(index, queryVector, {
+          topK,
+          returnMetadata: 'all',
+          ...(nativeNs ? { namespace: nativeNs } : {}),
+        });
+      } catch (retryErr) {
+        console.warn('[rag-vector] query without metadata filter failed:', retryErr);
+      }
+    }
   }
 
   // Legacy rows were written to the default namespace with metadata.namespace only.
   if (!matches.length && nativeNs) {
     try {
-      const fetched = await queryIndex(index, queryVector, base);
+      const fetched = await queryIndex(index, queryVector, { topK, returnMetadata: 'all' });
       matches = fetched.filter((m) => matchesNamespace(m, opts.namespace));
     } catch (e) {
       console.warn('[rag-vector] default-namespace fallback failed:', e);
     }
+  }
+
+  if (metaFilter) {
+    matches = matches.filter((m) => matchesMetaFilter(m, metaFilter));
   }
 
   if (opts.docType) {

@@ -166,6 +166,7 @@ export function buildRagToolset(
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
             billing: ctx.billing,
+            triggerContext: triggerContext as Record<string, unknown>,
           });
         },
       });

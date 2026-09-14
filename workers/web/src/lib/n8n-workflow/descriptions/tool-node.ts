@@ -74,6 +74,16 @@ export const TOOL_NODE_N8N_DESCRIPTION = resourceNode({
       displayOptions: { show: { toolKind: ["get-rag"] } },
     },
     {
+      displayName: "Group related docs by",
+      name: "groupByField",
+      type: "string",
+      default: "tableName",
+      placeholder: "tableName",
+      description:
+        "Metadata key Save RAG stored (e.g. tableName). Get RAG expands each related value with every stored document type (schema + data).",
+      displayOptions: { show: { toolKind: ["get-rag"] } },
+    },
+    {
       displayName: "Top K",
       name: "topK",
       type: "number",

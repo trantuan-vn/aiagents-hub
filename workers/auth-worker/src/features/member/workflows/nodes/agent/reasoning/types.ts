@@ -45,6 +45,7 @@ export type ReasoningOptions = {
   clarificationMode: ClarificationMode;
   requireCitations: boolean;
   maxReflectRetries: number;
+  noImprovementLimit: number;
   enablePlanner: PlannerMode;
   safetyLevel: SafetyLevel;
 };

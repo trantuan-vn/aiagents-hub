@@ -668,3 +668,135 @@ describe('preferSqlChunks', () => {
     expect(picked[0]?.metadata?.text).toContain('CREATE TABLE');
   });
 });
+
+describe('related table assembly', () => {
+  it('hydrates schema and sample data for each related table from metadata', async () => {
+    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
+      if (opts?.filter?.tableName === 'CHUNG_KHOAN') {
+        return {
+          matches: [
+            {
+              score: 0.7,
+              metadata: {
+                text: '## DDL\n```sql\nCREATE TABLE ADMIN.CHUNG_KHOAN (MA_CK VARCHAR2(20));\n```',
+                tableName: 'CHUNG_KHOAN',
+                docType: 'schema',
+                documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
+                chunkIndex: '0',
+                source: 'ADMIN.CHUNG_KHOAN.schema.md',
+              },
+            },
+            {
+              score: 0.6,
+              metadata: {
+                text: '## Sample shape (from live data)\n```json\n[{ "MA_CK": "VIC" }]\n```',
+                tableName: 'CHUNG_KHOAN',
+                docType: 'schema',
+                documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
+                chunkIndex: '1',
+              },
+            },
+            {
+              score: 0.5,
+              metadata: {
+                text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
+                tableName: 'CHUNG_KHOAN',
+                docType: 'sqlexample',
+                documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
+                chunkIndex: '0',
+              },
+            },
+          ],
+        };
+      }
+      return {
+        matches: [
+          {
+            score: 0.99,
+            metadata: {
+              text: '"MA_CK": "VNM", "TEN_CK": "Vinamilk"',
+              tableName: 'CHUNG_KHOAN',
+              docType: 'schema',
+              documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
+              chunkIndex: '1',
+              source: 'ADMIN.CHUNG_KHOAN.schema.md',
+            },
+          },
+        ],
+      };
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const wired: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((n) =>
+        n.id === 'tool_get'
+          ? { ...n, data: { ...n.data, groupByField: 'tableName', topK: 3 } }
+          : n,
+      ),
+    };
+
+    const result = await executeGetRag({
+      env,
+      definition: wired,
+      agentId: 'tool_get',
+      input: { query: 'co phieu Vinamilk' },
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.snippets[0]?.text).toContain('# CHUNG_KHOAN');
+    expect(result.snippets[0]?.text).toContain('CREATE TABLE');
+    expect(result.snippets[0]?.text).toContain('VIC');
+    expect(result.snippets[0]?.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
+    expect(result.snippets[0]?.tableName).toBe('CHUNG_KHOAN');
+  });
+
+  it('uses a mapped groupByField expression for the metadata key name', async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        { score: 0.8, metadata: { text: 'hello kb', source: 'kb.md', documentId: 'kb-1', chunkIndex: '0' } },
+      ],
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: {
+            toolKind: 'get-rag',
+            queryField: '{{ $json.body.question }}',
+            groupByField: '{{ $json.groupKey }}',
+          },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { body: { question: 'hello' }, groupKey: 'source' },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.count).toBe(1);
+    expect(String(out.ragText)).toContain('hello kb');
+    expect(query).toHaveBeenCalledWith(
+      [0.2, 0.3],
+      expect.objectContaining({ filter: { source: 'kb.md' } }),
+    );
+  });
+});

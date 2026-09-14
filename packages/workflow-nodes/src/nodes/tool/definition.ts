@@ -4,6 +4,7 @@ import type { WorkflowNodeDefinition } from "../../types/node-definition";
 import { TOOL_KIND_FIELD, TOOL_KINDS, TOOL_OVERRIDE_KINDS, type ToolKind } from "./kinds";
 import {
   GET_RAG_QUERY_FIELD,
+  GET_RAG_GROUP_BY_FIELD,
   GET_DB_INFO_USER_FIELD,
   GET_DB_INFO_PASSWORD_FIELD,
   GET_DB_INFO_CONNECT_STRING_FIELD,
@@ -104,6 +105,16 @@ const GET_RAG_FIELDS = [
     defaultValue: GET_RAG_QUERY_FIELD,
     order: 3,
     placeholderKey: "field_query_field_placeholder",
+    supportsExpression: true,
+  },
+  {
+    id: "groupByField",
+    type: "text" as const,
+    labelKey: "field_group_by_field",
+    descriptionKey: "field_group_by_field_desc",
+    defaultValue: GET_RAG_GROUP_BY_FIELD,
+    order: 3.5,
+    placeholderKey: "field_group_by_field_placeholder",
     supportsExpression: true,
   },
   { id: "topK", type: "number" as const, labelKey: "field_top_k", defaultValue: 12, order: 4 },
@@ -316,6 +327,7 @@ export const GET_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
     toolKind: "get-rag",
     toolName: "get_rag",
     queryField: GET_RAG_QUERY_FIELD,
+    groupByField: GET_RAG_GROUP_BY_FIELD,
   },
   sections: [
     defaultInputSection(),
@@ -370,6 +382,7 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolName: "get_rag",
     toolDescription: "Search the knowledge base for passages relevant to the user question.",
     queryField: GET_RAG_QUERY_FIELD,
+    groupByField: GET_RAG_GROUP_BY_FIELD,
     topK: 12,
     scoreThreshold: 0,
     querySource: "from_agent_input",

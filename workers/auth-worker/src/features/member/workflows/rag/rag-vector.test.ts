@@ -108,6 +108,30 @@ describe('rag-vector', () => {
     });
   });
 
+  it('passes extra metadata filters to Vectorize and JS-filters matches', async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        { score: 0.9, metadata: { text: 'keep', tableName: 'ORDERS' } },
+        { score: 0.8, metadata: { text: 'drop', tableName: 'USERS' } },
+      ],
+    });
+    const env = {
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const matches = await queryCollection(env, 'VECTORIZE', [0.1, 0.2], {
+      topK: 5,
+      namespace: 'kb',
+      filter: { tableName: 'ORDERS' },
+    });
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.metadata?.text).toBe('keep');
+    expect(query).toHaveBeenCalledWith(
+      [0.1, 0.2],
+      expect.objectContaining({ filter: { tableName: 'ORDERS' }, namespace: 'kb' }),
+    );
+  });
+
   it('caps topK at 20 when returning full metadata', async () => {
     const query = vi.fn().mockResolvedValue({ matches: [] });
     const env = {

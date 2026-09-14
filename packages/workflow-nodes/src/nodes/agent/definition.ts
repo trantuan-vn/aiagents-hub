@@ -11,6 +11,7 @@ import {
   type AgentKind,
 } from "./kinds";
 import {
+  REASONING_AGENT_DEFAULTS,
   REASONING_AGENT_PROMPT,
   REASONING_AGENT_SYSTEM_PROMPT,
   SQL_AGENT_PROMPT,
@@ -155,11 +156,7 @@ function defaultDataForKind(kind: AgentKind): Record<string, unknown> {
       prompt: REASONING_AGENT_PROMPT,
       systemPrompt: REASONING_AGENT_SYSTEM_PROMPT,
       [AGENT_KIND_FIELD]: kind,
-      clarificationMode: "ask",
-      requireCitations: true,
-      maxReflectRetries: 2,
-      enablePlanner: "auto",
-      safetyLevel: "standard",
+      ...REASONING_AGENT_DEFAULTS,
     };
   }
   return {

@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { TOOL_KIND_DEFAULTS, resolveCatalogEntryId, simpleMemoryDefaultData } from "@aiagents-hub/workflow-nodes";
+import { TOOL_KIND_DEFAULTS, REASONING_AGENT_DEFAULTS, resolveCatalogEntryId, simpleMemoryDefaultData } from "@aiagents-hub/workflow-nodes";
 
 import { useApprovedServices } from "../hooks/use-approved-services";
 import { useWorkflowIntegrations } from "../hooks/use-workflow-integrations";
@@ -735,11 +735,7 @@ export function WorkflowAddNodePanel({
         extra: {
           agentKind: "reasoning_agent",
           promptSource: "define_below",
-          clarificationMode: "ask",
-          requireCitations: true,
-          maxReflectRetries: 2,
-          enablePlanner: "auto",
-          safetyLevel: "standard",
+          ...REASONING_AGENT_DEFAULTS,
         },
       });
     });

@@ -3,6 +3,7 @@ import {
   embedTextWithUsage,
   matchToSnippet,
   queryCollection,
+  resolveVectorizeIndex,
   VECTORIZE_ALL_METADATA_TOPK,
   type VectorMatch,
 } from '../../../rag/index.js';
@@ -18,6 +19,16 @@ import {
   toolNodeConfig,
   type RagBilling,
 } from '../shared/rag-context.js';
+import {
+  assembleGroupSnippet,
+  chunkIdsForDocument,
+  groupDocumentIds,
+  inferGroupBy,
+  matchesFromVectorRows,
+  mergeMatches,
+  pickRelatedGroups,
+  resolveGroupKey,
+} from './assemble.js';
 
 export type GetRagInput = {
   query: string;
@@ -51,18 +62,9 @@ export type GetRagExecuteParams = {
   ownerId?: string;
   workflowId?: number;
   billing?: RagBilling;
+  /** Upstream payload — used only to resolve user-mapped Get RAG expressions. */
+  triggerContext?: Record<string, unknown>;
 };
-
-function mapMatch(match: VectorMatch, includeMetadata: boolean): GetRagSnippet {
-  const snippet: GetRagSnippet = { text: matchToSnippet(match), score: match.score };
-  if (includeMetadata && match.metadata) {
-    if (match.metadata.source) snippet.source = match.metadata.source;
-    if (match.metadata.documentId) snippet.documentId = match.metadata.documentId;
-    if (match.metadata.docType) snippet.docType = match.metadata.docType;
-    if (match.metadata.tableName) snippet.tableName = match.metadata.tableName;
-  }
-  return snippet;
-}
 
 function sqlChunkScore(match: VectorMatch): number {
   const text = matchToSnippet(match);
@@ -85,7 +87,7 @@ function groupKey(match: VectorMatch): string {
   );
 }
 
-/** Keep one best chunk per table, preferring DDL / SQL examples over sample-row tails. */
+/** @deprecated Prefer assembleGroupSnippet — kept for ranking which related groups to hydrate. */
 export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMatch[] {
   const ranked = [...matches].sort(
     (a, b) => sqlChunkScore(b) - sqlChunkScore(a) || (b.score ?? 0) - (a.score ?? 0),
@@ -96,6 +98,96 @@ export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMat
     if (!byTable.has(key)) byTable.set(key, match);
   }
   return [...byTable.values()].slice(0, topK);
+}
+
+function groupLooksIncomplete(matches: VectorMatch[]): boolean {
+  const text = matches.map(matchToSnippet).join('\n');
+  const types = new Set(matches.map((m) => String(m.metadata?.docType ?? '')).filter(Boolean));
+  const hasStructure = /CREATE TABLE|## DDL|## Columns/i.test(text);
+  const hasData = /Sample shape|```json/i.test(text) || types.size > 1;
+  return !hasStructure || !hasData;
+}
+
+/** Literal metadata key from node config, or an expression that resolves to a key name. */
+export function resolveGroupByField(template: unknown, input: Record<string, unknown>): string {
+  const expr = String(template ?? '').trim();
+  if (!expr) return '';
+  if (expr.includes('{{')) return resolveConfiguredText(expr, input, '');
+  return expr;
+}
+
+async function loadDocumentRows(
+  env: Env,
+  collection: string,
+  documentIds: string[],
+): Promise<VectorMatch[]> {
+  const index = resolveVectorizeIndex(env, collection);
+  if (!index?.getByIds || !documentIds.length) return [];
+  const ids = documentIds.flatMap(chunkIdsForDocument);
+  try {
+    const rows = await index.getByIds(ids);
+    return matchesFromVectorRows(rows ?? []);
+  } catch (e) {
+    console.warn('[get-rag] getByIds hydrate failed:', e);
+    return [];
+  }
+}
+
+async function hydrateRelatedGroups(params: {
+  env: Env;
+  collection: string;
+  queryVector: number[];
+  matches: VectorMatch[];
+  namespace?: string;
+  groupBy: string;
+  topK: number;
+  extraEmbed?: (text: string) => Promise<number[]>;
+}): Promise<VectorMatch[][]> {
+  const groupBy = inferGroupBy(params.matches, params.groupBy);
+  const groups = pickRelatedGroups(params.matches, groupBy, params.topK);
+  return Promise.all(
+    groups.map(async (groupValue) => {
+      let grouped = params.matches.filter((match) => resolveGroupKey(match, groupBy) === groupValue);
+      try {
+        const filtered = await queryCollection(params.env, params.collection, params.queryVector, {
+          topK: VECTORIZE_ALL_METADATA_TOPK,
+          namespace: params.namespace,
+          filter: groupBy ? { [groupBy]: groupValue } : undefined,
+        });
+        grouped = mergeMatches(grouped, filtered);
+      } catch (e) {
+        console.warn('[get-rag] related-group filter query failed:', e);
+      }
+
+      grouped = mergeMatches(grouped, await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)));
+
+      const catalogued = grouped.some(
+        (match) => match.metadata?.tableName || match.metadata?.docType || match.metadata?.schemaName,
+      );
+      if (catalogued && groupLooksIncomplete(grouped) && params.extraEmbed) {
+        try {
+          const namedVector = await params.extraEmbed(groupValue);
+          if (namedVector.length) {
+            const named = await queryCollection(params.env, params.collection, namedVector, {
+              topK: VECTORIZE_ALL_METADATA_TOPK,
+              namespace: params.namespace,
+            });
+            grouped = mergeMatches(
+              grouped,
+              named.filter((match) => resolveGroupKey(match, groupBy) === groupValue),
+            );
+            grouped = mergeMatches(
+              grouped,
+              await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)),
+            );
+          }
+        } catch (e) {
+          console.warn('[get-rag] related-group name query failed:', e);
+        }
+      }
+      return grouped;
+    }),
+  );
 }
 
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
@@ -128,6 +220,8 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
         `Get RAG embedding dimensions (${vector.length}) do not match Vectorize index (${rag.dimensions})`,
       );
     }
+    const extraEmbedUsages: AiUsage[] = [];
+    const extraEmbedTexts: string[] = [];
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
@@ -138,7 +232,43 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
       scoreThreshold,
     });
 
-    const snippets = preferSqlChunks(matches, topK).map((m) => mapMatch(m, includeMetadata));
+    const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {});
+    const hydrated = matches.length
+      ? await hydrateRelatedGroups({
+          env,
+          collection: rag.collection,
+          queryVector: vector,
+          matches,
+          namespace: namespace || undefined,
+          groupBy,
+          topK,
+          extraEmbed: async (text) => {
+            extraEmbedTexts.push(text);
+            const named = await embedTextWithUsage(env, text, embed.model);
+            if (named.usage) extraEmbedUsages.push(named.usage);
+            return named.vector;
+          },
+        })
+      : [];
+    if (extraEmbedTexts.length) {
+      await billRagEmbeddings(
+        embed,
+        params.billing,
+        extraEmbedTexts,
+        embeddingUsageOrEstimate(extraEmbedTexts, extraEmbedUsages[0]),
+      );
+    }
+
+    const inferredBy = inferGroupBy(matches, groupBy);
+    const snippets = (hydrated.length ? hydrated : [matches])
+      .map((group) => {
+        const first = group[0];
+        if (!first) return { text: '' };
+        return assembleGroupSnippet(resolveGroupKey(first, inferredBy), group);
+      })
+      .filter((snippet) => snippet.text.trim())
+      .slice(0, topK)
+      .map((snippet) => (includeMetadata ? snippet : { text: snippet.text, score: snippet.score }));
     return { snippets, count: snippets.length, raw: { usage } };
   } catch (e) {
     const message = String(e instanceof Error ? e.message : e).slice(0, 500);
@@ -173,6 +303,7 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
     billing: ragBillingFromNodeContext(ctx),
+    triggerContext: ctx.nodeInput as Record<string, unknown>,
   });
   const ragText = result.snippets.map((s) => s.text).filter(Boolean).join('\n\n');
   return withRagOutput(ctx.nodeInput, {
@@ -230,6 +361,7 @@ export async function prefetchLinkedGetRag(
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
       billing: ragBillingFromNodeContext(ctx),
+      triggerContext: (ctx.nodeInput ?? {}) as Record<string, unknown>,
     });
     const snippets = result.snippets.map((s) => s.text).filter(Boolean);
     return { ragText: snippets.join('\n\n'), snippets, query };

@@ -1,7 +1,7 @@
 import { interpolate } from '../../execution/node-runtime.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag/index.js';
 import type { NodeContext } from '../types.js';
-import { expressionScope, resolveConfiguredText } from '../tool/shared/pipeline.js';
+import { expressionScope, resolveConfiguredNumber, resolveConfiguredText } from '../tool/shared/pipeline.js';
 
 export function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<string, unknown> {
   if (!opts) return {};
@@ -33,11 +33,14 @@ export function resolveMaxTokens(
   agentData: Record<string, unknown>,
   serviceOptions?: Record<string, unknown>,
   modelId = '',
+  input: Record<string, unknown> = {},
 ): number {
   const fallback = isReasoningModel(modelId) ? 4096 : 1024;
-  const fromService = serviceOptions?.maxTokens;
-  const raw = fromService ?? agentData.maxTokens ?? fallback;
-  return Number(raw) || fallback;
+  const fromAgent = resolveConfiguredNumber(agentData.maxTokens, input);
+  if (fromAgent != null && fromAgent > 0) return fromAgent;
+  const fromService = Number(serviceOptions?.maxTokens);
+  if (Number.isFinite(fromService) && fromService > 0) return fromService;
+  return fallback;
 }
 
 /** Embedding models cannot be used with generateText / chat completions. */

@@ -45,6 +45,13 @@ export function formatCitationBlock(citations: AgentCitation[]): string {
   return citations.map((c) => `[${c.id}] (${c.source}) ${c.snippet}`).join('\n');
 }
 
+/** Full retrieved docs for the act prompt — do not truncate schema / sample rows. */
+export function formatRagContext(snippets: string[]): string {
+  const parts = snippets.map((text) => text.trim()).filter(Boolean);
+  if (!parts.length) return '';
+  return parts.map((text, i) => `[${i + 1}]\n${text}`).join('\n\n');
+}
+
 export function claimsNeedCitations(text: string, requireCitations: boolean): boolean {
   if (!requireCitations) return false;
   const trimmed = text.trim();
