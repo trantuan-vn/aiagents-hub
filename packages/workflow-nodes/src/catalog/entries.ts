@@ -5,6 +5,7 @@ import { TRANSFORM_KINDS } from "../nodes/data-transformation/kinds";
 import { FLOW_KINDS } from "../nodes/flow/kinds";
 import { HUMAN_REVIEW_CHANNELS } from "../nodes/human-review/channels";
 import { MEMORY_KINDS, MEMORY_OVERRIDE_KINDS } from "../nodes/memory/kinds";
+import { memoryKindDescKey, memoryKindNameKey } from "../nodes/memory/definition";
 import { TOOL_KINDS, TOOL_OVERRIDE_KINDS } from "../nodes/tool/kinds";
 import { TRIGGER_KINDS } from "../nodes/trigger/kinds";
 
@@ -14,7 +15,7 @@ const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"])
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>([]);
 const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
-const BACKEND_MEMORY_KINDS = new Set(["vectorize"]);
+const BACKEND_MEMORY_KINDS = new Set(["simple", "vectorize"]);
 const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
 
 /** Sub-kinds with dedicated frontend config / canvas plugins. */
@@ -163,8 +164,8 @@ function memoryEntries(): WorkflowCatalogEntrySeed[] {
       addCategory: "ai",
       runtimeType: "memory_node",
       kind,
-      nameKey: `memory_kind_${kind}`,
-      descKey: `memory_kind_${kind}_desc`,
+      nameKey: memoryKindNameKey(kind),
+      descKey: memoryKindDescKey(kind),
       hasBackend: BACKEND_MEMORY_KINDS.has(kind) || !MEMORY_OVERRIDE_KINDS.has(kind),
       hasFrontend: FRONTEND_MEMORY_KINDS.has(kind),
       sortOrder: 200 + index,

@@ -65,6 +65,37 @@ describe('executeReasoningAgent', () => {
     expect(llm).not.toHaveBeenCalled();
   });
 
+  it('does not crash when the act model returns empty text and a tool result is missing', async () => {
+    const llm: ReasoningLlmCall = async ({ purpose }) => {
+      if (purpose === 'act') {
+        return {
+          text: undefined as unknown as string,
+          observations: [{ tool: 'get_rag', ok: true, output: undefined as unknown as string }],
+        };
+      }
+      return {
+        text: '{"pass":true,"issues":[],"missingSlots":[],"canUseTools":true,"confidence":0.9}',
+        observations: [],
+      };
+    };
+    const out = await executeReasoningAgent(
+      ctx(
+        {
+          agentKind: 'reasoning_agent',
+          prompt: 'thông tin số dư của NĐT',
+          requireCitations: true,
+          enablePlanner: 'off',
+          maxReflectRetries: 0,
+        },
+        { chatInput: 'thông tin số dư của NĐT', query: 'thông tin số dư của NĐT' },
+      ),
+      { llm },
+    );
+    expect(out.status).toBe('ok');
+    expect(typeof out.text).toBe('string');
+    expect(out.sql).toBe('');
+  });
+
   it('returns citations on a successful grounded answer', async () => {
     const llm: ReasoningLlmCall = async ({ purpose }) => {
       if (purpose === 'act') {

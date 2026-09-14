@@ -48,8 +48,18 @@ function findLinkedMemoryNode(
   });
 }
 
-function firstMemoryNode(definition: WorkflowDefinition): WorkflowDefinition['nodes'][number] | undefined {
-  return definition.nodes.find((n) => n.type === 'memory_node');
+function isVectorizeMemoryNode(
+  node: WorkflowDefinition['nodes'][number] | undefined,
+): boolean {
+  if (!node || node.type !== 'memory_node') return false;
+  const kind = String((node.data as Record<string, unknown> | undefined)?.memoryKind ?? 'vectorize');
+  return kind === 'vectorize';
+}
+
+function firstVectorizeMemoryNode(
+  definition: WorkflowDefinition,
+): WorkflowDefinition['nodes'][number] | undefined {
+  return definition.nodes.find(isVectorizeMemoryNode);
 }
 
 function findSaveRagNode(
@@ -110,12 +120,15 @@ function mergeResourceContext(
     ...primary,
     serviceEndpoint: primary.serviceEndpoint || fallback.serviceEndpoint,
     serviceOptions: primary.serviceOptions ?? fallback.serviceOptions,
-    memoryCollection: primary.memoryCollection || fallback.memoryCollection,
+    memoryCollection: primary.memoryKind === 'simple' ? undefined : primary.memoryCollection || fallback.memoryCollection,
     memoryKind: primary.memoryKind || fallback.memoryKind,
-    memoryNamespace: primary.memoryNamespace || fallback.memoryNamespace,
+    memoryNamespace: primary.memoryKind === 'simple' ? undefined : primary.memoryNamespace || fallback.memoryNamespace,
     memoryNodeId: primary.memoryNodeId || fallback.memoryNodeId,
     memoryDimensions: primary.memoryDimensions ?? fallback.memoryDimensions,
     memoryMetric: primary.memoryMetric || fallback.memoryMetric,
+    memorySessionIdSource: primary.memorySessionIdSource || fallback.memorySessionIdSource,
+    memorySessionKey: primary.memorySessionKey || fallback.memorySessionKey,
+    memoryContextWindowLength: primary.memoryContextWindowLength ?? fallback.memoryContextWindowLength,
     tools: primary.tools.length ? primary.tools : fallback.tools,
   };
 }
@@ -162,7 +175,9 @@ export function resolveRagResources(
     linked.memoryNodeId != null
       ? definition.nodes.find((n) => n.id === linked.memoryNodeId)
       : findLinkedMemoryNode(definition, toolId);
-  const fallbackMem = linkedMem ?? firstMemoryNode(definition);
+  const fallbackMem = isVectorizeMemoryNode(linkedMem)
+    ? linkedMem
+    : firstVectorizeMemoryNode(definition);
   const memData = (fallbackMem?.data ?? {}) as Record<string, unknown> | undefined;
 
   const collection = normalizeVectorizeCollection(

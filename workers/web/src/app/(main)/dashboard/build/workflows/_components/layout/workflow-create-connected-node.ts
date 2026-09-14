@@ -6,7 +6,7 @@ import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
 import { WORKFLOW_CONNECT_OFFSET_X } from "./workflow-placement-constants";
 import { computeNewResourceNodePosition } from "./workflow-resource-layout";
 import { buildVectorizeNodeData } from "./vectorize-node-data";
-import { TOOL_KIND_DEFAULTS } from "@aiagents-hub/workflow-nodes";
+import { TOOL_KIND_DEFAULTS, simpleMemoryDefaultData } from "@aiagents-hub/workflow-nodes";
 
 const RESOURCE_NODE_TYPES = new Set(["service_node", "memory_node", "tool_node"]);
 
@@ -109,16 +109,21 @@ export function applyCreateConnectedNode(
     return null;
   }
 
-  const vectorizeDefaults =
-    args.type === "memory_node"
-      ? buildVectorizeNodeData(workflowId, newId, args.label)
-      : undefined;
+  const memoryKind = String(args.extraData?.memoryKind ?? "");
+  const memoryDefaults =
+    args.type !== "memory_node"
+      ? undefined
+      : memoryKind === "simple"
+        ? simpleMemoryDefaultData(args.label)
+        : !memoryKind || memoryKind === "vectorize"
+          ? buildVectorizeNodeData(workflowId, newId, args.label)
+          : undefined;
   const toolKind = typeof args.extraData?.toolKind === "string" ? args.extraData.toolKind : undefined;
   const toolDefaults =
     args.type === "tool_node" && toolKind ? TOOL_KIND_DEFAULTS[toolKind] : undefined;
   const data = buildExtraData(args.type, serviceEndpoint, {
     ...toolDefaults,
-    ...vectorizeDefaults,
+    ...memoryDefaults,
     ...args.extraData,
   });
   const newNode: Node = {

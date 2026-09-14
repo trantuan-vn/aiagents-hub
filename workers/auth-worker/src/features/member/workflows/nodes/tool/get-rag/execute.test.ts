@@ -405,6 +405,64 @@ describe('executeGetRagPipeline', () => {
     expect(String(out.ragText)).toContain('CREATE TABLE public.orders');
   });
 
+  it('does not use Simple Memory as the Vectorize dataset for Get RAG', async () => {
+    const query = vi.fn().mockResolvedValue({
+      matches: [{ score: 0.8, metadata: { text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);', namespace: 'uu1/wf1/nmem_kb' } }],
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const mixed: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'mem_simple',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: { memoryKind: 'simple', sessionIdSource: 'from_chat_trigger' },
+        },
+        {
+          id: 'mem_kb',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: { memoryKind: 'vectorize', collection: 'VECTORIZE', namespace: 'wf1/nmem_kb' },
+        },
+        {
+          id: 'agent_1',
+          type: 'agent',
+          position: { x: 0, y: 0 },
+          data: { agentKind: 'reasoning_agent' },
+        },
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', toolName: 'get_rag', topK: 3 },
+        },
+      ],
+      edges: [
+        { id: 'e-simple', source: 'mem_simple', target: 'agent_1', sourceHandle: 'memory', targetHandle: 'memory' },
+        { id: 'e-tools', source: 'tool_get', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+      ],
+    };
+
+    await executeGetRag({
+      env,
+      definition: mixed,
+      agentId: 'tool_get',
+      input: { query: 'so du NDT' },
+      ownerId: 'user-1',
+      workflowId: 1,
+    });
+
+    const nativeNs = await toVectorizeNativeNamespace('uuser-1/wf1/nmem_kb');
+    expect(query).toHaveBeenCalledWith(
+      [0.5, 0.6],
+      expect.objectContaining({ namespace: nativeNs }),
+    );
+  });
+
   it('queries the same workflow namespace Save RAG used when no memory node is attached', async () => {
     const query = vi.fn().mockResolvedValue({
       matches: [{ score: 0.8, metadata: { text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);', namespace: 'uu1/wf1' } }],
@@ -545,6 +603,39 @@ describe('executeGetRagPipeline', () => {
 
     const out = await executeGetRagPipeline(ctx);
     expect(out.query).toBe('doanh thu thang nay');
+  });
+
+  it('falls back to chatInput when Query field only maps body.question', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const pipelineDefinition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'tool_get',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-rag', queryField: '{{ $json.body.question }}' },
+        },
+      ],
+      edges: [],
+    };
+
+    const ctx = {
+      node: pipelineDefinition.nodes[0],
+      nodeInput: { chatInput: 'thong tin so du NDT', sessionId: 's1' },
+      definition: pipelineDefinition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    const out = await executeGetRagPipeline(ctx);
+    expect(out.query).toBe('thong tin so du NDT');
   });
 });
 

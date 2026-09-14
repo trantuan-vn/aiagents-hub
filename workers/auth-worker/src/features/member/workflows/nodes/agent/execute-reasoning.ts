@@ -17,20 +17,20 @@ import {
   buildRagToolset,
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
+import { attachSimpleMemory, isLinkedSimpleMemory } from '../memory-node/simple.js';
 import { ragBillingFromNodeContext } from '../tool/shared/rag-context.js';
+import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 import {
   aiParamsFromServiceOptions,
   assertTextGenerationModel,
   extractSql,
-  extractTriggerContext,
   interpolateTemplate,
   parseJsonObject,
   resolveAgentUserText,
   resolveEmbedModel,
   resolveMaxTokens,
-  withoutGetRagTools,
 } from './shared.js';
 import {
   buildCitations,
@@ -99,10 +99,34 @@ function readOptions(data: Record<string, unknown>): ReasoningOptions {
   };
 }
 
+function asText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value == null) return '';
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function truncate(value: unknown, max = 1500): string {
-  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  const text = asText(value);
   if (text.length <= max) return text;
   return `${text.slice(0, max)}…`;
+}
+
+function snippetTexts(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object' && 'text' in item) {
+        return String((item as { text?: unknown }).text ?? '');
+      }
+      return asText(item);
+    })
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 function billedUsage(usage: unknown, text: string): unknown {
@@ -236,7 +260,12 @@ function createDefaultLlm(args: {
           }
         }
       }
-      return { text: result.text, usage: result.totalUsage ?? result.usage, observations, askedUser };
+      return {
+        text: asText(result.text),
+        usage: result.totalUsage ?? result.usage,
+        observations,
+        askedUser,
+      };
     }
 
     const messages = [
@@ -250,7 +279,7 @@ function createDefaultLlm(args: {
       presence_penalty: args.presencePenalty,
     });
     return {
-      text: extractTextFromAiResponse(aiResponse),
+      text: asText(extractTextFromAiResponse(aiResponse)),
       usage: aiResponse,
       observations: [],
     };
@@ -267,9 +296,24 @@ export async function executeReasoningAgent(
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
   });
-  const nodeInput = (ctx.nodeInput ?? {}) as Record<string, unknown>;
-  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
+  let nodeInput = { ...(ctx.nodeInput ?? {}) } as Record<string, unknown>;
   let userText = resolveAgentUserText(data, nodeInput, ctx.input);
+
+  const prefetched = await prefetchLinkedGetRag({ ...ctx, nodeInput }, ctx.node.id, userText);
+  if (prefetched.ragText) {
+    nodeInput = {
+      ...nodeInput,
+      ragText: prefetched.ragText,
+      snippets: prefetched.snippets,
+      query:
+        typeof nodeInput.query === 'string' && nodeInput.query.trim()
+          ? nodeInput.query
+          : prefetched.query,
+    };
+    userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
+  }
+
+  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
   const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
 
   const pdfFiles = filesFromWebhookBody(nodeInput.body ?? ctx.nodeInput);
@@ -348,11 +392,12 @@ export async function executeReasoningAgent(
     memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id),
   );
 
-  const memoryCollection = String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
+  const memoryCollection = isLinkedSimpleMemory(linked)
+    ? ''
+    : String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
   const memoryNamespace = String(linked.memoryNamespace ?? '').trim() || undefined;
-  const ragSnippets = Array.isArray(nodeInput.snippets)
-    ? (nodeInput.snippets as unknown[]).map((s) => String(s))
-    : [];
+  const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
+  const ragSnippets = snippetTexts(nodeInput.snippets);
   const semantic =
     memoryCollection && !agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag')
       ? await retrieveSemanticMemory(ctx.c.env, memoryCollection, userText, 4, memoryNamespace)
@@ -361,21 +406,19 @@ export async function executeReasoningAgent(
 
   const embedModel = resolveEmbedModel(service);
   const billing = ragBillingFromNodeContext(ctx);
-  const ragTools = withoutGetRagTools(
-    buildRagToolset(
-      {
-        env: ctx.c.env,
-        userDO: ctx.userDO,
-        agentId: ctx.node.id,
-        triggerContext: extractTriggerContext(ctx),
-        embedModel,
-        ownerId: ctx.meta.ownerId,
-        workflowId: ctx.meta.workflowId,
-        billing,
-      },
-      ctx.definition,
-      ctx.node.id,
-    ),
+  const ragTools = buildRagToolset(
+    {
+      env: ctx.c.env,
+      userDO: ctx.userDO,
+      agentId: ctx.node.id,
+      triggerContext: nodeInput,
+      embedModel,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
+      billing,
+    },
+    ctx.definition,
+    ctx.node.id,
   );
   const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
   const memoryTool: ToolSet =
@@ -446,6 +489,7 @@ export async function executeReasoningAgent(
       summary: `Asked for ${frame.missingSlots.join(', ')}`,
       status: result.status,
     });
+    await simpleMemory.persist(questions.join('\n'));
     return toNodeOutput(result, { query: userText, snippets, endpoint });
   }
 
@@ -471,6 +515,7 @@ export async function executeReasoningAgent(
       ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
       : `If you lack required details, say so and ask. Do not guess.`,
     session.summary ? `Session memory:\n${session.summary}` : '',
+    simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
     formatCitationBlock(citationSeed) ? `Source snippets (cite as [n]):\n${formatCitationBlock(citationSeed)}` : '',
     options.requireCitations && citationSeed.length
       ? 'Every factual claim must include [n] citations that match the source list.'
@@ -494,11 +539,11 @@ export async function executeReasoningAgent(
           ? userText
           : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nKeep citations as [n].`,
       tools: policyNames.length ? policyTools : undefined,
-      toolChoice: policyNames.length ? initialToolChoice(policyNames, plan) : undefined,
+      toolChoice: policyNames.length ? initialToolChoice(policyNames, plan, snippets.length > 0) : undefined,
       stopSteps,
     });
     await maybeBill(act.usage, act.text);
-    observations = [...observations, ...act.observations];
+    observations = [...observations, ...(act.observations ?? [])];
     if (act.askedUser?.questions?.length) {
       const result = clarificationResult(act.askedUser.questions, act.askedUser.why ?? '', frame);
       result.plan = plan?.steps;
@@ -509,9 +554,10 @@ export async function executeReasoningAgent(
         summary: `Asked: ${act.askedUser.questions.join('; ')}`,
         status: result.status,
       });
+      await simpleMemory.persist(act.askedUser.questions.join('\n'));
       return toNodeOutput(result, { query: userText, snippets, endpoint });
     }
-    draft = act.text;
+    draft = asText(act.text);
 
     const citations = buildCitations({
       snippets,
@@ -553,6 +599,7 @@ export async function executeReasoningAgent(
       if (memoryCollection) {
         await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
       }
+      await simpleMemory.persist(outText);
       return toNodeOutput(result, { query: userText, snippets, endpoint });
     }
 
@@ -587,6 +634,7 @@ export async function executeReasoningAgent(
       if (memoryCollection) {
         await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
       }
+      await simpleMemory.persist(outText);
       return toNodeOutput(result, { query: userText, snippets, endpoint });
     }
   }
@@ -604,5 +652,6 @@ export async function executeReasoningAgent(
     confidence: frame.confidence,
     frame,
   };
+  await simpleMemory.persist(result.text);
   return toNodeOutput(result, { query: userText, snippets, endpoint });
 }

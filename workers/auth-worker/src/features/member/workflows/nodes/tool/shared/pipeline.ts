@@ -3,6 +3,67 @@ import type { NodeOutput } from '../../types.js';
 
 export type PipelineItem = Record<string, unknown>;
 
+/** Common question/message keys on chat + webhook payloads. Used only after the user's expression is empty. */
+export const USER_TEXT_KEYS = [
+  'chatInput',
+  'query',
+  'question',
+  'message',
+  'text',
+  'input',
+  'prompt',
+] as const;
+
+/** Lift `body` / `fields` so `{{ $json.chatInput }}` and `{{ $json.body.question }}` both resolve. */
+export function flattenTriggerPayload(input: Record<string, unknown>): Record<string, unknown> {
+  const body = input.body;
+  const fields = input.fields;
+  const fromFields =
+    fields && typeof fields === 'object' && !Array.isArray(fields)
+      ? { ...(fields as Record<string, unknown>) }
+      : {};
+  const fromBody =
+    body && typeof body === 'object' && !Array.isArray(body)
+      ? { ...(body as Record<string, unknown>) }
+      : {};
+  const flat: Record<string, unknown> = { ...fromFields, ...fromBody, ...input };
+  if (typeof body === 'string' && body.trim()) {
+    if (!usableText(flat.question)) flat.question = body;
+    if (!usableText(flat.text)) flat.text = body;
+  }
+  return flat;
+}
+
+export function expressionScope(
+  input: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const merged = { ...input, ...extra };
+  const flat = flattenTriggerPayload(merged);
+  return {
+    ...flat,
+    $json: flat,
+    json: flat,
+    body: input.body ?? flat.body,
+    input: extra.input ?? flat.input ?? '',
+  };
+}
+
+function usableText(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+}
+
+function firstString(item: Record<string, unknown>, keys: readonly string[]): string {
+  for (const key of keys) {
+    const text = usableText(item[key]);
+    if (text) return text;
+  }
+  return '';
+}
+
 /** Current loop batch or a single upstream object. */
 export function pipelineItems(nodeInput: NodeOutput): PipelineItem[] {
   if (Array.isArray(nodeInput.items)) {
@@ -15,14 +76,28 @@ export function pipelineItems(nodeInput: NodeOutput): PipelineItem[] {
   return [];
 }
 
-function firstString(item: PipelineItem, keys: string[]): string {
-  for (const key of keys) {
-    const value = item[key];
-    if (value == null) continue;
-    if (typeof value === 'string' && value.trim()) return value;
-    if (typeof value === 'number') return String(value);
+/**
+ * Resolve a user-mapped config expression (`{{ $json.chatInput }}`) against the
+ * current payload. If the expression is empty, fall back to common text keys
+ * present on the same payload — never invent a prompt.
+ */
+export function resolveConfiguredText(
+  template: unknown,
+  input: Record<string, unknown>,
+  fallbackInput = '',
+  fallbackKeys: readonly string[] = USER_TEXT_KEYS,
+): string {
+  const scope = expressionScope(input, { input: fallbackInput });
+  const expr = String(template ?? '').trim();
+  if (expr.includes('{{')) {
+    const text = usableText(interpolate(expr, scope));
+    if (text && text !== '[object Object]') return text;
+  } else if (expr) {
+    const named = usableText(scope[expr]);
+    if (named) return named;
   }
-  return '';
+  if (fallbackInput.trim()) return fallbackInput.trim();
+  return firstString(scope, fallbackKeys);
 }
 
 export function resolvePipelineField(
@@ -31,15 +106,9 @@ export function resolvePipelineField(
   nodeInput: NodeOutput,
   fallbackKeys: string[],
 ): string {
-  const expr = String(template ?? '').trim();
-  if (expr.includes('{{')) {
-    const resolved = interpolate(expr, { ...nodeInput, ...item, $json: { ...nodeInput, ...item } });
-    if (resolved != null && String(resolved).trim()) return String(resolved);
-  } else if (expr && !expr.startsWith('{{')) {
-    const fromItem = item[expr];
-    if (fromItem != null && String(fromItem).trim()) return String(fromItem);
-  }
-  return firstString(item, fallbackKeys);
+  const merged = { ...(nodeInput as Record<string, unknown>), ...item };
+  const keys = fallbackKeys;
+  return resolveConfiguredText(template, merged, '', keys);
 }
 
 export function stringifyUnknown(value: unknown): string {
@@ -61,8 +130,10 @@ export function resolvePipelineValue(
   const expr = String(template ?? '').trim();
   if (!expr) return undefined;
   const merged = { ...nodeInput, ...(item ?? {}) };
-  const scope = { ...merged, $json: merged };
+  const scope = expressionScope(merged);
   if (expr.includes('{{')) return interpolate(expr, scope);
   if (item && Object.prototype.hasOwnProperty.call(item, expr)) return item[expr];
+  const flat = flattenTriggerPayload(merged);
+  if (Object.prototype.hasOwnProperty.call(flat, expr)) return flat[expr];
   return nodeInput[expr];
 }

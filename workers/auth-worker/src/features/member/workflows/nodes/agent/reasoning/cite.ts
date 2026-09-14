@@ -24,7 +24,7 @@ export function buildCitations(args: {
     citations.push({ id: id++, source: 'memory', snippet: text.slice(0, 500) });
   }
   for (const obs of args.observations) {
-    const snippet = obs.output.trim();
+    const snippet = String(obs.output ?? '').trim();
     if (!snippet) continue;
     citations.push({
       id: id++,
@@ -55,7 +55,8 @@ export function claimsNeedCitations(text: string, requireCitations: boolean): bo
 }
 
 export function groundedTextOrFallback(text: string, citations: AgentCitation[]): string {
-  if (!citations.length) return text;
-  if (parseCitationIds(text).length) return text;
-  return `${text.trim()}\n\nSources: ${citations.map((c) => `[${c.id}]`).join(' ')}`;
+  const body = String(text ?? '');
+  if (!citations.length) return body;
+  if (parseCitationIds(body).length) return body;
+  return `${body.trim()}\n\nSources: ${citations.map((c) => `[${c.id}]`).join(' ')}`;
 }

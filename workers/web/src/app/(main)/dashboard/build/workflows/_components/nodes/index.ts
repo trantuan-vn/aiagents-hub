@@ -15,6 +15,7 @@ import { humanReviewUIPlugin, HUMAN_REVIEW_CHANNEL_UI_PLUGINS } from "./human-re
 import {
   memoryUIPlugin,
   MEMORY_KIND_UI_PLUGINS,
+  memorySimpleUIPlugin,
   memoryVectorizeUIPlugin,
 } from "./memory";
 import { serviceUIPlugin } from "./service";
@@ -72,6 +73,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   ...AGENT_KIND_UI_PLUGINS,
   agentReasoningUIPlugin,
   ...MEMORY_KIND_UI_PLUGINS,
+  memorySimpleUIPlugin,
   memoryVectorizeUIPlugin,
   ...TOOL_KIND_UI_PLUGINS,
   toolSaveRagUIPlugin,

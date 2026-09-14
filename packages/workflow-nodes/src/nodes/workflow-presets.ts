@@ -1,6 +1,9 @@
 /** Recommended expression defaults. Alternate predecessors use || (JS first-truthy). */
 
-export const GET_RAG_QUERY_FIELD = "{{ $json.body.question || $json.chatInput }}";
+export const SIMPLE_MEMORY_SESSION_KEY = "{{ $json.sessionId }}";
+export const SIMPLE_MEMORY_CONTEXT_WINDOW = 5;
+
+export const GET_RAG_QUERY_FIELD = "{{ $json.chatInput || $json.body.question || $json.body.message || $json.query || $json.question }}";
 
 export const GET_DB_INFO_USER_FIELD = "{{ $json.u || $json.fields.u || $json.user }}";
 export const GET_DB_INFO_PASSWORD_FIELD = "{{ $json.p || $json.fields.p || $json.password }}";
@@ -16,7 +19,7 @@ Retrieved schema and SQL examples:
 export const SQL_AGENT_SYSTEM_PROMPT =
   "You are a Text-to-SQL assistant. Use only tables and columns from the retrieved context. Reply with one read-only SQL query in a fenced sql code block.";
 
-export const REASONING_AGENT_PROMPT = `{{ $json.chatInput || $json.body.message || $json.query || $json.input }}`;
+export const REASONING_AGENT_PROMPT = `{{ $json.chatInput || $json.body.question || $json.body.message || $json.query || $json.input }}`;
 
 export const REASONING_AGENT_SYSTEM_PROMPT = `You are a careful assistant. Follow these rules:
 - Do not invent facts, URLs, credentials, or tool results.

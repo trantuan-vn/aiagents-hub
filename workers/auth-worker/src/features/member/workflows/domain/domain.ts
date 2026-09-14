@@ -197,3 +197,19 @@ export const AgentSessionMemorySchema = z.object({
 });
 
 export type AgentSessionMemory = z.infer<typeof AgentSessionMemorySchema>;
+
+/**
+ * Windowed chat turns for memory_node:simple, keyed per workflow/session/memory node.
+ * Kept DO-local (not queue-synced).
+ */
+export const SimpleMemorySchema = z.object({
+  memoryKey: z.string().min(1).max(160),
+  workflowId: z.number().int(),
+  sessionId: z.string().min(1).max(80),
+  memoryNodeId: z.string().min(1).max(80),
+  /** JSON array of { role: 'user' | 'assistant', content: string }. */
+  messages: z.string().default('[]'),
+  updatedAt: z.number().default(Date.now),
+});
+
+export type SimpleMemory = z.infer<typeof SimpleMemorySchema>;

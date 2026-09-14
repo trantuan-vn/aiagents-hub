@@ -8,7 +8,7 @@ import {
 } from '../../../rag/index.js';
 import { embeddingUsageOrEstimate, type AiUsage } from '../../../../../admin/service/pricing.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
-import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
+import { pipelineItems, resolveConfiguredText } from '../shared/pipeline.js';
 import {
   billRagEmbeddings,
   ragBillingFromNodeContext,
@@ -150,10 +150,8 @@ function queryFromInput(ctx: NodeContext): string {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const items = pipelineItems(ctx.nodeInput);
   const item = items[0] ?? ctx.nodeInput;
-
-  const fromField = resolvePipelineField(data.queryField, item, ctx.nodeInput, []);
-  if (fromField.trim() && fromField !== '[object Object]') return fromField.trim();
-  return '';
+  const merged = { ...(ctx.nodeInput as Record<string, unknown>), ...item };
+  return resolveConfiguredText(data.queryField, merged, '');
 }
 
 function withRagOutput(nodeInput: NodeOutput, rag: Record<string, unknown>): NodeOutput {
@@ -186,4 +184,57 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     text: query,
     ...result,
   });
+}
+
+export type PrefetchedRag = {
+  ragText: string;
+  snippets: string[];
+  query: string;
+};
+
+/** When Get RAG is wired as an agent tool, resolve its Query field against the current payload and retrieve. */
+export async function prefetchLinkedGetRag(
+  ctx: NodeContext,
+  agentId: string,
+  queryFallback = '',
+): Promise<PrefetchedRag> {
+  const empty: PrefetchedRag = { ragText: '', snippets: [], query: '' };
+  const existing = String((ctx.nodeInput as Record<string, unknown> | undefined)?.ragText ?? '').trim();
+  if (existing) {
+    const snippets = Array.isArray((ctx.nodeInput as Record<string, unknown>).snippets)
+      ? ((ctx.nodeInput as Record<string, unknown>).snippets as unknown[])
+          .map((s) => (typeof s === 'string' ? s : String((s as { text?: unknown })?.text ?? '')))
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [existing];
+    return { ragText: existing, snippets, query: queryFallback };
+  }
+
+  const config = toolNodeConfig(ctx.definition, agentId, 'get-rag');
+  if (!config) return empty;
+
+  const query = resolveConfiguredText(
+    config.queryField,
+    (ctx.nodeInput ?? {}) as Record<string, unknown>,
+    queryFallback,
+  );
+  if (!query) return empty;
+
+  try {
+    const result = await executeGetRag({
+      env: ctx.c.env,
+      definition: ctx.definition,
+      agentId,
+      input: { query },
+      userDO: ctx.userDO,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
+      billing: ragBillingFromNodeContext(ctx),
+    });
+    const snippets = result.snippets.map((s) => s.text).filter(Boolean);
+    return { ragText: snippets.join('\n\n'), snippets, query };
+  } catch (e) {
+    console.warn('[get-rag] prefetch from Query field failed:', e);
+    return empty;
+  }
 }

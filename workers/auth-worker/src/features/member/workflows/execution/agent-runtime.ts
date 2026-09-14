@@ -16,6 +16,7 @@ import {
   executeSaveRag,
 } from '../nodes/tool/index.js';
 import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
+import { resolveConfiguredText } from '../nodes/tool/shared/pipeline.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -151,18 +152,22 @@ export function buildRagToolset(
           namespace: z.string().optional(),
           docType: z.string().optional().describe('Filter by docType metadata (schema | sqlexample)'),
         }),
-        execute: async (input) =>
-          executeGetRag({
+        execute: async (input) => {
+          const query =
+            String(input.query ?? '').trim() ||
+            resolveConfiguredText(config.queryField, ctx.triggerContext ?? {}, '');
+          return executeGetRag({
             env: ctx.env,
             definition,
             agentId,
-            input,
+            input: { ...input, query },
             embedModel: ctx.embedModel,
             userDO: ctx.userDO,
             ownerId: ctx.ownerId,
             workflowId: ctx.workflowId,
             billing: ctx.billing,
-          }),
+          });
+        },
       });
     }
 

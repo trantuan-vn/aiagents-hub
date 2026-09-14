@@ -8,6 +8,7 @@ import {
   isNonExecutableNode,
   isToolNodeOnDataFlow,
   parseWorkflowExecuteInput,
+  resolveAgentResources,
 } from './graph-helpers.js';
 import { extractLoopItems, executeLoopOverItems } from './loop-helpers.js';
 
@@ -169,5 +170,41 @@ describe('execute-step input fallback', () => {
     expect(parsed.u).toBe('ADMIN');
     expect(isEmptyNodeInput({ parents: { form: {} } })).toBe(true);
     expect(isEmptyNodeInput({ u: 'ADMIN', parents: { form: {} } })).toBe(false);
+  });
+});
+
+describe('resolveAgentResources simple memory', () => {
+  it('does not bind Vectorize when a Simple Memory node is connected', () => {
+    const definition: WorkflowDefinition = {
+      nodes: [
+        { id: 'agent_1', type: 'agent', position: { x: 0, y: 0 }, data: {} },
+        {
+          id: 'mem_1',
+          type: 'memory_node',
+          position: { x: 0, y: 0 },
+          data: {
+            memoryKind: 'simple',
+            sessionIdSource: 'from_chat_trigger',
+            sessionKey: '{{ $json.sessionId }}',
+            contextWindowLength: 5,
+          },
+        },
+      ],
+      edges: [
+        {
+          id: 'e1',
+          source: 'mem_1',
+          target: 'agent_1',
+          sourceHandle: 'memory',
+          targetHandle: 'memory',
+        },
+      ],
+    };
+    const linked = resolveAgentResources(definition, 'agent_1');
+    expect(linked.memoryKind).toBe('simple');
+    expect(linked.memoryNodeId).toBe('mem_1');
+    expect(linked.memoryCollection).toBeUndefined();
+    expect(linked.memorySessionIdSource).toBe('from_chat_trigger');
+    expect(linked.memoryContextWindowLength).toBe(5);
   });
 });

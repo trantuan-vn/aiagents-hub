@@ -1,6 +1,7 @@
 import { interpolate } from '../../execution/node-runtime.js';
 import { DEFAULT_EMBED_MODEL } from '../../rag/index.js';
 import type { NodeContext } from '../types.js';
+import { expressionScope, resolveConfiguredText } from '../tool/shared/pipeline.js';
 
 export function aiParamsFromServiceOptions(opts?: Record<string, unknown>): Record<string, unknown> {
   if (!opts) return {};
@@ -62,20 +63,15 @@ export function resolveAgentUserText(
   fallbackInput?: string,
 ): string {
   const prompt = String(data.prompt ?? '');
-  const scope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: fallbackInput ?? '' };
-
   if (prompt.includes('{{')) {
-    const resolved = interpolate(prompt, scope);
-    if (resolved != null && String(resolved).trim()) return String(resolved);
-    return '';
+    return resolveConfiguredText(prompt, nodeInput, fallbackInput ?? '');
   }
-
   if (prompt.trim()) return prompt;
-  return String(fallbackInput ?? '').trim();
+  return resolveConfiguredText('', nodeInput, fallbackInput ?? '');
 }
 
-export function extractSql(text: string): string {
-  const trimmed = text.trim();
+export function extractSql(text: unknown): string {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
   if (!trimmed) return '';
   if (trimmed.startsWith('{') && /"choices"\s*:/.test(trimmed)) return '';
 
@@ -96,20 +92,9 @@ export function extractSql(text: string): string {
   return '';
 }
 
-export function withoutGetRagTools<T extends Record<string, unknown>>(tools: T): T {
-  const out = { ...tools };
-  for (const key of Object.keys(out)) {
-    const normalized = key.replace(/-/g, '_');
-    if (normalized === 'get_rag' || normalized.endsWith('_get_rag')) {
-      delete out[key];
-    }
-  }
-  return out;
-}
-
 export function interpolateTemplate(template: string, scope: Record<string, unknown>): string {
   if (!template.includes('{{')) return template;
-  const resolved = interpolate(template, scope);
+  const resolved = interpolate(template, expressionScope(scope, { input: String(scope.input ?? '') }));
   if (resolved == null) return '';
   return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
 }
@@ -126,8 +111,8 @@ export function isReasoningAgentKind(data: Record<string, unknown>): boolean {
   return String(data.agentKind ?? '') === 'reasoning_agent';
 }
 
-export function parseJsonObject(text: string): Record<string, unknown> | null {
-  const trimmed = text.trim();
+export function parseJsonObject(text: unknown): Record<string, unknown> | null {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
   if (!trimmed) return null;
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const raw = fenced?.[1]?.trim() ?? trimmed;

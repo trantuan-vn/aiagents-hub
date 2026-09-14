@@ -15,7 +15,7 @@ export function reflectHeuristics(args: {
   requireCitations: boolean;
 }): ReflectVerdict {
   const issues: string[] = [];
-  const text = args.text.trim();
+  const text = String(args.text ?? '').trim();
   if (!text) issues.push('empty_answer');
 
   if (args.frame.missingSlots.length > 0 && !/[?？]/.test(text)) {

@@ -20,6 +20,7 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | Core | — | `nodes/core/` + BE `http-request/`, `code/` | Factory; dedicated BE for http/code |
 | Service | [`service.md`](./service.md) | `nodes/service/` (shared+FE), `service-node/` (BE) | **Done** — resource, skipExecution |
 | Vectorize | [`vectorize.md`](./vectorize.md) | `nodes/memory/` | **Done** — resource + Vectorize |
+| Simple Memory | [`simple-memory.md`](./simple-memory.md) | `nodes/memory/` (`memoryKind: simple`) | **Done** — session chat window |
 | Tool | — | `nodes/tool/` | Factory; RAG overrides có execute |
 | Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | **Done** — pipeline + PDF extract |
 | Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Done** — query Vectorize |

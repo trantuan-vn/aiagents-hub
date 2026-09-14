@@ -70,6 +70,7 @@ describe('reasoning plan and tools', () => {
     expect(classifyToolName('get_rag')).toBe('retrieve');
     expect(classifyToolName('save_rag')).toBe('persist');
     expect(initialToolChoice(['http_search', 'get_rag'])).toEqual('required');
+    expect(initialToolChoice(['http_search', 'get_rag'], undefined, true)).toEqual('auto');
   });
 
   it('hides persist tools in strict mode without a low-risk plan step', () => {
@@ -87,6 +88,24 @@ describe('reasoning citations and reflect', () => {
     expect(parseCitationIds('Revenue grew [1] then [2].')).toEqual([1, 2]);
     expect(claimsNeedCitations('Revenue grew last year.', true)).toBe(true);
     expect(claimsNeedCitations('I do not know.', true)).toBe(false);
+  });
+
+  it('tolerates missing tool output when building citations', () => {
+    const citations = buildCitations({
+      snippets: ['schema: orders'],
+      observations: [{ tool: 'get_rag', ok: true, output: undefined as unknown as string }],
+    });
+    expect(citations).toHaveLength(1);
+    expect(groundedTextOrFallback(undefined as unknown as string, citations)).toContain('[1]');
+    expect(
+      reflectHeuristics({
+        text: undefined as unknown as string,
+        citations,
+        observations: [{ tool: 'get_rag', ok: true, output: undefined as unknown as string }],
+        frame: { goal: 'x', knownFacts: [], missingSlots: [], confidence: 0.8, canUseTools: true },
+        requireCitations: false,
+      }).issues,
+    ).toContain('empty_answer');
   });
 
   it('builds citations from snippets and tools', () => {

@@ -26,6 +26,14 @@ export const MEMORY_KIND_PLUGINS: WorkflowNodePlugin[] = MEMORY_KINDS.filter(
   (kind) => !MEMORY_OVERRIDE_KINDS.has(kind),
 ).map(createMemoryKindPlugin);
 
+/** Override — windowed chat memory stored in the user Durable Object. */
+export const memorySimplePlugin: WorkflowNodePlugin = {
+  id: 'memory_node:simple',
+  runtimeType: 'memory_node',
+  kind: 'simple',
+  skipExecution: true,
+};
+
 /** Override — vectorize memory (custom FE config panel). */
 export const memoryVectorizePlugin: WorkflowNodePlugin = {
   id: 'memory_node:vectorize',

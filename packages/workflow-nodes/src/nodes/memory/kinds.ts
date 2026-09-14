@@ -17,5 +17,9 @@ export type MemoryKind = (typeof MEMORY_KINDS)[number];
 /** Kind field stored on `node.data` for memory_node. */
 export const MEMORY_KIND_FIELD = "memoryKind" as const;
 
-/** Kinds with dedicated override UI/config (vectorize panel). */
-export const MEMORY_OVERRIDE_KINDS = new Set<MemoryKind>(["vectorize"]);
+/** Kinds with dedicated override UI/config (simple + vectorize panels). */
+export const MEMORY_OVERRIDE_KINDS = new Set<MemoryKind>(["simple", "vectorize"]);
+
+export function isSimpleMemoryKind(kind: unknown): boolean {
+  return String(kind ?? "") === "simple";
+}

@@ -50,6 +50,7 @@ export function filterToolsForPolicy(
 export function initialToolChoice(
   toolNames: string[],
   plan?: AgentPlan,
+  alreadyGrounded = false,
 ): 'auto' | 'required' | { type: 'tool'; toolName: string } {
   if (!toolNames.length) return 'auto';
   const retrieve = toolNames.find((n) => classifyToolName(n) === 'retrieve');
@@ -57,7 +58,7 @@ export function initialToolChoice(
   if (plannedRetrieve && toolNames.includes(plannedRetrieve)) {
     return { type: 'tool', toolName: plannedRetrieve };
   }
-  if (retrieve) return 'required';
+  if (retrieve && !alreadyGrounded) return 'required';
   return 'auto';
 }
 

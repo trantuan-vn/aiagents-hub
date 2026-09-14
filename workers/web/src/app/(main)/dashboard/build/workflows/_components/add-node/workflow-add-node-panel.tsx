@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { TOOL_KIND_DEFAULTS, resolveCatalogEntryId } from "@aiagents-hub/workflow-nodes";
+import { TOOL_KIND_DEFAULTS, resolveCatalogEntryId, simpleMemoryDefaultData } from "@aiagents-hub/workflow-nodes";
 
 import { useApprovedServices } from "../hooks/use-approved-services";
 import { useWorkflowIntegrations } from "../hooks/use-workflow-integrations";
@@ -51,6 +51,11 @@ import {
   WORKFLOW_ADD_TRIGGER,
   type WorkflowAddNodeCategory,
 } from "../catalogs/workflow-add-node-catalog";
+import {
+  WORKFLOW_AGENT_MEMORY_BEGINNERS,
+  WORKFLOW_AGENT_MEMORY_OTHER,
+  type WorkflowAgentMemoryItem,
+} from "../catalogs/workflow-memory-catalog";
 import {
   WORKFLOW_AGENT_BUILTIN_TOOLS,
   WORKFLOW_AGENT_MCP_SERVERS,
@@ -267,7 +272,26 @@ export function WorkflowAddNodePanel({
     });
   }, [q, t]);
 
-  const memoryHasResults = filteredMemoryVectorStores.length > 0;
+  const filteredBeginnerMemories = useMemo(() => {
+    return WORKFLOW_AGENT_MEMORY_BEGINNERS.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const filteredOtherMemories = useMemo(() => {
+    return WORKFLOW_AGENT_MEMORY_OTHER.filter((item) => {
+      const name = t(item.nameKey).toLowerCase();
+      const desc = t(item.descKey).toLowerCase();
+      return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
+    });
+  }, [q, t]);
+
+  const memoryHasResults =
+    filteredBeginnerMemories.length > 0 ||
+    filteredOtherMemories.length > 0 ||
+    filteredMemoryVectorStores.length > 0;
 
   const filteredRecommendedTools = useMemo(() => {
     return WORKFLOW_AGENT_TOOL_RECOMMENDED.filter((item) => {
@@ -446,7 +470,7 @@ export function WorkflowAddNodePanel({
                   : activeView === "services"
                 ? t("add_ai_services_title")
                 : activeView === "memory"
-                  ? t("tool_category_vector_stores")
+                  ? t("handle_memory")
                   : activeView === "tools"
                     ? t("search_section_tools")
                     : activeView === "tools_mcp"
@@ -620,6 +644,20 @@ export function WorkflowAddNodePanel({
           catalogId: item.id,
           memoryKind: item.id === "vectorize" ? "vectorize" : item.id,
         },
+      });
+    });
+  };
+
+  const pickMemoryItem = (item: WorkflowAgentMemoryItem) => {
+    guardCatalogPick(`memory_node:${item.id}`, () => {
+      const extra =
+        item.id === "simple"
+          ? simpleMemoryDefaultData(t(item.nameKey))
+          : { catalogId: item.id, memoryKind: item.id };
+      onPick({
+        type: "memory_node",
+        label: t(item.nameKey),
+        extra,
       });
     });
   };
@@ -948,15 +986,55 @@ export function WorkflowAddNodePanel({
 
         {activeView === "memory" ? (
           <div className="p-1">
-            {filteredMemoryVectorStores.map((item) => (
-              <VectorStoreItemRow
-                key={item.id}
-                item={item}
-                title={t(item.nameKey)}
-                description={t(item.descKey)}
-                onClick={() => pickMemoryVectorStore(item)}
-              />
-            ))}
+            <p className="text-muted-foreground px-2 py-2 text-xs leading-relaxed">{t("memory_connect_intro")}</p>
+            {filteredBeginnerMemories.length > 0 ? (
+              <>
+                <p className="text-muted-foreground px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wide uppercase">
+                  {t("memory_section_beginners")}
+                </p>
+                {filteredBeginnerMemories.map((item) => (
+                  <MemoryItemRow
+                    key={item.id}
+                    item={item}
+                    title={t(item.nameKey)}
+                    description={t(item.descKey)}
+                    onClick={() => pickMemoryItem(item)}
+                  />
+                ))}
+              </>
+            ) : null}
+            {filteredMemoryVectorStores.length > 0 ? (
+              <>
+                <p className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wide uppercase">
+                  {t("tool_category_vector_stores")}
+                </p>
+                {filteredMemoryVectorStores.map((item) => (
+                  <VectorStoreItemRow
+                    key={item.id}
+                    item={item}
+                    title={t(item.nameKey)}
+                    description={t(item.descKey)}
+                    onClick={() => pickMemoryVectorStore(item)}
+                  />
+                ))}
+              </>
+            ) : null}
+            {filteredOtherMemories.length > 0 ? (
+              <>
+                <p className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wide uppercase">
+                  {t("memory_section_other")}
+                </p>
+                {filteredOtherMemories.map((item) => (
+                  <MemoryItemRow
+                    key={item.id}
+                    item={item}
+                    title={t(item.nameKey)}
+                    description={t(item.descKey)}
+                    onClick={() => pickMemoryItem(item)}
+                  />
+                ))}
+              </>
+            ) : null}
             {!memoryHasResults ? (
               <p className="text-muted-foreground px-3 py-4 text-center text-sm">{t("add_node_no_results")}</p>
             ) : null}
@@ -1647,6 +1725,37 @@ function ToolCategoryRow({
         <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
       </span>
       <ChevronRight className="text-muted-foreground mt-1 size-4 shrink-0" />
+    </button>
+  );
+}
+
+function MemoryItemRow({
+  item,
+  title,
+  description,
+  onClick,
+}: {
+  item: WorkflowAgentMemoryItem;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  const Icon = item.lucideIcon;
+  return (
+    <button
+      type="button"
+      className="hover:bg-muted focus-visible:bg-muted flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left transition-colors"
+      onClick={onClick}
+    >
+      {item.brandIcon ? (
+        <BrandIcon icon={item.brandIcon} className="mt-0.5 size-5 shrink-0" />
+      ) : Icon ? (
+        <Icon className="text-muted-foreground mt-0.5 size-5 shrink-0" aria-hidden />
+      ) : null}
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold">{title}</span>
+        <span className="text-muted-foreground mt-0.5 block text-xs leading-snug">{description}</span>
+      </span>
     </button>
   );
 }

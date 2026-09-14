@@ -27,6 +27,7 @@ import {
   AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
   WorkflowExecutionSchema, WorkflowCredentialSchema, WorkflowVersionSchema,
   AgentSessionMemorySchema,
+  SimpleMemorySchema,
   PayoutBeneficiaryRecordSchema, EarningsPayoutSchema,
 } from '../domain.js';
 
@@ -178,6 +179,11 @@ export class UserDO extends DurableObject {
       this.table(
         'agent_session_memory',
         AgentSessionMemorySchema,
+        this.TABLE_CONFIGS.withUniqueIndex('memoryKey'),
+      );
+      this.table(
+        'simple_memory',
+        SimpleMemorySchema,
         this.TABLE_CONFIGS.withUniqueIndex('memoryKey'),
       );
       this.table('payout_beneficiary', extendWithQueue(PayoutBeneficiaryRecordSchema), this.TABLE_CONFIGS.queueTable());

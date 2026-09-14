@@ -11,6 +11,7 @@ import {
   retrieveMemory,
 } from '../execution/agent-runtime.js';
 import { resolveAgentResources } from '../engine/graph-helpers.js';
+import { attachSimpleMemory, isLinkedSimpleMemory } from '../nodes/memory-node/simple.js';
 import {
   billAgentUsage,
   ensureWalletBalance,
@@ -132,8 +133,38 @@ export async function createWorkflowChatStreamResponse(
     ownerId: resolved.ownerId,
     workflowId: resolved.workflowId,
   });
-  const memoryCollection = String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
+  const simpleMemoryLinked = isLinkedSimpleMemory(linked);
+  const memoryCollection = simpleMemoryLinked
+    ? ''
+    : String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
   const memoryNamespace = String(linked.memoryNamespace ?? '').trim();
+  const chatSessionId = `chat:${resolved.workflowId}:${user.identifier}`.slice(0, 80);
+  const simpleMemory = simpleMemoryLinked
+    ? await attachSimpleMemory(
+        {
+          node: agentNode,
+          nodeInput: { chatInput: latestUser, query: latestUser, sessionId: chatSessionId },
+          definition: resolved.definition,
+          outputs: {},
+          runContext: { sessionId: chatSessionId, chatInput: latestUser },
+          input: latestUser,
+          c,
+          bindingName,
+          user,
+          userDO,
+          meta: {
+            ownerId: resolved.ownerId,
+            workflowId: resolved.workflowId,
+            isOwnedByUser: resolved.isOwnedByUser,
+            workflowName: wfName,
+            workflowDescription: wfDesc,
+          },
+          attr,
+        },
+        linked,
+        latestUser,
+      )
+    : { history: [], historyText: '', persist: async () => undefined };
   const hasGetRagTool = agentHasRagToolKind(resolved.definition, agentNode.id, 'get-rag');
   const httpTools = buildAgentToolset({ env: c.env, userDO }, resolved.definition);
   const ragTools = buildRagToolset(
@@ -188,7 +219,12 @@ export async function createWorkflowChatStreamResponse(
     .filter(Boolean)
     .join('\n\n');
 
-  const modelMessages = await convertToModelMessages(uiMessages);
+  const modelMessages = simpleMemoryLinked
+    ? [
+        ...simpleMemory.history.map((m) => ({ role: m.role, content: m.content })),
+        { role: 'user' as const, content: latestUser },
+      ]
+    : await convertToModelMessages(uiMessages);
 
   const result = streamText({
     model: workersAI(modelId as never),
@@ -197,8 +233,9 @@ export async function createWorkflowChatStreamResponse(
     maxOutputTokens: Number(data.maxTokens ?? 1024) || 1024,
     tools: toolNames.length ? tools : undefined,
     stopWhen: toolNames.length ? stepCountIs(5) : undefined,
-    onFinish: async ({ usage }) => {
+    onFinish: async ({ usage, text }) => {
       try {
+        await simpleMemory.persist(text ?? '');
         const aiResponse = usage ? { usage } : { response: latestUser };
         await billAgentUsage(c.env, bindingName, userDO, user.identifier, service, {
           endpoint,

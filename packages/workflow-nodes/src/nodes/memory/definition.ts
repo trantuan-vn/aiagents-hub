@@ -2,6 +2,10 @@ import { defaultParametersSection } from "../default-sections";
 import { createBuiltin } from "../create-builtin";
 import type { WorkflowNodeDefinition } from "../../types/node-definition";
 import {
+  SIMPLE_MEMORY_CONTEXT_WINDOW,
+  SIMPLE_MEMORY_SESSION_KEY,
+} from "../workflow-presets";
+import {
   MEMORY_KIND_FIELD,
   MEMORY_KINDS,
   MEMORY_OVERRIDE_KINDS,
@@ -12,6 +16,7 @@ export {
   MEMORY_KIND_FIELD,
   MEMORY_KINDS,
   MEMORY_OVERRIDE_KINDS,
+  isSimpleMemoryKind,
   type MemoryKind,
 } from "./kinds";
 
@@ -48,7 +53,7 @@ export const VECTORIZE_MEMORY_FIELDS = [
   },
 ];
 
-function memoryNameKey(kind: MemoryKind): string {
+export function memoryKindNameKey(kind: MemoryKind): string {
   switch (kind) {
     case "simple":
       return "memory_simple";
@@ -75,7 +80,7 @@ function memoryNameKey(kind: MemoryKind): string {
   }
 }
 
-function memoryDescKey(kind: MemoryKind): string {
+export function memoryKindDescKey(kind: MemoryKind): string {
   switch (kind) {
     case "simple":
       return "memory_simple_desc";
@@ -122,7 +127,7 @@ export const MEMORY_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
         defaultValue: "vectorize",
         options: MEMORY_KINDS.map((value) => ({
           value,
-          labelKey: memoryNameKey(value),
+          labelKey: memoryKindNameKey(value),
         })),
         order: 0,
       },
@@ -135,8 +140,8 @@ export function createMemoryKindDefinition(kind: MemoryKind): WorkflowNodeDefini
     id: `memory_node:${kind}`,
     runtimeType: "memory_node",
     kind,
-    nameKey: memoryNameKey(kind),
-    descriptionKey: memoryDescKey(kind),
+    nameKey: memoryKindNameKey(kind),
+    descriptionKey: memoryKindDescKey(kind),
     category: "resource",
     icon: "Database",
     defaultData: {
@@ -153,7 +158,7 @@ export function createMemoryKindDefinition(kind: MemoryKind): WorkflowNodeDefini
           defaultValue: kind,
           options: MEMORY_KINDS.map((value) => ({
             value,
-            labelKey: memoryNameKey(value),
+            labelKey: memoryKindNameKey(value),
           })),
           order: 0,
         },
@@ -161,6 +166,61 @@ export function createMemoryKindDefinition(kind: MemoryKind): WorkflowNodeDefini
     ],
   });
 }
+
+export const SIMPLE_MEMORY_FIELDS = [
+  {
+    id: "sessionIdSource",
+    type: "select" as const,
+    labelKey: "field_session_id",
+    defaultValue: "from_chat_trigger",
+    options: [
+      { value: "from_chat_trigger", labelKey: "opt_session_from_chat_trigger" },
+      { value: "define_below", labelKey: "opt_session_define_below" },
+    ],
+    order: 1,
+  },
+  {
+    id: "sessionKey",
+    type: "expression" as const,
+    labelKey: "field_session_key",
+    defaultValue: SIMPLE_MEMORY_SESSION_KEY,
+    supportsExpression: true,
+    order: 2,
+  },
+  {
+    id: "contextWindowLength",
+    type: "number" as const,
+    labelKey: "field_context_window_length",
+    descriptionKey: "field_context_window_length_desc",
+    defaultValue: SIMPLE_MEMORY_CONTEXT_WINDOW,
+    order: 3,
+  },
+];
+
+export function simpleMemoryDefaultData(label = "Simple Memory"): Record<string, unknown> {
+  return {
+    label,
+    memoryKind: "simple",
+    catalogId: "simple",
+    sessionIdSource: "from_chat_trigger",
+    sessionKey: SIMPLE_MEMORY_SESSION_KEY,
+    contextWindowLength: SIMPLE_MEMORY_CONTEXT_WINDOW,
+  };
+}
+
+/** Override — windowed chat memory stored in the user's Durable Object. */
+export const SIMPLE_MEMORY_DEFINITION: WorkflowNodeDefinition = createBuiltin({
+  id: "memory_node:simple",
+  runtimeType: "memory_node",
+  kind: "simple",
+  nameKey: "memory_simple",
+  descriptionKey: "memory_simple_desc",
+  category: "resource",
+  icon: "Database",
+  defaultData: simpleMemoryDefaultData(),
+  sections: [defaultParametersSection(SIMPLE_MEMORY_FIELDS)],
+  handles: [{ id: "memory", type: "source", connectionType: "resource", position: "top" }],
+});
 
 /** Override — Vectorize memory with index/metric fields. */
 export const VECTORIZE_MEMORY_DEFINITION: WorkflowNodeDefinition = createBuiltin({

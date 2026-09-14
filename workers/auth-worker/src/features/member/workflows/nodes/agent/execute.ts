@@ -18,7 +18,9 @@ import {
   buildRagToolset,
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
+import { attachSimpleMemory } from '../memory-node/simple.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
+import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 import { executeReasoningAgent } from './execute-reasoning.js';
@@ -26,13 +28,11 @@ import {
   aiParamsFromServiceOptions,
   assertTextGenerationModel,
   extractSql,
-  extractTriggerContext,
   interpolateTemplate,
   isReasoningAgentKind,
   resolveAgentUserText,
   resolveEmbedModel,
   resolveMaxTokens,
-  withoutGetRagTools,
 } from './shared.js';
 
 export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
@@ -61,9 +61,22 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const saveRagSystemPrompt = String(saveRagConfig?.systemPrompt ?? '').trim();
   const saveRagUserPrompt = String(saveRagConfig?.userPrompt ?? '').trim();
 
-  const nodeInput = (ctx.nodeInput ?? {}) as Record<string, unknown>;
-  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
+  let nodeInput = { ...(ctx.nodeInput ?? {}) } as Record<string, unknown>;
   let userText = resolveAgentUserText(data, nodeInput, ctx.input);
+  const prefetched = await prefetchLinkedGetRag({ ...ctx, nodeInput }, ctx.node.id, userText);
+  if (prefetched.ragText) {
+    nodeInput = {
+      ...nodeInput,
+      ragText: prefetched.ragText,
+      snippets: prefetched.snippets,
+      query:
+        typeof nodeInput.query === 'string' && nodeInput.query.trim()
+          ? nodeInput.query
+          : prefetched.query,
+    };
+    userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
+  }
+  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
   const systemPrompt = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
 
   const pdfFiles = filesFromWebhookBody(
@@ -82,21 +95,19 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   }
 
   const billing = ragBillingFromNodeContext(ctx);
-  const ragTools = withoutGetRagTools(
-    buildRagToolset(
-      {
-        env: ctx.c.env,
-        userDO: ctx.userDO,
-        agentId: ctx.node.id,
-        triggerContext: extractTriggerContext(ctx),
-        embedModel,
-        ownerId: ctx.meta.ownerId,
-        workflowId: ctx.meta.workflowId,
-        billing,
-      },
-      ctx.definition,
-      ctx.node.id,
-    ),
+  const ragTools = buildRagToolset(
+    {
+      env: ctx.c.env,
+      userDO: ctx.userDO,
+      agentId: ctx.node.id,
+      triggerContext: nodeInput,
+      embedModel,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
+      billing,
+    },
+    ctx.definition,
+    ctx.node.id,
   );
   const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
   const tools = { ...httpTools, ...ragTools };
@@ -122,6 +133,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId);
   const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
+  const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
+  const historyMessages = simpleMemory.history.map((m) => ({ role: m.role, content: m.content }));
 
   if (useToolLoop && ctx.c.env.AI) {
     const result = await withAiCapacityRetry(async () => {
@@ -132,7 +145,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       return generateText({
         model: workersAI(modelId as never),
         system: systemParts.join('\n\n'),
-        messages: [{ role: 'user', content: userText }],
+        messages: [...historyMessages, { role: 'user', content: userText }],
         maxOutputTokens: maxTokens,
         temperature: modelParams.temperature as number | undefined,
         topP: modelParams.top_p as number | undefined,
@@ -161,6 +174,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       },
     );
     ctx.onCost?.(costVnd);
+    await simpleMemory.persist(text);
     return {
       text,
       sql: extractSql(text),
@@ -174,6 +188,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   const messages = [
     ...(systemParts.length ? [{ role: 'system', content: systemParts.join('\n\n') }] : []),
+    ...historyMessages,
     { role: 'user', content: userText },
   ];
 
@@ -216,6 +231,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     },
   );
   ctx.onCost?.(costVnd);
+  await simpleMemory.persist(text);
   return {
     text,
     sql,

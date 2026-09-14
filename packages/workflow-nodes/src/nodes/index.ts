@@ -84,12 +84,18 @@ export { TRIGGER_WEBHOOK_DEFINITION, CORE_WEBHOOK_DEFINITION } from "./webhook/d
 export {
   MEMORY_NODE_DEFINITION,
   MEMORY_KIND_DEFINITIONS,
+  SIMPLE_MEMORY_DEFINITION,
   VECTORIZE_MEMORY_DEFINITION,
   VECTORIZE_MEMORY_FIELDS,
+  SIMPLE_MEMORY_FIELDS,
   createMemoryKindDefinition,
+  simpleMemoryDefaultData,
+  memoryKindNameKey,
+  memoryKindDescKey,
   MEMORY_KINDS,
   MEMORY_KIND_FIELD,
   MEMORY_OVERRIDE_KINDS,
+  isSimpleMemoryKind,
   type MemoryKind,
 } from "./memory/definition";
 export {
@@ -120,6 +126,8 @@ export {
   GET_DB_INFO_PASSWORD_FIELD,
   GET_DB_INFO_CONNECT_STRING_FIELD,
   LOOP_ITEMS_FIELD,
+  SIMPLE_MEMORY_SESSION_KEY,
+  SIMPLE_MEMORY_CONTEXT_WINDOW,
 } from "./workflow-presets";
 export {
   buildWebhookItemOutput,

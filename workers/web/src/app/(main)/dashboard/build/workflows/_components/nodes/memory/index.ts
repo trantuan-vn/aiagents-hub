@@ -1,69 +1,21 @@
 import {
   MEMORY_KINDS,
   MEMORY_OVERRIDE_KINDS,
+  isSimpleMemoryKind,
+  memoryKindDescKey,
+  memoryKindNameKey,
+  simpleMemoryDefaultData,
   type MemoryKind,
 } from "@aiagents-hub/workflow-nodes";
 
 import type { WorkflowNodeUIPlugin } from "../types";
 import { MemoryWorkflowNode } from "./canvas";
 import { isVectorizeMemoryNode, VectorizeNodeConfigPanel } from "./config-panel";
+import { isSimpleMemoryNode, SimpleMemoryNodeConfigPanel } from "./simple-config-panel";
 
 export { MemoryWorkflowNode } from "./canvas";
 export { isVectorizeMemoryNode, VectorizeNodeConfigPanel } from "./config-panel";
-
-function memoryLabelKey(kind: MemoryKind): string {
-  switch (kind) {
-    case "simple":
-      return "memory_simple";
-    case "mongodb":
-      return "memory_mongodb_chat";
-    case "postgres":
-      return "memory_postgres_chat";
-    case "redis":
-      return "memory_redis_chat";
-    case "xata":
-      return "memory_xata";
-    case "vectorize":
-      return "mem_vectorize";
-    case "supabase":
-      return "tool_vector_supabase";
-    case "pinecone":
-      return "tool_vector_pinecone";
-    case "pgvector":
-      return "tool_vector_pgvector";
-    case "qdrant":
-      return "tool_vector_qdrant";
-    default:
-      return `memory_kind_${kind}`;
-  }
-}
-
-function memoryDescKey(kind: MemoryKind): string {
-  switch (kind) {
-    case "simple":
-      return "memory_simple_desc";
-    case "mongodb":
-      return "memory_mongodb_chat_desc";
-    case "postgres":
-      return "memory_postgres_chat_desc";
-    case "redis":
-      return "memory_redis_chat_desc";
-    case "xata":
-      return "memory_xata_desc";
-    case "vectorize":
-      return "mem_vectorize_desc";
-    case "supabase":
-      return "tool_vector_supabase_desc";
-    case "pinecone":
-      return "tool_vector_pinecone_desc";
-    case "pgvector":
-      return "tool_vector_pgvector_desc";
-    case "qdrant":
-      return "tool_vector_qdrant_desc";
-    default:
-      return `memory_kind_${kind}_desc`;
-  }
-}
+export { isSimpleMemoryNode, SimpleMemoryNodeConfigPanel } from "./simple-config-panel";
 
 /** Base memory_node — hidden; kind plugins are catalog entries. */
 export const memoryUIPlugin: WorkflowNodeUIPlugin = {
@@ -93,8 +45,8 @@ export function createMemoryKindUIPlugin(kind: MemoryKind): WorkflowNodeUIPlugin
     }),
     catalog: {
       category: "memory",
-      labelKey: memoryLabelKey(kind),
-      descriptionKey: memoryDescKey(kind),
+      labelKey: memoryKindNameKey(kind),
+      descriptionKey: memoryKindDescKey(kind),
       icon: "Database",
       keywords: [kind, "memory"],
     },
@@ -104,6 +56,14 @@ export function createMemoryKindUIPlugin(kind: MemoryKind): WorkflowNodeUIPlugin
 export const MEMORY_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = MEMORY_KINDS.filter(
   (kind) => !MEMORY_OVERRIDE_KINDS.has(kind),
 ).map(createMemoryKindUIPlugin);
+
+/** Override — windowed chat memory with n8n-style session config. */
+export const memorySimpleUIPlugin: WorkflowNodeUIPlugin = {
+  ...createMemoryKindUIPlugin("simple"),
+  ConfigPanel: SimpleMemoryNodeConfigPanel,
+  defaults: () => simpleMemoryDefaultData(),
+  match: (node) => isSimpleMemoryNode(node),
+};
 
 /** Override — vectorize with custom config panel. */
 export const memoryVectorizeUIPlugin: WorkflowNodeUIPlugin = {
@@ -117,5 +77,5 @@ export const memoryVectorizeUIPlugin: WorkflowNodeUIPlugin = {
     dimensions: 768,
     metric: "cosine",
   }),
-  match: (node) => isVectorizeMemoryNode(node),
+  match: (node) => isVectorizeMemoryNode(node) && !isSimpleMemoryKind((node.data as { memoryKind?: string })?.memoryKind),
 };

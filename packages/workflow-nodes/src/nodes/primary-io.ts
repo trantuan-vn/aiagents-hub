@@ -38,7 +38,7 @@ export function primaryOutputPaths(
   const flowKind = String(data.flowKind ?? "");
   const handle = String(options?.sourceHandle ?? "");
 
-  if (triggerKind === "chat") return ["chatInput"];
+  if (triggerKind === "chat") return ["chatInput", "sessionId"];
   if (triggerKind === "webhook" || coreKind === "webhook" || type === "webhook") {
     return ["body.question"];
   }

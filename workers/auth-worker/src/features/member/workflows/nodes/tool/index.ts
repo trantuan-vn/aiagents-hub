@@ -15,7 +15,7 @@ export type {
   SaveRagExecuteParams,
 } from './save-rag/execute.js';
 
-export { executeGetRag, executeGetRagPipeline } from './get-rag/execute.js';
+export { executeGetRag, executeGetRagPipeline, prefetchLinkedGetRag } from './get-rag/execute.js';
 export type {
   GetRagInput,
   GetRagSnippet,

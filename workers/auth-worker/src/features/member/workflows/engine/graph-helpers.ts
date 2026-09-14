@@ -1,3 +1,5 @@
+import { isSimpleMemoryKind } from '@aiagents-hub/workflow-nodes';
+
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { resolveVectorizeScope, type VectorizeScopeContext } from '../rag/index.js';
 import { isBranchSourceHandle } from './flow-helpers.js';
@@ -201,6 +203,9 @@ export interface AgentResourceContext {
   memoryNodeId?: string;
   memoryDimensions?: number;
   memoryMetric?: string;
+  memorySessionIdSource?: string;
+  memorySessionKey?: string;
+  memoryContextWindowLength?: number;
   tools: Array<Record<string, unknown>>;
 }
 
@@ -219,6 +224,9 @@ export function resolveAgentResources(
   let memoryNodeId: string | undefined;
   let memoryDimensions: number | undefined;
   let memoryMetric: string | undefined;
+  let memorySessionIdSource: string | undefined;
+  let memorySessionKey: string | undefined;
+  let memoryContextWindowLength: number | undefined;
 
   for (const edge of definition.edges) {
     if (edge.target !== agentId || !edge.targetHandle) continue;
@@ -239,21 +247,30 @@ export function resolveAgentResources(
     if (handle === 'memory' && source.type === 'memory_node') {
       memoryNodeId = source.id;
       memoryKind = String(data.memoryKind ?? 'vectorize');
-      memoryCollection = String(data.collection ?? data.memoryCollection ?? 'VECTORIZE');
-      const dims = Number(data.dimensions);
-      if (Number.isFinite(dims) && dims > 0) memoryDimensions = dims;
-      const metric = String(data.metric ?? '').trim();
-      if (metric) memoryMetric = metric;
-      const configuredNamespace = String(data.namespace ?? '').trim();
-      if (scope?.ownerId && scope.workflowId) {
-        memoryNamespace = resolveVectorizeScope(
-          scope.ownerId,
-          scope.workflowId,
-          source.id,
-          configuredNamespace,
-        );
+      if (isSimpleMemoryKind(memoryKind)) {
+        memoryCollection = undefined;
+        memoryNamespace = undefined;
+        memorySessionIdSource = String(data.sessionIdSource ?? 'from_chat_trigger');
+        memorySessionKey = String(data.sessionKey ?? '{{ $json.sessionId }}');
+        const window = Number(data.contextWindowLength);
+        memoryContextWindowLength = Number.isFinite(window) ? window : 5;
       } else {
-        memoryNamespace = configuredNamespace || memoryNamespace;
+        memoryCollection = String(data.collection ?? data.memoryCollection ?? 'VECTORIZE');
+        const dims = Number(data.dimensions);
+        if (Number.isFinite(dims) && dims > 0) memoryDimensions = dims;
+        const metric = String(data.metric ?? '').trim();
+        if (metric) memoryMetric = metric;
+        const configuredNamespace = String(data.namespace ?? '').trim();
+        if (scope?.ownerId && scope.workflowId) {
+          memoryNamespace = resolveVectorizeScope(
+            scope.ownerId,
+            scope.workflowId,
+            source.id,
+            configuredNamespace,
+          );
+        } else {
+          memoryNamespace = configuredNamespace || memoryNamespace;
+        }
       }
     }
 
@@ -276,6 +293,9 @@ export function resolveAgentResources(
     memoryNodeId,
     memoryDimensions,
     memoryMetric,
+    memorySessionIdSource,
+    memorySessionKey,
+    memoryContextWindowLength,
     tools,
   };
 }

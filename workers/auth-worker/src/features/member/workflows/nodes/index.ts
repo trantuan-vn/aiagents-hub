@@ -14,6 +14,7 @@ import { humanReviewPlugin, HUMAN_REVIEW_CHANNEL_PLUGINS } from './human-review/
 import {
   memoryNodePlugin,
   MEMORY_KIND_PLUGINS,
+  memorySimplePlugin,
   memoryVectorizePlugin,
 } from './memory-node/index.js';
 import { serviceNodePlugin } from './service-node/index.js';
@@ -75,6 +76,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   ...AGENT_KIND_PLUGINS,
   agentReasoningPlugin,
   ...MEMORY_KIND_PLUGINS,
+  memorySimplePlugin,
   memoryVectorizePlugin,
   ...TOOL_KIND_PLUGINS,
   toolSaveRagPlugin,
