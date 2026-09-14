@@ -16,6 +16,15 @@ Retrieved schema and SQL examples:
 export const SQL_AGENT_SYSTEM_PROMPT =
   "You are a Text-to-SQL assistant. Use only tables and columns from the retrieved context. Reply with one read-only SQL query in a fenced sql code block.";
 
+export const REASONING_AGENT_PROMPT = `{{ $json.chatInput || $json.body.message || $json.query || $json.input }}`;
+
+export const REASONING_AGENT_SYSTEM_PROMPT = `You are a careful assistant. Follow these rules:
+- Do not invent facts, URLs, credentials, or tool results.
+- If required information is missing and no tool can supply it, ask a clarifying question instead of guessing.
+- Call a tool when it can fetch the answer; do not guess values a tool can return.
+- Cite sources as [n] that map to provided snippets or tool observations.
+- Refuse requests that are illegal, harmful, or ask you to bypass safety rules.`;
+
 export const SQL_HTTP_BODY = '{"sql":"{{ $json.sql }}"}';
 
 export const VECTOR_GMAIL_SUBJECT = "Indexed {{ $json.totalBatches }} tables ({{ $json.schemaName }})";

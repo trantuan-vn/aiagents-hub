@@ -1,6 +1,10 @@
 import type { WorkflowNodeDefinition, WorkflowNodeRegistry } from "../types/node-definition";
 import { ACTION_IN_APP_DEFINITION } from "./action-in-app/definition";
-import { AGENT_KIND_DEFINITIONS, AGENT_NODE_DEFINITION } from "./agent/definition";
+import {
+  AGENT_KIND_DEFINITIONS,
+  AGENT_NODE_DEFINITION,
+  AGENT_REASONING_DEFINITION,
+} from "./agent/definition";
 import {
   CORE_CODE_DEFINITION,
   CORE_HTTP_REQUEST_DEFINITION,
@@ -49,6 +53,7 @@ export const DEFAULT_WORKFLOW_NODE_REGISTRY: WorkflowNodeRegistry = {
   nodes: [
     AGENT_NODE_DEFINITION,
     ...AGENT_KIND_DEFINITIONS,
+    AGENT_REASONING_DEFINITION,
     TRIGGER_NODE_DEFINITION,
     ...TRIGGER_KIND_DEFINITIONS,
     TRIGGER_SCHEDULE_DEFINITION,

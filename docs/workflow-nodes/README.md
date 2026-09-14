@@ -14,6 +14,7 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 |------|------|----------------|------------|
 | Webhook | [`webhook.md`](./webhook.md) | `nodes/webhook/` (shared + FE + BE) | **Done** — HTTP ingress + canvas |
 | Agent | [`agent.md`](./agent.md) | `nodes/agent/` | **Done** — execute + tool loop |
+| Reasoning Agent | [`reasoning-agent.md`](./reasoning-agent.md) | `nodes/agent/` (`agentKind: reasoning_agent`) | **Done** — governed loop |
 | Trigger | [`trigger.md`](./trigger.md) | `nodes/trigger/` + FE `nodes/form/` | **Done** — `form` + `form-trigger-runner` |
 | Flow | — | `nodes/flow/` | Family + `flowKind` (override: loop_over_items) |
 | Core | — | `nodes/core/` + BE `http-request/`, `code/` | Factory; dedicated BE for http/code |

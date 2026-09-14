@@ -1,6 +1,8 @@
 import {
   AGENT_KINDS,
   AGENT_OVERRIDE_KINDS,
+  REASONING_AGENT_PROMPT,
+  REASONING_AGENT_SYSTEM_PROMPT,
   SQL_AGENT_PROMPT,
   SQL_AGENT_SYSTEM_PROMPT,
   type AgentKind,
@@ -65,3 +67,40 @@ export function createAgentKindUIPlugin(kind: AgentKind): WorkflowNodeUIPlugin {
 export const AGENT_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = AGENT_KINDS.filter(
   (kind) => !AGENT_OVERRIDE_KINDS.has(kind),
 ).map(createAgentKindUIPlugin);
+
+export const agentReasoningUIPlugin: WorkflowNodeUIPlugin = {
+  id: "agent:reasoning_agent",
+  runtimeType: "agent",
+  kind: "reasoning_agent",
+  Canvas: AgentWorkflowNode,
+  ConfigPanel: AgentNodeConfigPanel,
+  defaults: () => ({
+    label: "Reasoning Agent",
+    promptSource: "define_below",
+    prompt: REASONING_AGENT_PROMPT,
+    systemPrompt: REASONING_AGENT_SYSTEM_PROMPT,
+    agentKind: "reasoning_agent",
+    clarificationMode: "ask",
+    requireCitations: true,
+    maxReflectRetries: 2,
+    enablePlanner: "auto",
+    safetyLevel: "standard",
+    agentVisibleOptions: [
+      "systemPrompt",
+      "clarificationMode",
+      "requireCitations",
+      "maxReflectRetries",
+      "enablePlanner",
+      "safetyLevel",
+    ],
+  }),
+  catalog: {
+    category: "ai",
+    labelKey: "agent_kind_reasoning_agent",
+    descriptionKey: "agent_kind_reasoning_agent_desc",
+    icon: "Bot",
+    keywords: ["agent", "ai", "reasoning", "memory", "citation"],
+  },
+  match: (node) =>
+    isAgentNode(node) && (node.data as { agentKind?: string })?.agentKind === "reasoning_agent",
+};

@@ -1,7 +1,7 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
 import type { NodePluginRegistry, WorkflowNodePlugin } from './types.js';
 import { actionInAppPlugin } from './action-in-app/index.js';
-import { agentPlugin, AGENT_KIND_PLUGINS } from './agent/index.js';
+import { agentPlugin, AGENT_KIND_PLUGINS, agentReasoningPlugin } from './agent/index.js';
 import { codePlugin, coreCodePlugin } from './code/index.js';
 import { corePlugin, CORE_KIND_PLUGINS } from './core/index.js';
 import {
@@ -73,6 +73,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   ...TRANSFORM_KIND_PLUGINS,
   ...HUMAN_REVIEW_CHANNEL_PLUGINS,
   ...AGENT_KIND_PLUGINS,
+  agentReasoningPlugin,
   ...MEMORY_KIND_PLUGINS,
   memoryVectorizePlugin,
   ...TOOL_KIND_PLUGINS,

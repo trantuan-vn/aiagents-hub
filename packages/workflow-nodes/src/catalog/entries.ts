@@ -15,7 +15,7 @@ const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>([]);
 const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
 const BACKEND_MEMORY_KINDS = new Set(["vectorize"]);
-const BACKEND_AGENT_KINDS = new Set(["tools_agent"]);
+const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
 
 /** Sub-kinds with dedicated frontend config / canvas plugins. */
 const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule", "chat"]);

@@ -180,3 +180,20 @@ export type WorkflowRoyalty = z.infer<typeof WorkflowRoyaltySchema>;
 export type WorkflowExecution = z.infer<typeof WorkflowExecutionSchema>;
 export type WorkflowExecutionStatus = z.infer<typeof WorkflowExecutionStatusSchema>;
 export type WorkflowVersion = z.infer<typeof WorkflowVersionSchema>;
+
+/**
+ * Episodic memory for reasoning_agent, keyed per workflow/session/agent.
+ * Kept DO-local (not queue-synced).
+ */
+export const AgentSessionMemorySchema = z.object({
+  memoryKey: z.string().min(1).max(160),
+  workflowId: z.number().int(),
+  sessionId: z.string().min(1).max(80),
+  agentId: z.string().min(1).max(80),
+  summary: z.string().default(''),
+  /** JSON array of { at, summary, status }. */
+  episodes: z.string().default('[]'),
+  updatedAt: z.number().default(Date.now),
+});
+
+export type AgentSessionMemory = z.infer<typeof AgentSessionMemorySchema>;

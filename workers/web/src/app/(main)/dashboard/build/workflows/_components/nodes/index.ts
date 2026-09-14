@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 
 import type { WorkflowNodeUIPlugin } from "./types";
 import { actionInAppUIPlugin } from "./action-in-app";
-import { agentUIPlugin, AGENT_KIND_UI_PLUGINS } from "./agent";
+import { agentUIPlugin, AGENT_KIND_UI_PLUGINS, agentReasoningUIPlugin } from "./agent";
 import { coreUIPlugin, CORE_KIND_UI_PLUGINS } from "./core";
 import {
   dataTransformationUIPlugin,
@@ -70,6 +70,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   ...TRANSFORM_KIND_UI_PLUGINS,
   ...HUMAN_REVIEW_CHANNEL_UI_PLUGINS,
   ...AGENT_KIND_UI_PLUGINS,
+  agentReasoningUIPlugin,
   ...MEMORY_KIND_UI_PLUGINS,
   memoryVectorizeUIPlugin,
   ...TOOL_KIND_UI_PLUGINS,

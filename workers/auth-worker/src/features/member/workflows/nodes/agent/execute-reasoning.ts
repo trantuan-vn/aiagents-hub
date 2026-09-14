@@ -1,0 +1,608 @@
+import { generateText, stepCountIs, tool, type ToolSet } from 'ai';
+import { createWorkersAI } from 'workers-ai-provider';
+import { z } from 'zod';
+
+import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
+import {
+  billAgentUsage,
+  ensureWalletBalance,
+  extractTextFromAiResponse,
+  getModelForService,
+  resolveServiceByEndpoint,
+  runTextModel,
+} from '../../billing/billing.js';
+import {
+  agentHasRagToolKind,
+  buildAgentToolset,
+  buildRagToolset,
+} from '../../execution/agent-runtime.js';
+import { resolveAgentResources } from '../../engine/graph-helpers.js';
+import { ragBillingFromNodeContext } from '../tool/shared/rag-context.js';
+import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
+import type { NodeContext, NodeOutput } from '../types.js';
+import {
+  aiParamsFromServiceOptions,
+  assertTextGenerationModel,
+  extractSql,
+  extractTriggerContext,
+  interpolateTemplate,
+  parseJsonObject,
+  resolveAgentUserText,
+  resolveEmbedModel,
+  resolveMaxTokens,
+  withoutGetRagTools,
+} from './shared.js';
+import {
+  buildCitations,
+  formatCitationBlock,
+  groundedTextOrFallback,
+} from './reasoning/cite.js';
+import {
+  emptyFrame,
+  inferMissingSlots,
+  parseTaskFrame,
+  shouldAskClarification,
+  FRAME_PROMPT,
+} from './reasoning/frame.js';
+import {
+  loadSessionMemory,
+  persistSemanticEpisode,
+  resolveSessionId,
+  retrieveSemanticMemory,
+  saveSessionMemory,
+  memoryKey,
+} from './reasoning/memory.js';
+import { normalizePlannerMode, parsePlan, shouldPlan, PLAN_PROMPT } from './reasoning/plan.js';
+import { parseReflect, reflectHeuristics, REFLECT_PROMPT } from './reasoning/reflect.js';
+import { parseLlmSafety, ruleClassify, SAFETY_CLASSIFIER_PROMPT } from './reasoning/safety.js';
+import {
+  buildAskUserTool,
+  decorateToolDescription,
+  filterToolsForPolicy,
+  initialToolChoice,
+  maxActSteps,
+} from './reasoning/tools.js';
+import type {
+  AgentCitation,
+  AgentPlan,
+  ReasoningOptions,
+  ReasoningResult,
+  SafetyCategory,
+  TaskFrame,
+  ToolObservation,
+} from './reasoning/types.js';
+import { ASK_USER_TOOL, DEFAULT_ACT_STEPS, RETRIEVE_MEMORY_TOOL } from './reasoning/types.js';
+
+export type ReasoningLlmCall = (args: {
+  purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect';
+  system: string;
+  user: string;
+  tools?: ToolSet;
+  maxTokens?: number;
+  toolChoice?: 'auto' | 'required' | { type: 'tool'; toolName: string };
+  stopSteps?: number;
+}) => Promise<{
+  text: string;
+  usage?: unknown;
+  observations: ToolObservation[];
+  askedUser?: { questions: string[]; why?: string };
+}>;
+
+function readOptions(data: Record<string, unknown>): ReasoningOptions {
+  const retries = Number(data.maxReflectRetries);
+  return {
+    clarificationMode: data.clarificationMode === 'best_effort' ? 'best_effort' : 'ask',
+    requireCitations: data.requireCitations !== false,
+    maxReflectRetries: Number.isFinite(retries) ? Math.min(2, Math.max(0, Math.floor(retries))) : 2,
+    enablePlanner: normalizePlannerMode(data.enablePlanner ?? data.requirePlan),
+    safetyLevel: data.safetyLevel === 'strict' ? 'strict' : 'standard',
+  };
+}
+
+function truncate(value: unknown, max = 1500): string {
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}…`;
+}
+
+function billedUsage(usage: unknown, text: string): unknown {
+  return usage ?? { response: text };
+}
+
+async function bill(
+  ctx: NodeContext,
+  service: Record<string, unknown>,
+  endpoint: string,
+  usage: unknown,
+): Promise<void> {
+  const costVnd = await billAgentUsage(
+    ctx.c.env,
+    ctx.bindingName,
+    ctx.userDO,
+    ctx.user.identifier,
+    service,
+    {
+      endpoint,
+      aiResponse: usage,
+      userAgent: ctx.requestMeta?.userAgent,
+      ipAddress: ctx.requestMeta?.ipAddress,
+      workflowAttribution: ctx.attr,
+    },
+  );
+  ctx.onCost?.(costVnd);
+}
+
+function refusedResult(reason: string, category: SafetyCategory): ReasoningResult {
+  return {
+    status: 'refused',
+    text: `I cannot help with that request. ${reason}`,
+    citations: [],
+    confidence: 1,
+    reason,
+    category,
+  };
+}
+
+function clarificationResult(questions: string[], why: string, frame: TaskFrame): ReasoningResult {
+  const unique = [...new Set(questions.map((q) => q.trim()).filter(Boolean))];
+  const text = unique.length
+    ? `I need a bit more information before I can continue:\n${unique.map((q) => `- ${q}`).join('\n')}`
+    : 'I need more information before I can continue.';
+  return {
+    status: 'needs_clarification',
+    text: why ? `${text}\n\n(${why})` : text,
+    citations: [],
+    questions: unique,
+    confidence: frame.confidence,
+    frame,
+    reason: why || undefined,
+  };
+}
+
+function toNodeOutput(
+  result: ReasoningResult,
+  extra: { query: string; snippets: string[]; endpoint: string },
+): NodeOutput {
+  return {
+    status: result.status,
+    text: result.text,
+    sql: extractSql(result.text),
+    citations: result.citations,
+    plan: result.plan,
+    questions: result.questions,
+    confidence: result.confidence,
+    reason: result.reason,
+    category: result.category,
+    query: extra.query,
+    snippets: extra.snippets,
+    count: extra.snippets.length,
+    endpoint: extra.endpoint,
+  };
+}
+
+function createDefaultLlm(args: {
+  ctx: NodeContext;
+  modelId: string;
+  maxTokens: number;
+  temperature?: number;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+}): ReasoningLlmCall {
+  const { ctx, modelId, maxTokens } = args;
+  return async (call) => {
+    const limit = call.maxTokens ?? Math.min(maxTokens, call.purpose === 'act' ? maxTokens : 512);
+    if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
+      const workersAI = createWorkersAI({
+        binding: ctx.c.env.AI,
+        gateway: WORKERS_AI_GATEWAY,
+      });
+      const result = await withAiCapacityRetry(async () =>
+        generateText({
+          model: workersAI(modelId as never),
+          system: call.system,
+          messages: [{ role: 'user', content: call.user }],
+          maxOutputTokens: limit,
+          temperature: args.temperature,
+          topP: args.topP,
+          frequencyPenalty: args.frequencyPenalty,
+          presencePenalty: args.presencePenalty,
+          tools: call.tools,
+          toolChoice: call.toolChoice,
+          stopWhen: stepCountIs(call.stopSteps ?? DEFAULT_ACT_STEPS),
+        }),
+      );
+      const observations: ToolObservation[] = [];
+      let askedUser: { questions: string[]; why?: string } | undefined;
+      const steps = (result.steps ?? []) as Array<{
+        toolCalls?: Array<{ toolName?: string }>;
+        toolResults?: Array<{ toolName?: string; result?: unknown }>;
+      }>;
+      for (const step of steps) {
+        for (const tr of step.toolResults ?? []) {
+          const name = String(tr.toolName ?? '');
+          const payload = tr.result;
+          observations.push({
+            tool: name,
+            ok: !(payload && typeof payload === 'object' && 'ok' in payload && (payload as { ok?: boolean }).ok === false),
+            output: truncate(payload),
+          });
+          if (name === ASK_USER_TOOL && payload && typeof payload === 'object') {
+            const rec = payload as { questions?: string[]; why?: string };
+            askedUser = {
+              questions: Array.isArray(rec.questions) ? rec.questions.map(String) : [],
+              why: rec.why,
+            };
+          }
+        }
+      }
+      return { text: result.text, usage: result.totalUsage ?? result.usage, observations, askedUser };
+    }
+
+    const messages = [
+      ...(call.system ? [{ role: 'system', content: call.system }] : []),
+      { role: 'user', content: call.user },
+    ];
+    const aiResponse = await runTextModel(ctx.c.env, modelId, messages, limit, {
+      temperature: args.temperature,
+      top_p: args.topP,
+      frequency_penalty: args.frequencyPenalty,
+      presence_penalty: args.presencePenalty,
+    });
+    return {
+      text: extractTextFromAiResponse(aiResponse),
+      usage: aiResponse,
+      observations: [],
+    };
+  };
+}
+
+export async function executeReasoningAgent(
+  ctx: NodeContext,
+  deps?: { llm?: ReasoningLlmCall },
+): Promise<NodeOutput> {
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  const options = readOptions(data);
+  const linked = resolveAgentResources(ctx.definition, ctx.node.id, {
+    ownerId: ctx.meta.ownerId,
+    workflowId: ctx.meta.workflowId,
+  });
+  const nodeInput = (ctx.nodeInput ?? {}) as Record<string, unknown>;
+  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
+  let userText = resolveAgentUserText(data, nodeInput, ctx.input);
+  const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
+
+  const pdfFiles = filesFromWebhookBody(nodeInput.body ?? ctx.nodeInput);
+  if (pdfFiles.length) {
+    const extracted = await extractTextFromPdfFiles(ctx.c.env, pdfFiles);
+    if (extracted.length) {
+      userText = `${userText}\n\nExtracted PDF text:\n${extracted.map((f) => `--- ${f.filename} ---\n${f.text}`).join('\n\n')}`;
+    }
+  }
+
+  const safetyIn = ruleClassify(userText);
+  if (safetyIn.action === 'refuse') {
+    return toNodeOutput(refusedResult(safetyIn.reason, safetyIn.category), {
+      query: userText,
+      snippets: [],
+      endpoint: String(linked.serviceEndpoint ?? data.serviceEndpoint ?? data.endpoint ?? '').trim(),
+    });
+  }
+
+  const endpoint = String(
+    linked.serviceEndpoint ?? data.serviceEndpoint ?? data.endpoint ?? '',
+  ).trim();
+  if (!deps?.llm && !endpoint) {
+    throw new Error('Agent node missing serviceEndpoint (connect a service node or pick a service)');
+  }
+
+  let service: Record<string, unknown> = { id: 0, endpoint };
+  let modelId = '@cf/meta/llama-3.1-8b-instruct';
+  if (!deps?.llm) {
+    await ensureWalletBalance(ctx.userDO);
+    service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
+    modelId = getModelForService(service);
+    assertTextGenerationModel(modelId);
+  }
+
+  const maybeBill = async (usage: unknown, text: string) => {
+    if (deps?.llm || !endpoint) return;
+    await bill(ctx, service, endpoint, billedUsage(usage, text));
+  };
+
+  const llm =
+    deps?.llm ??
+    createDefaultLlm({
+      ctx,
+      modelId,
+      maxTokens: resolveMaxTokens(data, linked.serviceOptions, modelId),
+      temperature: aiParamsFromServiceOptions(linked.serviceOptions).temperature as number | undefined,
+      topP: aiParamsFromServiceOptions(linked.serviceOptions).top_p as number | undefined,
+      frequencyPenalty: aiParamsFromServiceOptions(linked.serviceOptions).frequency_penalty as number | undefined,
+      presencePenalty: aiParamsFromServiceOptions(linked.serviceOptions).presence_penalty as number | undefined,
+    });
+
+  if (safetyIn.action === 'review') {
+    const classified = await llm({
+      purpose: 'safety',
+      system: SAFETY_CLASSIFIER_PROMPT,
+      user: userText,
+      maxTokens: 200,
+    });
+    await maybeBill(classified.usage, classified.text);
+    const parsed = parseLlmSafety(classified.text);
+    if (parsed.action === 'refuse') {
+      return toNodeOutput(refusedResult(parsed.reason, parsed.category), {
+        query: userText,
+        snippets: [],
+        endpoint,
+      });
+    }
+  }
+
+  const sessionId =
+    resolveSessionId(nodeInput, String(ctx.runContext.sessionId ?? '')) ||
+    `wf:${ctx.meta.workflowId}`;
+  const session = await loadSessionMemory(
+    ctx.userDO,
+    memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id),
+  );
+
+  const memoryCollection = String(data.memoryCollection ?? linked.memoryCollection ?? '').trim();
+  const memoryNamespace = String(linked.memoryNamespace ?? '').trim() || undefined;
+  const ragSnippets = Array.isArray(nodeInput.snippets)
+    ? (nodeInput.snippets as unknown[]).map((s) => String(s))
+    : [];
+  const semantic =
+    memoryCollection && !agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag')
+      ? await retrieveSemanticMemory(ctx.c.env, memoryCollection, userText, 4, memoryNamespace)
+      : [];
+  const snippets = [...new Set([...ragSnippets, ...semantic].map((s) => s.trim()).filter(Boolean))];
+
+  const embedModel = resolveEmbedModel(service);
+  const billing = ragBillingFromNodeContext(ctx);
+  const ragTools = withoutGetRagTools(
+    buildRagToolset(
+      {
+        env: ctx.c.env,
+        userDO: ctx.userDO,
+        agentId: ctx.node.id,
+        triggerContext: extractTriggerContext(ctx),
+        embedModel,
+        ownerId: ctx.meta.ownerId,
+        workflowId: ctx.meta.workflowId,
+        billing,
+      },
+      ctx.definition,
+      ctx.node.id,
+    ),
+  );
+  const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
+  const memoryTool: ToolSet =
+    memoryCollection && !Object.keys(ragTools).length
+      ? {
+          [RETRIEVE_MEMORY_TOOL]: tool({
+            description: decorateToolDescription(
+              RETRIEVE_MEMORY_TOOL,
+              'Search long-term memory / knowledge base for relevant context.',
+            ),
+            inputSchema: z.object({ query: z.string() }),
+            execute: async ({ query }: { query: string }) => {
+              const found = await retrieveSemanticMemory(
+                ctx.c.env,
+                memoryCollection,
+                query,
+                5,
+                memoryNamespace,
+              );
+              return { snippets: found, count: found.length };
+            },
+          }),
+        }
+      : {};
+
+  const baseTools: ToolSet = { ...httpTools, ...ragTools, ...memoryTool, ...buildAskUserTool() };
+  for (const [name, def] of Object.entries(baseTools)) {
+    const description = String((def as { description?: string }).description ?? '');
+    (def as { description?: string }).description = decorateToolDescription(name, description);
+  }
+
+  const toolNames = Object.keys(baseTools);
+  let frame: TaskFrame = {
+    ...emptyFrame(userText.slice(0, 240)),
+    missingSlots: inferMissingSlots(userText, {
+      hasTools: toolNames.some((n) => n !== ASK_USER_TOOL),
+      hasMemorySnippets: snippets.length > 0,
+      sessionSummary: session.summary,
+    }),
+    canUseTools: toolNames.some((n) => n !== ASK_USER_TOOL),
+    knownFacts: snippets.slice(0, 3),
+    confidence: snippets.length ? 0.7 : 0.4,
+  };
+
+  if (options.clarificationMode === 'ask' && !frame.missingSlots.length) {
+    const framed = await llm({
+      purpose: 'frame',
+      system: FRAME_PROMPT,
+      user: `User: ${userText}\nTools: ${toolNames.join(', ') || 'none'}\nSession: ${session.summary || '(empty)'}\nSnippets: ${snippets.slice(0, 3).join(' | ') || '(none)'}`,
+      maxTokens: 300,
+    });
+    await maybeBill(framed.usage, framed.text);
+    const parsed = parseTaskFrame(parseJsonObject(framed.text), frame.goal);
+    frame = {
+      ...parsed,
+      canUseTools: parsed.canUseTools || frame.canUseTools,
+      knownFacts: parsed.knownFacts.length ? parsed.knownFacts : frame.knownFacts,
+    };
+  }
+
+  if (shouldAskClarification(frame, options.clarificationMode)) {
+    const questions = frame.missingSlots.map((slot) => `Please provide: ${slot}`);
+    const result = clarificationResult(questions, 'Required details are missing and no tool can fill them.', frame);
+    await saveSessionMemory(ctx.userDO, {
+      workflowId: ctx.meta.workflowId,
+      sessionId,
+      agentId: ctx.node.id,
+      summary: `Asked for ${frame.missingSlots.join(', ')}`,
+      status: result.status,
+    });
+    return toNodeOutput(result, { query: userText, snippets, endpoint });
+  }
+
+  let plan: AgentPlan | undefined;
+  if (shouldPlan({ enablePlanner: options.enablePlanner, toolCount: toolNames.length, userText })) {
+    const planned = await llm({
+      purpose: 'plan',
+      system: PLAN_PROMPT,
+      user: `Goal: ${frame.goal}\nUser: ${userText}\nTools: ${toolNames.join(', ') || 'none'}`,
+      maxTokens: 400,
+    });
+    await maybeBill(planned.usage, planned.text);
+    plan = parsePlan(parseJsonObject(planned.text));
+  }
+
+  const policyTools = filterToolsForPolicy(baseTools, { plan, safetyLevel: options.safetyLevel });
+  const policyNames = Object.keys(policyTools);
+  const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
+  const systemParts = [
+    userSystem,
+    ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
+    policyNames.length
+      ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
+      : `If you lack required details, say so and ask. Do not guess.`,
+    session.summary ? `Session memory:\n${session.summary}` : '',
+    formatCitationBlock(citationSeed) ? `Source snippets (cite as [n]):\n${formatCitationBlock(citationSeed)}` : '',
+    options.requireCitations && citationSeed.length
+      ? 'Every factual claim must include [n] citations that match the source list.'
+      : '',
+    plan?.steps.length
+      ? `Plan:\n${plan.steps.map((s) => `${s.id}. ${s.action}${s.tool ? ` [${s.tool}]` : ''}`).join('\n')}`
+      : '',
+  ].filter(Boolean);
+
+  let draft = '';
+  let lastIssues = '';
+  let observations: ToolObservation[] = [];
+  const stopSteps = maxActSteps(data.maxActSteps ?? DEFAULT_ACT_STEPS);
+
+  for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {
+    const act = await llm({
+      purpose: 'act',
+      system: systemParts.join('\n\n'),
+      user:
+        attempt === 0
+          ? userText
+          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nKeep citations as [n].`,
+      tools: policyNames.length ? policyTools : undefined,
+      toolChoice: policyNames.length ? initialToolChoice(policyNames, plan) : undefined,
+      stopSteps,
+    });
+    await maybeBill(act.usage, act.text);
+    observations = [...observations, ...act.observations];
+    if (act.askedUser?.questions?.length) {
+      const result = clarificationResult(act.askedUser.questions, act.askedUser.why ?? '', frame);
+      result.plan = plan?.steps;
+      await saveSessionMemory(ctx.userDO, {
+        workflowId: ctx.meta.workflowId,
+        sessionId,
+        agentId: ctx.node.id,
+        summary: `Asked: ${act.askedUser.questions.join('; ')}`,
+        status: result.status,
+      });
+      return toNodeOutput(result, { query: userText, snippets, endpoint });
+    }
+    draft = act.text;
+
+    const citations = buildCitations({
+      snippets,
+      observations,
+      sessionSummary: session.summary,
+    });
+    const heuristic = reflectHeuristics({
+      text: draft,
+      citations,
+      observations,
+      frame,
+      requireCitations: options.requireCitations,
+    });
+    if (heuristic.pass || attempt === options.maxReflectRetries) {
+      const outText = groundedTextOrFallback(draft, citations);
+      const outputSafety = ruleClassify(outText);
+      if (outputSafety.action === 'refuse') {
+        return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), {
+          query: userText,
+          snippets,
+          endpoint,
+        });
+      }
+      const result: ReasoningResult = {
+        status: 'ok',
+        text: outText,
+        citations,
+        plan: plan?.steps,
+        confidence: frame.confidence,
+        frame,
+      };
+      await saveSessionMemory(ctx.userDO, {
+        workflowId: ctx.meta.workflowId,
+        sessionId,
+        agentId: ctx.node.id,
+        summary: outText.slice(0, 240),
+        status: result.status,
+      });
+      if (memoryCollection) {
+        await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
+      }
+      return toNodeOutput(result, { query: userText, snippets, endpoint });
+    }
+
+    const critique = await llm({
+      purpose: 'reflect',
+      system: REFLECT_PROMPT,
+      user: `Draft:\n${draft}\nSources:\n${formatCitationBlock(citations)}\nTool results:\n${observations.map((o) => `${o.tool}: ${o.output}`).join('\n')}`,
+      maxTokens: 400,
+    });
+    await maybeBill(critique.usage, critique.text);
+    const parsed = parseReflect(parseJsonObject(critique.text), heuristic);
+    lastIssues = parsed.issues.join(', ');
+    if (parsed.rewritten) draft = parsed.rewritten;
+    if (parsed.pass) {
+      const citations = buildCitations({ snippets, observations, sessionSummary: session.summary });
+      const outText = groundedTextOrFallback(draft, citations);
+      const result: ReasoningResult = {
+        status: 'ok',
+        text: outText,
+        citations,
+        plan: plan?.steps,
+        confidence: frame.confidence,
+        frame,
+      };
+      await saveSessionMemory(ctx.userDO, {
+        workflowId: ctx.meta.workflowId,
+        sessionId,
+        agentId: ctx.node.id,
+        summary: outText.slice(0, 240),
+        status: result.status,
+      });
+      if (memoryCollection) {
+        await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
+      }
+      return toNodeOutput(result, { query: userText, snippets, endpoint });
+    }
+  }
+
+  const citations: AgentCitation[] = buildCitations({
+    snippets,
+    observations,
+    sessionSummary: session.summary,
+  });
+  const result: ReasoningResult = {
+    status: 'ok',
+    text: groundedTextOrFallback(draft, citations),
+    citations,
+    plan: plan?.steps,
+    confidence: frame.confidence,
+    frame,
+  };
+  return toNodeOutput(result, { query: userText, snippets, endpoint });
+}

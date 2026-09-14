@@ -1,4 +1,4 @@
-import { convertToModelMessages, stepCountIs, streamText, type UIMessage } from 'ai';
+import { convertToModelMessages, createUIMessageStream, createUIMessageStreamResponse, stepCountIs, streamText, type UIMessage } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
 import { getIdFromName } from '../../../../shared/utils.js';
@@ -20,6 +20,9 @@ import {
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { findPrimaryAgentNode, workflowAttribution } from '../execution/workflow-context.js';
 import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
+import { executeReasoningAgent } from '../nodes/agent/execute-reasoning.js';
+import { isReasoningAgentKind } from '../nodes/agent/shared.js';
+import type { NodeContext } from '../nodes/types.js';
 
 function extractLatestUserText(messages: UIMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -32,6 +35,56 @@ function extractLatestUserText(messages: UIMessage[]): string {
     if (textPart && 'text' in textPart) return textPart.text.trim();
   }
   return '';
+}
+
+function textToUiStreamResponse(text: string): Response {
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      writer.write({ type: 'text-start', id: 'reasoning' });
+      writer.write({ type: 'text-delta', id: 'reasoning', delta: text });
+      writer.write({ type: 'text-end', id: 'reasoning' });
+    },
+  });
+  return createUIMessageStreamResponse({ stream });
+}
+
+async function createReasoningChatResponse(
+  c: any,
+  bindingName: string,
+  user: { identifier: string },
+  resolved: ResolvedWorkflow,
+  agentNode: NonNullable<ReturnType<typeof findPrimaryAgentNode>>,
+  uiMessages: UIMessage[],
+): Promise<Response> {
+  const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+  const latestUser = extractLatestUserText(uiMessages);
+  const sessionId = `chat:${resolved.workflowId}:${user.identifier}`.slice(0, 80);
+  const ctx: NodeContext = {
+    node: agentNode,
+    nodeInput: { chatInput: latestUser, query: latestUser, sessionId, messages: uiMessages },
+    definition: resolved.definition,
+    outputs: {},
+    runContext: { sessionId, chatInput: latestUser },
+    input: latestUser,
+    c,
+    bindingName,
+    user,
+    userDO,
+    meta: {
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      isOwnedByUser: resolved.isOwnedByUser,
+      workflowName: String(resolved.workflow.name ?? ''),
+      workflowDescription: String(resolved.workflow.description ?? ''),
+    },
+    attr: workflowAttribution(resolved),
+    requestMeta: {
+      userAgent: c.req.header('user-agent') ?? undefined,
+      ipAddress: c.req.header('cf-connecting-ip') ?? undefined,
+    },
+  };
+  const output = await executeReasoningAgent(ctx);
+  return textToUiStreamResponse(String(output.text ?? ''));
 }
 
 export async function createWorkflowChatStreamResponse(
@@ -51,6 +104,10 @@ export async function createWorkflowChatStreamResponse(
   }
 
   const data = (agentNode.data ?? {}) as Record<string, unknown>;
+  if (isReasoningAgentKind(data)) {
+    return createReasoningChatResponse(c, bindingName, user, resolved, agentNode, uiMessages);
+  }
+
   const endpoint = String(data.serviceEndpoint ?? data.endpoint ?? '').trim();
   if (!endpoint) {
     throw new Error('Agent node is missing serviceEndpoint');

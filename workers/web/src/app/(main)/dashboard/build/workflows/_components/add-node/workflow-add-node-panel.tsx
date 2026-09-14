@@ -689,6 +689,24 @@ export function WorkflowAddNodePanel({
     });
   };
 
+  const pickReasoningAgent = () => {
+    guardCatalogPick("agent:reasoning_agent", () => {
+      onPick({
+        type: "agent",
+        label: t("agent_kind_reasoning_agent"),
+        extra: {
+          agentKind: "reasoning_agent",
+          promptSource: "define_below",
+          clarificationMode: "ask",
+          requireCitations: true,
+          maxReflectRetries: 2,
+          enablePlanner: "auto",
+          safetyLevel: "standard",
+        },
+      });
+    });
+  };
+
   const pickService = (endpoint: string, name: string) => {
     guardCatalogPick("service_node", () => {
       onPick({
@@ -894,9 +912,16 @@ export function WorkflowAddNodePanel({
             <PickRow
               icon={Bot}
               title={t("node_agent")}
-              description={t("add_category_ai_desc")}
+              description={t("node_agent_desc")}
               disabled={!isCatalogActive("agent") && !isCatalogActive("agent:tools_agent")}
               onClick={pickAgent}
+            />
+            <PickRow
+              icon={Bot}
+              title={t("agent_kind_reasoning_agent")}
+              description={t("agent_kind_reasoning_agent_desc")}
+              disabled={!isCatalogActive("agent:reasoning_agent")}
+              onClick={pickReasoningAgent}
             />
           </div>
         ) : null}

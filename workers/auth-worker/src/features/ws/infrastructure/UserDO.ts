@@ -26,6 +26,7 @@ import {
   CommissionPolicyObjectSchema, CommissionSchema,
   AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
   WorkflowExecutionSchema, WorkflowCredentialSchema, WorkflowVersionSchema,
+  AgentSessionMemorySchema,
   PayoutBeneficiaryRecordSchema, EarningsPayoutSchema,
 } from '../domain.js';
 
@@ -174,6 +175,11 @@ export class UserDO extends DurableObject {
       this.table('workflow_credentials', WorkflowCredentialSchema, this.TABLE_CONFIGS.withUniqueIndex('credentialKey'));
       // Workflow version snapshots for history/restore. DO-local.
       this.table('workflow_versions', WorkflowVersionSchema, this.TABLE_CONFIGS.withUniqueIndex('versionKey'));
+      this.table(
+        'agent_session_memory',
+        AgentSessionMemorySchema,
+        this.TABLE_CONFIGS.withUniqueIndex('memoryKey'),
+      );
       this.table('payout_beneficiary', extendWithQueue(PayoutBeneficiaryRecordSchema), this.TABLE_CONFIGS.queueTable());
       this.table(
         'earnings_payouts',

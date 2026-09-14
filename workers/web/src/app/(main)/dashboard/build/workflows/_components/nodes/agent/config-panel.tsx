@@ -38,6 +38,54 @@ const AGENT_EXTRA_OPTIONS = [
   { id: "systemPrompt", labelKey: "agent_opt_system_message", type: "textarea" as const, defaultValue: SQL_AGENT_SYSTEM_PROMPT },
   { id: "maxTokens", labelKey: "field_max_tokens", type: "number" as const, defaultValue: 1024 },
   { id: "enableFallbackModel", labelKey: "field_enable_fallback_model", type: "toggle" as const, defaultValue: false },
+  {
+    id: "clarificationMode",
+    labelKey: "agent_opt_clarification_mode",
+    type: "select" as const,
+    defaultValue: "ask",
+    kinds: ["reasoning_agent"],
+    options: [
+      { value: "ask", labelKey: "agent_opt_clarification_ask" },
+      { value: "best_effort", labelKey: "agent_opt_clarification_best_effort" },
+    ],
+  },
+  {
+    id: "requireCitations",
+    labelKey: "agent_opt_require_citations",
+    type: "toggle" as const,
+    defaultValue: true,
+    kinds: ["reasoning_agent"],
+  },
+  {
+    id: "maxReflectRetries",
+    labelKey: "agent_opt_max_reflect_retries",
+    type: "number" as const,
+    defaultValue: 2,
+    kinds: ["reasoning_agent"],
+  },
+  {
+    id: "enablePlanner",
+    labelKey: "agent_opt_enable_planner",
+    type: "select" as const,
+    defaultValue: "auto",
+    kinds: ["reasoning_agent"],
+    options: [
+      { value: "auto", labelKey: "agent_opt_planner_auto" },
+      { value: "on", labelKey: "agent_opt_planner_on" },
+      { value: "off", labelKey: "agent_opt_planner_off" },
+    ],
+  },
+  {
+    id: "safetyLevel",
+    labelKey: "agent_opt_safety_level",
+    type: "select" as const,
+    defaultValue: "standard",
+    kinds: ["reasoning_agent"],
+    options: [
+      { value: "standard", labelKey: "agent_opt_safety_standard" },
+      { value: "strict", labelKey: "agent_opt_safety_strict" },
+    ],
+  },
 ] as const;
 
 type AgentExtraOptionId = (typeof AGENT_EXTRA_OPTIONS)[number]["id"];
@@ -137,6 +185,7 @@ export function AgentNodeConfigPanel({
   const promptSource = String(nodeData.promptSource ?? "define_below");
   const prompt = String(nodeData.prompt ?? "");
   const requireOutputFormat = !!nodeData.requireOutputFormat;
+  const agentKind = String(nodeData.agentKind ?? "tools_agent");
   const agentNotes = String(nodeData.agentNotes ?? "");
   const visibleOptions = (nodeData.agentVisibleOptions ?? []) as AgentExtraOptionId[];
 
@@ -179,7 +228,10 @@ export function AgentNodeConfigPanel({
     });
   };
 
-  const availableOptions = AGENT_EXTRA_OPTIONS.filter((o) => !visibleOptions.includes(o.id));
+  const kindOptions = AGENT_EXTRA_OPTIONS.filter(
+    (o) => !("kinds" in o) || (o.kinds as readonly string[]).includes(agentKind),
+  );
+  const availableOptions = kindOptions.filter((o) => !visibleOptions.includes(o.id));
 
   const executePrevious = () => {
     if (upstreamNodeId && onExecuteStep) {
@@ -319,7 +371,11 @@ export function AgentNodeConfigPanel({
 
                 <div className="space-y-3">
                   <Label className="text-xs">{t("field_options")}</Label>
-                  {AGENT_EXTRA_OPTIONS.filter((o) => visibleOptions.includes(o.id)).map((opt) => (
+                  {AGENT_EXTRA_OPTIONS.filter(
+                    (o) =>
+                      visibleOptions.includes(o.id) &&
+                      (!("kinds" in o) || (o.kinds as readonly string[]).includes(agentKind)),
+                  ).map((opt) => (
                     <div key={opt.id} className="space-y-1.5 rounded-md border px-3 py-2">
                       <div className="flex items-center justify-between gap-2">
                         <Label className="text-xs">{t(opt.labelKey)}</Label>
@@ -344,6 +400,22 @@ export function AgentNodeConfigPanel({
                           multiline
                           rows={3}
                         />
+                      ) : opt.type === "select" ? (
+                        <Select
+                          value={String(nodeData[opt.id] ?? opt.defaultValue)}
+                          onValueChange={(v) => patch({ [opt.id]: v })}
+                        >
+                          <SelectTrigger className="h-9 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {opt.options.map((item) => (
+                              <SelectItem key={item.value} value={item.value}>
+                                {t(item.labelKey)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       ) : (
                         <ExpressionDropField
                           value={String(nodeData[opt.id] ?? opt.defaultValue)}

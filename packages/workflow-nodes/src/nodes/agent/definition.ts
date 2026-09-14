@@ -11,6 +11,8 @@ import {
   type AgentKind,
 } from "./kinds";
 import {
+  REASONING_AGENT_PROMPT,
+  REASONING_AGENT_SYSTEM_PROMPT,
   SQL_AGENT_PROMPT,
   SQL_AGENT_SYSTEM_PROMPT,
 } from "../workflow-presets";
@@ -145,6 +147,30 @@ export const AGENT_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   sections: AGENT_SECTIONS,
 });
 
+function defaultDataForKind(kind: AgentKind): Record<string, unknown> {
+  if (kind === "reasoning_agent") {
+    return {
+      label: "Reasoning Agent",
+      promptSource: "define_below",
+      prompt: REASONING_AGENT_PROMPT,
+      systemPrompt: REASONING_AGENT_SYSTEM_PROMPT,
+      [AGENT_KIND_FIELD]: kind,
+      clarificationMode: "ask",
+      requireCitations: true,
+      maxReflectRetries: 2,
+      enablePlanner: "auto",
+      safetyLevel: "standard",
+    };
+  }
+  return {
+    label: "Agent",
+    promptSource: "define_below",
+    prompt: SQL_AGENT_PROMPT,
+    systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
+    [AGENT_KIND_FIELD]: kind,
+  };
+}
+
 export function createAgentKindDefinition(kind: AgentKind): WorkflowNodeDefinition {
   return createBuiltin({
     id: `agent:${kind}`,
@@ -154,13 +180,7 @@ export function createAgentKindDefinition(kind: AgentKind): WorkflowNodeDefiniti
     descriptionKey: kind === "tools_agent" ? "node_agent_desc" : `agent_kind_${kind}_desc`,
     category: "ai",
     icon: "Bot",
-    defaultData: {
-      label: "Agent",
-      promptSource: "define_below",
-      prompt: SQL_AGENT_PROMPT,
-      systemPrompt: SQL_AGENT_SYSTEM_PROMPT,
-      [AGENT_KIND_FIELD]: kind,
-    },
+    defaultData: defaultDataForKind(kind),
     sections: AGENT_SECTIONS,
   });
 }
@@ -168,3 +188,7 @@ export function createAgentKindDefinition(kind: AgentKind): WorkflowNodeDefiniti
 export const AGENT_KIND_DEFINITIONS: WorkflowNodeDefinition[] = AGENT_KINDS.filter(
   (kind) => !AGENT_OVERRIDE_KINDS.has(kind),
 ).map(createAgentKindDefinition);
+
+/** Override — governed reasoning loop (safety, memory, plan, reflect, cite). */
+export const AGENT_REASONING_DEFINITION: WorkflowNodeDefinition =
+  createAgentKindDefinition("reasoning_agent");

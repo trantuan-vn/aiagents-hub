@@ -53,7 +53,12 @@ export function primaryOutputPaths(
     if (handle === "done") return ["totalBatches", "schemaName", "loopCompleted"];
     return ["tableName"];
   }
-  if (type === "agent") return ["sql", "text"];
+  if (type === "agent") {
+    if (String(data.agentKind ?? "") === "reasoning_agent") {
+      return ["status", "text", "citations"];
+    }
+    return ["sql", "text"];
+  }
   if (type === "http_request" || coreKind === "http_request") return ["data", "status"];
   if (type === "human_review") return ["to", "sent"];
   return [];

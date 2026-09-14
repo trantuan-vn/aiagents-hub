@@ -24,6 +24,8 @@ Config panel theo layout **3 cột** (n8n-style): **INPUT** ← output node trư
 
 **Resource specs (RAG):** [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`saveRag.md`](./saveRag.md) · [`getRag.md`](./getRag.md) · [`trigger.md`](./trigger.md) · [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`rag-recipes.md`](./rag-recipes.md) · [`rag-implementation-phases.md`](./rag-implementation-phases.md)
 
+Kind **`reasoning_agent`:** vòng safety / memory / clarify / plan / reflect / cite — xem [`reasoning-agent.md`](./reasoning-agent.md). `tools_agent` không đổi.
+
 ---
 
 ## 2. Graph representation

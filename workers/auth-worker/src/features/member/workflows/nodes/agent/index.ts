@@ -6,8 +6,10 @@ import {
 
 import type { WorkflowNodePlugin } from '../types.js';
 import { executeAgent } from './execute.js';
+import { executeReasoningAgent } from './execute-reasoning.js';
 
 export { executeAgent } from './execute.js';
+export { executeReasoningAgent } from './execute-reasoning.js';
 
 /** Base agent — fallback when no agentKind is set (legacy graphs). */
 export const agentPlugin: WorkflowNodePlugin = {
@@ -28,3 +30,10 @@ export function createAgentKindPlugin(kind: AgentKind): WorkflowNodePlugin {
 export const AGENT_KIND_PLUGINS: WorkflowNodePlugin[] = AGENT_KINDS.filter(
   (kind) => !AGENT_OVERRIDE_KINDS.has(kind),
 ).map(createAgentKindPlugin);
+
+export const agentReasoningPlugin: WorkflowNodePlugin = {
+  id: 'agent:reasoning_agent',
+  runtimeType: 'agent',
+  kind: 'reasoning_agent',
+  execute: executeReasoningAgent,
+};
