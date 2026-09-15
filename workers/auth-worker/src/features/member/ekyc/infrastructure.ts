@@ -29,6 +29,7 @@ import {
   getServiceModel,
   roundUsdAmount,
 } from '../../admin/service/pricing';
+import { chargeServiceUsage } from '../workflows/billing/charge.js';
 
 const AI_GATEWAY_ID = 'unitoken';
 const DEFAULT_VISION_MODEL = '@cf/mistralai/mistral-small-3.1-24b-instruct';
@@ -70,67 +71,26 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     chargeUsd: number,
     workflowAttribution?: { workflowId: number; workflowOwnerId: string },
   ): Promise<void> => {
+    const amountUsd = roundUsdAmount(Math.max(0, Number(chargeUsd) || 0));
     const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const u = users[0];
-    if (!u?.id) {
-      throw new Error('User profile not found');
-    }
-
-    const amountUsd = roundUsdAmount(Math.max(0, Number(chargeUsd) || 0));
-    const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
-    if (amountUsd > balance) {
-      throw new Error('Insufficient wallet balance');
-    }
-
-    const operations: Array<{
-      table: string;
-      operation: 'insert' | 'update';
-      id?: number;
-      data: Record<string, unknown>;
-    }> = [];
-
-    if (amountUsd > 0) {
-      operations.push({
-        table: 'users',
-        operation: 'update',
-        id: u.id,
-        data: { ...u, walletBalance: balance - amountUsd, queueStatus: 'pending' },
-      });
-    }
-
-    const usageData: Record<string, unknown> = {
-      serviceId: service.id,
-      endpoint,
-      userAgent: request.userAgent,
-      ipAddress: request.ipAddress,
-      isError: false,
-      cost: amountUsd,
-      queueStatus: 'pending',
-    };
-    if (workflowAttribution) {
-      usageData.workflowId = workflowAttribution.workflowId;
-      usageData.workflowOwnerId = workflowAttribution.workflowOwnerId;
-    }
-
-    operations.push({
-      table: 'service_usages',
-      operation: 'insert',
-      data: usageData,
+    const consumerId =
+      String(u?.identifier ?? u?.user_identifier ?? userDO.id?.toString?.() ?? '');
+    await chargeServiceUsage({
+      env,
+      bindingName: 'USER_DO',
+      userDO,
+      consumerIdentifier: consumerId,
+      usageUsd: amountUsd,
+      workflowAttribution,
+      usageData: {
+        serviceId: service.id,
+        endpoint,
+        userAgent: request.userAgent,
+        ipAddress: request.ipAddress,
+        isError: false,
+      },
     });
-
-    await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
-
-    if (workflowAttribution && amountUsd > 0) {
-      const consumerId =
-        String(u.identifier ?? u.user_identifier ?? userDO.id?.toString?.() ?? '');
-      const { recordWorkflowRoyalty } = await import('../workflows/billing/royalty.js');
-      await recordWorkflowRoyalty(env, 'USER_DO', {
-        workflowId: workflowAttribution.workflowId,
-        workflowOwnerId: workflowAttribution.workflowOwnerId,
-        consumerIdentifier: consumerId,
-        baseCostUsd: amountUsd,
-      });
-    }
   };
 
   const recordApiError = async (service: any, endpoint: string, request: any): Promise<void> => {

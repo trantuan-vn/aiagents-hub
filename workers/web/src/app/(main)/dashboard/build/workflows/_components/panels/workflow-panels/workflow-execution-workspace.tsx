@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Textarea } from "@/components/ui/textarea";
-import { cn, formatUsd } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 import {
   autofixWorkflow,
@@ -22,7 +22,7 @@ import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout
 import { WorkflowExecutionGraph } from "./workflow-execution-graph";
 import { WorkflowExecutionIoPanel } from "./workflow-execution-io-panel";
 import { ExecutionStatusGlyph } from "./workflow-execution-list";
-import { durationMsOf, executionExportPayload, formatDataSize, formatDuration } from "./workflow-execution-utils";
+import { durationMsOf, executionExportPayload, formatDataSize, formatDuration, formatExecutionWalletCostLabel } from "./workflow-execution-utils";
 
 function exportExecution(selected: WorkflowExecutionRecord) {
   const blob = new Blob([executionExportPayload(selected)], { type: "application/json" });
@@ -83,7 +83,11 @@ function ExecutionMetaBar({
         <Copy className="size-3" aria-hidden />
       </button>
       <span className="text-muted-foreground hidden text-xs sm:inline">
-        {t("executions_col_cost")}: {formatUsd(selected.totalCostVnd)}
+        {t("executions_col_cost")}:{" "}
+        {formatExecutionWalletCostLabel(selected.totalCostVnd, selected.totalRoyaltyUsd, {
+          usage: t("executions_cost_usage"),
+          royalty: t("executions_cost_royalty"),
+        })}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
         {selected.status === "running" && onStop ? (

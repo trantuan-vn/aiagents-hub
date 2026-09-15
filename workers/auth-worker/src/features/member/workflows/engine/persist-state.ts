@@ -225,6 +225,7 @@ export function serializePersistedState(persisted: Record<string, unknown>): str
       ),
       runContext: {},
       totalCostVnd: engine.totalCostVnd ?? 0,
+      totalRoyaltyUsd: engine.totalRoyaltyUsd ?? 0,
       loopStates: {},
       pendingLoopReturn: engine.pendingLoopReturn,
       entryNodeId: engine.entryNodeId,

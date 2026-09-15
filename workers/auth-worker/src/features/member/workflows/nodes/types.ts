@@ -40,7 +40,7 @@ export interface NodeContext {
   attr?: WorkflowAttribution;
   requestMeta?: RequestMeta;
   webhookItem?: BuildWebhookItemParams;
-  onCost?: (vnd: number) => void;
+  onCost?: (chargedUsd: number, royaltyUsd?: number) => void;
 }
 
 export interface TriggerRecord {

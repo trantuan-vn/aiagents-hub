@@ -17,13 +17,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { formatUsd } from "@/lib/utils";
 
 import {
   executeWorkflow,
   resumeWorkflowExecution,
   type WorkflowExecutionResult,
 } from "../../../_lib/api";
+import { formatExecutionWalletCostLabel } from "./workflow-execution-utils";
 
 interface WorkflowExecuteDialogProps {
   workflowId: number;
@@ -123,7 +123,11 @@ export function WorkflowExecuteDialog({ workflowId, ownerId, open, onOpenChange 
           {result ? (
             <div className="overflow-hidden rounded-md border">
               <p className="border-b bg-muted/40 px-3 py-2 text-sm font-medium">
-                {t("status")}: {result.status} · {t("cost")}: {formatUsd(result.totalCostVnd)}
+                {t("status")}: {result.status} · {t("cost")}:{" "}
+                {formatExecutionWalletCostLabel(result.totalCostVnd, result.totalRoyaltyUsd, {
+                  usage: t("cost_usage"),
+                  royalty: t("cost_royalty"),
+                })}
               </p>
               <div className="max-h-56 overflow-y-auto px-3 py-3">
                 <pre className="text-muted-foreground font-sans text-xs break-words whitespace-pre-wrap">

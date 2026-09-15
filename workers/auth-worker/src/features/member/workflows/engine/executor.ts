@@ -55,6 +55,7 @@ export interface ExecutionStepLog {
   output?: unknown;
   error?: string;
   costVnd?: number;
+  royaltyUsd?: number;
   durationMs?: number;
   /** Number of attempts taken (>1 means the node was retried). */
   attempts?: number;
@@ -68,6 +69,8 @@ export interface WorkflowExecutionResult {
   output?: unknown;
   steps: ExecutionStepLog[];
   totalCostVnd: number;
+  /** Royalty portion of totalCostVnd, deducted from consumer A for owner B. */
+  totalRoyaltyUsd?: number;
   /** Set when status = pending_human: the node awaiting a decision. */
   pendingNodeId?: string;
 }
@@ -117,6 +120,7 @@ interface EngineState {
   steps: ExecutionStepLog[];
   runContext: NodeOutput;
   totalCostVnd: number;
+  totalRoyaltyUsd?: number;
   finalOutput?: unknown;
   /** Loop Over Items — persisted batch state per loop node. */
   loopStates?: Record<string, LoopState>;
@@ -221,7 +225,7 @@ async function executeNodeLogic(
   node: WorkflowDefinition['nodes'][number],
   nodeInput: NodeOutput,
   ctx: NodeContext,
-  onCost: (vnd: number) => void,
+  onCost: (chargedUsd: number, royaltyUsd?: number) => void,
 ): Promise<NodeOutput> {
   const plugin = nodePluginRegistry.resolve(node);
   if (!plugin) throw new Error(`Unknown node type: ${node.type}`);
@@ -596,9 +600,11 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       const { value: out, attempts } = await withRetry(
         (node.data ?? {}) as Record<string, unknown>,
         () =>
-          executeNodeLogic(node, nodeInput, ctx, (vnd) => {
-            engine.totalCostVnd += vnd;
-            log.costVnd = (log.costVnd ?? 0) + vnd;
+          executeNodeLogic(node, nodeInput, ctx, (chargedUsd, royaltyUsd = 0) => {
+            engine.totalCostVnd += chargedUsd;
+            engine.totalRoyaltyUsd = (engine.totalRoyaltyUsd ?? 0) + royaltyUsd;
+            log.costVnd = (log.costVnd ?? 0) + chargedUsd;
+            log.royaltyUsd = (log.royaltyUsd ?? 0) + royaltyUsd;
           }),
       );
       if (attempts > 1) log.attempts = attempts;
@@ -673,6 +679,7 @@ async function persistResult(
     state: capJson(persisted, 'state') ?? '{}',
     output: capJson(result.output, 'output'),
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     stepCount: persisted.engine.steps.length,
     pendingNodeId: status === 'cancelled' ? '' : (result.pendingNodeId ?? ''),
     error:
@@ -816,6 +823,7 @@ export async function executeWorkflowGraph(
     output: result.output,
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     pendingNodeId: result.pendingNodeId,
   };
 }
@@ -881,6 +889,7 @@ async function resolvePersistedForResume(params: {
       steps: [],
       runContext: { input: record.input ?? '', variables: {} },
       totalCostVnd: record.totalCostVnd ?? 0,
+      totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
       loopStates: {},
     },
   };
@@ -943,6 +952,7 @@ export async function resumeWorkflowExecution(params: {
     output: result.output,
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     pendingNodeId: result.pendingNodeId,
   };
 }
@@ -972,6 +982,7 @@ export async function cancelWorkflowExecution(params: {
       workflowOwnerId: record.workflowOwnerId,
       steps: [],
       totalCostVnd: record.totalCostVnd ?? 0,
+      totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
     };
   }
 
@@ -1007,5 +1018,6 @@ export async function cancelWorkflowExecution(params: {
     output: { stopped: true },
     steps,
     totalCostVnd: record.totalCostVnd ?? 0,
+    totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
   };
 }

@@ -13,6 +13,7 @@ import {
   resolveServiceByEndpoint,
   runTextModel,
 } from '../../billing/billing.js';
+import { reportUsageCharge } from '../../billing/charge.js';
 import {
   agentHasRagToolKind,
   buildAgentToolset,
@@ -167,7 +168,7 @@ async function bill(
   endpoint: string,
   usage: unknown,
 ): Promise<void> {
-  const costVnd = await billAgentUsage(
+  const charge = await billAgentUsage(
     ctx.c.env,
     ctx.bindingName,
     ctx.userDO,
@@ -181,7 +182,7 @@ async function bill(
       workflowAttribution: ctx.attr,
     },
   );
-  ctx.onCost?.(costVnd);
+  reportUsageCharge(ctx.onCost, charge);
 }
 
 function refusedResult(reason: string, category: SafetyCategory): ReasoningResult {

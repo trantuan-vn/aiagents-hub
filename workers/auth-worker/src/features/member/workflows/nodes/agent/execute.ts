@@ -14,6 +14,7 @@ import {
   resolveServiceByEndpoint,
   runTextModel,
 } from '../../billing/billing.js';
+import { reportUsageCharge } from '../../billing/charge.js';
 import {
   agentHasRagToolKind,
   buildAgentToolset,
@@ -54,7 +55,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const modelId = getModelForService(service);
 
   const billOnce = async (usage: unknown, fallbackText: string) => {
-    const costVnd = await billAgentUsage(
+    const charge = await billAgentUsage(
       ctx.c.env,
       ctx.bindingName,
       ctx.userDO,
@@ -68,8 +69,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         workflowAttribution: ctx.attr,
       },
     );
-    ctx.onCost?.(costVnd);
-    return costVnd;
+    reportUsageCharge(ctx.onCost, charge);
   };
   
   assertTextGenerationModel(modelId);

@@ -1,5 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 
+import { formatUsd } from "@/lib/utils";
+
 import type { ExecutionStepLog, WorkflowExecutionGraph, WorkflowExecutionRecord } from "../../../_lib/api";
 import { normalizeWorkflowEdge } from "../../edges/workflow-edge-utils";
 import { normalizeWorkflowNodes } from "../../layout/workflow-definition";
@@ -204,6 +206,25 @@ export function previewValue(value: unknown, max = 140): string {
   }
 }
 
+export function formatExecutionWalletCost(
+  totalCostVnd: number,
+  totalRoyaltyUsd = 0,
+): { total: number; usage: number; royalty: number } {
+  const royalty = Math.max(0, totalRoyaltyUsd);
+  const total = Math.max(0, totalCostVnd);
+  return { total, royalty, usage: Math.max(0, total - royalty) };
+}
+
+export function formatExecutionWalletCostLabel(
+  totalCostVnd: number,
+  totalRoyaltyUsd: number | undefined,
+  labels: { usage: string; royalty: string },
+): string {
+  const cost = formatExecutionWalletCost(totalCostVnd, totalRoyaltyUsd);
+  if (cost.royalty <= 0) return formatUsd(cost.total);
+  return `${formatUsd(cost.total)} · ${labels.usage}: ${formatUsd(cost.usage)} · ${labels.royalty}: ${formatUsd(cost.royalty)}`;
+}
+
 export function stepsByNodeId(steps: ExecutionStepLog[]): Map<string, ExecutionStepLog> {
   const map = new Map<string, ExecutionStepLog>();
   for (const step of steps) map.set(step.nodeId, step);
@@ -218,6 +239,8 @@ export function executionExportPayload(selected: WorkflowExecutionRecord): strin
       startedAt: selected.startedAt,
       finishedAt: selected.finishedAt,
       error: selected.error,
+      totalCostVnd: selected.totalCostVnd,
+      totalRoyaltyUsd: selected.totalRoyaltyUsd ?? 0,
       output: selected.output,
       steps: selected.steps,
       definition: selected.definition,

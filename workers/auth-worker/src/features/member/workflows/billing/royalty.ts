@@ -12,14 +12,26 @@ export interface WorkflowRoyaltyContext {
   serviceUsageGlobalId?: number;
 }
 
+export type ResolvedWorkflowRoyalty = {
+  royaltyAmountUsd: number;
+  royaltyPercent: number;
+  consumerDoId: string;
+};
+
+export function computeWorkflowRoyaltyUsd(baseCostUsd: number, royaltyPercent: number): number {
+  if (!baseCostUsd || baseCostUsd <= 0 || !royaltyPercent || royaltyPercent <= 0) return 0;
+  return roundUsdAmount((baseCostUsd * royaltyPercent) / 100);
+}
+
 /**
- * Credits workflow owner with royalty % of service usage cost (USD).
+ * Royalty charged to consumer A (and later accrued to owner B) when A runs B's shared workflow.
+ * Returns null when A is the owner or the run has no billable usage.
  */
-export async function recordWorkflowRoyalty(
+export async function resolveWorkflowRoyalty(
   env: Env,
   bindingName: string,
-  ctx: WorkflowRoyaltyContext,
-): Promise<{ royaltyAmountUsd: number; royaltyPercent: number } | null> {
+  ctx: Pick<WorkflowRoyaltyContext, 'workflowId' | 'workflowOwnerId' | 'consumerIdentifier' | 'baseCostUsd'>,
+): Promise<ResolvedWorkflowRoyalty | null> {
   const { workflowId, workflowOwnerId, consumerIdentifier, baseCostUsd } = ctx;
   if (!baseCostUsd || baseCostUsd <= 0) return null;
   if (!workflowOwnerId || !workflowId) return null;
@@ -27,10 +39,28 @@ export async function recordWorkflowRoyalty(
   const consumerDoId = runnerDoIdFromIdentifier(binding, consumerIdentifier);
   if (consumerDoId === workflowOwnerId) return null;
   const royaltyPercent = await getWorkflowRoyaltyPercentFromEnv(env);
-  const royaltyAmountUsd = roundUsdAmount((baseCostUsd * royaltyPercent) / 100);
-  if (royaltyAmountUsd <= 0) {
-    return { royaltyAmountUsd: 0, royaltyPercent };
-  }
+  return {
+    royaltyAmountUsd: computeWorkflowRoyaltyUsd(baseCostUsd, royaltyPercent),
+    royaltyPercent,
+    consumerDoId,
+  };
+}
+
+/**
+ * Accrues royalty % of service usage cost (USD) on the workflow owner's ledger.
+ * Consumer A is debited separately in chargeServiceUsage — this only credits B.
+ */
+export async function recordWorkflowRoyalty(
+  env: Env,
+  bindingName: string,
+  ctx: WorkflowRoyaltyContext,
+): Promise<ResolvedWorkflowRoyalty | null> {
+  const resolved = await resolveWorkflowRoyalty(env, bindingName, ctx);
+  if (!resolved) return null;
+  if (resolved.royaltyAmountUsd <= 0) return resolved;
+  const { workflowId, workflowOwnerId } = ctx;
+  const { royaltyAmountUsd, royaltyPercent, consumerDoId } = resolved;
+  const binding = env[bindingName as keyof Env] as DurableObjectNamespace;
   const ownerDO = binding.get(binding.idFromString(workflowOwnerId)) as DurableObjectStub<UserDO>;
 
   const workflows = await executeUtils.executeDynamicAction(
@@ -70,7 +100,7 @@ export async function recordWorkflowRoyalty(
         workflowOwnerId,
         consumerUserId: consumerDoId.toString(),
         serviceUsageGlobalId: ctx.serviceUsageGlobalId,
-        baseCostUsd,
+        baseCostUsd: ctx.baseCostUsd,
         royaltyPercent,
         royaltyAmountUsd,
         currency: 'USD',
@@ -80,7 +110,7 @@ export async function recordWorkflowRoyalty(
   ];
   await executeUtils.executeDynamicAction(ownerDO, 'multi-table', { operations });
 
-  return { royaltyAmountUsd, royaltyPercent };
+  return resolved;
 }
 
 /** Count one consumer run of a shared workflow (independent of billable AI steps). */

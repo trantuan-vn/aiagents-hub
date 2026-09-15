@@ -5,7 +5,7 @@ import {
   getServiceModel,
   roundUsdAmount,
 } from '../../../admin/service/pricing.js';
-import { recordWorkflowRoyalty } from './royalty.js';
+import { chargeServiceUsage, type UsageCharge } from './charge.js';
 import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 const DEFAULT_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -154,66 +154,23 @@ export async function billAgentUsage(
   consumerIdentifier: string,
   service: Record<string, unknown>,
   options: BillAgentUsageOptions,
-): Promise<number> {
-  const chargeUsd = roundUsdAmount(computeUsageChargeUsd(service, options.aiResponse));
-  const amountUsd = chargeUsd;
-
-  const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
-  const u = Array.isArray(users) ? users[0] : users;
-  if (!u?.id) throw new Error('User profile not found');
-
-  const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
-  if (amountUsd > balance) throw new Error('Insufficient wallet balance');
-
-  const usageData: Record<string, unknown> = {
-    serviceId: service.id,
-    endpoint: options.endpoint,
-    userAgent: options.userAgent,
-    ipAddress: options.ipAddress,
-    isError: false,
-    cost: amountUsd,
-    queueStatus: 'pending',
-  };
-
-  if (options.workflowAttribution) {
-    usageData.workflowId = options.workflowAttribution.workflowId;
-    usageData.workflowOwnerId = options.workflowAttribution.workflowOwnerId;
-  }
-
-  const operations: Array<{
-    table: string;
-    operation: 'insert' | 'update';
-    id?: number;
-    data: Record<string, unknown>;
-  }> = [];
-
-  if (amountUsd > 0) {
-    operations.push({
-      table: 'users',
-      operation: 'update',
-      id: u.id,
-      data: { ...u, walletBalance: balance - amountUsd, queueStatus: 'pending' },
-    });
-  }
-
-  operations.push({
-    table: 'service_usages',
-    operation: 'insert',
-    data: usageData,
+): Promise<UsageCharge> {
+  const usageUsd = roundUsdAmount(computeUsageChargeUsd(service, options.aiResponse));
+  return chargeServiceUsage({
+    env,
+    bindingName,
+    userDO,
+    consumerIdentifier,
+    usageUsd,
+    workflowAttribution: options.workflowAttribution,
+    usageData: {
+      serviceId: service.id,
+      endpoint: options.endpoint,
+      userAgent: options.userAgent,
+      ipAddress: options.ipAddress,
+      isError: false,
+    },
   });
-
-  await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
-
-  if (options.workflowAttribution && amountUsd > 0) {
-    await recordWorkflowRoyalty(env, bindingName, {
-      workflowId: options.workflowAttribution.workflowId,
-      workflowOwnerId: options.workflowAttribution.workflowOwnerId,
-      consumerIdentifier,
-      baseCostUsd: amountUsd,
-    });
-  }
-
-  return amountUsd;
 }
 
 export async function billEmbeddingUsage(
@@ -223,7 +180,7 @@ export async function billEmbeddingUsage(
   consumerIdentifier: string,
   service: Record<string, unknown>,
   options: Omit<BillAgentUsageOptions, 'aiResponse'> & { promptTokens: number },
-): Promise<number> {
+): Promise<UsageCharge | 0> {
   if (options.promptTokens <= 0) return 0;
   return billAgentUsage(env, bindingName, userDO, consumerIdentifier, service, {
     endpoint: options.endpoint,

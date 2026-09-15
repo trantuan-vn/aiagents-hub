@@ -9,6 +9,7 @@ import {
   findApprovedServiceByModel,
   resolveServiceByEndpoint,
 } from '../../../billing/billing.js';
+import { reportUsageCharge } from '../../../billing/charge.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
 import {
   DEFAULT_EMBED_MODEL,
@@ -221,7 +222,7 @@ export type RagBilling = {
   consumerIdentifier: string;
   requestMeta?: { userAgent?: string; ipAddress?: string };
   workflowAttribution?: WorkflowAttribution;
-  onCost?: (usd: number) => void;
+  onCost?: (usd: number, royaltyUsd?: number) => void;
 };
 
 export type ResolvedRagEmbed = {
@@ -295,7 +296,7 @@ export async function billRagEmbeddings(
     return 0;
   }
   await ensureWalletBalance(billing.userDO);
-  const costUsd = await billEmbeddingUsage(
+  const charge = await billEmbeddingUsage(
     billing.env,
     billing.bindingName,
     billing.userDO,
@@ -309,8 +310,7 @@ export async function billRagEmbeddings(
       workflowAttribution: billing.workflowAttribution,
     },
   );
-  billing.onCost?.(costUsd);
-  return costUsd;
+  return reportUsageCharge(billing.onCost, charge);
 }
 
 export function resolveEmbedModelFromService(service: Record<string, unknown>): string {

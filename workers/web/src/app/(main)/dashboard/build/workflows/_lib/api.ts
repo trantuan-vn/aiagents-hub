@@ -90,6 +90,7 @@ export interface ExecutionStepLog {
   output?: unknown;
   error?: string;
   costVnd?: number;
+  royaltyUsd?: number;
   durationMs?: number;
   attempts?: number;
 }
@@ -109,6 +110,7 @@ export interface WorkflowExecutionResult {
   output?: unknown;
   steps: ExecutionStepLog[];
   totalCostVnd: number;
+  totalRoyaltyUsd?: number;
   pendingNodeId?: string;
 }
 
@@ -146,6 +148,7 @@ export interface WorkflowExecutionRecord {
   output?: unknown;
   error?: string;
   totalCostVnd: number;
+  totalRoyaltyUsd?: number;
   stepCount: number;
   steps: ExecutionStepLog[];
   /** Graph snapshot captured at run time (from engine state). */
@@ -220,6 +223,7 @@ export interface WorkflowExecutionObservability {
   finishedAt?: number;
   totalDurationMs: number;
   totalCostVnd: number;
+  totalRoyaltyUsd?: number;
   stepCount: number;
   steps: ExecutionStepLog[];
   timeline: StepTimelineEntry[];

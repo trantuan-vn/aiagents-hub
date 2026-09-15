@@ -43,6 +43,7 @@ export interface UpdateExecutionPatch {
   output?: string;
   error?: string;
   totalCostVnd?: number;
+  totalRoyaltyUsd?: number;
   stepCount?: number;
   state?: string;
   /** Empty string clears the pending node (schema rejects null). */
