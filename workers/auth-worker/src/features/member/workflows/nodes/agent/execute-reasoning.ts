@@ -4,7 +4,9 @@ import { z } from 'zod';
 
 import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
 import {
+  asBillingAiResponse,
   billAgentUsage,
+  billGenerateTextCalls,
   ensureWalletBalance,
   extractTextFromAiResponse,
   getModelForService,
@@ -159,10 +161,6 @@ function snippetTexts(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-function billedUsage(usage: unknown, text: string): unknown {
-  return usage ?? { response: text };
-}
-
 async function bill(
   ctx: NodeContext,
   service: Record<string, unknown>,
@@ -242,8 +240,9 @@ function createDefaultLlm(args: {
   topP?: number;
   frequencyPenalty?: number;
   presencePenalty?: number;
+  onBill?: (usage: unknown, text: string) => Promise<void>;
 }): ReasoningLlmCall {
-  const { ctx, modelId, maxTokens } = args;
+  const { ctx, modelId, maxTokens, onBill } = args;
   return async (call) => {
     const limit = call.maxTokens ?? Math.min(maxTokens, call.purpose === 'act' ? maxTokens : 512);
     if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
@@ -251,6 +250,7 @@ function createDefaultLlm(args: {
         binding: ctx.c.env.AI,
         gateway: WORKERS_AI_GATEWAY,
       });
+      let billedSteps = 0;
       const result = await withAiCapacityRetry(async () =>
         generateText({
           model: workersAI(modelId as never),
@@ -264,8 +264,16 @@ function createDefaultLlm(args: {
           tools: call.tools,
           toolChoice: call.toolChoice,
           stopWhen: stepCountIs(call.stopSteps ?? DEFAULT_ACT_STEPS),
+          onStepFinish: async (step) => {
+            billedSteps += 1;
+            const usage = (step as { usage?: unknown }).usage;
+            await onBill?.(usage, asText((step as { text?: unknown }).text));
+          },
         }),
       );
+      await billGenerateTextCalls(async (usage, text) => {
+        await onBill?.(usage, text);
+      }, result, billedSteps);
       const observations: ToolObservation[] = [];
       let askedUser: { questions: string[]; why?: string } | undefined;
       const steps = (result.steps ?? []) as Array<{
@@ -308,8 +316,10 @@ function createDefaultLlm(args: {
       frequency_penalty: args.frequencyPenalty,
       presence_penalty: args.presencePenalty,
     });
+    const text = asText(extractTextFromAiResponse(aiResponse));
+    await onBill?.(aiResponse, text);
     return {
-      text: asText(extractTextFromAiResponse(aiResponse)),
+      text,
       usage: aiResponse,
       observations: [],
     };
@@ -381,11 +391,6 @@ export async function executeReasoningAgent(
     assertTextGenerationModel(modelId);
   }
 
-  const maybeBill = async (usage: unknown, text: string) => {
-    if (deps?.llm || !endpoint) return;
-    await bill(ctx, service, endpoint, billedUsage(usage, text));
-  };
-
   const llm =
     deps?.llm ??
     createDefaultLlm({
@@ -396,6 +401,9 @@ export async function executeReasoningAgent(
       topP: aiParamsFromServiceOptions(linked.serviceOptions).top_p as number | undefined,
       frequencyPenalty: aiParamsFromServiceOptions(linked.serviceOptions).frequency_penalty as number | undefined,
       presencePenalty: aiParamsFromServiceOptions(linked.serviceOptions).presence_penalty as number | undefined,
+      onBill: async (usage, text) => {
+        await bill(ctx, service, endpoint, asBillingAiResponse(usage, text));
+      },
     });
 
   if (safetyIn.action === 'review') {
@@ -405,7 +413,6 @@ export async function executeReasoningAgent(
       user: userText,
       maxTokens: 200,
     });
-    await maybeBill(classified.usage, classified.text);
     const parsed = parseLlmSafety(classified.text);
     if (parsed.action === 'refuse') {
       return toNodeOutput(refusedResult(parsed.reason, parsed.category), {
@@ -502,7 +509,6 @@ export async function executeReasoningAgent(
       user: `User: ${userText}\nTools: ${toolNames.join(', ') || 'none'}\nSession: ${session.summary || '(empty)'}\nSnippets: ${snippets.slice(0, 3).join(' | ') || '(none)'}`,
       maxTokens: 300,
     });
-    await maybeBill(framed.usage, framed.text);
     const parsed = parseTaskFrame(parseJsonObject(framed.text), frame.goal);
     frame = {
       ...parsed,
@@ -533,7 +539,6 @@ export async function executeReasoningAgent(
       user: `Goal: ${frame.goal}\nUser: ${userText}\nTools: ${toolNames.join(', ') || 'none'}`,
       maxTokens: 400,
     });
-    await maybeBill(planned.usage, planned.text);
     plan = parsePlan(parseJsonObject(planned.text));
   }
 
@@ -612,7 +617,6 @@ export async function executeReasoningAgent(
       toolChoice: policyNames.length ? initialToolChoice(policyNames, plan, snippets.length > 0) : undefined,
       stopSteps,
     });
-    await maybeBill(act.usage, act.text);
     observations = [...observations, ...(act.observations ?? [])];
     if (act.askedUser?.questions?.length) {
       const result = clarificationResult(act.askedUser.questions, act.askedUser.why ?? '', frame);
@@ -678,7 +682,6 @@ export async function executeReasoningAgent(
       user: `Draft:\n${draft}\nSources:\n${formatCitationBlock(citations)}\nTool results:\n${observations.map((o) => `${o.tool}: ${o.output}`).join('\n')}`,
       maxTokens: 800,
     });
-    await maybeBill(critique.usage, critique.text);
     const parsed = parseReflect(parseJsonObject(critique.text), heuristic);
     lastIssues = parsed.issues.join(', ');
     if (parsed.rewritten) {

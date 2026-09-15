@@ -12,6 +12,9 @@ vi.mock('../../../billing/billing.js', () => ({
   runTextModel: vi.fn(),
   extractTextFromAiResponse: vi.fn(),
   billAgentUsage: vi.fn().mockResolvedValue(0),
+  asBillingAiResponse: (usage: unknown, fallbackText = '') =>
+    usage != null && typeof usage === 'object' ? usage : { response: fallbackText },
+  billGenerateTextCalls: vi.fn().mockResolvedValue(undefined),
 }));
 
 function ctx(data: Record<string, unknown>, input: Record<string, unknown> = {}): NodeContext {

@@ -18,6 +18,52 @@ export interface BillAgentUsageOptions {
   workflowAttribution?: { workflowId: number; workflowOwnerId: string };
 }
 
+/** Workers AI response, AI SDK usage, or empty fallback the pricing extractor can read. */
+export function asBillingAiResponse(usage: unknown, fallbackText = ''): unknown {
+  if (usage != null && typeof usage === 'object') return usage;
+  return { response: fallbackText };
+}
+
+export type GenerateTextUsageSource = {
+  text?: unknown;
+  usage?: unknown;
+  totalUsage?: unknown;
+  steps?: Array<{ usage?: unknown; text?: unknown }>;
+};
+
+/** One usage blob per underlying model HTTP call (`generateText` steps). */
+export function llmUsagesFromGenerateText(
+  result: GenerateTextUsageSource,
+): Array<{ usage: unknown; text: string }> {
+  const fallbackText = result.text == null ? '' : String(result.text);
+  const steps = Array.isArray(result.steps) ? result.steps : [];
+  const fromSteps = steps
+    .map((step) => ({
+      usage: step?.usage,
+      text: step?.text == null ? fallbackText : String(step.text),
+    }))
+    .filter((row) => row.usage != null);
+  if (fromSteps.length) return fromSteps;
+  const usage = result.totalUsage ?? result.usage;
+  return usage != null ? [{ usage, text: fallbackText }] : [];
+}
+
+export async function billGenerateTextCalls(
+  onBill: (usage: unknown, text: string) => Promise<void>,
+  result: GenerateTextUsageSource,
+  alreadyBilled = 0,
+): Promise<void> {
+  if (alreadyBilled > 0) return;
+  const rows = llmUsagesFromGenerateText(result);
+  if (!rows.length) {
+    await onBill(undefined, result.text == null ? '' : String(result.text));
+    return;
+  }
+  for (const row of rows) {
+    await onBill(row.usage, row.text);
+  }
+}
+
 function serviceApprovalStatus(service: Record<string, unknown>): string {
   return String(service.approvalStatus ?? service.approval_status ?? 'approved');
 }

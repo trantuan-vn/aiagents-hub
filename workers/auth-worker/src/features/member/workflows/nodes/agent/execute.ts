@@ -4,7 +4,9 @@ import { createWorkersAI } from 'workers-ai-provider';
 import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
 
 import {
+  asBillingAiResponse,
   billAgentUsage,
+  billGenerateTextCalls,
   ensureWalletBalance,
   extractTextFromAiResponse,
   finishReasonFromAiResponse,
@@ -50,6 +52,25 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   await ensureWalletBalance(ctx.userDO);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
+
+  const billOnce = async (usage: unknown, fallbackText: string) => {
+    const costVnd = await billAgentUsage(
+      ctx.c.env,
+      ctx.bindingName,
+      ctx.userDO,
+      ctx.user.identifier,
+      service,
+      {
+        endpoint,
+        aiResponse: asBillingAiResponse(usage, fallbackText),
+        userAgent: ctx.requestMeta?.userAgent,
+        ipAddress: ctx.requestMeta?.ipAddress,
+        workflowAttribution: ctx.attr,
+      },
+    );
+    ctx.onCost?.(costVnd);
+    return costVnd;
+  };
   
   assertTextGenerationModel(modelId);
   const embedModel = resolveEmbedModel(service);
@@ -137,6 +158,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const historyMessages = simpleMemory.history.map((m) => ({ role: m.role, content: m.content }));
 
   if (useToolLoop && ctx.c.env.AI) {
+    let billedSteps = 0;
     const result = await withAiCapacityRetry(async () => {
       const workersAI = createWorkersAI({
         binding: ctx.c.env.AI,
@@ -153,27 +175,17 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         presencePenalty: modelParams.presence_penalty as number | undefined,
         tools,
         stopWhen: stepCountIs(5),
+        onStepFinish: async (step) => {
+          billedSteps += 1;
+          const usage = (step as { usage?: unknown }).usage;
+          await billOnce(usage, String((step as { text?: unknown }).text ?? ''));
+        },
       });
     });
 
     const text = result.text;
+    await billGenerateTextCalls(billOnce, result, billedSteps);
     const usage = result.totalUsage ?? result.usage;
-
-    const costVnd = await billAgentUsage(
-      ctx.c.env,
-      ctx.bindingName,
-      ctx.userDO,
-      ctx.user.identifier,
-      service,
-      {
-        endpoint,
-        aiResponse: usage ? { usage } : { response: text },
-        userAgent: ctx.requestMeta?.userAgent,
-        ipAddress: ctx.requestMeta?.ipAddress,
-        workflowAttribution: ctx.attr,
-      },
-    );
-    ctx.onCost?.(costVnd);
     await simpleMemory.persist(text);
     return {
       text,
@@ -194,6 +206,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   let aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams);
   let text = extractTextFromAiResponse(aiResponse);
+  await billOnce(aiResponse, text);
   let sql = extractSql(text);
 
   if (useRetrievedSqlContext && (!sql || (finishReasonFromAiResponse(aiResponse) === 'length' && !/```sql/i.test(text)))) {
@@ -212,25 +225,12 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       retryTokens,
       modelParams,
     );
-    text = extractTextFromAiResponse(aiResponse) || text;
+    const retryText = extractTextFromAiResponse(aiResponse);
+    await billOnce(aiResponse, retryText);
+    text = retryText || text;
     sql = extractSql(text);
   }
 
-  const costVnd = await billAgentUsage(
-    ctx.c.env,
-    ctx.bindingName,
-    ctx.userDO,
-    ctx.user.identifier,
-    service,
-    {
-      endpoint,
-      aiResponse,
-      userAgent: ctx.requestMeta?.userAgent,
-      ipAddress: ctx.requestMeta?.ipAddress,
-      workflowAttribution: ctx.attr,
-    },
-  );
-  ctx.onCost?.(costVnd);
   await simpleMemory.persist(text);
   return {
     text,

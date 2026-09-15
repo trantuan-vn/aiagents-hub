@@ -15,6 +15,9 @@ const billingMock = vi.hoisted(() => ({
   extractTextFromAiResponse: vi.fn().mockReturnValue('SELECT 1;'),
   finishReasonFromAiResponse: vi.fn().mockReturnValue('stop'),
   billAgentUsage: vi.fn().mockResolvedValue(0),
+  asBillingAiResponse: (usage: unknown, fallbackText = '') =>
+    usage != null && typeof usage === 'object' ? usage : { response: fallbackText },
+  billGenerateTextCalls: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./execute-reasoning.js', () => reasoningMock);
@@ -59,12 +62,14 @@ describe('executeAgent dispatcher', () => {
   beforeEach(() => {
     reasoningMock.executeReasoningAgent.mockClear();
     billingMock.runTextModel.mockClear();
+    billingMock.billAgentUsage.mockClear();
   });
 
   it('keeps tools_agent on the original generate path', async () => {
     const out = await executeAgent(ctx('tools_agent'));
     expect(reasoningMock.executeReasoningAgent).not.toHaveBeenCalled();
     expect(billingMock.runTextModel).toHaveBeenCalled();
+    expect(billingMock.billAgentUsage).toHaveBeenCalledTimes(1);
     expect(out.text).toBe('SELECT 1;');
   });
 

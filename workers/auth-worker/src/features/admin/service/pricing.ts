@@ -203,21 +203,19 @@ function normalizeUsageRecord(usage: Record<string, unknown>): Record<string, un
   if (!('inputTokens' in usage) && !('outputTokens' in usage)) {
     return usage;
   }
-  const input = Number(usage.inputTokens ?? 0);
-  const output = Number(usage.outputTokens ?? 0);
-  const details = usage.inputTokenDetails;
-  if (details && typeof details === 'object' && !Array.isArray(details)) {
-    const noCache = (details as Record<string, unknown>).noCacheTokens;
-    const cacheRead = (details as Record<string, unknown>).cacheReadTokens;
-    if (typeof noCache === 'number' && typeof cacheRead === 'number') {
-      return {
-        prompt_cache_hit_tokens: cacheRead,
-        prompt_cache_miss_tokens: noCache,
-        completion_tokens: output,
-      };
-    }
-  }
-  return { prompt_tokens: input, completion_tokens: output };
+  return {
+    prompt_tokens: Number(usage.inputTokens ?? 0),
+    completion_tokens: Number(usage.outputTokens ?? 0),
+  };
+}
+
+function hasTokenCounts(record: Record<string, unknown>): boolean {
+  return (
+    'inputTokens' in record ||
+    'outputTokens' in record ||
+    'prompt_tokens' in record ||
+    'completion_tokens' in record
+  );
 }
 
 export function extractUsageFromAiResponse(response: unknown): Record<string, unknown> | null {
@@ -233,5 +231,6 @@ export function extractUsageFromAiResponse(response: unknown): Record<string, un
       return normalizeUsageRecord(u as Record<string, unknown>);
     }
   }
+  if (hasTokenCounts(r)) return normalizeUsageRecord(r);
   return null;
 }
