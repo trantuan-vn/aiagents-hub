@@ -43,6 +43,7 @@ async function proxyCall<T>(env: ProxyEnv, body: Record<string, unknown>): Promi
 }
 
 export function oracleProxyConfigured(env: unknown): env is ProxyEnv {
+  if (!env || typeof env !== 'object') return false;
   const rec = env as ProxyEnv;
   return Boolean(String(rec.ORACLE_PROXY_URL ?? '').trim());
 }

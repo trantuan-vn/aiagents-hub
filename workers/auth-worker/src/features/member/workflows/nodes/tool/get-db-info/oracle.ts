@@ -8,11 +8,6 @@ import {
   type ProxyTableIntrospection,
 } from './oracle-proxy-client.js';
 
-type OracleEnv = {
-  ORACLE_PROXY_URL?: string;
-  ORACLE_PROXY_SECRET?: string;
-};
-
 export type OracleTableIntrospection = {
   tableName: string;
   columns: DbColumnInfo[];
@@ -29,14 +24,21 @@ function isCloudflareWorkersRuntime(): boolean {
   return g.Cloudflare != null || g.navigator?.userAgent?.includes('Cloudflare-Workers') === true;
 }
 
-function resolveOraclePath(env?: OracleEnv): 'proxy' | 'direct' {
-  if (env && oracleProxyConfigured(env)) return 'proxy';
+function resolveOraclePath(env?: unknown): 'proxy' | 'direct' {
+  if (oracleProxyConfigured(env)) return 'proxy';
   if (isCloudflareWorkersRuntime()) {
     throw new Error(
       'get_db_info: Oracle on Cloudflare Workers requires ORACLE_PROXY_URL (run services/oracle-proxy on OCI/Node)',
     );
   }
   return 'direct';
+}
+
+function requireProxyEnv(env: unknown) {
+  if (!oracleProxyConfigured(env)) {
+    throw new Error('get_db_info: ORACLE_PROXY_URL is not configured');
+  }
+  return env;
 }
 
 async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -56,10 +58,10 @@ async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => P
 export async function listOracleTables(
   config: OracleConnectConfig,
   schemaName: string,
-  env?: OracleEnv,
+  env?: unknown,
 ): Promise<string[]> {
   if (resolveOraclePath(env) === 'proxy') {
-    return proxyListOracleTables(env!, config, schemaName);
+    return proxyListOracleTables(requireProxyEnv(env), config, schemaName);
   }
   try {
     const { listOracleTablesDirect } = await import('@aiagents-hub/oracle-db');
@@ -75,7 +77,7 @@ export async function introspectOracleTable(
   schemaName: string,
   tableName: string,
   sampleLimit: number,
-  env?: OracleEnv,
+  env?: unknown,
 ): Promise<{
   columns: DbColumnInfo[];
   primaryKey: string[];
@@ -85,7 +87,7 @@ export async function introspectOracleTable(
   rowCountEstimate?: number;
 }> {
   if (resolveOraclePath(env) === 'proxy') {
-    return proxyIntrospectOracleTable(env!, config, schemaName, tableName, sampleLimit);
+    return proxyIntrospectOracleTable(requireProxyEnv(env), config, schemaName, tableName, sampleLimit);
   }
   try {
     const { introspectOracleTableDirect } = await import('@aiagents-hub/oracle-db');
@@ -107,14 +109,15 @@ export async function introspectOracleTables(
   schemaName: string,
   tableNames: string[],
   sampleLimit: number,
-  env?: OracleEnv,
+  env?: unknown,
 ): Promise<OracleTableIntrospection[]> {
   const unique = [...new Set(tableNames.map((name) => name.trim()).filter(Boolean))];
   if (!unique.length) return [];
 
   if (resolveOraclePath(env) === 'proxy') {
+    const proxyEnv = requireProxyEnv(env);
     try {
-      const rows = await proxyIntrospectOracleTables(env!, config, schemaName, unique, sampleLimit);
+      const rows = await proxyIntrospectOracleTables(proxyEnv, config, schemaName, unique, sampleLimit);
       return rows.map(normalizeProxyTableRow);
     } catch (err) {
       if (!isUnknownProxyAction(err)) {
@@ -123,7 +126,7 @@ export async function introspectOracleTables(
       }
       return mapPool(unique, 4, async (tableName) => {
         try {
-          const info = await proxyIntrospectOracleTable(env!, config, schemaName, tableName, sampleLimit);
+          const info = await proxyIntrospectOracleTable(proxyEnv, config, schemaName, tableName, sampleLimit);
           return { tableName, ...info };
         } catch (tableErr) {
           const message = tableErr instanceof Error ? tableErr.message : String(tableErr);
