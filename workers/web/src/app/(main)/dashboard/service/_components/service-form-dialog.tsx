@@ -100,16 +100,22 @@ function CreateServiceFormDialog({ onCreate, trigger }: Pick<ServiceFormDialogPr
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-y-auto">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{t("create_service")}</DialogTitle>
           <DialogDescription>{t("create_service_description")}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form id="service-form-submit" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
-            <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
-            <DialogFooter>
+          <form
+            id="service-form-submit"
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+          >
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
+              <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
+              <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
+            </div>
+            <DialogFooter className="shrink-0 border-t pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 {t("cancel")}
               </Button>
@@ -172,16 +178,21 @@ function EditServiceFormDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col overflow-y-auto">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{t("edit_service")}</DialogTitle>
           <DialogDescription>{t("edit_service_description")}</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
-            <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
-            <DialogFooter>
+          <form
+            onSubmit={form.handleSubmit(onSubmit)}
+            className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden"
+          >
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1">
+              <ServiceCoreFields control={form.control as Control<ServiceFormValues>} />
+              <ServiceModelPricingFields control={form.control as Control<ServiceFormValues>} />
+            </div>
+            <DialogFooter className="shrink-0 border-t pt-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 {t("cancel")}
               </Button>
