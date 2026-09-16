@@ -442,10 +442,10 @@
   "Navbar": {
     "home": "Trang chủ",
     "about": "Giới thiệu",
-    "packages": "Gói dịch vụ",
+    "packages": "Giá",
     "documentation": "Tài liệu",
     "contact": "Liên hệ",
-    "pricing": "Giá cả",
+    "pricing": "Giá",
     "resources": "Tài nguyên",
     "support": "Hỗ trợ",
     "blog": "Blog",
@@ -459,8 +459,8 @@
     "resources": "Tài nguyên",
     "developers": "Nhà phát triển",
     "features": "Tính năng",
-    "pricing": "Giá cả",
-    "api_packages": "Gói API",
+    "pricing": "Giá",
+    "api_packages": "Gói",
     "documentation": "Tài liệu",
     "about": "Về chúng tôi",
     "blog": "Blog",
@@ -470,63 +470,91 @@
     "changelog": "Nhật ký thay đổi",
     "status": "Trạng thái",
     "terms": "Điều khoản",
-    "api_reference": "eKYC API",
+    "api_reference": "API workflow",
     "community": "Cộng đồng",
-    "description": "Dịch vụ API mạnh mẽ cho nhà phát triển và doanh nghiệp. Xây dựng nhanh hơn với cơ sở hạ tầng đáng tin cậy của chúng tôi.",
-    "copyright": "© {year} AIAgentsHub. Tất cả quyền được bảo lưu.",
+    "description": "Xây agent và workflow AI trên một nền tảng. Trả Credit cho công việc hoàn thành — không hóa đơn token, không tách dòng hạ tầng.",
+    "copyright": "© {year} AI Agents Hub. Tất cả quyền được bảo lưu.",
     "privacy_policy": "Chính sách bảo mật",
     "terms_of_service": "Điều khoản dịch vụ",
-    "cookies": "Cookies"
+    "cookies": "Cookies",
+    "quickstart": "Bắt đầu nhanh"
   },
   "Hero": {
-    "badge": "Hiện có đề xuất được hỗ trợ bởi AI",
-    "title": "Xây dựng nhanh hơn với",
-    "title_gradient": "API mạnh mẽ",
-    "subtitle": "Truy cập các dịch vụ API cấp doanh nghiệp với giá cả đơn giản. Từ xử lý dữ liệu đến tích hợp AI, chúng tôi đã sẵn sàng hỗ trợ bạn.",
-    "explore_apis": "Khám phá API",
-    "view_demo": "Xem Tài liệu",
-    "uptime_sla": "Thời gian hoạt động SLA",
-    "api_calls_per_day": "Lượt gọi API/Ngày",
+    "badge": "One Platform, One Credit, Unlimited Models",
+    "title": "Xây agent AI",
+    "title_gradient": "hoàn thành việc",
+    "subtitle": "Thiết kế workflow, chạy agent với tool và bộ nhớ, rồi trả Credit theo việc đã làm xong. Model, chi phí và hạ tầng do chúng tôi quản lý phía sau.",
+    "explore_apis": "Xem giá",
+    "view_demo": "Đọc tài liệu",
+    "uptime_sla": "SLA uptime",
+    "api_calls_per_day": "Lượt gọi API/ngày",
     "developers": "Nhà phát triển",
     "low_latency": "Độ trễ thấp",
     "enterprise_security": "Bảo mật doanh nghiệp",
-    "ai_powered": "Được hỗ trợ bởi AI"
+    "ai_powered": "Được hỗ trợ bởi AI",
+    "get_started": "Bắt đầu xây",
+    "view_docs": "Đọc tài liệu",
+    "stat_credit_value": "1",
+    "stat_credit_label": "Credit cho mọi model",
+    "stat_models_value": "∞",
+    "stat_models_label": "Model, một đồng hồ đo",
+    "stat_plans_value": "3",
+    "stat_plans_label": "Gói: Free · Pro · Enterprise",
+    "pill_builder": "Workflow builder trực quan",
+    "pill_credits": "Tính bằng Credit",
+    "pill_enterprise": "SLA Enterprise"
   },
   "Features": {
-    "badge": "Tại sao chọn chúng tôi",
-    "title": "Được xây dựng để mở rộng quy mô, thiết kế cho",
-    "title_gradient": "Nhà phát triển",
-    "subtitle": "Mọi thứ bạn cần để tích hợp API mạnh mẽ vào ứng dụng của mình, với độ tin cậy cấp doanh nghiệp.",
-    "lightning_fast": "Cực kỳ nhanh",
-    "lightning_fast_desc": "Thời gian phản hồi trung bình dưới 50ms với cơ sở hạ tầng phân phối toàn cầu của chúng tôi.",
-    "enterprise_security": "Bảo mật doanh nghiệp",
-    "enterprise_security_desc": "Tuân thủ SOC 2 với mã hóa end-to-end và bảo vệ mối đe dọa nâng cao.",
-    "global_cdn": "CDN toàn cầu",
-    "global_cdn_desc": "Máy chủ biên tại hơn 50 vị trí đảm bảo độ trễ tối thiểu trên toàn thế giới.",
-    "realtime_analytics": "Phân tích thời gian thực",
-    "realtime_analytics_desc": "Theo dõi sử dụng, giám sát hiệu suất và tối ưu hóa việc sử dụng API của bạn.",
-    "developer_first": "Ưu tiên nhà phát triển",
-    "developer_first_desc": "SDK toàn diện, tài liệu chi tiết và ví dụ mã ở mọi ngôn ngữ.",
-    "support_24_7": "Hỗ trợ 24/7",
-    "support_24_7_desc": "Chatbot được hỗ trợ bởi AI cộng với các kỹ sư hỗ trợ chuyên dụng sẵn sàng giúp đỡ.",
-    "ai_integration": "Tích hợp AI",
-    "ai_integration_desc": "Đề xuất thông minh và truy vấn ngôn ngữ tự nhiên cho dữ liệu của bạn.",
-    "rate_limiting": "Giới hạn tốc độ",
-    "rate_limiting_desc": "Giới hạn tốc độ linh hoạt với cho phép burst và tự động mở rộng quy mô."
+    "badge": "Nền tảng",
+    "title": "Đủ thứ để đưa",
+    "title_gradient": "agent vào việc",
+    "subtitle": "Workspace để xây, chạy và chia sẻ workflow AI — một đồng hồ Credit thay vì hóa đơn token.",
+    "lightning_fast": "Workflow builder trực quan",
+    "lightning_fast_desc": "Ghép agent, tool, RAG, HTTP và logic trên canvas.",
+    "enterprise_security": "Bảo mật mặc định",
+    "enterprise_security_desc": "Mã hóa khi truyền, API key theo phạm vi, và quyền dashboard tối thiểu.",
+    "global_cdn": "Chạy ở edge",
+    "global_cdn_desc": "Workflow chạy trên Cloudflare Workers gần người dùng.",
+    "realtime_analytics": "Mức dùng giải thích được",
+    "realtime_analytics_desc": "Ước lượng Credit trước khi chạy và số trừ thật sau.",
+    "developer_first": "Thân thiện với developer",
+    "developer_first_desc": "Webhook, API key và tài liệu khớp sản phẩm bạn đang dùng.",
+    "support_24_7": "Hỗ trợ theo gói",
+    "support_24_7_desc": "Cộng đồng ở Free, ưu tiên ở Pro, SLA riêng ở Enterprise.",
+    "ai_integration": "Agent, bộ nhớ, RAG",
+    "ai_integration_desc": "Node agent với tool, memory phiên, Vectorize và truy vấn CSDL.",
+    "rate_limiting": "Quota, không hóa đơn bất ngờ",
+    "rate_limiting_desc": "Quota hạ tầng theo gói. Mức dùng AI đo bằng Credit.",
+    "workflow_builder": "Workflow builder trực quan",
+    "workflow_builder_desc": "Ghép agent, tool, RAG, HTTP và logic trên canvas. Lưu phiên bản và chạy từ dashboard.",
+    "agents_rag": "Agent, bộ nhớ, RAG",
+    "agents_rag_desc": "Node agent và reasoning-agent với tool, memory phiên, Vectorize và truy vấn CSDL.",
+    "one_credit": "Một Credit",
+    "one_credit_desc": "Mọi model trừ Credit. Bạn thấy chi phí mỗi lần chạy, không phải USD/1 triệu token.",
+    "unlimited_models": "Không giới hạn model",
+    "unlimited_models_desc": "Đổi model tiny, mid hay frontier mà không đổi gói. Hệ số do chúng tôi quản lý nội bộ.",
+    "webhooks_cron": "Webhook & cron",
+    "webhooks_cron_desc": "Kích hoạt workflow từ HTTP, lịch, hoặc chat host — cùng graph, cùng ví Credit.",
+    "sharing_royalty": "Chia sẻ & nhận royalty",
+    "sharing_royalty_desc": "Xuất bản workflow. Khi người khác chạy, họ trả Credit; bạn nhận royalty.",
+    "usage_visibility": "Mức dùng giải thích được",
+    "usage_visibility_desc": "Ước lượng Credit trước khi chạy và số trừ thật sau — kèm log từng execution.",
+    "support_levels": "Hỗ trợ theo gói",
+    "support_levels_desc": "Cộng đồng ở Free, ưu tiên ở Pro, kênh riêng và SLA ở Enterprise."
   },
   "CTA": {
-    "title": "Sẵn sàng để bắt đầu",
-    "title_gradient": "Xây dựng?",
-    "subtitle": "Tham gia cùng hàng nghìn nhà phát triển sử dụng API của chúng tôi để cung cấp năng lượng cho ứng dụng của họ. Bắt đầu miễn phí, không cần thẻ tín dụng.",
+    "title": "Sẵn sàng chạy",
+    "title_gradient": "agent đầu tiên?",
+    "subtitle": "Tạo workspace miễn phí, xây workflow và dùng Credit tặng. Không tính token, không cần thẻ để bắt đầu.",
     "get_started_free": "Bắt đầu miễn phí",
-    "talk_to_sales": "Nói chuyện với bán hàng",
-    "trusted_by": "Được tin tưởng bởi các nhà phát triển tại"
+    "talk_to_sales": "Nói chuyện với sales",
+    "trusted_by": "Dành cho đội muốn agent hoàn thành việc — tính bằng một Credit."
   },
   "Packages": {
-    "badge": "Giá cả",
-    "title": "Đơn giản, minh bạch",
-    "title_gradient": "Giá cả",
-    "subtitle": "Chọn gói phù hợp với nhu cầu của bạn. Mở rộng hoặc thu nhỏ bất cứ lúc nào.",
+    "badge": "Giá",
+    "title": "Gói đơn giản,",
+    "title_gradient": "ổn định",
+    "subtitle": "Subscription mở quyền dùng nền tảng. Credit đo mức dùng AI/agent. Enterprise mua sự đảm bảo.",
     "free": "Miễn phí",
     "free_desc": "Dùng thử nền tảng — Credit tặng hết hạn mỗi kỳ",
     "pro": "Pro",
@@ -536,11 +564,13 @@
     "enterprise": "Enterprise",
     "enterprise_desc": "SLA, hạ tầng riêng và Credit cam kết",
     "per_month": "/tháng",
+    "custom_price": "Theo hợp đồng",
     "most_popular": "Phổ biến nhất",
     "start_free": "Bắt đầu miễn phí",
     "get_started": "Bắt đầu",
     "contact_sales": "Liên hệ bán hàng",
-    "view_all_packages": "Xem tất cả gói",
+    "view_all_packages": "So sánh gói",
+    "compare_plans": "So sánh gói",
     "features": {
       "included_credits": "{count} Credit tặng / tháng",
       "platform_access": "Workflow builder và chia sẻ",
@@ -550,6 +580,9 @@
       "committed_credits": "Credit cam kết + mua thêm",
       "custom_quotas": "Quota tùy chỉnh và hạ tầng riêng",
       "model_family_visibility": "Hiện model family (vẫn trừ Credit)",
+      "credits_expire": "Credit tặng hết hạn cuối kỳ",
+      "sharing": "Chia sẻ workflow và nhận royalty",
+      "sso_audit": "SSO, audit và điều khoản tùy chỉnh",
       "api_calls_month": "{count} lượt gọi API/tháng",
       "basic_analytics": "Phân tích cơ bản",
       "community_support": "Hỗ trợ cộng đồng",
@@ -558,7 +591,7 @@
       "advanced_analytics": "Phân tích nâng cao",
       "priority_support": "Hỗ trợ ưu tiên",
       "higher_rate_limits": "Giới hạn tốc độ cao hơn",
-      "webhooks": "Webhooks",
+      "webhooks": "Webhook và cron",
       "custom_domains": "Tên miền tùy chỉnh",
       "unlimited_api_calls": "Lượt gọi API không giới hạn",
       "realtime_analytics": "Phân tích thời gian thực",
@@ -571,13 +604,13 @@
     }
   },
   "PackagesPage": {
-    "badge": "Thị trường API",
-    "title": "Khám phá",
-    "title_gradient": "Gói API của chúng tôi",
-    "subtitle": "Chọn từ bộ sưu tập API mạnh mẽ của chúng tôi. Mỗi gói bao gồm tài liệu toàn diện và SDK.",
-    "search_placeholder": "Tìm kiếm API...",
+    "badge": "Subscription + Credit",
+    "title": "Trả cho việc hoàn thành,",
+    "title_gradient": "không phải token",
+    "subtitle": "Một Credit đo mọi model. Giá gói ổn định khi nhà cung cấp đổi giá — chúng tôi chỉnh hệ số, không tách dòng hóa đơn hạ tầng.",
+    "search_placeholder": "Tìm gói...",
     "category": "Danh mục",
-    "all_categories": "Tất cả danh mục",
+    "all_categories": "Tất cả",
     "ai_ml": "AI & ML",
     "claw": "CLAW",
     "data_processing": "Xử lý dữ liệu",
@@ -592,254 +625,297 @@
     "included_credits": "Credit tặng / tháng",
     "api_calls": "lượt gọi API",
     "more_features": "+{count} tính năng khác",
-    "no_packages_found": "Không tìm thấy gói nào phù hợp với tiêu chí của bạn.",
+    "no_packages_found": "Không tìm thấy gói phù hợp.",
+    "layers": {
+      "kicker": "Cách chúng tôi thu",
+      "title": "Ba lớp.",
+      "title_gradient": "Hết.",
+      "subtitle": "Chúng tôi bán quyền dùng nền tảng, mức tiêu thụ AI/agent, và đảm bảo doanh nghiệp — không bán hóa đơn Cloudflare.",
+      "subscription": {
+        "title": "Subscription",
+        "body": "Quyền dùng workspace, builder, chia sẻ, webhook, cron và hỗ trợ theo gói. Giá gói không nhảy khi catalog model đổi."
+      },
+      "credit": {
+        "title": "Credit",
+        "body": "Đơn vị dịch vụ trả trước cho agent và model. Model rẻ tốn ít Credit; frontier tốn nhiều hơn. Bạn không thấy USD/1 triệu token."
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "body": "SLA, dung lượng riêng, quota tùy chỉnh, SSO/audit và Credit cam kết. BYOK là add-on — không phải bán sỉ token."
+      }
+    },
     "packages": {
       "ai_vision": {
-        "name": "API Thị giác AI",
-        "description": "Nhận dạng hình ảnh tiên tiến, phát hiện đối tượng và phân tích nội dung trực quan được hỗ trợ bởi machine learning.",
+        "name": "Pro",
+        "description": "Cho đội chạy agent thật.",
         "features": {
-          "0": "Phát hiện đối tượng",
-          "1": "Nhận dạng khuôn mặt",
-          "2": "OCR",
-          "3": "Kiểm duyệt nội dung"
+          "0": "Credit tặng",
+          "1": "Mua thêm Credit",
+          "2": "Webhook",
+          "3": "Hỗ trợ ưu tiên"
         }
       },
       "claw_api": {
-        "name": "API cho các CLAW",
-        "description": "Tích hợp một lần với nhiều biến thể CLAW: OpenClaw, NanoClaw, NemoClaw, BizClaw và các dòng tương thích khác — phù hợp agent, tác vụ tự động và kết nối hệ thống.",
+        "name": "Enterprise",
+        "description": "SLA và khối lượng cam kết.",
         "features": {
-          "0": "Hỗ trợ OpenClaw, NanoClaw, NemoClaw, BizClaw, …",
-          "1": "Định tuyến và cấu hình theo loại CLAW",
-          "2": "Webhook và luồng sự kiện thời gian thực",
-          "3": "Mở rộng cho CLAW tùy chỉnh"
+          "0": "Credit cam kết",
+          "1": "SLA",
+          "2": "Hỗ trợ riêng",
+          "3": "Quota tùy chỉnh"
         }
       }
     }
   },
   "AboutPage": {
-    "badge": "Hạ tầng API",
-    "title": "Dành cho đội ngũ coi API là",
-    "title_gradient": "trọng tâm kinh doanh",
-    "subtitle": "AIAgentsHub vận hành aiagents-hub.vn — nền tảng API được quản lý, truy cập theo lượt sử dụng rõ ràng. Chúng tôi giúp nhà phát triển và doanh nghiệp ra mắt sản phẩm nhanh hơn với hợp đồng ổn định, khả năng quan sát và bảo mật được tích hợp sẵn.",
+    "badge": "AI Agents Hub",
+    "title": "Chúng tôi bán việc hoàn thành,",
+    "title_gradient": "không bán token",
+    "subtitle": "AI Agents Hub là nền tảng sau aiagents-hub.vn: workflow trực quan, agent với tool và bộ nhớ, một Credit cho mọi model. Khách trả cho việc đã làm; chúng tôi quản lý chi phí và hạ tầng.",
     "mission": {
-      "title": "Sứ mệnh của chúng tôi",
-      "lead": "Phần mềm hiện nay chạy trên API. Thanh toán, định danh, AI, tự động hóa — khi tầng API gặp sự cố, sản phẩm cũng vậy.",
-      "body": "Chúng tôi tập trung vào hiệu năng dự đoán được, mức sử dụng minh bạch và tài liệu bạn có thể tích hợp ngay từ ngày đầu. Dù bạn đang prototype hay vận hành lưu lượng production, nhiệm vụ của chúng tôi là vô hình ở những điểm quan trọng: thời gian hoạt động, độ trễ và niềm tin.",
-      "terminal": "GET /v1/health HTTP/1.1\nHost: api.aiagents-hub.vn\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
-      "terminal_caption": "Phản hồi nhất quán trên nhiều khu vực — được giám sát 24/7"
+      "title": "Sứ mệnh",
+      "lead": "Đội ngũ không nên thành kế toán token. Họ nên đưa agent đi trả lời, truy xuất và hành động.",
+      "body": "Chúng tôi xây workspace để bạn thiết kế việc một lần, chạy bằng webhook, cron hoặc chat, và thấy ước lượng Credit — không USD/1 triệu token, không dòng D1/R2. Model rẻ hay frontier là hệ số nội bộ. Gói của bạn vẫn đọc được.",
+      "terminal": "POST /hooks/workflows/wf_42/run\nAuthorization: Bearer •••••\n\n200 OK\n{\n  \"status\": \"succeeded\",\n  \"credits\": 1.24,\n  \"job\": \"support_summary\"\n}",
+      "terminal_caption": "Ước lượng trước khi chạy. Trừ thật sau. Một Credit cho mọi model."
     },
     "values_section": {
       "title": "Điều chúng tôi tối ưu",
       "title_gradient": "mỗi ngày",
-      "subtitle": "Các nguyên tắc định hình cách chúng tôi thiết kế endpoint, bảng điều khiển và hỗ trợ."
+      "subtitle": "Nguyên tắc định hình builder, đồng hồ đo và hỗ trợ bạn nhận được."
     },
     "values": {
+      "job_done": {
+        "title": "Thu theo việc",
+        "description": "Khách mua lần chạy agent và kết quả workflow. Chúng tôi không bán token Cloudflare, GPT hay Claude như sản phẩm."
+      },
       "api_first": {
-        "title": "Ưu tiên API",
-        "description": "Sản phẩm và giá được xây quanh hợp đồng REST rõ ràng, phiên bản và chính sách ngừng hỗ trợ — không phải kế hoạch phụ."
+        "title": "Thu theo việc",
+        "description": "Khách mua lần chạy agent và kết quả workflow. Chúng tôi không bán token Cloudflare, GPT hay Claude như sản phẩm."
       },
       "trust": {
-        "title": "Bảo mật & tuân thủ",
-        "description": "Mã hóa khi truyền, khóa theo nguyên tắc tối thiểu và kiểm soát thuận lợi cho kiểm toán để đáp ứng kỳ vọng nội bộ và quy định."
+        "title": "Bảo mật & tin cậy",
+        "description": "Mã hóa khi truyền, khóa theo phạm vi và log thuận lợi kiểm toán để chạy agent production với mắt mở."
       },
       "developer": {
-        "title": "Trải nghiệm nhà phát triển",
-        "description": "Tài liệu kèm ví dụ chạy được, mã lỗi dự đoán được và công cụ rút ngắn đường từ lần gọi đầu tiên đến production."
+        "title": "Trải nghiệm builder",
+        "description": "Canvas, catalog node, chat host và webhook — từ graph đầu tiên đến agent sống mà không viết lại."
       },
       "scale": {
-        "title": "Quy mô toàn cầu",
-        "description": "Định tuyến gần biên và quy hoạch dung lượng để đỉnh lưu lượng là biểu đồ đường, không phải câu chuyện sự cố."
+        "title": "Lớn theo mức dùng",
+        "description": "Khi phục vụ nhiều người hơn, bạn dùng nhiều Credit hơn — không bị nhảy giá gói bất ngờ. Enterprise thêm SLA."
       }
     },
     "stats": {
       "uptime": {
-        "value": "99,9%",
-        "label": "Mục tiêu SLA uptime"
+        "value": "1 Credit",
+        "label": "Một đồng hồ cho mọi model"
       },
       "latency": {
-        "value": "<50ms",
-        "label": "Độ trễ API điển hình"
+        "value": "3 gói",
+        "label": "Free · Pro · Enterprise"
       },
       "regions": {
-        "value": "50+",
-        "label": "Điểm biên (edge)"
+        "value": "Edge",
+        "label": "Chạy trên Cloudflare Workers"
       },
       "sla": {
-        "value": "24/7",
-        "label": "Giám sát & cảnh báo"
+        "value": "SLA",
+        "label": "Ở Enterprise, có thông báo"
       }
     },
     "cta": {
-      "title": "Sẵn sàng tích hợp",
-      "title_gradient": "trong vài phút?",
-      "subtitle": "Tạo tài khoản, chọn gói và bắt đầu gọi endpoint production với mức sử dụng đo đếm được theo dõi trên bảng điều khiển.",
+      "title": "Bắt đầu với",
+      "title_gradient": "workspace miễn phí",
+      "subtitle": "Credit tặng hết hạn mỗi kỳ. Pro mở quyền mua thêm. Enterprise dành cho đội cần hợp đồng.",
       "get_started": "Bắt đầu",
-      "view_packages": "Xem gói dịch vụ",
+      "view_packages": "Xem giá",
       "view_docs": "Đọc tài liệu"
     }
   },
   "CommunityPage": {
-    "badge": "Kết nối & xây dựng",
-    "title": "Cộng đồng cho đội ngũ triển khai trên",
-    "title_gradient": "aiagents-hub.vn",
-    "subtitle": "Tài liệu, hỗ trợ và lộ trình rõ ràng tới API được quản lý, eKYC và bảng điều khiển — dù bạn đang prototype hay vận hành production.",
-    "base_url_label": "Base URL production",
+    "badge": "Cùng xây",
+    "title": "Cộng đồng cho đội đưa",
+    "title_gradient": "agent vào việc",
+    "subtitle": "Tài liệu, hỗ trợ và lộ trình rõ từ workflow đầu tiên đến mức dùng Credit production — dù bạn đang prototype hay chạy agent thật.",
+    "base_url_label": "Ứng dụng",
+    "base_url_value": "https://aiagents-hub.vn",
     "steps": {
       "title": "Bắt đầu trong",
       "title_gradient": "ba bước",
-      "subtitle": "Cùng luồng mà khách hàng của chúng tôi dùng — không mơ hồ.",
-      "1_title": "Tạo tài khoản",
-      "1_desc": "Đăng nhập bảng điều khiển để quản lý API key, phiên và định danh gắn ví.",
-      "2_title": "Chọn gói dịch vụ",
-      "2_desc": "Chọn mức truy cập đo đếm phù hợp khối lượng — eKYC, CLAW, AI Vision và hơn thế.",
-      "3_title": "Tích hợp & quan sát",
-      "3_desc": "Gọi api.aiagents-hub.vn với Bearer token, theo dõi mức dùng trên dashboard và liên hệ hỗ trợ khi cần."
+      "subtitle": "Cùng luồng khách hàng đang dùng — không mơ hồ.",
+      "1_title": "Tạo workspace",
+      "1_desc": "Đăng nhập dashboard. Gói Free có Credit tặng, hết hạn mỗi kỳ.",
+      "2_title": "Xây workflow",
+      "2_desc": "Thả trigger, agent, tool hoặc RAG lên canvas. Ước lượng Credit trước khi chạy.",
+      "3_title": "Chạy & quan sát",
+      "3_desc": "Kích hoạt từ chat, webhook hoặc cron. Chúng tôi trừ Credit cho mức dùng AI; log cho biết chuyện gì xảy ra."
     },
     "paths": {
       "title": "Đi tiếp",
       "title_gradient": "ở đâu",
-      "subtitle": "Vào đúng tài nguyên bạn cần, không vòng vo.",
+      "subtitle": "Vào đúng tài nguyên bạn cần.",
       "docs": {
         "title": "Tài liệu",
-        "description": "Tổng quan nền tảng, hướng dẫn và cách các phần kết nối."
+        "description": "Tổng quan nền tảng và cách các phần kết nối."
       },
       "quickstart": {
         "title": "Quickstart",
-        "description": "Gửi request đầu tiên lên API production."
+        "description": "Từ canvas trống đến agent đang chạy."
       },
       "api": {
-        "title": "Tham chiếu eKYC API",
-        "description": "Endpoint, xác thực và ví dụ chạy được."
+        "title": "API workflow",
+        "description": "Webhook, xác thực và ví dụ chạy được."
       },
       "packages": {
-        "title": "Gói dịch vụ",
-        "description": "Gói, tính năng và đo đếm rõ ràng cho từng bề mặt."
+        "title": "Giá",
+        "description": "Free, Pro, Enterprise — Subscription cộng Credit."
       },
       "support": {
         "title": "Hỗ trợ",
-        "description": "Trung tâm trợ giúp và luồng xử lý sự cố có cấu trúc."
+        "description": "Trung tâm trợ giúp và luồng sự cố."
       },
       "contact": {
         "title": "Liên hệ",
-        "description": "Hợp tác, tích hợp và câu hỏi thanh toán."
+        "description": "Hợp tác, thanh toán và Enterprise."
       },
       "blog": {
         "title": "Blog",
-        "description": "Ghi chú về eKYC, CLAW và cập nhật nền tảng."
+        "description": "Ghi chú về agent, Credit và chia sẻ workflow."
       },
       "careers": {
         "title": "Tuyển dụng",
-        "description": "Gia nhập đội xây nền tảng API được quản lý."
+        "description": "Gia nhập đội xây nền tảng agent."
       }
     },
     "ecosystem": {
-      "title": "Bám sát",
-      "title_gradient": "dịch vụ thật",
-      "subtitle": "Mỗi khối dưới đây tương ứng điều bạn có thể chạy trên nền tảng hôm nay.",
-      "managed": {
-        "title": "API gateway được quản lý",
-        "description": "Endpoint ổn định, lỗi dự đoán được và mức dùng đo đếm trên nhiều khu vực."
+      "title": "Bạn chạy được",
+      "title_gradient": "hôm nay",
+      "subtitle": "Mỗi khối dưới đây tương ứng thứ trong sản phẩm.",
+      "builder": {
+        "title": "Workflow builder",
+        "description": "Graph trực quan với agent, HTTP, code, flow và ghi chú — có version trong workspace."
       },
-      "ekyc": {
-        "title": "eKYC & định danh",
-        "description": "Luồng định danh phục vụ tuân thủ với kiểm soát thuận lợi cho kiểm toán."
+      "agents": {
+        "title": "Agent & RAG",
+        "description": "Vòng agent, reasoning agent, memory phiên, Vectorize và tool CSDL."
       },
-      "auth": {
-        "title": "Xác thực & ví",
-        "description": "Phiên, API key, SIWE và passkey — bảo vệ cho dashboard và API."
+      "credits": {
+        "title": "Một Credit",
+        "description": "Đơn vị trả trước cho mức dùng model và agent. Nạp qua VNPay, Casso hoặc PayPal."
       },
-      "billing": {
-        "title": "Thanh toán & billing",
-        "description": "Gói minh bạch và luồng thanh toán gắn với mức sử dụng đo được."
+      "sharing": {
+        "title": "Chia sẻ & royalty",
+        "description": "Xuất bản workflow. Người khác chạy bằng Credit; bạn nhận royalty."
       },
-      "claw": {
-        "title": "CLAW & API AI",
-        "description": "Bề mặt sẵn sàng tự động hóa cho agent, các biến thể CLAW và tải đa phương thức."
+      "triggers": {
+        "title": "Trigger",
+        "description": "Webhook, cron, form và chat host — cùng workflow, cùng ví."
       },
       "observability": {
-        "title": "Phân tích & giám sát",
-        "description": "Khả năng quan sát mức dùng, cảnh báo và sức khỏe dịch vụ để tin cậy production."
+        "title": "Log & execution",
+        "description": "Xem ước lượng, Credit thật và lịch sử chạy để production giải thích được."
+      },
+      "managed": {
+        "title": "Workflow builder",
+        "description": "Graph trực quan với agent và tool."
+      },
+      "ekyc": {
+        "title": "Agent & RAG",
+        "description": "Vòng agent, memory và truy xuất."
+      },
+      "auth": {
+        "title": "Một Credit",
+        "description": "Đơn vị trả trước cho mức dùng AI."
+      },
+      "billing": {
+        "title": "Chia sẻ & royalty",
+        "description": "Xuất bản workflow và nhận khi người khác chạy."
+      },
+      "claw": {
+        "title": "Trigger",
+        "description": "Webhook, cron, form và chat host."
       }
     },
     "cta": {
       "title": "Sẵn sàng",
       "title_gradient": "cùng chúng tôi?",
-      "subtitle": "Mở dashboard, đọc tài liệu hoặc gửi email — chúng tôi chuyển mỗi tin nhắn đến đúng chủ sở hữu.",
+      "subtitle": "Mở dashboard, đọc tài liệu hoặc gửi email — chúng tôi chuyển mỗi tin đến đúng người.",
       "get_started": "Mở bảng điều khiển",
       "view_docs": "Đọc tài liệu",
       "contact": "Liên hệ đội ngũ"
     }
   },
   "CareersPage": {
-    "badge": "Gia nhập đội nền tảng API",
-    "title": "Cùng xây xương sống cho",
-    "title_gradient": "các tích hợp hiện đại",
-    "subtitle": "Chúng tôi vận hành aiagents-hub.vn theo mô hình dịch vụ API: gateway ổn định, đo lường rõ ràng và tài liệu lấy nhà phát triển làm trung tâm. Hãy cùng chúng tôi phát triển hạ tầng mà đội khách hàng tin cậy mỗi ngày.",
+    "badge": "Gia nhập đội nền tảng agent",
+    "title": "Xây workspace nơi",
+    "title_gradient": "agent đi làm",
+    "subtitle": "Chúng tôi vận hành aiagents-hub.vn như nền tảng agent AI: workflow trực quan, một đồng hồ Credit, và hạ tầng khách không phải xuất hóa đơn. Hãy cùng đưa sản phẩm đội khách chạy mỗi ngày.",
     "why": {
       "title": "Vì sao chọn",
-      "title_gradient": "AIAgentsHub",
-      "subtitle": "Đội nhỏ nhưng tác động lớn — đúng tinh thần startup giai đoạn đầu trong lĩnh vực API.",
+      "title_gradient": "AI Agents Hub",
+      "subtitle": "Đội nhỏ, đòn bẩy lớn — đúng tinh thần startup giai đoạn đầu.",
       "impact": {
         "title": "Công việc gắn sản phẩm",
-        "description": "Code của bạn chạm tới xác thực, hạn mức, quan sát hệ thống và hợp đồng API đối ngoại — không chỉ công cụ nội bộ."
+        "description": "Code của bạn chạm builder, runtime, đồng hồ Credit và hợp đồng đối ngoại — không chỉ công cụ nội bộ."
       },
       "ownership": {
         "title": "Trách nhiệm trọn vẹn",
-        "description": "Thiết kế, triển khai và vận hành những gì bạn xây. On-call nhẹ nhưng thật; ưu tiên tự động hóa trước."
+        "description": "Thiết kế, triển khai và vận hành những gì bạn xây. On-call nhẹ nhưng thật; ưu tiên tự động hóa."
       },
       "stack": {
         "title": "Stack hiện đại",
-        "description": "Dịch vụ cloud-native, type chặt, metric đầy đủ và tài liệu luôn đồng bộ với API thực tế."
+        "description": "Cloudflare Workers, Durable Objects, D1, R2, Vectorize, plugin workflow có type, và tài liệu luôn đồng bộ."
       }
     },
     "roles_section": {
       "title": "Vị trí",
       "title_gradient": "đang tuyển",
-      "subtitle": "Định biên phù hợp giai đoạn đầu startup: một core team gọn, có chỗ mở rộng khi lưu lượng tăng.",
+      "subtitle": "Định biên giai đoạn đầu: core team gọn, có chỗ mở khi mức dùng tăng.",
       "team_total": "Khoảng 4–5 người trên các vị trí này ở giai đoạn một"
     },
     "jobs": {
-      "api_engineer": {
-        "title": "Kỹ sư Backend / API",
+      "platform": {
+        "title": "Kỹ sư nền tảng / Workflow",
         "headcount": "2 vị trí",
         "employment": "Toàn thời gian",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Thiết kế và triển khai API production: phiên bản, xác thực, rate limit, đo lường và mô hình lỗi nhất quán. Bạn phối hợp chặt về hành vi gateway và dữ liệu usage trên dashboard.",
+        "description": "Thiết kế và đưa runtime workflow: plugin node, vòng agent, billing bằng Credit, và execution nhất quán. Bạn làm việc xuyên schema canvas và Workers thực sự chạy graph.",
         "responsibilities": [
-          "Chịu trách nhiệm bề mặt REST/JSON (và mở rộng sau này) với quy tắc ngừng hỗ trợ và tương thích rõ ràng.",
-          "Triển khai luồng request bền bỉ, idempotency khi cần và quan sát (trace, metric, log có cấu trúc).",
-          "Phối hợp platform về rollout, feature flag và tiến hóa schema an toàn.",
-          "Rà soát tích hợp và tối ưu hiệu năng dưới tải thực tế của khách hàng."
+          "Chịu trách nhiệm plugin execute/trigger (agent, RAG, webhook, HTTP, memory) với quy tắc tương thích rõ.",
+          "Triển khai lần chạy bền, retry do ta chịu vs. mức dùng khách trả, và log có cấu trúc.",
+          "Phối hợp trừ Credit, ước lượng, và royalty khi workflow chia sẻ được chạy.",
+          "Rà soát graph dưới tải thật và giữ catalog node trung thực."
         ],
         "apply_label": "Ứng tuyển vị trí này",
-        "apply_subject": "Ứng tuyển — Kỹ sư Backend / API"
+        "apply_subject": "Ứng tuyển — Kỹ sư nền tảng / Workflow"
       },
       "devops": {
         "title": "Kỹ sư DevOps / Nền tảng",
         "headcount": "1 vị trí",
         "employment": "Toàn thời gian",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Giữ mặt API ổn định: CI/CD, môi trường, secret, dung lượng và công cụ xử lý sự cố. Bạn quan tâm SLO, không chỉ máy chủ.",
+        "description": "Giữ edge Workers ổn định: CI/CD, môi trường, secret, dung lượng và công cụ sự cố. Bạn quan tâm SLO, không chỉ máy chủ.",
         "responsibilities": [
-          "Xây và duy trì pipeline, infrastructure-as-code và quy trình triển khai an toàn.",
-          "Vận hành giám sát, cảnh báo và runbook on-call phù hợp mục tiêu độ trễ và sẵn sàng của API.",
-          "Củng cố mạng, TLS và mô hình truy cập giữa các dịch vụ và gateway công khai.",
-          "Cải thiện hiển thị chi phí và hiệu năng khi traffic tăng."
+          "Xây và duy trì pipeline, infrastructure-as-code và triển khai an toàn.",
+          "Vận hành giám sát, cảnh báo và runbook on-call phù hợp độ trễ và sẵn sàng của workflow.",
+          "Củng cố mạng, TLS và mô hình truy cập giữa dịch vụ và hook công khai.",
+          "Cải thiện hiển thị chi phí và hiệu năng khi mức dùng Credit tăng."
         ],
         "apply_label": "Ứng tuyển vị trí này",
         "apply_subject": "Ứng tuyển — Kỹ sư DevOps / Nền tảng"
       },
       "dx": {
-        "title": "Kỹ sư Trải nghiệm nhà phát triển (DX)",
+        "title": "Kỹ sư trải nghiệm nhà phát triển (DX)",
         "headcount": "1 vị trí",
         "employment": "Toàn thời gian",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Giúp tích hợp trở nên dễ dàng: tài liệu, ví dụ, luồng onboarding và truyền đạt kỹ thuật rõ ràng với đối tác. Bạn kết nối product, support và engineering.",
+        "description": "Giúp xây agent trở nên dễ: tài liệu, ví dụ, onboarding và trao đổi rõ với đối tác. Bạn nối product, support và engineering.",
         "responsibilities": [
-          "Chịu trách nhiệm tài liệu dev, quickstart và tham chiếu khớp với hành vi API thực tế.",
-          "Cung cấp mẫu code, Postman collection hoặc đoạn SDK để đội khách sao chép với độ tin cậy cao.",
-          "Thu thập phản hồi từ người tích hợp và chuyển thành cải tiến cụ thể.",
-          "Hỗ trợ hội thoại kỹ thuật với khách hàng đầu tiên và cộng đồng."
+          "Chịu trách nhiệm tài liệu, quickstart và tham chiếu khớp hành vi workflow thật.",
+          "Tạo mẫu webhook và chat host để đội khách sao chép với độ tin cậy cao.",
+          "Thu thập phản hồi từ người xây và chuyển thành cải tiến cụ thể.",
+          "Hỗ trợ hội thoại kỹ thuật với khách đầu tiên và kênh cộng đồng."
         ],
         "apply_label": "Ứng tuyển vị trí này",
         "apply_subject": "Ứng tuyển — Kỹ sư Developer Experience"
@@ -847,18 +923,18 @@
     },
     "cta": {
       "title": "Chưa thấy vị trí phù hợp?",
-      "title_gradient": "Vẫn cứ nhắn cho chúng tôi",
-      "subtitle": "Chúng tôi đọc từng tin. Hãy gửi chúng tôi, vài dòng về điều bạn muốn xây — chúng tôi sẽ liên hệ khi có cơ hội phù hợp.",
+      "title_gradient": "Vẫn cứ nhắn",
+      "subtitle": "Chúng tôi đọc từng tin. Gửi vài dòng về điều bạn muốn xây — chúng tôi liên hệ khi có cơ hội phù hợp.",
       "apply_general": "Email tuyển dụng",
-      "apply_general_subject": "Ứng tuyển chung — AIAgentsHub / aiagents-hub.vn",
+      "apply_general_subject": "Ứng tuyển chung — AI Agents Hub / aiagents-hub.vn",
       "browse_docs": "Đọc tài liệu"
     }
   },
   "ContactPage": {
     "badge": "Luôn sẵn sàng hỗ trợ",
     "title": "Trao đổi với",
-    "title_gradient": "đội AIAgentsHub",
-    "subtitle": "Thắc mắc về thanh toán, tích hợp hay hợp tác? Hãy liên hệ — chúng tôi chuyển mỗi tin nhắn đến đúng người tại aiagents-hub.vn.",
+    "title_gradient": "đội AI Agents Hub",
+    "subtitle": "Thắc mắc về Credit, workflow hay Enterprise? Hãy liên hệ — chúng tôi chuyển mỗi tin đến đúng người tại aiagents-hub.vn.",
     "response_hint": "Thường phản hồi trong một ngày làm việc.",
     "cards": {
       "copy": {
@@ -867,12 +943,12 @@
       },
       "support": {
         "title": "Tự phục vụ",
-        "description": "Trợ lý AI và FAQ về khóa API, giới hạn và gói dịch vụ.",
+        "description": "Câu trả lời về Credit, gói và workflow đầu tiên.",
         "action": "Mở Hỗ trợ"
       },
       "docs": {
         "title": "Tài liệu",
-        "description": "Quickstart, tham chiếu và ví dụ cho api.aiagents-hub.vn.",
+        "description": "Quickstart, webhook và cách Credit hoạt động.",
         "action": "Xem tài liệu"
       }
     },
@@ -887,14 +963,14 @@
       "email_placeholder": "ban@congty.com",
       "topic_label": "Chủ đề",
       "message_label": "Nội dung",
-      "message_placeholder": "Bạn cần hỗ trợ điều gì? Có thể kèm link hoặc thông tin tài khoản nếu cần.",
+      "message_placeholder": "Bạn cần hỗ trợ điều gì? Có thể kèm thông tin workspace nếu cần.",
       "submit": "Mở trong ứng dụng mail",
       "mailto_note": "Khi gửi, trình mail mặc định sẽ mở với bản nháp tới support@aiagents-hub.vn. Bạn có thể chỉnh sửa trước khi gửi."
     },
     "topics": {
       "general": "Chung",
-      "billing": "Thanh toán & gói",
-      "technical": "Kỹ thuật / API",
+      "billing": "Thanh toán & Credit",
+      "technical": "Workflow / agent",
       "partnership": "Hợp tác",
       "other": "Khác"
     },
@@ -908,198 +984,213 @@
     "validation_message": "Vui lòng nhập thêm chi tiết (ít nhất 8 ký tự)."
   },
   "SupportPage": {
-    "badge": "Hỗ trợ được hỗ trợ bởi AI",
+    "badge": "Hỗ trợ",
     "title": "Chúng tôi có thể",
-    "title_gradient": "Giúp gì?",
-    "subtitle": "Trò chuyện với trợ lý AI của chúng tôi hoặc duyệt tài nguyên để có câu trả lời tức thì.",
-    "ai_assistant": "Trợ lý Hỗ trợ AI",
+    "title_gradient": "giúp gì?",
+    "subtitle": "Hỏi về Credit, workflow hoặc gói — hoặc xem FAQ.",
+    "ai_assistant": "Trợ lý hỗ trợ",
     "online": "Trực tuyến",
     "type_message": "Nhập tin nhắn của bạn...",
     "quick_actions": {
-      "recommend_api": "Đề xuất API cho trường hợp sử dụng của tôi",
-      "calls_left": "Tôi còn bao nhiêu lượt gọi?",
-      "rate_limiting": "Giúp với giới hạn tốc độ",
-      "upgrade": "Nâng cấp gói đăng ký của tôi"
+      "build_agent": "Làm sao xây agent đầu tiên?",
+      "credits_left": "Credit hoạt động thế nào?",
+      "how_credits": "Một lần chạy tốn bao nhiêu?",
+      "recommend_api": "Làm sao xây agent đầu tiên?",
+      "calls_left": "Credit hoạt động thế nào?",
+      "rate_limiting": "Một lần chạy tốn bao nhiêu?",
+      "upgrade": "Nâng cấp gói"
     },
     "faq": {
       "title": "Câu hỏi thường gặp",
+      "first_workflow": {
+        "question": "Làm sao xây workflow đầu tiên?",
+        "answer": "Vào Dashboard > Workflows, tạo graph, thêm trigger và agent, rồi chạy từ chat hoặc Execute. Ước lượng Credit hiện trước khi node AI chạy."
+      },
+      "credits": {
+        "question": "Credit hoạt động thế nào?",
+        "answer": "Credit là đơn vị dịch vụ trả trước cho mức dùng AI/agent. Credit tặng hết hạn cuối kỳ. Pro mua thêm được; Free thường không tích trữ."
+      },
       "generate_key": {
-        "question": "Làm thế nào để tạo khóa API mới?",
-        "answer": "Đi tới Bảng điều khiển > Khóa API > Nhấp \"Khóa mới\". Bạn có thể đặt tên cho khóa và thiết lập quyền."
+        "question": "Làm sao xây workflow đầu tiên?",
+        "answer": "Vào Dashboard > Workflows, tạo graph, thêm trigger và agent, rồi chạy."
       },
       "rate_limit": {
-        "question": "Điều gì xảy ra nếu tôi vượt quá giới hạn tốc độ?",
-        "answer": "Các yêu cầu vượt quá giới hạn tốc độ sẽ nhận được phản hồi 429. Hãy cân nhắc nâng cấp gói của bạn để có giới hạn cao hơn."
+        "question": "Credit hoạt động thế nào?",
+        "answer": "Credit đo mức dùng AI. Quota hạ tầng đi theo gói, không bán thành dòng hóa đơn."
       },
       "change_plan": {
-        "question": "Làm thế nào để thay đổi gói đăng ký của tôi?",
-        "answer": "Điều hướng đến Bảng điều khiển > Thanh toán > Thay đổi Gói. Thay đổi có hiệu lực vào chu kỳ thanh toán tiếp theo của bạn."
+        "question": "Làm sao đổi gói?",
+        "answer": "Vào Dashboard > Thanh toán. Đổi gói theo chu kỳ tiếp theo, trừ khi lên Enterprise theo hợp đồng."
       },
       "free_trial": {
-        "question": "Có bản dùng thử miễn phí không?",
-        "answer": "Có! Tất cả API của chúng tôi bao gồm gói miễn phí với số lượt gọi hạn chế mỗi tháng. Không cần thẻ tín dụng."
+        "question": "Có gói miễn phí không?",
+        "answer": "Có. Free gồm Credit tặng hết hạn mỗi kỳ. Không cần thẻ để bắt đầu."
       }
     },
     "need_help": {
       "title": "Cần thêm trợ giúp?",
-      "description": "Liên hệ với nhóm hỗ trợ của chúng tôi",
-      "email_support": "Hỗ trợ Email",
+      "description": "Liên hệ nhóm hỗ trợ",
+      "email_support": "Hỗ trợ email",
       "response_time": "Thời gian phản hồi",
       "response_time_value": "Thường trong vòng 24 giờ"
     },
     "resources": {
       "title": "Tài nguyên",
-      "api_docs": "Tài liệu API",
-      "getting_started": "Hướng dẫn Bắt đầu",
+      "api_docs": "Tài liệu",
+      "getting_started": "Bắt đầu",
+      "credits_guide": "Gói & Credit",
       "video_tutorials": "Video hướng dẫn",
-      "developer_blog": "Blog Nhà phát triển"
+      "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Xin chào! Tôi là trợ lý hỗ trợ AI của bạn. Tôi có thể giúp bạn với đề xuất API, xử lý sự cố và trả lời câu hỏi về việc sử dụng của bạn. Tôi có thể hỗ trợ bạn như thế nào hôm nay?",
-      "recommend": "Dựa trên câu hỏi của bạn, tôi khuyên dùng **API Thị giác AI** cho xử lý hình ảnh, hoặc **API cho các CLAW** (OpenClaw, NanoClaw, NemoClaw, BizClaw, …) cho agent và tích hợp tự động. Bạn đang làm việc với trường hợp sử dụng cụ thể nào?",
-      "calls": "Bạn hiện có **15.000 lượt gọi API** còn lại trong tháng này trên tất cả các gói đăng ký của bạn. Hạn mức của bạn được đặt lại vào ngày 1 mỗi tháng.",
-      "rate_limit": "Giới hạn tốc độ bảo vệ cơ sở hạ tầng của chúng tôi. Giới hạn hiện tại của bạn là:\n- **Gói miễn phí**: 10 yêu cầu/giây\n- **Gói Pro**: 100 yêu cầu/giây\n\nHãy cân nhắc triển khai exponential backoff trong code của bạn.",
-      "default": "Tôi hiểu bạn đang hỏi về {query}. Để tôi kết nối bạn với thông tin cụ thể hơn. Bạn có thể cung cấp thêm chi tiết về những gì bạn đang cố gắng thực hiện không?"
+      "welcome": "Xin chào — tôi giúp về workflow, Credit và gói. Bạn đang muốn đưa gì vào việc?",
+      "recommend": "Bắt đầu ở Dashboard > Workflows: thêm trigger (chat, webhook hoặc cron), node agent, và RAG/tool nếu cần. Chạy một lần và xem ước lượng Credit. Bạn đang làm việc cụ thể nào (hỗ trợ, RAG Q&A, tự động HTTP)?",
+      "credits": "Credit là đồng hồ duy nhất cho mức dùng AI/agent. Credit tặng theo gói và hết hạn mỗi kỳ. Pro mua thêm được (có trần ví). Giao diện thành viên không hiện USD/1 triệu token.",
+      "how_credits": "Mỗi lần chạy trừ Credit theo lớp model (tiny / mid / frontier) và token đã dùng. Có ước lượng trước; ví trừ sau. Chạy workflow người khác có thể thêm royalty bằng Credit.",
+      "calls": "Credit đo mức dùng AI. Xem Dashboard > Thanh toán để biết số dư và Credit tặng.",
+      "rate_limit": "Gói có quota hạ tầng (chống lạm dụng). Mức dùng AI là Credit, không phải SKU request/giây. Nếu lần chạy bị chặn, kiểm tra quota và số dư Credit.",
+      "default": "Tôi hiểu bạn đang hỏi về {query}. Cho biết đây là xây workflow, Credit hay gói để tôi chỉ đúng chỗ."
     }
   },
   "TermsPage": {
     "badge": "Pháp lý",
     "title": "Điều khoản",
     "title_gradient": "dịch vụ",
-    "subtitle": "Các Điều khoản này điều chỉnh việc bạn sử dụng aiagents-hub.vn và nền tảng API được quản lý của chúng tôi—bao gồm khả năng hỗ trợ bởi AI và liên quan blockchain—phù hợp với thông lệ quốc tế phổ biến đối với dịch vụ đám mây và API.",
-    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "subtitle": "Các Điều khoản này điều chỉnh việc bạn sử dụng AI Agents Hub (aiagents-hub.vn): workflow builder, agent, Credit và API liên quan.",
+    "last_updated": "Cập nhật lần cuối: 16 tháng 9, 2026",
     "toc_title": "Mục lục",
     "toc_aria": "Các mục điều khoản dịch vụ",
     "related_title": "Liên quan",
     "related_contact": "Liên hệ & thông báo pháp lý",
     "cta_title": "Thắc mắc về Điều khoản?",
-    "cta_body": "Đội ngũ của chúng tôi có thể làm rõ thanh toán, tích hợp, tuân thủ hoặc hợp đồng doanh nghiệp.",
+    "cta_body": "Đội ngũ có thể làm rõ Credit, gói, hợp đồng Enterprise hoặc sử dụng hợp lệ.",
     "cta_button": "Liên hệ",
     "sections": {
       "agreement": {
         "title": "Chấp nhận Điều khoản",
         "paragraphs": [
           "Điều khoản dịch vụ này (\"Điều khoản\") là thỏa thuận ràng buộc giữa bạn (\"bạn\" hoặc \"Khách hàng\") và bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (gọi chung là \"Nền tảng\", \"chúng tôi\").",
-          "Bằng việc truy cập hoặc sử dụng Nền tảng, tạo tài khoản, đăng ký sản phẩm API, tạo khóa API, kết nối ví hoặc sử dụng dịch vụ theo bất kỳ cách nào khác, bạn đồng ý với Điều khoản này và Chính sách quyền riêng tư (nếu có). Nếu không đồng ý, vui lòng không sử dụng Nền tảng.",
+          "Bằng việc truy cập hoặc sử dụng Nền tảng, tạo tài khoản, đăng ký gói, mua Credit, tạo khóa API hoặc sử dụng dịch vụ theo cách khác, bạn đồng ý với Điều khoản này và Chính sách quyền riêng tư. Nếu không đồng ý, vui lòng không sử dụng Nền tảng.",
           "Nếu bạn sử dụng Nền tảng thay mặt một tổ chức, bạn xác nhận có thẩm quyền ràng buộc tổ chức đó; khi đó \"bạn\" bao gồm cả tổ chức đó."
         ]
       },
       "definitions": {
         "title": "Định nghĩa",
         "paragraphs": [
-          "\"API\" gồm các giao diện lập trình ứng dụng, endpoint, SDK, webhook và công cụ dành cho nhà phát triển mà chúng tôi cung cấp tại hoặc thông qua api.aiagents-hub.vn (hoặc URL kế thừa).",
-          "\"Tính năng AI\" là các khả năng học máy hoặc tạo sinh mà chúng tôi cung cấp (ví dụ trợ lý, phân loại, làm giàu dữ liệu hoặc tự động hóa), dù có gắn nhãn AI hay không.",
-          "\"Tính năng blockchain\" là chức năng tương tác với sổ cái phân tán công khai hoặc được cấp phép, hợp đồng thông minh, xác thực qua ví hoặc chứng thực on-chain.",
-          "\"Nội dung\" là dữ liệu, prompt, tệp, payload, siêu dữ liệu hoặc tài liệu khác mà bạn hoặc người dùng cuối gửi tới hoặc nhận từ Nền tảng."
+          "\"Workflow\" là graph các node bạn thiết kế trên builder (agent, tool, RAG, HTTP, trigger và bước liên quan).",
+          "\"Credit\" là đơn vị dịch vụ trả trước dùng để đo mức dùng AI và agent. Credit không phải e-money, tiền mã hóa hay số dư tiền mặt; Credit đã mua hết hạn theo tài liệu sản phẩm, và Credit tặng hết hạn cuối mỗi kỳ subscription.",
+          "\"Tính năng AI\" là khả năng học máy hoặc tạo sinh chúng tôi cung cấp qua agent, model, trợ lý hoặc công cụ tương tự.",
+          "\"Nội dung\" gồm dữ liệu, prompt, tệp, payload, metadata hoặc tài liệu khác mà bạn hoặc người dùng cuối gửi tới hoặc lấy từ Nền tảng."
         ]
       },
       "services": {
-        "title": "Phạm vi dịch vụ",
+        "title": "Dịch vụ",
         "paragraphs": [
-          "Chúng tôi cung cấp mô hình API được quản lý: gateway, đo lường, tài liệu, hook quan sát và công cụ tài khoản nhằm giúp nhà phát triển và doanh nghiệp tích hợp ổn định ở quy mô lớn. Khả năng cụ thể, vùng, mục tiêu thời gian hoạt động và mức hỗ trợ phụ thuộc gói dịch vụ và tài liệu sản phẩm của bạn.",
-          "Chúng tôi có thể sửa đổi, ngừng hỗ trợ hoặc thay thế tính năng khi cần thiết một cách hợp lý vì bảo mật, tuân thủ hoặc vận hành, theo cách thông báo thay đổi mô tả bên dưới và trong thông báo sản phẩm."
+          "Chúng tôi cung cấp nền tảng agent AI: workflow builder, runtime cho agent và tool, đo Credit, tài liệu, quan sát và công cụ tài khoản. Chúng tôi bán quyền dùng nền tảng (Subscription), mức tiêu thụ đo được (Credit) và đảm bảo Enterprise tùy chọn (SLA, dung lượng riêng, điều khoản tùy chỉnh). Chúng tôi không bán token model bên thứ ba hay dòng hạ tầng như sản phẩm độc lập.",
+          "Khả năng cụ thể, quota, khu vực, mục tiêu uptime và mức hỗ trợ phụ thuộc gói và tài liệu sản phẩm. Chúng tôi có thể sửa, ngừng hoặc thay tính năng khi cần cho bảo mật, tuân thủ hoặc vận hành, theo thực hành thông báo dưới đây."
         ]
       },
       "api_usage": {
-        "title": "Truy cập API, khóa và sử dụng công bằng",
+        "title": "Truy cập, khóa và sử dụng hợp lý",
         "paragraphs": [
-          "Bạn phải dùng thông tin đăng nhập (khóa API, token OAuth hoặc cơ chế chúng tôi quy định) một cách có trách nhiệm và bảo mật. Bạn chịu trách nhiệm về mọi hoạt động dưới tài khoản trừ khi bạn đã thông báo sự cố theo hướng dẫn bảo mật của chúng tôi.",
-          "Chúng tôi áp dụng giới hạn tốc độ, hạn ngạch, kiểm soát đồng thời và biện pháp chống lạm dụng. Phản hồi như HTTP 429 hoặc tương đương có nghĩa bạn nên giảm tần suất, tối ưu sử dụng hoặc nâng cấp gói. Trừ khi được nêu rõ trong thỏa thuận riêng bằng văn bản, chúng tôi không đảm bảo thông lượng không giới hạn hay một phân vị độ trễ cụ thể.",
-          "Bạn phải tuân theo tài liệu, phiên bản và yêu cầu xác thực. Chúng tôi có thể yêu cầu chuyển sang phiên bản API mới; việc tiếp tục sử dụng sau ngày ngừng hỗ trợ đã thông báo có thể không được hỗ trợ hoặc bị vô hiệu hóa."
+          "Bạn phải dùng thông tin xác thực (API key, cookie phiên hoặc cơ chế chúng tôi chỉ định) có trách nhiệm và giữ bí mật. Bạn chịu trách nhiệm mọi hoạt động trên tài khoản trừ khi đã báo cho chúng tôi về sự xâm nhập.",
+          "Chúng tôi áp dụng quota, kiểm soát đồng thời và bảo vệ chống lạm dụng. Quota hạ tầng thuộc gói; mức dùng AI trừ Credit. Trừ khi thỏa thuận viết nêu rõ, chúng tôi không đảm bảo thông lượng không giới hạn hay một percentile độ trễ cụ thể.",
+          "Bạn phải theo tài liệu về đường webhook, xác thực và phiên bản. Chúng tôi có thể yêu cầu chuyển sang giao diện mới; tiếp tục dùng sau ngày ngừng hỗ trợ có thể không được hỗ trợ hoặc bị tắt."
         ]
       },
       "ai_features": {
         "title": "Tính năng AI và đầu ra",
         "paragraphs": [
-          "Tính năng AI có thể cho kết quả xác suất hoặc không đầy đủ. Đầu ra có thể sai, lỗi thời hoặc không phù hợp với ngữ cảnh chịu quy định đặc biệt. Bạn hoàn toàn chịu trách nhiệm đánh giá đầu ra trước khi dựa vào trong môi trường sản xuất, an toàn, tài chính, y tế, pháp lý hoặc bối cảnh rủi ro cao khác.",
-          "Bạn không được dùng Tính năng AI để tạo nội dung trái pháp luật, xâm phạm quyền sở hữu trí tuệ hoặc quyền riêng tư, lừa dối người dùng cuối theo cách trọng yếu, hoặc vượt qua biện pháp an toàn hợp lý mà chúng tôi triển khai. Hạn chế mô tả cho từng mô hình hoặc công cụ là một phần của Điều khoản này.",
-          "Trừ khi chúng tôi đồng ý khác bằng văn bản, chúng tôi không dùng Nội dung của bạn để huấn luyện mô hình nền theo cách nhận diện bạn hoặc người dùng cuối; tuy nhiên chúng tôi có thể xử lý Nội dung để cung cấp dịch vụ, bảo vệ Nền tảng, tuân thủ pháp luật và cải thiện độ tin cậy (ví dụ nhật ký, gỡ lỗi, chỉ số chất lượng tổng hợp)."
+          "Tính năng AI có thể cho kết quả xác suất hoặc không đầy đủ. Đầu ra có thể sai, cũ hoặc không phù hợp cho trường hợp chịu quy định. Bạn tự chịu trách nhiệm đánh giá đầu ra trước khi dựa vào chúng trong production, an toàn sống còn, tài chính, y tế, pháp lý hoặc ngữ cảnh rủi ro cao khác.",
+          "Bạn không được dùng Tính năng AI để tạo nội dung bất hợp pháp, xâm phạm sở hữu trí tuệ hoặc quyền riêng tư, lừa người dùng cuối một cách trọng yếu, hoặc vượt biện pháp bảo vệ hợp lý chúng tôi triển khai.",
+          "Trừ khi chúng tôi đồng ý rõ bằng văn bản, chúng tôi không dùng Nội dung của bạn để huấn luyện mô hình nền tảng theo cách nhận dạng bạn hoặc người dùng cuối; tuy nhiên chúng tôi có thể xử lý Nội dung để cung cấp dịch vụ, bảo mật Nền tảng, tuân thủ pháp luật và cải thiện độ tin cậy (ví dụ log, gỡ lỗi và metric chất lượng tổng hợp)."
         ]
       },
-      "blockchain": {
-        "title": "Blockchain, ví và hoạt động on-chain",
+      "identity": {
+        "title": "Định danh tùy chọn và ví",
         "paragraphs": [
-          "Tính năng blockchain phụ thuộc mạng bên thứ ba mà chúng tôi không kiểm soát. Tính cuối cùng của giao dịch, phí (kể cả gas), tổ chức lại chuỗi, hành vi hợp đồng thông minh và biến động token nằm ngoài trách nhiệm của chúng tôi. Bạn thừa nhận rủi ro cố hữu khi tương tác với hệ thống blockchain.",
-          "Kết nối ví và chữ ký là trách nhiệm của bạn. Bạn phải bảo vệ cụm từ khôi phục, khóa riêng và thiết bị. Chúng tôi không giữ hộ tài sản số của bạn trừ khi thỏa thuận riêng bằng văn bản quy định rõ.",
-          "Khi Tính năng blockchain đọc hoặc ghi dữ liệu on-chain, bạn cam đoan việc sử dụng tuân thủ lệnh trừng phạt, chứng khoán, bảo vệ người tiêu dùng và chống rửa tiền áp dụng cho bạn. Chúng tôi có thể chặn, lọc hoặc từ chối tương tác khi pháp luật yêu cầu hoặc để bảo vệ Nền tảng."
+          "Một số tính năng tài khoản có thể cho phép liên kết định danh phi tập trung hoặc ví để xác thực. Các luồng đó là tùy chọn. Chúng tôi không lưu ký tài sản số và không bán sản phẩm blockchain.",
+          "Bạn phải bảo vệ thiết bị, thông tin xác thực và mọi khóa bạn chọn dùng. Dữ liệu mạng công khai (nếu bạn kết nối ví) hiển thị trên mạng chúng tôi không kiểm soát.",
+          "Chúng tôi có thể tắt liên kết định danh khi pháp luật yêu cầu hoặc để bảo vệ Nền tảng."
         ]
       },
       "acceptable_use": {
-        "title": "Sử dụng chấp nhận được",
+        "title": "Sử dụng hợp lệ",
         "paragraphs": [
-          "Bạn đồng ý không lạm dụng Nền tảng. Không giới hạn ở đây, bạn không được dò quét hoặc tấn công hệ thống; vượt qua giới hạn kỹ thuật; phát tán phần mềm độc hại; gửi thư rác; thu thập dữ liệu trái pháp; hoặc dùng API theo cách gây nguy hiểm cho trẻ vị thành niên, cổ xúy bạo lực hoặc vi phạm kiểm soát xuất khẩu hoặc lệnh trừng phạt.",
-          "Bạn không được bán lại hoặc cấp phép lại quyền truy cập API theo cách che giấu nguồn, trốn đo lường hoặc vi phạm gói của bạn. Nếu bạn cung cấp sản phẩm cho khách hàng dựa trên API của chúng tôi, bạn vẫn chịu trách nhiệm về sản phẩm và phải chuyển tải điều khoản và thông tin phù hợp cho người dùng của bạn.",
-          "Chúng tôi có thể điều tra hành vi nghi ngờ vi phạm và tạm ngưng hoặc chấm dứt quyền truy cập khi cần thiết một cách hợp lý để bảo vệ người dùng, Nền tảng hoặc tuân thủ nghĩa vụ pháp lý."
+          "Bạn đồng ý không lạm dụng Nền tảng. Không giới hạn, bạn không được dò, quét hoặc tấn công hệ thống; vượt hạn mức kỹ thuật hoặc đo Credit; phát tán malware; gửi spam; thu thập dữ liệu trái pháp luật; hoặc dùng agent theo cách gây hại trẻ vị thành niên, kích động bạo lực, hoặc vi phạm kiểm soát xuất khẩu hay lệnh trừng phạt.",
+          "Bạn không được bán lại hoặc cấp quyền truy cập theo cách làm sai nguồn gốc, né đo lường, hoặc vi phạm gói. Nếu bạn cung cấp sản phẩm cho khách của mình nhờ Nền tảng, bạn vẫn chịu trách nhiệm về sản phẩm đó và phải chuyển điều khoản phù hợp cho người dùng.",
+          "Chúng tôi có thể điều tra vi phạm bị nghi và tạm ngưng hoặc chấm dứt truy cập khi cần để bảo vệ người dùng, Nền tảng hoặc tuân thủ nghĩa vụ pháp lý."
         ]
       },
       "accounts": {
         "title": "Tài khoản và bảo mật",
         "paragraphs": [
-          "Bạn phải cung cấp thông tin đăng ký chính xác và cập nhật. Xác thực đa yếu tố và khóa API theo nguyên tắc quyền tối thiểu được khuyến nghị mạnh.",
-          "Bạn phải thông báo kịp thời khi có truy cập trái phép hoặc nghi ngờ lộ khóa. Chúng tôi có thể thực hiện biện pháp bảo vệ như xoay khóa, giới hạn lưu lượng hoặc yêu cầu xác minh bổ sung."
+          "Bạn phải cung cấp thông tin đăng ký chính xác và giữ cập nhật. Xác thực đa yếu tố và API key theo nguyên tắc tối thiểu được khuyến khích mạnh.",
+          "Bạn phải thông báo kịp thời khi truy cập trái phép hoặc nghi rò khóa. Chúng tôi có thể xoay credential, hạn chế lưu lượng hoặc yêu cầu xác minh thêm."
         ]
       },
       "fees": {
-        "title": "Phí, thuế và thanh toán",
+        "title": "Phí, Credit và thanh toán",
         "paragraphs": [
-          "Gói trả phí, phí theo mức dùng và thuế (nếu có) được mô tả khi thanh toán, trên bảng điều khiển hoặc trong đơn hàng. Trừ khi nêu khác, phí không hoàn trừ khi pháp luật bắt buộc.",
-          "Không thanh toán có thể dẫn đến tạm ngưng hoặc chấm dứt quyền truy cập. Bạn chịu trách nhiệm cung cấp phương thức thanh toán hợp lệ và mọi phí ngân hàng hoặc phí mạng blockchain do bên thứ ba tính."
+          "Subscription trả phí, mua Credit và thuế (nếu có) được mô tả lúc thanh toán, trên dashboard hoặc trên đơn hàng. Credit là đơn vị dịch vụ trả trước: không hoàn thành tiền mặt trừ khi luật bắt buộc, không chuyển nhượng trừ khi chúng tôi cho phép rõ (ví dụ earnings royalty trên sổ riêng), và Credit đã mua hết hạn theo quy tắc sản phẩm (thường mười hai tháng kể từ khi credited).",
+          "Credit tặng theo Subscription hết hạn cuối kỳ và không chuyển kỳ. Chúng tôi có thể áp trần số dư Credit. Hệ số model (một lần chạy tốn bao nhiêu Credit) có thể đổi kèm thông báo theo tài liệu sản phẩm; chúng tôi không chuyển hóa đơn nhà cung cấp thành dòng riêng.",
+          "Không thanh toán có thể dẫn tới tạm ngưng hoặc chấm dứt truy cập. Bạn chịu trách nhiệm cung cấp thông tin thanh toán hợp lệ và mọi phí cổng (ví dụ VNPay, Casso hoặc PayPal)."
         ]
       },
       "ip": {
         "title": "Sở hữu trí tuệ",
         "paragraphs": [
-          "Chúng tôi giữ mọi quyền đối với Nền tảng, tài liệu, nhãn hiệu và phần mềm/mô hình độc quyền, trừ quyền được cấp rõ ràng cho bạn.",
-          "Chúng tôi cấp cho bạn giấy phép hạn chế, không độc quyền, không chuyển nhượng trong thời gian đăng ký để gọi API và dùng tài liệu chỉ trong phạm vi cần thiết theo Điều khoản này. Bạn không được dịch ngược dịch vụ trừ khi pháp luật bắt buộc cho phép tương thích.",
-          "Bạn cấp cho chúng tôi giấy phép toàn cầu để lưu trữ, xử lý, truyền và hiển thị Nội dung của bạn trong phạm vi hợp lý để cung cấp và bảo vệ dịch vụ. Bạn cam đoan có đủ quyền để cấp giấy phép này."
+          "Chúng tôi giữ mọi quyền đối với Nền tảng, tài liệu, nhãn hiệu và phần mềm độc quyền, trừ quyền được cấp rõ cho bạn.",
+          "Chúng tôi cấp cho bạn giấy phép hạn chế, không độc quyền, không chuyển nhượng trong thời gian subscription để dùng builder, chạy workflow và gọi API đã tài liệu, chỉ trong phạm vi cần để thực hiện quyền theo Điều khoản này. Bạn không được dịch ngược dịch vụ trừ khi luật bắt buộc cho phép tương thích.",
+          "Bạn cấp cho chúng tôi giấy phép toàn cầu để lưu trữ, xử lý, truyền và hiển thị Nội dung khi cần hợp lý để cung cấp và bảo mật dịch vụ. Bạn xác nhận có quyền cần thiết để cấp giấy phép này. Workflow bạn chia sẻ có thể được người khác chạy theo quy tắc royalty; bạn vẫn chịu trách nhiệm về Nội dung mình xuất bản."
         ]
       },
       "data": {
         "title": "Bảo vệ dữ liệu và quyền riêng tư",
         "paragraphs": [
-          "Việc xử lý dữ liệu cá nhân được mô tả trong Chính sách quyền riêng tư và, khi có, điều khoản xử lý dữ liệu dành cho khách hàng doanh nghiệp. Bạn không gửi các loại dữ liệu nhạy cảm đặc biệt tới API trừ khi pháp luật và hợp đồng cho phép.",
-          "Chúng tôi có thể tạo nhật ký dịch vụ và chỉ số (gồm siêu dữ liệu yêu cầu và dấu vết lỗi) để vận hành, bảo mật và cải thiện Nền tảng. Thời gian lưu giữ theo chính sách và yêu cầu pháp luật."
+          "Việc xử lý dữ liệu cá nhân được mô tả trong Chính sách quyền riêng tư và, khi liên quan, điều khoản xử lý dữ liệu dành cho khách Enterprise. Bạn không gửi dữ liệu thuộc nhóm đặc biệt trừ khi pháp luật và hợp đồng cho phép.",
+          "Chúng tôi có thể tạo log và metric dịch vụ (gồm metadata execution, lần trừ Credit và vết lỗi) để vận hành, bảo mật và cải thiện Nền tảng. Thời gian lưu theo chính sách và yêu cầu pháp lý."
         ]
       },
       "warranties": {
-        "title": "Tuyên bố từ chối",
+        "title": "Tuyên bố miễn trừ",
         "paragraphs": [
-          "TRỪ KHI PHÁP LUẬT CẤM, NỀN TẢNG VÀ API ĐƯỢC CUNG CẤP \"NGUYÊN TRẠNG\" VÀ \"SẴN CÓ\" KHÔNG KÈM BẤT KỲ BẢO ĐẢM NÀO, DÙ RÕ RÀNG, NGẦM ĐỊNH HAY THEO LUẬT ĐỊNH, GỒM KHẢ NĂNG THƯƠNG MẠI, PHÙ HỢP MỤC ĐÍCH CỤ THỂ, QUYỀN SỞ HỮU VÀ KHÔNG XÂM PHẠM.",
-          "CHÚNG TÔI KHÔNG BẢO ĐẢM DỊCH VỤ KHÔNG GIÁN ĐOẠN, KHÔNG LỖI HOẶC KHÔNG CÓ THÀNH PHẦN GÂY HẠI. HỆ THỐNG AI VÀ BLOCKCHAIN CÓ BẤT ĐỊNH CỐ HỮU; BẠN CHỊU MỌI RỦI RO LIÊN QUAN."
+          "TRỪ KHI PHÁP LUẬT CẤM, NỀN TẢNG ĐƯỢC CUNG CẤP \"NGUYÊN TRẠNG\" VÀ \"KHI CÓ SẴN\" KHÔNG BẢO ĐẢM DẠNG NÀO, DÙ RÕ, NGẦM HAY THEO LUẬT, GỒM KHẢ NĂNG BÁN ĐƯỢC, PHÙ HỢP MỤC ĐÍCH CỤ THỂ, QUYỀN SỞ HỮU VÀ KHÔNG XÂM PHẠM.",
+          "CHÚNG TÔI KHÔNG BẢO ĐẢM DỊCH VỤ SẼ KHÔNG GIÁN ĐOẠN, KHÔNG LỖI HAY KHÔNG CÓ THÀNH PHẦN GÂY HẠI. HỆ THỐNG AI MANG TÍNH BẤT ĐỊNH VỐN CÓ; BẠN TỰ CHỊU RỦI RO KHI DÙNG VÀ KHI DỰA VÀO ĐẦU RA CỦA AGENT."
         ]
       },
       "liability": {
         "title": "Giới hạn trách nhiệm",
         "paragraphs": [
-          "TRONG PHẠM VI PHÁP LUẬT CHO PHÉP, KHÔNG BÊN NÀO CHỊU TRÁCH NHIỆM VỀ THIỆT HẠI GIÁN TIẾP, NGẪU NHIÊN, ĐẶC BIỆT, HẬU QUẢ HOẶC TRỪNG PHẠT, HOẶC MẤT LỢI NHUẬN, DỮ LIỆU, UY TÍN HOẶC CƠ HỘI KINH DOANH, KỂ CẢ KHI ĐÃ ĐƯỢC CẢNH BÁO.",
-          "TỔNG TRÁCH NHIỆM CỦA CHÚNG TÔI PHÁT SINH TỪ HOẶC LIÊN QUAN ĐẾN ĐIỀU KHOẢN HOẶC DỊCH VỤ KHÔNG VƯỢT QUÁ (A) SỐ TIỀN BẠN ĐÃ TRẢ CHO CHÚNG TÔI TRONG MƯỜI HAI (12) THÁNG TRƯỚC SỰ KIỆN GÂY RA TRÁCH NHIỆM, HOẶC (B) MỘT TRĂM ĐÔ LA MỸ (100 USD) NẾU BẠN CHƯA CÓ NGHĨA VỤ THANH TOÁN. NHIỀU KHIẾU NẠI KHÔNG LÀM TĂNG MỨC TRẦN NÀY. MỘT SỐ PHÁP LỆNH KHÔNG CHO PHÉP GIỚI HẠN NHẤT ĐỊNH; TRONG TRƯỜNG HỢP ĐÓ TRÁCH NHIỆM CỦA CHÚNG TÔI ĐƯỢC GIỚI HẠN Ở MỨC TỐI ĐA PHÁP LUẬT CHO PHÉP."
+          "TRONG PHẠM VI PHÁP LUẬT CHO PHÉP TỐI ĐA, KHÔNG BÊN NÀO CHỊU TRÁCH NHIỆM VỀ THIỆT HẠI GIÁN TIẾP, NGẪU NHIÊN, ĐẶC BIỆT, HỆ QUẢ HAY TRỪNG PHẠT, HOẶC MẤT LỢI NHUẬN, DỮ LIỆU, UY TÍN HAY CƠ HỘI KINH DOANH, DÙ ĐÃ ĐƯỢC CẢNH BÁO VỀ KHẢ NĂNG XẢY RA.",
+          "TỔNG TRÁCH NHIỆM CỦA CHÚNG TÔI PHÁT SINH TỪ HOẶC LIÊN QUAN ĐẾN ĐIỀU KHOẢN NÀY HOẶC DỊCH VỤ SẼ KHÔNG VƯỢT QUÁ MỨC LỚN HƠN GIỮA (A) SỐ TIỀN BẠN ĐÃ TRẢ CHO CHÚNG TÔI VỀ DỊCH VỤ TRONG MƯỜI HAI (12) THÁNG TRƯỚC SỰ KIỆN LÀM PHÁT SINH TRÁCH NHIỆM, HOẶC (B) MỘT TRĂM ĐÔ LA MỸ (USD $100) NẾU BẠN CHƯA CÓ NGHĨA VỤ THANH TOÁN. NHIỀU KHIẾU NẠI KHÔNG LÀM TĂNG TRẦN NÀY. MỘT SỐ PHẠM VI PHÁP LÝ KHÔNG CHO PHÉP MỘT SỐ GIỚI HẠN; TRONG TRƯỜNG HỢP ĐÓ TRÁCH NHIỆM CỦA CHÚNG TÔI BỊ GIỚI HẠN Ở MỨC TỐI ĐA ĐƯỢC PHÉP."
         ]
       },
       "indemnity": {
-        "title": "Bồi thường",
+        "title": "Bồi hoàn",
         "paragraphs": [
-          "Bạn sẽ bảo vệ và bồi thường cho chúng tôi và các công ty liên kết, cán bộ và nhân viên trước khiếu nại, thiệt hại và chi phí của bên thứ ba (gồm phí luật sư hợp lý) phát sinh từ Nội dung của bạn, sản phẩm của bạn, lạm dụng API hoặc vi phạm Điều khoản hoặc pháp luật áp dụng, trừ phần do hành vi cố ý nghiêm trọng của chúng tôi gây ra."
+          "Bạn sẽ bảo vệ và bồi hoàn chúng tôi cùng công ty liên kết, cán bộ và nhân viên trước khiếu nại, thiệt hại và chi phí của bên thứ ba (gồm phí luật sư hợp lý) phát sinh từ Nội dung của bạn, sản phẩm của bạn, việc lạm dụng Nền tảng, hoặc vi phạm Điều khoản này hay pháp luật áp dụng, trừ phần do cố ý sai trái của chúng tôi."
         ]
       },
       "changes": {
         "title": "Thay đổi Điều khoản",
         "paragraphs": [
-          "Chúng tôi có thể cập nhật Điều khoản để phản ánh tính năng mới, yêu cầu pháp lý hoặc quản lý rủi ro. Chúng tôi sẽ đăng bản sửa đổi trên trang này và cập nhật ngày \"Cập nhật lần cuối\". Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ email hoặc biểu ngữ trên bảng điều khiển).",
-          "Tiếp tục sử dụng sau ngày hiệu lực của Điều khoản đã sửa đổi đồng nghĩa chấp nhận. Nếu không đồng ý, bạn phải ngừng sử dụng Nền tảng và hủy gói trả phí theo quy tắc thanh toán."
+          "Chúng tôi có thể cập nhật Điều khoản để phản ánh tính năng mới, yêu cầu pháp lý hoặc quản trị rủi ro. Chúng tôi đăng bản sửa trên trang này và cập nhật ngày \"Cập nhật lần cuối\". Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ email hoặc banner dashboard).",
+          "Tiếp tục sử dụng sau ngày hiệu lực của Điều khoản cập nhật đồng nghĩa chấp nhận. Nếu không đồng ý, bạn phải ngừng dùng Nền tảng và hủy subscription trả phí theo quy tắc thanh toán."
         ]
       },
       "law": {
         "title": "Luật áp dụng và tranh chấp",
         "paragraphs": [
-          "Trừ khi quy định bắt buộc về bảo vệ người tiêu dùng tại quốc gia của bạn yêu cầu khác, Điều khoản này chịu sự điều chỉnh của pháp luật áp dụng cho bên vận hành aiagents-hub.vn, không tính các nguyên tắc xung đột pháp luật dẫn tới áp dụng pháp luật nước khác.",
-          "Bạn đồng ý liên hệ chúng tôi trước để giải quyết tranh chấp không chính thức. Nếu không đạt, thẩm quyền và địa điểm độc quyền cho tố tụng thuộc tòa án có thẩm quyền tại nơi đăng ký hoạt động của bên vận hành, trừ khi pháp luật bắt buộc quy định diễn đàn khác đối với người tiêu dùng.",
-          "Công ước Liên Hợp Quốc về Hợp đồng Mua bán Hàng hóa Quốc tế không áp dụng."
+          "Trừ khi quy tắc bảo vệ người tiêu dùng bắt buộc tại nơi bạn ở yêu cầu khác, Điều khoản này chịu luật áp dụng đối với bên vận hành aiagents-hub.vn, không xét nguyên tắc xung đột pháp luật dẫn tới áp dụng luật nơi khác.",
+          "Bạn đồng ý liên hệ chúng tôi trước để tìm cách giải quyết không chính thức. Nếu không giải quyết được, thẩm quyền và nơi xét xử độc quyền thuộc tòa có thẩm quyền tại trụ sở đăng ký của bên vận hành, trừ khi luật áp dụng yêu cầu diễn đàn khác cho người tiêu dùng.",
+          "Công ước Liên Hợp Quốc về Hợp đồng mua bán hàng hóa quốc tế không áp dụng."
         ]
       },
       "contact": {
         "title": "Liên hệ",
         "paragraphs": [
-          "Về Điều khoản, thanh toán hoặc tuân thủ, vui lòng liên hệ support@aiagents-hub.vn. Tên pháp nhân và địa chỉ đăng ký có thể được cung cấp theo yêu cầu cho mục đích hợp đồng hoặc quy định."
+          "Với câu hỏi về Điều khoản, thanh toán hoặc tuân thủ, liên hệ support@aiagents-hub.vn. Tên pháp nhân và địa chỉ đăng ký có thể được cung cấp khi yêu cầu cho mục đích hợp đồng hoặc quy định."
         ]
       }
     }
@@ -1108,8 +1199,8 @@
     "badge": "Tin cậy & minh bạch",
     "title": "Chính sách",
     "title_gradient": "bảo mật",
-    "subtitle": "Cách chúng tôi thu thập, sử dụng, chia sẻ và bảo vệ thông tin cá nhân khi bạn dùng aiagents-hub.vn, api.aiagents-hub.vn và dịch vụ liên quan. Thông báo này được soạn thảo phù hợp với các kỳ vọng quốc tế phổ biến, gồm nguyên tắc minh bạch trong GDPR và các khung pháp lý tương tự.",
-    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "subtitle": "Cách chúng tôi thu thập, dùng, chia sẻ và bảo vệ thông tin cá nhân khi bạn dùng AI Agents Hub (aiagents-hub.vn), dashboard, runtime workflow và API liên quan.",
+    "last_updated": "Cập nhật lần cuối: 16 tháng 9, 2026",
     "toc_title": "Trên trang này",
     "toc_aria": "Các mục chính sách bảo mật",
     "related_title": "Liên quan",
@@ -1122,33 +1213,34 @@
       "intro": {
         "title": "Giới thiệu và phạm vi",
         "paragraphs": [
-          "Chính sách bảo mật này (\"Chính sách\") mô tả cách bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (gọi chung là \"Nền tảng\", \"chúng tôi\") xử lý thông tin cá nhân.",
-          "Chính sách áp dụng khi bạn truy cập trang web, tạo hoặc sử dụng tài khoản, mua hoặc dùng sản phẩm API, tương tác với bảng điều khiển hoặc tài liệu, xác thực bằng ví hoặc passkey khi được cung cấp, hoặc sử dụng dịch vụ của chúng tôi theo cách khác. Bạn nên đọc cùng Điều khoản dịch vụ và mọi thông báo riêng theo từng sản phẩm.",
-          "Chúng tôi có thể cập nhật Chính sách theo thời gian. Bản sửa đổi sẽ được đăng trên trang này và ngày \"Cập nhật lần cuối\" sẽ thay đổi. Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý (ví dụ qua email hoặc biểu ngữ trong sản phẩm)."
+          "Chính sách quyền riêng tư này (\"Chính sách\") giải thích cách bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (gọi chung là \"Nền tảng\", \"chúng tôi\") xử lý thông tin cá nhân.",
+          "Áp dụng khi bạn truy cập website, tạo hoặc dùng tài khoản, đăng ký gói hoặc mua Credit, chạy workflow hay agent, tương tác dashboard hoặc tài liệu, hoặc dùng dịch vụ theo cách khác. Nên đọc cùng Điều khoản dịch vụ.",
+          "Chúng tôi có thể cập nhật Chính sách theo thời gian. Bản sửa được đăng trên trang này và đổi ngày \"Cập nhật lần cuối\". Khi thay đổi trọng yếu, chúng tôi sẽ thông báo thêm khi hợp lý."
         ]
       },
       "controller": {
         "title": "Bên kiểm soát dữ liệu và liên hệ",
         "paragraphs": [
-          "Bên kiểm soát dữ liệu chịu trách nhiệm về thông tin cá nhân trong Chính sách này là pháp nhân vận hành Nền tảng (gọi gọn là \"AIAgentsHub\" / \"Unitoken\"). Tên pháp nhân đầy đủ, địa chỉ đăng ký và mã số đăng ký có thể được cung cấp theo yêu cầu cho hóa đơn, hợp đồng hoặc mục đích quy định.",
+          "Bên kiểm soát dữ liệu chịu trách nhiệm thông tin cá nhân mô tả trong Chính sách này là pháp nhân vận hành AI Agents Hub. Tên pháp nhân, địa chỉ đăng ký và mã đăng ký có thể được cung cấp khi yêu cầu cho mục đích hợp đồng, hóa đơn hoặc quy định.",
           "Đối với câu hỏi chung về quyền riêng tư và để thực hiện quyền của bạn khi pháp luật cho phép, liên hệ support@aiagents-hub.vn. Đối với sự cố bảo mật liên quan đến thông tin đăng nhập hoặc truy cập trái phép nghi ngờ, hãy liên hệ kịp thời kèm chi tiết liên quan để chúng tôi xử lý hiệu quả."
         ]
       },
       "collection": {
         "title": "Các loại thông tin chúng tôi thu thập",
         "paragraphs": [
-          "Dữ liệu tài khoản và định danh: ví dụ họ tên, email, tổ chức, tên người dùng hoặc mã người dùng, các yếu tố xác thực bạn bật (ví dụ TOTP, passkey hoặc định danh đăng nhập mạng xã hội đã liên kết), và tùy chọn trong hồ sơ.",
-          "Dữ liệu sử dụng và kỹ thuật: ví dụ địa chỉ IP, vị trí gần đúng suy ra từ IP, loại thiết bị và trình duyệt, mốc thời gian, trang hoặc endpoint truy cập, siêu dữ liệu yêu cầu API (ví dụ route, mã trạng thái, độ trễ, log lỗi), bản ghi đăng ký và đo lường, ticket hỗ trợ, và phân tích trong sản phẩm cần thiết để vận hành và cải thiện dịch vụ.",
-          "Dữ liệu thanh toán và hóa đơn: ví dụ thông tin liên hệ thanh toán, mã giao dịch, mã số thuế khi bắt buộc, và trạng thái thanh toán. Xử lý thẻ thanh toán có thể do đối tác thanh toán được chứng nhận thực hiện; chúng tôi thường chỉ nhận dữ liệu hóa đơn và xác nhận hạn chế thay vì số thẻ đầy đủ.",
-          "Thông tin liên lạc: nội dung bạn gửi (email, biểu mẫu liên hệ, hoặc bản ghi chat) và hồ sơ cần để trả lời và chứng minh tuân thủ.",
-          "Dữ liệu liên quan blockchain và ví: khi bạn kết nối ví hoặc dùng tính năng on-chain, chúng tôi có thể xử lý địa chỉ ví công khai, mã nhận dạng chuỗi, và tham chiếu giao dịch hoặc chứng thực cần cho tính năng. Dữ liệu on-chain công khai vốn hiển thị trên mạng mà chúng tôi không kiểm soát.",
-          "Cookie và công nghệ tương tự: được mô tả ở mục cookie bên dưới."
+          "Dữ liệu tài khoản và định danh: như tên, email, tổ chức, tên người dùng hoặc ID, yếu tố xác thực bạn bật (ví dụ TOTP, passkey, hoặc định danh đăng nhập liên kết), và tùy chọn trên hồ sơ.",
+          "Dữ liệu sử dụng và kỹ thuật: như địa chỉ IP, vị trí gần đúng từ IP, loại thiết bị và trình duyệt, mốc thời gian, trang hoặc endpoint truy cập, metadata execution workflow, lần trừ Credit, metadata API, ticket hỗ trợ, và phân tích trong sản phẩm cần để vận hành và cải thiện dịch vụ.",
+          "Dữ liệu thanh toán: như liên hệ billing, mã giao dịch, mã số thuế khi cần, và trạng thái thanh toán. Cổng thanh toán có thể do đối tác xử lý (ví dụ VNPay, Casso, PayPal); chúng tôi thường nhận dữ liệu xác nhận hạn chế chứ không phải số thẻ đầy đủ.",
+          "Liên lạc: nội dung bạn gửi (email, form liên hệ, hoặc bản ghi chat) và hồ sơ cần để phản hồi và chứng minh tuân thủ.",
+          "Nội dung workflow và agent: prompt, tệp, tài liệu truy xuất và đầu ra bạn gửi hoặc tạo, trong phạm vi cần để chạy, tính phí, gỡ lỗi và bảo mật các việc đó.",
+          "Dữ liệu ví hoặc DID tùy chọn: nếu bạn chọn liên kết định danh phi tập trung, chúng tôi có thể xử lý địa chỉ công khai hoặc mã thử thách cho luồng đó. Đây là tùy chọn, không phải phần cốt lõi của sản phẩm agent.",
+          "Cookie và công nghệ tương tự: mô tả ở mục cookie bên dưới."
         ]
       },
       "purposes": {
         "title": "Mục đích và cơ sở pháp lý",
         "paragraphs": [
-          "Chúng tôi xử lý thông tin cá nhân cho các mục đích như: cung cấp, bảo đảm an toàn và cải thiện Nền tảng; xác thực người dùng; đo lường và thanh toán; hỗ trợ khách hàng; phòng chống gian lận, phát hiện lạm dụng và giám sát bảo mật; tuân thủ nghĩa vụ pháp lý; và gửi thông báo liên quan dịch vụ.",
+          "Chúng tôi xử lý thông tin cá nhân nhằm: cung cấp, bảo mật và cải thiện Nền tảng; xác thực người dùng; đo Credit và thu Subscription; chạy workflow; hỗ trợ khách hàng; phòng gian lận, phát hiện lạm dụng và giám sát bảo mật; tuân thủ nghĩa vụ pháp lý; và gửi thông báo liên quan dịch vụ.",
           "Tùy ngữ cảnh và pháp luật áp dụng, chúng tôi dựa vào một hoặc nhiều cơ sở sau: thực hiện hợp đồng với bạn; lợi ích hợp pháp không bị quyền của bạn vượt trội (ví dụ bảo vệ hệ thống và hiểu dùng tổng hợp), khi được phép; tuân thủ nghĩa vụ pháp lý; và sự đồng ý khi bắt buộc (ví dụ cookie không thiết yếu hoặc tiếp thị, nếu được yêu cầu riêng).",
           "Khi cơ sở là đồng ý, bạn có thể rút lại bất cứ lúc nào mà không ảnh hưởng tính hợp pháp của xử lý trước khi rút. Thông điệp tiếp thị, nếu có, sẽ có cách từ chối."
         ]
@@ -1187,7 +1279,7 @@
         "title": "Bảo mật",
         "paragraphs": [
           "Chúng tôi áp dụng biện pháp kỹ thuật và tổ chức nhằm bảo vệ thông tin cá nhân khỏi truy cập trái phép, mất mát hoặc thay đổi. Các biện pháp có thể gồm mã hóa khi truyền, kiểm soát truy cập, nguyên tắc đặc quyền tối thiểu cho nhân sự và hệ thống, giám sát, và đánh giá nhà cung cấp.",
-          "Không phương thức truyền tải hay lưu trữ nào an toàn tuyệt đối. Bạn chịu trách nhiệm bảo vệ thông tin đăng nhập, khóa API và cụm từ khôi phục ví. Vui lòng báo sự cố nghi ngờ kịp thời."
+          "Không phương thức truyền hay lưu nào hoàn toàn an toàn. Bạn chịu trách nhiệm bảo vệ thông tin xác thực và API key. Hãy báo sự cố bị nghi ngay."
         ]
       },
       "rights": {
@@ -1230,8 +1322,8 @@
     "badge": "Minh bạch",
     "title": "Chính sách",
     "title_gradient": "Cookie",
-    "subtitle": "Cách aiagents-hub.vn và api.aiagents-hub.vn dùng cookie và công nghệ tương tự cho xác thực, bảo mật, tính năng ví và tùy chọn giao diện. Trang này bổ sung Chính sách bảo mật và phản ánh cách chúng tôi xây dựng dịch vụ hiện tại.",
-    "last_updated": "Cập nhật lần cuối: 25 tháng 3, 2025",
+    "subtitle": "Cách aiagents-hub.vn dùng cookie và công nghệ tương tự cho xác thực, bảo mật và tùy chọn. Trang này bổ sung Chính sách quyền riêng tư.",
+    "last_updated": "Cập nhật lần cuối: 16 tháng 9, 2026",
     "toc_title": "Trên trang này",
     "toc_aria": "Các mục chính sách cookie",
     "related_title": "Liên quan",
@@ -1246,7 +1338,7 @@
       "intro": {
         "title": "Giới thiệu",
         "paragraphs": [
-          "Chính sách Cookie này giải thích cách bên vận hành aiagents-hub.vn và api.aiagents-hub.vn (\"Nền tảng\", \"chúng tôi\") sử dụng cookie HTTP và bộ nhớ tương tự trên thiết bị của bạn khi dùng trang web, bảng điều khiển và API.",
+          "Chính sách cookie này giải thích cách bên vận hành AI Agents Hub (aiagents-hub.vn và api.aiagents-hub.vn) dùng cookie HTTP và lưu trữ tương tự trên thiết bị khi bạn dùng website, dashboard và API.",
           "Bạn nên đọc cùng Chính sách bảo mật, mô tả rộng hơn về xử lý dữ liệu cá nhân. Khi nhắc tới \"cookie\", chúng tôi gồm cả công nghệ tương đương như local storage khi có vai trò tương tự, trừ khi nêu khác.",
           "Chúng tôi hạn chế thu thập và chủ yếu dùng cookie thiết yếu cho bảo mật và phiên đăng nhập. Cookie không thiết yếu hoặc phân tích chỉ chạy khi phù hợp cấu hình sản phẩm và pháp luật áp dụng."
         ]
@@ -1261,7 +1353,7 @@
       "purposes": {
         "title": "Mục đích sử dụng",
         "paragraphs": [
-          "Chúng tôi dùng cookie để: duy trì đăng nhập an toàn; bảo vệ tài khoản khỏi lạm dụng; hoàn tất OAuth, OTP và bắt tay kết nối ví; ghi nhớ tùy chọn giao diện khi lưu trong cookie; và vận hành chẩn đoán giúp Nền tảng ổn định.",
+          "Chúng tôi dùng cookie để: giữ bạn đăng nhập an toàn; bảo vệ tài khoản; hoàn tất OAuth và OTP; nhớ tùy chọn giao diện khi lưu trong cookie; và vận hành chẩn đoán giữ Nền tảng tin cậy.",
           "Chúng tôi phân loại cookie thành thiết yếu (bắt buộc cho bảo mật và vận hành cơ bản), chức năng (cải thiện trải nghiệm, ví dụ trạng thái ví), và khi bật, phân tích (thống kê tổng hợp). Chúng tôi không dùng cookie để \"bán\" thông tin cá nhân theo nghĩa mô tả trong Chính sách bảo mật."
         ]
       },
@@ -1310,10 +1402,10 @@
         ]
       },
       "web3_ui": {
-        "title": "Ví, bảng điều khiển và tùy chọn",
+        "title": "Tùy chọn dashboard và định danh tùy chọn",
         "paragraphs": [
-          "Khi bạn kết nối ví, WalletConnect và nhà cung cấp chuỗi có thể đặt hoặc đọc thêm cookie hoặc bộ nhớ thiết bị để hoàn tất ghép nối, hiển thị trạng thái chuỗi hoặc đáp ứng yêu cầu bảo mật của họ. Dữ liệu đó xử lý theo chính sách riêng của họ.",
-          "Giao diện, ngôn ngữ hoặc bố cục có thể lưu trong cookie hoặc local storage tùy bề mặt (trang marketing so với bảng điều khiển). Chặn bộ nhớ chức năng có thể khiến tùy chọn không thiết yếu bị đặt lại mỗi lần truy cập."
+          "Chủ đề, ngôn ngữ hoặc bố cục có thể lưu trong cookie hoặc local storage tùy bề mặt (site marketing vs dashboard). Chặn lưu chức năng có thể reset tùy chọn không thiết yếu mỗi lần vào.",
+          "Nếu bạn dùng liên kết ví hoặc DID tùy chọn, thư viện ghép nối có thể đặt thêm lưu trữ trên thiết bị. Các nhà cung cấp đó xử lý dữ liệu theo chính sách riêng. Liên kết ví không bắt buộc để xây hoặc chạy agent."
         ]
       },
       "third_party": {
@@ -2591,7 +2683,6 @@
     "menu_replace": "Thay thế",
     "menu_deactivate": "Tắt",
     "menu_copy": "Sao chép",
-    
     "menu_tidy": "Sắp xếp workflow",
     "canvas_zoom_in": "Phóng to",
     "canvas_zoom_out": "Thu nhỏ",
@@ -2623,7 +2714,6 @@
     "selection_count": "Đã chọn {count} node",
     "group_shortcut": "⌘G",
     "ungroup_shortcut": "⌘⇧G",
-    
     "breadcrumb_workflows": "Workflows",
     "untitled": "Workflow chưa đặt tên",
     "add_tag": "Thêm tag",
@@ -4124,116 +4214,146 @@
     "example_code": "Ví dụ code"
   },
   "Docs": {
-    "badge": "Tài liệu dành cho nhà phát triển",
-    "hub_title": "Tài liệu API UniToken",
-    "hub_description": "Mọi thứ bạn cần để tích hợp eKYC và API định danh: bắt đầu nhanh và tài liệu endpoint eKYC.",
-    "hub_badge_1": "REST · multipart/form-data · Bearer token",
-    "hub_badge_2": "Base URL: api.aiagents-hub.vn",
-    "card_quickstart_title": "Bắt đầu nhanh",
-    "card_quickstart_desc": "Tạo API key, gửi request đầu tiên và xác minh phản hồi trong vài phút.",
-    "card_api_title": "eKyc API",
-    "card_api_desc": "Danh sách đầy đủ endpoint eKYC kèm tham số và mã mẫu nhiều ngôn ngữ.",
+    "badge": "Tài liệu",
+    "hub_title": "Tài liệu AI Agents Hub",
+    "hub_description": "Xây workflow, chạy agent, trả bằng Credit. Bắt đầu ở đây, rồi kích hoạt graph từ chat, cron hoặc HTTP.",
+    "hub_badge_1": "Workflow · Agent · Một Credit",
+    "hub_badge_2": "Dashboard: aiagents-hub.vn",
+    "card_quickstart_title": "Quickstart",
+    "card_quickstart_desc": "Tạo workspace, vẽ graph, chạy agent và xem ước lượng Credit.",
+    "card_api_title": "API workflow",
+    "card_api_desc": "Kích hoạt workflow từ webhook với Bearer token — cùng graph bạn xây trên canvas.",
     "hub_base_title": "Base URL production",
-    "hub_base_body": "Toàn bộ lưu lượng API dùng HTTPS. Thay placeholder bằng API key thật; không commit bí mật vào mã nguồn.",
-    "quickstart_title": "Bắt đầu nhanh",
-    "quickstart_description": "Xác thực bằng Bearer token và gọi endpoint eKYC đầu tiên.",
-    "quickstart_try_title": "Request đầu tiên: nhận dạng giấy tờ",
-    "quickstart_try_body": "Dưới đây là ví dụ multipart hoạt động được. Thay bằng ảnh JPEG/PNG thật dưới 2MB.",
-    "quickstart_more": "Xem mọi endpoint và tham số tại",
-    "api_page_title": "eKYC API",
-    "api_page_description": "HTTP API eKYC tại https://api.aiagents-hub.vn. Mọi lệnh gọi cần header Authorization Bearer với quyền phù hợp.",
-    "params_label": "Trường form",
-    "section_start": "Bắt đầu",
+    "hub_base_body": "Lưu lượng API dùng HTTPS. Thay placeholder bằng API key của bạn; đừng commit secret.",
+    "hub_builder_title": "Builder",
+    "hub_builder_body": "Canvas chính là sản phẩm. Thêm trigger, agent, RAG, HTTP và flow. Version nằm trong workspace; graph chia sẻ có thể nhận royalty khi người khác chạy.",
+    "hub_credits_title": "Credit",
+    "hub_credits_body": "Mức dùng AI trừ Credit — một đơn vị cho mọi model. Bạn không thấy USD/1 triệu token. Credit tặng hết hạn mỗi kỳ; Pro mua thêm được.",
+    "quickstart_title": "Quickstart",
+    "quickstart_description": "Từ workspace trống đến agent đang chạy, tính bằng Credit.",
+    "quickstart_open_dashboard": "Mở dashboard",
+    "quickstart_step1_title": "Tạo tài khoản",
+    "quickstart_step1_body": "Đăng nhập dashboard. Free có Credit tặng, hết hạn cuối kỳ.",
+    "quickstart_step2_title": "Tạo workflow",
+    "quickstart_step2_body": "Mở Workflows, thêm trigger (chat, webhook hoặc cron) và node agent. Có thể gắn memory, RAG hoặc tool HTTP.",
+    "quickstart_step3_title": "Chạy một lần",
+    "quickstart_step3_body": "Dùng Execute hoặc chat host. UI hiện ước lượng Credit trước khi node AI chạy; ví trừ sau.",
+    "quickstart_step4_title": "Xem log",
+    "quickstart_step4_body": "Mở execution để thấy output node, lỗi và Credit đã trừ. Retry do lỗi nền tảng phía chúng tôi không tính phí.",
+    "quickstart_try_title": "Credit trừ những gì",
+    "quickstart_try_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không.",
+    "quickstart_credits_title": "Credit trừ những gì",
+    "quickstart_credits_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không. Hạ tầng (lưu trữ, hàng đợi) nằm trong gói cộng quota — không phải hóa đơn riêng.",
+    "quickstart_more": "Kích hoạt cùng graph qua HTTP trong",
+    "api_page_title": "API workflow",
+    "api_page_description": "Xác thực Bearer token và POST tới webhook workflow. Mức dùng vẫn trừ Credit trên workspace sở hữu lần chạy.",
+    "api_auth_title": "Base URL và xác thực",
+    "api_auth_body": "Tạo API key tại Điều khiển > API Keys. Gửi dưới dạng Bearer token. Xoay khóa nếu bị lộ.",
+    "api_base_url_label": "Base URL",
+    "api_auth_header": "Header Authorization",
+    "api_webhook_title": "Kích hoạt workflow",
+    "api_webhook_body": "Mỗi workflow có trigger webhook mở một đường HTTP. Thay YOUR_WORKFLOW_ID và path bạn cấu hình trên node. Body JSON sẵn cho các node phía sau.",
+    "api_param_workflow": "id workflow trên dashboard.",
+    "api_param_path": "đoạn path cấu hình trên webhook trigger (ví dụ: run).",
+    "api_param_body": "payload graph đọc (message, field, metadata tệp).",
+    "api_credits_title": "Credit khi gọi API",
+    "api_credits_body": "Lần chạy webhook trừ cùng ví Credit như canvas. Ước lượng có thể khác số trừ cuối. Workflow chia sẻ có thể thêm royalty Credit cho tác giả.",
+    "params_label": "Tham số",
+    "section_start": "Bắt đầu ở đây",
     "section_guides": "Hướng dẫn",
     "nav_overview": "Tổng quan",
-    "nav_quickstart": "Bắt đầu nhanh",
-    "nav_api": "eKYC API",
+    "nav_quickstart": "Quickstart",
+    "nav_api": "API workflow",
     "menu": "Menu",
     "mobile_nav_title": "Duyệt tài liệu",
-    "search_placeholder": "Lọc mục lục…",
+    "search_placeholder": "Lọc điều hướng…",
     "nav_aria": "Tài liệu",
     "placeholder_api_key": "YOUR_API_KEY",
     "copy": "Sao chép",
-    "copied": "Đã chép"
+    "copied": "Đã sao chép"
   },
   "BlogPage": {
     "badge": "Sản phẩm & nền tảng",
-    "title": "Blog",
-    "title_gradient": "từ aiagents-hub.vn",
-    "subtitle": "Ghi chú thực tiễn về triển khai eKYC qua API được quản lý hôm nay, và định hướng dịch vụ CLAW — dành cho đội kỹ thuật, sản phẩm và quản trị rủi ro.",
+    "title": "Ghi chú từ",
+    "title_gradient": "AI Agents Hub",
+    "subtitle": "Cách chúng tôi xây agent, đo Credit và giữ gói đọc được — viết cho đội sẽ thực sự chạy graph.",
     "author_display": "support@aiagents-hub.vn",
-    "byline": "Bài viết từ {author}",
-    "section_ekyc": "Dịch vụ eKYC",
-    "section_ekyc_sub": "Xác minh danh tính và luồng gắn với tuân thủ qua api.aiagents-hub.vn — hợp đồng API, bảo mật và vận hành.",
-    "section_claw": "Dịch vụ CLAW",
-    "section_claw_sub": "Kết nối sắp tới cho OpenClaw, NanoClaw, NemoClaw, BizClaw và các stack tương thích — phục vụ agent và tự động hóa.",
-    "badge_upcoming": "Sắp ra mắt",
+    "byline": "Từ {author}",
+    "section_product": "Sản phẩm",
+    "section_product_sub": "Builder, agent, RAG, và cách graph ra sống.",
+    "section_credits": "Credit & gói",
+    "section_credits_sub": "Một đồng hồ đo, ba lớp thu, và chia sẻ với royalty.",
+    "section_ekyc": "Sản phẩm",
+    "section_ekyc_sub": "Builder, agent, RAG, và cách graph ra sống.",
+    "section_claw": "Credit & gói",
+    "section_claw_sub": "Một đồng hồ đo, ba lớp thu, và chia sẻ với royalty.",
+    "badge_upcoming": "Sắp có",
     "min_read": "{count} phút đọc",
     "read_more": "Đọc bài",
-    "back_to_blog": "Về danh sách blog",
-    "not_found_title": "Không tìm thấy bài viết",
-    "not_found_body": "URL này không khớp bài đã xuất bản. Hãy quay lại trang blog để xem các cập nhật eKYC và CLAW.",
-    "cta_lead": "Cần hỗ trợ tích hợp eKYC hoặc tham gia sớm CLAW? Chúng tôi chuyển mỗi tin nhắn đến đúng chủ sở hữu.",
+    "back_to_blog": "Quay lại blog",
+    "not_found_title": "Không tìm thấy bài",
+    "not_found_body": "URL này không khớp bài đã xuất bản. Hãy dùng trang blog để xem cập nhật.",
+    "cta_lead": "Thắc mắc về workflow, Credit hoặc Enterprise? Chúng tôi chuyển mỗi tin đến đúng người.",
     "cta_contact": "Liên hệ",
     "posts": {
-      "ekyc-how-we-deliver-identity-verification": {
-        "title": "Cách chúng tôi cung cấp eKYC như một dịch vụ được quản lý",
-        "excerpt": "Tóm tắt các giai đoạn xác minh, xử lý chứng cứ và cách giữ trải nghiệm ổn định cho bên tích hợp.",
+      "one-platform-one-credit-unlimited-models": {
+        "title": "One Platform, One Credit, Unlimited Models",
+        "excerpt": "Vì sao chúng tôi tính việc agent hoàn thành bằng Credit — và từ chối bán token hay hóa đơn Cloudflare.",
         "body": [
-          "eKYC (định danh điện tử) không còn là tùy chọn: đó là cổng vào cho onboarding chịu quy định, chi trả và các quy trình cần độ tin cậy cao. Tại aiagents-hub.vn chúng tôi coi eKYC là một bề mặt sản phẩm với hợp đồng API rõ ràng, không phải dự án tích hợp một lần rồi bỏ.",
-          "Dịch vụ tách thu thập, xác minh và quyết định thành các bước được định nghĩa tốt. Ứng dụng của bạn có thể thu thập đồng ý và tài liệu một lần, trong khi pipeline áp dụng kiểm tra nhất quán, hỗ trợ rà soát có máy khi phù hợp, và kết quả có thể đối soát trong hệ thống của bạn.",
-          "Về vận hành, chúng tôi thiết kế để chịu lỗi: yêu cầu lũy đẳng (idempotent) khi cần, lỗi có cấu trúc ánh xạ tới bước khắc phục, và trạng thái hiển thị trên dashboard mà không bắt buộc ticket hỗ trợ. Mục tiêu là đội của bạn ra mắt nhanh hơn mà không đánh đổi sự rõ ràng với người dùng.",
-          "Khi đánh giá nhà cung cấp, hãy hỏi cách biểu diễn kết quả, giới hạn lưu giữ và cách phân quyền khóa. Chúng tôi công bố các kỳ vọng đó cùng endpoint để bộ phận tuân thủ và kỹ thuật xem cùng một bộ dữ kiện."
+          "AI Agents Hub không phải nơi bán lại model. Chúng tôi không cạnh tranh USD/1 triệu token. Khách chỉ cần một câu hỏi: việc này tốn bao nhiêu Credit?",
+          "Subscription trả cho workspace — builder, chia sẻ, webhook, cron, hỗ trợ và quota hạ tầng. Credit trả cho mức tiêu thụ AI và agent. Enterprise trả cho sự đảm bảo: SLA, dung lượng riêng, điều khoản tùy chỉnh.",
+          "Model rẻ tốn ít Credit; frontier tốn nhiều hơn. Khác biệt đó là hệ số nội bộ, không phải catalog bạn phải đàm phán lại khi nhà cung cấp tăng giá. Chúng tôi đổi hệ số kèm thông báo. Chúng tôi không đổi giá gói trên đường đó.",
+          "Credit tặng hết hạn mỗi kỳ để không tích trữ trước cú sốc chi phí. Pro mua thêm được, có trần ví. Free là dùng thử, không phải sản phẩm chúng tôi sống nhờ."
         ]
       },
-      "ekyc-api-contracts-for-international-rollouts": {
-        "title": "Hợp đồng API eKYC cho triển khai quốc tế",
-        "excerpt": "Phiên bản, scope và mô hình lỗi phù hợp cách các đội nghiêm túc triển khai xác minh danh tính xuyên khu vực.",
+      "build-your-first-agent-workflow": {
+        "title": "Xây workflow agent đầu tiên",
+        "excerpt": "Trigger, agent, tool tùy chọn — rồi ước lượng Credit trước khi thứ đắt chạy.",
         "body": [
-          "Triển khai quốc tế thất bại khi API mơ hồ. Chúng tôi phiên bản hóa tài nguyên có chủ đích, công bố thay đổi phá vỡ tương thích trước, và căn chỉnh xác thực với quyền tối thiểu để khóa sandbox không vô tình chạm dữ liệu production.",
-          "Payload ưu tiên trường rõ ràng hơn là enum quá tải. Khi quy tắc từng khu vực khác nhau, chúng tôi hiển thị cờ năng lực và loại giấy tờ được hỗ trợ để client phân nhánh mà không đoán hành vi máy chủ.",
-          "Lỗi ưu tiên đọc được bằng máy trước: mã ổn định, văn bản cho người sau. Đó là thông lệ phổ biến trên nền tảng đám mây — giữ mobile, web và server đồng bộ khi cần thử lại hoặc sửa phía người dùng.",
-          "Đối tác lộ trình theo giai đoạn nên bắt đầu với hồ sơ xác minh hẹp, đo chuyển đổi và độ trễ, rồi mở rộng phạm vi giấy tờ. Hợp đồng của chúng tôi được thiết kế để cùng bạn mở rộng mà không viết lại lõi tích hợp."
+          "Mở Workflows và bắt đầu canvas trống. Graph hữu ích đầu tiên rất nhỏ: trigger chat hoặc webhook, một node agent, và đích (trả lời, gọi HTTP, hoặc human review).",
+          "Cấu hình agent bằng prompt mô tả việc, không mô tả model. Gắn memory nếu hội thoại cần nhớ lượt vừa rồi. Gắn RAG nếu câu trả lời phải trích tài liệu của bạn.",
+          "Chạy một lần từ editor. Bạn sẽ thấy ước lượng Credit, rồi log execution. Nếu kết quả sai, sửa prompt hoặc tool — không sửa trang giá.",
+          "Khi graph ổn, bật webhook hoặc cron. Cùng ví Credit trả, dù bạn bấm Execute hay hệ thống ngoài POST vào."
         ]
       },
-      "ekyc-data-minimization-retention-and-auditability": {
-        "title": "Tối thiểu hóa dữ liệu, lưu giữ và eKYC sẵn sàng kiểm toán",
-        "excerpt": "Vì sao chỉ thu thập phần cần cho xác minh, cách thông báo cửa sổ lưu giữ và điều kiểm toán thường xem xét.",
+      "agents-rag-memory-and-tools": {
+        "title": "Agent, RAG, memory và tool",
+        "excerpt": "Các họ node chúng tôi thực sự chạy: vòng agent, truy xuất, memory phiên và truy vấn CSDL.",
         "body": [
-          "eKYC mạnh vừa là thứ bạn không lưu vừa là thứ bạn thu. Chúng tôi tối thiểu hóa dữ liệu theo mặc định: phần nhạy cảm được xử lý để xác minh, sau đó chỉ giữ khi chính sách hoặc quy định yêu cầu dấu vết kiểm toán giới hạn.",
-          "Lưu giữ không phải suy nghĩ sau. Khung thời gian được trình bày theo ngôn ngữ sản phẩm và phản ánh trong vận hành — bài đánh giá bảo mật của bạn phải thấy cùng câu chuyện mà kỹ sư triển khai. Khi khách hàng yêu cầu xóa, chúng tôi phối hợp theo thời hạn và bước xác minh áp dụng được.",
-          "Khả năng kiểm toán nghĩa là truy vết mà không lộ thừa. Truy cập chứng từ xác minh được ghi nhật ký, giới hạn theo vai trò và tương thích đánh giá định kỳ. Đó là nền tảng khi định danh chạm quy trình chịu quy định.",
-          "Nếu chương trình của bạn trải nhiều khu vực pháp lý, hãy kết hợp kiểm soát kỹ thuật của chúng tôi với đánh giá pháp lý của bạn. Chúng tôi cung cấp chi tiết vận hành; bên tư vấn ánh xạ tới luật địa phương — phân công phù hợp quy mô quốc tế."
+          "Node agent là một vòng: model gọi tool, đọc memory, rồi trả lời. Reasoning agent thêm vòng có kiểm soát hơn khi bạn cần kiểm tra trước khi hành động.",
+          "RAG là hai việc. Save RAG nạp tài liệu (kể cả PDF) vào Vectorize. Get RAG lấy chunk lúc hỏi. Giữ graph đó nhàm chán và quan sát được; chất lượng truy xuất thắng thơ prompt.",
+          "Simple memory giữ cửa sổ phiên. Vectorize memory dành cho nhớ ngữ nghĩa dài hơn. Get DB Info tới D1 hoặc Oracle khi agent phải bám dữ liệu có cấu trúc.",
+          "Không thứ nào bán thành SKU riêng. Chúng trừ Credit khi gọi model. Lưu trữ và hàng đợi nằm trong gói cộng quota."
         ]
       },
-      "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
-        "title": "CLAW trên aiagents-hub.vn: lộ trình và khả năng sắp tới",
-        "excerpt": "Hướng phát triển — hỗ trợ đa biến thể, định tuyến và tích hợp hướng sự kiện cho hệ thống tự động nặng.",
+      "webhooks-cron-and-hosted-chat": {
+        "title": "Webhook, cron và chat host",
+        "excerpt": "Một graph, ba cửa vào. Đồng hồ Credit không quan tâm bạn đi cửa nào.",
         "body": [
-          "CLAW là lớp kết nối sắp tới cho khối lượng agent và tự động hóa trên OpenClaw, NanoClaw, NemoClaw, BizClaw và các triển khai tương thích. Mục tiêu quen thuộc với đội nền tảng: tích hợp một lần, định tuyến thông minh và quan sát hành vi nhất quán.",
-          "Trên lộ trình sẽ có cấu hình riêng cho từng biến thể CLAW, phân tách rõ giữa gọi đồng bộ và tác vụ chạy lâu, cùng webhook phản ánh chuyển trạng thái đáng tin để điều phối phía sau.",
-          "Chúng tôi cũng siết trải nghiệm nhà phát triển: xác thực dự đoán được, thống nhất với phần còn lại của api.aiagents-hub.vn, sandbox sát giới hạn production, và tài liệu đồng bộ với bề mặt API.",
-          "Không gì thay thế bài rà soát bảo mật của bạn — nội dung này bổ trợ. Khi gần phổ cập, chúng tôi sẽ công bố ghi chú migration, chính sách ngừng hỗ trợ và kênh hỗ trợ đối tác thiết kế."
+          "Trigger webhook mở đường HTTP trên api.aiagents-hub.vn. Xác thực Bearer token, POST JSON, để node phía sau đọc payload.",
+          "Cron là cùng graph theo lịch. Dùng cho bản tóm tắt, đồng bộ, và việc không nên chờ người bấm Run.",
+          "Chat host dành cho operator và người dùng cuối nói chuyện với agent mà không mở canvas. Vẫn trừ Credit của workspace.",
+          "Thiết kế lỗi giống nhau ở cả ba: timeout, retry do ta chịu vs. mức dùng bạn trả, và log người đọc được lúc 2 giờ sáng."
         ]
       },
-      "claw-launch-what-partners-can-expect": {
-        "title": "Đối tác có thể kỳ vọng gì khi dịch vụ CLAW lên sóng",
-        "excerpt": "Mốc thời gian mức cao, ranh giới phạm vi và cách onboarding cho người dùng sớm.",
+      "sharing-workflows-and-royalties": {
+        "title": "Chia sẻ workflow và royalty",
+        "excerpt": "Xuất bản graph. Khi người khác chạy, họ trả Credit; bạn nhận royalty.",
         "body": [
-          "Đối tác nên kỳ vọng triển khai theo giai đoạn: xem trước riêng với SLA rõ ràng, rồi mở rộng khi chúng tôi xác nhận thông lượng, chế độ lỗi và quy trình vận hành. Ngày chuyển đổi sẽ được báo trước đủ để cập nhật runbook.",
-          "Phạm vi sẽ minh bạch. Mỗi cửa xem trước liệt kê biến thể CLAW được hỗ trợ, khu vực và rate limit. Tính năng thử nghiệm được gắn nhãn — chúng tôi không thăng cấp thầm hành vi mà tích hợp của bạn vẫn coi là tạm.",
-          "Onboarding sẽ giống cách chúng tôi đưa đối tác eKYC vào hệ thống hôm nay: liên hệ kỹ thuật, kênh chung cho sự cố, và tài liệu có ví dụ chạy được thay vì hứa hẹn trừu tượng.",
-          "Nếu bạn phụ thuộc CLAW cho tự động hóa đối mặt khách hàng, hãy vẽ miền lỗi ngay từ bây giờ — thử lại, khóa lũy đẳng và thông báo trễ cho người dùng. Nền tảng sẽ hỗ trợ quan sát; sản phẩm vẫn cần giải thích nhẹ nhàng khi chậm."
+          "Workflow chia sẻ vẫn là thiết kế của bạn. Khi workspace khác chạy, họ bị trừ Credit cho mức dùng AI cộng phần trăm royalty bạn cấu hình.",
+          "Người chạy trả phần thêm. Bạn nhận earnings trên sổ riêng (payout không phải ví Credit). Hub không lấy royalty từ chi phí model của mình.",
+          "Chỉ ổn nếu graph hiểu được: input rõ, ước lượng trung thực, không tác dụng phụ ẩn. Coi workflow chia sẻ như API bạn sẵn sàng version.",
+          "Nếu không muốn người khác chạy graph, giữ riêng. Chia sẻ là tính năng, không phải bắt buộc."
         ]
       },
-      "claw-integration-patterns-early-access": {
-        "title": "Mẫu tích hợp CLAW: lưu ý khi truy cập sớm",
-        "excerpt": "Worker xếp hàng, đăng ký sự kiện và chiến lược thử an toàn trước khi bật traffic production.",
+      "subscription-credits-and-enterprise": {
+        "title": "Subscription, Credit và Enterprise",
+        "excerpt": "Ba lớp thu — và vì sao chúng tôi cố tình tách.",
         "body": [
-          "Tích hợp CLAW giai đoạn đầu hưởng lợi từ cùng mẫu API trưởng thành: cách ly lệnh gọi ra sau hàng đợi nội bộ, giới hạn đồng thời, và ưu tiên đăng ký sự kiện thay vì poll khi có thể — giảm tải và đơn giản hóa phục hồi.",
-          "Trong bản xem trước, chúng tôi có thể bật header chẩn đoán hoặc trace id. Hãy dùng khi có, nhưng tránh phụ thuộc cứng cho đến khi được ghi trong tài liệu ổn định.",
-          "Kiểm thử nên phủ kịch bản sandbox có lỗi một phần. Tự động hóa chưa từng thấy timeout sẽ gây bất ngờ sau này. Chúng tôi sẽ công bố ma trận thử khuyến nghị cùng ví dụ tham chiếu.",
-          "Đội quan tâm có thể liên hệ qua support@aiagents-hub.vn kèm tóm tắt use case, quy mô dự kiến và khu vực. Chúng tôi ưu tiên đối tác có thể phản hồi có cấu trúc trong thời gian xem trước."
+          "Free là cách thử builder. Credit tặng ít và hết hạn. Chúng tôi không thiết kế Free thành sản phẩm chính.",
+          "Pro cho đội làm việc thật: quota cao hơn, quyền mua Credit, webhook, hỗ trợ ưu tiên. Giá gói nên nhàm. Mức dùng nên lớn theo việc agent thực sự chạy.",
+          "Enterprise là sự đảm bảo: SLA, dung lượng riêng hoặc tùy chỉnh, Credit cam kết, SSO/audit, và BYOK tùy chọn. Không phải bán sỉ token rẻ hơn.",
+          "Khi nhà cung cấp tăng giá, chúng tôi chỉnh hệ số kèm thông báo. Chúng tôi không đổi Credit thành token chuyển tiếp. Đó là ý nghĩa của một đồng hồ đo."
         ]
       }
     }

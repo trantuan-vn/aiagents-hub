@@ -8,16 +8,16 @@ import {
   BookOpen,
   Briefcase,
   Code2,
-  CreditCard,
   FileText,
   Layers,
   Mail,
   MessageCircle,
   Rocket,
-  Shield,
+  Share2,
   Sparkles,
   Users,
   Wallet,
+  Webhook,
   Zap,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -96,11 +96,11 @@ const Community = () => {
   ];
 
   const ecosystem = [
-    { icon: Zap, title: t("ecosystem.managed.title"), description: t("ecosystem.managed.description") },
-    { icon: Shield, title: t("ecosystem.ekyc.title"), description: t("ecosystem.ekyc.description") },
-    { icon: Wallet, title: t("ecosystem.auth.title"), description: t("ecosystem.auth.description") },
-    { icon: CreditCard, title: t("ecosystem.billing.title"), description: t("ecosystem.billing.description") },
-    { icon: Sparkles, title: t("ecosystem.claw.title"), description: t("ecosystem.claw.description") },
+    { icon: Zap, title: t("ecosystem.builder.title"), description: t("ecosystem.builder.description") },
+    { icon: Sparkles, title: t("ecosystem.agents.title"), description: t("ecosystem.agents.description") },
+    { icon: Wallet, title: t("ecosystem.credits.title"), description: t("ecosystem.credits.description") },
+    { icon: Share2, title: t("ecosystem.sharing.title"), description: t("ecosystem.sharing.description") },
+    { icon: Webhook, title: t("ecosystem.triggers.title"), description: t("ecosystem.triggers.description") },
     {
       icon: BarChart3,
       title: t("ecosystem.observability.title"),
@@ -134,7 +134,7 @@ const Community = () => {
                   {t("base_url_label")}
                 </span>
                 <code className="text-foreground bg-muted/80 rounded-lg px-3 py-1.5 font-mono text-sm">
-                  https://api.aiagents-hub.vn
+                  {t("base_url_value")}
                 </code>
               </div>
             </div>

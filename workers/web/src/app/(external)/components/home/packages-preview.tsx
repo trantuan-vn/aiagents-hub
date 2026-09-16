@@ -60,8 +60,8 @@ const PackagesPreview = () => {
     {
       name: t("enterprise"),
       description: t("enterprise_desc"),
-      price: "$149",
-      period: t("per_month"),
+      price: t("custom_price"),
+      period: "",
       features: [
         t("features.committed_credits"),
         t("features.sla_guarantee"),
@@ -70,7 +70,7 @@ const PackagesPreview = () => {
         t("features.model_family_visibility"),
       ],
       cta: t("contact_sales"),
-      href: "/auth/v3/login",
+      href: "/contact",
       variant: "outline" as const,
       popular: false,
     },
@@ -127,9 +127,15 @@ const PackagesPreview = () => {
                 ))}
               </ul>
 
-              <Button variant={pkg.variant} className="w-full" asChild>
-                <NextLink href={pkg.href}>{pkg.cta}</NextLink>
-              </Button>
+              {pkg.href.startsWith("/auth") ? (
+                <Button variant={pkg.variant} className="w-full" asChild>
+                  <NextLink href={pkg.href}>{pkg.cta}</NextLink>
+                </Button>
+              ) : (
+                <Button variant={pkg.variant} className="w-full" asChild>
+                  <Link to={pkg.href}>{pkg.cta}</Link>
+                </Button>
+              )}
             </div>
           ))}
         </div>
@@ -138,7 +144,7 @@ const PackagesPreview = () => {
         <div className="mt-12 text-center">
           <Link to="/packages">
             <Button variant="ghost" className="group">
-              {t("view_all_packages")}
+              {t("compare_plans")}
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
           </Link>

@@ -6,9 +6,9 @@ import {
   Code2,
   Cpu,
   Mail,
-  Server,
   Sparkles,
   Users,
+  Workflow,
   Zap,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -26,10 +26,10 @@ function mailtoHref(subject: string) {
   return `mailto:${CAREERS_EMAIL}?${q.toString()}`;
 }
 
-const JOB_KEYS = ["api_engineer", "devops", "dx"] as const;
+const JOB_KEYS = ["platform", "devops", "dx"] as const;
 
 const JOB_ICONS = {
-  api_engineer: Server,
+  platform: Workflow,
   devops: Cpu,
   dx: Code2,
 } as const;

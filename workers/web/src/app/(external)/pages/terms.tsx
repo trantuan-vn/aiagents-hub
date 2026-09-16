@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Blocks,
   Bot,
   FileText,
   Gavel,
@@ -25,7 +24,7 @@ const SECTION_ICONS = {
   services: Server,
   api_usage: Link2,
   ai_features: Bot,
-  blockchain: Blocks,
+  identity: Globe2,
   acceptable_use: Shield,
   accounts: Globe2,
   fees: Sparkles,
@@ -47,7 +46,7 @@ const SECTION_ORDER: SectionKey[] = [
   "services",
   "api_usage",
   "ai_features",
-  "blockchain",
+  "identity",
   "acceptable_use",
   "accounts",
   "fees",

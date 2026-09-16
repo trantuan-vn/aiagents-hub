@@ -16,17 +16,15 @@ const CTASection = () => {
   const t = useTranslations("CTA");
   const themeMode = usePreferencesStore((s) => s.themeMode);
 
-  // Sync theme with document
   useEffect(() => {
     updateThemeMode(themeMode);
   }, [themeMode]);
+
   return (
     <section className="relative overflow-hidden py-24">
-      {/* Background */}
       <div className="from-primary/10 via-background to-accent/10 absolute inset-0 bg-gradient-to-br" />
       <div className="bg-grid absolute inset-0 opacity-30" />
 
-      {/* Gradient orbs */}
       <div className="bg-primary/20 absolute top-0 left-1/4 h-72 w-72 rounded-full blur-3xl" />
       <div className="bg-accent/20 absolute right-1/4 bottom-0 h-72 w-72 rounded-full blur-3xl" />
 
@@ -44,7 +42,7 @@ const CTASection = () => {
                 <ArrowRight className="h-5 w-5" />
               </NextLink>
             </Button>
-            <RouterLink to="/support">
+            <RouterLink to="/contact">
               <Button variant="outline" size="lg">
                 <MessageCircle className="h-5 w-5" />
                 {t("talk_to_sales")}
@@ -52,17 +50,7 @@ const CTASection = () => {
             </RouterLink>
           </div>
 
-          {/* Trust badges */}
-          <div className="border-border/50 mt-12 border-t pt-12">
-            <p className="text-muted-foreground mb-6 text-sm">{t("trusted_by")}</p>
-            <div className="flex flex-wrap items-center justify-center gap-8 opacity-60">
-              {["Google", "Microsoft", "Amazon", "Meta", "Netflix"].map((company) => (
-                <span key={company} className="text-xl font-semibold tracking-tight">
-                  {company}
-                </span>
-              ))}
-            </div>
-          </div>
+          <p className="text-muted-foreground mt-12 text-sm">{t("trusted_by")}</p>
         </div>
       </div>
     </section>

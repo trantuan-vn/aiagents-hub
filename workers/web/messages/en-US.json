@@ -442,8 +442,8 @@
   "Navbar": {
     "home": "Home",
     "about": "About",
-    "packages": "Packages",
-    "documentation": "Documentation",
+    "packages": "Pricing",
+    "documentation": "Docs",
     "contact": "Contact",
     "pricing": "Pricing",
     "resources": "Resources",
@@ -460,7 +460,7 @@
     "developers": "Developers",
     "features": "Features",
     "pricing": "Pricing",
-    "api_packages": "API Packages",
+    "api_packages": "Plans",
     "documentation": "Documentation",
     "about": "About",
     "blog": "Blog",
@@ -470,63 +470,91 @@
     "changelog": "Changelog",
     "status": "Status",
     "terms": "Terms",
-    "api_reference": "eKYC API",
+    "api_reference": "Workflow API",
     "community": "Community",
-    "description": "Powerful API services for developers and businesses. Build faster with our reliable infrastructure.",
-    "copyright": "© {year} AIAgentsHub. All rights reserved.",
+    "description": "Build AI agents and workflows on one platform. Pay in Credits for completed work — not tokens, not infrastructure line items.",
+    "copyright": "© {year} AI Agents Hub. All rights reserved.",
     "privacy_policy": "Privacy Policy",
     "terms_of_service": "Terms of Service",
-    "cookies": "Cookies"
+    "cookies": "Cookies",
+    "quickstart": "Quickstart"
   },
   "Hero": {
-    "badge": "Now with AI-powered recommendations",
-    "title": "Build Faster with",
-    "title_gradient": "Powerful APIs",
-    "subtitle": "Access enterprise-grade API services with simple pricing. From data processing to AI integrations, we've got you covered.",
-    "explore_apis": "Explore APIs",
-    "view_demo": "View Demo",
+    "badge": "One Platform, One Credit, Unlimited Models",
+    "title": "Build AI agents that",
+    "title_gradient": "finish the job",
+    "subtitle": "Design workflows, run agents with tools and memory, then pay in Credits for the work they complete. We handle models, cost, and infrastructure behind the scenes.",
+    "explore_apis": "View pricing",
+    "view_demo": "Read the docs",
     "uptime_sla": "Uptime SLA",
     "api_calls_per_day": "API Calls/Day",
     "developers": "Developers",
     "low_latency": "Low Latency",
     "enterprise_security": "Enterprise Security",
-    "ai_powered": "AI-Powered"
+    "ai_powered": "AI-Powered",
+    "get_started": "Start building",
+    "view_docs": "Read the docs",
+    "stat_credit_value": "1",
+    "stat_credit_label": "Credit for every model",
+    "stat_models_value": "∞",
+    "stat_models_label": "Models, one meter",
+    "stat_plans_value": "3",
+    "stat_plans_label": "Plans: Free · Pro · Enterprise",
+    "pill_builder": "Visual workflow builder",
+    "pill_credits": "Billed in Credits",
+    "pill_enterprise": "Enterprise SLA"
   },
   "Features": {
-    "badge": "Why Choose Us",
-    "title": "Built for Scale, Designed for",
-    "title_gradient": "Developers",
-    "subtitle": "Everything you need to integrate powerful APIs into your applications, with enterprise-grade reliability.",
-    "lightning_fast": "Lightning Fast",
-    "lightning_fast_desc": "Average response time under 50ms with our globally distributed infrastructure.",
-    "enterprise_security": "Enterprise Security",
-    "enterprise_security_desc": "SOC 2 compliant with end-to-end encryption and advanced threat protection.",
-    "global_cdn": "Global CDN",
-    "global_cdn_desc": "Edge servers in 50+ locations ensure minimal latency worldwide.",
-    "realtime_analytics": "Real-time Analytics",
-    "realtime_analytics_desc": "Monitor usage, track performance, and optimize your API consumption.",
-    "developer_first": "Developer First",
-    "developer_first_desc": "Comprehensive SDKs, detailed docs, and code examples in every language.",
-    "support_24_7": "24/7 Support",
-    "support_24_7_desc": "AI-powered chatbot plus dedicated support engineers ready to help.",
-    "ai_integration": "AI Integration",
-    "ai_integration_desc": "Smart recommendations and natural language queries for your data.",
-    "rate_limiting": "Rate Limiting",
-    "rate_limiting_desc": "Flexible rate limits with burst allowances and automatic scaling."
+    "badge": "The platform",
+    "title": "Everything to ship",
+    "title_gradient": "working agents",
+    "subtitle": "A workspace for building, running, and sharing AI workflows — with one Credit meter instead of token invoices.",
+    "lightning_fast": "Visual workflow builder",
+    "lightning_fast_desc": "Compose agents, tools, RAG, HTTP, and logic on a canvas.",
+    "enterprise_security": "Security by default",
+    "enterprise_security_desc": "Encrypted in transit, scoped API keys, and least-privilege dashboard access.",
+    "global_cdn": "Runs on the edge",
+    "global_cdn_desc": "Workflows execute on Cloudflare Workers close to your users.",
+    "realtime_analytics": "Usage you can explain",
+    "realtime_analytics_desc": "Credit estimates before a run and actual charges after.",
+    "developer_first": "Developer friendly",
+    "developer_first_desc": "Webhook triggers, API keys, and docs that match the product you actually use.",
+    "support_24_7": "Support by plan",
+    "support_24_7_desc": "Community on Free, priority on Pro, dedicated SLA on Enterprise.",
+    "ai_integration": "Agents, memory, RAG",
+    "ai_integration_desc": "Agent nodes with tools, session memory, Vectorize, and database lookups.",
+    "rate_limiting": "Quotas, not surprise bills",
+    "rate_limiting_desc": "Infrastructure quotas come with the plan. AI usage is metered in Credits.",
+    "workflow_builder": "Visual workflow builder",
+    "workflow_builder_desc": "Compose agents, tools, RAG, HTTP, and logic on a canvas. Save versions and run from the dashboard.",
+    "agents_rag": "Agents, memory, RAG",
+    "agents_rag_desc": "Agent and reasoning-agent nodes with tools, session memory, Vectorize, and database lookups.",
+    "one_credit": "One Credit",
+    "one_credit_desc": "Every model bills in Credits. You see cost per run, not USD per million tokens.",
+    "unlimited_models": "Unlimited models",
+    "unlimited_models_desc": "Swap tiny, mid, or frontier models without changing your plan. We manage coefficients internally.",
+    "webhooks_cron": "Webhooks & cron",
+    "webhooks_cron_desc": "Trigger workflows from HTTP, schedules, or hosted chat — same graph, same Credit wallet.",
+    "sharing_royalty": "Share & earn",
+    "sharing_royalty_desc": "Publish a workflow. When someone else runs it, they pay Credits; you receive royalties.",
+    "usage_visibility": "Usage you can explain",
+    "usage_visibility_desc": "See Credit estimates before a run and actual charges after — plus logs for each execution.",
+    "support_levels": "Support by plan",
+    "support_levels_desc": "Community on Free, priority on Pro, dedicated channels and SLA on Enterprise."
   },
   "CTA": {
-    "title": "Ready to Start",
-    "title_gradient": "Building?",
-    "subtitle": "Join thousands of developers using our APIs to power their applications. Get started for free, no credit card required.",
-    "get_started_free": "Get Started Free",
-    "talk_to_sales": "Talk to Sales",
-    "trusted_by": "Trusted by developers at"
+    "title": "Ready to run your",
+    "title_gradient": "first agent?",
+    "subtitle": "Create a free workspace, build a workflow, and spend included Credits. No token math, no credit card required to start.",
+    "get_started_free": "Start free",
+    "talk_to_sales": "Talk to sales",
+    "trusted_by": "Built for teams who want agents that complete work — billed in one Credit."
   },
   "Packages": {
     "badge": "Pricing",
-    "title": "Simple, Transparent",
-    "title_gradient": "Pricing",
-    "subtitle": "Choose the plan that fits your needs. Scale up or down at any time.",
+    "title": "Simple, stable",
+    "title_gradient": "plans",
+    "subtitle": "Subscription unlocks the platform. Credits meter AI and agent usage. Enterprise buys the guarantee.",
     "free": "Free",
     "free_desc": "Try the platform — included Credits expire each period",
     "pro": "Pro",
@@ -536,11 +564,13 @@
     "enterprise": "Enterprise",
     "enterprise_desc": "SLA, dedicated infrastructure, and committed Credits",
     "per_month": "/month",
+    "custom_price": "Custom",
     "most_popular": "Most Popular",
     "start_free": "Start Free",
     "get_started": "Get Started",
     "contact_sales": "Contact Sales",
-    "view_all_packages": "View all packages",
+    "view_all_packages": "Compare plans",
+    "compare_plans": "Compare plans",
     "features": {
       "included_credits": "{count} included Credits / month",
       "platform_access": "Workflow builder and sharing",
@@ -550,6 +580,9 @@
       "committed_credits": "Committed Credit volume + on-demand",
       "custom_quotas": "Custom quotas and dedicated infra",
       "model_family_visibility": "Model family visible (still billed in Credits)",
+      "credits_expire": "Included Credits expire at period end",
+      "sharing": "Share workflows and earn royalties",
+      "sso_audit": "SSO, audit, and custom terms",
       "api_calls_month": "{count} API calls/month",
       "basic_analytics": "Basic analytics",
       "community_support": "Community support",
@@ -558,7 +591,7 @@
       "advanced_analytics": "Advanced analytics",
       "priority_support": "Priority support",
       "higher_rate_limits": "Higher rate limits",
-      "webhooks": "Webhooks",
+      "webhooks": "Webhooks and cron triggers",
       "custom_domains": "Custom domains",
       "unlimited_api_calls": "Unlimited API calls",
       "realtime_analytics": "Real-time analytics",
@@ -571,13 +604,13 @@
     }
   },
   "PackagesPage": {
-    "badge": "API Marketplace",
-    "title": "Explore Our",
-    "title_gradient": "API Packages",
-    "subtitle": "Choose from our collection of powerful APIs. Each package includes comprehensive documentation and SDKs.",
-    "search_placeholder": "Search APIs...",
+    "badge": "Subscription + Credits",
+    "title": "Pay for completed work,",
+    "title_gradient": "not tokens",
+    "subtitle": "One Credit meters every model. Plans stay stable when providers change price — we adjust coefficients, not your invoice line items.",
+    "search_placeholder": "Search plans...",
     "category": "Category",
-    "all_categories": "All Categories",
+    "all_categories": "All",
     "ai_ml": "AI & ML",
     "claw": "CLAW",
     "data_processing": "Data Processing",
@@ -592,108 +625,131 @@
     "included_credits": "included Credits / month",
     "api_calls": "API calls",
     "more_features": "+{count} more features",
-    "no_packages_found": "No packages found matching your criteria.",
+    "no_packages_found": "No plans found matching your criteria.",
+    "layers": {
+      "kicker": "How we charge",
+      "title": "Three layers.",
+      "title_gradient": "That's it.",
+      "subtitle": "We sell platform access, AI/agent consumption, and enterprise guarantees — not Cloudflare invoices.",
+      "subscription": {
+        "title": "Subscription",
+        "body": "The right to use the workspace, builder, sharing, webhooks, cron, and plan-level support. Price stays put when model catalogs move."
+      },
+      "credit": {
+        "title": "Credit",
+        "body": "Prepaid service units for agent and model usage. Cheap models cost few Credits; frontier models cost more. You never see USD/1M tokens."
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "body": "SLA, dedicated capacity, custom quotas, SSO/audit, and committed Credit volume. Optional BYOK is an add-on — not a token reseller."
+      }
+    },
     "packages": {
       "ai_vision": {
-        "name": "AI Vision API",
-        "description": "Advanced image recognition, object detection, and visual content analysis powered by machine learning.",
+        "name": "Pro",
+        "description": "For teams running real agents.",
         "features": {
-          "0": "Object detection",
-          "1": "Face recognition",
-          "2": "OCR",
-          "3": "Content moderation"
+          "0": "Included Credits",
+          "1": "Buy extra Credits",
+          "2": "Webhooks",
+          "3": "Priority support"
         }
       },
       "claw_api": {
-        "name": "CLAW APIs",
-        "description": "Integrate once across CLAW variants—OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible stacks—for agents, automation, and system connectivity.",
+        "name": "Enterprise",
+        "description": "SLA and committed volume.",
         "features": {
-          "0": "OpenClaw, NanoClaw, NemoClaw, BizClaw, and more",
-          "1": "Routing and configuration per CLAW type",
-          "2": "Webhooks and real-time event streams",
-          "3": "Extensible for custom CLAW implementations"
+          "0": "Committed Credits",
+          "1": "SLA",
+          "2": "Dedicated support",
+          "3": "Custom quotas"
         }
       }
     }
   },
   "AboutPage": {
-    "badge": "API infrastructure",
-    "title": "Built for teams who treat APIs as",
-    "title_gradient": "core business",
-    "subtitle": "AIAgentsHub powers aiagents-hub.vn — a managed platform for reliable, metered API access. We help developers and enterprises ship faster with clear contracts, observability, and security baked in.",
+    "badge": "AI Agents Hub",
+    "title": "We sell completed work,",
+    "title_gradient": "not tokens",
+    "subtitle": "AI Agents Hub is the platform behind aiagents-hub.vn: visual workflows, agents with tools and memory, and one Credit for every model. Customers pay for the job done; we manage cost and infrastructure.",
     "mission": {
       "title": "Why we exist",
-      "lead": "Software today runs on APIs. Billing, identity, AI, automation — when the API layer fails, products fail.",
-      "body": "We focus on predictable performance, transparent usage, and documentation you can actually integrate from day one. Whether you are prototyping or running production traffic, our job is to stay invisible where it matters: uptime, latency, and trust.",
-      "terminal": "GET /v1/health HTTP/1.1\nHost: api.aiagents-hub.vn\n\n200 OK\n{\n  \"status\": \"healthy\",\n  \"region\": \"global\",\n  \"latency_ms\": 42\n}",
-      "terminal_caption": "Consistent responses across regions — monitored 24/7"
+      "lead": "Teams should not become token accountants. They should ship agents that answer, retrieve, and act.",
+      "body": "We built a workspace where you design the work once, run it on webhooks, cron, or chat, and see a Credit estimate — not USD per million tokens, not D1/R2 line items. Cheap or frontier models are an internal coefficient. Your plan stays readable.",
+      "terminal": "POST /hooks/workflows/wf_42/run\nAuthorization: Bearer •••••\n\n200 OK\n{\n  \"status\": \"succeeded\",\n  \"credits\": 1.24,\n  \"job\": \"support_summary\"\n}",
+      "terminal_caption": "Estimate before the run. Charge after. One Credit for every model."
     },
     "values_section": {
       "title": "What we optimize",
       "title_gradient": "every day",
-      "subtitle": "Principles that shape how we design endpoints, dashboards, and support."
+      "subtitle": "Principles that shape the builder, the meter, and the support you get."
     },
     "values": {
+      "job_done": {
+        "title": "Charge the job",
+        "description": "Customers buy agent runs and workflow outcomes. We never sell Cloudflare, GPT, or Claude tokens as a product."
+      },
       "api_first": {
-        "title": "API-first delivery",
-        "description": "Products and pricing are built around clear REST contracts, versioning, and deprecation policies — not afterthoughts."
+        "title": "Charge the job",
+        "description": "Customers buy agent runs and workflow outcomes. We never sell Cloudflare, GPT, or Claude tokens as a product."
       },
       "trust": {
-        "title": "Security & compliance",
-        "description": "Encryption in transit, least-privilege keys, and audit-friendly controls so teams can meet internal and regulatory expectations."
+        "title": "Security & trust",
+        "description": "Encryption in transit, scoped keys, and audit-friendly logs so teams can run agents in production with eyes open."
       },
       "developer": {
-        "title": "Developer experience",
-        "description": "Docs with runnable examples, predictable error codes, and tooling that shortens the path from first call to production."
+        "title": "Builder experience",
+        "description": "A canvas, node catalog, hosted chat, and webhook paths that go from first graph to a live agent without a rewrite."
       },
       "scale": {
-        "title": "Global scale",
-        "description": "Edge-aware routing and capacity planning so spikes in traffic look like a line chart, not an outage story."
+        "title": "Grow with usage",
+        "description": "When you serve more users, you spend more Credits — not a surprise jump in plan price. Enterprise adds SLA on top."
       }
     },
     "stats": {
       "uptime": {
-        "value": "99.9%",
-        "label": "Target uptime SLA"
+        "value": "1 Credit",
+        "label": "One meter for every model"
       },
       "latency": {
-        "value": "<50ms",
-        "label": "Typical API latency"
+        "value": "3 plans",
+        "label": "Free · Pro · Enterprise"
       },
       "regions": {
-        "value": "50+",
-        "label": "Edge locations"
+        "value": "Edge",
+        "label": "Runs on Cloudflare Workers"
       },
       "sla": {
-        "value": "24/7",
-        "label": "Monitoring & alerts"
+        "value": "SLA",
+        "label": "On Enterprise, with notice"
       }
     },
     "cta": {
-      "title": "Ready to integrate",
-      "title_gradient": "in minutes?",
-      "subtitle": "Create an account, pick a package, and start calling production endpoints with metered usage you can track in the dashboard.",
+      "title": "Start with a",
+      "title_gradient": "free workspace",
+      "subtitle": "Included Credits expire each period. Pro unlocks buying more. Enterprise is for teams that need a contract.",
       "get_started": "Get started",
-      "view_packages": "View packages",
+      "view_packages": "View pricing",
       "view_docs": "Read the docs"
     }
   },
   "CommunityPage": {
-    "badge": "Connect & build",
-    "title": "A community for teams shipping on",
-    "title_gradient": "aiagents-hub.vn",
-    "subtitle": "Documentation, support, and clear paths into managed APIs, eKYC, and the dashboard—whether you are prototyping or running production traffic.",
-    "base_url_label": "Production base URL",
+    "badge": "Build together",
+    "title": "A community for teams shipping",
+    "title_gradient": "agents",
+    "subtitle": "Docs, support, and a clear path from first workflow to production Credit usage — whether you are prototyping or running live agents.",
+    "base_url_label": "App",
+    "base_url_value": "https://aiagents-hub.vn",
     "steps": {
       "title": "Start in",
       "title_gradient": "three moves",
-      "subtitle": "The same flows our customers use—no guesswork.",
-      "1_title": "Create an account",
-      "1_desc": "Sign in to the dashboard to manage API keys, sessions, and wallet-linked identity.",
-      "2_title": "Choose a package",
-      "2_desc": "Pick metered access that matches your workloads—eKYC, CLAW, AI Vision, and more.",
-      "3_title": "Integrate & observe",
-      "3_desc": "Call api.aiagents-hub.vn with Bearer tokens, track usage in the dashboard, and reach support when you need humans."
+      "subtitle": "The same flows our customers use — no guesswork.",
+      "1_title": "Create a workspace",
+      "1_desc": "Sign in to the dashboard. Your Free plan includes a small Credit pool that expires each period.",
+      "2_title": "Build a workflow",
+      "2_desc": "Drop a trigger, an agent, tools or RAG on the canvas. Estimate Credits before you run.",
+      "3_title": "Run & observe",
+      "3_desc": "Fire from chat, webhook, or cron. We debit Credits for AI usage; logs show what happened."
     },
     "paths": {
       "title": "Where to go",
@@ -701,19 +757,19 @@
       "subtitle": "Jump straight to the resources you need.",
       "docs": {
         "title": "Documentation",
-        "description": "Platform overview, guides, and how the pieces fit together."
+        "description": "Platform overview and how the pieces fit together."
       },
       "quickstart": {
         "title": "Quickstart",
-        "description": "Ship your first requests against the production API."
+        "description": "From empty canvas to a running agent."
       },
       "api": {
-        "title": "eKYC API reference",
-        "description": "Endpoints, authentication, and runnable examples."
+        "title": "Workflow API",
+        "description": "Webhook triggers, authentication, and runnable examples."
       },
       "packages": {
-        "title": "Packages",
-        "description": "Plans, features, and clear metering for every surface."
+        "title": "Pricing",
+        "description": "Free, Pro, Enterprise — Subscription plus Credits."
       },
       "support": {
         "title": "Support",
@@ -721,67 +777,87 @@
       },
       "contact": {
         "title": "Contact",
-        "description": "Partnerships, integrations, and billing questions."
+        "description": "Partnerships, billing, and Enterprise conversations."
       },
       "blog": {
         "title": "Blog",
-        "description": "Notes on eKYC, CLAW, and platform updates."
+        "description": "Notes on agents, Credits, and sharing workflows."
       },
       "careers": {
         "title": "Careers",
-        "description": "Join the team building the managed API platform."
+        "description": "Join the team building the agent platform."
       }
     },
     "ecosystem": {
-      "title": "Aligned with",
-      "title_gradient": "live services",
-      "subtitle": "Every block below maps to something you can run on the platform today.",
-      "managed": {
-        "title": "Managed API gateway",
-        "description": "Stable endpoints, predictable errors, and metered usage across regions."
+      "title": "What you can run",
+      "title_gradient": "today",
+      "subtitle": "Every block below maps to something in the product.",
+      "builder": {
+        "title": "Workflow builder",
+        "description": "Visual graphs with agents, HTTP, code, flow, and notes — versioned in your workspace."
       },
-      "ekyc": {
-        "title": "eKYC & identity",
-        "description": "Identity flows built for compliance with audit-friendly controls."
+      "agents": {
+        "title": "Agents & RAG",
+        "description": "Agent loops, reasoning agents, session memory, Vectorize, and database tools."
       },
-      "auth": {
-        "title": "Auth & wallet",
-        "description": "Sessions, API keys, SIWE, and passkeys—secured for dashboard and APIs."
+      "credits": {
+        "title": "One Credit",
+        "description": "A single prepaid unit for model and agent usage. Top up with VNPay, Casso, or PayPal."
       },
-      "billing": {
-        "title": "Billing & payments",
-        "description": "Transparent plans and payment flows tied to measured usage."
+      "sharing": {
+        "title": "Share & royalties",
+        "description": "Publish a workflow. Others run it in Credits; you earn a royalty without extra COGS for the Hub."
       },
-      "claw": {
-        "title": "CLAW & AI APIs",
-        "description": "Automation-ready surfaces for agents, CLAW variants, and multimodal workloads."
+      "triggers": {
+        "title": "Triggers",
+        "description": "Webhooks, cron, forms, and hosted chat — same workflow, same wallet."
       },
       "observability": {
-        "title": "Analytics & monitoring",
-        "description": "Usage visibility, alerts, and health checks so production traffic stays trustworthy."
+        "title": "Logs & executions",
+        "description": "See estimates, actual Credits, and run history so production traffic stays explainable."
+      },
+      "managed": {
+        "title": "Workflow builder",
+        "description": "Visual graphs with agents and tools."
+      },
+      "ekyc": {
+        "title": "Agents & RAG",
+        "description": "Agent loops, memory, and retrieval."
+      },
+      "auth": {
+        "title": "One Credit",
+        "description": "A single prepaid unit for AI usage."
+      },
+      "billing": {
+        "title": "Share & royalties",
+        "description": "Publish workflows and earn when others run them."
+      },
+      "claw": {
+        "title": "Triggers",
+        "description": "Webhooks, cron, forms, and hosted chat."
       }
     },
     "cta": {
       "title": "Ready to build",
       "title_gradient": "with us?",
-      "subtitle": "Open the dashboard, read the docs, or email us—we route every message to the right owners.",
+      "subtitle": "Open the dashboard, read the docs, or email us — we route every message to the right owners.",
       "get_started": "Open dashboard",
       "view_docs": "Read documentation",
       "contact": "Contact the team"
     }
   },
   "CareersPage": {
-    "badge": "Join the API platform team",
-    "title": "Build the backbone of",
-    "title_gradient": "modern integrations",
-    "subtitle": "We operate aiagents-hub.vn as a managed API business: reliable gateways, clear metering, and developer-first docs. Help us ship infrastructure other teams depend on every day.",
+    "badge": "Join the agent platform team",
+    "title": "Build the workspace where",
+    "title_gradient": "agents go to work",
+    "subtitle": "We operate aiagents-hub.vn as an AI agent platform: visual workflows, one Credit meter, and infrastructure customers never have to invoice. Help us ship the product teams run every day.",
     "why": {
       "title": "Why",
-      "title_gradient": "AIAgentsHub",
-      "subtitle": "Small team, high leverage — typical of an early-stage API product company.",
+      "title_gradient": "AI Agents Hub",
+      "subtitle": "Small team, high leverage — typical of an early-stage product company.",
       "impact": {
         "title": "Product-shaped work",
-        "description": "Your code touches authentication, quotas, observability, and customer-facing contracts — not internal-only tools."
+        "description": "Your code touches the builder, runtime, Credit meter, and customer-facing contracts — not internal-only tools."
       },
       "ownership": {
         "title": "Ownership end-to-end",
@@ -789,7 +865,7 @@
       },
       "stack": {
         "title": "Modern stack",
-        "description": "Cloud-native services, strong typing, metrics everywhere, and docs that stay in sync with the API."
+        "description": "Cloudflare Workers, Durable Objects, D1, R2, Vectorize, typed workflow plugins, and docs that stay in sync."
       }
     },
     "roles_section": {
@@ -799,32 +875,32 @@
       "team_total": "~4–5 people across these roles in phase one"
     },
     "jobs": {
-      "api_engineer": {
-        "title": "Backend / API Engineer",
+      "platform": {
+        "title": "Platform / Workflow Engineer",
         "headcount": "2 roles",
         "employment": "Full-time",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Design and ship production APIs: versioning, auth, rate limits, metering, and consistent error models. You will collaborate closely on gateway behavior and dashboard-backed usage data.",
+        "description": "Design and ship the workflow runtime: node plugins, agent loops, billing in Credits, and consistent execution. You will work across the canvas schema and the Workers that actually run graphs.",
         "responsibilities": [
-          "Own REST/JSON (and future) API surfaces with clear deprecation and compatibility rules.",
-          "Implement resilient request paths, idempotency where needed, and observability (traces, metrics, structured logs).",
-          "Partner with platform on rollout, feature flags, and safe schema evolution.",
-          "Review integrations and help tune performance under real customer load."
+          "Own execute/trigger plugins (agent, RAG, webhook, HTTP, memory) with clear compatibility rules.",
+          "Implement resilient runs, retries that we eat vs. customer-paid usage, and structured logs.",
+          "Partner on Credit charging, estimates, and royalty when shared workflows run.",
+          "Review graphs under real customer load and keep the node catalog honest."
         ],
         "apply_label": "Apply for this role",
-        "apply_subject": "Application — Backend / API Engineer"
+        "apply_subject": "Application — Platform / Workflow Engineer"
       },
       "devops": {
         "title": "DevOps / Platform Engineer",
         "headcount": "1 role",
         "employment": "Full-time",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Keep our API edge reliable: CI/CD, environments, secrets, capacity, and incident tooling. You care about SLOs, not just servers.",
+        "description": "Keep the Workers edge reliable: CI/CD, environments, secrets, capacity, and incident tooling. You care about SLOs, not just servers.",
         "responsibilities": [
           "Build and maintain pipelines, infrastructure-as-code, and safe deployment practices.",
-          "Run monitoring, alerting, and on-call playbooks aligned with API latency and availability targets.",
-          "Harden networking, TLS, and access patterns between services and the public gateway.",
-          "Improve cost and performance visibility as traffic grows."
+          "Run monitoring, alerting, and on-call playbooks aligned with workflow latency and availability.",
+          "Harden networking, TLS, and access patterns between services and public hooks.",
+          "Improve cost and performance visibility as Credit usage grows."
         ],
         "apply_label": "Apply for this role",
         "apply_subject": "Application — DevOps / Platform Engineer"
@@ -834,11 +910,11 @@
         "headcount": "1 role",
         "employment": "Full-time",
         "location": "Remote · Hybrid (GMT+7)",
-        "description": "Make integration effortless: documentation, examples, onboarding flows, and crisp communication with partners. You bridge product, support, and engineering.",
+        "description": "Make building agents effortless: documentation, examples, onboarding, and crisp communication with partners. You bridge product, support, and engineering.",
         "responsibilities": [
-          "Own developer docs, quickstarts, and reference material that match real API behavior.",
-          "Produce code samples, Postman collections, or SDK snippets that teams can copy-paste with confidence.",
-          "Gather feedback from integrators and turn it into actionable improvements.",
+          "Own developer docs, quickstarts, and reference material that match real workflow behavior.",
+          "Produce samples for webhook triggers and hosted chat that teams can copy with confidence.",
+          "Gather feedback from builders and turn it into actionable improvements.",
           "Support technical conversations with early customers and community channels."
         ],
         "apply_label": "Apply for this role",
@@ -848,17 +924,17 @@
     "cta": {
       "title": "Don’t see a perfect fit?",
       "title_gradient": "Say hello anyway",
-      "subtitle": "We read every message. Send us a few lines about what you want to build — we will reach out when there is a good fit.",
-      "apply_general": "Email admin",
-      "apply_general_subject": "General application — AIAgentsHub / aiagents-hub.vn",
+      "subtitle": "We read every message. Send a few lines about what you want to build — we will reach out when there is a good fit.",
+      "apply_general": "Email hiring",
+      "apply_general_subject": "General application — AI Agents Hub / aiagents-hub.vn",
       "browse_docs": "Read the docs"
     }
   },
   "ContactPage": {
     "badge": "We’re here to help",
     "title": "Talk to the",
-    "title_gradient": "AIAgentsHub team",
-    "subtitle": "Questions about billing, integration, or partnerships? Reach out — we route every message to the right people at aiagents-hub.vn.",
+    "title_gradient": "AI Agents Hub team",
+    "subtitle": "Questions about Credits, workflows, or Enterprise? Reach out — we route every message to the right people at aiagents-hub.vn.",
     "response_hint": "We usually reply within one business day.",
     "cards": {
       "copy": {
@@ -866,13 +942,13 @@
         "description": "One tap to copy — paste into your mail app anytime."
       },
       "support": {
-        "title": "Self‑serve help",
-        "description": "AI answers and FAQs for keys, limits, and plans.",
+        "title": "Self-serve help",
+        "description": "Answers for Credits, plans, and first workflows.",
         "action": "Open Support"
       },
       "docs": {
         "title": "Documentation",
-        "description": "Quickstart, reference, and examples for api.aiagents-hub.vn.",
+        "description": "Quickstart, webhook triggers, and how Credits work.",
         "action": "Browse docs"
       }
     },
@@ -887,14 +963,14 @@
       "email_placeholder": "you@company.com",
       "topic_label": "Topic",
       "message_label": "Message",
-      "message_placeholder": "What should we know? Include links or account details if relevant.",
+      "message_placeholder": "What should we know? Include workspace details if relevant.",
       "submit": "Open in email app",
       "mailto_note": "Submitting opens your default mail app with a draft to support@aiagents-hub.vn. You can edit before sending."
     },
     "topics": {
       "general": "General",
-      "billing": "Billing & plans",
-      "technical": "Technical / API",
+      "billing": "Billing & Credits",
+      "technical": "Workflows / agents",
       "partnership": "Partnership",
       "other": "Other"
     },
@@ -908,40 +984,51 @@
     "validation_message": "Please add a bit more detail (at least 8 characters)."
   },
   "SupportPage": {
-    "badge": "AI-Powered Support",
-    "title": "How Can We",
-    "title_gradient": "Help?",
-    "subtitle": "Chat with our AI assistant or browse our resources for instant answers.",
-    "ai_assistant": "AI Support Assistant",
+    "badge": "Support",
+    "title": "How can we",
+    "title_gradient": "help?",
+    "subtitle": "Ask about Credits, workflows, or plans — or browse the FAQ.",
+    "ai_assistant": "Support assistant",
     "online": "Online",
     "type_message": "Type your message...",
     "quick_actions": {
-      "recommend_api": "Recommend an API for my use case",
-      "calls_left": "How many calls do I have left?",
-      "rate_limiting": "Help with rate limiting",
-      "upgrade": "Upgrade my subscription"
+      "build_agent": "How do I build my first agent?",
+      "credits_left": "How do Credits work?",
+      "how_credits": "What does a run cost?",
+      "recommend_api": "How do I build my first agent?",
+      "calls_left": "How do Credits work?",
+      "rate_limiting": "What does a run cost?",
+      "upgrade": "Upgrade my plan"
     },
     "faq": {
       "title": "FAQ",
+      "first_workflow": {
+        "question": "How do I build my first workflow?",
+        "answer": "Open Dashboard > Workflows, create a graph, add a trigger and an agent, then run from chat or Execute. A Credit estimate appears before AI nodes fire."
+      },
+      "credits": {
+        "question": "How do Credits work?",
+        "answer": "Credits are prepaid service units for AI and agent usage. Included Credits expire at the end of each billing period. Pro can buy more; Free generally cannot stockpile."
+      },
       "generate_key": {
-        "question": "How do I generate a new API key?",
-        "answer": "Go to Dashboard > API Keys > Click \"New Key\". You can name your key and set permissions."
+        "question": "How do I build my first workflow?",
+        "answer": "Open Dashboard > Workflows, create a graph, add a trigger and an agent, then run."
       },
       "rate_limit": {
-        "question": "What happens if I exceed my rate limit?",
-        "answer": "Requests exceeding your rate limit will receive a 429 response. Consider upgrading your plan for higher limits."
+        "question": "How do Credits work?",
+        "answer": "Credits meter AI usage. Infrastructure quotas come with your plan and are not sold as line items."
       },
       "change_plan": {
-        "question": "How do I change my subscription plan?",
-        "answer": "Navigate to Dashboard > Billing > Change Plan. Changes take effect at your next billing cycle."
+        "question": "How do I change my plan?",
+        "answer": "Go to Dashboard > Billing. Plan changes follow the next cycle unless you are moving to Enterprise by contract."
       },
       "free_trial": {
-        "question": "Is there a free trial available?",
-        "answer": "Yes! All our APIs include a free tier with limited calls per month. No credit card required."
+        "question": "Is there a free plan?",
+        "answer": "Yes. Free includes a small Credit pool that expires each period. No card required to start."
       }
     },
     "need_help": {
-      "title": "Need More Help?",
+      "title": "Need more help?",
       "description": "Reach out to our support team",
       "email_support": "Email Support",
       "response_time": "Response Time",
@@ -949,86 +1036,89 @@
     },
     "resources": {
       "title": "Resources",
-      "api_docs": "API Documentation",
-      "getting_started": "Getting Started Guide",
-      "video_tutorials": "Video Tutorials",
-      "developer_blog": "Developer Blog"
+      "api_docs": "Documentation",
+      "getting_started": "Getting started",
+      "credits_guide": "Plans & Credits",
+      "video_tutorials": "Video tutorials",
+      "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Hello! I'm your AI support assistant. I can help you with API recommendations, troubleshooting, and answer questions about your usage. How can I assist you today?",
-      "recommend": "Based on your question, I'd recommend our **AI Vision API** for image work, or our **CLAW APIs** (OpenClaw, NanoClaw, NemoClaw, BizClaw, …) for agents and automation. What specific use case are you working on?",
-      "calls": "You currently have **15,000 API calls** remaining this month across all your subscriptions. Your quota resets on the 1st of each month.",
-      "rate_limit": "Rate limiting protects our infrastructure. Your current limits are:\n- **Free tier**: 10 requests/second\n- **Pro tier**: 100 requests/second\n\nConsider implementing exponential backoff in your code.",
-      "default": "I understand you're asking about {query}. Let me connect you with more specific information. Could you provide more details about what you're trying to accomplish?"
+      "welcome": "Hello — I can help with workflows, Credits, and plans. What are you trying to ship?",
+      "recommend": "Start in Dashboard > Workflows: add a trigger (chat, webhook, or cron), an agent node, and optional RAG or tools. Run once and watch the Credit estimate. Need a specific job (support, RAG Q&A, HTTP automation)?",
+      "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each period. Pro can buy more (wallet cap applies). You will not see USD/1M tokens on the member UI.",
+      "how_credits": "A run costs Credits based on model class (tiny / mid / frontier) and tokens used. You get an estimate first; the wallet is charged after. Sharing someone else's workflow may add a royalty in Credits.",
+      "calls": "Credits meter AI usage. Check Dashboard > Billing for your balance and included pool.",
+      "rate_limit": "Plans include infrastructure quotas (to prevent abuse). AI usage is Credits, not request/second product SKUs. If a run is blocked, check quota and Credit balance.",
+      "default": "I understand you're asking about {query}. Share whether this is about building a workflow, Credits, or your plan and I can point you more precisely."
     }
   },
   "TermsPage": {
     "badge": "Legal",
     "title": "Terms of",
     "title_gradient": "Service",
-    "subtitle": "These Terms govern your use of aiagents-hub.vn and our managed API platform—including AI-assisted and blockchain-related capabilities—in line with common international practice for cloud and API services.",
-    "last_updated": "Last updated: March 25, 2025",
+    "subtitle": "These Terms govern your use of AI Agents Hub (aiagents-hub.vn): the workflow builder, agents, Credits, and related APIs.",
+    "last_updated": "Last updated: September 16, 2026",
     "toc_title": "On this page",
     "toc_aria": "Terms of service sections",
     "related_title": "Related",
     "related_contact": "Contact & legal notices",
     "cta_title": "Questions about these Terms?",
-    "cta_body": "Our team can help clarify billing, integration, compliance, or enterprise agreements.",
+    "cta_body": "Our team can help clarify Credits, plans, Enterprise agreements, or acceptable use.",
     "cta_button": "Contact us",
     "sections": {
       "agreement": {
         "title": "Agreement to these Terms",
         "paragraphs": [
           "These Terms of Service (\"Terms\") form a binding agreement between you (\"you\", \"your\", or \"Customer\") and the operator of aiagents-hub.vn and api.aiagents-hub.vn (collectively, the \"Platform\", \"we\", \"us\", or \"our\").",
-          "By accessing or using the Platform, creating an account, subscribing to an API product, generating API keys, connecting a wallet, or otherwise using our services, you agree to these Terms and to our Privacy Policy (where applicable). If you do not agree, do not use the Platform.",
+          "By accessing or using the Platform, creating an account, subscribing, buying Credits, generating API keys, or otherwise using our services, you agree to these Terms and to our Privacy Policy. If you do not agree, do not use the Platform.",
           "If you use the Platform on behalf of an organization, you represent that you have authority to bind that organization, and \"you\" includes that entity."
         ]
       },
       "definitions": {
         "title": "Definitions",
         "paragraphs": [
-          "\"API\" means the application programming interfaces, endpoints, SDKs, webhooks, and related developer tools we make available at or through api.aiagents-hub.vn (or successor URLs).",
-          "\"AI Features\" means machine-learning or generative capabilities we provide (for example assistants, classification, enrichment, or automation) whether labeled as AI or not.",
-          "\"Blockchain Features\" means functionality that interacts with public or permissioned distributed ledgers, smart contracts, wallet-based authentication, or on-chain attestations.",
+          "\"Workflow\" means a graph of nodes you design in the builder (agents, tools, RAG, HTTP, triggers, and related steps).",
+          "\"Credit\" means the prepaid service unit we use to meter AI and agent usage. Credits are not e-money, cryptocurrency, or a cash balance; unused purchased Credits expire as described in product documentation, and included Credits expire at the end of each subscription period.",
+          "\"AI Features\" means machine-learning or generative capabilities we provide through agents, models, assistants, or similar tools.",
           "\"Content\" means data, prompts, files, payloads, metadata, or other materials that you or your end users submit to or retrieve from the Platform."
         ]
       },
       "services": {
         "title": "The services",
         "paragraphs": [
-          "We provide a managed API business: gateways, metering, documentation, observability hooks, and account tooling intended to help developers and enterprises integrate reliably at scale. Specific capabilities, regions, uptime targets, and support levels depend on your plan and product documentation.",
-          "We may modify, deprecate, or replace features where reasonably necessary for security, compliance, or operations, in line with the change and notice practices described below and in product notices."
+          "We provide an AI agent platform: a workflow builder, runtime for agents and tools, Credit metering, documentation, observability, and account tooling. We sell platform access (Subscription), metered consumption (Credits), and optional Enterprise guarantees (SLA, dedicated capacity, custom terms). We do not sell third-party model tokens or infrastructure line items as standalone products.",
+          "Specific capabilities, quotas, regions, uptime targets, and support levels depend on your plan and product documentation. We may modify, deprecate, or replace features where reasonably necessary for security, compliance, or operations, in line with the change and notice practices described below."
         ]
       },
       "api_usage": {
-        "title": "API access, keys, and fair use",
+        "title": "Access, keys, and fair use",
         "paragraphs": [
-          "You must use credentials (API keys, OAuth tokens, or other mechanisms we specify) responsibly and keep them confidential. You are responsible for all activity under your account unless you have notified us of a compromise in line with our security guidance.",
-          "We apply rate limits, quotas, concurrency controls, and abuse protections. Responses such as HTTP 429 or equivalent signals indicate that you should back off, optimize usage, or upgrade your plan. Unless expressly stated in a separate written agreement, we do not guarantee unlimited throughput or a particular latency percentile.",
-          "You must follow our documentation, versioning, and authentication requirements. We may require migration to newer API versions; continued use after a stated sunset date may be unsupported or disabled."
+          "You must use credentials (API keys, session cookies, or other mechanisms we specify) responsibly and keep them confidential. You are responsible for all activity under your account unless you have notified us of a compromise.",
+          "We apply quotas, concurrency controls, and abuse protections. Infrastructure quotas are part of the plan; AI usage is billed in Credits. Unless expressly stated in a written agreement, we do not guarantee unlimited throughput or a particular latency percentile.",
+          "You must follow our documentation for webhook paths, authentication, and versioning. We may require migration to newer interfaces; continued use after a stated sunset date may be unsupported or disabled."
         ]
       },
       "ai_features": {
         "title": "AI features and outputs",
         "paragraphs": [
           "AI Features may produce probabilistic or incomplete results. Outputs may be inaccurate, outdated, or unsuitable for a given regulated use case. You are solely responsible for evaluating outputs before relying on them in production, safety-critical, financial, medical, legal, or other high-risk contexts.",
-          "You must not use AI Features to generate unlawful content, to infringe intellectual property or privacy rights, to deceive end users in material ways, or to bypass reasonable safeguards we implement. Where we describe restrictions for specific models or tools, those restrictions form part of these Terms.",
+          "You must not use AI Features to generate unlawful content, to infringe intellectual property or privacy rights, to deceive end users in material ways, or to bypass reasonable safeguards we implement.",
           "Unless we expressly agree otherwise in writing, we do not use your Content to train foundation models in a way that identifies you or your end users; however, we may process Content to provide the service, secure the Platform, comply with law, and improve reliability (for example logging, debugging, and aggregated quality metrics)."
         ]
       },
-      "blockchain": {
-        "title": "Blockchain, wallets, and on-chain activity",
+      "identity": {
+        "title": "Optional identity and wallets",
         "paragraphs": [
-          "Blockchain Features depend on third-party networks that we do not control. Transaction finality, fees (including gas), reorganizations, smart-contract behavior, and token volatility are outside our responsibility. You acknowledge the inherent risks of interacting with blockchain systems.",
-          "Wallet connections and signatures are your responsibility. You must safeguard seed phrases, private keys, and devices. We are not a custodian of your digital assets unless a separate written agreement explicitly states otherwise.",
-          "When Blockchain Features involve reading or writing on-chain data, you represent that your use complies with applicable sanctions, securities, consumer-protection, and anti-money-laundering rules that apply to you. We may block, filter, or refuse interactions where required by law or to protect the Platform."
+          "Some account features may let you link a decentralized identifier or wallet for authentication. Those flows are optional. We are not a custodian of digital assets, and we do not sell blockchain products.",
+          "You must safeguard devices, credentials, and any keys you choose to use. Public network data (if you connect a wallet) is visible on networks we do not control.",
+          "We may disable identity linking where required by law or to protect the Platform."
         ]
       },
       "acceptable_use": {
         "title": "Acceptable use",
         "paragraphs": [
-          "You agree not to misuse the Platform. Without limitation, you must not probe, scan, or attack our systems; circumvent technical limits; distribute malware; send spam; harvest data in violation of applicable law; or use the APIs in a way that endangers minors, promotes violence, or violates export-control or sanctions rules.",
-          "You must not resell or sublicense API access in a manner that misrepresents origin, evades metering, or violates your plan. If you offer a product to your own customers powered by our APIs, you remain responsible for your product and for passing appropriate terms and disclosures to your users.",
+          "You agree not to misuse the Platform. Without limitation, you must not probe, scan, or attack our systems; circumvent technical limits or Credit metering; distribute malware; send spam; harvest data in violation of applicable law; or use agents in a way that endangers minors, promotes violence, or violates export-control or sanctions rules.",
+          "You must not resell or sublicense access in a manner that misrepresents origin, evades metering, or violates your plan. If you offer a product to your own customers powered by our Platform, you remain responsible for your product and for passing appropriate terms to your users.",
           "We may investigate suspected violations and suspend or terminate access where reasonably necessary to protect users, the Platform, or comply with legal obligations."
         ]
       },
@@ -1040,32 +1130,33 @@
         ]
       },
       "fees": {
-        "title": "Fees, taxes, and billing",
+        "title": "Fees, Credits, and billing",
         "paragraphs": [
-          "Paid plans, usage-based charges, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Unless stated otherwise, fees are non-refundable except where mandatory law requires otherwise.",
-          "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any bank or blockchain network fees charged by third parties."
+          "Paid Subscriptions, Credit purchases, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Credits are prepaid service units: they are not refundable as cash except where mandatory law requires otherwise, they are not transferable except as we expressly allow (for example royalty earnings on a separate ledger), and purchased Credits expire according to product rules (typically twelve months from credit).",
+          "Included Credits granted with a Subscription expire at the end of the billing period and do not roll over. We may enforce a maximum Credit balance. Model coefficients (how many Credits a run costs) may change with notice as described in product documentation; we do not pass through provider invoices as line items.",
+          "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any fees charged by payment providers (for example VNPay, Casso, or PayPal)."
         ]
       },
       "ip": {
         "title": "Intellectual property",
         "paragraphs": [
-          "We retain all rights in the Platform, documentation, trademarks, and our proprietary models and software, except for rights expressly granted to you.",
-          "We grant you a limited, non-exclusive, non-transferable license during your subscription to call the APIs and use our documentation solely as needed to exercise your rights under these Terms. You may not reverse engineer our services except where mandatory law permits interoperability.",
-          "You grant us a worldwide license to host, process, transmit, and display your Content as reasonably necessary to provide and secure the services. You represent that you have the rights needed to grant this license."
+          "We retain all rights in the Platform, documentation, trademarks, and our proprietary software, except for rights expressly granted to you.",
+          "We grant you a limited, non-exclusive, non-transferable license during your subscription to use the builder, run workflows, and call documented APIs solely as needed to exercise your rights under these Terms. You may not reverse engineer our services except where mandatory law permits interoperability.",
+          "You grant us a worldwide license to host, process, transmit, and display your Content as reasonably necessary to provide and secure the services. You represent that you have the rights needed to grant this license. Workflows you share may be run by others under our royalty rules; you remain responsible for Content you publish."
         ]
       },
       "data": {
         "title": "Data protection and privacy",
         "paragraphs": [
-          "Our processing of personal data is described in our Privacy Policy and, where relevant, data processing terms offered to enterprise customers. You will not submit special categories of personal data to the APIs unless permitted by law and contract.",
-          "We may generate service logs and metrics (including request metadata and error traces) to operate, secure, and improve the Platform. Retention follows our policies and legal requirements."
+          "Our processing of personal data is described in our Privacy Policy and, where relevant, data processing terms offered to Enterprise customers. You will not submit special categories of personal data unless permitted by law and contract.",
+          "We may generate service logs and metrics (including execution metadata, Credit charges, and error traces) to operate, secure, and improve the Platform. Retention follows our policies and legal requirements."
         ]
       },
       "warranties": {
         "title": "Disclaimers",
         "paragraphs": [
-          "EXCEPT WHERE PROHIBITED BY LAW, THE PLATFORM AND APIs ARE PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.",
-          "WE DO NOT WARRANT THAT THE SERVICES WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL COMPONENTS. AI AND BLOCKCHAIN SYSTEMS INVOLVE INHERENT UNCERTAINTY; YOU ASSUME ALL RISKS ASSOCIATED WITH YOUR USE."
+          "EXCEPT WHERE PROHIBITED BY LAW, THE PLATFORM IS PROVIDED \"AS IS\" AND \"AS AVAILABLE\" WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT.",
+          "WE DO NOT WARRANT THAT THE SERVICES WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL COMPONENTS. AI SYSTEMS INVOLVE INHERENT UNCERTAINTY; YOU ASSUME ALL RISKS ASSOCIATED WITH YOUR USE AND WITH RELYING ON AGENT OUTPUTS."
         ]
       },
       "liability": {
@@ -1078,7 +1169,7 @@
       "indemnity": {
         "title": "Indemnity",
         "paragraphs": [
-          "You will defend and indemnify us and our affiliates, officers, and employees against third-party claims, damages, and costs (including reasonable attorneys' fees) arising from your Content, your products, your misuse of the APIs, or your violation of these Terms or applicable law, except to the extent caused by our willful misconduct."
+          "You will defend and indemnify us and our affiliates, officers, and employees against third-party claims, damages, and costs (including reasonable attorneys' fees) arising from your Content, your products, your misuse of the Platform, or your violation of these Terms or applicable law, except to the extent caused by our willful misconduct."
         ]
       },
       "changes": {
@@ -1108,8 +1199,8 @@
     "badge": "Trust & transparency",
     "title": "Privacy",
     "title_gradient": "Policy",
-    "subtitle": "How we collect, use, share, and protect personal information when you use aiagents-hub.vn, api.aiagents-hub.vn, and related services. This notice is designed to align with common international expectations, including transparency principles reflected in the GDPR and similar frameworks.",
-    "last_updated": "Last updated: March 25, 2025",
+    "subtitle": "How we collect, use, share, and protect personal information when you use AI Agents Hub (aiagents-hub.vn), the dashboard, workflow runtime, and related APIs.",
+    "last_updated": "Last updated: September 16, 2026",
     "toc_title": "On this page",
     "toc_aria": "Privacy policy sections",
     "related_title": "Related",
@@ -1123,32 +1214,33 @@
         "title": "Introduction and scope",
         "paragraphs": [
           "This Privacy Policy (\"Policy\") explains how the operator of aiagents-hub.vn and api.aiagents-hub.vn (collectively, the \"Platform\", \"we\", \"us\", or \"our\") handles personal information.",
-          "It applies when you visit our websites, create or use an account, purchase or use API products, interact with dashboards or documentation, authenticate with a wallet or passkey where offered, or otherwise engage with our services. It should be read together with our Terms of Service and any product-specific notices we provide.",
-          "We may update this Policy from time to time. We will post the revised version on this page and change the \"Last updated\" date. Where changes are material, we will provide additional notice when reasonable (for example by email or an in-product banner)."
+          "It applies when you visit our websites, create or use an account, subscribe or buy Credits, run workflows or agents, interact with dashboards or documentation, or otherwise engage with our services. It should be read together with our Terms of Service.",
+          "We may update this Policy from time to time. We will post the revised version on this page and change the \"Last updated\" date. Where changes are material, we will provide additional notice when reasonable."
         ]
       },
       "controller": {
         "title": "Data controller and contact",
         "paragraphs": [
-          "The data controller responsible for personal information described in this Policy is the legal entity operating the Platform (referred to here as \"AIAgentsHub\" / \"Unitoken\" for convenience). Corporate name, registered address, and registration identifiers may be provided on request for contractual, invoicing, or regulatory purposes.",
+          "The data controller responsible for personal information described in this Policy is the legal entity operating AI Agents Hub. Corporate name, registered address, and registration identifiers may be provided on request for contractual, invoicing, or regulatory purposes.",
           "For general privacy inquiries and to exercise your rights where applicable, contact us at support@aiagents-hub.vn. For security incidents involving credentials or suspected unauthorized access, contact us promptly using the same channel and include relevant details so we can respond effectively."
         ]
       },
       "collection": {
         "title": "Categories of information we collect",
         "paragraphs": [
-          "Account and identity data: such as name, email address, organization, username or user ID, authentication factors you enable (for example TOTP, passkeys, or linked social login identifiers), and preferences you set in your profile.",
-          "Usage and technical data: such as IP address, approximate location derived from IP, device and browser type, timestamps, pages or endpoints accessed, API request metadata (for example route, status codes, latency, error traces), subscription and metering records, support tickets, and in-product analytics needed to operate and improve the service.",
-          "Payment and billing data: such as billing contact details, transaction references, tax identifiers where required, and payment status. Payment card processing may be handled by certified payment partners; we typically receive limited billing and confirmation data rather than full card numbers.",
+          "Account and identity data: such as name, email address, organization, username or user ID, authentication factors you enable (for example TOTP, passkeys, or linked login identifiers), and preferences you set in your profile.",
+          "Usage and technical data: such as IP address, approximate location derived from IP, device and browser type, timestamps, pages or endpoints accessed, workflow execution metadata, Credit charges, API request metadata, support tickets, and in-product analytics needed to operate and improve the service.",
+          "Payment and billing data: such as billing contact details, transaction references, tax identifiers where required, and payment status. Payment processing may be handled by partners (for example VNPay, Casso, PayPal); we typically receive limited billing and confirmation data rather than full card numbers.",
           "Communications: content you send us (for example emails, contact forms, or chat transcripts) and records needed to respond and demonstrate compliance.",
-          "Blockchain- and wallet-related data: where you connect a wallet or use on-chain features, we may process public wallet addresses, chain identifiers, and transaction or attestation references as needed to provide those features. Public blockchain data is inherently visible on networks we do not control.",
+          "Workflow and agent content: prompts, files, retrieved documents, and outputs you submit to or generate with workflows, to the extent needed to run, bill, debug, and secure those jobs.",
+          "Optional wallet or DID data: if you choose to link a decentralized identifier, we may process public addresses or challenge identifiers needed for that flow. This is optional and not part of the core agent product.",
           "Cookies and similar technologies: described in the section on cookies below."
         ]
       },
       "purposes": {
         "title": "Purposes and legal bases",
         "paragraphs": [
-          "We process personal information for purposes such as: providing, securing, and improving the Platform; authenticating users; metering and billing; customer support; fraud prevention, abuse detection, and security monitoring; complying with legal obligations; and communicating service-related notices.",
+          "We process personal information for purposes such as: providing, securing, and improving the Platform; authenticating users; metering Credits and billing Subscriptions; running workflows; customer support; fraud prevention, abuse detection, and security monitoring; complying with legal obligations; and communicating service-related notices.",
           "Depending on the context and applicable law, we rely on one or more of the following legal bases: performance of a contract with you; legitimate interests that are not overridden by your rights (for example securing our systems and understanding aggregate usage), where permitted; compliance with legal obligations; and consent where required (for example certain non-essential cookies or marketing, where we ask for it separately).",
           "Where consent is the basis, you may withdraw it at any time without affecting the lawfulness of processing before withdrawal. Marketing communications, if any, will include a way to opt out."
         ]
@@ -1187,7 +1279,7 @@
         "title": "Security",
         "paragraphs": [
           "We implement technical and organizational measures designed to protect personal information against unauthorized access, loss, or alteration. These may include encryption in transit, access controls, least-privilege practices for staff and systems, monitoring, and vendor assessments.",
-          "No method of transmission or storage is completely secure. You are responsible for safeguarding your credentials, API keys, and wallet seed phrases. Please report suspected incidents to us promptly."
+          "No method of transmission or storage is completely secure. You are responsible for safeguarding your credentials and API keys. Please report suspected incidents to us promptly."
         ]
       },
       "rights": {
@@ -1230,8 +1322,8 @@
     "badge": "Transparency",
     "title": "Cookie",
     "title_gradient": "Policy",
-    "subtitle": "How aiagents-hub.vn and api.aiagents-hub.vn use cookies and similar technologies for authentication, security, wallet features, and preferences. This page complements our Privacy Policy and reflects how our services are built today.",
-    "last_updated": "Last updated: March 25, 2025",
+    "subtitle": "How aiagents-hub.vn uses cookies and similar technologies for authentication, security, and preferences. This page complements our Privacy Policy.",
+    "last_updated": "Last updated: September 16, 2026",
     "toc_title": "On this page",
     "toc_aria": "Cookie policy sections",
     "related_title": "Related",
@@ -1246,7 +1338,7 @@
       "intro": {
         "title": "Introduction",
         "paragraphs": [
-          "This Cookie Policy explains how the operator of aiagents-hub.vn and api.aiagents-hub.vn (the \"Platform\", \"we\", \"us\") uses HTTP cookies and similar storage on your device when you use our websites, dashboards, and APIs.",
+          "This Cookie Policy explains how the operator of AI Agents Hub (aiagents-hub.vn and api.aiagents-hub.vn) uses HTTP cookies and similar storage on your device when you use our websites, dashboards, and APIs.",
           "It should be read together with our Privacy Policy, which describes personal data processing more broadly. Where this page refers to \"cookies\", we include comparable technologies such as local storage when they serve a similar role, unless noted otherwise.",
           "We minimize data collection and rely on strictly necessary cookies for core security and session management. Non-essential cookies or analytics run only where compatible with our product configuration and applicable law."
         ]
@@ -1261,7 +1353,7 @@
       "purposes": {
         "title": "Why we use cookies",
         "paragraphs": [
-          "We use cookies to: keep you signed in securely; protect accounts against abuse; complete OAuth, OTP, and wallet handshakes; remember UI preferences where we store them in cookies; and operate diagnostics that keep the Platform reliable.",
+          "We use cookies to: keep you signed in securely; protect accounts against abuse; complete OAuth and OTP handshakes; remember UI preferences where we store them in cookies; and operate diagnostics that keep the Platform reliable.",
           "We classify cookies as strictly necessary (required for security and basic operation), functional (improving experience, such as wallet state), and, where enabled, analytics (aggregate insight). We do not use cookies to sell personal information in the conventional sense described in our Privacy Policy."
         ]
       },
@@ -1310,10 +1402,10 @@
         ]
       },
       "web3_ui": {
-        "title": "Wallet, dashboard, and preferences",
+        "title": "Dashboard preferences and optional identity",
         "paragraphs": [
-          "When you connect a wallet, WalletConnect and chain providers may set or read additional cookies or device storage to complete pairing, display chain state, or meet their security requirements. Those providers process data under their own policies.",
-          "Theme, language, or layout preferences may be stored in cookies or local storage depending on the surface (marketing site vs dashboard). Blocking functional storage may reset non-essential preferences on each visit."
+          "Theme, language, or layout preferences may be stored in cookies or local storage depending on the surface (marketing site vs dashboard). Blocking functional storage may reset non-essential preferences on each visit.",
+          "If you use optional wallet or DID linking, pairing libraries may set additional device storage. Those providers process data under their own policies. Wallet linking is not required to build or run agents."
         ]
       },
       "third_party": {
@@ -4122,30 +4214,56 @@
     "example_code": "Example code"
   },
   "Docs": {
-    "badge": "Developer documentation",
-    "hub_title": "UniToken API documentation",
-    "hub_description": "Everything you need to integrate eKYC and identity APIs: quickstart and the eKYC API reference.",
-    "hub_badge_1": "REST · multipart/form-data · Bearer tokens",
-    "hub_badge_2": "Base URL: api.aiagents-hub.vn",
+    "badge": "Documentation",
+    "hub_title": "AI Agents Hub docs",
+    "hub_description": "Build workflows, run agents, and pay in Credits. Start here, then trigger graphs from chat, cron, or HTTP.",
+    "hub_badge_1": "Workflows · Agents · One Credit",
+    "hub_badge_2": "Dashboard: aiagents-hub.vn",
     "card_quickstart_title": "Quickstart",
-    "card_quickstart_desc": "Create an API key, send your first request, and verify responses in minutes.",
-    "card_api_title": "eKyc API",
-    "card_api_desc": "Full list of eKYC endpoints with parameters and copy-ready code in multiple languages.",
+    "card_quickstart_desc": "Create a workspace, draw a graph, run an agent, and see the Credit estimate.",
+    "card_api_title": "Workflow API",
+    "card_api_desc": "Fire a workflow from a webhook with a Bearer token — same graph you built in the canvas.",
     "hub_base_title": "Production base URL",
-    "hub_base_body": "All API traffic uses HTTPS. Replace placeholders with your own API key; never commit secrets to source control.",
+    "hub_base_body": "API traffic uses HTTPS. Replace placeholders with your own API key; never commit secrets.",
+    "hub_builder_title": "Builder",
+    "hub_builder_body": "The canvas is the product. Add triggers, agents, RAG, HTTP, and flow nodes. Versions live in your workspace; shared graphs can earn royalties when others run them.",
+    "hub_credits_title": "Credits",
+    "hub_credits_body": "AI usage bills in Credits — one unit for every model. You will not see USD per million tokens. Included Credits expire each period; Pro can buy more.",
     "quickstart_title": "Quickstart",
-    "quickstart_description": "Authenticate with a Bearer token and call your first eKYC endpoint.",
-    "quickstart_try_title": "First request: document recognition",
-    "quickstart_try_body": "Below is a working multipart example. Swap in a real JPEG/PNG under 2MB.",
-    "quickstart_more": "See every endpoint and parameter in",
-    "api_page_title": "eKYC API",
-    "api_page_description": "eKYC HTTP API served at https://api.aiagents-hub.vn. All calls require an Authorization Bearer token with the right scopes.",
-    "params_label": "Form fields",
+    "quickstart_description": "From an empty workspace to a running agent, billed in Credits.",
+    "quickstart_open_dashboard": "Open the dashboard",
+    "quickstart_step1_title": "Create an account",
+    "quickstart_step1_body": "Sign in at the dashboard. Free includes a small Credit pool that expires at the end of the period.",
+    "quickstart_step2_title": "Create a workflow",
+    "quickstart_step2_body": "Open Workflows, add a trigger (chat, webhook, or cron) and an agent node. Optionally attach memory, RAG, or HTTP tools.",
+    "quickstart_step3_title": "Run once",
+    "quickstart_step3_body": "Use Execute or hosted chat. The UI shows a Credit estimate before AI nodes run; the wallet is charged after.",
+    "quickstart_step4_title": "Watch logs",
+    "quickstart_step4_body": "Open the execution to see node output, errors, and Credits charged. Retry caused by our platform faults is not billed.",
+    "quickstart_try_title": "What a Credit covers",
+    "quickstart_try_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not.",
+    "quickstart_credits_title": "What a Credit covers",
+    "quickstart_credits_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not. Infrastructure (storage, queues) is absorbed into the plan plus quotas — not a separate invoice.",
+    "quickstart_more": "Trigger the same graph from HTTP in",
+    "api_page_title": "Workflow API",
+    "api_page_description": "Authenticate with a Bearer token and POST to a workflow webhook. Usage still bills in Credits on the workspace that owns the run.",
+    "api_auth_title": "Base URL and auth",
+    "api_auth_body": "Create an API key in Control > API Keys. Send it as a Bearer token. Rotate keys if they leak.",
+    "api_base_url_label": "Base URL",
+    "api_auth_header": "Authorization header",
+    "api_webhook_title": "Trigger a workflow",
+    "api_webhook_body": "Each workflow with a webhook trigger exposes an HTTP path. Replace YOUR_WORKFLOW_ID and the path you configured on the node. The JSON body is available to downstream nodes.",
+    "api_param_workflow": "the workflow id from the dashboard.",
+    "api_param_path": "the path segment configured on the webhook trigger (example: run).",
+    "api_param_body": "payload your graph reads (message, fields, files metadata).",
+    "api_credits_title": "Credits on API runs",
+    "api_credits_body": "Webhook runs debit the same Credit wallet as the canvas. Estimates can differ from the final charge. Shared workflows may add a royalty in Credits for the author.",
+    "params_label": "Parameters",
     "section_start": "Start here",
     "section_guides": "Guide",
     "nav_overview": "Overview",
     "nav_quickstart": "Quickstart",
-    "nav_api": "eKYC API",
+    "nav_api": "Workflow API",
     "menu": "Menu",
     "mobile_nav_title": "Browse docs",
     "search_placeholder": "Filter navigation…",
@@ -4156,82 +4274,86 @@
   },
   "BlogPage": {
     "badge": "Product & platform",
-    "title": "Blog",
-    "title_gradient": "from aiagents-hub.vn",
-    "subtitle": "Practical notes on delivering eKYC through our managed APIs today, and what is ahead for CLAW — written for engineering, product, and risk teams.",
+    "title": "Notes from",
+    "title_gradient": "AI Agents Hub",
+    "subtitle": "How we build agents, meter Credits, and keep plans readable — written for the teams who will actually run the graphs.",
     "author_display": "support@aiagents-hub.vn",
-    "byline": "Editorial from {author}",
-    "section_ekyc": "eKYC services",
-    "section_ekyc_sub": "Identity verification and compliance-oriented flows served via api.aiagents-hub.vn — contracts, security, and operations.",
-    "section_claw": "CLAW services",
-    "section_claw_sub": "Upcoming connectivity across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible stacks for agents and automation.",
+    "byline": "From {author}",
+    "section_product": "Product",
+    "section_product_sub": "Builder, agents, RAG, and the ways a graph goes live.",
+    "section_credits": "Credits & plans",
+    "section_credits_sub": "One meter, three revenue layers, and sharing with royalties.",
+    "section_ekyc": "Product",
+    "section_ekyc_sub": "Builder, agents, RAG, and the ways a graph goes live.",
+    "section_claw": "Credits & plans",
+    "section_claw_sub": "One meter, three revenue layers, and sharing with royalties.",
     "badge_upcoming": "Coming soon",
     "min_read": "{count} min read",
     "read_more": "Read article",
     "back_to_blog": "Back to blog",
     "not_found_title": "Article not found",
-    "not_found_body": "This URL does not match a published post. Use the blog index to browse eKYC and CLAW updates.",
-    "cta_lead": "Questions about eKYC integration or early CLAW access? Our team routes every message to the right owners.",
+    "not_found_body": "This URL does not match a published post. Use the blog index to browse updates.",
+    "cta_lead": "Questions about workflows, Credits, or Enterprise? We route every message to the right owners.",
     "cta_contact": "Contact us",
     "posts": {
-      "ekyc-how-we-deliver-identity-verification": {
-        "title": "How we deliver eKYC as a managed service",
-        "excerpt": "A concise look at verification stages, evidence handling, and how we keep the experience predictable for integrators.",
+      "one-platform-one-credit-unlimited-models": {
+        "title": "One Platform, One Credit, Unlimited Models",
+        "excerpt": "Why we bill completed agent work in Credits — and refuse to sell tokens or Cloudflare invoices.",
         "body": [
-          "Electronic Know Your Customer (eKYC) is no longer a nice-to-have: it is the front door for regulated onboarding, payouts, and high-trust workflows. At aiagents-hub.vn we treat eKYC as a product surface with explicit API contracts, not a one-off integration project.",
-          "Our service separates capture, verification, and decisioning into well-defined steps. That means your application can collect user consent and documents once, while our pipeline applies consistent checks, machine-assisted review where appropriate, and auditable outcomes you can reconcile in your own systems.",
-          "Operationally, we design for resilience: idempotent requests where it matters, structured errors that map to remediation paths, and dashboards that reflect status without forcing support tickets. The goal is simple — your team ships faster without trading off clarity for customers.",
-          "If you are evaluating providers, ask how outcomes are represented, how retention is bounded, and how keys are scoped. We publish those expectations alongside our endpoints so compliance and engineering can review the same facts."
+          "AI Agents Hub is not a model reseller. We do not compete on USD per million tokens. Customers should see one question: how much Credit does this job take?",
+          "Subscription pays for the workspace — builder, sharing, webhooks, cron, support, and infrastructure quotas. Credits pay for AI and agent consumption. Enterprise pays for the guarantee: SLA, dedicated capacity, custom terms.",
+          "Cheap models cost few Credits; frontier models cost more. That difference is an internal coefficient, not a catalog you have to re-negotiate when a provider raises prices. We change coefficients with notice. We do not change your plan price on that path.",
+          "Included Credits expire each period so a gifted pool cannot be stockpiled against a cost shock. Pro can buy more, with a wallet cap. Free is a trial, not the product we intend to live on."
         ]
       },
-      "ekyc-api-contracts-for-international-rollouts": {
-        "title": "eKYC API contracts built for international rollouts",
-        "excerpt": "Versioning, scopes, and error models that match how serious teams ship identity checks across regions.",
+      "build-your-first-agent-workflow": {
+        "title": "Build your first agent workflow",
+        "excerpt": "Trigger, agent, optional tools — then a Credit estimate before anything expensive runs.",
         "body": [
-          "International rollouts fail when APIs are ambiguous. We version resources deliberately, document breaking changes in advance, and align authentication with least-privilege scopes so a key used for sandbox cannot accidentally reach production data.",
-          "Payloads favor explicit fields over overloaded enums. Where regional rules differ, we expose capability flags and supported document types so your client can branch without guessing server behavior.",
-          "Errors are machine-readable first: stable codes, human text second. That pattern is standard among cloud platforms for a reason — it keeps mobile, web, and server clients aligned when something needs a retry or a user-facing correction.",
-          "For partners planning phased launches, we recommend starting with a narrow verification profile, measuring conversion and latency, then expanding document coverage. Our contracts are designed to grow with you without rewriting your core integration."
+          "Open Workflows and start from a blank canvas. The first useful graph is small: a chat or webhook trigger, an agent node, and a destination (a reply, an HTTP call, or a human review).",
+          "Configure the agent with a prompt that describes the job, not the model. Attach memory if the conversation should remember the last turns. Attach RAG if the answer should cite your documents.",
+          "Run once from the editor. You should see an estimate in Credits, then an execution log. If the result is wrong, fix the prompt or the tools — not the pricing page.",
+          "When the graph is stable, turn on a webhook or cron. The same Credit wallet pays, whether you click Execute or an external system POSTs in."
         ]
       },
-      "ekyc-data-minimization-retention-and-auditability": {
-        "title": "Data minimization, retention, and audit-ready eKYC",
-        "excerpt": "Why we collect only what verification requires, how retention windows are communicated, and what auditors typically review.",
+      "agents-rag-memory-and-tools": {
+        "title": "Agents, RAG, memory, and tools",
+        "excerpt": "The node families we actually run: agent loops, retrieval, session memory, and database lookups.",
         "body": [
-          "Strong eKYC is as much about what you do not retain as what you collect. We apply data minimization by default: sensitive elements are processed for verification, then retained only where policy or regulation requires a limited audit trail.",
-          "Retention is not an afterthought. Windows are communicated in product terms and reflected operationally — your security reviews should see the same story our engineers implement. When customers request deletion workflows, we align responses with applicable timelines and verification steps.",
-          "Auditability means traceability without unnecessary exposure. Access to verification artifacts is logged, scoped to roles, and compatible with periodic reviews. That is the baseline teams expect when identity touches regulated flows.",
-          "If your program spans multiple jurisdictions, pair our technical controls with your legal assessment. We provide the operational detail; your counsel maps it to local rules — a division of labor that scales internationally."
+          "An agent node is a loop: the model can call tools, read memory, and come back with an answer. A reasoning agent adds a more governed loop when you need extra checks before acting.",
+          "RAG is two jobs. Save RAG ingests documents (including PDFs) into Vectorize. Get RAG retrieves chunks at query time. Keep those graphs boring and observable; retrieval quality beats prompt poetry.",
+          "Simple memory holds a session window. Vectorize memory is for longer semantic recall. Get DB Info reaches D1 or Oracle when the agent must ground itself in structured data.",
+          "None of these are sold as separate SKUs. They consume Credits when they call models. Storage and queues stay inside the plan plus quotas."
         ]
       },
-      "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw": {
-        "title": "CLAW on aiagents-hub.vn: roadmap and upcoming capabilities",
-        "excerpt": "Where we are taking CLAW next — multi-variant support, routing, and event-driven integrations for automation-heavy stacks.",
+      "webhooks-cron-and-hosted-chat": {
+        "title": "Webhooks, cron, and hosted chat",
+        "excerpt": "One graph, three ways in. The Credit meter does not care which door you used.",
         "body": [
-          "CLAW is our upcoming connectivity layer for agent-style and automation workloads across OpenClaw, NanoClaw, NemoClaw, BizClaw, and compatible implementations. The objective is familiar to platform teams: integrate once, route intelligently, and observe behavior consistently.",
-          "On the roadmap you will see first-class configuration per CLAW variant, clearer separation between synchronous calls and long-running tasks, and webhooks that reflect state transitions you can trust for downstream orchestration.",
-          "We are also tightening developer ergonomics: predictable authentication aligned with the rest of api.aiagents-hub.vn, sandbox parity that mirrors production limits, and documentation that stays synchronized with the API surface.",
-          "Nothing here replaces your security review — it complements it. As we approach general availability, we will publish migration notes, deprecation policies, and support channels for design partners."
+          "A webhook trigger exposes an HTTP path on api.aiagents-hub.vn. Authenticate with a Bearer token, POST a JSON body, and let downstream nodes read the payload.",
+          "Cron is the same graph on a schedule. Use it for digests, syncs, and anything that should not wait for a human to click Run.",
+          "Hosted chat is for operators and end users who should talk to the agent without opening the canvas. It still bills Credits to the workspace.",
+          "Design failure the same way in all three: timeouts, retries we eat versus usage you pay, and logs a human can read at 2 a.m."
         ]
       },
-      "claw-launch-what-partners-can-expect": {
-        "title": "What partners can expect as CLAW services go live",
-        "excerpt": "Timelines at a high level, scope boundaries, and how onboarding will work for early adopters.",
+      "sharing-workflows-and-royalties": {
+        "title": "Sharing workflows and royalties",
+        "excerpt": "Publish a graph. When someone else runs it, they pay Credits; you earn a royalty.",
         "body": [
-          "Partners should expect a staged rollout: private previews with explicit SLAs, followed by broader access as we validate throughput, failure modes, and operational playbooks. We will communicate cutover dates with enough lead time for your runbooks.",
-          "Scope will be clear. Each preview window will list supported CLAW variants, regions, and rate limits. Features marked experimental will be labeled as such — we will not silently promote behavior that your integration depended on as provisional.",
-          "Onboarding will mirror how we onboard eKYC integrators today: technical contacts, a shared channel for incidents, and documentation that includes worked examples rather than abstract promises.",
-          "If you plan to depend on CLAW for customer-facing automation, start by mapping your failure domains now — retries, idempotency keys, and user-visible messaging. The platform will meet you with observability; your product must still explain delays kindly."
+          "A shared workflow is still your design. When another workspace runs it, they are charged Credits for the AI usage plus a royalty percentage you configure.",
+          "The runner pays the extra. You receive earnings on a separate ledger (payouts are not the same as the Credit wallet). The Hub does not take the royalty out of its own model cost.",
+          "This only works if the graph is understandable: clear inputs, honest estimates, and no hidden side effects. Treat a shared workflow like an API you would be proud to version.",
+          "If you do not want others to run your graph, keep it private. Sharing is a product feature, not a requirement."
         ]
       },
-      "claw-integration-patterns-early-access": {
-        "title": "Integration patterns for CLAW: early access considerations",
-        "excerpt": "Queue-backed workers, event subscriptions, and safe testing strategies before you wire production traffic.",
+      "subscription-credits-and-enterprise": {
+        "title": "Subscription, Credits, and Enterprise",
+        "excerpt": "Three layers of revenue — and why we keep them separate on purpose.",
         "body": [
-          "Early CLAW integrations benefit from the same patterns that work for mature APIs: isolate outbound calls behind your own queue, cap concurrency, and subscribe to events instead of polling when possible — it reduces load and simplifies recovery.",
-          "In previews, we may expose additional diagnostic headers or trace identifiers. Use them while they exist, but avoid hard-coding reliance until those fields graduate to stable documentation.",
-          "Testing should span sandbox scenarios that include partial failures. Automation that never sees a timeout is automation that will surprise you later. We will publish recommended test matrices alongside reference implementations.",
-          "Interested teams can reach out via support@aiagents-hub.vn with a short summary of use case, expected volume, and regions. We prioritize partners who can share structured feedback during the preview window."
+          "Free is how you try the builder. Included Credits are small and expire. We do not design Free as the main product.",
+          "Pro is for teams doing real work: more quota, the right to buy Credits, webhooks, and priority support. Plan price should feel boring. Usage should scale with how much the agents actually run.",
+          "Enterprise is the guarantee: SLA, dedicated or custom capacity, committed Credit volume, SSO/audit, and optional BYOK as an add-on. It is not a cheaper token wholesale deal.",
+          "When a provider raises prices, we adjust coefficients with notice. We do not rename Credits into pass-through tokens. That is the whole point of one meter."
         ]
       }
     }

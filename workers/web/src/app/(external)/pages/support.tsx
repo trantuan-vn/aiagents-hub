@@ -30,20 +30,20 @@ const Support = () => {
   const [isTyping, setIsTyping] = useState(false);
 
   const quickActions = [
-    t("quick_actions.recommend_api"),
-    t("quick_actions.calls_left"),
-    t("quick_actions.rate_limiting"),
+    t("quick_actions.build_agent"),
+    t("quick_actions.credits_left"),
+    t("quick_actions.how_credits"),
     t("quick_actions.upgrade"),
   ];
 
   const faqItems = [
     {
-      question: t("faq.generate_key.question"),
-      answer: t("faq.generate_key.answer"),
+      question: t("faq.first_workflow.question"),
+      answer: t("faq.first_workflow.answer"),
     },
     {
-      question: t("faq.rate_limit.question"),
-      answer: t("faq.rate_limit.answer"),
+      question: t("faq.credits.question"),
+      answer: t("faq.credits.answer"),
     },
     {
       question: t("faq.change_plan.question"),
@@ -81,14 +81,31 @@ const Support = () => {
   const getAIResponse = (query: string): string => {
     const lowerQuery = query.toLowerCase();
 
-    if (lowerQuery.includes("recommend") || lowerQuery.includes("suggest") || lowerQuery.includes("đề xuất")) {
+    if (
+      lowerQuery.includes("agent") ||
+      lowerQuery.includes("workflow") ||
+      lowerQuery.includes("recommend") ||
+      lowerQuery.includes("đề xuất") ||
+      lowerQuery.includes("xây")
+    ) {
       return t("ai_responses.recommend");
     }
-    if (lowerQuery.includes("calls") || lowerQuery.includes("quota") || lowerQuery.includes("lượt gọi")) {
-      return t("ai_responses.calls");
+    if (
+      lowerQuery.includes("credit") ||
+      lowerQuery.includes("quota") ||
+      lowerQuery.includes("calls") ||
+      lowerQuery.includes("ví") ||
+      lowerQuery.includes("credit")
+    ) {
+      return t("ai_responses.credits");
     }
-    if (lowerQuery.includes("rate limit") || lowerQuery.includes("giới hạn")) {
-      return t("ai_responses.rate_limit");
+    if (
+      lowerQuery.includes("rate limit") ||
+      lowerQuery.includes("giới hạn") ||
+      lowerQuery.includes("how credit") ||
+      lowerQuery.includes("credit work")
+    ) {
+      return t("ai_responses.how_credits");
     }
     return t("ai_responses.default", { query });
   };
@@ -259,6 +276,7 @@ const Support = () => {
                   {[
                     { name: t("resources.api_docs"), href: "/docs" },
                     { name: t("resources.getting_started"), href: "/docs/quickstart" },
+                    { name: t("resources.credits_guide"), href: "/packages" },
                     { name: t("resources.developer_blog"), href: "/blog" },
                   ].map((resource) => (
                     <a

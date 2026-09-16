@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { Zap, Shield, Globe, BarChart3, Code2, Headphones, Sparkles, Lock } from "lucide-react";
+import { BarChart3, Coins, Headphones, Share2, Sparkles, Webhook, Workflow, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { updateThemeMode } from "@/lib/theme-utils";
@@ -12,69 +12,67 @@ const FeaturesSection = () => {
   const t = useTranslations("Features");
   const themeMode = usePreferencesStore((s) => s.themeMode);
 
-  // Sync theme with document
   useEffect(() => {
     updateThemeMode(themeMode);
   }, [themeMode]);
 
   const features = [
     {
-      icon: Zap,
-      title: t("lightning_fast"),
-      description: t("lightning_fast_desc"),
-      color: "from-yellow-500 to-orange-500",
-    },
-    {
-      icon: Shield,
-      title: t("enterprise_security"),
-      description: t("enterprise_security_desc"),
-      color: "from-green-500 to-emerald-500",
-    },
-    {
-      icon: Globe,
-      title: t("global_cdn"),
-      description: t("global_cdn_desc"),
-      color: "from-blue-500 to-cyan-500",
-    },
-    {
-      icon: BarChart3,
-      title: t("realtime_analytics"),
-      description: t("realtime_analytics_desc"),
-      color: "from-purple-500 to-pink-500",
-    },
-    {
-      icon: Code2,
-      title: t("developer_first"),
-      description: t("developer_first_desc"),
-      color: "from-primary to-primary/70",
-    },
-    {
-      icon: Headphones,
-      title: t("support_24_7"),
-      description: t("support_24_7_desc"),
-      color: "from-rose-500 to-red-500",
+      icon: Workflow,
+      title: t("workflow_builder"),
+      description: t("workflow_builder_desc"),
+      color: "from-violet-500 to-indigo-500",
     },
     {
       icon: Sparkles,
-      title: t("ai_integration"),
-      description: t("ai_integration_desc"),
+      title: t("agents_rag"),
+      description: t("agents_rag_desc"),
       color: "from-accent to-accent/70",
     },
     {
-      icon: Lock,
-      title: t("rate_limiting"),
-      description: t("rate_limiting_desc"),
-      color: "from-slate-500 to-slate-600",
+      icon: Coins,
+      title: t("one_credit"),
+      description: t("one_credit_desc"),
+      color: "from-amber-500 to-orange-500",
+    },
+    {
+      icon: Zap,
+      title: t("unlimited_models"),
+      description: t("unlimited_models_desc"),
+      color: "from-yellow-500 to-orange-500",
+    },
+    {
+      icon: Webhook,
+      title: t("webhooks_cron"),
+      description: t("webhooks_cron_desc"),
+      color: "from-blue-500 to-cyan-500",
+    },
+    {
+      icon: Share2,
+      title: t("sharing_royalty"),
+      description: t("sharing_royalty_desc"),
+      color: "from-green-500 to-emerald-500",
+    },
+    {
+      icon: BarChart3,
+      title: t("usage_visibility"),
+      description: t("usage_visibility_desc"),
+      color: "from-purple-500 to-pink-500",
+    },
+    {
+      icon: Headphones,
+      title: t("support_levels"),
+      description: t("support_levels_desc"),
+      color: "from-rose-500 to-red-500",
     },
   ];
+
   return (
     <section className="relative overflow-hidden py-24">
-      {/* Background */}
       <div className="bg-muted/30 absolute inset-0" />
       <div className="bg-dots absolute inset-0" />
 
       <div className="relative z-10 container mx-auto px-4">
-        {/* Section Header */}
         <div className="mx-auto mb-16 max-w-2xl text-center">
           <div className="bg-accent/10 border-accent/20 mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1">
             <span className="text-accent text-xs font-medium">{t("badge")}</span>
@@ -85,7 +83,6 @@ const FeaturesSection = () => {
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
 
-        {/* Features Grid */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {features.map((feature, index) => (
             <div

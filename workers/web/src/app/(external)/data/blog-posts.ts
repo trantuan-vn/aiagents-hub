@@ -1,4 +1,4 @@
-export type BlogCategory = "ekyc" | "claw";
+export type BlogCategory = "product" | "credits";
 
 export interface BlogPostMeta {
   slug: string;
@@ -13,39 +13,39 @@ export const BLOG_AUTHOR_EMAIL = "support@aiagents-hub.vn";
 /** Ordered newest first for listing */
 export const BLOG_POST_METAS: BlogPostMeta[] = [
   {
-    slug: "claw-integration-patterns-early-access",
-    category: "claw",
-    date: "2025-03-18",
+    slug: "one-platform-one-credit-unlimited-models",
+    category: "credits",
+    date: "2026-09-16",
+    readMinutes: 6,
+  },
+  {
+    slug: "build-your-first-agent-workflow",
+    category: "product",
+    date: "2026-09-10",
     readMinutes: 5,
   },
   {
-    slug: "claw-launch-what-partners-can-expect",
-    category: "claw",
-    date: "2025-03-04",
-    readMinutes: 6,
-  },
-  {
-    slug: "claw-roadmap-openclaw-nanoclaw-nemoclaw-bizclaw",
-    category: "claw",
-    date: "2025-02-19",
+    slug: "agents-rag-memory-and-tools",
+    category: "product",
+    date: "2026-09-02",
     readMinutes: 7,
   },
   {
-    slug: "ekyc-data-minimization-retention-and-auditability",
-    category: "ekyc",
-    date: "2025-02-01",
-    readMinutes: 7,
-  },
-  {
-    slug: "ekyc-api-contracts-for-international-rollouts",
-    category: "ekyc",
-    date: "2025-01-14",
+    slug: "webhooks-cron-and-hosted-chat",
+    category: "product",
+    date: "2026-08-21",
     readMinutes: 6,
   },
   {
-    slug: "ekyc-how-we-deliver-identity-verification",
-    category: "ekyc",
-    date: "2025-01-02",
+    slug: "sharing-workflows-and-royalties",
+    category: "credits",
+    date: "2026-08-08",
+    readMinutes: 5,
+  },
+  {
+    slug: "subscription-credits-and-enterprise",
+    category: "credits",
+    date: "2026-07-22",
     readMinutes: 6,
   },
 ];

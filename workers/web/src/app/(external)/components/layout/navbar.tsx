@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Menu, X, Zap } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import { updateThemeMode } from "@/lib/theme-utils";
 import { setValueToCookie } from "@/server/server-actions";
@@ -12,6 +12,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import type { Locale } from "@/types/preferences/locale";
 import type { ThemeMode } from "@/types/preferences/theme";
 
+import { BrandMark } from "./brand-mark";
 import { DesktopCTA, DesktopNavigation, MobileMenu } from "./navbar-components";
 
 export default function Navbar() {
@@ -122,18 +123,7 @@ export default function Navbar() {
     >
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between lg:h-20">
-          {/* Logo */}
-          <Link to="/" className="group flex items-center gap-2">
-            <div className="relative">
-              <div className="from-primary to-accent flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br shadow-lg transition-shadow duration-300 group-hover:shadow-xl">
-                <Zap className="text-primary-foreground h-5 w-5" />
-              </div>
-              <div className="from-primary to-accent absolute inset-0 rounded-xl bg-gradient-to-br opacity-0 blur-xl transition-opacity duration-300 group-hover:opacity-50" />
-            </div>
-            <span className="text-xl font-bold tracking-tight">
-              API<span className="text-primary">Hub</span>
-            </span>
-          </Link>
+          <BrandMark />
 
           <DesktopNavigation navLinks={navLinks} isActive={isActive} t={t} />
           <DesktopCTA

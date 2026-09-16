@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Code2, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, Coins, Sparkles, Webhook, Workflow, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
@@ -23,7 +23,7 @@ const DocsIndex = () => {
     },
     {
       href: "/docs/api",
-      icon: Code2,
+      icon: Webhook,
       titleKey: "card_api_title" as const,
       descKey: "card_api_desc" as const,
     },
@@ -62,12 +62,21 @@ const DocsIndex = () => {
             ))}
           </div>
 
-          <div className="bg-muted/40 border-border rounded-xl border p-6 md:p-8">
-            <h2 className="text-foreground mb-2 text-lg font-semibold">{t("hub_base_title")}</h2>
-            <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{t("hub_base_body")}</p>
-            <code className="bg-background border-border block rounded-lg border px-4 py-3 text-sm break-all">
-              https://api.aiagents-hub.vn
-            </code>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="bg-muted/40 border-border rounded-xl border p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <Workflow className="text-primary h-5 w-5" />
+                <h2 className="text-foreground text-lg font-semibold">{t("hub_builder_title")}</h2>
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed">{t("hub_builder_body")}</p>
+            </div>
+            <div className="bg-muted/40 border-border rounded-xl border p-6">
+              <div className="mb-3 flex items-center gap-2">
+                <Coins className="text-primary h-5 w-5" />
+                <h2 className="text-foreground text-lg font-semibold">{t("hub_credits_title")}</h2>
+              </div>
+              <p className="text-muted-foreground text-sm leading-relaxed">{t("hub_credits_body")}</p>
+            </div>
           </div>
         </div>
       </DocsShell>

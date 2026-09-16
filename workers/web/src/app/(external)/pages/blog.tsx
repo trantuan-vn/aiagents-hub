@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 
-import { ArrowRight, BookOpen, Fingerprint, Sparkles, Workflow } from "lucide-react";
+import { ArrowRight, BookOpen, Coins, Workflow } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
@@ -38,14 +38,9 @@ function PostCard({
   return (
     <article className="hover:border-primary/30 bg-card border-border group flex h-full flex-col rounded-2xl border p-6 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Badge variant={category === "ekyc" ? "default" : "secondary"} className="font-medium">
-          {category === "ekyc" ? t("section_ekyc") : t("section_claw")}
+        <Badge variant={category === "product" ? "default" : "secondary"} className="font-medium">
+          {category === "product" ? t("section_product") : t("section_credits")}
         </Badge>
-        {category === "claw" && (
-          <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
-            {t("badge_upcoming")}
-          </Badge>
-        )}
       </div>
       <h2 className="group-hover:text-primary mb-2 text-lg font-semibold tracking-tight transition-colors md:text-xl">
         <Link to={`/blog/${slug}`}>{t(`posts.${slug}.title` as never)}</Link>
@@ -73,10 +68,10 @@ function PostCard({
 const Blog = () => {
   const t = useTranslations("BlogPage");
 
-  const { ekyc, claw } = useMemo(() => {
-    const ekyc = BLOG_POST_METAS.filter((p) => p.category === "ekyc");
-    const claw = BLOG_POST_METAS.filter((p) => p.category === "claw");
-    return { ekyc, claw };
+  const { product, credits } = useMemo(() => {
+    const product = BLOG_POST_METAS.filter((p) => p.category === "product");
+    const credits = BLOG_POST_METAS.filter((p) => p.category === "credits");
+    return { product, credits };
   }, []);
 
   return (
@@ -110,14 +105,14 @@ const Blog = () => {
             <div className="mx-auto mb-10 flex max-w-6xl flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Fingerprint className="text-primary h-5 w-5" />
-                  <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{t("section_ekyc")}</h2>
+                  <Workflow className="text-primary h-5 w-5" />
+                  <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{t("section_product")}</h2>
                 </div>
-                <p className="text-muted-foreground max-w-2xl text-sm md:text-base">{t("section_ekyc_sub")}</p>
+                <p className="text-muted-foreground max-w-2xl text-sm md:text-base">{t("section_product_sub")}</p>
               </div>
             </div>
             <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {ekyc.map((p) => (
+              {product.map((p) => (
                 <PostCard key={p.slug} slug={p.slug} category={p.category} date={p.date} readMinutes={p.readMinutes} />
               ))}
             </div>
@@ -129,15 +124,14 @@ const Blog = () => {
             <div className="mx-auto mb-10 flex max-w-6xl flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="mb-2 flex items-center gap-2">
-                  <Workflow className="text-primary h-5 w-5" />
-                  <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{t("section_claw")}</h2>
-                  <Sparkles className="h-5 w-5 text-amber-500" aria-hidden />
+                  <Coins className="text-primary h-5 w-5" />
+                  <h2 className="text-2xl font-bold tracking-tight md:text-3xl">{t("section_credits")}</h2>
                 </div>
-                <p className="text-muted-foreground max-w-2xl text-sm md:text-base">{t("section_claw_sub")}</p>
+                <p className="text-muted-foreground max-w-2xl text-sm md:text-base">{t("section_credits_sub")}</p>
               </div>
             </div>
             <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {claw.map((p) => (
+              {credits.map((p) => (
                 <PostCard key={p.slug} slug={p.slug} category={p.category} date={p.date} readMinutes={p.readMinutes} />
               ))}
             </div>

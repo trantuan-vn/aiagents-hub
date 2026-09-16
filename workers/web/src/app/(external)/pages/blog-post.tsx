@@ -84,14 +84,9 @@ function BlogPostArticle({
             </Button>
 
             <div className="mb-5 flex flex-wrap items-center gap-2">
-              <Badge variant={category === "ekyc" ? "default" : "secondary"}>
-                {category === "ekyc" ? t("section_ekyc") : t("section_claw")}
+              <Badge variant={category === "product" ? "default" : "secondary"}>
+                {category === "product" ? t("section_product") : t("section_credits")}
               </Badge>
-              {category === "claw" && (
-                <Badge variant="outline" className="border-amber-500/50 text-amber-700 dark:text-amber-400">
-                  {t("badge_upcoming")}
-                </Badge>
-              )}
             </div>
 
             <h1 className="mb-6 text-3xl font-bold tracking-tight md:text-4xl lg:text-[2.5rem] lg:leading-tight">

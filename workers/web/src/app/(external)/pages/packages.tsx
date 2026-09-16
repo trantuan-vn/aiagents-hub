@@ -1,286 +1,174 @@
 "use client";
 
-import { useState } from "react";
-
 import NextLink from "next/link";
 
-import { type LucideIcon, Bot, Brain, Check, Search, Sparkles } from "lucide-react";
+import { Check, Coins, Shield, Sparkles, Workflow, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 import Layout from "../components/layout/main-layout";
-
-type Tier = "free" | "basic" | "pro";
-
-type PackageEntry = {
-  id: number;
-  name: string;
-  description: string;
-  icon: LucideIcon;
-  category: string;
-  pricing: {
-    free: { credits: number; price: number };
-    basic: { credits: number; price: number };
-    pro: { credits: number; price: number };
-  };
-  features: string[];
-  popular: boolean;
-  comingSoon?: boolean;
-  /** Nếu có — nút "Tìm hiểu thêm" mở URL này (thay vì /packages/:id) */
-  learnMoreHref?: string;
-  /** Nếu true — nút "Tìm hiểu thêm" không điều hướng */
-  learnMoreNoOp?: boolean;
-};
-
-function tierPricing(tier: Tier, pricing: PackageEntry["pricing"]) {
-  if (tier === "free") return pricing.free;
-  if (tier === "basic") return pricing.basic;
-  return pricing.pro;
-}
-
-function PackageCard({
-  pkg,
-  selectedTier,
-  categories,
-  t,
-}: {
-  pkg: PackageEntry;
-  selectedTier: Tier;
-  categories: { value: string; label: string }[];
-  t: ReturnType<typeof useTranslations<"PackagesPage">>;
-}) {
-  const tier = tierPricing(selectedTier, pkg.pricing);
-
-  return (
-    <div
-      className={`bg-card card-hover relative rounded-2xl border p-6 transition-all duration-300 ${
-        pkg.popular ? "border-primary shadow-lg" : "border-border hover:border-primary/50"
-      }`}
-    >
-      {pkg.popular && (
-        <Badge className="from-primary to-accent absolute -top-3 right-4 bg-gradient-to-r text-white">
-          {t("popular")}
-        </Badge>
-      )}
-      {pkg.comingSoon && (
-        <Badge
-          className="absolute -top-3 right-4 border border-cyan-400/40 bg-gradient-to-r from-slate-950 via-cyan-950/90 to-violet-950 text-[11px] font-semibold tracking-wide text-cyan-100 shadow-[0_0_22px_rgba(34,211,238,0.35)]"
-          variant="outline"
-        >
-          <Sparkles className="h-3 w-3 text-cyan-300" aria-hidden />
-          {t("coming_soon")}
-        </Badge>
-      )}
-
-      <div className="mb-4 flex items-start gap-4">
-        <div className="from-primary/20 to-accent/20 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br">
-          <pkg.icon className="text-primary h-6 w-6" />
-        </div>
-        <div className="flex-1">
-          <h3 className="mb-1 text-lg font-semibold">{pkg.name}</h3>
-          <Badge variant="outline" className="text-xs capitalize">
-            {categories.find((cat) => cat.value === pkg.category)?.label ?? pkg.category}
-          </Badge>
-        </div>
-      </div>
-
-      <p className="text-muted-foreground mb-4 text-sm leading-relaxed">{pkg.description}</p>
-
-      <div className="bg-muted/50 mb-4 rounded-xl p-4">
-        <div className="mb-1 flex items-baseline gap-1">
-          <span className="text-2xl font-bold">${tier.price}</span>
-          <span className="text-muted-foreground text-sm">{t("per_month")}</span>
-        </div>
-        <p className="text-muted-foreground text-xs">
-          {tier.credits.toLocaleString()} {t("included_credits")}
-        </p>
-      </div>
-
-      <ul className="mb-6 space-y-2">
-        {pkg.features.slice(0, 3).map((feature) => (
-          <li key={feature} className="flex items-center gap-2 text-sm">
-            <Check className="text-accent h-4 w-4" />
-            {feature}
-          </li>
-        ))}
-        {pkg.features.length > 3 && (
-          <li className="text-muted-foreground text-xs">{t("more_features", { count: pkg.features.length - 3 })}</li>
-        )}
-      </ul>
-
-      <div className="flex gap-2">
-        {pkg.learnMoreNoOp ? (
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={(e) => {
-              e.preventDefault();
-            }}
-          >
-            {t("learn_more")}
-          </Button>
-        ) : pkg.learnMoreHref ? (
-          <Button variant="outline" className="w-full flex-1" asChild>
-            <a href={pkg.learnMoreHref}>{t("learn_more")}</a>
-          </Button>
-        ) : (
-          <Link to={`/packages/${pkg.id}`} className="flex-1">
-            <Button variant="outline" className="w-full">
-              {t("learn_more")}
-            </Button>
-          </Link>
-        )}
-        <Button variant="default" asChild>
-          <NextLink href="/auth/v3/login">{t("subscribe")}</NextLink>
-        </Button>
-      </div>
-    </div>
-  );
-}
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
 
 const Packages = () => {
-  const t = useTranslations("PackagesPage");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedTier, setSelectedTier] = useState<"free" | "basic" | "pro">("basic");
+  const t = useTranslations("Packages");
+  const tp = useTranslations("PackagesPage");
 
-  const categories = [
-    { value: "all", label: t("all_categories") },
-    { value: "ai", label: t("ai_ml") },
-    { value: "claw", label: t("claw") },
-  ];
-
-  const apiPackages: PackageEntry[] = [
+  const plans = [
     {
-      id: 1,
-      name: t("packages.ai_vision.name"),
-      description: t("packages.ai_vision.description"),
-      icon: Brain,
-      category: "ai",
-      pricing: {
-        free: { credits: 200, price: 0 },
-        basic: { credits: 5000, price: 49 },
-        pro: { credits: 25000, price: 149 },
-      },
+      name: t("free"),
+      description: t("free_desc"),
+      price: "$0",
+      period: t("per_month"),
       features: [
-        t("packages.ai_vision.features.0"),
-        t("packages.ai_vision.features.1"),
-        t("packages.ai_vision.features.2"),
-        t("packages.ai_vision.features.3"),
+        t("features.included_credits", { count: "200" }),
+        t("features.platform_access"),
+        t("features.community_support"),
+        t("features.standard_quotas"),
+        t("features.credits_expire"),
       ],
-      popular: true,
-      learnMoreHref: "https://aiagents-hub.vn/docs/api",
-    },
-    {
-      id: 2,
-      name: t("packages.claw_api.name"),
-      description: t("packages.claw_api.description"),
-      icon: Bot,
-      category: "claw",
-      pricing: {
-        free: { credits: 100, price: 0 },
-        basic: { credits: 3000, price: 39 },
-        pro: { credits: 15000, price: 119 },
-      },
-      features: [
-        t("packages.claw_api.features.0"),
-        t("packages.claw_api.features.1"),
-        t("packages.claw_api.features.2"),
-        t("packages.claw_api.features.3"),
-      ],
+      cta: t("start_free"),
+      href: "/auth/v3/login",
+      variant: "outline" as const,
       popular: false,
-      comingSoon: true,
-      learnMoreNoOp: true,
+      external: true,
+    },
+    {
+      name: t("pro"),
+      description: t("pro_desc"),
+      price: "$49",
+      period: t("per_month"),
+      features: [
+        t("features.included_credits", { count: "5,000" }),
+        t("features.buy_credits"),
+        t("features.priority_support"),
+        t("features.higher_quotas"),
+        t("features.webhooks"),
+        t("features.sharing"),
+      ],
+      cta: t("get_started"),
+      href: "/auth/v3/login",
+      variant: "gradient" as const,
+      popular: true,
+      external: true,
+    },
+    {
+      name: t("enterprise"),
+      description: t("enterprise_desc"),
+      price: t("custom_price"),
+      period: "",
+      features: [
+        t("features.committed_credits"),
+        t("features.sla_guarantee"),
+        t("features.dedicated_support"),
+        t("features.custom_quotas"),
+        t("features.model_family_visibility"),
+        t("features.sso_audit"),
+      ],
+      cta: t("contact_sales"),
+      href: "/contact",
+      variant: "outline" as const,
+      popular: false,
+      external: false,
     },
   ];
 
-  const filteredPackages = apiPackages.filter((pkg) => {
-    const matchesSearch =
-      pkg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pkg.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || pkg.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const layers = [
+    { icon: Workflow, title: tp("layers.subscription.title"), body: tp("layers.subscription.body") },
+    { icon: Coins, title: tp("layers.credit.title"), body: tp("layers.credit.body") },
+    { icon: Shield, title: tp("layers.enterprise.title"), body: tp("layers.enterprise.body") },
+  ];
 
   return (
     <Layout>
-      <div className="pt-24 pb-16">
-        <div className="container mx-auto px-4">
-          {/* Header */}
+      <div className="relative overflow-hidden pt-24 pb-16">
+        <div className="from-background via-background to-muted/30 absolute inset-0 bg-gradient-to-b" />
+        <div className="bg-grid absolute inset-0 opacity-40" />
+
+        <div className="relative z-10 container mx-auto px-4">
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <div className="bg-primary/10 border-primary/20 mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1">
               <Sparkles className="text-primary h-4 w-4" />
-              <span className="text-primary text-xs font-medium">{t("badge")}</span>
+              <span className="text-primary text-xs font-medium">{tp("badge")}</span>
             </div>
             <h1 className="mb-4 text-3xl font-bold md:text-4xl">
-              {t("title")} <span className="gradient-text">{t("title_gradient")}</span>
+              {tp("title")} <span className="gradient-text">{tp("title_gradient")}</span>
             </h1>
-            <p className="text-muted-foreground">{t("subtitle")}</p>
+            <p className="text-muted-foreground">{tp("subtitle")}</p>
           </div>
 
-          {/* Filters */}
-          <div className="mb-8 flex flex-col gap-4 md:flex-row">
-            <div className="relative flex-1">
-              <Search className="text-muted-foreground absolute top-1/2 left-3 h-5 w-5 -translate-y-1/2" />
-              <Input
-                placeholder={t("search_placeholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder={t("category")} />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    {cat.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="mx-auto mb-16 grid max-w-5xl gap-8 md:grid-cols-3">
+            {plans.map((plan) => (
+              <div
+                key={plan.name}
+                className={`card-hover relative rounded-2xl border p-8 transition-all duration-300 ${
+                  plan.popular
+                    ? "bg-card border-primary z-10 scale-105 shadow-xl"
+                    : "bg-card border-border hover:border-primary/50"
+                }`}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                    <Badge className="from-primary to-accent bg-gradient-to-r px-4 py-1 text-white shadow-lg">
+                      <Sparkles className="mr-1 h-3 w-3" />
+                      {t("most_popular")}
+                    </Badge>
+                  </div>
+                )}
 
-          {/* Tier Toggle */}
-          <div className="mb-12 flex items-center justify-center gap-2">
-            <span className="text-muted-foreground text-sm">{t("compare_plans")}</span>
-            <div className="bg-muted flex rounded-lg p-1">
-              {(["free", "basic", "pro"] as const).map((tier) => (
-                <button
-                  key={tier}
-                  onClick={() => setSelectedTier(tier)}
-                  className={`rounded-md px-4 py-2 text-sm font-medium transition-all ${
-                    selectedTier === tier
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {tier.charAt(0).toUpperCase() + tier.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
+                <div className="mb-6 text-center">
+                  <h2 className="mb-2 text-xl font-semibold">{plan.name}</h2>
+                  <p className="text-muted-foreground mb-4 text-sm">{plan.description}</p>
+                  <div className="flex items-baseline justify-center gap-1">
+                    <span className="text-4xl font-bold">{plan.price}</span>
+                    {plan.period ? <span className="text-muted-foreground">{plan.period}</span> : null}
+                  </div>
+                </div>
 
-          {/* Packages Grid */}
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {filteredPackages.map((pkg) => (
-              <PackageCard key={pkg.id} pkg={pkg} selectedTier={selectedTier} categories={categories} t={t} />
+                <ul className="mb-8 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-3">
+                      <Check className="text-accent mt-0.5 h-5 w-5 shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {plan.external ? (
+                  <Button variant={plan.variant} className="w-full" asChild>
+                    <NextLink href={plan.href}>{plan.cta}</NextLink>
+                  </Button>
+                ) : (
+                  <Button variant={plan.variant} className="w-full" asChild>
+                    <Link to={plan.href}>{plan.cta}</Link>
+                  </Button>
+                )}
+              </div>
             ))}
           </div>
 
-          {filteredPackages.length === 0 && (
-            <div className="py-12 text-center">
-              <p className="text-muted-foreground">{t("no_packages_found")}</p>
+          <div className="mx-auto mb-8 max-w-3xl text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1">
+              <Zap className="text-primary h-4 w-4" />
+              <span className="text-primary text-xs font-medium uppercase">{tp("layers.kicker")}</span>
             </div>
-          )}
+            <h2 className="mb-3 text-2xl font-bold md:text-3xl">
+              {tp("layers.title")} <span className="gradient-text">{tp("layers.title_gradient")}</span>
+            </h2>
+            <p className="text-muted-foreground">{tp("layers.subtitle")}</p>
+          </div>
+
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
+            {layers.map((layer) => (
+              <div key={layer.title} className="bg-card border-border rounded-2xl border p-6">
+                <div className="from-primary/15 to-accent/15 mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br">
+                  <layer.icon className="text-primary h-5 w-5" />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{layer.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{layer.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </Layout>

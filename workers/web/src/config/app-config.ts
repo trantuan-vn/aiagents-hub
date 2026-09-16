@@ -6,9 +6,10 @@ export const APP_CONFIG = {
   name: "AI Agents Hub",
   homeUrl: "https://aiagents-hub.vn/",
   version: packageJson.version,
-  copyright: `© ${currentYear}, Unitoken.`,
+  copyright: `© ${currentYear}, AI Agents Hub.`,
   meta: {
     title: "AI Agents Hub",
-    description: "AI Agents Hub - API Management Platform",
+    description:
+      "One platform, one Credit, unlimited models. Build AI agents and workflows — pay for completed work, not tokens.",
   },
 };

@@ -2,30 +2,52 @@
 
 import { useTranslations } from "next-intl";
 
-import { ENDPOINTS, ENDPOINT_CODE_EXAMPLES } from "@/app/(main)/dashboard/build/ekyc/_data/code-examples";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-
 import Layout from "../../components/layout/main-layout";
 
 import { DocsCodeSample } from "./docs-code-sample";
 import { DocsShell } from "./docs-shell";
 
+const WEBHOOK_EXAMPLES = {
+  curl: (apiKey: string) => `curl -X POST "https://api.aiagents-hub.vn/hooks/workflows/YOUR_WORKFLOW_ID/run" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"message": "Summarize today's support tickets"}'`,
+  javascript: (apiKey: string) => `const res = await fetch(
+  "https://api.aiagents-hub.vn/hooks/workflows/YOUR_WORKFLOW_ID/run",
+  {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer ${apiKey}",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message: "Summarize today's support tickets" }),
+  },
+);
+const data = await res.json();`,
+  python: (apiKey: string) => `import requests
+
+r = requests.post(
+    "https://api.aiagents-hub.vn/hooks/workflows/YOUR_WORKFLOW_ID/run",
+    headers={"Authorization": f"Bearer ${apiKey}"},
+    json={"message": "Summarize today's support tickets"},
+)
+print(r.json())`,
+};
+
 const ApiReferencePage = () => {
   const t = useTranslations("Docs");
-  const te = useTranslations("BuildEkycPage");
 
   return (
     <Layout>
       <DocsShell title={t("api_page_title")} description={t("api_page_description")}>
         <div className="space-y-12">
           <section className="bg-muted/40 border-border rounded-xl border p-6 md:p-8">
-            <h2 className="text-foreground mb-2 text-lg font-semibold">{te("base_url_title")}</h2>
-            <p className="text-muted-foreground mb-4 text-sm">{te("auth_note")}</p>
+            <h2 className="text-foreground mb-2 text-lg font-semibold">{t("api_auth_title")}</h2>
+            <p className="text-muted-foreground mb-4 text-sm">{t("api_auth_body")}</p>
             <div className="space-y-3 text-sm">
               <div>
                 <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
-                  {te("base_url_label")}
+                  {t("api_base_url_label")}
                 </p>
                 <code className="bg-background border-border block rounded-lg border px-3 py-2 break-all">
                   https://api.aiagents-hub.vn
@@ -33,7 +55,7 @@ const ApiReferencePage = () => {
               </div>
               <div>
                 <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
-                  {te("auth_header")}
+                  {t("api_auth_header")}
                 </p>
                 <code className="bg-background border-border block rounded-lg border px-3 py-2 break-all">
                   Authorization: Bearer YOUR_API_KEY
@@ -43,44 +65,30 @@ const ApiReferencePage = () => {
           </section>
 
           <section>
-            <h2 className="text-foreground mb-2 text-xl font-semibold">{te("api_reference_title")}</h2>
-            <p className="text-muted-foreground mb-8 text-base">{te("api_reference_description")}</p>
-
-            <div className="space-y-16">
-              {ENDPOINTS.map((endpoint) => {
-                const examples = ENDPOINT_CODE_EXAMPLES[endpoint.id];
-                return (
-                  <article key={endpoint.id} id={endpoint.id} className="scroll-mt-28">
-                    <div className="mb-4 flex flex-wrap items-center gap-2">
-                      <Badge className="font-mono text-xs">{endpoint.method}</Badge>
-                      <code className="text-foreground text-sm font-medium">{endpoint.path}</code>
-                    </div>
-                    <h3 className="text-foreground mb-2 text-lg font-semibold">{te(endpoint.titleKey)}</h3>
-                    <p className="text-muted-foreground mb-4 max-w-3xl text-base leading-relaxed">
-                      {te(endpoint.descKey)}
-                    </p>
-                    <div className="mb-4">
-                      <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-                        {t("params_label")}
-                      </p>
-                      <ul className="text-foreground list-inside list-disc text-sm">
-                        {endpoint.params.map((p) => (
-                          <li key={p}>{p}</li>
-                        ))}
-                      </ul>
-                    </div>
-                    <Separator className="my-6" />
-                    <p className="text-muted-foreground mb-3 text-sm font-medium">{te("example_code")}</p>
-                    <DocsCodeSample key={endpoint.id} examples={examples} />
-                  </article>
-                );
-              })}
+            <h2 className="text-foreground mb-2 text-xl font-semibold">{t("api_webhook_title")}</h2>
+            <p className="text-muted-foreground mb-6 text-base leading-relaxed">{t("api_webhook_body")}</p>
+            <div className="mb-6">
+              <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
+                {t("params_label")}
+              </p>
+              <ul className="text-foreground list-inside list-disc space-y-1 text-sm">
+                <li>
+                  <code>workflowId</code> — {t("api_param_workflow")}
+                </li>
+                <li>
+                  <code>path</code> — {t("api_param_path")}
+                </li>
+                <li>
+                  JSON body — {t("api_param_body")}
+                </li>
+              </ul>
             </div>
+            <DocsCodeSample examples={WEBHOOK_EXAMPLES} />
           </section>
 
           <section className="bg-muted/30 border-border rounded-xl border p-6">
-            <h2 className="text-foreground mb-2 text-lg font-semibold">{te("response_title")}</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">{te("response_description")}</p>
+            <h2 className="text-foreground mb-2 text-lg font-semibold">{t("api_credits_title")}</h2>
+            <p className="text-muted-foreground text-sm leading-relaxed">{t("api_credits_body")}</p>
           </section>
         </div>
       </DocsShell>
