@@ -3632,7 +3632,7 @@
     "payout_not_scheduled": "Not scheduled",
     "loading": "Loading...",
     "workflow": "Workflow",
-    "amount": "Amount (USD)",
+    "amount": "Amount (CR)",
     "date": "Date",
     "load_error": "Failed to load earnings"
   },

@@ -49,6 +49,7 @@ import {
   listSharedWorkflowsFromD1,
   listWorkflowRoyalties,
 } from '../infrastructure/infrastructure';
+import { getBillingEconomicsFromEnv } from '../../../admin/service/get-billing-economics.js';
 import { getWorkflowEarningsMonthlySummary } from '../billing/earnings-monthly.js';
 import { parseWorkflowDefinition, resolveWorkflow } from '../execution/workflow-context.js';
 import { touchUserCronAlarm } from '../triggers/cron-alarm.js';
@@ -355,7 +356,8 @@ export function createWorkflowRoutes(bindingName: string) {
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
       const ownerId = getUserId(c, user.identifier);
-      const summary = await getWorkflowEarningsMonthlySummary(db, ownerId);
+      const eco = await getBillingEconomicsFromEnv(c.env);
+      const summary = await getWorkflowEarningsMonthlySummary(db, ownerId, 50, eco.creditPriceUsd);
       return c.json(summary);
     }, 'Failed to get monthly workflow earnings'),
   );

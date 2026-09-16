@@ -1,3 +1,5 @@
+import { payoutTotalUsd } from './royalty-credits';
+
 /** D1 aggregates for monthly commission & workflow royalty earnings. */
 
 export function currentPeriod(): string {
@@ -109,7 +111,7 @@ export async function mergePeriodEarnings(
     const commission = commissionMap.get(userId);
     const workflowTotal = workflowMap.get(userId) ?? 0;
     const commissionTotal = commission?.amount ?? 0;
-    const total = commissionTotal + workflowTotal;
+    const total = payoutTotalUsd(commissionTotal, workflowTotal);
     if (total <= 0) continue;
 
     let identifier = commission?.identifier ?? '';

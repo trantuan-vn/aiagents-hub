@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 const chartConfig = {
   total: { label: "Royalty", color: "var(--chart-1)" },
@@ -19,12 +19,12 @@ export function AccruingEarningsChart({ byDay }: AccruingEarningsChartProps) {
       <BarChart data={byDay} margin={{ left: -12, right: 0, top: 10, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={8} />
-        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={48} />
+        <YAxis tickLine={false} axisLine={false} tickMargin={8} width={56} />
         <ChartTooltip
           content={
             <ChartTooltipContent
               formatter={(value) =>
-                formatUsd(value as number)
+                formatCredits(value as number)
               }
             />
           }

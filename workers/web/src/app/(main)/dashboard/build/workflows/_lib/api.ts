@@ -501,6 +501,7 @@ export function listEarnings(period: number, limit = 50, offset = 0) {
 export interface WorkflowClosedPeriodRow {
   period: string;
   totalAmountUsd: number;
+  totalAmountCr: number;
   payoutStatus: "pending" | "paid" | null;
 }
 
@@ -509,11 +510,13 @@ export interface WorkflowEarningsMonthlySummary {
   accruing: {
     period: string;
     totalAmountUsd: number;
+    totalAmountCr: number;
     byDay: { date: string; total: number }[];
     royalties: Record<string, unknown>[];
   };
   closedPeriods: WorkflowClosedPeriodRow[];
   closedTotalAmountUsd: number;
+  closedTotalAmountCr: number;
 }
 
 export function getWorkflowEarningsMonthlySummary() {

@@ -9,12 +9,13 @@ import { PAYPAL_API_PAYOUT_ENABLED } from "./paypal-api-payout-enabled";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatUsd } from "@/lib/utils";
+import { formatUsd, formatWorkflowRoyaltyCr } from "@/lib/utils";
 
 export interface PayoutPeriodRow {
   period: string;
   commissionAmountUsd: number;
   workflowRoyaltyAmountUsd: number;
+  workflowRoyaltyAmountCr?: number;
   totalAmountUsd: number;
   bankStatus: "paid" | "unpaid";
   paidAt?: string;
@@ -25,6 +26,7 @@ export interface PayoutItem {
   recipientIdentifier: string;
   commissionAmountUsd: number;
   workflowRoyaltyAmountUsd: number;
+  workflowRoyaltyAmountCr?: number;
   totalAmountUsd: number;
   bankStatus: "paid" | "unpaid";
   hasBeneficiary: boolean;
@@ -204,7 +206,9 @@ function PayoutItemRows({
         <ExpandToggleCell isOpen={isOpen} />
         <TableCell className="font-mono text-sm">{item.recipientIdentifier}</TableCell>
         <TableCell className="text-right">{formatUsd(item.commissionAmountUsd)}</TableCell>
-        <TableCell className="text-right">{formatUsd(item.workflowRoyaltyAmountUsd)}</TableCell>
+        <TableCell className="text-right">
+          {formatWorkflowRoyaltyCr(item.workflowRoyaltyAmountCr, item.workflowRoyaltyAmountUsd)}
+        </TableCell>
         <TableCell className="text-right font-medium">{formatUsd(item.totalAmountUsd)}</TableCell>
         {!isAccruing && <PayoutCurrencyCell currency={item.earningsPayoutCurrency} />}
         {!isAccruing && (
@@ -249,7 +253,9 @@ function PayoutPeriodRow({
       <TableCell />
       <TableCell className="text-muted-foreground pl-6 text-sm">{period.period}</TableCell>
       <TableCell className="text-right text-sm">{formatUsd(period.commissionAmountUsd)}</TableCell>
-      <TableCell className="text-right text-sm">{formatUsd(period.workflowRoyaltyAmountUsd)}</TableCell>
+      <TableCell className="text-right text-sm">
+        {formatWorkflowRoyaltyCr(period.workflowRoyaltyAmountCr, period.workflowRoyaltyAmountUsd)}
+      </TableCell>
       <TableCell className="text-right text-sm">{formatUsd(period.totalAmountUsd)}</TableCell>
       {!isAccruing && <TableCell />}
       {!isAccruing && <TableCell />}

@@ -76,6 +76,9 @@ export default function EarningsPayoutsPage() {
         hint={qr.mode === "paypal" ? t("paypal_qr_hint") : t("qr_hint")}
         cancelLabel={t("cancel")}
         paidLabel={qr.mode === "paypal" ? t("confirm_paid_paypal") : t("confirm_paid")}
+        commissionLabel={t("commission")}
+        workflowLabel={t("workflow")}
+        totalLabel={t("total")}
         markingPaid={qr.markingPaid}
         onPaid={qr.onPaid}
       />
@@ -93,6 +96,9 @@ export default function EarningsPayoutsPage() {
         cancelLabel={t("cancel")}
         sendingLabel={t("paypal_sending")}
         successLabel={t("paypal_success")}
+        commissionLabel={t("commission")}
+        workflowLabel={t("workflow")}
+        totalLabel={t("total")}
         onConfirm={paypal.onConfirm}
       />
     </div>

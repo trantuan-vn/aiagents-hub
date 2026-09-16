@@ -1,6 +1,6 @@
 "use client";
 
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 interface AccruingRoyaltiesTableProps {
   royalties: Record<string, unknown>[];
@@ -36,7 +36,7 @@ export function AccruingRoyaltiesTable({
             >
               <td className="py-2">{String(r.workflowId ?? "")}</td>
               <td className="py-2">
-                {formatUsd(Number(r.royaltyAmountUsd ?? 0))}
+                {formatCredits(Number(r.royaltyAmountCr ?? 0))}
               </td>
               <td className="text-muted-foreground py-2">
                 {r.created_at ? new Date(Number(r.created_at)).toLocaleDateString() : "—"}

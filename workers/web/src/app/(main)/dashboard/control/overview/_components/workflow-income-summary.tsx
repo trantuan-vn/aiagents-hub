@@ -8,7 +8,7 @@ import { GitBranch, TrendingUp, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -17,7 +17,7 @@ interface WorkflowIncomeSummaryProps {
 }
 
 interface WorkflowMonthlyPreview {
-  accruing?: { totalAmountUsd?: number };
+  accruing?: { totalAmountCr?: number; totalAmountUsd?: number };
 }
 
 export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
@@ -62,7 +62,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
     );
   }
 
-  const totalEarnings = stats?.accruing?.totalAmountUsd ?? 0;
+  const totalEarnings = stats?.accruing?.totalAmountCr ?? 0;
 
   return (
     <Card className="border-primary/20 overflow-hidden transition-shadow hover:shadow-md">
@@ -77,7 +77,7 @@ export function WorkflowIncomeSummary({ t }: WorkflowIncomeSummaryProps) {
         {totalEarnings > 0 && (
           <div className="bg-primary/5 rounded-lg p-3">
             <p className="text-muted-foreground text-xs">{t("workflow.earned")}</p>
-            <p className="text-primary text-2xl font-bold">{formatUsd(totalEarnings)}</p>
+            <p className="text-primary text-2xl font-bold">{formatCredits(totalEarnings)}</p>
           </div>
         )}
         <div className="flex gap-2">

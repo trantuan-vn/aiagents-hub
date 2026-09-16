@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatUsd } from "@/lib/utils";
+import { formatUsd, formatWorkflowRoyaltyCr } from "@/lib/utils";
 
 import type { PayoutItem } from "./earnings-payout-table";
 
@@ -28,6 +28,9 @@ interface EarningsPaypalPayoutDialogProps {
   cancelLabel: string;
   sendingLabel: string;
   successLabel: string;
+  commissionLabel: string;
+  workflowLabel: string;
+  totalLabel: string;
   onConfirm: () => void;
 }
 
@@ -44,6 +47,9 @@ export function EarningsPaypalPayoutDialog({
   cancelLabel,
   sendingLabel,
   successLabel,
+  commissionLabel,
+  workflowLabel,
+  totalLabel,
   onConfirm,
 }: EarningsPaypalPayoutDialogProps) {
   const description = selectedItem
@@ -67,6 +73,25 @@ export function EarningsPaypalPayoutDialog({
           <p className="text-sm text-green-600 dark:text-green-400">{successLabel}</p>
         ) : (
           <div className="space-y-3 text-sm">
+            {selectedItem ? (
+              <div className="space-y-1">
+                <p>
+                  <span className="text-muted-foreground">{commissionLabel}: </span>
+                  {formatUsd(selectedItem.commissionAmountUsd)}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">{workflowLabel}: </span>
+                  {formatWorkflowRoyaltyCr(
+                    selectedItem.workflowRoyaltyAmountCr,
+                    selectedItem.workflowRoyaltyAmountUsd,
+                  )}
+                </p>
+                <p className="font-medium">
+                  <span className="text-muted-foreground">{totalLabel}: </span>
+                  {formatUsd(selectedItem.totalAmountUsd)}
+                </p>
+              </div>
+            ) : null}
             {selectedItem?.beneficiaryHint && (
               <p>
                 <span className="text-muted-foreground">{hint}: </span>

@@ -3632,7 +3632,7 @@
     "payout_not_scheduled": "Chưa lên lịch",
     "loading": "Đang tải...",
     "workflow": "Workflow",
-    "amount": "Số tiền (USD)",
+    "amount": "Số tiền (CR)",
     "date": "Ngày",
     "load_error": "Không tải được thu nhập"
   },

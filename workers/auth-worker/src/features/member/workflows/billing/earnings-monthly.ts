@@ -3,11 +3,13 @@ import {
   enumeratePeriods,
   periodToRange,
 } from '../../../admin/earnings-payout/d1';
+import { DEFAULT_CREDIT_PRICE_USD, usdToCredits } from '../../../admin/service/credit.js';
 import type { RoyaltyStatsRow } from '../infrastructure/infrastructure';
 
 export interface WorkflowClosedPeriodRow {
   period: string;
   totalAmountUsd: number;
+  totalAmountCr: number;
   payoutStatus: 'pending' | 'paid' | null;
 }
 
@@ -16,11 +18,13 @@ export interface WorkflowEarningsMonthlySummary {
   accruing: {
     period: string;
     totalAmountUsd: number;
+    totalAmountCr: number;
     byDay: RoyaltyStatsRow[];
     royalties: Record<string, unknown>[];
   };
   closedPeriods: WorkflowClosedPeriodRow[];
   closedTotalAmountUsd: number;
+  closedTotalAmountCr: number;
 }
 
 function lastClosedPeriod(): string {
@@ -128,10 +132,15 @@ async function getPayoutStatusByPeriod(
   return map;
 }
 
+function toRoyaltyCredits(usd: number, creditPriceUsd: number): number {
+  return usdToCredits(usd, creditPriceUsd);
+}
+
 export async function getWorkflowEarningsMonthlySummary(
   db: D1Database,
   ownerUserId: string,
   royaltiesLimit = 50,
+  creditPriceUsd = DEFAULT_CREDIT_PRICE_USD,
 ): Promise<WorkflowEarningsMonthlySummary> {
   const current = currentPeriod();
   const { fromTs: accruingFrom, toTs: accruingTo } = periodToRange(current);
@@ -155,6 +164,7 @@ export async function getWorkflowEarningsMonthlySummary(
       closedPeriods.push({
         period: p,
         totalAmountUsd,
+        totalAmountCr: toRoyaltyCredits(totalAmountUsd, creditPriceUsd),
         payoutStatus: payoutByPeriod.get(p) ?? null,
       });
     }
@@ -162,16 +172,28 @@ export async function getWorkflowEarningsMonthlySummary(
   }
 
   const closedTotalAmountUsd = closedPeriods.reduce((s, r) => s + r.totalAmountUsd, 0);
+  const accruingUsd = accruingStats.totalAmount;
 
   return {
     currentPeriod: current,
     accruing: {
       period: current,
-      totalAmountUsd: accruingStats.totalAmount,
-      byDay: accruingStats.byDay,
-      royalties: accruingRoyalties,
+      totalAmountUsd: accruingUsd,
+      totalAmountCr: toRoyaltyCredits(accruingUsd, creditPriceUsd),
+      byDay: accruingStats.byDay.map((d) => ({
+        date: d.date,
+        total: toRoyaltyCredits(d.total, creditPriceUsd),
+      })),
+      royalties: accruingRoyalties.map((r) => ({
+        ...r,
+        royaltyAmountCr: toRoyaltyCredits(
+          Number(r.royaltyAmountUsd ?? r.royaltyAmountVnd ?? 0) || 0,
+          creditPriceUsd,
+        ),
+      })),
     },
     closedPeriods,
     closedTotalAmountUsd,
+    closedTotalAmountCr: toRoyaltyCredits(closedTotalAmountUsd, creditPriceUsd),
   };
 }

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 import type { WorkflowClosedPeriodRow, WorkflowEarningsMonthlySummary } from "../../_lib/api";
 
@@ -54,7 +54,7 @@ export function WorkflowClosedPeriodsCard({
             <p className="text-muted-foreground mb-4 text-sm">
               {closedTotalLabel}:{" "}
               <span className="text-foreground font-medium">
-                {formatUsd(summary?.closedTotalAmountUsd ?? 0)}
+                {formatCredits(summary?.closedTotalAmountCr ?? 0)}
               </span>
             </p>
             <Table>
@@ -70,7 +70,7 @@ export function WorkflowClosedPeriodsCard({
                   <TableRow key={row.period}>
                     <TableCell className="font-mono text-sm">{row.period}</TableCell>
                     <TableCell className="text-right">
-                      {formatUsd(row.totalAmountUsd)}
+                      {formatCredits(row.totalAmountCr)}
                     </TableCell>
                     <TableCell>
                       <PayoutStatusBadge status={row.payoutStatus} labels={payoutLabels} />

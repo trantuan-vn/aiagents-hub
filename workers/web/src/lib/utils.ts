@@ -70,3 +70,13 @@ export function formatCredits(amount: number, locale = "en-US"): string {
     minimumFractionDigits: 0,
   }).format(n)} CR`;
 }
+
+/** Workflow royalty: CR primary, converted USD in parentheses. */
+export function formatCreditsWithUsd(credits: number, usd: number, locale = "en-US"): string {
+  return `${formatCredits(credits, locale)} (${formatUsd(usd, locale)})`;
+}
+
+export function formatWorkflowRoyaltyCr(credits: number | undefined, usd: number, locale = "en-US"): string {
+  if (credits == null) return formatUsd(usd, locale);
+  return formatCreditsWithUsd(credits, usd, locale);
+}

@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatUsd } from "@/lib/utils";
+import { formatUsd, formatWorkflowRoyaltyCr } from "@/lib/utils";
 
 import type { PayoutItem } from "./earnings-payout-table";
 
@@ -28,6 +28,9 @@ interface EarningsPayoutQrDialogProps {
   hint: string;
   cancelLabel: string;
   paidLabel: string;
+  commissionLabel: string;
+  workflowLabel: string;
+  totalLabel: string;
   markingPaid?: boolean;
   onPaid: () => void;
 }
@@ -38,7 +41,13 @@ function QrDialogBody({
   qrError,
   qrSrc,
   hint,
-}: Pick<EarningsPayoutQrDialogProps, "selectedItem" | "qrLoading" | "qrError" | "qrSrc" | "hint">) {
+  commissionLabel,
+  workflowLabel,
+  totalLabel,
+}: Pick<
+  EarningsPayoutQrDialogProps,
+  "selectedItem" | "qrLoading" | "qrError" | "qrSrc" | "hint" | "commissionLabel" | "workflowLabel" | "totalLabel"
+>) {
   if (qrLoading) {
     return (
       <div className="flex min-h-[220px] items-center justify-center">
@@ -56,6 +65,25 @@ function QrDialogBody({
           <Image src={qrSrc} alt="" width={280} height={280} unoptimized className="max-h-[280px] object-contain" />
         </div>
       )}
+      {selectedItem ? (
+        <div className="space-y-1 text-sm">
+          <p>
+            <span className="text-muted-foreground">{commissionLabel}: </span>
+            {formatUsd(selectedItem.commissionAmountUsd)}
+          </p>
+          <p>
+            <span className="text-muted-foreground">{workflowLabel}: </span>
+            {formatWorkflowRoyaltyCr(
+              selectedItem.workflowRoyaltyAmountCr,
+              selectedItem.workflowRoyaltyAmountUsd,
+            )}
+          </p>
+          <p className="font-medium">
+            <span className="text-muted-foreground">{totalLabel}: </span>
+            {formatUsd(selectedItem.totalAmountUsd)}
+          </p>
+        </div>
+      ) : null}
       {selectedItem && <p className="text-muted-foreground text-center text-xs">{hint}</p>}
     </>
   );
@@ -72,6 +100,9 @@ export function EarningsPayoutQrDialog({
   hint,
   cancelLabel,
   paidLabel,
+  commissionLabel,
+  workflowLabel,
+  totalLabel,
   markingPaid = false,
   onPaid,
 }: EarningsPayoutQrDialogProps) {
@@ -86,7 +117,16 @@ export function EarningsPayoutQrDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
-        <QrDialogBody selectedItem={selectedItem} qrLoading={qrLoading} qrError={qrError} qrSrc={qrSrc} hint={hint} />
+        <QrDialogBody
+          selectedItem={selectedItem}
+          qrLoading={qrLoading}
+          qrError={qrError}
+          qrSrc={qrSrc}
+          hint={hint}
+          commissionLabel={commissionLabel}
+          workflowLabel={workflowLabel}
+          totalLabel={totalLabel}
+        />
         <DialogFooter className="gap-2 sm:gap-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             {cancelLabel}

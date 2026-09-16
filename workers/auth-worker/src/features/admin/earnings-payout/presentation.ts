@@ -18,8 +18,10 @@ import { GeneratePayoutQrSchema, MarkPaypalQrPaidSchema, SendPaypalPayoutSchema 
 import { sendPaypalPayout } from './paypal-payout';
 import { paypalQrKeyToDataUrl } from '../../member/payout/r2';
 import { currentPeriod } from './d1';
+import { getBillingEconomicsFromEnv } from '../service/get-billing-economics';
 import {
   attachBeneficiaries,
+  attachWorkflowRoyaltyCredits,
   buildAccruingPayoutList,
   buildAggregatedPayoutList,
   getPrimaryAdminIdentifier,
@@ -41,8 +43,9 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       );
 
       const allRecords = await syncAllPeriodPayoutRecords(db, payoutInfra);
-      const aggregated = buildAggregatedPayoutList(allRecords);
-      const accruing = buildAccruingPayoutList(allRecords);
+      const eco = await getBillingEconomicsFromEnv(c.env);
+      const aggregated = attachWorkflowRoyaltyCredits(buildAggregatedPayoutList(allRecords), eco.creditPriceUsd);
+      const accruing = attachWorkflowRoyaltyCredits(buildAccruingPayoutList(allRecords), eco.creditPriceUsd);
       const [items, accruingItems] = await Promise.all([
         attachBeneficiaries(c, bindingName, aggregated),
         attachBeneficiaries(c, bindingName, accruing),
@@ -70,7 +73,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
 
-      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+      const { keys, totalAmountUsd, commissionAmountUsd, workflowRoyaltyAmountUsd, identifier } =
+        await getUnpaidPayoutKeysForUser(
         db,
         payoutInfra,
         recipientUserId,
@@ -127,6 +131,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       return c.json({
         qr,
         amountUsd: totalAmountUsd,
+        commissionAmountUsd,
+        workflowRoyaltyAmountUsd,
         amountVnd: totalAmountVnd,
         usdVndRate,
         beneficiary,
@@ -157,7 +163,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
 
-      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+      const { keys, totalAmountUsd, commissionAmountUsd, workflowRoyaltyAmountUsd, identifier } =
+        await getUnpaidPayoutKeysForUser(
         db,
         payoutInfra,
         recipientUserId,
@@ -198,6 +205,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       return c.json({
         qr,
         amountUsd: totalAmountUsd,
+        commissionAmountUsd,
+        workflowRoyaltyAmountUsd,
         paypalEmail: paypal.paypalEmail,
         maskedEmail: maskPaypalEmail(paypal.paypalEmail),
         recipientUserId,
@@ -226,7 +235,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
 
-      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+      const { keys, totalAmountUsd, commissionAmountUsd, workflowRoyaltyAmountUsd, identifier } =
+        await getUnpaidPayoutKeysForUser(
         db,
         payoutInfra,
         recipientUserId,
@@ -241,6 +251,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       return c.json({
         success: true,
         amountUsd: totalAmountUsd,
+        commissionAmountUsd,
+        workflowRoyaltyAmountUsd,
         recipientUserId,
         recipientIdentifier: identifier,
         payoutKeys: keys,
@@ -266,7 +278,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       ) as DurableObjectStub<UserDO>;
       const payoutInfra = createEarningsPayoutInfrastructure(adminStub);
 
-      const { keys, totalAmountUsd, identifier } = await getUnpaidPayoutKeysForUser(
+      const { keys, totalAmountUsd, commissionAmountUsd, workflowRoyaltyAmountUsd, identifier } =
+        await getUnpaidPayoutKeysForUser(
         db,
         payoutInfra,
         recipientUserId,
@@ -309,6 +322,8 @@ export function createAdminEarningsPayoutRoutes(bindingName: string) {
       return c.json({
         success: true,
         amountUsd: totalAmountUsd,
+        commissionAmountUsd,
+        workflowRoyaltyAmountUsd,
         paypalEmail: paypalBeneficiary.paypalEmail,
         payoutBatchId: payoutResult.payoutBatchId,
         batchStatus: payoutResult.batchStatus,

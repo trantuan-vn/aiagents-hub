@@ -1,11 +1,10 @@
 import { Context } from 'hono';
-import { getIdFromName } from '../../../shared/utils';
+import { executeUtils, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
+import { createPayoutBeneficiaryInfrastructure, maskPaypalEmail } from '../../member/payout/beneficiary-infrastructure';
+import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
+import { getPrimaryAdminIdentifier } from '../admin-identifier';
 import { parseEarningsPayoutCassoMapping, toPayoutAmountVnd } from './casso-payout';
-import {
-  createEarningsPayoutInfrastructure,
-  payoutKey,
-} from './infrastructure';
 import {
   currentPeriod,
   enumeratePeriods,
@@ -13,11 +12,11 @@ import {
   isPeriodEligibleForPayout,
   mergePeriodEarnings,
 } from './d1';
-import { executeUtils } from '../../../shared/utils';
-import { createPayoutBeneficiaryInfrastructure, maskPaypalEmail } from '../../member/payout/beneficiary-infrastructure';
-import { createPayoutEncryptionSecretGetter } from '../../member/payout/crypto';
-
-import { getPrimaryAdminIdentifier } from '../admin-identifier';
+import {
+  createEarningsPayoutInfrastructure,
+  payoutKey,
+} from './infrastructure';
+import { payoutTotalUsd, withWorkflowRoyaltyCredits } from './royalty-credits';
 
 export { getPrimaryAdminIdentifier };
 
@@ -25,6 +24,7 @@ export interface PayoutPeriodRow {
   period: string;
   commissionAmountUsd: number;
   workflowRoyaltyAmountUsd: number;
+  workflowRoyaltyAmountCr: number;
   totalAmountUsd: number;
   bankStatus: 'paid' | 'unpaid';
   paidAt?: string;
@@ -35,6 +35,7 @@ export interface AggregatedPayoutItem {
   recipientIdentifier: string;
   commissionAmountUsd: number;
   workflowRoyaltyAmountUsd: number;
+  workflowRoyaltyAmountCr: number;
   totalAmountUsd: number;
   bankStatus: 'paid' | 'unpaid';
   hasBeneficiary: boolean;
@@ -108,6 +109,7 @@ function aggregatePayoutRecords(
         recipientIdentifier: record.recipientIdentifier,
         commissionAmountUsd: 0,
         workflowRoyaltyAmountUsd: 0,
+        workflowRoyaltyAmountCr: 0,
         totalAmountUsd: 0,
         bankStatus: 'unpaid',
         hasBeneficiary: false,
@@ -119,12 +121,13 @@ function aggregatePayoutRecords(
 
     agg.commissionAmountUsd += record.commissionAmountUsd;
     agg.workflowRoyaltyAmountUsd += record.workflowRoyaltyAmountUsd;
-    agg.totalAmountUsd += record.totalAmountUsd;
+    agg.totalAmountUsd = payoutTotalUsd(agg.commissionAmountUsd, agg.workflowRoyaltyAmountUsd);
     agg.periods.push({
       period: record.period,
       commissionAmountUsd: record.commissionAmountUsd,
       workflowRoyaltyAmountUsd: record.workflowRoyaltyAmountUsd,
-      totalAmountUsd: record.totalAmountUsd,
+      workflowRoyaltyAmountCr: 0,
+      totalAmountUsd: payoutTotalUsd(record.commissionAmountUsd, record.workflowRoyaltyAmountUsd),
       bankStatus: 'unpaid',
       paidAt: record.paidAt,
     });
@@ -136,6 +139,13 @@ function aggregatePayoutRecords(
     item.periods.sort((a, b) => b.period.localeCompare(a.period));
   }
   return items;
+}
+
+export function attachWorkflowRoyaltyCredits(
+  items: AggregatedPayoutItem[],
+  creditPriceUsd: number,
+): AggregatedPayoutItem[] {
+  return items.map((item) => withWorkflowRoyaltyCredits(item, creditPriceUsd));
 }
 
 /** Closed periods only — eligible for bank payout. */
@@ -214,7 +224,13 @@ export async function getUnpaidPayoutKeysForUser(
   db: D1Database,
   payoutInfra: ReturnType<typeof createEarningsPayoutInfrastructure>,
   recipientUserId: string,
-): Promise<{ keys: string[]; totalAmountUsd: number; identifier: string }> {
+): Promise<{
+  keys: string[];
+  commissionAmountUsd: number;
+  workflowRoyaltyAmountUsd: number;
+  totalAmountUsd: number;
+  identifier: string;
+}> {
   await syncAllPeriodPayoutRecords(db, payoutInfra);
   const all = await payoutInfra.listAll();
   const unpaid = all.filter(
@@ -223,11 +239,14 @@ export async function getUnpaidPayoutKeysForUser(
       p.status !== 'paid' &&
       isPeriodEligibleForPayout(p.period),
   );
-  const totalAmountUsd = unpaid.reduce((s, p) => s + p.totalAmountUsd, 0);
+  const commissionAmountUsd = unpaid.reduce((s, p) => s + p.commissionAmountUsd, 0);
+  const workflowRoyaltyAmountUsd = unpaid.reduce((s, p) => s + p.workflowRoyaltyAmountUsd, 0);
   const identifier = unpaid[0]?.recipientIdentifier ?? recipientUserId;
   return {
     keys: unpaid.map((p) => p.payoutKey),
-    totalAmountUsd,
+    commissionAmountUsd,
+    workflowRoyaltyAmountUsd,
+    totalAmountUsd: payoutTotalUsd(commissionAmountUsd, workflowRoyaltyAmountUsd),
     identifier,
   };
 }

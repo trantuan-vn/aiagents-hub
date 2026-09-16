@@ -4,7 +4,7 @@ import { Clock } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 import type { WorkflowEarningsMonthlySummary } from "../../_lib/api";
 
@@ -80,7 +80,7 @@ export function WorkflowAccruingCard({
   const accruing = summary?.accruing;
   const totalLabel = loading
     ? "..."
-    : formatUsd(accruing?.totalAmountUsd ?? 0);
+    : formatCredits(accruing?.totalAmountCr ?? 0);
 
   return (
     <Card>
