@@ -357,8 +357,6 @@ export function LoginForm() {
   const [showTotpPopup, setShowTotpPopup] = useState(false);
   const [showSmsPopup, setShowSmsPopup] = useState(false);
   const [showBackupCodePopup, setShowBackupCodePopup] = useState(false);
-  const [showRecoverSection, setShowRecoverSection] = useState(false);
-  const [recoverBackupCode, setRecoverBackupCode] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [backupCode, setBackupCode] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -709,61 +707,6 @@ export function LoginForm() {
     setShowBackupCodePopup(true);
   }, []);
 
-  const handleRecoverWithBackupCode = useCallback(
-    async (emailValue: string) => {
-      const email = emailValue?.trim() ?? form.getValues("email")?.trim();
-      if (!email) {
-        toast.error(t("email_required"));
-        return;
-      }
-      const normalized = recoverBackupCode.replace(/\s/g, "").replace(/-/g, "").toUpperCase();
-      if (!/^[0-9A-F]{16}$/.test(normalized)) {
-        toast.error(t("backup_code_verify_error"));
-        return;
-      }
-      if (captcha.needsTokenBeforeSubmit) {
-        toast.error(t("captcha_required"));
-        return;
-      }
-      setIsLoading(true);
-      try {
-        const body: { identifier: string; code: string; turnstileToken?: string } = {
-          identifier: email,
-          code: normalized,
-        };
-        const token = captcha.turnstileTokenForBody();
-        if (token) body.turnstileToken = token;
-        const response = await fetch(`${AUTH_API_URL}/backup-code/recover`, {
-          method: "POST",
-          headers: authJsonHeaders(),
-          body: JSON.stringify(body),
-          credentials: "include",
-        });
-        if (!response.ok) {
-          const err = (await response.json().catch(() => ({}))) as {
-            error?: string;
-            retryAfter?: number;
-            requiresCaptcha?: boolean;
-            siteKey?: string | null;
-          };
-          captcha.applyCaptchaError(err);
-          throw new Error(
-            formatAuthApiErrorMessage(err, t("backup_code_verify_error"), t, response.status),
-          );
-        }
-        await captcha.onRequestSuccess();
-        setShowRecoverSection(false);
-        setRecoverBackupCode("");
-        finishLogin(email);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : t("backup_code_verify_error"));
-      } finally {
-        if (isMounted.current) setIsLoading(false);
-      }
-    },
-    [recoverBackupCode, finishLogin, form, t, captcha],
-  );
-
   const onSubmit = useCallback(
     async (data: z.infer<typeof FormSchema>) => {
       if (!isMounted.current) return;
@@ -882,91 +825,16 @@ export function LoginForm() {
           </div>
         </div>
 
-        {!showRecoverSection ? <HumanChallengeTurnstile challenge={captcha} keyPrefix="otp-" /> : null}
+        <HumanChallengeTurnstile challenge={captcha} keyPrefix="otp-" />
 
         <Button
           type="submit"
           variant="outline"
           className="w-full"
-          disabled={
-            isLoading ||
-            !form.formState.isValid ||
-            (!showRecoverSection && captcha.needsTokenBeforeSubmit)
-          }
+          disabled={isLoading || !form.formState.isValid || captcha.needsTokenBeforeSubmit}
         >
           {isLoading && !usePasskeyMode ? t("sending_otp") : t("login_with_otp")}
         </Button>
-
-        {!showRecoverSection ? (
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground text-sm underline"
-            onClick={() => {
-              captcha.resetWidget();
-              setShowRecoverSection(true);
-            }}
-          >
-            {t("recover_with_backup_code")}
-          </button>
-        ) : (
-          <div className="space-y-3 rounded-lg border p-4">
-            <p className="text-muted-foreground text-sm">{t("recover_with_backup_code_desc")}</p>
-            <div className="space-y-2">
-              <FormLabel htmlFor="recover-email">{t("email_label")}</FormLabel>
-              <Input
-                id="recover-email"
-                type="email"
-                placeholder={t("email_placeholder")}
-                value={form.watch("email")}
-                onChange={(e) => form.setValue("email", e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <FormLabel htmlFor="recover-backup-code">{t("backup_code_label")}</FormLabel>
-              <Input
-                id="recover-backup-code"
-                type="text"
-                placeholder={t("backup_code_placeholder")}
-                value={recoverBackupCode}
-                onChange={(e) => {
-                  const cleaned = e.target.value.replace(/[^0-9A-Fa-f-]/g, "").slice(0, 17);
-                  setRecoverBackupCode(cleaned);
-                }}
-                className="font-mono tracking-widest uppercase"
-                disabled={isLoading}
-              />
-            </div>
-            <HumanChallengeTurnstile challenge={captcha} keyPrefix="recover-" />
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setShowRecoverSection(false);
-                  setRecoverBackupCode("");
-                  captcha.resetWidget();
-                }}
-              >
-                {t("cancel")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                disabled={
-                  isLoading ||
-                  !form.watch("email")?.trim() ||
-                  recoverBackupCode.replace(/\s|-/g, "").length !== 16 ||
-                  captcha.needsTokenBeforeSubmit
-                }
-                onClick={() => handleRecoverWithBackupCode(form.getValues("email"))}
-              >
-                {isLoading ? t("verifying") : t("verify_backup_code")}
-              </Button>
-            </div>
-          </div>
-        )}
       </form>
 
       <OtpDialog

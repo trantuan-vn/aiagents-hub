@@ -6,9 +6,7 @@ import { APP_CONFIG } from "@/config/app-config";
 
 import { LanguageSwitcher } from "../../_components/language-switcher";
 import { LoginForm } from "../../_components/login-form";
-import { FacebookButton } from "../../_components/social-auth/facebook-button";
 import { GoogleButton } from "../../_components/social-auth/google-button";
-import { WalletConnectButton } from "../../_components/web3/walletconnect-button";
 
 export default async function Page() {
   const t = await getTranslations("LoginPage");
@@ -28,8 +26,6 @@ export default async function Page() {
             <span className="bg-background text-muted-foreground relative z-10 px-2">{t("or_continue_with")}</span>
           </div>
           <GoogleButton className="w-full" />
-          <FacebookButton className="w-full" />
-          <WalletConnectButton className="w-full" />
         </div>
       </div>
 

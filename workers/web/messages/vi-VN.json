@@ -33,7 +33,7 @@
   },
   "AuthLayout": {
     "apihub_title": "AIAgentsHub",
-    "apihub_tagline": "Nền tảng API chuyên nghiệp cho doanh nghiệp hiện đại",
+    "apihub_tagline": "Nền tảng AI workflow chuyên nghiệp cho doanh nghiệp hiện đại",
     "feature_speed_title": "Tốc độ vượt trội",
     "feature_speed_description": "Xử lý hàng triệu request mỗi giây với độ trễ thấp nhất",
     "feature_security_title": "Bảo mật hàng đầu",
@@ -41,7 +41,7 @@
     "feature_scalability_title": "Mở rộng linh hoạt",
     "feature_scalability_description": "Điều chỉnh tài nguyên theo nhu cầu, tự động scale để đáp ứng tải",
     "feature_integration_title": "Tích hợp dễ dàng",
-    "feature_integration_description": "SDK và tài liệu đầy đủ hỗ trợ mọi ngôn ngữ lập trình phổ biến",
+    "feature_integration_description": "Tài liệu đầy đủ hỗ trợ mọi ngôn ngữ lập trình phổ biến",
     "feature_global_title": "Toàn cầu hóa",
     "feature_global_description": "Điểm kết nối đa dạng trên toàn thế giới, đảm bảo hiệu năng tối ưu",
     "trust_message": "Hàng nghìn doanh nghiệp tin tưởng sử dụng AIAgentsHub để xây dựng giải pháp của họ"
