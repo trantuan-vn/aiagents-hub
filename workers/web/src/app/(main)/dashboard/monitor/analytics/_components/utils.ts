@@ -1,3 +1,5 @@
+import { formatCredits } from "@/lib/utils";
+
 export interface DailyUsage {
   date: string;
   requestCount: number;
@@ -22,10 +24,10 @@ export function formatDate(dateStr: string, locale?: string): string {
   });
 }
 
-/** Định dạng chi phí thực tế (giá cố định hoặc cost từ AI Gateway). */
+/** Usage charged in Credits (converted from service_usages USD when needed). */
 export function formatUsageCost(amount: number): string {
   if (amount == null || amount === 0) return "—";
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 8 }).format(amount);
+  return formatCredits(amount);
 }
 
 export function getQualityLevel(

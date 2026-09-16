@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth } from "../../../auth/authMiddleware";
 import { handleError } from "../../../../shared/utils";
+import { getBillingEconomicsFromEnv } from "../../../admin/service/get-billing-economics";
 import { getServiceUsageAnalytics, type AnalyticsDuration } from "./infrastructure";
 
 const VALID_DURATIONS: AnalyticsDuration[] = ["week", "month", "quarter", "year"];
@@ -22,7 +23,13 @@ export function createMonitorAnalyticsRoutes(bindingName: string) {
         ? (durationParam as AnalyticsDuration)
         : "month";
 
-      const { daily, totalRequests, totalCost } = await getServiceUsageAnalytics(db, userId, duration);
+      const eco = await getBillingEconomicsFromEnv(c.env);
+      const { daily, totalRequests, totalCost } = await getServiceUsageAnalytics(
+        db,
+        userId,
+        duration,
+        eco.creditPriceUsd,
+      );
 
       return c.json({
         daily,

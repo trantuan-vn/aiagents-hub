@@ -1984,7 +1984,7 @@
   },
   "MonitorAnalyticsPage": {
     "title": "API Analytics",
-    "description": "Track your API usage over time. View request volume, success rates, and costs. Monitor service quality at a glance.",
+    "description": "Track your API usage over time. View request volume, success rates, and Credits. Monitor service quality at a glance.",
     "fetch_error": "Failed to load analytics",
     "error": "Error",
     "refresh": "Refresh",
@@ -2004,12 +2004,12 @@
       "success_rate": "Success Rate",
       "errors": "Errors",
       "peak_day": "Peak Day",
-      "estimated_cost": "Usage cost",
+      "estimated_cost": "Credits used",
       "in_period": "in selected period",
       "of_total": "of total",
       "no_errors": "No errors",
       "no_data": "No data",
-      "unit_per_request": "Sum of per-call charges",
+      "unit_per_request": "Total Credits charged",
       "quality_excellent": "Excellent",
       "quality_good": "Good",
       "quality_attention": "Needs attention"
@@ -2027,13 +2027,13 @@
     },
     "table": {
       "title": "Daily Summary",
-      "description": "Breakdown of API requests and cost by date",
+      "description": "Breakdown of API requests and Credits by date",
       "date": "Date",
       "requests": "API Requests",
       "total_requests": "Total API Requests",
       "success_requests": "Successful API Requests",
       "error_requests": "Failed API Requests",
-      "cost": "Cost",
+      "cost": "Credits",
       "total": "Total"
     }
   },

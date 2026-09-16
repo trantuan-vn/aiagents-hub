@@ -1,6 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
+import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
 import { getServiceUsageAnalytics, type AnalyticsDuration } from '../../member/monitor/analytics/infrastructure';
 
 const GetMonitorAnalyticsInputSchema = z.object({
@@ -21,7 +22,13 @@ export function getMonitorAnalyticsTool(c: any, bindingName: string, user: any) 
         }
 
         const userId = (c.env[bindingName] as DurableObjectNamespace).idFromName(user.identifier).toString();
-        const result = await getServiceUsageAnalytics(db, userId, input.duration as AnalyticsDuration);
+        const eco = await getBillingEconomicsFromEnv(c.env);
+        const result = await getServiceUsageAnalytics(
+          db,
+          userId,
+          input.duration as AnalyticsDuration,
+          eco.creditPriceUsd,
+        );
 
         yield {
           state: 'ready' as const,

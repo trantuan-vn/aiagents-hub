@@ -1984,7 +1984,7 @@
   },
   "MonitorAnalyticsPage": {
     "title": "Phân tích API",
-    "description": "Theo dõi sử dụng API theo thời gian. Xem số lượng request, tỷ lệ thành công và chi phí. Đánh giá chất lượng dịch vụ một cách trực quan.",
+    "description": "Theo dõi sử dụng API theo thời gian. Xem số lượng request, tỷ lệ thành công và Credit. Đánh giá chất lượng dịch vụ một cách trực quan.",
     "fetch_error": "Không thể tải dữ liệu phân tích",
     "error": "Lỗi",
     "refresh": "Làm mới",
@@ -2004,12 +2004,12 @@
       "success_rate": "Tỷ lệ thành công",
       "errors": "Lỗi",
       "peak_day": "Ngày cao điểm",
-      "estimated_cost": "Chi phí sử dụng",
+      "estimated_cost": "Credit đã dùng",
       "in_period": "trong khoảng thời gian chọn",
       "of_total": "trên tổng",
       "no_errors": "Không có lỗi",
       "no_data": "Không có dữ liệu",
-      "unit_per_request": "Tổng phí của các lần gọi",
+      "unit_per_request": "Tổng Credit đã trừ",
       "quality_excellent": "Xuất sắc",
       "quality_good": "Tốt",
       "quality_attention": "Cần chú ý"
@@ -2027,13 +2027,13 @@
     },
     "table": {
       "title": "Tổng quan theo ngày",
-      "description": "Chi tiết số request API và chi phí theo ngày",
+      "description": "Chi tiết số request API và Credit theo ngày",
       "date": "Ngày",
       "requests": "Request API",
       "total_requests": "Tổng số request API",
       "success_requests": "Số request API thành công",
       "error_requests": "Số request API lỗi",
-      "cost": "Chi phí",
+      "cost": "Credit",
       "total": "Tổng cộng"
     }
   },
