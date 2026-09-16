@@ -4,6 +4,7 @@ import { getUsdSellRate } from '../exchange-rate/get-rate';
 export type MemberBillingParams = {
 	usdVndRate: number;
 	minTopUpVnd: number;
+	creditPriceUsd: number;
 };
 
 /** Min top-up từ KV; tỉ giá lấy live từ Vietcombank (user nạp tiền → tỷ giá bán). */
@@ -35,7 +36,11 @@ export async function getMemberBillingParamsFromEnv(
 		rawMin <= 100000000
 			? rawMin
 			: (defaults.MIN_TOP_UP_VND ?? 1000);
-	return { usdVndRate, minTopUpVnd };
+	return {
+		usdVndRate,
+		minTopUpVnd,
+		creditPriceUsd: billing.CREDIT_PRICE_USD ?? defaults.CREDIT_PRICE_USD ?? 0.0077,
+	};
 }
 
 /** VND per 1 USD — tỷ giá bán hiện tại của Vietcombank (dùng cho luồng nạp tiền). */

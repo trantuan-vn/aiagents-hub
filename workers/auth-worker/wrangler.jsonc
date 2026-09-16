@@ -70,10 +70,9 @@
 	"observability": {
 		"enabled": true
 	},
-	// Empty array deletes previously deployed Worker cron triggers.
-	// Omitting `triggers` leaves the old `* * * * *` schedule in place.
+	// Daily contribution van at 00:20 ICT (17:20 UTC). Admin can also POST /dashboard/admin/billing/contribution/scan.
 	"triggers": {
-		"crons": []
+		"crons": ["20 17 * * *"]
 	},
 	"images": {
 		"binding": "IMAGES" // i.e. available in your Worker on env.IMAGES

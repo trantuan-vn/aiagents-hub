@@ -50,7 +50,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   ).trim();
   if (!endpoint) throw new Error('Agent node missing serviceEndpoint (connect a service node or pick a service)');
 
-  await ensureWalletBalance(ctx.userDO);
+  await ensureWalletBalance(ctx.userDO, ctx.c.env);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
 

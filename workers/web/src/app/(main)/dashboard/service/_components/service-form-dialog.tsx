@@ -53,6 +53,10 @@ function serviceToFormValues(service: Service): UpdateServiceFormInput {
     priceOutput: service.priceOutput,
     priceInputCache: service.priceInputCache,
     feePercent: service.feePercent ?? 100,
+    modelClass: service.modelClass,
+    creditCoeffInput: service.creditCoeffInput,
+    creditCoeffOutput: service.creditCoeffOutput,
+    creditCoeffInputCache: service.creditCoeffInputCache,
   };
 }
 

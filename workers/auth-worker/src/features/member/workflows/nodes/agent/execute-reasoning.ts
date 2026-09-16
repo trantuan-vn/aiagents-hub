@@ -386,7 +386,7 @@ export async function executeReasoningAgent(
   let service: Record<string, unknown> = { id: 0, endpoint };
   let modelId = '@cf/meta/llama-3.1-8b-instruct';
   if (!deps?.llm) {
-    await ensureWalletBalance(ctx.userDO);
+    await ensureWalletBalance(ctx.userDO, ctx.c.env);
     service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
     modelId = getModelForService(service);
     assertTextGenerationModel(modelId);

@@ -1,6 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 import type { ExecutionStepLog, WorkflowExecutionGraph, WorkflowExecutionRecord } from "../../../_lib/api";
 import { normalizeWorkflowEdge } from "../../edges/workflow-edge-utils";
@@ -221,8 +221,8 @@ export function formatExecutionWalletCostLabel(
   labels: { usage: string; royalty: string },
 ): string {
   const cost = formatExecutionWalletCost(totalCostVnd, totalRoyaltyUsd);
-  if (cost.royalty <= 0) return formatUsd(cost.total);
-  return `${formatUsd(cost.total)} · ${labels.usage}: ${formatUsd(cost.usage)} · ${labels.royalty}: ${formatUsd(cost.royalty)}`;
+  if (cost.royalty <= 0) return formatCredits(cost.total);
+  return `${formatCredits(cost.total)} · ${labels.usage}: ${formatCredits(cost.usage)} · ${labels.royalty}: ${formatCredits(cost.royalty)}`;
 }
 
 export function stepsByNodeId(steps: ExecutionStepLog[]): Map<string, ExecutionStepLog> {
@@ -240,6 +240,8 @@ export function executionExportPayload(selected: WorkflowExecutionRecord): strin
       finishedAt: selected.finishedAt,
       error: selected.error,
       totalCostVnd: selected.totalCostVnd,
+      totalCreditsCharged: selected.totalCreditsCharged ?? selected.totalCostVnd,
+      totalCreditsRoyalty: selected.totalCreditsRoyalty ?? selected.totalRoyaltyUsd ?? 0,
       totalRoyaltyUsd: selected.totalRoyaltyUsd ?? 0,
       output: selected.output,
       steps: selected.steps,

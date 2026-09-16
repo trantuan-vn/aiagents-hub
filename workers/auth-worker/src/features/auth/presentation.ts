@@ -70,6 +70,9 @@ import {
 import { createDocumentAIService } from '../member/ekyc/application';
 import { EKYC_SERVICES } from '../member/ekyc/constant';
 import { processFormData, processDocumentFormData, processFaceFormData, mergeImages, hashIdentifier, saveToEkycR2, getFromEkycR2 } from '../member/ekyc/utils';
+import { resolveCreditBalance, soonestExpiry } from '../member/workflows/billing/credit-wallet';
+import { loadUserAndSyncPlan } from '../member/workflows/billing/billing';
+import { loadProposals, memberCoeffNotices } from '../admin/billing/contribution';
 import { createOTPService } from './infrastructure';
 import { createWalletService } from './infrastructure';
 import { createAuthenticatorRepository, createSmsRepository } from '../account/infrastructure';
@@ -981,27 +984,38 @@ export function createAuthRoutes(bindingName: string) {
   app.get('/profile/me', async (c) => {
     try {
       const user = requireAuth(c);
-      const wb = user.walletBalance ?? user.wallet_balance;
-      const walletBalance = typeof wb === "number" && !Number.isNaN(wb) ? wb : Number(wb) || 0;
-      const rawCurrency = user.earningsPayoutCurrency ?? user.earnings_payout_currency;
+      const userDO = getIdFromName(c, String(user.identifier), bindingName) as DurableObjectStub<UserDO>;
+      const { row, quota, eco } = await loadUserAndSyncPlan(userDO, c.env);
+      const resolved = resolveCreditBalance(row, eco);
+      const creditBalance = resolved.credits;
+      const rawCurrency = row.earningsPayoutCurrency ?? row.earnings_payout_currency ?? user.earningsPayoutCurrency ?? user.earnings_payout_currency;
       const earningsPayoutCurrency = rawCurrency === 'USD' ? 'USD' : 'VND';
-      const membershipTier = user.membershipTier ?? user.membership_tier ?? 'member';
+      const membershipTier = row.membershipTier ?? row.membership_tier ?? user.membershipTier ?? user.membership_tier ?? 'member';
       const needsStrongAuthSetup = await requiresStrongAuthSetup(c, bindingName, user);
       const clientId = (c.env[bindingName as keyof Env] as DurableObjectNamespace)
         .idFromName(String(user.identifier))
         .toString();
+      const proposals = await loadProposals(c.env.SYSTEM_CONFIG_KV);
       return c.json({
-        id: user.id,
-        identifier: user.identifier,
+        id: row.id ?? user.id,
+        identifier: row.identifier ?? user.identifier,
         /** Durable Object id — use as X-Client-ID for hooks / HTTP Request auth. */
         clientId,
-        address: user.address,
-        role: user.role || "member",
+        address: row.address ?? user.address,
+        role: row.role || user.role || "member",
         membershipTier,
-        monthlyTopUpVnd: Number(user.monthlyTopUpVnd ?? user.monthly_top_up_vnd ?? 0) || 0,
-        tierPeriodYm: user.tierPeriodYm ?? user.tier_period_ym ?? null,
-        walletBalance: Math.max(0, walletBalance),
-        walletCurrency: 'USD',
+        monthlyTopUpVnd: Number(row.monthlyTopUpVnd ?? row.monthly_top_up_vnd ?? 0) || 0,
+        tierPeriodYm: row.tierPeriodYm ?? row.tier_period_ym ?? null,
+        walletBalance: creditBalance,
+        creditBalance,
+        walletCurrency: 'CR',
+        creditsExpiring: soonestExpiry(resolved.lots),
+        planId: quota.planId,
+        canBuyCredits: quota.canBuyCredits,
+        workflowRunsToday: quota.workflowRunsToday,
+        workflowRunsRemaining: quota.workflowRunsRemaining,
+        includedCredits: quota.entitlement.includedCredits,
+        notices: memberCoeffNotices(proposals, quota.planId),
         earningsPayoutCurrency,
         requiresStrongAuthSetup: needsStrongAuthSetup,
       });

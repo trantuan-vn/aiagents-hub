@@ -295,7 +295,7 @@ export async function billRagEmbeddings(
     console.warn('[rag] embedding ran but no approved embedding service was found to bill');
     return 0;
   }
-  await ensureWalletBalance(billing.userDO);
+  await ensureWalletBalance(billing.userDO, billing.env);
   const charge = await billEmbeddingUsage(
     billing.env,
     billing.bindingName,

@@ -35,7 +35,7 @@ function PriceField({
   disabled,
 }: {
   control: Control<ServiceFormValues>;
-  name: "priceInput" | "priceOutput" | "priceInputCache";
+  name: "priceInput" | "priceOutput" | "priceInputCache" | "creditCoeffInput" | "creditCoeffOutput" | "creditCoeffInputCache";
   label: string;
   description: string;
   disabled?: boolean;
@@ -241,6 +241,54 @@ export function ServiceModelPricingFields({ control }: { control: Control<Servic
             />
           </div>
         )}
+
+        <FormField
+          control={control}
+          name="modelClass"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>{t("form.model_class")}</FormLabel>
+              <FormControl>
+                <select
+                  className="border-input bg-background ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                  value={field.value ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    field.onChange(v === "tiny" || v === "mid" || v === "frontier" ? v : undefined);
+                  }}
+                >
+                  <option value="">{t("form.model_class_auto")}</option>
+                  <option value="tiny">tiny</option>
+                  <option value="mid">mid</option>
+                  <option value="frontier">frontier</option>
+                </select>
+              </FormControl>
+              <FormDescription>{t("form.model_class_description")}</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <PriceField
+            control={control}
+            name="creditCoeffInput"
+            label={t("form.credit_coeff_input")}
+            description={t("form.credit_coeff_description")}
+          />
+          <PriceField
+            control={control}
+            name="creditCoeffOutput"
+            label={t("form.credit_coeff_output")}
+            description={t("form.credit_coeff_description")}
+          />
+          <PriceField
+            control={control}
+            name="creditCoeffInputCache"
+            label={t("form.credit_coeff_input_cache")}
+            description={t("form.credit_coeff_description")}
+          />
+        </div>
       </>
     </PricingFieldContext.Provider>
   );

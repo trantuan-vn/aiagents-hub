@@ -64,25 +64,24 @@ export const ServiceObjectSchema = z.object({
   priceInput: priceField,
   priceOutput: priceField,
   priceInputCache: priceField,
-  /** eKYC: user charge = token cost × (feePercent / 100). Default 100 = at cost. */
+  /** eKYC: user charge = token cost × (feePercent / 100). Default 100 = at cost. Seed hệ số lúc migrate. */
   feePercent: z.number().min(0.01).max(1_000_000).default(100),
+  modelClass: z.enum(['tiny', 'mid', 'frontier']).optional(),
+  creditCoeffInput: priceField,
+  creditCoeffOutput: priceField,
+  creditCoeffInputCache: priceField,
+  creditRateVersion: z.number().int().min(0).optional(),
 });
 
 export const ServiceSchema = ServiceObjectSchema.superRefine(applyModelPricingRefine);
 
-/** Members may only change model and per-token prices */
-export const ServicePricingUpdateSchema = z
-  .object({
-    model: z.preprocess(
-      (val) => (typeof val === 'string' && !val.trim() ? undefined : val),
-      z.string().max(256).optional(),
-    ),
-    priceInput: priceField,
-    priceOutput: priceField,
-    priceInputCache: priceField,
-    feePercent: z.number().min(0.01).max(1_000_000).optional(),
-  })
-  .superRefine(applyModelPricingRefine);
+/** Members may only change the model; Hub owns USD/1M prices and credit coeffs. */
+export const ServicePricingUpdateSchema = z.object({
+  model: z.preprocess(
+    (val) => (typeof val === 'string' && !val.trim() ? undefined : val),
+    z.string().max(256).optional(),
+  ),
+});
 
 export const ServiceUpdateSchema = ServiceObjectSchema.partial().superRefine(applyModelPricingRefine);
 
@@ -97,6 +96,18 @@ export const ServiceUsageSchema = z.object({
   workflowId: z.number().int().optional(),
   workflowOwnerId: z.string().optional(),
   workflowRoyaltyVnd: z.number().min(0).optional(),
+  creditsUsage: z.number().min(0).optional(),
+  creditsRoyalty: z.number().min(0).optional(),
+  creditsCharged: z.number().min(0).optional(),
+  cogsAiUsd: z.number().min(0).optional(),
+  cogsInfraUsdEst: z.number().min(0).optional(),
+  paymentFeeUsd: z.number().min(0).optional(),
+  revenueUsd: z.number().min(0).optional(),
+  contributionUsd: z.number().optional(),
+  contributionPct: z.number().optional(),
+  modelId: z.string().max(256).optional(),
+  modelClass: z.enum(['tiny', 'mid', 'frontier']).optional(),
+  creditRateVersion: z.number().int().min(0).optional(),
 });
 
 export const ServiceIdSchema = z.string().uuid();
@@ -115,6 +126,11 @@ export const PendingServiceFromModelSchema = z.object({
   approvalStatus: z.literal('pending'),
   isActive: z.literal(false),
   feePercent: z.number().min(0.01).max(1_000_000).default(100),
+  modelClass: z.enum(['tiny', 'mid', 'frontier']).optional(),
+  creditCoeffInput: priceField,
+  creditCoeffOutput: priceField,
+  creditCoeffInputCache: priceField,
+  creditRateVersion: z.number().int().min(0).optional(),
 });
 
 export type PendingServiceFromModel = z.infer<typeof PendingServiceFromModelSchema>;

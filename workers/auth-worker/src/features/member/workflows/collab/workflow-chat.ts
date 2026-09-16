@@ -115,7 +115,7 @@ export async function createWorkflowChatStreamResponse(
   }
 
   const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-  await ensureWalletBalance(userDO);
+  await ensureWalletBalance(userDO, c.env);
   const service = await resolveServiceByEndpoint(userDO, endpoint);
   const modelId = getModelForService(service);
   const attr = workflowAttribution(resolved);

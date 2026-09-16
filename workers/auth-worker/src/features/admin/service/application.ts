@@ -5,6 +5,8 @@ import { createServiceInfrastructureService } from './infrastructure';
 import { searchAiModels } from './model-search';
 import { scanCloudflareModelsToPendingServices } from './scan-cloudflare';
 import { ServiceUsage, Service, ModelSearchResult, ScanCloudflareModelsResult } from './domain';
+import { seedServiceCreditFields } from './credit';
+import { getBillingEconomicsFromEnv } from './get-billing-economics';
 import { getServiceModel, getServicePricing, isCfModel, isProxyModel } from './pricing';
 
 function assertServiceReadyForApproval(row: Record<string, unknown>): void {
@@ -50,8 +52,11 @@ export function createServiceApplicationService(
 
   return {
     async registerService(identifier: string, request: Service): Promise<any> {
+      const eco = await getBillingEconomicsFromEnv(c.env);
       const serviceInfra = getServiceInfrastructure(identifier);
-      return await serviceInfra.registerService(request);
+      return await serviceInfra.registerService(
+        seedServiceCreditFields(request as unknown as Record<string, unknown>, eco) as Service,
+      );
     },
 
     async getUserServices(identifier: string): Promise<any[]> {
@@ -93,8 +98,9 @@ export function createServiceApplicationService(
       serviceId: number,
       data: Record<string, unknown>,
     ): Promise<any> {
+      const eco = await getBillingEconomicsFromEnv(c.env);
       const serviceInfra = getServiceInfrastructure(identifier);
-      return await serviceInfra.updateService(serviceId, data);
+      return await serviceInfra.updateService(serviceId, seedServiceCreditFields(data, eco));
     },
 
     async cancelService(identifier: string, serviceId: number): Promise<void> {

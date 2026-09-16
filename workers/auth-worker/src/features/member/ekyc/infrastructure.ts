@@ -24,11 +24,9 @@ import {
 } from './utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
-import {
-  computeUsageChargeUsd,
-  getServiceModel,
-  roundUsdAmount,
-} from '../../admin/service/pricing';
+import { computeUsageCredits } from '../../admin/service/credit';
+import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
+import { getServiceModel } from '../../admin/service/pricing';
 import { chargeServiceUsage } from '../workflows/billing/charge.js';
 
 const AI_GATEWAY_ID = 'unitoken';
@@ -68,10 +66,11 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
     service: any,
     endpoint: string,
     request: any,
-    chargeUsd: number,
+    aiResponse: unknown,
     workflowAttribution?: { workflowId: number; workflowOwnerId: string },
   ): Promise<void> => {
-    const amountUsd = roundUsdAmount(Math.max(0, Number(chargeUsd) || 0));
+    const eco = await getBillingEconomicsFromEnv(env);
+    const usage = computeUsageCredits(service, aiResponse, eco);
     const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const u = users[0];
     const consumerId =
@@ -81,7 +80,8 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       bindingName: 'USER_DO',
       userDO,
       consumerIdentifier: consumerId,
-      usageUsd: amountUsd,
+      creditsUsage: usage.creditsUsage,
+      usageCredits: usage,
       workflowAttribution,
       usageData: {
         serviceId: service.id,
@@ -89,6 +89,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         userAgent: request.userAgent,
         ipAddress: request.ipAddress,
         isError: false,
+        modelId: getServiceModel(service),
       },
     });
   };
@@ -173,8 +174,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
           throw e;
         }
       }
-      const chargeUsd = computeUsageChargeUsd(service, response);
-      return await processResult(response, service, chargeUsd);
+      return await processResult(response, service, 0);
     } catch (e) {
       await recordApiError(service, endpoint, request);
       throw e;
@@ -221,7 +221,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
         imageType: request.image.type,
       },
     };
-    await updateServiceUsage(service, request.endpoint, request, usageCost);
+    await updateServiceUsage(service, request.endpoint, request, response);
     return returnData;
   };
 
@@ -271,7 +271,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       faceCount,
       processingTime: Date.now(),
     };
-    await updateServiceUsage(service, request.endpoint, request, usageCost);
+    await updateServiceUsage(service, request.endpoint, request, response);
     return returnData;
   };
 
@@ -304,7 +304,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       attributes: q != null ? { image1: { quality: q }, image2: { quality: q } } : {},
       processingTime: Date.now(),
     };
-    await updateServiceUsage(service, request.endpoint, request, usageCost);
+    await updateServiceUsage(service, request.endpoint, request, response);
     return returnData;
   };
 
@@ -335,7 +335,7 @@ export function createAIService(env: Env, userDO: DurableObjectStub<UserDO>): IA
       processingTime: Date.now(),
       recommendations,
     };
-    await updateServiceUsage(service, request.endpoint, request, usageCost);
+    await updateServiceUsage(service, request.endpoint, request, response);
     return returnData;
   };
 

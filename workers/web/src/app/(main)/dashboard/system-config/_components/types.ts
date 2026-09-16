@@ -31,6 +31,23 @@ export interface BillingConfig {
   WORKFLOW_ROYALTY_PERCENT?: number;
   /** Extra % on Cloudflare cost when scanning services (30 → feePercent 130). */
   SERVICE_FEE_MARKUP_PERCENT?: number;
+  CREDIT_PRICE_USD?: number;
+  PAYMENT_FEE_PCT?: number;
+  INFRA_BUFFER_PCT?: number;
+  COEFF_NOTIFY_CHANGE_PCT?: number;
+  COEFF_NOTIFY_LEAD_DAYS_PRO?: number;
+  COEFF_NOTIFY_LEAD_DAYS_ENT?: number;
+  CREDIT_EXPIRY_DAYS?: number;
+  MAX_CREDIT_BALANCE_PRO?: number;
+  INCLUDED_COGS_USD_CAP?: number;
+  BILLING_UNIT?: "usd" | "credit";
+  FX_RELIST_THRESHOLD_PCT?: number;
+  TARGET_CONTRIBUTION_TINY_PCT?: number;
+  TARGET_CONTRIBUTION_MID_PCT?: number;
+  TARGET_CONTRIBUTION_FRONTIER_PCT?: number;
+  FLOOR_CONTRIBUTION_TINY_PCT?: number;
+  FLOOR_CONTRIBUTION_MID_PCT?: number;
+  FLOOR_CONTRIBUTION_FRONTIER_PCT?: number;
 }
 
 export interface SystemConfigData {

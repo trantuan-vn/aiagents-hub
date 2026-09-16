@@ -1,10 +1,13 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { convertVndToUsd, roundWalletTopUpUsd, convertUsdToVnd } from '../../admin/service/pricing';
+import { usdToCredits } from '../../admin/service/credit';
+import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { createVoucherInfrastructureService } from '../../admin/voucher/infrastructure';
 import { syncUserMembershipTierOnAccess } from '../../admin/membership-tier/infrastructure';
 import type { MembershipTier } from '../../admin/membership-tier/domain';
 import { processCommissionOnOrder } from '../referral/commission-service';
+import { assertCanBuyCredits, quotaFromUser } from '../workflows/billing/plan';
 import {
   CreateOrder,
   UpdateOrderStatus,
@@ -38,6 +41,8 @@ export function createOrderInfrastructureService(
       if (!dbUser?.id) {
         throw new Error('User profile not found');
       }
+      const eco = await getBillingEconomicsFromEnv(context.env);
+      assertCanBuyCredits(quotaFromUser(dbUser as Record<string, unknown>, eco));
 
       const membershipTier = (dbUser.membershipTier ?? dbUser.membership_tier ?? 'member') as MembershipTier;
       const userId = Number(dbUser.id);
@@ -76,14 +81,54 @@ export function createOrderInfrastructureService(
         finalAmount = roundWalletTopUpUsd(finalRaw);
         const rate = await getUsdVndRateFromEnv(context.env, bindingName);
         payableAmountVnd = Math.round(convertUsdToVnd(finalAmount, rate));
-      } else {
-        const usdVndRate = await getUsdVndRateFromEnv(context.env, bindingName);
-        subtotalAmount = convertVndToUsd(subtotal, usdVndRate);
-        discountAmountStored = convertVndToUsd(discountAmount, usdVndRate);
-        finalAmount = convertVndToUsd(finalRaw, usdVndRate);
-        payableAmountVnd = Math.round(finalRaw);
+        const creditedCredits = usdToCredits(finalAmount, eco.creditPriceUsd);
+        const orderCode = generateOrderCode();
+        const orderRecord = await executeUtils.executeDynamicAction(
+          userDO,
+          'insert',
+          {
+            orderCode,
+            subtotalAmount,
+            discountAmount: discountAmountStored,
+            finalAmount,
+            currency: 'USD',
+            appliedVoucherCode,
+            status: 'PENDING',
+            notes: request.notes,
+            payableAmountVnd,
+            usdVndRate: rate,
+            creditPriceUsd: eco.creditPriceUsd,
+            creditedCredits,
+          },
+          'orders',
+        );
+
+        try {
+          await processCommissionOnOrder(context, bindingName, user, {
+            id: orderRecord.id,
+            orderCode,
+            finalAmount,
+            currency: 'USD',
+          });
+        } catch (e) {
+          console.warn('[Order] Commission processing failed:', e);
+        }
+
+        return {
+          id: orderRecord.id,
+          order: mapOrderForMemberApi(orderRecord as Record<string, unknown>),
+          appliedVoucherCode,
+          discountAmount: discountAmountStored,
+          creditedCredits,
+        };
       }
 
+      const usdVndRate = await getUsdVndRateFromEnv(context.env, bindingName);
+      subtotalAmount = convertVndToUsd(subtotal, usdVndRate);
+      discountAmountStored = convertVndToUsd(discountAmount, usdVndRate);
+      finalAmount = convertVndToUsd(finalRaw, usdVndRate);
+      payableAmountVnd = Math.round(finalRaw);
+      const creditedCredits = usdToCredits(finalAmount, eco.creditPriceUsd);
       const orderCode = generateOrderCode();
       const orderRecord = await executeUtils.executeDynamicAction(
         userDO,
@@ -98,6 +143,9 @@ export function createOrderInfrastructureService(
           status: 'PENDING',
           notes: request.notes,
           payableAmountVnd,
+          usdVndRate,
+          creditPriceUsd: eco.creditPriceUsd,
+          creditedCredits,
         },
         'orders',
       );
@@ -118,6 +166,7 @@ export function createOrderInfrastructureService(
         order: mapOrderForMemberApi(orderRecord as Record<string, unknown>),
         appliedVoucherCode,
         discountAmount: discountAmountStored,
+        creditedCredits,
       };
     },
 

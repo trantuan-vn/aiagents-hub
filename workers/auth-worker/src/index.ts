@@ -25,6 +25,7 @@ import { createWorkflowHookRoutes } from './features/member/workflows/api/hooks-
 import { createFormHookRoutes } from './features/member/workflows/api/form-hooks-presentation';
 import { createChatHookRoutes } from './features/member/workflows/api/chat-hooks-presentation';
 import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
+import { scanContributionAndPropose } from './features/admin/billing/scan';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -39,6 +40,7 @@ import { createAdminDefaultRoutes } from './features/admin/default/presentation'
 import { createAdminCrmRoutes } from './features/admin/crm/presentation';
 import { createAdminFinanceRoutes } from './features/admin/finance/presentation';
 import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payout/presentation';
+import { createAdminBillingRoutes } from './features/admin/billing/presentation';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
 import {
   createWorkflowNodeCatalogAdminRoutes,
@@ -111,6 +113,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/crm-stats', createAdminCrmRoutes());
   routes.route('/dashboard/admin/finance-stats', createAdminFinanceRoutes());
   routes.route('/dashboard/admin/earnings-payouts', createAdminEarningsPayoutRoutes(bindingName));
+  routes.route('/dashboard/admin/billing', createAdminBillingRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());
@@ -177,9 +180,16 @@ export default {
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   },
-  // Cloudflare can keep delivering ScheduledEvent for up to ~15 minutes after
-  // `triggers.crons = []` is deployed. Ignore leftover Worker cron ticks.
-  async scheduled(): Promise<void> {},
+  // Daily contribution van (`20 17 * * *` = 00:20 ICT). Admin can also POST /dashboard/admin/billing/contribution/scan.
+  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+    try {
+      await scanContributionAndPropose(env);
+    } catch (err) {
+      log.warn('billing.contribution_scan_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  },
   async queue(batch: MessageBatch<WorkflowCronRunMessage>, env: Env): Promise<void> {
     for (const message of batch.messages) {
       try {

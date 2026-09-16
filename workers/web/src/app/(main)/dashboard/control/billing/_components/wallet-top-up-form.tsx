@@ -12,9 +12,9 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { cn, formatUsd } from "@/lib/utils";
+import { cn, formatCredits, formatUsd } from "@/lib/utils";
 
-import { fetchAvailableVouchers } from "./billing-api";
+import { fetchAvailableVouchers, fetchMemberBillingParams } from "./billing-api";
 import { createUsdTopUpOrderSchema, MIN_TOP_UP_USD, type CreateOrder } from "./schema";
 import { formatUsdInputValue, parseUsdInput, sanitizeUsdInput, type AvailableVoucher } from "./wallet-top-up-utils";
 import { WalletTopUpVoucherField } from "./wallet-top-up-voucher-field";
@@ -33,6 +33,7 @@ export function WalletTopUpForm({ onCreate, onDismiss }: WalletTopUpFormProps) {
   const [usdInput, setUsdInput] = useState("10");
   const [selectedPreset, setSelectedPreset] = useState<number | null>(10);
   const [usdInputError, setUsdInputError] = useState<string | null>(null);
+  const [creditPriceUsd, setCreditPriceUsd] = useState(0.0077);
   const [voucherOpen, setVoucherOpen] = useState(false);
   const [availableVouchers, setAvailableVouchers] = useState<AvailableVoucher[]>([]);
   const [loadingVouchers, setLoadingVouchers] = useState(false);
@@ -79,6 +80,10 @@ export function WalletTopUpForm({ onCreate, onDismiss }: WalletTopUpFormProps) {
     },
     [form],
   );
+
+  useEffect(() => {
+    void fetchMemberBillingParams().then((p) => setCreditPriceUsd(p.creditPriceUsd));
+  }, []);
 
   useEffect(() => {
     const parsed = parseUsdInput(usdInput);
@@ -176,6 +181,19 @@ export function WalletTopUpForm({ onCreate, onDismiss }: WalletTopUpFormProps) {
           </FormControl>
           {usdInputError ? <p className="text-destructive text-sm">{usdInputError}</p> : null}
         </FormItem>
+
+        {(() => {
+          const parsed = parseUsdInput(usdInput);
+          if (parsed == null || parsed <= 0 || creditPriceUsd <= 0) return null;
+          const discount = Number(selectedVoucher?.estimatedDiscount ?? 0) || 0;
+          const payable = Math.max(0, parsed - discount);
+          const credits = Math.round((payable / creditPriceUsd) * 10_000) / 10_000;
+          return (
+            <p className="text-muted-foreground text-sm">
+              {t("credits_you_receive", { credits: formatCredits(credits) })}
+            </p>
+          );
+        })()}
 
         <WalletTopUpVoucherField
           control={form.control}

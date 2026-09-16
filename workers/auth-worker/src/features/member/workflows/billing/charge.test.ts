@@ -62,12 +62,19 @@ describe('chargeServiceUsage', () => {
       usageData: { serviceId: 9, endpoint: '/ai' },
     });
 
-    expect(result).toEqual({ usageUsd: 1, royaltyUsd: 0, chargedUsd: 1 });
+    expect(result).toEqual({
+      usageUsd: 1,
+      royaltyUsd: 0,
+      chargedUsd: 1,
+      creditsUsage: 0,
+      creditsRoyalty: 0,
+      creditsCharged: 0,
+    });
     expect(resolveWorkflowRoyalty).not.toHaveBeenCalled();
     expect(recordWorkflowRoyalty).not.toHaveBeenCalled();
     const multi = executeDynamicAction.mock.calls.find((c) => c[1] === 'multi-table');
     expect(multi?.[2].operations[0].data.walletBalance).toBe(9);
-    expect(multi?.[2].operations[1].data).toMatchObject({ cost: 1, serviceId: 9 });
+    expect(multi?.[2].operations[1].data).toMatchObject({ cost: 1, serviceId: 9, creditsCharged: 0 });
     expect(multi?.[2].operations[1].data.workflowRoyaltyVnd).toBeUndefined();
   });
 
@@ -88,7 +95,14 @@ describe('chargeServiceUsage', () => {
       usageData: { serviceId: 9, endpoint: '/ai' },
     });
 
-    expect(result).toEqual({ usageUsd: 1, royaltyUsd: 0.05, chargedUsd: 1.05 });
+    expect(result).toEqual({
+      usageUsd: 1,
+      royaltyUsd: 0.05,
+      chargedUsd: 1.05,
+      creditsUsage: 0,
+      creditsRoyalty: 0,
+      creditsCharged: 0,
+    });
     const multi = executeDynamicAction.mock.calls.find((c) => c[1] === 'multi-table');
     expect(multi?.[2].operations[0].data.walletBalance).toBe(8.95);
     expect(multi?.[2].operations[1].data).toMatchObject({
@@ -127,5 +141,44 @@ describe('chargeServiceUsage', () => {
       }),
     ).rejects.toThrow('Insufficient wallet balance');
     expect(recordWorkflowRoyalty).not.toHaveBeenCalled();
+  });
+
+  it('debits credits and dual-writes USD revenue', async () => {
+    executeDynamicAction.mockImplementation(async (_do: unknown, op: string) => {
+      if (op === 'select') {
+        return [{
+          id: 1,
+          walletBalance: 100,
+          walletCurrency: 'CR',
+          creditLotsJson: JSON.stringify([
+            { credits: 100, remaining: 100, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+          ]),
+          identifier: 'a@x.com',
+        }];
+      }
+      return undefined;
+    });
+
+    const result = await chargeServiceUsage({
+      env,
+      bindingName: 'USER_DO',
+      userDO,
+      consumerIdentifier: 'a@x.com',
+      creditsUsage: 10,
+      usageCredits: { creditsUsage: 10, cogsAiUsd: 0.02, contributionPct: 50, modelClass: 'tiny' },
+      usageData: { serviceId: 9, endpoint: '/ai' },
+    });
+
+    expect(result.creditsCharged).toBe(10);
+    expect(result.creditsUsage).toBe(10);
+    expect(result.usageUsd).toBeGreaterThan(0);
+    const multi = executeDynamicAction.mock.calls.find((c) => c[1] === 'multi-table');
+    expect(multi?.[2].operations[0].data.walletCurrency).toBe('CR');
+    expect(multi?.[2].operations[0].data.walletBalance).toBe(90);
+    expect(multi?.[2].operations[1].data).toMatchObject({
+      creditsCharged: 10,
+      creditsUsage: 10,
+      serviceId: 9,
+    });
   });
 });

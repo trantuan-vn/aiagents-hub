@@ -2,11 +2,13 @@ import { tool } from 'ai';
 import { z } from 'zod';
 
 import { createServiceApplicationService } from '../../admin/service/application';
+import { toMemberServiceList } from '../../admin/service/member-dto';
+import { inferPlanId } from '../../member/workflows/billing/plan';
 
 export function getServicesTool(c: any, bindingName: string, user: any) {
   return tool({
     description:
-      'Lay danh sach dich vu (endpoint, model, gia token) cua user da dang nhap.',
+      'Lay danh sach dich vu (endpoint, model family, uoc luong Credit/run) cua user da dang nhap.',
     inputSchema: z.object({
       activeOnly: z.boolean().default(true),
     }),
@@ -20,18 +22,16 @@ export function getServicesTool(c: any, bindingName: string, user: any) {
         const filteredServices = request.activeOnly
           ? services.filter((service: any) => service.isActive)
           : services;
-
-        const data = filteredServices.map((service: any) => ({
+        const enterprise = inferPlanId(user as Record<string, unknown>) === 'enterprise';
+        const data = toMemberServiceList(filteredServices, { enterprise }).map((service) => ({
           id: service.id,
           name: service.name,
           endpoint: service.endpoint,
           isActive: service.isActive,
           expiresAt: service.expiresAt,
-          model: service.model ?? service.model_id,
-          priceInput: service.priceInput ?? service.price_input,
-          priceOutput: service.priceOutput ?? service.price_output,
-          priceInputCache: service.priceInputCache ?? service.price_input_cache,
-          feePercent: service.feePercent ?? service.fee_percent ?? 100,
+          model: service.model,
+          modelFamily: enterprise ? service.modelFamily : undefined,
+          estimatedCreditsPerRun: service.estimatedCreditsPerRun,
         }));
 
         yield {

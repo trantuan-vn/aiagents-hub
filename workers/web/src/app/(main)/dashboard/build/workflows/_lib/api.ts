@@ -110,6 +110,8 @@ export interface WorkflowExecutionResult {
   output?: unknown;
   steps: ExecutionStepLog[];
   totalCostVnd: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   totalRoyaltyUsd?: number;
   pendingNodeId?: string;
 }
@@ -148,6 +150,8 @@ export interface WorkflowExecutionRecord {
   output?: unknown;
   error?: string;
   totalCostVnd: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   totalRoyaltyUsd?: number;
   stepCount: number;
   steps: ExecutionStepLog[];
@@ -223,6 +227,8 @@ export interface WorkflowExecutionObservability {
   finishedAt?: number;
   totalDurationMs: number;
   totalCostVnd: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   totalRoyaltyUsd?: number;
   stepCount: number;
   steps: ExecutionStepLog[];

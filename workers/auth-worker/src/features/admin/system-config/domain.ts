@@ -33,14 +33,37 @@ export const D1tor2CronConfigSchema = z.object({
 });
 export type D1tor2CronConfig = z.infer<typeof D1tor2CronConfigSchema>;
 
+export const ModelClassSchema = z.enum(['tiny', 'mid', 'frontier']);
+export type ModelClass = z.infer<typeof ModelClassSchema>;
+
 /** Billing / ví (tỉ giá quản lý riêng tại admin → Quản lý tỉ giá) */
 export const BillingConfigSchema = z.object({
 	/** Số tiền nạp tối thiểu mỗi lệnh (VND, số nguyên ≥ 1) */
 	MIN_TOP_UP_VND: z.number().int().min(1).max(100000000).optional(),
 	/** % phí chia cho chủ workflow khi user khác dùng workflow sharing (mặc định 5) */
 	WORKFLOW_ROYALTY_PERCENT: z.number().min(0).max(100).optional(),
-	/** % thu nhập thêm trên giá Cloudflare khi quét sinh service (30 → feePercent 130 trên service) */
+	/** % thu nhập thêm trên giá Cloudflare khi quét sinh service (30 → feePercent 130 trên service) — deprecated seed only */
 	SERVICE_FEE_MARKUP_PERCENT: z.number().min(0).max(500).optional(),
+	/** usd = legacy token markup; credit = One Credit (default). */
+	BILLING_UNIT: z.enum(['usd', 'credit']).optional(),
+	/** SSOT nội bộ: USD per Credit. Không đổi vì Cloudflare tăng giá. */
+	CREDIT_PRICE_USD: z.number().min(0.0001).max(1).optional(),
+	PAYMENT_FEE_PCT: z.number().min(0).max(20).optional(),
+	/** Chỉ hạ tầng / retry / support biến đổi — không nhét lãi vào đây. */
+	INFRA_BUFFER_PCT: z.number().min(0).max(50).optional(),
+	COEFF_NOTIFY_CHANGE_PCT: z.number().min(0).max(100).optional(),
+	COEFF_NOTIFY_LEAD_DAYS_PRO: z.number().int().min(0).max(90).optional(),
+	COEFF_NOTIFY_LEAD_DAYS_ENT: z.number().int().min(0).max(90).optional(),
+	CREDIT_EXPIRY_DAYS: z.number().int().min(1).max(3650).optional(),
+	MAX_CREDIT_BALANCE_PRO: z.number().min(0).optional(),
+	INCLUDED_COGS_USD_CAP: z.number().min(0).optional(),
+	FX_RELIST_THRESHOLD_PCT: z.number().min(0).max(100).optional(),
+	TARGET_CONTRIBUTION_TINY_PCT: z.number().min(0).max(95).optional(),
+	TARGET_CONTRIBUTION_MID_PCT: z.number().min(0).max(95).optional(),
+	TARGET_CONTRIBUTION_FRONTIER_PCT: z.number().min(0).max(95).optional(),
+	FLOOR_CONTRIBUTION_TINY_PCT: z.number().min(0).max(95).optional(),
+	FLOOR_CONTRIBUTION_MID_PCT: z.number().min(0).max(95).optional(),
+	FLOOR_CONTRIBUTION_FRONTIER_PCT: z.number().min(0).max(95).optional(),
 });
 export type BillingConfig = z.infer<typeof BillingConfigSchema>;
 
@@ -82,6 +105,21 @@ export const DEFAULT_BILLING_CONFIG: BillingConfig = {
 	MIN_TOP_UP_VND: 1000,
 	WORKFLOW_ROYALTY_PERCENT: 5,
 	SERVICE_FEE_MARKUP_PERCENT: 0,
+	BILLING_UNIT: 'credit',
+	CREDIT_PRICE_USD: 0.0077,
+	PAYMENT_FEE_PCT: 2,
+	INFRA_BUFFER_PCT: 12,
+	COEFF_NOTIFY_CHANGE_PCT: 10,
+	COEFF_NOTIFY_LEAD_DAYS_PRO: 7,
+	COEFF_NOTIFY_LEAD_DAYS_ENT: 30,
+	CREDIT_EXPIRY_DAYS: 365,
+	FX_RELIST_THRESHOLD_PCT: 10,
+	TARGET_CONTRIBUTION_TINY_PCT: 65,
+	TARGET_CONTRIBUTION_MID_PCT: 52,
+	TARGET_CONTRIBUTION_FRONTIER_PCT: 38,
+	FLOOR_CONTRIBUTION_TINY_PCT: 50,
+	FLOOR_CONTRIBUTION_MID_PCT: 40,
+	FLOOR_CONTRIBUTION_FRONTIER_PCT: 30,
 };
 
 export const KV_KEY = 'aiagents-hub-system-config';

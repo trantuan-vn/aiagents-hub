@@ -7,6 +7,8 @@ import {
 } from './domain';
 import { requireAuth } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
+import { inferPlanId } from '../../member/workflows/billing/plan';
+import { toMemberServiceList } from './member-dto';
 
 function parseServiceIdParam(serviceIdParam: string): number {
   if (!/^\d+$/.test(serviceIdParam)) {
@@ -60,7 +62,8 @@ export function createServiceRoutes(bindingName: string) {
         user.role === 'admin'
           ? await serviceApp.getAdminServices(user.identifier)
           : await serviceApp.getUserServices(user.identifier);
-      return c.json(result);
+      if (user.role === 'admin') return c.json(result);
+      return c.json(toMemberServiceList(result, { enterprise: inferPlanId(user as Record<string, unknown>) === 'enterprise' }));
     }, 'Failed to get services', false),
   );
 
@@ -69,7 +72,8 @@ export function createServiceRoutes(bindingName: string) {
     createRouteHandler(async (c: any, user: any) => {
       const serviceApp = createServiceApplicationService(c, bindingName);
       const result = await serviceApp.getApprovedActiveServices(user.identifier);
-      return c.json(result);
+      if (user.role === 'admin') return c.json(result);
+      return c.json(toMemberServiceList(result, { enterprise: inferPlanId(user as Record<string, unknown>) === 'enterprise' }));
     }, 'Failed to get approved services', false),
   );
 
@@ -118,7 +122,10 @@ export function createServiceRoutes(bindingName: string) {
           : ServicePricingUpdateSchema.parse(body);
         const serviceApp = createServiceApplicationService(c, bindingName);
         const result = await serviceApp.updateService(user.identifier, serviceId, request);
-        return c.json(result);
+        if (isAdmin) return c.json(result);
+        return c.json(
+          toMemberServiceList([result], { enterprise: inferPlanId(user as Record<string, unknown>) === 'enterprise' })[0],
+        );
       },
       'Failed to update service',
       false,

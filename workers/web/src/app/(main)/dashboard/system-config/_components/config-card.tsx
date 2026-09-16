@@ -16,13 +16,13 @@ interface ConfigFieldProps {
 
 function ConfigField({ label, value, min, max, onChange }: ConfigFieldProps) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseInt(e.target.value, 10);
+    const v = Number.parseFloat(e.target.value);
     onChange(Number.isNaN(v) ? min : v);
   };
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
-      <Input type="number" min={min} max={max} value={value} onChange={handleChange} />
+      <Input type="number" min={min} max={max} step="any" value={value} onChange={handleChange} />
     </div>
   );
 }

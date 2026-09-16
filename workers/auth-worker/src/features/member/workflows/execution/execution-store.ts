@@ -29,6 +29,8 @@ export async function createExecution(
     {
       status: 'running',
       totalCostVnd: 0,
+      totalCreditsCharged: 0,
+      totalCreditsRoyalty: 0,
       stepCount: 0,
       startedAt: Date.now(),
       ...data,
@@ -43,6 +45,8 @@ export interface UpdateExecutionPatch {
   output?: string;
   error?: string;
   totalCostVnd?: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   totalRoyaltyUsd?: number;
   stepCount?: number;
   state?: string;

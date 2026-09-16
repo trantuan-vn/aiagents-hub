@@ -60,3 +60,13 @@ export function formatUsd(amount: number, locale = "en-US"): string {
     maximumFractionDigits: USD_DECIMAL_PLACES,
   });
 }
+
+/** Customer-facing Credit balance and usage. */
+export function formatCredits(amount: number, locale = "en-US"): string {
+  const n = Number.isFinite(amount) ? amount : 0;
+  const digits = n !== 0 && Math.abs(n) < 1 ? 4 : 2;
+  return `${new Intl.NumberFormat(locale, {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  }).format(n)} CR`;
+}

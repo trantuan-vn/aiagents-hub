@@ -107,6 +107,9 @@ export const WorkflowExecutionSchema = z.object({
   output: z.string().optional(),
   error: z.string().max(2000).optional(),
   totalCostVnd: z.number().min(0).default(0),
+  /** Dual-write of charged Credits (same value as totalCostVnd when BILLING_UNIT=credit). */
+  totalCreditsCharged: z.number().min(0).optional(),
+  totalCreditsRoyalty: z.number().min(0).optional(),
   /** Royalty deducted from the consumer wallet when running a shared workflow. */
   totalRoyaltyUsd: z.number().min(0).default(0),
   stepCount: z.number().int().min(0).default(0),

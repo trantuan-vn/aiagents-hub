@@ -101,6 +101,12 @@ export const sidebarItems: NavGroup[] = [
         adminOnly: true,
       },
       {
+        title: "Contribution",
+        url: "/dashboard/contribution",
+        icon: BarChart3,
+        adminOnly: true,
+      },
+      {
         title: "User Groups",
         url: "/dashboard/user-groups",
         icon: UserCircle,

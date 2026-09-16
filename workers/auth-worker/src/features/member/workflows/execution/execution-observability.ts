@@ -32,6 +32,8 @@ export interface ExecutionObservability {
   finishedAt?: number;
   totalDurationMs: number;
   totalCostVnd: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   totalRoyaltyUsd?: number;
   stepCount: number;
   steps: ExecutionStepLog[];
@@ -117,6 +119,8 @@ export function buildExecutionObservability(row: ExecutionRow, steps?: Execution
     finishedAt: row.finishedAt,
     totalDurationMs: wallDuration,
     totalCostVnd: row.totalCostVnd ?? 0,
+    totalCreditsCharged: row.totalCreditsCharged ?? row.totalCostVnd ?? 0,
+    totalCreditsRoyalty: row.totalCreditsRoyalty ?? row.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: row.totalRoyaltyUsd ?? 0,
     stepCount: row.stepCount ?? resolvedSteps.length,
     steps: resolvedSteps,

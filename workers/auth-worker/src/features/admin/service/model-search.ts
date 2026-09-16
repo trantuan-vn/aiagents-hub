@@ -1,4 +1,5 @@
 import type { ModelSearchResult, PendingServiceFromModel } from './domain';
+import { billingEconomicsFromConfig, classifyModelClass, deriveCreditCoeffs } from './credit';
 import { filterPopularGatewayModels, listPopularAiGatewayModels } from './gateway-models';
 
 /** Providers on AI Gateway unified billing (provider/model, no @cf prefix). */
@@ -186,6 +187,30 @@ export function modelSearchHitToPendingService(
   model: ModelSearchResult,
   feePercent = 100,
 ): PendingServiceFromModel {
+  const row = {
+    model: model.id,
+    priceInput: model.priceInput,
+    priceOutput: model.priceOutput ?? 0,
+    priceInputCache: model.priceInputCache,
+  };
+  const eco = billingEconomicsFromConfig();
+  const modelClass = classifyModelClass(row, {
+    priceInput: model.priceInput ?? 0,
+    priceOutput: model.priceOutput ?? 0,
+    priceInputCache: model.priceInputCache,
+  });
+  const coeffs =
+    model.priceInput != null
+      ? deriveCreditCoeffs(
+          {
+            priceInput: model.priceInput,
+            priceOutput: model.priceOutput ?? 0,
+            priceInputCache: model.priceInputCache,
+          },
+          modelClass,
+          eco,
+        )
+      : undefined;
   return {
     name: displayNameFromModel(model),
     endpoint: modelIdToServiceEndpoint(model.id),
@@ -196,6 +221,11 @@ export function modelSearchHitToPendingService(
     approvalStatus: 'pending',
     isActive: false,
     feePercent,
+    modelClass,
+    creditCoeffInput: coeffs?.input,
+    creditCoeffOutput: coeffs?.output,
+    creditCoeffInputCache: coeffs?.inputCache,
+    creditRateVersion: 1,
   };
 }
 

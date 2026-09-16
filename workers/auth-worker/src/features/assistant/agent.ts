@@ -271,7 +271,7 @@ export async function createAssistantAgent(
   latestUserMessageText = '',
 ) {
   const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
-  await ensureWalletBalance(userDO);
+  await ensureWalletBalance(userDO, c.env);
   const service = await resolveServiceByEndpoint(userDO, ASSISTANT_CHAT_SERVICE.endpoint);
 
   const workersAI = createWorkersAI({

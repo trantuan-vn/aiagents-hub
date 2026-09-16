@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { convertUsdToVnd } from '../../admin/service/pricing';
+import { roundCredits, usdToCredits } from '../../admin/service/credit';
 
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
 
@@ -15,6 +16,9 @@ export const OrderSchema = z.object({
   finalAmount: z.number().min(0),
   /** VND payable via VNPay/Casso (frozen at order creation) */
   payableAmountVnd: z.number().int().min(0).optional(),
+  usdVndRate: z.number().min(0).optional(),
+  creditPriceUsd: z.number().min(0).optional(),
+  creditedCredits: z.number().min(0).optional(),
   status: OrderStatusSchema,
   currency: z.string().default('USD'),
   appliedVoucherCode: z.string().optional(),
@@ -151,6 +155,12 @@ export function mapOrderForMemberApi(row: Record<string, unknown>): Record<strin
   if (typeof payable === 'number' && payable > 0) {
     mapped.payableAmountVnd = Math.round(payable);
   }
+  const usdVndRate = row.usdVndRate ?? row.usd_vnd_rate;
+  if (typeof usdVndRate === 'number' && usdVndRate > 0) mapped.usdVndRate = usdVndRate;
+  const creditPriceUsd = row.creditPriceUsd ?? row.credit_price_usd;
+  if (typeof creditPriceUsd === 'number' && creditPriceUsd > 0) mapped.creditPriceUsd = creditPriceUsd;
+  const creditedCredits = row.creditedCredits ?? row.credited_credits;
+  if (typeof creditedCredits === 'number' && creditedCredits > 0) mapped.creditedCredits = creditedCredits;
   return mapped;
 }
 
@@ -163,6 +173,21 @@ export function getOrderWalletCreditUsd(order: {
   const sub = order.subtotalAmount ?? order.subtotal_amount;
   if (typeof sub === 'number' && sub > 0) return sub;
   return Number(order.finalAmount ?? order.final_amount ?? 0) || 0;
+}
+
+export function getOrderCreditedCredits(
+  order: Parameters<typeof getOrderWalletCreditUsd>[0] & {
+    creditedCredits?: number;
+    credited_credits?: number;
+    creditPriceUsd?: number;
+    credit_price_usd?: number;
+  },
+  creditPriceUsd: number,
+): number {
+  const frozen = Number(order.creditedCredits ?? order.credited_credits ?? 0) || 0;
+  if (frozen > 0) return roundCredits(frozen);
+  const price = Number(order.creditPriceUsd ?? order.credit_price_usd ?? creditPriceUsd) || creditPriceUsd;
+  return usdToCredits(getOrderWalletCreditUsd(order), price);
 }
 
 export function getOrderWalletCreditVnd(

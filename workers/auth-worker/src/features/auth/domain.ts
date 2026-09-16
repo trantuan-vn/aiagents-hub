@@ -166,11 +166,14 @@ export const UserSchema = BaseUserSchema.extend({
   phone: z.string().optional(),
   privateKey: z.string().optional(),
   mnemonicPhrase: z.string().optional(),
-  /** USD balance after successful top-ups (VND payments converted at daily rate); usage deducts in USD */
+  /** Credit balance (CR). Legacy USD wallets are lazy-converted on first charge/top-up. */
   walletBalance: z.preprocess(
     (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
     z.number().min(0),
   ).optional(),
+  walletCurrency: z.enum(['USD', 'CR']).optional(),
+  /** FIFO lots JSON: [{ credits, remaining, expiresAt, source }] */
+  creditLotsJson: z.string().max(100_000).optional(),
   /** Membership tier from monthly top-up volume (VND). */
   membershipTier: z.enum(['member', 'silver', 'gold', 'diamond']).default('member').optional(),
   /** YYYY-MM period for `monthlyTopUpVnd` accumulation. */
@@ -186,6 +189,16 @@ export const UserSchema = BaseUserSchema.extend({
   referrerId: z.string().optional(),
   /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */
   referralCode: z.string().min(6).max(32).optional(),
+  /** Subscription plan. Missing values are inferred then stamped on first billing sync. */
+  planId: z.enum(['free', 'pro', 'enterprise']).optional(),
+  /** UTC YYYY-MM of the current included-credit grant. */
+  planPeriodYm: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  workflowRunsToday: z.preprocess(
+    (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
+    z.number().int().min(0),
+  ).optional(),
+  /** UTC YYYY-MM-DD for `workflowRunsToday`. */
+  workflowRunsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export type BaseUser = z.infer<typeof BaseUserSchema>;

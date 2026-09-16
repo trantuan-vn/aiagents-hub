@@ -44,6 +44,7 @@ import {
 import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
 import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
+import { consumeDailyWorkflowRun } from '../billing/billing.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -69,6 +70,8 @@ export interface WorkflowExecutionResult {
   output?: unknown;
   steps: ExecutionStepLog[];
   totalCostVnd: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
   /** Royalty portion of totalCostVnd, deducted from consumer A for owner B. */
   totalRoyaltyUsd?: number;
   /** Set when status = pending_human: the node awaiting a decision. */
@@ -679,6 +682,8 @@ async function persistResult(
     state: capJson(persisted, 'state') ?? '{}',
     output: capJson(result.output, 'output'),
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalCreditsCharged: persisted.engine.totalCostVnd,
+    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     stepCount: persisted.engine.steps.length,
     pendingNodeId: status === 'cancelled' ? '' : (result.pendingNodeId ?? ''),
@@ -770,6 +775,7 @@ export async function executeWorkflowGraph(
 
   let record: { id: number };
   try {
+    await consumeDailyWorkflowRun(userDO, c.env);
     record = await createExecution(userDO, {
       executionKey,
       workflowId: resolved.workflowId,
@@ -823,6 +829,8 @@ export async function executeWorkflowGraph(
     output: result.output,
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalCreditsCharged: persisted.engine.totalCostVnd,
+    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     pendingNodeId: result.pendingNodeId,
   };
@@ -952,6 +960,8 @@ export async function resumeWorkflowExecution(params: {
     output: result.output,
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
+    totalCreditsCharged: persisted.engine.totalCostVnd,
+    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     pendingNodeId: result.pendingNodeId,
   };
@@ -982,6 +992,8 @@ export async function cancelWorkflowExecution(params: {
       workflowOwnerId: record.workflowOwnerId,
       steps: [],
       totalCostVnd: record.totalCostVnd ?? 0,
+      totalCreditsCharged: record.totalCreditsCharged ?? record.totalCostVnd ?? 0,
+      totalCreditsRoyalty: record.totalCreditsRoyalty ?? record.totalRoyaltyUsd ?? 0,
       totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
     };
   }
@@ -1018,6 +1030,8 @@ export async function cancelWorkflowExecution(params: {
     output: { stopped: true },
     steps,
     totalCostVnd: record.totalCostVnd ?? 0,
+    totalCreditsCharged: record.totalCreditsCharged ?? record.totalCostVnd ?? 0,
+    totalCreditsRoyalty: record.totalCreditsRoyalty ?? record.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
   };
 }

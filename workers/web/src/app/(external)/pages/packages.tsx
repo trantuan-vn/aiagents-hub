@@ -24,9 +24,9 @@ type PackageEntry = {
   icon: LucideIcon;
   category: string;
   pricing: {
-    free: { calls: number; price: number };
-    basic: { calls: number; price: number };
-    pro: { calls: number; price: number };
+    free: { credits: number; price: number };
+    basic: { credits: number; price: number };
+    pro: { credits: number; price: number };
   };
   features: string[];
   popular: boolean;
@@ -97,7 +97,7 @@ function PackageCard({
           <span className="text-muted-foreground text-sm">{t("per_month")}</span>
         </div>
         <p className="text-muted-foreground text-xs">
-          {tier.calls.toLocaleString()} {t("api_calls")}
+          {tier.credits.toLocaleString()} {t("included_credits")}
         </p>
       </div>
 
@@ -164,9 +164,9 @@ const Packages = () => {
       icon: Brain,
       category: "ai",
       pricing: {
-        free: { calls: 500, price: 0 },
-        basic: { calls: 25000, price: 49 },
-        pro: { calls: 250000, price: 149 },
+        free: { credits: 200, price: 0 },
+        basic: { credits: 5000, price: 49 },
+        pro: { credits: 25000, price: 149 },
       },
       features: [
         t("packages.ai_vision.features.0"),
@@ -184,9 +184,9 @@ const Packages = () => {
       icon: Bot,
       category: "claw",
       pricing: {
-        free: { calls: 1000, price: 0 },
-        basic: { calls: 40000, price: 39 },
-        pro: { calls: 400000, price: 119 },
+        free: { credits: 100, price: 0 },
+        basic: { credits: 3000, price: 39 },
+        pro: { credits: 15000, price: 119 },
       },
       features: [
         t("packages.claw_api.features.0"),

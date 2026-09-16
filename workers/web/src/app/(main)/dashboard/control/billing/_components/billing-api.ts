@@ -9,26 +9,92 @@ export const FALLBACK_MIN_TOP_UP_VND = 1000;
 export type MemberBillingParams = {
   usdVndRate: number;
   minTopUpVnd: number;
+  creditPriceUsd: number;
 };
 
 export async function fetchWalletBalance(): Promise<number> {
+  const snap = await fetchWalletSnapshot();
+  return snap.creditBalance;
+}
+
+export type CoeffNotice = {
+  modelClass: string;
+  emergency: boolean;
+  effectiveAt: string;
+  deltaPct: number;
+};
+
+export type WalletSnapshot = {
+  creditBalance: number;
+  creditsExpiring: string | null;
+  planId: "free" | "pro" | "enterprise";
+  canBuyCredits: boolean;
+  workflowRunsToday: number;
+  workflowRunsRemaining: number | null;
+  notices: CoeffNotice[];
+};
+
+function parsePlanId(raw: unknown): "free" | "pro" | "enterprise" {
+  const s = String(raw ?? "").toLowerCase();
+  if (s === "pro" || s === "enterprise") return s;
+  return "free";
+}
+
+function parseNotices(raw: unknown): CoeffNotice[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((row) => row && typeof row === "object")
+    .map((row) => {
+      const o = row as Record<string, unknown>;
+      return {
+        modelClass: String(o.modelClass ?? ""),
+        emergency: o.emergency === true,
+        effectiveAt: typeof o.effectiveAt === "string" ? o.effectiveAt : "",
+        deltaPct: typeof o.deltaPct === "number" ? o.deltaPct : 0,
+      };
+    })
+    .filter((n) => n.modelClass);
+}
+
+export async function fetchWalletSnapshot(): Promise<WalletSnapshot> {
+  const empty: WalletSnapshot = {
+    creditBalance: 0,
+    creditsExpiring: null,
+    planId: "free",
+    canBuyCredits: false,
+    workflowRunsToday: 0,
+    workflowRunsRemaining: null,
+    notices: [],
+  };
   const response = await fetch(`${API_BASE_URL}/dashboard/auth/profile/me`, {
     method: "GET",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
   });
-  if (!response.ok) return 0;
+  if (!response.ok) return empty;
   const json: unknown = await response.json();
-  if (!json || typeof json !== "object") return 0;
-  const w = "walletBalance" in json ? (json as { walletBalance?: unknown }).walletBalance : undefined;
-  return typeof w === "number" && !Number.isNaN(w) ? Math.max(0, w) : 0;
+  if (!json || typeof json !== "object") return empty;
+  const o = json as Record<string, unknown>;
+  const raw = typeof o.creditBalance === "number" ? o.creditBalance : o.walletBalance;
+  const creditBalance = typeof raw === "number" && !Number.isNaN(raw) ? Math.max(0, raw) : 0;
+  const creditsExpiring = typeof o.creditsExpiring === "string" && o.creditsExpiring ? o.creditsExpiring : null;
+  const remaining = o.workflowRunsRemaining;
+  return {
+    creditBalance,
+    creditsExpiring,
+    planId: parsePlanId(o.planId),
+    canBuyCredits: o.canBuyCredits === true,
+    workflowRunsToday: typeof o.workflowRunsToday === "number" ? Math.max(0, o.workflowRunsToday) : 0,
+    workflowRunsRemaining: typeof remaining === "number" ? Math.max(0, remaining) : remaining === null ? null : null,
+    notices: parseNotices(o.notices),
+  };
 }
 
 function parseMemberBillingJson(json: unknown): MemberBillingParams {
   if (!json || typeof json !== "object") {
-    return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND };
+    return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND, creditPriceUsd: 0.0077 };
   }
-  const o = json as { usdVndRate?: unknown; minTopUpVnd?: unknown };
+  const o = json as { usdVndRate?: unknown; minTopUpVnd?: unknown; creditPriceUsd?: unknown };
   const usdVndRate =
     typeof o.usdVndRate === "number" && !Number.isNaN(o.usdVndRate) && o.usdVndRate >= 1
       ? o.usdVndRate
@@ -40,7 +106,11 @@ function parseMemberBillingJson(json: unknown): MemberBillingParams {
     o.minTopUpVnd >= 1
       ? o.minTopUpVnd
       : FALLBACK_MIN_TOP_UP_VND;
-  return { usdVndRate, minTopUpVnd };
+  const creditPriceUsd =
+    typeof o.creditPriceUsd === "number" && !Number.isNaN(o.creditPriceUsd) && o.creditPriceUsd > 0
+      ? o.creditPriceUsd
+      : 0.0077;
+  return { usdVndRate, minTopUpVnd, creditPriceUsd };
 }
 
 export async function fetchMemberBillingParams(): Promise<MemberBillingParams> {
@@ -51,12 +121,12 @@ export async function fetchMemberBillingParams(): Promise<MemberBillingParams> {
       headers: { "Content-Type": "application/json" },
     });
     if (!response.ok) {
-      return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND };
+      return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND, creditPriceUsd: 0.0077 };
     }
     const json: unknown = await response.json();
     return parseMemberBillingJson(json);
   } catch {
-    return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND };
+    return { usdVndRate: FALLBACK_USD_VND, minTopUpVnd: FALLBACK_MIN_TOP_UP_VND, creditPriceUsd: 0.0077 };
   }
 }
 

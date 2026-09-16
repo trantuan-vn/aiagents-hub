@@ -9,17 +9,21 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
-import { fetchWalletBalance } from "../../billing/_components/billing-api";
+import { fetchWalletSnapshot } from "../../billing/_components/billing-api";
 
 export function WalletCard() {
   const t = useTranslations("OverviewPage");
-  const [balanceUsd, setBalanceUsd] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
+  const [expiring, setExpiring] = useState<string | null>(null);
+  const [canBuy, setCanBuy] = useState(true);
 
   const loadWallet = useCallback(async () => {
-    const balance = await fetchWalletBalance();
-    setBalanceUsd(balance);
+    const snap = await fetchWalletSnapshot();
+    setBalance(snap.creditBalance);
+    setExpiring(snap.creditsExpiring);
+    setCanBuy(snap.canBuyCredits);
   }, []);
 
   useEffect(() => {
@@ -35,23 +39,34 @@ export function WalletCard() {
           </div>
           <div className="min-w-0">
             <p className="text-muted-foreground text-sm font-medium">{t("wallet.title")}</p>
-            {balanceUsd == null ? (
+            {balance == null ? (
               <div className="bg-muted mt-2 h-8 w-36 animate-pulse rounded-md" />
             ) : (
               <>
                 <p className="text-primary mt-0.5 text-2xl font-bold tracking-tight tabular-nums md:text-3xl">
-                  {formatUsd(balanceUsd)}
+                  {formatCredits(balance)}
                 </p>
+                {expiring ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {t("wallet.expires", { date: new Date(expiring).toLocaleDateString() })}
+                  </p>
+                ) : null}
               </>
             )}
           </div>
         </div>
-        <Button asChild size="sm" className="shrink-0 gap-1.5 self-start sm:self-center">
-          <Link href="/dashboard/control/billing?topup=1">
-            <Plus className="h-4 w-4" />
-            {t("wallet.top_up")}
-          </Link>
-        </Button>
+        {canBuy ? (
+          <Button asChild size="sm" className="shrink-0 gap-1.5 self-start sm:self-center">
+            <Link href="/dashboard/control/billing?topup=1">
+              <Plus className="h-4 w-4" />
+              {t("wallet.top_up")}
+            </Link>
+          </Button>
+        ) : (
+          <Button asChild size="sm" variant="outline" className="shrink-0 self-start sm:self-center">
+            <Link href="/dashboard/control/billing">{t("wallet.view_billing")}</Link>
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

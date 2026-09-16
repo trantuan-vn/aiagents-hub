@@ -19,12 +19,13 @@ import {
   FALLBACK_USD_VND,
   fetchMemberBillingParams,
   fetchOrdersList,
-  fetchWalletBalance,
+  fetchWalletSnapshot,
   loadHistoryFromApi,
   postCancelOrder,
   postCreateOrder,
   requestCassoQr,
   requestVnpayPaymentUrl,
+  type CoeffNotice,
 } from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
@@ -39,6 +40,11 @@ export default function BillingPage() {
   const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
+  const [creditsExpiring, setCreditsExpiring] = useState<string | null>(null);
+  const [canBuyCredits, setCanBuyCredits] = useState(true);
+  const [planId, setPlanId] = useState<"free" | "pro" | "enterprise">("free");
+  const [workflowRunsRemaining, setWorkflowRunsRemaining] = useState<number | null>(null);
+  const [notices, setNotices] = useState<CoeffNotice[]>([]);
   const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +85,17 @@ export default function BillingPage() {
     }
   };
 
+  const refreshWallet = (): void => {
+    void fetchWalletSnapshot().then((snap) => {
+      setWalletBalanceUsd(snap.creditBalance);
+      setCreditsExpiring(snap.creditsExpiring);
+      setCanBuyCredits(snap.canBuyCredits);
+      setPlanId(snap.planId);
+      setWorkflowRunsRemaining(snap.workflowRunsRemaining);
+      setNotices(snap.notices);
+    });
+  };
+
   const refreshBillingParams = (): void => {
     void fetchMemberBillingParams().then((p) => {
       setUsdVndRate(p.usdVndRate);
@@ -102,7 +119,7 @@ export default function BillingPage() {
 
   useEffect(() => {
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceUsd);
+    refreshWallet();
     refreshBillingParams();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, page, limit]);
@@ -146,7 +163,7 @@ export default function BillingPage() {
 
       // Refresh danh sách orders
       void fetchOrders();
-      void fetchWalletBalance().then(setWalletBalanceUsd);
+      refreshWallet();
       refreshBillingParams();
 
       // Xóa query params sau khi xử lý
@@ -168,7 +185,7 @@ export default function BillingPage() {
   const handleCreateOrder = async (data: CreateOrder): Promise<unknown> => {
     const result = await postCreateOrder({ ...data, currency: "USD" }, t("create_error"));
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceUsd);
+    refreshWallet();
     refreshBillingParams();
     return result;
   };
@@ -207,7 +224,7 @@ export default function BillingPage() {
 
   const handleBillingRefresh = (): void => {
     void fetchOrders();
-    void fetchWalletBalance().then(setWalletBalanceUsd);
+    refreshWallet();
     refreshBillingParams();
   };
 
@@ -221,7 +238,9 @@ export default function BillingPage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={setTopUpOpen} />
+        {canBuyCredits ? (
+          <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={setTopUpOpen} />
+        ) : null}
       </div>
 
       <BillingStatsCards
@@ -230,7 +249,34 @@ export default function BillingPage() {
         completedVolumeUsd={orders
           .filter((o) => o.status === "COMPLETED")
           .reduce((s, o) => s + o.finalAmount, 0)}
+        creditsExpiring={creditsExpiring}
+        planId={planId}
+        workflowRunsRemaining={workflowRunsRemaining}
       />
+
+      {!canBuyCredits ? (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>{t("plan_free_title")}</AlertTitle>
+          <AlertDescription>{t("plan_free_description")}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {notices.map((notice) => (
+        <Alert key={`${notice.modelClass}-${notice.effectiveAt}`} variant={notice.emergency ? "destructive" : "default"}>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>
+            {notice.emergency ? t("coeff_notice_emergency_title") : t("coeff_notice_title")}
+          </AlertTitle>
+          <AlertDescription>
+            {t("coeff_notice_description", {
+              modelClass: notice.modelClass,
+              date: notice.effectiveAt ? new Date(notice.effectiveAt).toLocaleDateString() : "",
+              delta: String(notice.deltaPct),
+            })}
+          </AlertDescription>
+        </Alert>
+      ))}
 
       {/* Error Alert */}
       {error && (

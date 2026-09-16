@@ -1,9 +1,11 @@
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { executeUtils } from '../../../shared/utils';
 import { createLogger } from '../../../shared/logger';
+import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastructure';
-import { getOrderWalletCreditUsd, getOrderWalletCreditVnd } from '../order/domain';
+import { getOrderWalletCreditUsd, getOrderWalletCreditVnd, getOrderCreditedCredits } from '../order/domain';
+import { applyWalletCreditTopUp } from '../workflows/billing/credit-wallet';
 import { PaymentSchema } from '../vnpay/domain';
 import { PAYMENT_STATUS, ORDER_STATUS } from '../vnpay/constant';
 import {
@@ -103,10 +105,10 @@ export function createPaypalService(
       throw new Error(PAYPAL_ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
-    const credit = getOrderWalletCreditUsd(order);
-    const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
     const rate = await getRate();
     const topUpVnd = getOrderWalletCreditVnd({ ...order, currency: order.currency ?? 'USD' }, rate);
+    const eco = await getBillingEconomicsFromEnv(options.env);
+    const walletPatch = applyWalletCreditTopUp(dbUser, getOrderCreditedCredits(order, eco.creditPriceUsd), eco);
 
     await executeUtils.executeDynamicAction(userDO, 'multi-table', {
       operations: [
@@ -120,7 +122,7 @@ export function createPaypalService(
           table: 'users',
           operation: 'update',
           id: dbUser.id,
-          data: { walletBalance: prevBal + credit, queueStatus: 'pending' },
+          data: { ...walletPatch, queueStatus: 'pending' },
         },
       ],
     });

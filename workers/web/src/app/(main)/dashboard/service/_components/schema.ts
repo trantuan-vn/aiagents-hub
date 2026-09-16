@@ -93,6 +93,10 @@ const modelPricingFields = {
   priceOutput: optionalPrice,
   priceInputCache: optionalPrice,
   feePercent: optionalFeePercent,
+  modelClass: z.enum(["tiny", "mid", "frontier"]).optional(),
+  creditCoeffInput: optionalPrice,
+  creditCoeffOutput: optionalPrice,
+  creditCoeffInputCache: optionalPrice,
 };
 
 const serviceObjectSchema = z.object({
@@ -148,7 +152,10 @@ export const serviceUsageSchema = z.object({
   createdAt: z.string().datetime().optional(),
 });
 
-export type Service = z.infer<typeof serviceSchema>;
+export type Service = z.infer<typeof serviceSchema> & {
+  estimatedCreditsPerRun?: number;
+  modelFamily?: string;
+};
 export type CreateService = z.infer<typeof createServiceSchema>;
 export type CreateServiceFormInput = z.input<typeof createServiceSchema>;
 export type UpdateService = z.infer<typeof updateServiceSchema>;
@@ -165,5 +172,9 @@ export type ServiceFormValues = {
   priceOutput?: number | string | null;
   priceInputCache?: number | string | null;
   feePercent?: number | string | null;
+  creditCoeffInput?: number | string | null;
+  creditCoeffOutput?: number | string | null;
+  creditCoeffInputCache?: number | string | null;
+  modelClass?: "tiny" | "mid" | "frontier";
 };
 export type ServiceUsage = z.infer<typeof serviceUsageSchema>;

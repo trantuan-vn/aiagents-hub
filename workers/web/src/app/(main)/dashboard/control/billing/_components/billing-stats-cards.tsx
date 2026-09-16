@@ -4,20 +4,26 @@ import { CreditCard, Receipt, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits, formatUsd } from "@/lib/utils";
 
 interface BillingStatsCardsProps {
-  /** Wallet balance in USD */
+  /** Wallet balance in Credits */
   walletBalanceUsd: number;
   pendingTopUps: number;
   /** Sum of finalAmount (USD) for completed top-up orders on this page */
   completedVolumeUsd: number;
+  creditsExpiring?: string | null;
+  planId?: "free" | "pro" | "enterprise";
+  workflowRunsRemaining?: number | null;
 }
 
 export function BillingStatsCards({
   walletBalanceUsd,
   pendingTopUps,
   completedVolumeUsd,
+  creditsExpiring,
+  planId,
+  workflowRunsRemaining,
 }: BillingStatsCardsProps) {
   const t = useTranslations("BillingPage");
 
@@ -29,7 +35,14 @@ export function BillingStatsCards({
           <Wallet className="text-muted-foreground h-4 w-4" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatUsd(walletBalanceUsd)}</div>
+          <div className="text-2xl font-bold">{formatCredits(walletBalanceUsd)}</div>
+          {creditsExpiring ? (
+            <p className="text-muted-foreground text-xs">
+              {t("stats.expires", { date: new Date(creditsExpiring).toLocaleDateString() })}
+            </p>
+          ) : planId ? (
+            <p className="text-muted-foreground text-xs">{t("stats.plan", { plan: planId })}</p>
+          ) : null}
         </CardContent>
       </Card>
       <Card>
@@ -40,6 +53,9 @@ export function BillingStatsCards({
         <CardContent>
           <div className="text-2xl font-bold">{pendingTopUps}</div>
           <p className="text-muted-foreground text-xs">{t("stats.pending_topups_description")}</p>
+          {workflowRunsRemaining != null ? (
+            <p className="text-muted-foreground text-xs">{t("stats.runs_remaining", { count: String(workflowRunsRemaining) })}</p>
+          ) : null}
         </CardContent>
       </Card>
       <Card>

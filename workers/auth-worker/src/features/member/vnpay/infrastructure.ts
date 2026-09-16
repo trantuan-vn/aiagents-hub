@@ -20,9 +20,11 @@ import { VNPAY_CONSTANTS, PAYMENT_STATUS, ORDER_STATUS, PAYMENT_ERROR_MESSAGES }
 
 import { executeUtils } from '../../../shared/utils';
 import { convertVndToUsd } from '../../admin/service/pricing';
+import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
 import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastructure';
-import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd } from '../order/domain';
+import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd, getOrderCreditedCredits } from '../order/domain';
+import { applyWalletCreditDebit, applyWalletCreditTopUp, resolveCreditBalance } from '../workflows/billing/credit-wallet';
 import { appendCassoIpnLog } from './casso-ipn-log';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
@@ -113,9 +115,14 @@ export function createVNPayService(
         throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
       }
       const credit = await walletCreditUsd(orderRow);
-      const prevBal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
       const rate = await getRate();
       const topUpVnd = getOrderWalletCreditVnd(orderRow, rate);
+      const eco = walletOptions?.env
+        ? await getBillingEconomicsFromEnv(walletOptions.env)
+        : undefined;
+      const walletPatch = eco
+        ? applyWalletCreditTopUp(dbUser, getOrderCreditedCredits(orderRow, eco.creditPriceUsd), eco)
+        : { walletBalance: (Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0) + credit };
 
       operations.push({
         table: 'orders',
@@ -131,7 +138,7 @@ export function createVNPayService(
         table: 'users',
         operation: 'update',
         id: dbUser.id,
-        data: { walletBalance: prevBal + credit, queueStatus: 'pending' },
+        data: { ...walletPatch, queueStatus: 'pending' },
       });
 
       await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
@@ -194,14 +201,33 @@ export function createVNPayService(
     const userRows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const dbUser = userRows[0];
     if (dbUser?.id && orderRow) {
-      const bal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
-      const debit = Math.min(bal, await walletCreditUsd(orderRow));
-      operations.push({
-        table: 'users',
-        operation: 'update',
-        id: dbUser.id,
-        data: { walletBalance: bal - debit, queueStatus: 'pending' },
-      });
+        const creditUsd = await walletCreditUsd(orderRow);
+        const eco = walletOptions?.env
+          ? await getBillingEconomicsFromEnv(walletOptions.env)
+          : undefined;
+        if (eco) {
+          const debitCr = getOrderCreditedCredits(orderRow, eco.creditPriceUsd);
+        const available = resolveCreditBalance(dbUser, eco).credits;
+        const take = Math.min(available, debitCr);
+        if (take > 0) {
+          const patch = applyWalletCreditDebit(dbUser, take, eco);
+          operations.push({
+            table: 'users',
+            operation: 'update',
+            id: dbUser.id,
+            data: { ...patch, queueStatus: 'pending' },
+          });
+        }
+      } else {
+        const bal = Number(dbUser.walletBalance ?? dbUser.wallet_balance ?? 0) || 0;
+        const debit = Math.min(bal, creditUsd);
+        operations.push({
+          table: 'users',
+          operation: 'update',
+          id: dbUser.id,
+          data: { walletBalance: bal - debit, queueStatus: 'pending' },
+        });
+      }
     }
 
     const results = await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations: operations });

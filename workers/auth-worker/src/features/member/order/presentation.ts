@@ -27,8 +27,8 @@ export function createOrderRoutes(bindingName: string) {
 
   /** Tỉ giá + số tiền nạp tối thiểu từ system config (member đọc được). */
   app.get('/exchange-rate', createRouteHandler(async (c: any) => {
-    const { usdVndRate, minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env, bindingName);
-    return c.json({ usdVndRate, minTopUpVnd });
+    const { usdVndRate, minTopUpVnd, creditPriceUsd } = await getMemberBillingParamsFromEnv(c.env, bindingName);
+    return c.json({ usdVndRate, minTopUpVnd, creditPriceUsd });
   }, 'Failed to get exchange rate'));
 
   // Tạo đơn hàng mới

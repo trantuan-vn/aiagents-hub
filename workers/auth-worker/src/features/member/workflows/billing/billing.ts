@@ -1,11 +1,17 @@
 import { executeUtils } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
-import {
-  computeUsageChargeUsd,
-  getServiceModel,
-  roundUsdAmount,
-} from '../../../admin/service/pricing.js';
+import { computeUsageCredits, type BillingEconomics } from '../../../admin/service/credit.js';
+import { getBillingEconomicsFromEnv } from '../../../admin/service/get-billing-economics.js';
+import { computeUsageChargeUsd, getServiceModel } from '../../../admin/service/pricing.js';
 import { chargeServiceUsage, type UsageCharge } from './charge.js';
+import { resolveCreditBalance } from './credit-wallet.js';
+import {
+  quotaFromUser,
+  syncPlanPeriod,
+  incrementDailyWorkflowRuns,
+  assertCanStartWorkflowRun,
+  type QuotaSnapshot,
+} from './plan.js';
 import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 const DEFAULT_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
@@ -140,11 +146,71 @@ export async function resolveServiceByEndpoint(
   return record;
 }
 
-export async function ensureWalletBalance(userDO: DurableObjectStub<UserDO>): Promise<void> {
+function applyPlanPatch(row: Record<string, unknown>, patch: ReturnType<typeof syncPlanPeriod>): Record<string, unknown> {
+  return {
+    ...row,
+    planId: patch.planId,
+    planPeriodYm: patch.planPeriodYm,
+    workflowRunsToday: patch.workflowRunsToday,
+    workflowRunsOn: patch.workflowRunsOn,
+    ...(patch.creditLotsJson
+      ? {
+          walletBalance: patch.walletBalance,
+          walletCurrency: 'CR',
+          creditLotsJson: patch.creditLotsJson,
+        }
+      : {}),
+  };
+}
+
+export async function loadUserAndSyncPlan(
+  userDO: DurableObjectStub<UserDO>,
+  env: Env,
+): Promise<{ row: Record<string, unknown>; quota: QuotaSnapshot; eco: BillingEconomics }> {
+  const eco = await getBillingEconomicsFromEnv(env);
   const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
   const u = Array.isArray(users) ? users[0] : users;
-  const balance = Number(u?.walletBalance ?? u?.wallet_balance ?? 0) || 0;
+  if (!u?.id) throw new Error('User profile not found');
+  const row = u as Record<string, unknown>;
+  const patch = syncPlanPeriod(row, eco);
+  const merged = applyPlanPatch(row, patch);
+  const storedYm = String(row.planPeriodYm ?? row.plan_period_ym ?? '');
+  if (patch.grantedIncluded || patch.planPeriodYm !== storedYm || row.planId == null) {
+    await executeUtils.executeDynamicAction(
+      userDO,
+      'update',
+      { id: row.id, ...merged, queueStatus: 'pending' },
+      'users',
+    );
+  }
+  return { row: merged, quota: quotaFromUser(merged, eco), eco };
+}
+
+export async function ensureWalletBalance(userDO: DurableObjectStub<UserDO>, env?: Env): Promise<void> {
+  if (env) {
+    const { row, eco } = await loadUserAndSyncPlan(userDO, env);
+    const { credits } = resolveCreditBalance(row, eco);
+    if (credits <= 0) throw new Error('Insufficient wallet balance');
+    return;
+  }
+  const users = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
+  const u = Array.isArray(users) ? users[0] : users;
+  if (!u) throw new Error('Insufficient wallet balance');
+  const balance = Number(u.walletBalance ?? u.wallet_balance ?? 0) || 0;
   if (balance <= 0) throw new Error('Insufficient wallet balance');
+}
+
+/** One daily quota tick per workflow execution (not per AI node). */
+export async function consumeDailyWorkflowRun(userDO: DurableObjectStub<UserDO>, env: Env): Promise<void> {
+  const { row, quota } = await loadUserAndSyncPlan(userDO, env);
+  assertCanStartWorkflowRun(quota);
+  const bumped = incrementDailyWorkflowRuns(row);
+  await executeUtils.executeDynamicAction(
+    userDO,
+    'update',
+    { id: row.id, ...row, ...bumped, queueStatus: 'pending' },
+    'users',
+  );
 }
 
 export async function billAgentUsage(
@@ -155,13 +221,34 @@ export async function billAgentUsage(
   service: Record<string, unknown>,
   options: BillAgentUsageOptions,
 ): Promise<UsageCharge> {
-  const usageUsd = roundUsdAmount(computeUsageChargeUsd(service, options.aiResponse));
+  const eco = await getBillingEconomicsFromEnv(env);
+  if (eco.billingUnit === 'usd') {
+    const usageUsd = computeUsageChargeUsd(service, options.aiResponse);
+    return chargeServiceUsage({
+      env,
+      bindingName,
+      userDO,
+      consumerIdentifier,
+      usageUsd,
+      workflowAttribution: options.workflowAttribution,
+      usageData: {
+        serviceId: service.id,
+        endpoint: options.endpoint,
+        userAgent: options.userAgent,
+        ipAddress: options.ipAddress,
+        isError: false,
+        modelId: getServiceModel(service),
+      },
+    });
+  }
+  const usage = computeUsageCredits(service, options.aiResponse, eco);
   return chargeServiceUsage({
     env,
     bindingName,
     userDO,
     consumerIdentifier,
-    usageUsd,
+    creditsUsage: usage.creditsUsage,
+    usageCredits: usage,
     workflowAttribution: options.workflowAttribution,
     usageData: {
       serviceId: service.id,
@@ -169,6 +256,7 @@ export async function billAgentUsage(
       userAgent: options.userAgent,
       ipAddress: options.ipAddress,
       isError: false,
+      modelId: getServiceModel(service),
     },
   });
 }
