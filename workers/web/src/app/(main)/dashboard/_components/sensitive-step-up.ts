@@ -23,6 +23,7 @@ const ADMIN_MANAGEMENT_PREFIXES = [
   "/dashboard/finance",
   "/dashboard/earnings-payouts",
   "/dashboard/contribution",
+  "/dashboard/user-economics",
   "/dashboard/policy",
   "/dashboard/user-groups",
   "/dashboard/workflow/services",

@@ -4,6 +4,7 @@ import {
   Bell,
   Bot,
   ChartBar,
+  CircleDollarSign,
   Code,
   Coins,
   CreditCard,
@@ -104,6 +105,12 @@ export const sidebarItems: NavGroup[] = [
         title: "Contribution",
         url: "/dashboard/contribution",
         icon: BarChart3,
+        adminOnly: true,
+      },
+      {
+        title: "User Economics",
+        url: "/dashboard/user-economics",
+        icon: CircleDollarSign,
         adminOnly: true,
       },
       {

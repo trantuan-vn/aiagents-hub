@@ -89,6 +89,7 @@ export function SearchDialog({ user }: SearchDialogProps) {
         Finance: t("finance"),
         "Commission Policy": t("commission_policy"),
         Analytics: t("analytics"),
+        "User Economics": t("user_economics"),
         "E-commerce": t("ecommerce"),
         Academy: t("academy"),
         Logistics: t("logistics"),

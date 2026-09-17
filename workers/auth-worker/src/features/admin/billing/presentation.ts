@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 import { confirmCoeffProposal, dismissCoeffProposal, getContributionReport, scanContributionAndPropose } from './scan';
+import {
+  getUserEconomicsReport,
+  parseEconomicsHours,
+  UserEconomicsNotFoundError,
+} from './user-economics';
 
 export function createAdminBillingRoutes() {
   const app = new Hono<{ Bindings: Env }>();
@@ -14,6 +19,22 @@ export function createAdminBillingRoutes() {
       return c.json(data);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to load contribution');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/user-economics', async (c) => {
+    try {
+      requireAdmin(c);
+      const hours = parseEconomicsHours(c.req.query('hours'));
+      const email = c.req.query('email');
+      const data = await getUserEconomicsReport(c.env, { email, hours });
+      return c.json(data);
+    } catch (e) {
+      if (e instanceof UserEconomicsNotFoundError) {
+        return c.json({ error: e.message }, 404);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load user economics');
       return c.json(errorResponse, status);
     }
   });
