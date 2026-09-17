@@ -9,6 +9,7 @@ import {
   hubNetUsd,
   normalizeEconomicsEmail,
   parseEconomicsHours,
+  pickRecognizedRevenueUsd,
   preferCredits,
 } from './user-economics.js';
 
@@ -54,5 +55,11 @@ describe('user economics helpers', () => {
     expect(economicsWindow(0, 1_000_000).fromMs).toBe(0);
     expect(economicsWindow(0, 1_000_000).groupBy).toBe('month');
     expect(economicsWindow(91 * 24, 1_000_000).groupBy).toBe('month');
+  });
+
+  it('recognizes Credit revenueUsd and falls back to leftover USD cost', () => {
+    expect(pickRecognizedRevenueUsd(0.03, 4, 0.2)).toBe(0.03);
+    expect(pickRecognizedRevenueUsd(0, 0, 0.2)).toBe(0.2);
+    expect(pickRecognizedRevenueUsd(0, 4, 0.2)).toBe(0);
   });
 });

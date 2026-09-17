@@ -182,6 +182,7 @@ type UsageTotals = {
   creditsUsage: number;
   creditsRoyalty: number;
   creditsCharged: number;
+  legacyUsd: number;
   revenueUsd: number;
   cogsAiUsd: number;
   cogsInfraUsd: number;
@@ -195,6 +196,7 @@ const EMPTY_USAGE: UsageTotals = {
   creditsUsage: 0,
   creditsRoyalty: 0,
   creditsCharged: 0,
+  legacyUsd: 0,
   revenueUsd: 0,
   cogsAiUsd: 0,
   cogsInfraUsd: 0,
@@ -213,6 +215,25 @@ function usageWhere(userId?: string): { sql: string; extra: unknown[] } {
   return { sql, extra };
 }
 
+/**
+ * D1 `service_usages` is camelCase. Naming a missing snake_case column
+ * (`credits_charged`, `revenue_usd`, …) fails the entire statement.
+ */
+const REVENUE_USD_SQL = `CASE
+  WHEN COALESCE("revenueUsd", 0) > 0 THEN "revenueUsd"
+  WHEN COALESCE("creditsCharged", 0) = 0 THEN COALESCE("cost", 0)
+  ELSE 0
+END`;
+const LEGACY_COST_SQL = `CASE WHEN COALESCE("creditsCharged", 0) = 0 THEN COALESCE("cost", 0) ELSE 0 END`;
+const MODEL_CLASS_SQL = `COALESCE(NULLIF("modelClass", ''), 'unclassified')`;
+
+/** Match D1 CASE: recorded revenueUsd, else leftover USD `cost` on pre-Credit rows. */
+export function pickRecognizedRevenueUsd(revenueUsd: number, creditsCharged: number, cost: number): number {
+  if ((Number(revenueUsd) || 0) > 0) return Number(revenueUsd) || 0;
+  if ((Number(creditsCharged) || 0) === 0) return Number(cost) || 0;
+  return 0;
+}
+
 async function queryUsageTotals(
   db: D1Database,
   fromMs: number,
@@ -224,15 +245,16 @@ async function queryUsageTotals(
   const full = `
     SELECT
       COUNT(*) as runs,
-      SUM(COALESCE(credits_usage, creditsUsage, 0)) as creditsUsage,
-      SUM(COALESCE(credits_royalty, creditsRoyalty, 0)) as creditsRoyalty,
-      SUM(COALESCE(credits_charged, creditsCharged, 0)) as creditsCharged,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as revenueUsd,
-      SUM(COALESCE(cogs_ai_usd, cogsAiUsd, 0)) as cogsAiUsd,
-      SUM(COALESCE(cogs_infra_usd_est, cogsInfraUsdEst, 0)) as cogsInfraUsd,
-      SUM(COALESCE(payment_fee_usd, paymentFeeUsd, 0)) as paymentFeeUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd,
-      SUM(COALESCE(workflowRoyaltyVnd, workflow_royalty_vnd, 0)) as royaltyPaidUsd
+      SUM(COALESCE("creditsUsage", 0)) as creditsUsage,
+      SUM(COALESCE("creditsRoyalty", 0)) as creditsRoyalty,
+      SUM(COALESCE("creditsCharged", 0)) as creditsCharged,
+      SUM(${LEGACY_COST_SQL}) as legacyUsd,
+      SUM(${REVENUE_USD_SQL}) as revenueUsd,
+      SUM(COALESCE("cogsAiUsd", 0)) as cogsAiUsd,
+      SUM(COALESCE("cogsInfraUsdEst", 0)) as cogsInfraUsd,
+      SUM(COALESCE("paymentFeeUsd", 0)) as paymentFeeUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd,
+      SUM(COALESCE("workflowRoyaltyVnd", 0)) as royaltyPaidUsd
     FROM service_usages
     ${sql}
   `;
@@ -242,12 +264,13 @@ async function queryUsageTotals(
       0 as creditsUsage,
       0 as creditsRoyalty,
       0 as creditsCharged,
-      SUM(COALESCE(cost, 0)) as revenueUsd,
+      SUM(COALESCE("cost", 0)) as legacyUsd,
+      SUM(COALESCE("cost", 0)) as revenueUsd,
       0 as cogsAiUsd,
       0 as cogsInfraUsd,
       0 as paymentFeeUsd,
       0 as contributionUsd,
-      SUM(COALESCE(workflowRoyaltyVnd, 0)) as royaltyPaidUsd
+      SUM(COALESCE("workflowRoyaltyVnd", 0)) as royaltyPaidUsd
     FROM service_usages
     ${sql}
   `;
@@ -271,12 +294,37 @@ function mapUsage(row: Record<string, unknown> | null): UsageTotals {
     creditsUsage: num(row.creditsUsage),
     creditsRoyalty: num(row.creditsRoyalty),
     creditsCharged: num(row.creditsCharged),
+    legacyUsd: num(row.legacyUsd),
     revenueUsd: num(row.revenueUsd),
     cogsAiUsd: num(row.cogsAiUsd),
     cogsInfraUsd: num(row.cogsInfraUsd),
     paymentFeeUsd: num(row.paymentFeeUsd),
     contributionUsd: num(row.contributionUsd),
     royaltyPaidUsd: num(row.royaltyPaidUsd),
+  };
+}
+
+function mapClassOrUserRow(
+  r: Record<string, unknown>,
+  creditPriceUsd: number,
+): {
+  runs: number;
+  userCharged: DualAmount;
+  hubRevenue: DualAmount;
+  cogsAi: DualAmount;
+  contribution: DualAmount;
+  contributionPct: number;
+} {
+  const revenueUsd = num(r.revenueUsd);
+  const contributionUsd = num(r.contributionUsd);
+  const credits = num(r.creditsCharged) + usdToCredits(num(r.legacyUsd), creditPriceUsd);
+  return {
+    runs: num(r.runs),
+    userCharged: dualHybrid(revenueUsd, credits, creditPriceUsd),
+    hubRevenue: dualFromUsd(revenueUsd, creditPriceUsd),
+    cogsAi: dualFromUsd(num(r.cogsAiUsd), creditPriceUsd),
+    contribution: dualFromUsd(contributionUsd, creditPriceUsd),
+    contributionPct: contributionPct(contributionUsd, revenueUsd),
   };
 }
 
@@ -288,35 +336,48 @@ async function queryByClass(
   userId?: string,
 ): Promise<UserEconomicsClassRow[]> {
   const { sql, extra } = usageWhere(userId);
-  const q = `
+  const binds = [fromMs, toMs, ...extra];
+  const full = `
     SELECT
-      COALESCE(model_class, modelClass, 'unknown') as modelClass,
+      ${MODEL_CLASS_SQL} as modelClass,
       COUNT(*) as runs,
-      SUM(COALESCE(credits_charged, creditsCharged, 0)) as creditsCharged,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as revenueUsd,
-      SUM(COALESCE(cogs_ai_usd, cogsAiUsd, 0)) as cogsAiUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd
+      SUM(COALESCE("creditsCharged", 0)) as creditsCharged,
+      SUM(${LEGACY_COST_SQL}) as legacyUsd,
+      SUM(${REVENUE_USD_SQL}) as revenueUsd,
+      SUM(COALESCE("cogsAiUsd", 0)) as cogsAiUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd
     FROM service_usages
     ${sql}
-    GROUP BY COALESCE(model_class, modelClass, 'unknown')
+    GROUP BY ${MODEL_CLASS_SQL}
+  `;
+  const fallback = `
+    SELECT
+      'unclassified' as modelClass,
+      COUNT(*) as runs,
+      0 as creditsCharged,
+      SUM(COALESCE("cost", 0)) as legacyUsd,
+      SUM(COALESCE("cost", 0)) as revenueUsd,
+      0 as cogsAiUsd,
+      0 as contributionUsd
+    FROM service_usages
+    ${sql}
   `;
   try {
-    const result = await db.prepare(q).bind(fromMs, toMs, ...extra).all<Record<string, unknown>>();
-    return (result.results ?? []).map((r) => {
-      const revenueUsd = num(r.revenueUsd);
-      const contributionUsd = num(r.contributionUsd);
-      return {
-        modelClass: str(r.modelClass) || 'unknown',
-        runs: num(r.runs),
-        userCharged: dualHybrid(revenueUsd, num(r.creditsCharged), creditPriceUsd),
-        hubRevenue: dualFromUsd(revenueUsd, creditPriceUsd),
-        cogsAi: dualFromUsd(num(r.cogsAiUsd), creditPriceUsd),
-        contribution: dualFromUsd(contributionUsd, creditPriceUsd),
-        contributionPct: contributionPct(contributionUsd, revenueUsd),
-      };
-    });
+    const result = await db.prepare(full).bind(...binds).all<Record<string, unknown>>();
+    return (result.results ?? []).map((r) => ({
+      modelClass: str(r.modelClass) || 'unclassified',
+      ...mapClassOrUserRow(r, creditPriceUsd),
+    }));
   } catch {
-    return [];
+    try {
+      const result = await db.prepare(fallback).bind(...binds).all<Record<string, unknown>>();
+      return (result.results ?? []).map((r) => ({
+        modelClass: str(r.modelClass) || 'unclassified',
+        ...mapClassOrUserRow(r, creditPriceUsd),
+      }));
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -328,24 +389,37 @@ async function querySeries(
   userId?: string,
 ): Promise<UserEconomicsSeriesPoint[]> {
   const { sql, extra } = usageWhere(userId);
+  const binds = [fromMs, toMs, ...extra];
   const periodExpr =
     groupBy === 'month'
       ? `strftime('%Y-%m', datetime(created_at/1000, 'unixepoch'))`
       : `date(created_at/1000, 'unixepoch')`;
-  const q = `
+  const full = `
     SELECT
       ${periodExpr} as period,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as hubRevenueUsd,
-      SUM(COALESCE(cogs_ai_usd, cogsAiUsd, 0)) as cogsAiUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd,
-      SUM(COALESCE(credits_charged, creditsCharged, 0)) as creditsCharged
+      SUM(${REVENUE_USD_SQL}) as hubRevenueUsd,
+      SUM(COALESCE("cogsAiUsd", 0)) as cogsAiUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd,
+      SUM(COALESCE("creditsCharged", 0)) as creditsCharged
+    FROM service_usages
+    ${sql}
+    GROUP BY period
+    ORDER BY period ASC
+  `;
+  const fallback = `
+    SELECT
+      ${periodExpr} as period,
+      SUM(COALESCE("cost", 0)) as hubRevenueUsd,
+      0 as cogsAiUsd,
+      0 as contributionUsd,
+      0 as creditsCharged
     FROM service_usages
     ${sql}
     GROUP BY period
     ORDER BY period ASC
   `;
   try {
-    const result = await db.prepare(q).bind(fromMs, toMs, ...extra).all<Record<string, unknown>>();
+    const result = await db.prepare(full).bind(...binds).all<Record<string, unknown>>();
     return (result.results ?? []).map((r) => ({
       period: str(r.period),
       hubRevenueUsd: num(r.hubRevenueUsd),
@@ -354,7 +428,18 @@ async function querySeries(
       creditsCharged: num(r.creditsCharged),
     }));
   } catch {
-    return [];
+    try {
+      const result = await db.prepare(fallback).bind(...binds).all<Record<string, unknown>>();
+      return (result.results ?? []).map((r) => ({
+        period: str(r.period),
+        hubRevenueUsd: num(r.hubRevenueUsd),
+        cogsAiUsd: num(r.cogsAiUsd),
+        contributionUsd: num(r.contributionUsd),
+        creditsCharged: num(r.creditsCharged),
+      }));
+    } catch {
+      return [];
+    }
   }
 }
 
@@ -365,43 +450,59 @@ async function queryTopUsers(
   creditPriceUsd: number,
   limit = 25,
 ): Promise<UserEconomicsTopUser[]> {
-  const q = `
+  const full = `
     SELECT
       user_id as userId,
       COUNT(*) as runs,
-      SUM(COALESCE(credits_charged, creditsCharged, 0)) as creditsCharged,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as revenueUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd
+      SUM(COALESCE("creditsCharged", 0)) as creditsCharged,
+      SUM(${LEGACY_COST_SQL}) as legacyUsd,
+      SUM(${REVENUE_USD_SQL}) as revenueUsd,
+      SUM(COALESCE("cogsAiUsd", 0)) as cogsAiUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd
     FROM service_usages
     WHERE created_at >= ? AND created_at <= ? AND (isError = 0 OR isError IS NULL)
     GROUP BY user_id
-    ORDER BY contributionUsd DESC
+    ORDER BY contributionUsd DESC, revenueUsd DESC
     LIMIT ?
   `;
+  const fallback = `
+    SELECT
+      user_id as userId,
+      COUNT(*) as runs,
+      0 as creditsCharged,
+      SUM(COALESCE("cost", 0)) as legacyUsd,
+      SUM(COALESCE("cost", 0)) as revenueUsd,
+      0 as cogsAiUsd,
+      0 as contributionUsd
+    FROM service_usages
+    WHERE created_at >= ? AND created_at <= ? AND (isError = 0 OR isError IS NULL)
+    GROUP BY user_id
+    ORDER BY revenueUsd DESC
+    LIMIT ?
+  `;
+  let rows: Record<string, unknown>[] = [];
   try {
-    const result = await db.prepare(q).bind(fromMs, toMs, limit).all<Record<string, unknown>>();
-    const rows = result.results ?? [];
-    const identifiers = await mapUserIdentifiers(
-      db,
-      rows.map((r) => str(r.userId)).filter(Boolean),
-    );
-    return rows.map((r) => {
-      const userId = str(r.userId);
-      const revenueUsd = num(r.revenueUsd);
-      const contributionUsd = num(r.contributionUsd);
-      return {
-        userId,
-        identifier: identifiers.get(userId) ?? userId,
-        runs: num(r.runs),
-        userCharged: dualHybrid(revenueUsd, num(r.creditsCharged), creditPriceUsd),
-        hubRevenue: dualFromUsd(revenueUsd, creditPriceUsd),
-        contribution: dualFromUsd(contributionUsd, creditPriceUsd),
-        contributionPct: contributionPct(contributionUsd, revenueUsd),
-      };
-    });
+    rows = (await db.prepare(full).bind(fromMs, toMs, limit).all<Record<string, unknown>>()).results ?? [];
   } catch {
-    return [];
+    try {
+      rows = (await db.prepare(fallback).bind(fromMs, toMs, limit).all<Record<string, unknown>>()).results ?? [];
+    } catch {
+      return [];
+    }
   }
+  const identifiers = await mapUserIdentifiers(
+    db,
+    rows.map((r) => str(r.userId)).filter(Boolean),
+  );
+  return rows.map((r) => {
+    const mapped = mapClassOrUserRow(r, creditPriceUsd);
+    const userId = str(r.userId);
+    return {
+      userId,
+      identifier: identifiers.get(userId) ?? userId,
+      ...mapped,
+    };
+  });
 }
 
 async function mapUserIdentifiers(db: D1Database, userIds: string[]): Promise<Map<string, string>> {
@@ -618,6 +719,9 @@ export async function getUserEconomicsReport(
   const contributionUsd = usage.contributionUsd;
   const hubRevenueUsd = usage.revenueUsd;
   const netUsd = hubNetUsd(contributionUsd, commissionPaidUsd);
+  const legacyCredits = usdToCredits(usage.legacyUsd, price);
+  const chargedCredits = usage.creditsCharged + legacyCredits;
+  const usageCredits = usage.creditsUsage + legacyCredits;
 
   return {
     scope: email ? 'user' : 'all',
@@ -630,8 +734,8 @@ export async function getUserEconomicsReport(
     profile: email && userId ? profileFromRow(row, userId, email, price, eco) : null,
     runs: usage.runs,
     orders: orders.orders,
-    userCharged: dualHybrid(hubRevenueUsd + usage.royaltyPaidUsd, usage.creditsCharged, price),
-    hubRevenue: dualHybrid(hubRevenueUsd, usage.creditsUsage, price),
+    userCharged: dualHybrid(hubRevenueUsd + usage.royaltyPaidUsd, chargedCredits, price),
+    hubRevenue: dualHybrid(hubRevenueUsd, usageCredits, price),
     cogsAi: dualFromUsd(usage.cogsAiUsd, price),
     cogsInfra: dualFromUsd(usage.cogsInfraUsd, price),
     paymentFee: dualFromUsd(usage.paymentFeeUsd, price),

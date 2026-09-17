@@ -65,17 +65,21 @@ export async function queryContributionByClass(
 ): Promise<ContributionClassRow[]> {
   const sql = `
     SELECT
-      COALESCE(model_class, modelClass, 'unknown') as modelClass,
+      COALESCE(NULLIF("modelClass", ''), 'unclassified') as modelClass,
       COUNT(*) as runs,
-      SUM(COALESCE(credits_charged, creditsCharged, 0)) as creditsCharged,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as revenueUsd,
-      SUM(COALESCE(cogs_ai_usd, cogsAiUsd, 0)) as cogsAiUsd,
-      SUM(COALESCE(cogs_infra_usd_est, cogsInfraUsdEst, 0)) as cogsInfraUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd
+      SUM(COALESCE("creditsCharged", 0)) as creditsCharged,
+      SUM(CASE
+        WHEN COALESCE("revenueUsd", 0) > 0 THEN "revenueUsd"
+        WHEN COALESCE("creditsCharged", 0) = 0 THEN COALESCE("cost", 0)
+        ELSE 0
+      END) as revenueUsd,
+      SUM(COALESCE("cogsAiUsd", 0)) as cogsAiUsd,
+      SUM(COALESCE("cogsInfraUsdEst", 0)) as cogsInfraUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd
     FROM service_usages
     WHERE created_at >= ? AND created_at <= ?
       AND (isError = 0 OR isError IS NULL)
-    GROUP BY COALESCE(model_class, modelClass, 'unknown')
+    GROUP BY COALESCE(NULLIF("modelClass", ''), 'unclassified')
   `;
   try {
     const result = await db.prepare(sql).bind(fromMs, toMs).all<Record<string, unknown>>();
@@ -106,16 +110,20 @@ export async function queryLosingWorkflows(
 ): Promise<ContributionWorkflowRow[]> {
   const sql = `
     SELECT
-      COALESCE(workflowId, workflow_id, 0) as workflowId,
+      COALESCE("workflowId", 0) as workflowId,
       COUNT(*) as runs,
-      SUM(COALESCE(revenue_usd, revenueUsd, cost, 0)) as revenueUsd,
-      SUM(COALESCE(contribution_usd, contributionUsd, 0)) as contributionUsd
+      SUM(CASE
+        WHEN COALESCE("revenueUsd", 0) > 0 THEN "revenueUsd"
+        WHEN COALESCE("creditsCharged", 0) = 0 THEN COALESCE("cost", 0)
+        ELSE 0
+      END) as revenueUsd,
+      SUM(COALESCE("contributionUsd", 0)) as contributionUsd
     FROM service_usages
     WHERE created_at >= ? AND created_at <= ?
       AND (isError = 0 OR isError IS NULL)
-      AND COALESCE(workflowId, workflow_id, 0) > 0
-    GROUP BY COALESCE(workflowId, workflow_id, 0)
-    HAVING SUM(COALESCE(contribution_usd, contributionUsd, 0)) < 0
+      AND COALESCE("workflowId", 0) > 0
+    GROUP BY COALESCE("workflowId", 0)
+    HAVING SUM(COALESCE("contributionUsd", 0)) < 0
     ORDER BY contributionUsd ASC
     LIMIT ?
   `;
