@@ -216,13 +216,93 @@ const retryAllMessages = (chunk: ProcessedItem[]): void => {
 };
 
 
-const parseMessage = (message: Message): {
+type ParsedQueueItem = {
   userId: string;
   table: string;
   recordData: any;
   queueId?: number;
   batchInfo?: any;
-}[] | null => {
+  pullFromDo?: boolean;
+};
+
+const fetchRecordFromUserDO = async (
+  userId: string,
+  table: string,
+  queueId: number,
+  env: Env,
+): Promise<any | null> => {
+  const doId = env.USER_DO.idFromString(userId);
+  const stub = env.USER_DO.get(doId);
+  const response = await stub.fetch('https://do.internal/dynamic/select', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      table,
+      where: { field: 'queueId', operator: '=', value: queueId },
+      limit: 1,
+    }),
+  });
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to pull record from UserDO: ${response.status} - ${errorText}`);
+  }
+  const result = await response.json() as { success?: boolean; data?: any[] };
+  return result.data?.[0] ?? null;
+};
+
+/** Expand compact `pullFromDo` pointers into the full UserDO row. */
+const resolvePulledRecords = async (
+  parsed: ParsedQueueItem[],
+  env: Env,
+): Promise<{ items: ParsedQueueItem[]; retry: boolean }> => {
+  const items: ParsedQueueItem[] = [];
+  for (const parsedItem of parsed) {
+    if (!parsedItem.pullFromDo) {
+      items.push(parsedItem);
+      continue;
+    }
+    if (parsedItem.queueId == null) {
+      log.warn('queue.pull_from_do_missing_id', {
+        userId: parsedItem.userId,
+        table: parsedItem.table,
+      });
+      return { items: [], retry: true };
+    }
+    try {
+      const pulled = await fetchRecordFromUserDO(
+        parsedItem.userId,
+        parsedItem.table,
+        parsedItem.queueId,
+        env,
+      );
+      if (!pulled) {
+        log.warn('queue.pull_from_do_missing', {
+          userId: parsedItem.userId,
+          table: parsedItem.table,
+          queueId: parsedItem.queueId,
+        });
+        return { items: [], retry: false };
+      }
+      log.info('queue.pull_from_do', {
+        userId: parsedItem.userId,
+        table: parsedItem.table,
+        queueId: parsedItem.queueId,
+      });
+      items.push({ ...parsedItem, recordData: pulled });
+    } catch (error) {
+      log.error('queue.pull_from_do_failed', {
+        userId: parsedItem.userId,
+        table: parsedItem.table,
+        queueId: parsedItem.queueId,
+        error,
+      });
+      return { items: [], retry: true };
+    }
+  }
+  return { items, retry: false };
+};
+
+const parseMessage = (message: Message): ParsedQueueItem[] | null => {
   try {
 		const dataArr = message.body as any[];
 		// Kiểm tra nếu không phải array
@@ -252,7 +332,8 @@ const parseMessage = (message: Message): {
 				table,
 				recordData,
 				queueId: queueId ? (typeof queueId === 'string' ? parseInt(queueId) : queueId) : undefined,
-				batchInfo: parsedBody.batchInfo
+				batchInfo: parsedBody.batchInfo,
+				pullFromDo: parsedBody.pullFromDo === true || parsedBody.batchInfo?.pullFromDo === true,
 			});
 		}
 
@@ -276,7 +357,18 @@ const processInputQueue = async (batch: MessageBatch, env: Env): Promise<void> =
       message.ack();
       continue;
     }
-		for (const parsedItem of parsed) {
+
+    const pulled = await resolvePulledRecords(parsed, env);
+    if (pulled.retry) {
+      message.retry();
+      continue;
+    }
+    if (pulled.items.length === 0) {
+      message.ack();
+      continue;
+    }
+
+		for (const parsedItem of pulled.items) {
 			const { userId, table, recordData } = parsedItem;
 
 			if (!userTableGroups.has(userId)) {

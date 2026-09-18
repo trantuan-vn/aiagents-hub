@@ -11,6 +11,10 @@ import {
   ensureTriggerTable,
   resolveAlarmTime,
 } from '../../member/workflows/triggers/triggers.js';
+import {
+  groupRecordsForQueueFlush,
+  isNonRetryableFlushError,
+} from './queue-flush.js';
 
 const doLog = createLogger('auth-worker', 'user-do');
 const CRON_NEXT_RUN_AT_KEY = 'cron:nextRunAt';
@@ -748,45 +752,54 @@ export class UserDO extends DurableObject {
         return;
       }
 
-      const minId = pendingRecords[0].queueId;
-      const maxId = Math.max(...pendingRecords.map(r => r.queueId));
-
-      await this.env.INPUT_QUEUE.send(
-        pendingRecords.map(record => ({
-          body: JSON.stringify({
-            table: tableName,
-            schema: this.database.getTableConfig(tableName)?.schema,
-            data: record,
-            id: record.queueId,
-            batchInfo: {
-              userId: this.userId,
-              table: tableName,
-              batchSize: pendingRecords.length,
-              minId,
-              maxId,
-              previousFlushedId: state.lastFlushedId,
-              timestamp: Date.now()
-            }
-          })
-        }))
+      const groups = groupRecordsForQueueFlush(
+        pendingRecords,
+        (group) => this.buildQueueFlushItems(tableName, group, state),
       );
 
-      await this.markRecordsAsFlushed(tableName, minId, maxId);
-      await this.updateTableState(tableName, { 
-        lastFlushedId: maxId, 
+      if (groups.length > 1 || groups.some((group) => group.oversized)) {
+        doLog.info('do.flush_chunked', {
+          userId: this.userId,
+          table: tableName,
+          pending: pendingRecords.length,
+          groups: groups.length,
+          oversized: groups.filter((group) => group.oversized).length,
+        });
+      }
+
+      let lastFlushedId = state.lastFlushedId;
+      for (const group of groups) {
+        const minId = group.records[0].queueId;
+        const maxId = group.records[group.records.length - 1].queueId;
+        const payload = group.oversized
+          ? this.buildQueuePullItems(tableName, group.records[0], state)
+          : this.buildQueueFlushItems(tableName, group.records, state);
+
+        if (group.oversized) {
+          doLog.warn('do.flush_record_oversized', {
+            userId: this.userId,
+            table: tableName,
+            queueId: minId,
+          });
+        }
+
+        await this.env.INPUT_QUEUE.send(payload);
+        await this.markRecordsAsFlushed(tableName, minId, maxId);
+        lastFlushedId = maxId;
+      }
+
+      await this.updateTableState(tableName, {
+        lastFlushedId,
         lastFlushTime: Date.now(),
-        pendingCount: await this.getPendingCount(tableName)
+        pendingCount: await this.getPendingCount(tableName),
       });
-
-
     } catch (error) {
       doLog.error('do.flush_failed', {
         userId: this.userId,
         table: tableName,
         error: error instanceof Error ? error.message : String(error),
       });
-      const errMsg = error instanceof Error ? error.message : String(error);
-      if (!errMsg.includes('no such column') && !errMsg.includes('SQLITE_ERROR')) {
+      if (!isNonRetryableFlushError(error)) {
         this.state.waitUntil(
           (async () => {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -795,6 +808,59 @@ export class UserDO extends DurableObject {
         );
       }
     }
+  }
+
+  private buildQueueFlushItems(
+    tableName: string,
+    records: any[],
+    state: TableState,
+  ): Array<{ body: string }> {
+    const minId = records[0].queueId;
+    const maxId = records[records.length - 1].queueId;
+    const timestamp = Date.now();
+    return records.map((record) => ({
+      body: JSON.stringify({
+        table: tableName,
+        data: record,
+        id: record.queueId,
+        batchInfo: {
+          userId: this.userId,
+          table: tableName,
+          batchSize: records.length,
+          minId,
+          maxId,
+          previousFlushedId: state.lastFlushedId,
+          timestamp,
+        },
+      }),
+    }));
+  }
+
+  /** Compact pointer when a single row exceeds the 128 KB Queue message cap. */
+  private buildQueuePullItems(
+    tableName: string,
+    record: any,
+    state: TableState,
+  ): Array<{ body: string }> {
+    const queueId = record.queueId;
+    return [{
+      body: JSON.stringify({
+        table: tableName,
+        id: queueId,
+        pullFromDo: true,
+        data: { queueId },
+        batchInfo: {
+          userId: this.userId,
+          table: tableName,
+          batchSize: 1,
+          minId: queueId,
+          maxId: queueId,
+          previousFlushedId: state.lastFlushedId,
+          timestamp: Date.now(),
+          pullFromDo: true,
+        },
+      }),
+    }];
   }
 
   private async markRecordsAsFlushed(tableName: string, minId: number, maxId: number): Promise<number> {
