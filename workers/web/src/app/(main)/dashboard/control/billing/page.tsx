@@ -41,7 +41,7 @@ export default function BillingPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
   const [creditsExpiring, setCreditsExpiring] = useState<string | null>(null);
-  const [canBuyCredits, setCanBuyCredits] = useState(true);
+  const [canBuyCredits, setCanBuyCredits] = useState<boolean | null>(null);
   const [planId, setPlanId] = useState<"free" | "pro" | "enterprise">("free");
   const [workflowRunsRemaining, setWorkflowRunsRemaining] = useState<number | null>(null);
   const [notices, setNotices] = useState<CoeffNotice[]>([]);
@@ -128,18 +128,19 @@ export default function BillingPage() {
     void fetchPaypalConfig().then(setPaypalConfig);
   }, []);
 
-  // Mở dialog nạp tiền khi điều hướng từ overview (?topup=1)
+  // Mở dialog nạp tiền khi điều hướng từ overview (?topup=1), sau khi biết quyền mua Credit.
   useEffect(() => {
     if (searchParams.get("topup") !== "1") return;
+    if (canBuyCredits == null) return;
 
-    setTopUpOpen(true);
+    if (canBuyCredits) setTopUpOpen(true);
 
     const newSearchParams = new URLSearchParams(searchParams.toString());
     newSearchParams.delete("topup");
     const newUrl = newSearchParams.toString() ? `?${newSearchParams.toString()}` : "";
     router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canBuyCredits]);
 
   // Xử lý kết quả thanh toán từ VNPay return
   useEffect(() => {
@@ -238,7 +239,7 @@ export default function BillingPage() {
           <h1 className="mb-1 text-2xl font-bold">{t("title")}</h1>
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
-        {canBuyCredits ? (
+        {canBuyCredits === true ? (
           <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={setTopUpOpen} />
         ) : null}
       </div>
@@ -254,7 +255,7 @@ export default function BillingPage() {
         workflowRunsRemaining={workflowRunsRemaining}
       />
 
-      {!canBuyCredits ? (
+      {canBuyCredits === false ? (
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>{t("plan_free_title")}</AlertTitle>

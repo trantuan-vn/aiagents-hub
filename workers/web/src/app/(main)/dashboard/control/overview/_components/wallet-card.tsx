@@ -17,7 +17,7 @@ export function WalletCard() {
   const t = useTranslations("OverviewPage");
   const [balance, setBalance] = useState<number | null>(null);
   const [expiring, setExpiring] = useState<string | null>(null);
-  const [canBuy, setCanBuy] = useState(true);
+  const [canBuy, setCanBuy] = useState<boolean | null>(null);
 
   const loadWallet = useCallback(async () => {
     const snap = await fetchWalletSnapshot();
@@ -55,18 +55,18 @@ export function WalletCard() {
             )}
           </div>
         </div>
-        {canBuy ? (
+        {canBuy === true ? (
           <Button asChild size="sm" className="shrink-0 gap-1.5 self-start sm:self-center">
             <Link href="/dashboard/control/billing?topup=1">
               <Plus className="h-4 w-4" />
               {t("wallet.top_up")}
             </Link>
           </Button>
-        ) : (
+        ) : canBuy === false ? (
           <Button asChild size="sm" variant="outline" className="shrink-0 self-start sm:self-center">
             <Link href="/dashboard/control/billing">{t("wallet.view_billing")}</Link>
           </Button>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
