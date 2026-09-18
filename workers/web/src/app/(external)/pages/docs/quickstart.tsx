@@ -8,56 +8,58 @@ import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 
-import Layout from "../../components/layout/main-layout";
-
-import { DocsShell } from "./docs-shell";
+import { DocsCallout, DocsList, DocsPage, DocsP, DocsSection, DocsSteps } from "./docs-ui";
 
 const QuickstartPage = () => {
   const t = useTranslations("Docs");
-
-  const steps = [
-    { title: t("quickstart_step1_title"), body: t("quickstart_step1_body") },
-    { title: t("quickstart_step2_title"), body: t("quickstart_step2_body") },
-    { title: t("quickstart_step3_title"), body: t("quickstart_step3_body") },
-    { title: t("quickstart_step4_title"), body: t("quickstart_step4_body") },
-  ];
+  const steps = t.raw("quickstart.steps") as { title: string; body: string }[];
 
   return (
-    <Layout>
-      <DocsShell title={t("quickstart_title")} description={t("quickstart_description")}>
-        <div className="max-w-none">
-          <ol className="text-foreground mb-10 list-decimal space-y-8 pl-5 text-base leading-relaxed">
-            {steps.map((step, index) => (
-              <li key={step.title}>
-                <p className="font-semibold">{step.title}</p>
-                <p className="text-muted-foreground mt-2">{step.body}</p>
-                {index === 0 ? (
-                  <Button asChild className="mt-4" variant="default">
-                    <NextLink href="/auth/v3/login">
-                      {t("quickstart_open_dashboard")}
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </NextLink>
-                  </Button>
-                ) : null}
-              </li>
-            ))}
-          </ol>
+    <DocsPage
+      title={t("quickstart.title")}
+      description={t("quickstart.description")}
+      toc={[
+        { id: "steps", label: t("quickstart.toc_steps") },
+        { id: "credits", label: t("quickstart.toc_credits") },
+        { id: "next", label: t("quickstart.toc_next") },
+      ]}
+    >
+      <DocsSection id="steps" title={t("quickstart.toc_steps")}>
+        <DocsSteps
+          steps={steps.map((step, index) => ({
+            ...step,
+            action:
+              index === 0 ? (
+                <Button asChild className="mt-4" variant="default">
+                  <NextLink href="/auth/v3/login">
+                    {t("quickstart.open_dashboard")}
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </NextLink>
+                </Button>
+              ) : undefined,
+          }))}
+        />
+      </DocsSection>
 
-          <div className="bg-muted/40 border-border rounded-xl border p-6">
-            <h2 className="text-foreground mb-2 text-lg font-semibold">{t("quickstart_credits_title")}</h2>
-            <p className="text-muted-foreground text-sm leading-relaxed">{t("quickstart_credits_body")}</p>
-          </div>
+      <DocsSection id="credits" title={t("quickstart.credits_title")}>
+        <DocsP>{t("quickstart.credits_body")}</DocsP>
+        <DocsList items={t.raw("quickstart.credits_items") as string[]} />
+      </DocsSection>
 
-          <p className="text-muted-foreground mt-8 text-sm">
-            {t("quickstart_more")}{" "}
-            <Link to="/docs/api" className="text-primary font-medium hover:underline">
-              {t("nav_api")}
-            </Link>
-            .
-          </p>
-        </div>
-      </DocsShell>
-    </Layout>
+      <DocsSection id="next" title={t("quickstart.next_title")}>
+        <DocsCallout variant="info" title={t("quickstart.next_callout")}>
+          {t("quickstart.next_body")}{" "}
+          <Link to="/docs/api" className="text-primary font-medium hover:underline">
+            {t("nav.api")}
+          </Link>{" "}
+          {t("quickstart.next_or")}{" "}
+          <Link to="/docs/plans" className="text-primary font-medium hover:underline">
+            {t("nav.plans")}
+          </Link>
+          .
+        </DocsCallout>
+      </DocsSection>
+    </DocsPage>
   );
 };
 

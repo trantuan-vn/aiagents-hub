@@ -18,9 +18,17 @@ import Careers from "./pages/careers";
 import Community from "./pages/community";
 import Contact from "./pages/contact";
 import Cookies from "./pages/cookies";
+import DocsAgents from "./pages/docs/agents";
 import DocsApi from "./pages/docs/api";
+import DocsCredits from "./pages/docs/credits";
+import DocsEnterprise from "./pages/docs/enterprise";
 import DocsIndex from "./pages/docs/index";
+import DocsPlans from "./pages/docs/plans";
+import DocsPlatform from "./pages/docs/platform";
 import DocsQuickstart from "./pages/docs/quickstart";
+import DocsSharing from "./pages/docs/sharing";
+import DocsTriggers from "./pages/docs/triggers";
+import DocsWorkflows from "./pages/docs/workflows";
 import Index from "./pages/index";
 import Packages from "./pages/packages";
 import Privacy from "./pages/privacy";
@@ -78,7 +86,15 @@ const App = () => (
           <Route path="/cookies" element={<Cookies />} />
           <Route path="/docs" element={<DocsIndex />} />
           <Route path="/docs/quickstart" element={<DocsQuickstart />} />
+          <Route path="/docs/platform" element={<DocsPlatform />} />
+          <Route path="/docs/workflows" element={<DocsWorkflows />} />
+          <Route path="/docs/agents" element={<DocsAgents />} />
+          <Route path="/docs/triggers" element={<DocsTriggers />} />
+          <Route path="/docs/credits" element={<DocsCredits />} />
+          <Route path="/docs/plans" element={<DocsPlans />} />
+          <Route path="/docs/sharing" element={<DocsSharing />} />
           <Route path="/docs/api" element={<DocsApi />} />
+          <Route path="/docs/enterprise" element={<DocsEnterprise />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE
           <Route path="*" element={<NotFound />} /> */}
         </Routes>

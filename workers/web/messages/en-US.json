@@ -544,7 +544,8 @@
     "privacy_policy": "Privacy Policy",
     "terms_of_service": "Terms of Service",
     "cookies": "Cookies",
-    "quickstart": "Quickstart"
+    "quickstart": "Quickstart",
+    "credits": "Credits"
   },
   "Hero": {
     "badge": "Agents that finish work, not just chat",
@@ -4365,62 +4366,513 @@
   },
   "Docs": {
     "badge": "Documentation",
-    "hub_title": "AI Agents Hub docs",
-    "hub_description": "Build workflows, run agents, and pay in Credits. Start here, then trigger graphs from chat, cron, or HTTP.",
-    "hub_badge_1": "Workflows · Agents · One Credit",
-    "hub_badge_2": "Dashboard: aiagents-hub.vn",
-    "card_quickstart_title": "Quickstart",
-    "card_quickstart_desc": "Create a workspace, draw a graph, run an agent, and see the Credit estimate.",
-    "card_api_title": "Workflow API",
-    "card_api_desc": "Fire a workflow from a webhook with a Bearer token — same graph you built in the canvas.",
-    "hub_base_title": "Production base URL",
-    "hub_base_body": "API traffic uses HTTPS. Replace placeholders with your own API key; never commit secrets.",
-    "hub_builder_title": "Builder",
-    "hub_builder_body": "The canvas is the product. Add triggers, agents, RAG, HTTP, and flow nodes. Versions live in your workspace; shared graphs can earn royalties when others run them.",
-    "hub_credits_title": "Credits",
-    "hub_credits_body": "AI usage bills in Credits — one unit for every model. You will not see USD per million tokens. Included Credits expire each UTC month; Starter and above can buy more.",
-    "quickstart_title": "Quickstart",
-    "quickstart_description": "From an empty workspace to a running agent, billed in Credits.",
-    "quickstart_open_dashboard": "Open the dashboard",
-    "quickstart_step1_title": "Create an account",
-    "quickstart_step1_body": "Sign in at the dashboard. Free includes a small Credit pool that expires at the end of the period.",
-    "quickstart_step2_title": "Create a workflow",
-    "quickstart_step2_body": "Open Workflows, add a trigger (chat, webhook, or cron) and an agent node. Optionally attach memory, RAG, or HTTP tools.",
-    "quickstart_step3_title": "Run once",
-    "quickstart_step3_body": "Use Execute or hosted chat. The UI shows a Credit estimate before AI nodes run; the wallet is charged after.",
-    "quickstart_step4_title": "Watch logs",
-    "quickstart_step4_body": "Open the execution to see node output, errors, and Credits charged. Retry caused by our platform faults is not billed.",
-    "quickstart_try_title": "What a Credit covers",
-    "quickstart_try_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not.",
-    "quickstart_credits_title": "What a Credit covers",
-    "quickstart_credits_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not.",
-    "quickstart_more": "Trigger the same graph from HTTP in",
-    "api_page_title": "Workflow API",
-    "api_page_description": "Authenticate with a Bearer token and POST to a workflow webhook. Usage still bills in Credits on the workspace that owns the run.",
-    "api_auth_title": "Base URL and auth",
-    "api_auth_body": "Create an API key in Control > API Keys. Send it as a Bearer token. Rotate keys if they leak.",
-    "api_base_url_label": "Base URL",
-    "api_auth_header": "Authorization header",
-    "api_webhook_title": "Trigger a workflow",
-    "api_webhook_body": "Each workflow with a webhook trigger exposes an HTTP path. Replace YOUR_WORKFLOW_ID and the path you configured on the node. The JSON body is available to downstream nodes.",
-    "api_param_workflow": "the workflow id from the dashboard.",
-    "api_param_path": "the path segment configured on the webhook trigger (example: run).",
-    "api_param_body": "payload your graph reads (message, fields, files metadata).",
-    "api_credits_title": "Credits on API runs",
-    "api_credits_body": "Webhook runs debit the same Credit wallet as the canvas. Estimates can differ from the final charge. Shared workflows may add a royalty in Credits for the author.",
-    "params_label": "Parameters",
-    "section_start": "Start here",
-    "section_guides": "Guide",
-    "nav_overview": "Overview",
-    "nav_quickstart": "Quickstart",
-    "nav_api": "Workflow API",
     "menu": "Menu",
     "mobile_nav_title": "Browse docs",
-    "search_placeholder": "Filter navigation…",
+    "search_placeholder": "Filter pages…",
     "nav_aria": "Documentation",
     "placeholder_api_key": "YOUR_API_KEY",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "section": {
+      "start": "Get started",
+      "product": "Product",
+      "billing": "Billing",
+      "developers": "Developers",
+      "company": "Enterprise"
+    },
+    "nav": {
+      "overview": "Overview",
+      "quickstart": "Quickstart",
+      "platform": "How you pay",
+      "workflows": "Workflows",
+      "agents": "Agents & RAG",
+      "triggers": "Triggers",
+      "credits": "Credits",
+      "plans": "Plans",
+      "sharing": "Sharing",
+      "api": "Workflow API",
+      "enterprise": "Enterprise"
+    },
+    "pager": {
+      "aria": "Docs pagination",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "toc": {
+      "aria": "On this page",
+      "title": "On this page"
+    },
+    "hub": {
+      "title": "AI Agents Hub docs",
+      "description": "Build the job once. Run it from chat, a webhook, or a schedule. Pay in Credits — not tokens.",
+      "badge_1": "One Platform · One Credit · Unlimited Models",
+      "badge_2": "Dashboard: aiagents-hub.vn",
+      "layers_title": "How the product is sold",
+      "layers_body": "Three layers, and only three. The workspace plan unlocks the builder. Credits pay for agent runs. Enterprise is a contract for SLA, SSO, and invoices — not a fifth pricing card.",
+      "layer_plan_title": "Workspace plan",
+      "layer_plan_desc": "Free, Starter, Pro, or Business. You buy the right to build, share, and run — not a model catalog.",
+      "layer_credit_title": "Credits",
+      "layer_credit_desc": "One unit for every model. See an estimate before the run; the wallet is charged after.",
+      "layer_ent_title": "Enterprise",
+      "layer_ent_desc": "SLA, SSO, company invoices, custom quotas, optional BYOK. Contact us — we do not list it as a card.",
+      "paths_title": "Choose a path",
+      "path_start_title": "Start in the canvas",
+      "path_start_desc": "Create a workspace, draw a small graph, run once, and read the Credit estimate.",
+      "path_build_title": "Design the work",
+      "path_build_desc": "Triggers, agents, RAG, memory, and tools. The canvas is the product.",
+      "path_run_title": "Go live over HTTP",
+      "path_run_desc": "The same graph you built, fired with a Bearer token. Usage still bills Credits.",
+      "path_earn_title": "Share and earn",
+      "path_earn_desc": "Publish a workflow. Runners pay Credits; you receive a royalty on a separate ledger.",
+      "callout_title": "Pick a plan for the work you need done",
+      "callout_body": "Included Credits expire each UTC month. Starter and above can buy more. Compare the four self-serve plans on",
+      "callout_link": "Pricing"
+    },
+    "quickstart": {
+      "title": "Quickstart",
+      "description": "From an empty workspace to a running agent, billed in Credits.",
+      "open_dashboard": "Open the dashboard",
+      "toc_steps": "Build and run",
+      "toc_credits": "What Credits cover",
+      "toc_next": "What to read next",
+      "steps": [
+        {
+          "title": "Create an account",
+          "body": "Sign in at the dashboard. Free includes a small Credit pool that expires at the end of the UTC month. You do not need a card to try the builder."
+        },
+        {
+          "title": "Create a workflow",
+          "body": "Open Workflows and start from a blank canvas. Add a trigger (chat, webhook, or cron) and an agent. Optionally attach memory, RAG, or an HTTP tool."
+        },
+        {
+          "title": "Run once",
+          "body": "Use Execute or hosted chat. The UI shows a Credit estimate before AI nodes run; the wallet is charged after the job finishes."
+        },
+        {
+          "title": "Read the execution",
+          "body": "Open the run to see node output, errors, and Credits charged. Retries caused by our platform faults are not billed."
+        }
+      ],
+      "credits_title": "What a Credit covers",
+      "credits_body": "You pay for completed AI work, not for opening the editor.",
+      "credits_items": [
+        "Charged: model calls (LLM, embeddings, vision, speech) and tools that call a model.",
+        "Not charged: saving a graph, listing runs, reading logs, or retries we owe you.",
+        "Infrastructure (storage, queues, compute) is not a line item. It sits inside the plan plus quotas."
+      ],
+      "next_title": "What to read next",
+      "next_callout": "Same graph, other doors",
+      "next_body": "When the graph is stable, trigger it from HTTP in",
+      "next_or": "or pick a workspace plan in"
+    },
+    "platform": {
+      "title": "How you pay",
+      "description": "One platform. One Credit. Unlimited models. Three commercial layers — nothing else.",
+      "toc_principle": "The principle",
+      "toc_layers": "Three layers",
+      "toc_see": "What you see",
+      "toc_scale": "How spend scales",
+      "principle_title": "The principle",
+      "principle_body": "You pay for the value of work the agent finishes, not for the infrastructure bill we receive. Faster or deeper models change Credits per run — they do not rewrite your plan price.",
+      "slogan": "One Platform, One Credit, Unlimited Models",
+      "slogan_body": "The plan is the right to use the workspace. Credits are the meter for AI usage. Enterprise is a guarantee (SLA, SSO, invoices) — not a cheaper token SKU.",
+      "layers_title": "Three layers",
+      "layers_body": "When you grow, you do not get a surprise token invoice. You pay more because you run more work.",
+      "col_layer": "Layer",
+      "col_buy": "You buy",
+      "col_not": "Not",
+      "layer_rows": [
+        [
+          "Workspace plan",
+          "Builder, sharing, webhooks, cron, support, quotas",
+          "Tokens, models, or Cloudflare line items"
+        ],
+        [
+          "Credits",
+          "Prepaid usage for agent and model work",
+          "USD per million tokens"
+        ],
+        [
+          "Enterprise contract",
+          "SLA, SSO, audit, custom quotas, optional BYOK",
+          "A fifth card on Pricing"
+        ]
+      ],
+      "see_title": "What you see",
+      "see_body": "Free, Starter, and Pro see Credits, estimates, and plan quotas. Business (and Enterprise contracts) can also see the model family — Llama, GPT, Claude — still billed in Credits.",
+      "see_items": [
+        "How many Credits remain, and which lots expire soon.",
+        "About how many Credits a run will cost, before it runs.",
+        "How many Credits the last run actually charged (usage plus any royalty).",
+        "What the plan allows — not which model costs how many dollars."
+      ],
+      "hide_title": "You will not see",
+      "hide_body": "USD per million tokens, profit percents, or storage/queue invoices. Those stay on our side of the meter.",
+      "scale_title": "How spend scales",
+      "scale_body": "A hundred users consume few Credits. Ten thousand consume many. That is by design — read",
+      "scale_and": "and"
+    },
+    "workflows": {
+      "title": "Workflows",
+      "description": "The canvas is the product. Draw the job once, then run it from chat, HTTP, or a schedule.",
+      "toc_canvas": "The canvas",
+      "toc_nodes": "Node families",
+      "toc_run": "Test vs production",
+      "toc_versions": "Versions and sharing",
+      "canvas_title": "The canvas",
+      "canvas_body": "Open Workflows in the dashboard. A graph is nodes plus edges. You configure each step in place, save a version in your workspace, and run it without leaving the editor.",
+      "nodes_title": "Node families",
+      "nodes_body": "Start small: one trigger, one agent, one destination. Add RAG, memory, or HTTP only when the job needs them.",
+      "col_family": "Family",
+      "col_role": "Role",
+      "node_rows": [
+        [
+          "Trigger",
+          "How the graph starts — chat, webhook, form, or cron."
+        ],
+        [
+          "Agent",
+          "The model loop. Can call tools, read memory, and answer."
+        ],
+        [
+          "RAG & tools",
+          "Ingest documents, retrieve chunks, call HTTP, or query a database."
+        ],
+        [
+          "Flow",
+          "Branch, loop, and control — the job stays a graph, not a script dump."
+        ],
+        [
+          "HTTP / actions",
+          "Call an API or an app you already use."
+        ]
+      ],
+      "edges_title": "Two kinds of wires",
+      "edges_body": "Solid edges are the run path (out → in). Dashed edges attach a model, memory, or tool to an agent — they are configuration, not extra steps you pay for twice.",
+      "run_title": "Test vs production",
+      "run_body": "Execute in the editor always uses your real quota and Credits. Production doors (webhook, cron, hosted chat) use the same graph and the same wallet.",
+      "run_items": [
+        "Watch the Credit estimate before an AI node runs.",
+        "Open the execution log after — output, errors, Credits charged.",
+        "Retries we cause are not billed. Failed AI usage that did work still is."
+      ],
+      "versions_title": "Versions and sharing",
+      "versions_body": "Versions live in your workspace. When a graph is ready for others, publish it — runners pay Credits, you can earn a royalty. See"
+    },
+    "agents": {
+      "title": "Agents, RAG, and tools",
+      "description": "The model loop, retrieval, session memory, and tools — billed in Credits when they call a model.",
+      "toc_loop": "The agent loop",
+      "toc_rag": "RAG",
+      "toc_memory": "Memory and data",
+      "toc_sku": "Not sold as SKUs",
+      "loop_title": "The agent loop",
+      "loop_body": "An agent node is not the start of the graph. It receives input from upstream, calls a registered model, may use tools, and sends output downstream. Write the prompt as the job, not as a model name.",
+      "col_kind": "Kind",
+      "col_when": "When to use it",
+      "kind_rows": [
+        [
+          "Agent",
+          "Default loop: reason, call tools, answer."
+        ],
+        [
+          "Reasoning agent",
+          "A more governed loop when you need checks before acting."
+        ]
+      ],
+      "rag_title": "RAG",
+      "rag_body": "Retrieval is two jobs. Keep those graphs boring and observable — retrieval quality beats prompt poetry.",
+      "rag_items": [
+        "Save RAG ingests documents (including PDFs) into the vector store.",
+        "Get RAG retrieves chunks at query time for the agent to cite.",
+        "Ingest burns Credits when it embeds. Query burns Credits when it embeds and when the agent answers."
+      ],
+      "memory_title": "Memory and data",
+      "memory_body": "Simple memory holds a short session window. Vector memory is for longer semantic recall. Get DB Info reaches structured data (D1 or Oracle) when the agent must ground itself in tables, not documents.",
+      "sku_title": "Not sold as SKUs",
+      "sku_callout": "One meter",
+      "sku_body": "Agents, RAG, memory, and tools are capabilities of the workspace. They consume Credits when they call a model. Storage and queues stay inside the plan. Details in"
+    },
+    "triggers": {
+      "title": "Triggers",
+      "description": "One graph, three ways in. The Credit meter does not care which door you used.",
+      "toc_doors": "Doors",
+      "toc_plans": "What the plan unlocks",
+      "toc_grace": "Always-on when quota runs out",
+      "doors_title": "Doors",
+      "doors_body": "Design failure the same way for all three: timeouts, logs a human can read, and a Credit estimate before expensive nodes run.",
+      "col_door": "Door",
+      "col_use": "Use it for",
+      "door_rows": [
+        [
+          "Hosted chat",
+          "Operators or end users talking to the agent without opening the canvas."
+        ],
+        [
+          "Webhook",
+          "An HTTP path on api.aiagents-hub.vn. POST JSON; downstream nodes read the body."
+        ],
+        [
+          "Cron",
+          "The same graph on a schedule — digests, syncs, anything that should not wait for a click."
+        ]
+      ],
+      "plans_title": "What the plan unlocks",
+      "plans_body": "Free can build and run its own graphs in the editor. Production webhooks, cron, and sharing start on Starter. Quotas live on",
+      "plan_items": [
+        "Free: no production webhook, cron, or sharing.",
+        "Starter: webhooks, sharing, up to 3 cron jobs.",
+        "Pro: 15 cron jobs. Business: 100.",
+        "Daily run limits apply on every plan (15 / 50 / 200 / 1,000)."
+      ],
+      "grace_title": "Always-on when quota runs out",
+      "grace_body": "Paid plans can mark a production webhook or cron workflow to keep running under a tight safety cap after included Credits or daily runs are exhausted — only if you have no purchased Credits left. This is not unlimited free compute.",
+      "grace_callout": "When grace ends, we stop",
+      "grace_warn": "A production call that cannot run returns HTTP 402 with a path to top up or upgrade. Frontier models, RAG ingest, and unbounded code are blocked in grace. Editor tests never use grace — they always charge the real wallet."
+    },
+    "credits": {
+      "title": "Credits",
+      "description": "One unit for every model. Prepaid usage for work that finishes — not a token reseller.",
+      "toc_unit": "One unit",
+      "toc_billed": "What is billed",
+      "toc_expiry": "Expiry and top-ups",
+      "toc_estimate": "Estimate vs charge",
+      "unit_title": "One unit",
+      "unit_body": "Cheap or frontier, the customer unit is Credit. A cheaper model costs fewer Credits per run; a frontier model costs more. Changing models does not change your plan price.",
+      "unit_callout": "Not e-money",
+      "unit_callout_body": "Credits are prepaid platform usage. They do not convert back to cash, except creator earnings which pay out on a separate ledger.",
+      "billed_title": "What is billed",
+      "billed_body": "The wallet is the workspace that owns the run — including API and shared-graph runs.",
+      "col_event": "Event",
+      "col_charge": "Credits?",
+      "bill_rows": [
+        [
+          "LLM, embeddings, vision, speech",
+          "Yes"
+        ],
+        [
+          "Tools that call a model (including RAG query/ingest)",
+          "Yes"
+        ],
+        [
+          "Royalty when you run someone else's shared graph",
+          "Yes, extra"
+        ],
+        [
+          "Save workflow, list executions, read logs",
+          "No"
+        ],
+        [
+          "Retry after a platform fault on our side",
+          "No"
+        ]
+      ],
+      "expiry_title": "Expiry and top-ups",
+      "expiry_body": "Two clocks. Included Credits reset every UTC month — unused amounts do not roll over, even if you prepaid 12 months of the plan. Purchased Credits expire 12 months after they are credited (oldest first).",
+      "expiry_items": [
+        "Free cannot buy Credits — upgrade to Starter or above.",
+        "Starter / Pro / Business can buy packs when included Credits run out.",
+        "Wallets have a balance cap per plan (20,000 / 50,000 / 200,000) so usage stays in the product, not in a hoard.",
+        "When included Credits hit their usage cap, the next AI call uses purchased Credits if you have them."
+      ],
+      "topup_body": "Top-up is not an upgrade. Buying Credits does not change your plan. Plans are explained in",
+      "estimate_title": "Estimate vs charge",
+      "estimate_body": "The editor shows an estimate before AI nodes run. The wallet is charged the actual usage after. They can differ — the UI says so on purpose.",
+      "royalty_title": "Royalties",
+      "royalty_body": "If you run a shared workflow, you pay usage plus a royalty in Credits. The author earns on a payout ledger. Details in"
+    },
+    "plans": {
+      "title": "Plans",
+      "description": "Four self-serve plans. Included Credits expire each UTC month. Pay longer up front and the monthly rate drops.",
+      "toc_catalog": "The catalog",
+      "toc_compare": "What each plan includes",
+      "toc_billing": "How you subscribe",
+      "toc_cancel": "Cancel and change",
+      "catalog_title": "The catalog",
+      "catalog_body": "Free is how you try the builder — not the product we live on. Starter is the paid door. Pro is the default for teams running agents every day. Business is for higher volume.",
+      "col_plan": "Plan",
+      "col_price": "List / month",
+      "col_for": "Meant for",
+      "catalog_rows": [
+        [
+          "Free",
+          "$0",
+          "Try the canvas. 150 included Credits. No top-up, webhook, cron, or sharing."
+        ],
+        [
+          "Starter",
+          "$4.90",
+          "Paid door: buy Credits, share, webhooks, 3 cron jobs."
+        ],
+        [
+          "Pro",
+          "$19.90",
+          "Teams running real agents. 2,000 included Credits, 15 cron jobs."
+        ],
+        [
+          "Business",
+          "$99.90",
+          "Higher volume, 100 cron jobs, model family visible."
+        ]
+      ],
+      "compare_title": "What each plan includes",
+      "compare_body": "Numbers below are the self-serve catalog. Live checkout reads the same source as the Pricing page.",
+      "compare_headers": [
+        "",
+        "Free",
+        "Starter",
+        "Pro",
+        "Business"
+      ],
+      "compare_rows": [
+        [
+          "Included Credits / UTC month",
+          "150",
+          "500",
+          "2,000",
+          "10,000"
+        ],
+        [
+          "Buy more Credits",
+          "No",
+          "Yes",
+          "Yes",
+          "Yes"
+        ],
+        [
+          "Runs / day",
+          "15",
+          "50",
+          "200",
+          "1,000"
+        ],
+        [
+          "Share / webhook",
+          "No",
+          "Yes",
+          "Yes",
+          "Yes"
+        ],
+        [
+          "Cron jobs",
+          "0",
+          "3",
+          "15",
+          "100"
+        ],
+        [
+          "Always-on grace",
+          "No",
+          "Tight cap",
+          "Yes",
+          "Wider cap"
+        ],
+        [
+          "Model family on UI",
+          "No",
+          "No",
+          "No",
+          "Yes"
+        ]
+      ],
+      "billing_title": "How you subscribe",
+      "billing_body": "PayPal Subscriptions (Visa, Mastercard, or a PayPal wallet) auto-renew. You can also pay the current period once via bank transfer / PayPal Orders — that path does not auto-renew.",
+      "billing_items": [
+        "Intervals: 1 / 3 / 6 / 12 months, with 0% / 10% / 15% / 20% off the prepaid total.",
+        "Included Credits still reset every UTC month, even if you prepaid a year.",
+        "The plan charge date can differ from the Credit reset (UTC month). Copy in Billing says so."
+      ],
+      "checkout_title": "Checkout",
+      "checkout_body": "Compare and subscribe on",
+      "checkout_link": "Pricing",
+      "cancel_title": "Cancel and change",
+      "cancel_body": "Cancel at period end: you keep the plan until the period you already paid. Purchased Credits stay until they expire. Unused included Credits still vanish at the end of the UTC month. Downgrades take effect at period end; upgrades after PayPal confirms."
+    },
+    "sharing": {
+      "title": "Sharing and royalties",
+      "description": "Publish a graph. When someone else runs it, they pay Credits; you earn a royalty.",
+      "toc_publish": "Publish",
+      "toc_royalty": "Royalties",
+      "toc_minplan": "Minimum plan",
+      "publish_title": "Publish",
+      "publish_body": "Sharing is a product feature, not a requirement. Keep a graph private if others should not run it. Treat a shared workflow like an API you would version.",
+      "publish_items": [
+        "Starter and above can share. Free cannot publish production graphs.",
+        "Marketplace listings hide the definition from callers who do not meet the minimum plan.",
+        "The runner's workspace is billed — not the author's Credits."
+      ],
+      "royalty_title": "Royalties",
+      "royalty_body": "The runner pays AI usage plus a royalty percentage you configure. You receive earnings on a payout ledger (VND or USD), not as spendable Credits in the same wallet. The Hub does not take that royalty out of its own model cost.",
+      "ledger_title": "Two ledgers",
+      "ledger_body": "Credits pay for runs. Earnings pay creators. Mixing them would hide what a job actually cost.",
+      "minplan_title": "Minimum plan",
+      "minplan_body": "Authors can require runners to hold at least Starter, Pro, or Business — up to their own plan. Callers below that get HTTP 403 with a checkout path. Read",
+      "minplan_callout": "Owner plan goes down",
+      "minplan_warn": "If you downgrade, the Hub clamps each workflow's minimum plan to what you can still assign. A Pro-gated graph will not stay Pro-gated on a Starter workspace."
+    },
+    "api": {
+      "title": "Workflow API",
+      "description": "Authenticate with a Bearer token and POST to a workflow webhook. Usage still bills Credits on the workspace that owns the run.",
+      "toc_auth": "Auth",
+      "toc_run": "Trigger a workflow",
+      "toc_errors": "Errors",
+      "toc_credits": "Credits on API runs",
+      "auth_title": "Base URL and auth",
+      "auth_body": "Create an API key in Control → API Keys. Send it as a Bearer token. Rotate keys if they leak. Production webhooks need a paid plan.",
+      "base_url_label": "Base URL",
+      "auth_header": "Authorization header",
+      "webhook_title": "Trigger a workflow",
+      "webhook_body": "Each workflow with a webhook trigger exposes an HTTP path. Replace YOUR_WORKFLOW_ID and the path you configured on the node. The JSON body is available to downstream nodes.",
+      "param_items": [
+        "workflowId — the workflow id from the dashboard.",
+        "path — the path segment on the webhook trigger (example: run).",
+        "JSON body — payload your graph reads (message, fields, file metadata)."
+      ],
+      "trigger_note": "Chat and cron are the other two doors. See",
+      "errors_title": "Errors",
+      "errors_body": "Failed production calls return a machine-readable code. Do not retry 402/403 in a tight loop.",
+      "col_code": "Status / code",
+      "col_when": "When",
+      "error_rows": [
+        [
+          "402 PAYMENT_REQUIRED",
+          "No Credits or daily runs left (and grace did not apply). Top up or wait for UTC reset."
+        ],
+        [
+          "403 PLAN_FEATURE",
+          "The plan cannot use webhooks, cron, or sharing. Upgrade to Starter or above."
+        ],
+        [
+          "403 PLAN_REQUIRED",
+          "This shared graph requires a higher plan. Checkout is in the response."
+        ]
+      ],
+      "credits_title": "Credits on API runs",
+      "credits_callout": "Same wallet as the canvas",
+      "credits_body": "Webhook runs debit the same Credit wallet. Estimates can differ from the final charge. Shared workflows may add a royalty in Credits for the author."
+    },
+    "enterprise": {
+      "title": "Enterprise",
+      "description": "SLA, SSO, invoices, and optional BYOK — a contract, not a fifth pricing card.",
+      "toc_what": "What a contract buys",
+      "toc_not": "What it is not",
+      "toc_contact": "Talk to us",
+      "what_title": "What a contract buys",
+      "what_body": "Self-serve stops at Business. If you need guarantees the public catalog cannot promise, we write a contract.",
+      "what_items": [
+        "Uptime SLA and a named support path.",
+        "SSO, audit logs, and company invoices.",
+        "Custom quotas and committed Credit volume.",
+        "Optional BYOK: you pay the model provider; we still charge a platform fee. Usage on Hub-hosted models still spends Credits."
+      ],
+      "not_title": "What it is not",
+      "not_callout": "Not a cheaper Business",
+      "not_body": "Enterprise does not replace the $99.90 Business card and is not a wholesale token SKU. The four self-serve plans stay on",
+      "byok_body": "BYOK is not available on Free, Starter, Pro, or self-serve Business. It exists so large teams are not forced through our model catalog — not so the Hub becomes a pass-through gateway.",
+      "contact_title": "Talk to us",
+      "contact_body": "Tell us the SLA, identity, and invoice constraints. We route Enterprise topics to the right owners.",
+      "contact_cta": "Contact sales"
+    }
   },
   "BlogPage": {
     "badge": "Product & platform",

@@ -544,7 +544,8 @@
     "privacy_policy": "Chính sách bảo mật",
     "terms_of_service": "Điều khoản dịch vụ",
     "cookies": "Cookies",
-    "quickstart": "Bắt đầu nhanh"
+    "quickstart": "Bắt đầu nhanh",
+    "credits": "Credit"
   },
   "Hero": {
     "badge": "Agent làm việc thật, không chỉ chat",
@@ -4365,62 +4366,513 @@
   },
   "Docs": {
     "badge": "Tài liệu",
-    "hub_title": "Tài liệu AI Agents Hub",
-    "hub_description": "Xây workflow, chạy agent, trả bằng Credit. Bắt đầu ở đây, rồi kích hoạt graph từ chat, cron hoặc HTTP.",
-    "hub_badge_1": "Workflow · Agent · Một Credit",
-    "hub_badge_2": "Dashboard: aiagents-hub.vn",
-    "card_quickstart_title": "Quickstart",
-    "card_quickstart_desc": "Tạo workspace, vẽ graph, chạy agent và xem ước lượng Credit.",
-    "card_api_title": "API workflow",
-    "card_api_desc": "Kích hoạt workflow từ webhook với Bearer token — cùng graph bạn xây trên canvas.",
-    "hub_base_title": "Base URL production",
-    "hub_base_body": "Lưu lượng API dùng HTTPS. Thay placeholder bằng API key của bạn; đừng commit secret.",
-    "hub_builder_title": "Builder",
-    "hub_builder_body": "Canvas chính là sản phẩm. Thêm trigger, agent, RAG, HTTP và flow. Version nằm trong workspace; graph chia sẻ có thể nhận royalty khi người khác chạy.",
-    "hub_credits_title": "Credit",
-    "hub_credits_body": "Mức dùng AI trừ Credit — một đơn vị cho mọi model. Bạn không thấy USD/1 triệu token. Credit tặng hết hạn mỗi tháng UTC; Starter trở lên mua thêm được.",
-    "quickstart_title": "Quickstart",
-    "quickstart_description": "Từ workspace trống đến agent đang chạy, tính bằng Credit.",
-    "quickstart_open_dashboard": "Mở dashboard",
-    "quickstart_step1_title": "Tạo tài khoản",
-    "quickstart_step1_body": "Đăng nhập dashboard. Free có Credit tặng, hết hạn cuối kỳ.",
-    "quickstart_step2_title": "Tạo workflow",
-    "quickstart_step2_body": "Mở Workflows, thêm trigger (chat, webhook hoặc cron) và node agent. Có thể gắn memory, RAG hoặc tool HTTP.",
-    "quickstart_step3_title": "Chạy một lần",
-    "quickstart_step3_body": "Dùng Execute hoặc chat host. UI hiện ước lượng Credit trước khi node AI chạy; ví trừ sau.",
-    "quickstart_step4_title": "Xem log",
-    "quickstart_step4_body": "Mở execution để thấy output node, lỗi và Credit đã trừ. Retry do lỗi nền tảng phía chúng tôi không tính phí.",
-    "quickstart_try_title": "Credit trừ những gì",
-    "quickstart_try_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không.",
-    "quickstart_credits_title": "Credit trừ những gì",
-    "quickstart_credits_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không.",
-    "quickstart_more": "Kích hoạt cùng graph qua HTTP trong",
-    "api_page_title": "API workflow",
-    "api_page_description": "Xác thực Bearer token và POST tới webhook workflow. Mức dùng vẫn trừ Credit trên workspace sở hữu lần chạy.",
-    "api_auth_title": "Base URL và xác thực",
-    "api_auth_body": "Tạo API key tại Điều khiển > API Keys. Gửi dưới dạng Bearer token. Xoay khóa nếu bị lộ.",
-    "api_base_url_label": "Base URL",
-    "api_auth_header": "Header Authorization",
-    "api_webhook_title": "Kích hoạt workflow",
-    "api_webhook_body": "Mỗi workflow có trigger webhook mở một đường HTTP. Thay YOUR_WORKFLOW_ID và path bạn cấu hình trên node. Body JSON sẵn cho các node phía sau.",
-    "api_param_workflow": "id workflow trên dashboard.",
-    "api_param_path": "đoạn path cấu hình trên webhook trigger (ví dụ: run).",
-    "api_param_body": "payload graph đọc (message, field, metadata tệp).",
-    "api_credits_title": "Credit khi gọi API",
-    "api_credits_body": "Lần chạy webhook trừ cùng ví Credit như canvas. Ước lượng có thể khác số trừ cuối. Workflow chia sẻ có thể thêm royalty Credit cho tác giả.",
-    "params_label": "Tham số",
-    "section_start": "Bắt đầu ở đây",
-    "section_guides": "Hướng dẫn",
-    "nav_overview": "Tổng quan",
-    "nav_quickstart": "Quickstart",
-    "nav_api": "API workflow",
     "menu": "Menu",
     "mobile_nav_title": "Duyệt tài liệu",
-    "search_placeholder": "Lọc điều hướng…",
+    "search_placeholder": "Lọc trang…",
     "nav_aria": "Tài liệu",
     "placeholder_api_key": "YOUR_API_KEY",
     "copy": "Sao chép",
-    "copied": "Đã sao chép"
+    "copied": "Đã sao chép",
+    "section": {
+      "start": "Bắt đầu",
+      "product": "Sản phẩm",
+      "billing": "Thanh toán",
+      "developers": "Developers",
+      "company": "Enterprise"
+    },
+    "nav": {
+      "overview": "Tổng quan",
+      "quickstart": "Quickstart",
+      "platform": "Cách tính tiền",
+      "workflows": "Workflow",
+      "agents": "Agent & RAG",
+      "triggers": "Trigger",
+      "credits": "Credit",
+      "plans": "Gói",
+      "sharing": "Chia sẻ",
+      "api": "API workflow",
+      "enterprise": "Enterprise"
+    },
+    "pager": {
+      "aria": "Chuyển trang tài liệu",
+      "previous": "Trước",
+      "next": "Tiếp"
+    },
+    "toc": {
+      "aria": "Trong trang này",
+      "title": "Trong trang này"
+    },
+    "hub": {
+      "title": "Tài liệu AI Agents Hub",
+      "description": "Thiết kế việc một lần. Chạy từ chat, webhook hoặc lịch. Trả bằng Credit — không phải token.",
+      "badge_1": "Một nền tảng · Một Credit · Không giới hạn model",
+      "badge_2": "Dashboard: aiagents-hub.vn",
+      "layers_title": "Sản phẩm được bán thế nào",
+      "layers_body": "Ba lớp, chỉ ba lớp. Gói workspace mở khóa builder. Credit trả cho lần chạy agent. Enterprise là hợp đồng SLA, SSO, hóa đơn — không phải card giá thứ năm.",
+      "layer_plan_title": "Gói workspace",
+      "layer_plan_desc": "Free, Starter, Pro hoặc Business. Bạn mua quyền xây, chia sẻ và chạy — không mua catalog model.",
+      "layer_credit_title": "Credit",
+      "layer_credit_desc": "Một đơn vị cho mọi model. Xem ước lượng trước khi chạy; ví trừ sau khi việc xong.",
+      "layer_ent_title": "Enterprise",
+      "layer_ent_desc": "SLA, SSO, hóa đơn công ty, quota tùy chỉnh, BYOK tùy chọn. Liên hệ — chúng tôi không để card riêng.",
+      "paths_title": "Chọn lối vào",
+      "path_start_title": "Bắt đầu trên canvas",
+      "path_start_desc": "Tạo workspace, vẽ graph nhỏ, chạy một lần và đọc ước lượng Credit.",
+      "path_build_title": "Thiết kế việc",
+      "path_build_desc": "Trigger, agent, RAG, memory và tool. Canvas chính là sản phẩm.",
+      "path_run_title": "Ra sống qua HTTP",
+      "path_run_desc": "Cùng graph bạn xây, kích hoạt bằng Bearer token. Mức dùng vẫn trừ Credit.",
+      "path_earn_title": "Chia sẻ và nhận",
+      "path_earn_desc": "Xuất bản workflow. Người chạy trả Credit; bạn nhận royalty trên sổ riêng.",
+      "callout_title": "Chọn gói theo lượng việc cần làm",
+      "callout_body": "Credit tặng hết hạn mỗi tháng UTC. Starter trở lên mua thêm được. So sánh bốn gói self-serve trên",
+      "callout_link": "Bảng giá"
+    },
+    "quickstart": {
+      "title": "Quickstart",
+      "description": "Từ workspace trống đến agent đang chạy, tính bằng Credit.",
+      "open_dashboard": "Mở dashboard",
+      "toc_steps": "Xây và chạy",
+      "toc_credits": "Credit trừ những gì",
+      "toc_next": "Đọc tiếp",
+      "steps": [
+        {
+          "title": "Tạo tài khoản",
+          "body": "Đăng nhập dashboard. Free có Credit tặng, hết hạn cuối tháng UTC. Không cần thẻ để thử builder."
+        },
+        {
+          "title": "Tạo workflow",
+          "body": "Mở Workflows, canvas trống. Thêm trigger (chat, webhook hoặc cron) và agent. Có thể gắn memory, RAG hoặc tool HTTP."
+        },
+        {
+          "title": "Chạy một lần",
+          "body": "Dùng Execute hoặc chat host. UI hiện ước lượng Credit trước khi node AI chạy; ví trừ sau khi việc xong."
+        },
+        {
+          "title": "Đọc execution",
+          "body": "Mở lần chạy để thấy output node, lỗi và Credit đã trừ. Retry do lỗi nền tảng phía chúng tôi không tính phí."
+        }
+      ],
+      "credits_title": "Credit trừ những gì",
+      "credits_body": "Bạn trả cho việc AI hoàn thành, không trả cho việc mở editor.",
+      "credits_items": [
+        "Trừ: lời gọi model (LLM, embed, vision, speech) và tool gọi model.",
+        "Không trừ: lưu graph, liệt kê lần chạy, đọc log, hoặc retry chúng tôi nợ bạn.",
+        "Hạ tầng (lưu trữ, hàng đợi, compute) không thành dòng hóa đơn. Chúng nằm trong gói cộng quota."
+      ],
+      "next_title": "Đọc tiếp",
+      "next_callout": "Cùng graph, cửa khác",
+      "next_body": "Khi graph ổn, kích hoạt qua HTTP trong",
+      "next_or": "hoặc chọn gói workspace trong"
+    },
+    "platform": {
+      "title": "Cách tính tiền",
+      "description": "Một nền tảng. Một Credit. Không giới hạn model. Ba lớp thương mại — không thêm lớp nào.",
+      "toc_principle": "Nguyên tắc",
+      "toc_layers": "Ba lớp",
+      "toc_see": "Bạn thấy gì",
+      "toc_scale": "Chi phí tăng thế nào",
+      "principle_title": "Nguyên tắc",
+      "principle_body": "Bạn trả theo giá trị việc agent làm xong, không theo hóa đơn hạ tầng chúng tôi nhận. Model nhanh hay sâu đổi Credit mỗi lần chạy — không đổi giá gói.",
+      "slogan": "One Platform, One Credit, Unlimited Models",
+      "slogan_body": "Gói là quyền dùng workspace. Credit là đồng hồ đo mức dùng AI. Enterprise là đảm bảo (SLA, SSO, hóa đơn) — không phải SKU token rẻ hơn.",
+      "layers_title": "Ba lớp",
+      "layers_body": "Khi bạn lớn lên, không có hóa đơn token bất ngờ. Bạn trả nhiều hơn vì chạy nhiều việc hơn.",
+      "col_layer": "Lớp",
+      "col_buy": "Bạn mua",
+      "col_not": "Không phải",
+      "layer_rows": [
+        [
+          "Gói workspace",
+          "Builder, chia sẻ, webhook, cron, hỗ trợ, quota",
+          "Token, model, hay dòng Cloudflare"
+        ],
+        [
+          "Credit",
+          "Mức dùng trả trước cho việc agent và model",
+          "USD trên mỗi triệu token"
+        ],
+        [
+          "Hợp đồng Enterprise",
+          "SLA, SSO, audit, quota tùy chỉnh, BYOK tùy chọn",
+          "Card thứ năm trên trang giá"
+        ]
+      ],
+      "see_title": "Bạn thấy gì",
+      "see_body": "Free, Starter và Pro thấy Credit, ước lượng và quota gói. Business (và hợp đồng Enterprise) còn thấy họ model — Llama, GPT, Claude — vẫn trừ Credit.",
+      "see_items": [
+        "Còn bao nhiêu Credit, lot nào sắp hết hạn.",
+        "Một lần chạy tốn khoảng bao nhiêu Credit, trước khi chạy.",
+        "Lần vừa rồi trừ bao nhiêu (mức dùng cộng royalty nếu có).",
+        "Gói cho phép gì — không phải model nào giá bao nhiêu đô."
+      ],
+      "hide_title": "Bạn sẽ không thấy",
+      "hide_body": "USD trên mỗi triệu token, phần trăm lãi, hay hóa đơn lưu trữ/hàng đợi. Những thứ đó ở phía đồng hồ của chúng tôi.",
+      "scale_title": "Chi phí tăng thế nào",
+      "scale_body": "Một trăm user tiêu ít Credit. Mười nghìn tiêu nhiều. Đó là thiết kế — đọc",
+      "scale_and": "và"
+    },
+    "workflows": {
+      "title": "Workflow",
+      "description": "Canvas chính là sản phẩm. Vẽ việc một lần, rồi chạy từ chat, HTTP hoặc lịch.",
+      "toc_canvas": "Canvas",
+      "toc_nodes": "Họ node",
+      "toc_run": "Test và production",
+      "toc_versions": "Version và chia sẻ",
+      "canvas_title": "Canvas",
+      "canvas_body": "Mở Workflows trên dashboard. Graph là node cộng dây. Cấu hình từng bước tại chỗ, lưu version trong workspace, chạy mà không rời editor.",
+      "nodes_title": "Họ node",
+      "nodes_body": "Bắt đầu nhỏ: một trigger, một agent, một đích. Thêm RAG, memory hoặc HTTP khi việc thật sự cần.",
+      "col_family": "Họ",
+      "col_role": "Vai trò",
+      "node_rows": [
+        [
+          "Trigger",
+          "Cách graph bắt đầu — chat, webhook, form hoặc cron."
+        ],
+        [
+          "Agent",
+          "Vòng model. Có thể gọi tool, đọc memory và trả lời."
+        ],
+        [
+          "RAG & tool",
+          "Nạp tài liệu, lấy chunk, gọi HTTP hoặc truy vấn CSDL."
+        ],
+        [
+          "Flow",
+          "Nhánh, vòng lặp, điều khiển — việc vẫn là graph, không phải đống script."
+        ],
+        [
+          "HTTP / action",
+          "Gọi API hoặc app bạn đang dùng."
+        ]
+      ],
+      "edges_title": "Hai loại dây",
+      "edges_body": "Dây liền là đường chạy (out → in). Dây đứt gắn model, memory hoặc tool vào agent — đó là cấu hình, không phải bước tính tiền lần hai.",
+      "run_title": "Test và production",
+      "run_body": "Execute trong editor luôn dùng quota và Credit thật. Cửa production (webhook, cron, chat host) dùng cùng graph và cùng ví.",
+      "run_items": [
+        "Xem ước lượng Credit trước khi node AI chạy.",
+        "Mở log execution sau — output, lỗi, Credit đã trừ.",
+        "Retry do lỗi phía chúng tôi không tính. Lần gọi AI đã chạy thì vẫn trừ."
+      ],
+      "versions_title": "Version và chia sẻ",
+      "versions_body": "Version nằm trong workspace. Khi graph sẵn cho người khác, xuất bản — người chạy trả Credit, bạn có thể nhận royalty. Xem"
+    },
+    "agents": {
+      "title": "Agent, RAG và tool",
+      "description": "Vòng model, truy xuất, memory phiên và tool — trừ Credit khi chúng gọi model.",
+      "toc_loop": "Vòng agent",
+      "toc_rag": "RAG",
+      "toc_memory": "Memory và dữ liệu",
+      "toc_sku": "Không bán thành SKU",
+      "loop_title": "Vòng agent",
+      "loop_body": "Node agent không phải điểm vào graph. Nó nhận input từ upstream, gọi model đã đăng ký, có thể dùng tool, rồi gửi output xuống. Viết prompt như mô tả việc, không như tên model.",
+      "col_kind": "Loại",
+      "col_when": "Khi nào dùng",
+      "kind_rows": [
+        [
+          "Agent",
+          "Vòng mặc định: suy luận, gọi tool, trả lời."
+        ],
+        [
+          "Reasoning agent",
+          "Vòng có kiểm soát hơn khi cần kiểm tra trước khi hành động."
+        ]
+      ],
+      "rag_title": "RAG",
+      "rag_body": "Truy xuất là hai việc. Giữ graph đó nhàm chán và quan sát được — chất lượng retrieval thắng thơ prompt.",
+      "rag_items": [
+        "Save RAG nạp tài liệu (kể cả PDF) vào vector store.",
+        "Get RAG lấy chunk lúc hỏi để agent trích dẫn.",
+        "Ingest trừ Credit khi embed. Query trừ khi embed và khi agent trả lời."
+      ],
+      "memory_title": "Memory và dữ liệu",
+      "memory_body": "Simple memory giữ cửa sổ phiên ngắn. Vector memory dành cho nhớ ngữ nghĩa dài hơn. Get DB Info tới dữ liệu có cấu trúc (D1 hoặc Oracle) khi agent phải bám bảng, không phải tài liệu.",
+      "sku_title": "Không bán thành SKU",
+      "sku_callout": "Một đồng hồ đo",
+      "sku_body": "Agent, RAG, memory và tool là năng lực của workspace. Chúng trừ Credit khi gọi model. Lưu trữ và hàng đợi nằm trong gói. Chi tiết trong"
+    },
+    "triggers": {
+      "title": "Trigger",
+      "description": "Một graph, ba cửa vào. Đồng hồ Credit không quan tâm bạn đi cửa nào.",
+      "toc_doors": "Các cửa",
+      "toc_plans": "Gói mở khóa gì",
+      "toc_grace": "Giữ chạy khi hết hạn mức",
+      "doors_title": "Các cửa",
+      "doors_body": "Thiết kế lỗi giống nhau cho cả ba: timeout, log người đọc được, và ước lượng Credit trước khi node đắt chạy.",
+      "col_door": "Cửa",
+      "col_use": "Dùng khi",
+      "door_rows": [
+        [
+          "Chat host",
+          "Operator hoặc end user nói với agent mà không mở canvas."
+        ],
+        [
+          "Webhook",
+          "Đường HTTP trên api.aiagents-hub.vn. POST JSON; node phía sau đọc body."
+        ],
+        [
+          "Cron",
+          "Cùng graph theo lịch — digest, sync, việc không chờ người bấm."
+        ]
+      ],
+      "plans_title": "Gói mở khóa gì",
+      "plans_body": "Free xây và chạy graph của mình trong editor. Webhook production, cron và chia sẻ bắt đầu từ Starter. Quota nằm trên",
+      "plan_items": [
+        "Free: không webhook production, cron hay chia sẻ.",
+        "Starter: webhook, chia sẻ, tối đa 3 cron.",
+        "Pro: 15 cron. Business: 100.",
+        "Trần run/ngày trên mọi gói (15 / 50 / 200 / 1.000)."
+      ],
+      "grace_title": "Giữ chạy khi hết hạn mức",
+      "grace_body": "Gói trả phí có thể đánh dấu workflow webhook/cron production để chạy tiếp với trần an toàn sau khi hết Credit tặng hoặc run/ngày — chỉ khi không còn Credit đã mua. Đây không phải compute miễn phí vô hạn.",
+      "grace_callout": "Hết grace thì dừng",
+      "grace_warn": "Lời gọi production không chạy được trả HTTP 402 kèm đường nạp hoặc nâng gói. Model frontier, RAG ingest và code không trần bị chặn trong grace. Test trên editor không dùng grace — luôn trừ ví thật."
+    },
+    "credits": {
+      "title": "Credit",
+      "description": "Một đơn vị cho mọi model. Mức dùng trả trước cho việc làm xong — không phải nơi bán lại token.",
+      "toc_unit": "Một đơn vị",
+      "toc_billed": "Cái gì bị trừ",
+      "toc_expiry": "Hết hạn và nạp thêm",
+      "toc_estimate": "Ước lượng và số trừ",
+      "unit_title": "Một đơn vị",
+      "unit_body": "Rẻ hay frontier, đơn vị khách hàng là Credit. Model rẻ tốn ít Credit mỗi lần chạy; model frontier tốn nhiều hơn. Đổi model không đổi giá gói.",
+      "unit_callout": "Không phải tiền điện tử",
+      "unit_callout_body": "Credit là mức dùng nền tảng trả trước. Không đổi ngược ra tiền mặt, trừ earnings creator chi trên sổ riêng.",
+      "billed_title": "Cái gì bị trừ",
+      "billed_body": "Ví thuộc workspace sở hữu lần chạy — kể cả API và graph chia sẻ.",
+      "col_event": "Sự kiện",
+      "col_charge": "Trừ Credit?",
+      "bill_rows": [
+        [
+          "LLM, embeddings, vision, speech",
+          "Có"
+        ],
+        [
+          "Tool gọi model (kể cả RAG query/ingest)",
+          "Có"
+        ],
+        [
+          "Royalty khi chạy graph chia sẻ của người khác",
+          "Có, thêm"
+        ],
+        [
+          "Lưu workflow, liệt kê execution, đọc log",
+          "Không"
+        ],
+        [
+          "Retry sau lỗi nền tảng phía chúng tôi",
+          "Không"
+        ]
+      ],
+      "expiry_title": "Hết hạn và nạp thêm",
+      "expiry_body": "Hai đồng hồ. Credit tặng reset mỗi tháng UTC — phần không dùng không cộng dồn, kể cả khi trả trước 12 tháng gói. Credit mua hết hạn 12 tháng sau ngày credited (cũ trước).",
+      "expiry_items": [
+        "Free không mua Credit — hãy nâng Starter trở lên.",
+        "Starter / Pro / Business mua pack khi hết Credit tặng.",
+        "Ví có trần theo gói (20.000 / 50.000 / 200.000) để mức dùng ở trong sản phẩm, không tích trữ.",
+        "Khi Credit tặng chạm trần sử dụng, lần AI tiếp theo trừ Credit đã mua nếu còn."
+      ],
+      "topup_body": "Nạp không phải nâng gói. Mua Credit không đổi plan. Gói được giải thích trong",
+      "estimate_title": "Ước lượng và số trừ",
+      "estimate_body": "Editor hiện ước lượng trước khi node AI chạy. Ví trừ mức dùng thật sau. Hai số có thể khác — UI nói rõ vì chủ đích.",
+      "royalty_title": "Royalty",
+      "royalty_body": "Nếu bạn chạy workflow chia sẻ, bạn trả mức dùng cộng royalty bằng Credit. Tác giả nhận trên sổ chi. Chi tiết trong"
+    },
+    "plans": {
+      "title": "Gói",
+      "description": "Bốn gói self-serve. Credit tặng hết hạn mỗi tháng UTC. Trả trước càng lâu, giá quy tháng càng thấp.",
+      "toc_catalog": "Catalog",
+      "toc_compare": "Mỗi gói gồm gì",
+      "toc_billing": "Cách đăng ký",
+      "toc_cancel": "Hủy và đổi gói",
+      "catalog_title": "Catalog",
+      "catalog_body": "Free để thử builder — không phải sản phẩm chính. Starter là cửa trả phí. Pro là mặc định cho đội chạy agent hàng ngày. Business cho volume cao hơn.",
+      "col_plan": "Gói",
+      "col_price": "Giá / tháng",
+      "col_for": "Dành cho",
+      "catalog_rows": [
+        [
+          "Free",
+          "$0",
+          "Thử canvas. 150 Credit tặng. Không nạp, webhook, cron hay chia sẻ."
+        ],
+        [
+          "Starter",
+          "$4.90",
+          "Cửa trả phí: mua Credit, chia sẻ, webhook, 3 cron."
+        ],
+        [
+          "Pro",
+          "$19.90",
+          "Đội chạy agent thật. 2.000 Credit tặng, 15 cron."
+        ],
+        [
+          "Business",
+          "$99.90",
+          "Volume cao, 100 cron, hiện họ model."
+        ]
+      ],
+      "compare_title": "Mỗi gói gồm gì",
+      "compare_body": "Số dưới đây là catalog self-serve. Checkout đọc cùng nguồn với trang giá.",
+      "compare_headers": [
+        "",
+        "Free",
+        "Starter",
+        "Pro",
+        "Business"
+      ],
+      "compare_rows": [
+        [
+          "Credit tặng / tháng UTC",
+          "150",
+          "500",
+          "2.000",
+          "10.000"
+        ],
+        [
+          "Mua thêm Credit",
+          "Không",
+          "Có",
+          "Có",
+          "Có"
+        ],
+        [
+          "Run / ngày",
+          "15",
+          "50",
+          "200",
+          "1.000"
+        ],
+        [
+          "Chia sẻ / webhook",
+          "Không",
+          "Có",
+          "Có",
+          "Có"
+        ],
+        [
+          "Cron",
+          "0",
+          "3",
+          "15",
+          "100"
+        ],
+        [
+          "Always-on grace",
+          "Không",
+          "Trần chặt",
+          "Có",
+          "Trần rộng hơn"
+        ],
+        [
+          "Họ model trên UI",
+          "Không",
+          "Không",
+          "Không",
+          "Có"
+        ]
+      ],
+      "billing_title": "Cách đăng ký",
+      "billing_body": "PayPal Subscriptions (Visa, Mastercard hoặc ví PayPal) tự gia hạn. Bạn cũng có thể trả kỳ này một lần qua chuyển khoản / PayPal Orders — đường đó không tự gia hạn.",
+      "billing_items": [
+        "Chu kỳ: 1 / 3 / 6 / 12 tháng, chiết khấu 0% / 10% / 15% / 20% trên tổng trả trước.",
+        "Credit tặng vẫn reset mỗi tháng UTC, kể cả khi trả trước cả năm.",
+        "Ngày trừ gói có thể khác ngày reset Credit (tháng UTC). Copy trên Billing nói rõ."
+      ],
+      "checkout_title": "Thanh toán",
+      "checkout_body": "So sánh và đăng ký trên",
+      "checkout_link": "Bảng giá",
+      "cancel_title": "Hủy và đổi gói",
+      "cancel_body": "Hủy cuối kỳ: bạn giữ gói đến hết kỳ đã trả. Credit đã mua giữ đến hạn. Credit tặng không dùng vẫn mất cuối tháng UTC. Hạ cấp có hiệu lực cuối kỳ; nâng cấp sau khi PayPal xác nhận."
+    },
+    "sharing": {
+      "title": "Chia sẻ và royalty",
+      "description": "Xuất bản graph. Khi người khác chạy, họ trả Credit; bạn nhận royalty.",
+      "toc_publish": "Xuất bản",
+      "toc_royalty": "Royalty",
+      "toc_minplan": "Gói tối thiểu",
+      "publish_title": "Xuất bản",
+      "publish_body": "Chia sẻ là tính năng sản phẩm, không bắt buộc. Giữ graph riêng nếu người khác không nên chạy. Coi workflow chia sẻ như API bạn sẽ version.",
+      "publish_items": [
+        "Starter trở lên mới chia sẻ. Free không xuất bản graph production.",
+        "Marketplace ẩn definition với caller chưa đủ gói tối thiểu.",
+        "Workspace người chạy bị trừ — không phải Credit của tác giả."
+      ],
+      "royalty_title": "Royalty",
+      "royalty_body": "Người chạy trả mức dùng AI cộng phần trăm royalty bạn cấu hình. Bạn nhận earnings trên sổ chi (VND hoặc USD), không phải Credit tiêu được cùng ví. Hub không lấy royalty từ chi phí model của mình.",
+      "ledger_title": "Hai sổ",
+      "ledger_body": "Credit trả cho lần chạy. Earnings trả cho creator. Trộn chúng sẽ che mất việc thực sự tốn bao nhiêu.",
+      "minplan_title": "Gói tối thiểu",
+      "minplan_body": "Tác giả có thể yêu cầu người chạy tối thiểu Starter, Pro hoặc Business — không vượt gói của mình. Caller thấp hơn nhận HTTP 403 kèm đường checkout. Đọc",
+      "minplan_callout": "Khi owner hạ gói",
+      "minplan_warn": "Nếu bạn hạ gói, Hub kẹp gói tối thiểu của từng workflow về mức bạn còn gán được. Graph gắn Pro sẽ không treo Pro trên workspace Starter."
+    },
+    "api": {
+      "title": "API workflow",
+      "description": "Xác thực Bearer token và POST tới webhook workflow. Mức dùng vẫn trừ Credit trên workspace sở hữu lần chạy.",
+      "toc_auth": "Xác thực",
+      "toc_run": "Kích hoạt workflow",
+      "toc_errors": "Lỗi",
+      "toc_credits": "Credit khi gọi API",
+      "auth_title": "Base URL và xác thực",
+      "auth_body": "Tạo API key tại Điều khiển → API Keys. Gửi dưới dạng Bearer token. Xoay khóa nếu bị lộ. Webhook production cần gói trả phí.",
+      "base_url_label": "Base URL",
+      "auth_header": "Header Authorization",
+      "webhook_title": "Kích hoạt workflow",
+      "webhook_body": "Mỗi workflow có trigger webhook mở một đường HTTP. Thay YOUR_WORKFLOW_ID và path bạn cấu hình trên node. Body JSON sẵn cho các node phía sau.",
+      "param_items": [
+        "workflowId — id workflow trên dashboard.",
+        "path — đoạn path trên webhook trigger (ví dụ: run).",
+        "JSON body — payload graph đọc (message, field, metadata tệp)."
+      ],
+      "trigger_note": "Chat và cron là hai cửa còn lại. Xem",
+      "errors_title": "Lỗi",
+      "errors_body": "Lời gọi production thất bại trả mã máy đọc được. Đừng retry 402/403 trong vòng chặt.",
+      "col_code": "Status / mã",
+      "col_when": "Khi nào",
+      "error_rows": [
+        [
+          "402 PAYMENT_REQUIRED",
+          "Hết Credit hoặc run/ngày (và grace không áp dụng). Nạp thêm hoặc đợi reset UTC."
+        ],
+        [
+          "403 PLAN_FEATURE",
+          "Gói không dùng được webhook, cron hoặc chia sẻ. Nâng Starter trở lên."
+        ],
+        [
+          "403 PLAN_REQUIRED",
+          "Graph chia sẻ này cần gói cao hơn. Checkout nằm trong response."
+        ]
+      ],
+      "credits_title": "Credit khi gọi API",
+      "credits_callout": "Cùng ví với canvas",
+      "credits_body": "Lần chạy webhook trừ cùng ví Credit. Ước lượng có thể khác số trừ cuối. Workflow chia sẻ có thể thêm royalty Credit cho tác giả."
+    },
+    "enterprise": {
+      "title": "Enterprise",
+      "description": "SLA, SSO, hóa đơn và BYOK tùy chọn — hợp đồng, không phải card giá thứ năm.",
+      "toc_what": "Hợp đồng mua gì",
+      "toc_not": "Không phải gì",
+      "toc_contact": "Liên hệ",
+      "what_title": "Hợp đồng mua gì",
+      "what_body": "Self-serve dừng ở Business. Nếu bạn cần đảm bảo catalog công khai không hứa được, chúng tôi viết hợp đồng.",
+      "what_items": [
+        "SLA uptime và đường hỗ trợ có tên.",
+        "SSO, audit log và hóa đơn công ty.",
+        "Quota tùy chỉnh và Credit cam kết.",
+        "BYOK tùy chọn: bạn trả nhà cung cấp model; chúng tôi vẫn thu phí nền tảng. Mức dùng model Hub host vẫn trừ Credit."
+      ],
+      "not_title": "Không phải gì",
+      "not_callout": "Không phải Business rẻ hơn",
+      "not_body": "Enterprise không thay card Business $99.90 và không phải SKU token sỉ. Bốn gói self-serve vẫn ở",
+      "byok_body": "BYOK không mở cho Free, Starter, Pro hay Business self-serve. Nó tồn tại để đội lớn không bị ép qua catalog model của chúng tôi — không để Hub thành gateway pass-through.",
+      "contact_title": "Liên hệ",
+      "contact_body": "Nói SLA, định danh và ràng buộc hóa đơn. Chúng tôi chuyển chủ đề Enterprise đến đúng người.",
+      "contact_cta": "Liên hệ sales"
+    }
   },
   "BlogPage": {
     "badge": "Sản phẩm & nền tảng",

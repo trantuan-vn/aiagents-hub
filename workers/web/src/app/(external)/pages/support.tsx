@@ -294,7 +294,7 @@ const Support = () => {
                   {[
                     { name: t("resources.api_docs"), href: "/docs" },
                     { name: t("resources.getting_started"), href: "/docs/quickstart" },
-                    { name: t("resources.credits_guide"), href: "/packages" },
+                    { name: t("resources.credits_guide"), href: "/docs/credits" },
                     { name: t("resources.developer_blog"), href: "/blog" },
                   ].map((resource) => (
                     <a

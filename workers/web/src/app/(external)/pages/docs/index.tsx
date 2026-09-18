@@ -1,86 +1,76 @@
 "use client";
 
-import { ArrowRight, Coins, Sparkles, Webhook, Workflow, Zap } from "lucide-react";
+import { Building2, Coins, Layers, Share2, Sparkles, Webhook, Workflow, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-import Layout from "../../components/layout/main-layout";
-
-import { DocsShell } from "./docs-shell";
+import { DocsCallout, DocsLinkCard, DocsPage, DocsP, DocsSection } from "./docs-ui";
 
 const DocsIndex = () => {
   const t = useTranslations("Docs");
 
-  const cards = [
+  const layers = [
+    { href: "/docs/plans", icon: Layers, title: t("hub.layer_plan_title"), description: t("hub.layer_plan_desc") },
+    { href: "/docs/credits", icon: Coins, title: t("hub.layer_credit_title"), description: t("hub.layer_credit_desc") },
     {
-      href: "/docs/quickstart",
-      icon: Zap,
-      titleKey: "card_quickstart_title" as const,
-      descKey: "card_quickstart_desc" as const,
-    },
-    {
-      href: "/docs/api",
-      icon: Webhook,
-      titleKey: "card_api_title" as const,
-      descKey: "card_api_desc" as const,
+      href: "/docs/enterprise",
+      icon: Building2,
+      title: t("hub.layer_ent_title"),
+      description: t("hub.layer_ent_desc"),
     },
   ];
 
+  const paths = [
+    { href: "/docs/quickstart", icon: Zap, title: t("hub.path_start_title"), description: t("hub.path_start_desc") },
+    {
+      href: "/docs/workflows",
+      icon: Workflow,
+      title: t("hub.path_build_title"),
+      description: t("hub.path_build_desc"),
+    },
+    { href: "/docs/api", icon: Webhook, title: t("hub.path_run_title"), description: t("hub.path_run_desc") },
+    { href: "/docs/sharing", icon: Share2, title: t("hub.path_earn_title"), description: t("hub.path_earn_desc") },
+  ];
+
   return (
-    <Layout>
-      <DocsShell title={t("hub_title")} description={t("hub_description")}>
-        <div className="space-y-10">
-          <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary" className="gap-1 font-normal">
-              <Sparkles className="h-3.5 w-3.5" />
-              {t("hub_badge_1")}
-            </Badge>
-            <Badge variant="outline" className="font-normal">
-              {t("hub_badge_2")}
-            </Badge>
-          </div>
+    <DocsPage title={t("hub.title")} description={t("hub.description")} wide>
+      <div className="flex flex-wrap gap-2">
+        <Badge variant="secondary" className="gap-1 font-normal">
+          <Sparkles className="h-3.5 w-3.5" />
+          {t("hub.badge_1")}
+        </Badge>
+        <Badge variant="outline" className="font-normal">
+          {t("hub.badge_2")}
+        </Badge>
+      </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {cards.map((c) => (
-              <Link key={c.href} to={c.href} className="group block">
-                <Card className="border-border/80 hover:border-primary/40 h-full transition-all duration-200 hover:shadow-md">
-                  <CardHeader className="space-y-3">
-                    <div className="bg-primary/10 text-primary inline-flex h-10 w-10 items-center justify-center rounded-lg">
-                      <c.icon className="h-5 w-5" />
-                    </div>
-                    <CardTitle className="group-hover:text-primary flex items-center gap-2 text-lg transition-colors">
-                      {t(c.titleKey)}
-                      <ArrowRight className="h-4 w-4 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
-                    </CardTitle>
-                    <CardDescription className="text-base leading-relaxed">{t(c.descKey)}</CardDescription>
-                  </CardHeader>
-                </Card>
-              </Link>
-            ))}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="bg-muted/40 border-border rounded-xl border p-6">
-              <div className="mb-3 flex items-center gap-2">
-                <Workflow className="text-primary h-5 w-5" />
-                <h2 className="text-foreground text-lg font-semibold">{t("hub_builder_title")}</h2>
-              </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">{t("hub_builder_body")}</p>
-            </div>
-            <div className="bg-muted/40 border-border rounded-xl border p-6">
-              <div className="mb-3 flex items-center gap-2">
-                <Coins className="text-primary h-5 w-5" />
-                <h2 className="text-foreground text-lg font-semibold">{t("hub_credits_title")}</h2>
-              </div>
-              <p className="text-muted-foreground text-sm leading-relaxed">{t("hub_credits_body")}</p>
-            </div>
-          </div>
+      <DocsSection id="how-you-pay" title={t("hub.layers_title")}>
+        <DocsP>{t("hub.layers_body")}</DocsP>
+        <div className="grid gap-4 md:grid-cols-3">
+          {layers.map((card) => (
+            <DocsLinkCard key={card.href} {...card} />
+          ))}
         </div>
-      </DocsShell>
-    </Layout>
+      </DocsSection>
+
+      <DocsSection id="choose-a-path" title={t("hub.paths_title")}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {paths.map((card) => (
+            <DocsLinkCard key={card.href} {...card} />
+          ))}
+        </div>
+      </DocsSection>
+
+      <DocsCallout variant="tip" title={t("hub.callout_title")}>
+        {t("hub.callout_body")}{" "}
+        <Link to="/packages" className="text-primary font-medium hover:underline">
+          {t("hub.callout_link")}
+        </Link>
+        .
+      </DocsCallout>
+    </DocsPage>
   );
 };
 

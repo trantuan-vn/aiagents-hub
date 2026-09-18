@@ -28,7 +28,8 @@ const Footer = () => {
     ],
     [t("developers")]: [
       { name: t("quickstart"), path: "/docs/quickstart" },
-      { name: t("support"), path: "/support" },
+      { name: t("credits"), path: "/docs/credits" },
+      { name: t("api_reference"), path: "/docs/api" },
     ],
   };
 
