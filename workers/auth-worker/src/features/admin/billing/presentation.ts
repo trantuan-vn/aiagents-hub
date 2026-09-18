@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { requireAdmin } from '../../auth/authMiddleware';
-import { handleError } from '../../../shared/utils';
+import { handleError, getIdFromName } from '../../../shared/utils';
+import { UserDO } from '../../ws/infrastructure/UserDO';
+import { AdminGrantPlanSchema, grantAdminPlan } from '../../member/paypal/subscriptions';
 import { confirmCoeffProposal, dismissCoeffProposal, getContributionReport, scanContributionAndPropose } from './scan';
 import {
   getUserEconomicsReport,
@@ -68,6 +70,20 @@ export function createAdminBillingRoutes() {
       return c.json(row);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to dismiss proposal');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.put('/users/:id/plan', async (c) => {
+    try {
+      requireAdmin(c);
+      const identifier = decodeURIComponent(c.req.param('id'));
+      const body = AdminGrantPlanSchema.parse(await c.req.json());
+      const userDO = getIdFromName(c, identifier, 'USER_DO') as DurableObjectStub<UserDO>;
+      const snap = await grantAdminPlan({ userDO, planId: body.planId, reason: body.reason });
+      return c.json(snap);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to grant plan');
       return c.json(errorResponse, status);
     }
   });

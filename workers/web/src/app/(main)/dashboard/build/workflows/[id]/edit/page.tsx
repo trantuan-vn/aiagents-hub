@@ -22,6 +22,8 @@ type WorkflowSnapshot = {
   tags: string[];
   definition: string;
   isShared: boolean;
+  minPlanId: "free" | "starter" | "pro" | "business";
+  graceWhenExhausted: boolean;
   starCount: number;
   starLabel: string;
   status: "draft" | "published";
@@ -44,6 +46,8 @@ function snapshotFromState(state: {
   tags: string[];
   definition: string;
   isShared: boolean;
+  minPlanId: "free" | "starter" | "pro" | "business";
+  graceWhenExhausted: boolean;
   starCount: number;
   starLabel: string;
   status: "draft" | "published";
@@ -63,6 +67,10 @@ export default function EditWorkflowPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [definition, setDefinition] = useState('{"nodes":[],"edges":[]}');
   const [isShared, setIsShared] = useState(false);
+  const [minPlanId, setMinPlanId] = useState<"free" | "starter" | "pro" | "business">("free");
+  const [graceWhenExhausted, setGraceWhenExhausted] = useState(false);
+  const [maxAssignableMinPlanId, setMaxAssignableMinPlanId] = useState<"free" | "starter" | "pro" | "business">("free");
+  const [canGraceWhenExhausted, setCanGraceWhenExhausted] = useState(false);
   const [starCount, setStarCount] = useState(0);
   const [starLabel, setStarLabel] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
@@ -83,11 +91,13 @@ export default function EditWorkflowPage() {
         tags,
         definition,
         isShared,
+        minPlanId,
+        graceWhenExhausted,
         starCount,
         starLabel,
         status,
       }),
-    [name, description, tags, definition, isShared, starCount, starLabel, status],
+    [name, description, tags, definition, isShared, minPlanId, graceWhenExhausted, starCount, starLabel, status],
   );
   const currentSnapshotRef = useRef(currentSnapshot);
   currentSnapshotRef.current = currentSnapshot;
@@ -103,6 +113,8 @@ export default function EditWorkflowPage() {
       setTags(snap.tags);
       setDefinition(snap.definition);
       setIsShared(snap.isShared);
+      setMinPlanId(snap.minPlanId);
+      setGraceWhenExhausted(snap.graceWhenExhausted);
       setStarCount(snap.starCount);
       setStarLabel(snap.starLabel);
       setStatus(snap.status);
@@ -122,6 +134,8 @@ export default function EditWorkflowPage() {
         tags: parseWorkflowTags(workflow.tags),
         definition: workflow.definition || '{"nodes":[],"edges":[]}',
         isShared: !!workflow.isShared,
+        minPlanId: workflow.minPlanId === "starter" || workflow.minPlanId === "pro" || workflow.minPlanId === "business" ? workflow.minPlanId : "free",
+        graceWhenExhausted: !!workflow.graceWhenExhausted,
         starCount: workflow.starCount ?? 0,
         starLabel: workflow.starLabel ?? "",
         status: workflow.status === "published" ? "published" : "draft",
@@ -129,6 +143,24 @@ export default function EditWorkflowPage() {
       applySnapshot(snap);
       clear();
       hydratedRef.current = true;
+      try {
+        const meRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn"}/dashboard/auth/profile/me`, {
+          credentials: "include",
+        });
+        if (meRes.ok) {
+          const me = (await meRes.json()) as {
+            maxAssignableMinPlanId?: string;
+            canGraceWhenExhausted?: boolean;
+          };
+          const cap = me.maxAssignableMinPlanId;
+          if (cap === "starter" || cap === "pro" || cap === "business" || cap === "free") {
+            setMaxAssignableMinPlanId(cap);
+          }
+          setCanGraceWhenExhausted(me.canGraceWhenExhausted === true);
+        }
+      } catch {
+        /* keep defaults */
+      }
     } catch {
       toast.error(t("load_error"));
     } finally {
@@ -148,6 +180,8 @@ export default function EditWorkflowPage() {
         tags: serializeWorkflowTags(payload.tags),
         definition: payload.definition,
         isShared: payload.isShared,
+        minPlanId: payload.minPlanId,
+        graceWhenExhausted: payload.graceWhenExhausted,
         starCount: payload.starCount,
         starLabel: payload.starLabel,
         status: payload.isShared ? "published" : payload.status,
@@ -185,6 +219,8 @@ export default function EditWorkflowPage() {
       else if (key === "tags") setTags(value as string[]);
       else if (key === "definition") setDefinition(value as string);
       else if (key === "isShared") setIsShared(value as boolean);
+      else if (key === "minPlanId") setMinPlanId(value as "free" | "starter" | "pro" | "business");
+      else if (key === "graceWhenExhausted") setGraceWhenExhausted(value as boolean);
       else if (key === "starCount") setStarCount(value as number);
       else if (key === "starLabel") setStarLabel(value as string);
       else if (key === "status") setStatus(value as "draft" | "published");
@@ -340,6 +376,12 @@ export default function EditWorkflowPage() {
             recordAndSet("isShared", v);
             if (v) recordAndSet("status", "published");
           },
+          minPlanId,
+          onMinPlanIdChange: (v) => recordAndSet("minPlanId", v),
+          maxAssignableMinPlanId,
+          graceWhenExhausted,
+          onGraceWhenExhaustedChange: (v) => recordAndSet("graceWhenExhausted", v),
+          canGraceWhenExhausted,
           starCount,
           onStarCountChange: (n) => recordAndSet("starCount", n),
           starLabel,

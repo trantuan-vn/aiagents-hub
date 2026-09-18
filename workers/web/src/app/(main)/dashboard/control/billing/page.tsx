@@ -28,6 +28,7 @@ import {
   type CoeffNotice,
 } from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
+import { BillingPlanCard, type BillingPlanId } from "./_components/billing-plan-card";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
 import { OrderList } from "./_components/order-list";
 import type { CreateOrder, Order } from "./_components/schema";
@@ -42,7 +43,11 @@ export default function BillingPage() {
   const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
   const [creditsExpiring, setCreditsExpiring] = useState<string | null>(null);
   const [canBuyCredits, setCanBuyCredits] = useState<boolean | null>(null);
-  const [planId, setPlanId] = useState<"free" | "pro" | "enterprise">("free");
+  const [planId, setPlanId] = useState<BillingPlanId>("free");
+  const [planStatus, setPlanStatus] = useState<string | null>(null);
+  const [planCurrentPeriodEnd, setPlanCurrentPeriodEnd] = useState<string | null>(null);
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [billingEnabled, setBillingEnabled] = useState(true);
   const [workflowRunsRemaining, setWorkflowRunsRemaining] = useState<number | null>(null);
   const [notices, setNotices] = useState<CoeffNotice[]>([]);
   const [usdVndRate, setUsdVndRate] = useState(FALLBACK_USD_VND);
@@ -61,6 +66,7 @@ export default function BillingPage() {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [topUpOpen, setTopUpOpen] = useState(false);
+  const [payOrderId, setPayOrderId] = useState<number | null>(null);
   const [paypalConfig, setPaypalConfig] = useState<{ clientId: string; enabled: boolean }>({
     clientId: "",
     enabled: false,
@@ -91,6 +97,10 @@ export default function BillingPage() {
       setCreditsExpiring(snap.creditsExpiring);
       setCanBuyCredits(snap.canBuyCredits);
       setPlanId(snap.planId);
+      setPlanStatus(snap.planStatus ?? null);
+      setPlanCurrentPeriodEnd(snap.planCurrentPeriodEnd ?? null);
+      setCancelAtPeriodEnd(snap.cancelAtPeriodEnd === true);
+      setBillingEnabled(snap.billingEnabled === true);
       setWorkflowRunsRemaining(snap.workflowRunsRemaining);
       setNotices(snap.notices);
     });
@@ -142,7 +152,43 @@ export default function BillingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canBuyCredits]);
 
-  // Xử lý kết quả thanh toán từ VNPay return
+  useEffect(() => {
+    const raw = searchParams.get("payOrder");
+    if (!raw) return;
+    const id = Number(raw);
+    if (!Number.isFinite(id) || id <= 0) return;
+    setPayOrderId(id);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("payOrder");
+    const newUrl = next.toString() ? `?${next.toString()}` : "";
+    router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    const sub = searchParams.get("subscription");
+    if (sub === "success") {
+      const sid = searchParams.get("subscription_id") ?? searchParams.get("ba_token");
+      toast({ title: t("subscription_success") });
+      if (sid) {
+        void fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn"}/dashboard/billing/subscriptions/sync`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paypalSubscriptionId: searchParams.get("subscription_id") ?? "" }),
+        }).finally(() => refreshWallet());
+      } else {
+        refreshWallet();
+      }
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("subscription");
+      next.delete("subscription_id");
+      next.delete("ba_token");
+      const newUrl = next.toString() ? `?${next.toString()}` : "";
+      router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   useEffect(() => {
     const paymentResult = searchParams.get("payment_result");
     if (paymentResult) {
@@ -244,6 +290,14 @@ export default function BillingPage() {
         ) : null}
       </div>
 
+      <BillingPlanCard
+        planId={planId}
+        planStatus={planStatus}
+        planCurrentPeriodEnd={planCurrentPeriodEnd}
+        cancelAtPeriodEnd={cancelAtPeriodEnd}
+        billingEnabled={billingEnabled}
+      />
+
       <BillingStatsCards
         walletBalanceUsd={walletBalanceUsd}
         pendingTopUps={pendingOrders.length}
@@ -259,7 +313,20 @@ export default function BillingPage() {
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>{t("plan_free_title")}</AlertTitle>
-          <AlertDescription>{t("plan_free_description")}</AlertDescription>
+          <AlertDescription>
+            {t("plan_free_description")}{" "}
+            <a href="/packages" className="text-primary font-medium underline-offset-4 hover:underline">
+              {t("upgrade_plan")}
+            </a>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {planStatus === "past_due" || planStatus === "suspended" ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>{t("plan_past_due_title")}</AlertTitle>
+          <AlertDescription>{t("plan_past_due_description")}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -336,6 +403,7 @@ export default function BillingPage() {
               paypalClientId={paypalConfig.clientId}
               paypalEnabled={paypalConfig.enabled}
               onPaidDone={handleBillingRefresh}
+              autoPayOrderId={payOrderId}
             />
           )}
         </TabsContent>

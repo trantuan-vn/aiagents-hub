@@ -22,7 +22,7 @@ function handleInsufficientPermissions(req: NextRequest, pathname: string): Next
 }
 
 function handleAuthenticatedLogin(req: NextRequest): NextResponse {
-  return NextResponse.redirect(new URL("/dashboard", req.url));
+  return NextResponse.redirect(new URL("/dashboard/control/overview", req.url));
 }
 
 async function validateUserAuthentication(req: NextRequest) {

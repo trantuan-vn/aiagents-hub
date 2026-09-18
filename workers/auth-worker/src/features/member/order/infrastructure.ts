@@ -8,6 +8,7 @@ import { syncUserMembershipTierOnAccess } from '../../admin/membership-tier/infr
 import type { MembershipTier } from '../../admin/membership-tier/domain';
 import { processCommissionOnOrder } from '../referral/commission-service';
 import { assertCanBuyCredits, quotaFromUser } from '../workflows/billing/plan';
+import { parsePlanOrderIntent } from '../billing/plan-order';
 import {
   CreateOrder,
   UpdateOrderStatus,
@@ -42,7 +43,10 @@ export function createOrderInfrastructureService(
         throw new Error('User profile not found');
       }
       const eco = await getBillingEconomicsFromEnv(context.env);
-      assertCanBuyCredits(quotaFromUser(dbUser as Record<string, unknown>, eco));
+      const planIntent = parsePlanOrderIntent(request);
+      if (!planIntent) {
+        assertCanBuyCredits(quotaFromUser(dbUser as Record<string, unknown>, eco));
+      }
 
       const membershipTier = (dbUser.membershipTier ?? dbUser.membership_tier ?? 'member') as MembershipTier;
       const userId = Number(dbUser.id);
@@ -81,7 +85,7 @@ export function createOrderInfrastructureService(
         finalAmount = roundWalletTopUpUsd(finalRaw);
         const rate = await getUsdVndRateFromEnv(context.env, bindingName);
         payableAmountVnd = Math.round(convertUsdToVnd(finalAmount, rate));
-        const creditedCredits = usdToCredits(finalAmount, eco.creditPriceUsd);
+        const creditedCredits = planIntent ? 0 : usdToCredits(finalAmount, eco.creditPriceUsd);
         const orderCode = generateOrderCode();
         const orderRecord = await executeUtils.executeDynamicAction(
           userDO,
@@ -128,7 +132,7 @@ export function createOrderInfrastructureService(
       discountAmountStored = convertVndToUsd(discountAmount, usdVndRate);
       finalAmount = convertVndToUsd(finalRaw, usdVndRate);
       payableAmountVnd = Math.round(finalRaw);
-      const creditedCredits = usdToCredits(finalAmount, eco.creditPriceUsd);
+      const creditedCredits = planIntent ? 0 : usdToCredits(finalAmount, eco.creditPriceUsd);
       const orderCode = generateOrderCode();
       const orderRecord = await executeUtils.executeDynamicAction(
         userDO,

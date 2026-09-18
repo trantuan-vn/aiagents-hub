@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Calendar, CreditCard, Package, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -39,6 +39,7 @@ interface OrderListProps {
   paypalClientId?: string;
   paypalEnabled?: boolean;
   onPaidDone?: () => void;
+  autoPayOrderId?: number | null;
   /** Read-only mode: không hiển thị nút thanh toán và hủy (dùng cho tab History) */
   readOnly?: boolean;
 }
@@ -56,6 +57,7 @@ export function OrderList({
   paypalClientId = "",
   paypalEnabled = false,
   onPaidDone,
+  autoPayOrderId = null,
   readOnly = false,
 }: OrderListProps) {
   const t = useTranslations("BillingPage");
@@ -63,6 +65,15 @@ export function OrderList({
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>("casso");
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (autoPayOrderId == null || readOnly) return;
+    const order = orders.find((o) => o.id === autoPayOrderId);
+    if (order && (order.status === "PENDING" || order.status === "CONFIRMED")) {
+      setSelectedOrder(order);
+      setPaymentTab("casso");
+    }
+  }, [autoPayOrderId, orders, readOnly]);
 
   const getStatusBadgeVariant = (status: OrderStatus): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {

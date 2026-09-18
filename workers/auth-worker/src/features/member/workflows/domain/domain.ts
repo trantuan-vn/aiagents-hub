@@ -53,6 +53,8 @@ export const AgentWorkflowSchema = z.object({
   /** JSON string of WorkflowDefinition */
   definition: z.string().default('{"nodes":[],"edges":[]}'),
   isShared: z.boolean().default(false),
+  minPlanId: z.enum(['free', 'starter', 'pro', 'business']).default('free'),
+  graceWhenExhausted: z.boolean().default(false),
   /** Owner labels workflow type (1–5 stars). */
   starCount: z.number().int().min(0).max(5).default(0),
   starLabel: z.string().max(100).optional(),

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { createServiceApplicationService } from '../../admin/service/application';
 import { toMemberServiceList } from '../../admin/service/member-dto';
-import { inferPlanId } from '../../member/workflows/billing/plan';
+import { entitlementFor, resolvePlanId } from '../../member/workflows/billing/plan';
 
 export function getServicesTool(c: any, bindingName: string, user: any) {
   return tool({
@@ -22,15 +22,15 @@ export function getServicesTool(c: any, bindingName: string, user: any) {
         const filteredServices = request.activeOnly
           ? services.filter((service: any) => service.isActive)
           : services;
-        const enterprise = inferPlanId(user as Record<string, unknown>) === 'enterprise';
-        const data = toMemberServiceList(filteredServices, { enterprise }).map((service) => ({
+        const showModelFamily = entitlementFor(resolvePlanId(user as Record<string, unknown>)).showModelFamily;
+        const data = toMemberServiceList(filteredServices, { showModelFamily }).map((service) => ({
           id: service.id,
           name: service.name,
           endpoint: service.endpoint,
           isActive: service.isActive,
           expiresAt: service.expiresAt,
           model: service.model,
-          modelFamily: enterprise ? service.modelFamily : undefined,
+          modelFamily: showModelFamily ? service.modelFamily : undefined,
           estimatedCreditsPerRun: service.estimatedCreditsPerRun,
         }));
 

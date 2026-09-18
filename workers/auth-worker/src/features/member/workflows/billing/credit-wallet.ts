@@ -1,6 +1,6 @@
 import { billingEconomicsFromConfig, roundCredits, usdToCredits, type BillingEconomics } from '../../../admin/service/credit.js';
 
-export type CreditLotSource = 'purchased' | 'included';
+export type CreditLotSource = 'purchased' | 'included' | 'grace';
 
 export type CreditLot = {
   credits: number;
@@ -32,7 +32,8 @@ function normalizeLots(rows: unknown[]): CreditLot[] {
     if (remaining <= 0) continue;
     const expiresAt = String(r.expiresAt ?? r.expires_at ?? '');
     if (!expiresAt) continue;
-    const source: CreditLotSource = r.source === 'included' ? 'included' : 'purchased';
+    const source: CreditLotSource =
+      r.source === 'included' ? 'included' : r.source === 'grace' ? 'grace' : 'purchased';
     const capRaw = Number(r.includedCogsUsdCap ?? r.included_cogs_usd_cap);
     const spentRaw = Number(r.includedCogsUsdSpent ?? r.included_cogs_usd_spent);
     const lot: CreditLot = {
@@ -110,7 +111,7 @@ export function debitCreditLots(
   lots: CreditLot[],
   amount: number,
   now = new Date(),
-  opts?: { cogsAiUsd?: number; includedCogsUsdCap?: number },
+  opts?: { cogsAiUsd?: number; includedCogsUsdCap?: number; graceOnly?: boolean },
 ): { lots: CreditLot[]; remainingToDebit: number } {
   let left = roundCredits(amount);
   const cogs = Number(opts?.cogsAiUsd ?? 0) || 0;
@@ -118,6 +119,15 @@ export function debitCreditLots(
   const ordered = liveLots(lots, now).sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
   for (const lot of ordered) {
     if (left <= 0) {
+      next.push(lot);
+      continue;
+    }
+    if (opts?.graceOnly) {
+      if (lot.source !== 'grace') {
+        next.push(lot);
+        continue;
+      }
+    } else if (lot.source === 'grace') {
       next.push(lot);
       continue;
     }
@@ -198,33 +208,56 @@ export function applyWalletCreditDebit(
   return { walletBalance: credits, walletCurrency: 'CR', creditLotsJson: serializeCreditLots(lots) };
 }
 
+function paidPlanTopUpGate(user: Record<string, unknown>, eco: BillingEconomics): { canBuy: boolean; cap?: number } {
+  const source = String(user.planSource ?? user.plan_source ?? '').toLowerCase();
+  const sub = String(user.paypalSubscriptionId ?? user.paypal_subscription_id ?? '').trim();
+  let plan = String(user.planId ?? user.plan_id ?? '').toLowerCase();
+  if (plan === 'enterprise') plan = 'business';
+  const entitled = source === 'admin' || source === 'paypal' || source === 'order' || sub.length > 0;
+  if (!entitled) return { canBuy: false };
+  if (plan === 'starter') return { canBuy: true, cap: 20_000 };
+  if (plan === 'pro') return { canBuy: true, cap: eco.maxCreditBalancePro ?? 50_000 };
+  if (plan === 'business') return { canBuy: true, cap: 200_000 };
+  return { canBuy: false };
+}
+
 export function applyWalletCreditTopUp(
   user: Record<string, unknown>,
   creditsToAdd: number,
   eco: BillingEconomics,
   now = new Date(),
 ): { walletBalance: number; walletCurrency: 'CR'; creditLotsJson: string } {
+  const gate = paidPlanTopUpGate(user, eco);
+  if (!gate.canBuy) {
+    throw new Error('Credit packs are not available on the Free plan');
+  }
   const resolved = resolveCreditBalance(user, eco, now);
   const lots = creditPurchasedLots(resolved.lots, creditsToAdd, eco, now);
   const credits = creditBalanceFromLots(lots, now);
-  const explicit = String(user.planId ?? user.plan_id ?? '').toLowerCase();
-  if (explicit === 'free') {
-    throw new Error('Credit packs are not available on the Free plan');
-  }
-  const isEnterprise = explicit === 'enterprise';
-  const isPro =
-    explicit === 'pro' ||
-    (!explicit &&
-      (resolved.lots.some((lot) => lot.source === 'purchased') ||
-        (Number(user.monthlyTopUpVnd ?? user.monthly_top_up_vnd ?? 0) || 0) > 0));
-  if (!isPro && !isEnterprise) {
-    throw new Error('Credit packs are not available on the Free plan');
-  }
-  const cap = isPro && !isEnterprise ? (eco.maxCreditBalancePro ?? 100_000) : undefined;
-  if (cap != null && credits > cap) {
+  if (gate.cap != null && credits > gate.cap) {
     throw new Error('Credit balance exceeds plan maximum');
   }
   return { walletBalance: credits, walletCurrency: 'CR', creditLotsJson: serializeCreditLots(lots) };
+}
+
+export function creditGraceLots(
+  lots: CreditLot[],
+  credits: number,
+  expiresAt: string,
+  now = new Date(),
+): CreditLot[] {
+  const add = roundCredits(credits);
+  const live = liveLots(lots, now);
+  if (add <= 0) return live;
+  const existing = live.find((l) => l.source === 'grace');
+  if (existing) {
+    return live.map((l) =>
+      l.source === 'grace'
+        ? { ...l, credits: roundCredits(l.credits + add), remaining: roundCredits(l.remaining + add), expiresAt }
+        : l,
+    );
+  }
+  return [...live, { credits: add, remaining: add, expiresAt, source: 'grace' }];
 }
 
 export function defaultEconomics(): BillingEconomics {

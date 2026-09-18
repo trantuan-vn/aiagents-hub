@@ -319,8 +319,12 @@ const POST_LOGIN_REDIRECT_COOKIE = "post_login_redirect";
 /** Only allow redirects back to first-party aiagents-hub.vn hosts. */
 function sanitizeHubRedirect(value: string | null | undefined): string | null {
   if (!value) return null;
+  const trimmed = value.trim();
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !trimmed.includes("\\") && !trimmed.includes("://")) {
+    return trimmed;
+  }
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
     if ((url.protocol === "https:" || url.protocol === "http:") && url.hostname.endsWith("aiagents-hub.vn")) {
       return url.toString();
     }
@@ -379,7 +383,7 @@ export function LoginForm() {
       window.location.href = target;
       return;
     }
-    router.push("/dashboard");
+    router.push("/dashboard/control/overview");
   }, [redirectTarget, router]);
 
   const language = locale.startsWith("vi") ? "vi" : "en";

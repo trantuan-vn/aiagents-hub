@@ -19,6 +19,7 @@ import { createEkycRoutes } from './features/member/ekyc/presentation';
 import { createOrderRoutes } from './features/member/order/presentation';
 import { createPaymentRoutes } from './features/member/vnpay/presentation';
 import { createPaypalRoutes } from './features/member/paypal/presentation';
+import { createBillingSubscriptionRoutes, createPublicPlanRoutes } from './features/member/billing/subscription-presentation';
 import { createAssistantRoutes } from './features/assistant/presentation';
 import { createWorkflowRoutes } from './features/member/workflows/api/presentation';
 import { createWorkflowHookRoutes } from './features/member/workflows/api/hooks-presentation';
@@ -26,6 +27,7 @@ import { createFormHookRoutes } from './features/member/workflows/api/form-hooks
 import { createChatHookRoutes } from './features/member/workflows/api/chat-hooks-presentation';
 import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
 import { scanContributionAndPropose } from './features/admin/billing/scan';
+import { processPendingCancels } from './features/member/paypal/subscriptions';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -81,6 +83,8 @@ function createRoutes(bindingName: string) {
     return new Response(null, { status: 204 });
   });
 
+  routes.route('/public', createPublicPlanRoutes());
+
   // I. DASHBOARD
   // Auth middleware
   routes.use('/dashboard/*', createAuthMiddleware(bindingName));
@@ -98,6 +102,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));
+  routes.route('/dashboard/billing/subscriptions', createBillingSubscriptionRoutes(bindingName));
   routes.route('/dashboard/admin/service', createServiceRoutes(bindingName));
   routes.route('/dashboard/admin/voucher', createVoucherRoutes(bindingName));
   routes.route('/dashboard/admin/membership-tier', createMembershipTierRoutes(bindingName));
@@ -186,6 +191,13 @@ export default {
       await scanContributionAndPropose(env);
     } catch (err) {
       log.warn('billing.contribution_scan_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await processPendingCancels(env, 'USER_DO');
+    } catch (err) {
+      log.warn('billing.subscription_cancel_scan_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

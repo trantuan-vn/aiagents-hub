@@ -612,7 +612,7 @@
   "CTA": {
     "title": "Ready to run your",
     "title_gradient": "first agent?",
-    "subtitle": "Create a free workspace, build a workflow, and spend included Credits. No token math, no credit card required to start.",
+    "subtitle": "Start Free with no card. Four plans — Starter, Pro, and Business unlock sharing, webhooks, cron, and extra Credits.",
     "get_started_free": "Start free",
     "talk_to_sales": "Talk to sales",
     "trusted_by": "Built for teams who want agents that complete work — billed in one Credit."
@@ -621,25 +621,50 @@
     "badge": "Pricing",
     "title": "Simple, stable",
     "title_gradient": "plans",
-    "subtitle": "Subscription unlocks the platform. Credits meter AI and agent usage. Enterprise buys the guarantee.",
+    "subtitle": "Four plans. Included Credits expire each UTC month. Pay 3, 6, or 12 months up front and the monthly rate drops.",
     "free": "Free",
-    "free_desc": "Try the platform — included Credits expire each period",
+    "free_desc": "Try the workspace — no card required. Included Credits expire each UTC month.",
+    "starter": "Starter",
+    "starter_desc": "Share, webhooks, cron, and buy extra Credits",
     "pro": "Pro",
     "pro_desc": "For teams running real agents",
+    "business": "Business",
+    "business_desc": "Higher quotas, grace, and model-family visibility",
     "basic": "Pro",
     "basic_desc": "For teams running real agents",
     "enterprise": "Enterprise",
-    "enterprise_desc": "SLA, dedicated infrastructure, and committed Credits",
+    "enterprise_desc": "SLA, SSO, and custom quotas — contact us, not a fifth card",
     "per_month": "/month",
     "custom_price": "Custom",
     "most_popular": "Most Popular",
     "start_free": "Start Free",
+    "go_dashboard": "Open dashboard",
+    "current_plan": "Current plan",
+    "upgrade": "Upgrade — pay with PayPal",
+    "downgrade_end": "Downgrade (end of period)",
+    "redirecting": "Redirecting…",
+    "pay_now": "Pay {amount} now · renews on PayPal",
+    "save_pct": "Save {pct}%",
+    "interval_1": "Monthly",
+    "interval_n": "{n} months",
+    "paypal_hint": "Visa, Mastercard, or PayPal wallet (auto-renew). Or pay this period with Casso / PayPal like a normal top-up — no auto-renew.",
+    "pay_order": "Pay this period with Casso or PayPal",
+    "enterprise_footer": "Need SLA / SSO / a company invoice? Contact us",
+    "checkout_cancelled": "Checkout was not completed — pick a plan again when you are ready.",
     "get_started": "Get Started",
     "contact_sales": "Contact Sales",
     "view_all_packages": "Compare plans",
-    "compare_plans": "Compare plans",
+    "compare_plans": "Compare all four plans",
     "features": {
       "included_credits": "{count} included Credits / month",
+      "runs_per_day": "{count} workflow runs / day",
+      "no_buy_credits": "Cannot buy extra Credits",
+      "no_sharing": "No public sharing",
+      "no_webhooks": "No production webhooks",
+      "cron_count": "{count} cron jobs",
+      "no_cron": "No cron",
+      "grace": "Always-on grace when Credits run out (capped)",
+      "no_grace": "No grace — upgrade or wait for the next month",
       "platform_access": "Workflow builder and sharing",
       "buy_credits": "Buy extra Credits (metered AI/agent usage)",
       "standard_quotas": "Standard infrastructure quotas",
@@ -674,7 +699,7 @@
     "badge": "Subscription + Credits",
     "title": "Pay for completed work,",
     "title_gradient": "not tokens",
-    "subtitle": "One Credit meters every model. Plans stay stable when providers change price — we adjust coefficients, not your invoice line items.",
+    "subtitle": "Four plans. Included Credits expire each UTC month. Pay longer up front and the monthly rate drops.",
     "search_placeholder": "Search plans...",
     "category": "Category",
     "all_categories": "All",
@@ -779,8 +804,8 @@
         "label": "One meter for every model"
       },
       "latency": {
-        "value": "3 plans",
-        "label": "Free · Pro · Enterprise"
+        "value": "4 plans",
+        "label": "Free · Starter · Pro · Business"
       },
       "regions": {
         "value": "Edge",
@@ -794,7 +819,7 @@
     "cta": {
       "title": "Start with a",
       "title_gradient": "free workspace",
-      "subtitle": "Included Credits expire each period. Pro unlocks buying more. Enterprise is for teams that need a contract.",
+      "subtitle": "Start Free with no card. Starter, Pro, and Business unlock extra Credits. SLA / SSO is a contract — contact us.",
       "get_started": "Get started",
       "view_packages": "View pricing",
       "view_docs": "Read the docs"
@@ -1038,6 +1063,7 @@
       "general": "General",
       "billing": "Billing & Credits",
       "technical": "Workflows / agents",
+      "enterprise": "Enterprise / SLA",
       "partnership": "Partnership",
       "other": "Other"
     },
@@ -1075,7 +1101,7 @@
       },
       "credits": {
         "question": "How do Credits work?",
-        "answer": "Credits are prepaid service units for AI and agent usage. Included Credits expire at the end of each billing period. Pro can buy more; Free generally cannot stockpile."
+        "answer": "Credits are prepaid service units for AI and agent usage. Included Credits expire at the end of each UTC month and do not roll over — even if you prepaid 12 months. Starter, Pro, and Business can buy more; Free cannot."
       },
       "generate_key": {
         "question": "How do I build my first workflow?",
@@ -1087,11 +1113,15 @@
       },
       "change_plan": {
         "question": "How do I change my plan?",
-        "answer": "Go to Dashboard > Billing. Plan changes follow the next cycle unless you are moving to Enterprise by contract."
+        "answer": "Open /packages to pick Free, Starter, Pro, or Business. Paid plans check out on PayPal (Visa, Mastercard, or PayPal wallet) and auto-renew. Enterprise SLA / SSO is a contract — use Contact, not a fifth card."
       },
       "free_trial": {
         "question": "Is there a free plan?",
-        "answer": "Yes. Free includes a small Credit pool that expires each period. No card required to start."
+        "answer": "Yes. Free includes a small Credit pool that expires each UTC month. No card required to start."
+      },
+      "cancel_plan": {
+        "question": "How do I cancel a paid plan?",
+        "answer": "Open Dashboard > Billing > Cancel plan. You keep paid entitlements until the PayPal period end, then return to Free. Included Credits still expire at the UTC month boundary."
       }
     },
     "need_help": {
@@ -1112,7 +1142,8 @@
     "ai_responses": {
       "welcome": "Hello — I can help with workflows, Credits, and plans. What are you trying to ship?",
       "recommend": "Start in Dashboard > Workflows: add a trigger (chat, webhook, or cron), an agent node, and optional RAG or tools. Run once and watch the Credit estimate. Need a specific job (support, RAG Q&A, HTTP automation)?",
-      "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each period. Pro can buy more (wallet cap applies). You will not see USD/1M tokens on the member UI.",
+      "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each UTC month. Starter, Pro, and Business can buy more (wallet cap applies). Buying Credits does not upgrade your plan.",
+      "upgrade": "Change plans at /packages. PayPal Subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet. Cancel at Dashboard > Billing > Cancel plan — you keep the plan until the period you already paid for ends. Need SLA / SSO? Use Contact.",
       "how_credits": "A run costs Credits based on model class (tiny / mid / frontier) and tokens used. You get an estimate first; the wallet is charged after. Sharing someone else's workflow may add a royalty in Credits.",
       "calls": "Credits meter AI usage. Check Dashboard > Billing for your balance and included pool.",
       "rate_limit": "Plans include infrastructure quotas (to prevent abuse). AI usage is Credits, not request/second product SKUs. If a run is blocked, check quota and Credit balance.",
@@ -1199,9 +1230,9 @@
       "fees": {
         "title": "Fees, Credits, and billing",
         "paragraphs": [
-          "Paid Subscriptions, Credit purchases, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Credits are prepaid service units: they are not refundable as cash except where mandatory law requires otherwise, they are not transferable except as we expressly allow (for example royalty earnings on a separate ledger), and purchased Credits expire according to product rules (typically twelve months from credit).",
-          "Included Credits granted with a Subscription expire at the end of the billing period and do not roll over. We may enforce a maximum Credit balance. Model coefficients (how many Credits a run costs) may change with notice as described in product documentation; we do not pass through provider invoices as line items.",
-          "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any fees charged by payment providers (for example VNPay, Casso, or PayPal)."
+          "Paid Subscriptions, Credit purchases, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Self-serve plans (Starter, Pro, Business) are billed through PayPal Subscriptions using a Visa/Mastercard or PayPal wallet on PayPal's checkout. Subscriptions auto-renew at the interval you choose (1, 3, 6, or 12 months) until you cancel. Cancelling stops the next PayPal charge; you keep paid entitlements until the current period end, then return to Free. Credits are prepaid service units: they are not refundable as cash except where mandatory law requires otherwise, they are not transferable except as we expressly allow (for example royalty earnings on a separate ledger), and purchased Credits expire according to product rules (typically twelve months from credit).",
+          "Included Credits granted with a Subscription expire at the end of each UTC calendar month and do not roll over, including when you prepay 3, 6, or 12 months. Buying Credits (Casso, PayPal Orders, or other wallets we offer) does not upgrade your plan. We may enforce a maximum Credit balance. Model coefficients (how many Credits a run costs) may change with notice as described in product documentation; we do not pass through provider invoices as line items.",
+          "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any fees charged by payment providers (for example VNPay, Casso, or PayPal). We do not store full card numbers (PAN); PayPal is the payment processor for subscriptions."
         ]
       },
       "ip": {
@@ -1297,7 +1328,7 @@
         "paragraphs": [
           "Account and identity data: such as name, email address, organization, username or user ID, authentication factors you enable (for example TOTP, passkeys, or linked login identifiers), and preferences you set in your profile.",
           "Usage and technical data: such as IP address, approximate location derived from IP, device and browser type, timestamps, pages or endpoints accessed, workflow execution metadata, Credit charges, API request metadata, support tickets, and in-product analytics needed to operate and improve the service.",
-          "Payment and billing data: such as billing contact details, transaction references, tax identifiers where required, and payment status. Payment processing may be handled by partners (for example VNPay, Casso, PayPal); we typically receive limited billing and confirmation data rather than full card numbers.",
+          "Payment and billing data: such as billing contact details, transaction references, tax identifiers where required, PayPal subscription identifiers, and payment status. Payment processing is handled by partners (PayPal for subscriptions and optional Credit checkout; VNPay or Casso for some Credit top-ups). We do not store full card numbers (PAN); PayPal processes Visa/Mastercard on its own pages. Webhooks from PayPal may include a subscription id we use to keep your plan in sync.",
           "Communications: content you send us (for example emails, contact forms, or chat transcripts) and records needed to respond and demonstrate compliance.",
           "Workflow and agent content: prompts, files, retrieved documents, and outputs you submit to or generate with workflows, to the extent needed to run, bill, debug, and secure those jobs.",
           "Optional wallet or DID data: if you choose to link a decentralized identifier, we may process public addresses or challenge identifiers needed for that flow. This is optional and not part of the core agent product.",
@@ -1505,7 +1536,7 @@
   },
   "OverviewPage": {
     "title": "Dashboard",
-    "description": "Welcome back! Here's your API overview.",
+    "description": "Your workspace plan, Credits, and recent activity.",
     "add_api": "Ask AI",
     "loading": "Loading dashboard...",
     "fetch_error": "Failed to load dashboard data",
@@ -1517,6 +1548,7 @@
     "wallet": {
       "title": "Credit balance",
       "top_up": "Top up",
+      "upgrade": "Upgrade plan",
       "view_billing": "View billing",
       "vnd_hint": "≈ {amount} (reference at daily rate)",
       "expires": "Earliest lot expires {date}"
@@ -1552,13 +1584,25 @@
       "avg_response_time": "Avg Response Time",
       "this_month": "this month"
     },
+    "workspace_plan": {
+      "title": "Your plan",
+      "description": "Workspace subscription — separate from services you call",
+      "upgrade": "Upgrade plan",
+      "change": "Change plan",
+      "cancel": "Cancel plan",
+      "status": "Status: {status}",
+      "renews_on": "Renews on {date}",
+      "ends_on": "Paid access ends {date}",
+      "free_hint": "Included Credits expire at the end of each UTC month. Upgrade to buy more and unlock sharing, webhooks, and cron."
+    },
     "subscriptions": {
-      "title": "Active Subscriptions",
-      "description": "Your current API packages and usage",
+      "title": "Services in use",
+      "description": "Models and APIs you have enabled — not your workspace plan",
       "view_all": "View all",
       "explore": "Explore Packages",
       "renews": "Renews",
-      "api_calls": "API Calls",
+      "api_calls": "Usage",
+      "usage_count": "{count} calls",
       "plan": "Plan"
     },
     "api_keys": {
@@ -1597,8 +1641,10 @@
       "description": "Resources to help you succeed",
       "ask_ai": "Ask AI",
       "assistant": "Assistant",
+      "upgrade": "Upgrade plan",
+      "cancel_plan": "Cancel plan",
       "status_page": "Status Page",
-      "billing_history": "Billing History"
+      "billing_history": "Top-up history"
     }
   },
   "TokenPage": {
@@ -2374,7 +2420,15 @@
     "webhook_integrate_lang_go": "Go",
     "webhook_integrate_lang_rust": "Rust",
     "share_toggle": "Share publicly",
-    "share_hint": "Workflows appear in Community sharing only when public sharing is on and status is Published. Changes save automatically. Your own workflows are hidden here (other users see them).",
+    "share_hint": "Workflows appear in Community sharing only when public sharing is on and status is Published. Changes save automatically. Your own workflows are hidden here (other users see them). Sharing requires a paid plan.",
+    "min_plan": "Minimum runner plan",
+    "min_plan_hint": "Others must be on this plan or higher to run the shared workflow. You can only require a plan up to your own.",
+    "grace_toggle": "Always-on when Credits run out",
+    "grace_hint": "Paid plans only. Marked production webhooks/cron may keep running on a capped grace pool, then 402. Not unlimited free usage.",
+    "plan_free": "Free",
+    "plan_starter": "Starter",
+    "plan_pro": "Pro",
+    "plan_business": "Business",
     "stars": "Stars",
     "star_label": "Category label",
     "usage_count": "Users",
@@ -4116,7 +4170,7 @@
   },
   "BillingPage": {
     "title": "Billing & wallet",
-    "description": "Top up your balance (USD presets), pay via Casso/VNPay",
+    "description": "Workspace plan on PayPal, Credit top-ups via Casso or PayPal",
     "fetch_error": "Failed to fetch orders",
     "error": "Error",
     "create_error": "Failed to create order",
@@ -4238,7 +4292,27 @@
       "runs_remaining": "{count} workflow runs remaining today"
     },
     "plan_free_title": "Free plan",
-    "plan_free_description": "Credit packs are included on Pro and Enterprise. Upgrade to buy additional Credits.",
+    "plan_free_description": "Starter, Pro, and Business can buy extra Credits. Upgrade to unlock top-up, sharing, webhooks, and cron.",
+    "workspace_plan": "Workspace plan",
+    "plan_status": "Status: {status}",
+    "ends_on": "Paid access ends {date}",
+    "renews_on": "Renews on {date}",
+    "billing_coming": "PayPal auto-renew is off. You can still buy a plan this period with Casso or PayPal.",
+    "upgrade_plan": "Upgrade plan",
+    "cancel_plan": "Cancel plan",
+    "cancel_title": "Cancel at period end",
+    "cancel_body": "You are on {plan}. After you confirm, PayPal will not charge the next cycle. You keep this plan until {date}, then return to Free.",
+    "cancel_lose_credits": "You will no longer be able to buy Credits. Included Credits still expire at the UTC month end.",
+    "cancel_lose_share": "Public sharing, production webhooks, and cron stop after the period ends.",
+    "cancel_lose_hooks": "Always-on grace and any min-plan you assigned on shared workflows reset with Free.",
+    "resume_plan": "Undo cancellation",
+    "cancel_reason": "Optional reason (price, unused, missing features, other)",
+    "keep_plan": "Keep this plan",
+    "cancel_scheduled": "Cancellation scheduled for period end",
+    "resume_ok": "Your plan will renew as usual",
+    "subscription_success": "Plan updated",
+    "plan_past_due_title": "Payment past due",
+    "plan_past_due_description": "Update your card or PayPal wallet so the subscription can resume. Paid entitlements may be suspended until PayPal collects.",
     "coeff_notice_title": "Model Credit rates changing",
     "coeff_notice_emergency_title": "Emergency Credit rate update",
     "coeff_notice_description": "{modelClass} coefficients change by {delta}% on {date}. Your Credit packs keep working; new runs use the updated rates.",
@@ -4295,7 +4369,7 @@
     "hub_builder_title": "Builder",
     "hub_builder_body": "The canvas is the product. Add triggers, agents, RAG, HTTP, and flow nodes. Versions live in your workspace; shared graphs can earn royalties when others run them.",
     "hub_credits_title": "Credits",
-    "hub_credits_body": "AI usage bills in Credits — one unit for every model. You will not see USD per million tokens. Included Credits expire each period; Pro can buy more.",
+    "hub_credits_body": "AI usage bills in Credits — one unit for every model. You will not see USD per million tokens. Included Credits expire each UTC month; Starter and above can buy more.",
     "quickstart_title": "Quickstart",
     "quickstart_description": "From an empty workspace to a running agent, billed in Credits.",
     "quickstart_open_dashboard": "Open the dashboard",

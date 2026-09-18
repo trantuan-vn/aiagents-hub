@@ -27,16 +27,21 @@ export type CoeffNotice = {
 export type WalletSnapshot = {
   creditBalance: number;
   creditsExpiring: string | null;
-  planId: "free" | "pro" | "enterprise";
+  planId: "free" | "starter" | "pro" | "business";
   canBuyCredits: boolean;
   workflowRunsToday: number;
   workflowRunsRemaining: number | null;
   notices: CoeffNotice[];
+  planStatus?: string | null;
+  planCurrentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  billingEnabled?: boolean;
 };
 
-function parsePlanId(raw: unknown): "free" | "pro" | "enterprise" {
+function parsePlanId(raw: unknown): "free" | "starter" | "pro" | "business" {
   const s = String(raw ?? "").toLowerCase();
-  if (s === "pro" || s === "enterprise") return s;
+  if (s === "starter" || s === "pro" || s === "business") return s;
+  if (s === "enterprise") return "business";
   return "free";
 }
 
@@ -87,6 +92,10 @@ export async function fetchWalletSnapshot(): Promise<WalletSnapshot> {
     workflowRunsToday: typeof o.workflowRunsToday === "number" ? Math.max(0, o.workflowRunsToday) : 0,
     workflowRunsRemaining: typeof remaining === "number" ? Math.max(0, remaining) : remaining === null ? null : null,
     notices: parseNotices(o.notices),
+    planStatus: typeof o.planStatus === "string" ? o.planStatus : null,
+    planCurrentPeriodEnd: typeof o.planCurrentPeriodEnd === "string" ? o.planCurrentPeriodEnd : null,
+    cancelAtPeriodEnd: o.cancelAtPeriodEnd === true,
+    billingEnabled: o.billingEnabled === true,
   };
 }
 

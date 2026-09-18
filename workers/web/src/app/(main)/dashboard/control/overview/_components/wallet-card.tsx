@@ -64,7 +64,7 @@ export function WalletCard() {
           </Button>
         ) : canBuy === false ? (
           <Button asChild size="sm" variant="outline" className="shrink-0 self-start sm:self-center">
-            <Link href="/dashboard/control/billing">{t("wallet.view_billing")}</Link>
+            <a href="/packages">{t("wallet.upgrade")}</a>
           </Button>
         ) : null}
       </CardContent>

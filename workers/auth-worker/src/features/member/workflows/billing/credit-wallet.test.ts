@@ -50,7 +50,7 @@ describe('credit lots FIFO', () => {
   });
 
   it('top-up then debit updates walletBalance as remaining lots', () => {
-    const added = applyWalletCreditTopUp({ planId: 'pro', walletBalance: 0, walletCurrency: 'CR' }, 20, eco);
+    const added = applyWalletCreditTopUp({ planId: 'pro', planSource: 'paypal', paypalSubscriptionId: 'I-1', walletBalance: 0, walletCurrency: 'CR' }, 20, eco);
     const after = applyWalletCreditDebit(added, 7.5, eco);
     expect(after.walletCurrency).toBe('CR');
     expect(after.walletBalance).toBe(12.5);
@@ -60,6 +60,15 @@ describe('credit lots FIFO', () => {
     expect(() => applyWalletCreditTopUp({ planId: 'free', walletBalance: 0, walletCurrency: 'CR' }, 20, eco)).toThrow(
       /Free plan/,
     );
+  });
+
+  it('allows credit pack top-up on a PayPal Starter plan', () => {
+    const added = applyWalletCreditTopUp(
+      { planId: 'starter', planSource: 'paypal', paypalSubscriptionId: 'I-1', walletBalance: 0, walletCurrency: 'CR' },
+      20,
+      eco,
+    );
+    expect(added.walletBalance).toBe(20);
   });
 
   it('skips included lots when the COGS cap is exhausted', () => {

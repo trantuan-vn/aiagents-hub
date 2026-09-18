@@ -91,7 +91,7 @@ export function DesktopCTA({
           variant="gradient"
           size="sm"
           onClick={() => {
-            window.location.href = "/dashboard";
+            window.location.href = "/dashboard/control/overview";
           }}
         >
           {t("get_started")}
@@ -195,7 +195,7 @@ export function MobileMenu({
               className="w-full"
               onClick={() => {
                 setIsMobileMenuOpen(false);
-                window.location.href = "/dashboard";
+                window.location.href = "/dashboard/control/overview";
               }}
             >
               {t("get_started")}

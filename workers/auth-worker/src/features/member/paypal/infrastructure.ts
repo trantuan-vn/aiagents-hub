@@ -16,6 +16,7 @@ import {
   IPaypalService,
 } from './domain';
 import { getPaypalApiBase, getPaypalCredentials, PAYPAL_ERROR_MESSAGES } from './config';
+import { paidPlanGrantPatch, parsePlanOrderIntent } from '../billing/plan-order';
 
 const payLog = createLogger('auth-worker', 'paypal');
 
@@ -105,6 +106,27 @@ export function createPaypalService(
       throw new Error(PAYPAL_ERROR_MESSAGES.ORDER_NOT_FOUND);
     }
 
+    const planIntent = parsePlanOrderIntent(order);
+    if (planIntent) {
+      await executeUtils.executeDynamicAction(userDO, 'multi-table', {
+        operations: [
+          {
+            table: 'orders',
+            operation: 'update',
+            id: order.id,
+            data: { status: ORDER_STATUS.COMPLETED, queueStatus: 'pending' },
+          },
+          {
+            table: 'users',
+            operation: 'update',
+            id: dbUser.id,
+            data: { ...paidPlanGrantPatch(planIntent), queueStatus: 'pending' },
+          },
+        ],
+      });
+      return 0;
+    }
+
     const rate = await getRate();
     const topUpVnd = getOrderWalletCreditVnd({ ...order, currency: order.currency ?? 'USD' }, rate);
     const eco = await getBillingEconomicsFromEnv(options.env);
@@ -133,7 +155,7 @@ export function createPaypalService(
       payLog.error('paypal.tier_upgrade_failed', { orderId: order.id, captureId, tierErr });
     }
 
-    return credit;
+    return getOrderWalletCreditUsd(order);
   };
 
   const createOrder = async (

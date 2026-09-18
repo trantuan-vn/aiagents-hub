@@ -27,6 +27,8 @@ export default function NewWorkflowPage() {
           tags: serializeWorkflowTags([]),
           status: "draft",
           isShared: false,
+          minPlanId: "free",
+          graceWhenExhausted: false,
         });
         if (workflow.id) {
           router.replace(`/dashboard/build/workflows/${workflow.id}/edit`);

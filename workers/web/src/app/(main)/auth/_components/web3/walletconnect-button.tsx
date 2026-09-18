@@ -136,7 +136,7 @@ export function WalletConnectButton({ className, ...props }: React.ComponentProp
       }
 
       toast.success(t("connect_success"));
-      router.push("/dashboard");
+      router.push("/dashboard/control/overview");
     },
     [t, router],
   );

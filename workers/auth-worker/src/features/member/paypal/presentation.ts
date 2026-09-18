@@ -3,6 +3,12 @@ import { handleError } from '../../../shared/utils';
 import { requireAuth } from '../../auth/authMiddleware';
 import { createPaypalApplicationService } from './application';
 import { PAYPAL_ERROR_MESSAGES } from './config';
+import {
+  applyPaypalSubscriptionToUser,
+  rememberPaypalEvent,
+  resolveUserDoForPaypalEvent,
+  verifyPaypalWebhook,
+} from './subscriptions';
 
 export function createPaypalRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -49,6 +55,44 @@ export function createPaypalRoutes(bindingName: string) {
       return c.json(result);
     }, PAYPAL_ERROR_MESSAGES.CAPTURE_FAILED),
   );
+
+  app.post('/webhook', async (c) => {
+    try {
+      const event = (await c.req.json()) as {
+        id?: string;
+        event_type?: string;
+        resource?: Record<string, unknown>;
+      };
+      const ok = await verifyPaypalWebhook(c.env, c.req.raw.headers, event);
+      if (!ok) return c.json({ error: PAYPAL_ERROR_MESSAGES.WEBHOOK_INVALID }, 400);
+      const eventId = String(event.id ?? '');
+      const type = String(event.event_type ?? '');
+      const resource = (event.resource ?? {}) as {
+        id?: string;
+        status?: string;
+        plan_id?: string;
+        custom_id?: string;
+        subscriber?: { payer_id?: string };
+        billing_info?: { next_billing_time?: string };
+      };
+      const sub =
+        type.startsWith('BILLING.SUBSCRIPTION') || resource.plan_id
+          ? resource
+          : ((resource as { billing_agreement_id?: string }).billing_agreement_id
+            ? { id: String((resource as { billing_agreement_id?: string }).billing_agreement_id) }
+            : resource);
+      const fresh = await rememberPaypalEvent(c.env.D1DB, eventId, type, String(sub.custom_id ?? ''));
+      if (!fresh) return c.json({ ok: true, duplicate: true });
+      const userDO = await resolveUserDoForPaypalEvent(c.env, bindingName, sub);
+      if (userDO && (type.startsWith('BILLING.SUBSCRIPTION') || type === 'PAYMENT.SALE.COMPLETED')) {
+        await applyPaypalSubscriptionToUser({ env: c.env, userDO, sub });
+      }
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, PAYPAL_ERROR_MESSAGES.WEBHOOK_INVALID);
+      return c.json(errorResponse, status);
+    }
+  });
 
   return app;
 }

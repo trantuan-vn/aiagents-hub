@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { Bot, CreditCard, ExternalLink } from "lucide-react";
+import { Ban, Bot, CreditCard, ExternalLink, History } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -12,7 +12,9 @@ interface QuickLinksCardProps {
 
 const LINKS = [
   { nameKey: "quick_links.assistant", path: "/dashboard/control/assistant", icon: Bot },
-  { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing", icon: CreditCard },
+  { nameKey: "quick_links.upgrade", path: "/packages", icon: CreditCard },
+  { nameKey: "quick_links.cancel_plan", path: "/dashboard/control/billing/cancel", icon: Ban },
+  { nameKey: "quick_links.billing_history", path: "/dashboard/control/billing", icon: History },
 ] as const;
 
 export function QuickLinksCard({ t }: QuickLinksCardProps) {

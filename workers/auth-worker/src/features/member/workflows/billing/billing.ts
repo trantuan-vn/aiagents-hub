@@ -9,7 +9,12 @@ import {
   quotaFromUser,
   syncPlanPeriod,
   incrementDailyWorkflowRuns,
+  incrementGraceRuns,
   assertCanStartWorkflowRun,
+  canEnterGrace,
+  parseGraceLastByWorkflow,
+  graceMonthSpent,
+  periodYm,
   type QuotaSnapshot,
 } from './plan.js';
 import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
@@ -153,6 +158,8 @@ function applyPlanPatch(row: Record<string, unknown>, patch: ReturnType<typeof s
     planPeriodYm: patch.planPeriodYm,
     workflowRunsToday: patch.workflowRunsToday,
     workflowRunsOn: patch.workflowRunsOn,
+    ...(patch.planSource ? { planSource: patch.planSource } : {}),
+    ...(patch.planStatus ? { planStatus: patch.planStatus } : {}),
     ...(patch.creditLotsJson
       ? {
           walletBalance: patch.walletBalance,
@@ -200,17 +207,61 @@ export async function ensureWalletBalance(userDO: DurableObjectStub<UserDO>, env
   if (balance <= 0) throw new Error('Insufficient wallet balance');
 }
 
+export type WorkflowRunQuotaOpts = {
+  triggerKind?: string;
+  graceWhenExhausted?: boolean;
+  workflowId?: number;
+};
+
 /** One daily quota tick per workflow execution (not per AI node). */
-export async function consumeDailyWorkflowRun(userDO: DurableObjectStub<UserDO>, env: Env): Promise<void> {
+export async function consumeDailyWorkflowRun(
+  userDO: DurableObjectStub<UserDO>,
+  env: Env,
+  opts?: WorkflowRunQuotaOpts,
+): Promise<{ usedGrace: boolean }> {
   const { row, quota } = await loadUserAndSyncPlan(userDO, env);
-  assertCanStartWorkflowRun(quota);
-  const bumped = incrementDailyWorkflowRuns(row);
-  await executeUtils.executeDynamicAction(
-    userDO,
-    'update',
-    { id: row.id, ...row, ...bumped, queueStatus: 'pending' },
-    'users',
-  );
+  try {
+    assertCanStartWorkflowRun(quota);
+    const bumped = incrementDailyWorkflowRuns(row);
+    await executeUtils.executeDynamicAction(
+      userDO,
+      'update',
+      { id: row.id, ...row, ...bumped, queueStatus: 'pending' },
+      'users',
+    );
+    return { usedGrace: false };
+  } catch {
+    const lastMap = parseGraceLastByWorkflow(row.graceLastByWorkflowJson ?? row.grace_last_by_workflow_json);
+    const wfKey = opts?.workflowId != null ? String(opts.workflowId) : '';
+    const spent = graceMonthSpent(row);
+    const entitled = canEnterGrace({
+      quota,
+      planStatus: String(row.planStatus ?? row.plan_status ?? 'active'),
+      triggerKind: opts?.triggerKind,
+      workflowGrace: opts?.graceWhenExhausted,
+      workflowId: opts?.workflowId,
+      lastGraceAtMs: wfKey ? lastMap[wfKey] : undefined,
+    });
+    if (!entitled || spent.cogsUsd >= quota.entitlement.graceCogsUsdCap || spent.credits >= quota.entitlement.graceCreditsPerMonth) {
+      throw new Error('PAYMENT_REQUIRED: Daily workflow run quota exceeded');
+    }
+    const graceBump = incrementGraceRuns(row);
+    if (wfKey) lastMap[wfKey] = Date.now();
+    await executeUtils.executeDynamicAction(
+      userDO,
+      'update',
+      {
+        id: row.id,
+        ...row,
+        ...graceBump,
+        graceMonthYm: periodYm(),
+        graceLastByWorkflowJson: JSON.stringify(lastMap),
+        queueStatus: 'pending',
+      },
+      'users',
+    );
+    return { usedGrace: true };
+  }
 }
 
 export async function billAgentUsage(

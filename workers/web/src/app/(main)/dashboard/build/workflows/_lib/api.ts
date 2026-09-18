@@ -29,6 +29,8 @@ export interface AgentWorkflow {
   /** Compact trigger metadata from the shared list API (no full graph). */
   triggers?: WorkflowListTriggerSummary;
   isShared?: boolean;
+  minPlanId?: "free" | "starter" | "pro" | "business";
+  graceWhenExhausted?: boolean;
   starCount?: number;
   starLabel?: string;
   communityStarAvg?: number;

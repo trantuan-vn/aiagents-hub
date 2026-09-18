@@ -13,7 +13,7 @@ interface BillingStatsCardsProps {
   /** Sum of finalAmount (USD) for completed top-up orders on this page */
   completedVolumeUsd: number;
   creditsExpiring?: string | null;
-  planId?: "free" | "pro" | "enterprise";
+  planId?: "free" | "starter" | "pro" | "business";
   workflowRunsRemaining?: number | null;
 }
 

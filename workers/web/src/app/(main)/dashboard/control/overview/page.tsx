@@ -149,7 +149,7 @@ export default function OverviewPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          <SubscriptionsCard subscriptions={data.subscriptions} t={t} />
+          <SubscriptionsCard subscriptions={data.subscriptions} />
           <ApiKeysCard apiKeys={data.apiKeys} t={t} />
         </div>
         <div className="space-y-6">

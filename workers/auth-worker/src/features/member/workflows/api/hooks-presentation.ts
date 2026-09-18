@@ -16,6 +16,35 @@ import {
 import { validateWebhookApiToken } from '../triggers/webhook-auth.js';
 import { consumerRunActor } from '../execution/workflow-runner.js';
 
+function secondsUntilUtcMidnight(now = new Date()): number {
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(60, Math.ceil((next - now.getTime()) / 1000));
+}
+
+function webhookQuotaResponse(c: any, result: { status: string; executionKey: string; output?: unknown }) {
+  const output = result.output && typeof result.output === 'object' ? (result.output as Record<string, unknown>) : {};
+  const code = String(output.code ?? '');
+  const err = String(output.error ?? '');
+  if (code === 'PLAN_REQUIRED') {
+    return c.json({ code: 'PLAN_REQUIRED', minPlanId: output.minPlanId, checkoutPath: '/packages', output: result.output }, 403);
+  }
+  if (code === 'PLAN_FEATURE') {
+    return c.json({ code: 'PLAN_FEATURE', checkoutPath: '/packages', output: result.output }, 403);
+  }
+  if (code === 'PAYMENT_REQUIRED' || err.includes('PAYMENT_REQUIRED') || err.includes('quota exceeded')) {
+    c.header('Retry-After', String(secondsUntilUtcMidnight()));
+    return c.json(
+      { code: 'PAYMENT_REQUIRED', upgradePath: '/packages', topUpPath: '/dashboard/control/billing?topup=1', output: result.output },
+      402,
+    );
+  }
+  return c.json({
+    status: result.status,
+    executionKey: result.executionKey,
+    output: result.output,
+  });
+}
+
 /**
  * Public webhook endpoints that fire workflows. Mounted OUTSIDE the
  * authenticated `/dashboard/*` and `/api/*` namespaces.
@@ -124,12 +153,7 @@ export function createWorkflowHookRoutes(bindingName: string) {
         actor,
       );
       if (result.notFound) return c.json({ error: 'Webhook not found' }, 404);
-
-      return c.json({
-        status: result.status,
-        executionKey: result.executionKey,
-        output: result.output,
-      });
+      return webhookQuotaResponse(c, result);
     } catch (e) {
       const { errorResponse, status } = await handleErrorWithoutIp(e, 'Webhook execution failed', c.env);
       if (status >= 500) {
@@ -168,12 +192,7 @@ export function createWorkflowHookRoutes(bindingName: string) {
         c.req.raw,
       );
       if (result.notFound) return c.json({ error: 'Webhook not found' }, 404);
-
-      return c.json({
-        status: result.status,
-        executionKey: result.executionKey,
-        output: result.output,
-      });
+      return webhookQuotaResponse(c, result);
     } catch (e) {
       const { errorResponse, status } = await handleErrorWithoutIp(e, 'Webhook execution failed', c.env);
       if (status >= 500) {

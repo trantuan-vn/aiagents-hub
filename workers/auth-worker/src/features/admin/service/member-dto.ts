@@ -36,7 +36,7 @@ const MEMBER_HIDDEN = new Set([
 
 export function toMemberServiceDto(
   service: Record<string, unknown>,
-  opts?: { enterprise?: boolean },
+  opts?: { enterprise?: boolean; showModelFamily?: boolean },
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(service)) {
@@ -45,14 +45,14 @@ export function toMemberServiceDto(
   }
   const model = typeof service.model === 'string' ? service.model : undefined;
   out.estimatedCreditsPerRun = estimateCreditsPerRun(service);
-  if (opts?.enterprise) out.modelFamily = modelFamilyLabel(model);
+  if (opts?.showModelFamily || opts?.enterprise) out.modelFamily = modelFamilyLabel(model);
   else delete out.modelFamily;
   return out;
 }
 
 export function toMemberServiceList(
   services: unknown,
-  opts?: { enterprise?: boolean },
+  opts?: { enterprise?: boolean; showModelFamily?: boolean },
 ): Record<string, unknown>[] {
   const list = Array.isArray(services) ? services : services ? [services] : [];
   return list

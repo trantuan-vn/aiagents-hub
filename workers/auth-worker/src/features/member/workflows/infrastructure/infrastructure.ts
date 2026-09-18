@@ -24,6 +24,8 @@ export interface SharedWorkflowRow {
   starLabel?: string;
   usageCount?: number;
   totalEarningsUsd?: number;
+  minPlanId?: string;
+  graceWhenExhausted?: boolean | number;
   status?: string;
   created_at?: number;
   /** Average 1–5 from community ratings (workflow_user_stars). */
@@ -85,7 +87,7 @@ export async function listSharedWorkflowsFromD1(
 
   const whereClause = conditions.join(' AND ');
   const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.definition, w.isShared, w.starCount, w.starLabel,
-      w.usageCount, w.totalEarningsUsd, w.status, w.created_at,
+      w.usageCount, w.totalEarningsUsd, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
       COALESCE(star_stats.rater_count, 0) AS communityStarCount
     FROM agent_workflows w

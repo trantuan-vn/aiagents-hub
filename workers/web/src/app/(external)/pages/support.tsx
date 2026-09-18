@@ -53,6 +53,10 @@ const Support = () => {
       question: t("faq.free_trial.question"),
       answer: t("faq.free_trial.answer"),
     },
+    {
+      question: t("faq.cancel_plan.question"),
+      answer: t("faq.cancel_plan.answer"),
+    },
   ];
 
   const handleSend = () => {
@@ -107,10 +111,24 @@ const Support = () => {
     ) {
       return t("ai_responses.how_credits");
     }
+    if (
+      lowerQuery.includes("upgrade") ||
+      lowerQuery.includes("plan") ||
+      lowerQuery.includes("gói") ||
+      lowerQuery.includes("nâng cấp") ||
+      lowerQuery.includes("cancel") ||
+      lowerQuery.includes("hủy")
+    ) {
+      return t("ai_responses.upgrade");
+    }
     return t("ai_responses.default", { query });
   };
 
   const handleQuickAction = (action: string) => {
+    if (action === t("quick_actions.upgrade")) {
+      window.location.href = "/packages";
+      return;
+    }
     setInputValue(action);
   };
 

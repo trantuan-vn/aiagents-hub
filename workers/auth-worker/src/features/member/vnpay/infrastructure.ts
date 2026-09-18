@@ -26,6 +26,7 @@ import { recordTopUpAndUpgradeTier } from '../../admin/membership-tier/infrastru
 import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd, getOrderCreditedCredits } from '../order/domain';
 import { applyWalletCreditDebit, applyWalletCreditTopUp, resolveCreditBalance } from '../workflows/billing/credit-wallet';
 import { appendCassoIpnLog } from './casso-ipn-log';
+import { paidPlanGrantPatch, parsePlanOrderIntent } from '../billing/plan-order';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
 
@@ -113,6 +114,23 @@ export function createVNPayService(
       const dbUser = userRows[0];
       if (!dbUser?.id || !orderRow) {
         throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
+      }
+      const planIntent = parsePlanOrderIntent(orderRow);
+      if (planIntent) {
+        operations.push({
+          table: 'orders',
+          operation: 'update',
+          id: orderId,
+          data: { status: ORDER_STATUS.COMPLETED, queueStatus: 'pending' },
+        });
+        operations.push({
+          table: 'users',
+          operation: 'update',
+          id: dbUser.id,
+          data: { ...paidPlanGrantPatch(planIntent), queueStatus: 'pending' },
+        });
+        await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
+        return;
       }
       const credit = await walletCreditUsd(orderRow);
       const rate = await getRate();

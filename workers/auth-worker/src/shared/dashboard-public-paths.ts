@@ -33,5 +33,6 @@ export function isDashboardPublicPath(path: string, method: string): boolean {
   if (path === '/dashboard/vnpay/vnpay_return') return true;
   if (path === '/dashboard/vnpay/vnpay_ipn') return true;
   if (path === '/dashboard/vnpay/casso_ipn') return true;
+  if (path === '/dashboard/paypal/webhook' && method === 'POST') return true;
   return false;
 }

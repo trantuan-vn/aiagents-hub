@@ -612,7 +612,7 @@
   "CTA": {
     "title": "Sẵn sàng chạy",
     "title_gradient": "agent đầu tiên?",
-    "subtitle": "Tạo workspace miễn phí, xây workflow và dùng Credit tặng. Không tính token, không cần thẻ để bắt đầu.",
+    "subtitle": "Bắt đầu Free không cần thẻ. Bốn gói — Starter, Pro và Business mở chia sẻ, webhook, cron và mua thêm Credit.",
     "get_started_free": "Bắt đầu miễn phí",
     "talk_to_sales": "Nói chuyện với sales",
     "trusted_by": "Dành cho đội muốn agent hoàn thành việc — tính bằng một Credit."
@@ -621,25 +621,50 @@
     "badge": "Giá",
     "title": "Gói đơn giản,",
     "title_gradient": "ổn định",
-    "subtitle": "Subscription mở quyền dùng nền tảng. Credit đo mức dùng AI/agent. Enterprise mua sự đảm bảo.",
+    "subtitle": "Bốn gói. Credit tặng hết mỗi tháng UTC. Trả trước 3, 6 hoặc 12 tháng thì giá mỗi tháng rẻ hơn.",
     "free": "Miễn phí",
-    "free_desc": "Dùng thử nền tảng — Credit tặng hết hạn mỗi kỳ",
+    "free_desc": "Dùng workspace — không cần thẻ. Credit tặng hết hạn mỗi tháng UTC.",
+    "starter": "Starter",
+    "starter_desc": "Chia sẻ, webhook, cron và mua thêm Credit",
     "pro": "Pro",
     "pro_desc": "Cho đội ngũ chạy agent thật",
+    "business": "Business",
+    "business_desc": "Quota cao hơn, grace, và hiện model family",
     "basic": "Pro",
     "basic_desc": "Cho đội ngũ chạy agent thật",
     "enterprise": "Enterprise",
-    "enterprise_desc": "SLA, hạ tầng riêng và Credit cam kết",
+    "enterprise_desc": "SLA, SSO và quota tùy chỉnh — liên hệ, không phải card thứ năm",
     "per_month": "/tháng",
     "custom_price": "Theo hợp đồng",
     "most_popular": "Phổ biến nhất",
     "start_free": "Bắt đầu miễn phí",
+    "go_dashboard": "Vào dashboard",
+    "current_plan": "Gói hiện tại",
+    "upgrade": "Nâng cấp — thanh toán PayPal",
+    "downgrade_end": "Hạ cấp (cuối kỳ)",
+    "redirecting": "Đang chuyển…",
+    "pay_now": "Thanh toán {amount} · gia hạn PayPal",
+    "save_pct": "Tiết kiệm {pct}%",
+    "interval_1": "Hàng tháng",
+    "interval_n": "{n} tháng",
+    "paypal_hint": "Visa, Mastercard hoặc ví PayPal (tự gia hạn). Hoặc trả kỳ này bằng Casso / PayPal như nạp Credit — không tự gia hạn.",
+    "pay_order": "Trả kỳ này bằng Casso hoặc PayPal",
+    "enterprise_footer": "Cần SLA / SSO / hóa đơn công ty? Liên hệ",
+    "checkout_cancelled": "Chưa thanh toán — chọn lại gói khi sẵn sàng.",
     "get_started": "Bắt đầu",
     "contact_sales": "Liên hệ bán hàng",
     "view_all_packages": "So sánh gói",
-    "compare_plans": "So sánh gói",
+    "compare_plans": "So sánh đủ 4 gói",
     "features": {
       "included_credits": "{count} Credit tặng / tháng",
+      "runs_per_day": "{count} lượt chạy workflow / ngày",
+      "no_buy_credits": "Không mua thêm Credit",
+      "no_sharing": "Không chia sẻ công khai",
+      "no_webhooks": "Không webhook production",
+      "cron_count": "{count} cron",
+      "no_cron": "Không cron",
+      "grace": "Grace always-on khi hết Credit (có trần)",
+      "no_grace": "Không grace — nâng cấp hoặc đợi tháng sau",
       "platform_access": "Workflow builder và chia sẻ",
       "buy_credits": "Mua thêm Credit (tiêu thụ AI/Agent)",
       "standard_quotas": "Quota hạ tầng tiêu chuẩn",
@@ -674,7 +699,7 @@
     "badge": "Subscription + Credit",
     "title": "Trả cho việc hoàn thành,",
     "title_gradient": "không phải token",
-    "subtitle": "Một Credit đo mọi model. Giá gói ổn định khi nhà cung cấp đổi giá — chúng tôi chỉnh hệ số, không tách dòng hóa đơn hạ tầng.",
+    "subtitle": "Bốn gói. Credit tặng hết mỗi tháng UTC. Trả trước càng lâu càng rẻ.",
     "search_placeholder": "Tìm gói...",
     "category": "Danh mục",
     "all_categories": "Tất cả",
@@ -779,8 +804,8 @@
         "label": "Một đồng hồ cho mọi model"
       },
       "latency": {
-        "value": "3 gói",
-        "label": "Free · Pro · Enterprise"
+        "value": "4 gói",
+        "label": "Free · Starter · Pro · Business"
       },
       "regions": {
         "value": "Edge",
@@ -794,7 +819,7 @@
     "cta": {
       "title": "Bắt đầu với",
       "title_gradient": "workspace miễn phí",
-      "subtitle": "Credit tặng hết hạn mỗi kỳ. Pro mở quyền mua thêm. Enterprise dành cho đội cần hợp đồng.",
+      "subtitle": "Bắt đầu Free không cần thẻ. Starter, Pro và Business mở mua thêm Credit. SLA / SSO là hợp đồng — liên hệ chúng tôi.",
       "get_started": "Bắt đầu",
       "view_packages": "Xem giá",
       "view_docs": "Đọc tài liệu"
@@ -1038,6 +1063,7 @@
       "general": "Chung",
       "billing": "Thanh toán & Credit",
       "technical": "Workflow / agent",
+      "enterprise": "Enterprise / SLA",
       "partnership": "Hợp tác",
       "other": "Khác"
     },
@@ -1075,7 +1101,7 @@
       },
       "credits": {
         "question": "Credit hoạt động thế nào?",
-        "answer": "Credit là đơn vị dịch vụ trả trước cho mức dùng AI/agent. Credit tặng hết hạn cuối kỳ. Pro mua thêm được; Free thường không tích trữ."
+        "answer": "Credit là đơn vị dịch vụ trả trước cho mức dùng AI/agent. Credit tặng hết hạn cuối mỗi tháng UTC, không cộng dồn — kể cả khi trả trước 12 tháng. Starter, Pro và Business mua thêm được; Free thì không."
       },
       "generate_key": {
         "question": "Làm sao xây workflow đầu tiên?",
@@ -1087,11 +1113,15 @@
       },
       "change_plan": {
         "question": "Làm sao đổi gói?",
-        "answer": "Vào Dashboard > Thanh toán. Đổi gói theo chu kỳ tiếp theo, trừ khi lên Enterprise theo hợp đồng."
+        "answer": "Mở /packages để chọn Free, Starter, Pro hoặc Business. Gói trả phí thanh toán trên PayPal (Visa, Mastercard hoặc ví PayPal) và tự gia hạn. Enterprise SLA / SSO là hợp đồng — dùng Liên hệ, không phải card thứ năm."
       },
       "free_trial": {
         "question": "Có gói miễn phí không?",
-        "answer": "Có. Free gồm Credit tặng hết hạn mỗi kỳ. Không cần thẻ để bắt đầu."
+        "answer": "Có. Free gồm Credit tặng hết hạn mỗi tháng UTC. Không cần thẻ để bắt đầu."
+      },
+      "cancel_plan": {
+        "question": "Làm sao hủy gói trả phí?",
+        "answer": "Mở Dashboard > Thanh toán > Hủy gói. Bạn giữ quyền đến hết kỳ PayPal rồi về Free. Credit tặng vẫn hết cuối tháng UTC."
       }
     },
     "need_help": {
@@ -1112,7 +1142,8 @@
     "ai_responses": {
       "welcome": "Xin chào — tôi giúp về workflow, Credit và gói. Bạn đang muốn đưa gì vào việc?",
       "recommend": "Bắt đầu ở Dashboard > Workflows: thêm trigger (chat, webhook hoặc cron), node agent, và RAG/tool nếu cần. Chạy một lần và xem ước lượng Credit. Bạn đang làm việc cụ thể nào (hỗ trợ, RAG Q&A, tự động HTTP)?",
-      "credits": "Credit là đồng hồ duy nhất cho mức dùng AI/agent. Credit tặng theo gói và hết hạn mỗi kỳ. Pro mua thêm được (có trần ví). Giao diện thành viên không hiện USD/1 triệu token.",
+      "credits": "Credit là đồng hồ duy nhất cho mức dùng AI/agent. Credit tặng theo gói và hết hạn mỗi tháng UTC. Starter, Pro và Business mua thêm được (có trần ví). Nạp Credit không nâng gói.",
+      "upgrade": "Đổi gói tại /packages. PayPal Subscriptions tự gia hạn bằng Visa, Mastercard hoặc ví PayPal. Hủy tại Dashboard > Thanh toán > Hủy gói — bạn giữ gói đến hết kỳ đã trả. Cần SLA / SSO? Dùng Liên hệ.",
       "how_credits": "Mỗi lần chạy trừ Credit theo lớp model (tiny / mid / frontier) và token đã dùng. Có ước lượng trước; ví trừ sau. Chạy workflow người khác có thể thêm royalty bằng Credit.",
       "calls": "Credit đo mức dùng AI. Xem Dashboard > Thanh toán để biết số dư và Credit tặng.",
       "rate_limit": "Gói có quota hạ tầng (chống lạm dụng). Mức dùng AI là Credit, không phải SKU request/giây. Nếu lần chạy bị chặn, kiểm tra quota và số dư Credit.",
@@ -1199,9 +1230,9 @@
       "fees": {
         "title": "Phí, Credit và thanh toán",
         "paragraphs": [
-          "Subscription trả phí, mua Credit và thuế (nếu có) được mô tả lúc thanh toán, trên dashboard hoặc trên đơn hàng. Credit là đơn vị dịch vụ trả trước: không hoàn thành tiền mặt trừ khi luật bắt buộc, không chuyển nhượng trừ khi chúng tôi cho phép rõ (ví dụ earnings royalty trên sổ riêng), và Credit đã mua hết hạn theo quy tắc sản phẩm (thường mười hai tháng kể từ khi credited).",
-          "Credit tặng theo Subscription hết hạn cuối kỳ và không chuyển kỳ. Chúng tôi có thể áp trần số dư Credit. Hệ số model (một lần chạy tốn bao nhiêu Credit) có thể đổi kèm thông báo theo tài liệu sản phẩm; chúng tôi không chuyển hóa đơn nhà cung cấp thành dòng riêng.",
-          "Không thanh toán có thể dẫn tới tạm ngưng hoặc chấm dứt truy cập. Bạn chịu trách nhiệm cung cấp thông tin thanh toán hợp lệ và mọi phí cổng (ví dụ VNPay, Casso hoặc PayPal)."
+          "Subscription trả phí, mua Credit và thuế (nếu có) được mô tả lúc thanh toán, trên dashboard hoặc trên đơn hàng. Gói tự phục vụ (Starter, Pro, Business) thu qua PayPal Subscriptions bằng Visa/Mastercard hoặc ví PayPal trên trang PayPal. Gói tự gia hạn theo chu kỳ bạn chọn (1, 3, 6 hoặc 12 tháng) đến khi bạn hủy. Hủy sẽ không thu kỳ PayPal tiếp theo; bạn giữ quyền đến hết kỳ hiện tại rồi về Free. Credit là đơn vị dịch vụ trả trước: không hoàn thành tiền mặt trừ khi luật bắt buộc, không chuyển nhượng trừ khi chúng tôi cho phép rõ (ví dụ earnings royalty trên sổ riêng), và Credit đã mua hết hạn theo quy tắc sản phẩm (thường mười hai tháng kể từ khi credited).",
+          "Credit tặng theo Subscription hết hạn cuối mỗi tháng lịch UTC và không chuyển kỳ, kể cả khi bạn trả trước 3, 6 hoặc 12 tháng. Nạp Credit (Casso, PayPal Orders hoặc ví khác chúng tôi cung cấp) không nâng gói. Chúng tôi có thể áp trần số dư Credit. Hệ số model (một lần chạy tốn bao nhiêu Credit) có thể đổi kèm thông báo theo tài liệu sản phẩm; chúng tôi không chuyển hóa đơn nhà cung cấp thành dòng riêng.",
+          "Không thanh toán có thể dẫn tới tạm ngưng hoặc chấm dứt truy cập. Bạn chịu trách nhiệm cung cấp thông tin thanh toán hợp lệ và mọi phí cổng (ví dụ VNPay, Casso hoặc PayPal). Chúng tôi không lưu số thẻ đầy đủ (PAN); PayPal là bộ xử lý thanh toán cho subscription."
         ]
       },
       "ip": {
@@ -1297,7 +1328,7 @@
         "paragraphs": [
           "Dữ liệu tài khoản và định danh: như tên, email, tổ chức, tên người dùng hoặc ID, yếu tố xác thực bạn bật (ví dụ TOTP, passkey, hoặc định danh đăng nhập liên kết), và tùy chọn trên hồ sơ.",
           "Dữ liệu sử dụng và kỹ thuật: như địa chỉ IP, vị trí gần đúng từ IP, loại thiết bị và trình duyệt, mốc thời gian, trang hoặc endpoint truy cập, metadata execution workflow, lần trừ Credit, metadata API, ticket hỗ trợ, và phân tích trong sản phẩm cần để vận hành và cải thiện dịch vụ.",
-          "Dữ liệu thanh toán: như liên hệ billing, mã giao dịch, mã số thuế khi cần, và trạng thái thanh toán. Cổng thanh toán có thể do đối tác xử lý (ví dụ VNPay, Casso, PayPal); chúng tôi thường nhận dữ liệu xác nhận hạn chế chứ không phải số thẻ đầy đủ.",
+          "Dữ liệu thanh toán: như liên hệ billing, mã giao dịch, mã số thuế khi cần, mã subscription PayPal, và trạng thái thanh toán. Cổng thanh toán do đối tác xử lý (PayPal cho gói và tùy chọn nạp Credit; VNPay hoặc Casso cho một số lần nạp). Chúng tôi không lưu số thẻ đầy đủ (PAN); PayPal xử lý Visa/Mastercard trên trang của họ. Webhook PayPal có thể gồm subscription id để đồng bộ gói của bạn.",
           "Liên lạc: nội dung bạn gửi (email, form liên hệ, hoặc bản ghi chat) và hồ sơ cần để phản hồi và chứng minh tuân thủ.",
           "Nội dung workflow và agent: prompt, tệp, tài liệu truy xuất và đầu ra bạn gửi hoặc tạo, trong phạm vi cần để chạy, tính phí, gỡ lỗi và bảo mật các việc đó.",
           "Dữ liệu ví hoặc DID tùy chọn: nếu bạn chọn liên kết định danh phi tập trung, chúng tôi có thể xử lý địa chỉ công khai hoặc mã thử thách cho luồng đó. Đây là tùy chọn, không phải phần cốt lõi của sản phẩm agent.",
@@ -1505,7 +1536,7 @@
   },
   "OverviewPage": {
     "title": "Bảng điều khiển",
-    "description": "Chào mừng trở lại! Đây là tổng quan API của bạn.",
+    "description": "Gói workspace, Credit và hoạt động gần đây.",
     "add_api": "Hỏi AI",
     "loading": "Đang tải bảng điều khiển...",
     "fetch_error": "Không thể tải dữ liệu bảng điều khiển",
@@ -1517,6 +1548,7 @@
     "wallet": {
       "title": "Số dư Credit",
       "top_up": "Nạp tiền",
+      "upgrade": "Nâng cấp gói",
       "view_billing": "Xem thanh toán",
       "vnd_hint": "≈ {amount} (tham chiếu theo tỉ giá ngày)",
       "expires": "Lot sớm nhất hết hạn {date}"
@@ -1552,13 +1584,25 @@
       "avg_response_time": "Thời gian phản hồi trung bình",
       "this_month": "tháng này"
     },
+    "workspace_plan": {
+      "title": "Gói của bạn",
+      "description": "Subscription workspace — tách khỏi dịch vụ bạn đang gọi",
+      "upgrade": "Nâng cấp gói",
+      "change": "Đổi gói",
+      "cancel": "Hủy gói",
+      "status": "Trạng thái: {status}",
+      "renews_on": "Gia hạn ngày {date}",
+      "ends_on": "Dùng đến hết {date}",
+      "free_hint": "Credit tặng hết cuối mỗi tháng UTC. Nâng cấp để mua thêm và mở chia sẻ, webhook, cron."
+    },
     "subscriptions": {
-      "title": "Gói đăng ký đang hoạt động",
-      "description": "Các gói API và mức sử dụng hiện tại của bạn",
+      "title": "Dịch vụ đang dùng",
+      "description": "Model và API bạn đã bật — không phải gói workspace",
       "view_all": "Xem tất cả",
-      "explore": "Khám phá gói dịch vụ",
+      "explore": "Khám phá gói",
       "renews": "Gia hạn",
-      "api_calls": "Lượt gọi API",
+      "api_calls": "Mức dùng",
+      "usage_count": "{count} lượt",
       "plan": "Gói"
     },
     "api_keys": {
@@ -1597,8 +1641,10 @@
       "description": "Tài nguyên hỗ trợ bạn thành công",
       "ask_ai": "Hỏi AI",
       "assistant": "Trợ lý",
+      "upgrade": "Nâng cấp gói",
+      "cancel_plan": "Hủy gói",
       "status_page": "Trang trạng thái",
-      "billing_history": "Lịch sử thanh toán"
+      "billing_history": "Lịch sử nạp"
     }
   },
   "TokenPage": {
@@ -2374,7 +2420,15 @@
     "webhook_integrate_lang_go": "Go",
     "webhook_integrate_lang_rust": "Rust",
     "share_toggle": "Chia sẻ công khai",
-    "share_hint": "Workflow chỉ hiện ở tab Chia sẻ cộng đồng khi bật chia sẻ và trạng thái Đã xuất bản. Thay đổi được lưu tự động. Workflow của bạn không hiện trong tab này (chỉ user khác thấy).",
+    "share_hint": "Workflow chỉ hiện ở tab Chia sẻ cộng đồng khi bật chia sẻ và trạng thái Đã xuất bản. Thay đổi được lưu tự động. Workflow của bạn không hiện trong tab này (chỉ user khác thấy). Chia sẻ cần gói trả phí.",
+    "min_plan": "Gói tối thiểu của người chạy",
+    "min_plan_hint": "Người khác phải ở gói này trở lên mới chạy được workflow chia sẻ. Bạn chỉ được khóa tối đa bằng gói của mình.",
+    "grace_toggle": "Always-on khi hết Credit",
+    "grace_hint": "Chỉ gói trả phí. Webhook/cron production được đánh dấu có thể chạy tiếp trên quỹ grace có trần, rồi 402. Không phải chạy free vô hạn.",
+    "plan_free": "Free",
+    "plan_starter": "Starter",
+    "plan_pro": "Pro",
+    "plan_business": "Business",
     "stars": "Sao",
     "star_label": "Nhãn phân loại",
     "usage_count": "Người dùng",
@@ -4116,7 +4170,7 @@
   },
   "BillingPage": {
     "title": "Thanh toán & ví",
-    "description": "Nạp tiền (mức USD gợi ý), thanh toán qua Casso/VNPay",
+    "description": "Gói workspace trên PayPal, nạp Credit qua Casso hoặc PayPal",
     "fetch_error": "Không thể tải danh sách đơn hàng",
     "error": "Lỗi",
     "create_error": "Không thể tạo đơn hàng",
@@ -4238,7 +4292,27 @@
       "runs_remaining": "Còn {count} lượt chạy workflow hôm nay"
     },
     "plan_free_title": "Gói Free",
-    "plan_free_description": "Gói Credit mua thêm dành cho Pro và Enterprise. Nâng cấp để nạp thêm Credit.",
+    "plan_free_description": "Starter, Pro và Business được nạp thêm Credit. Nâng cấp để mở nạp, chia sẻ, webhook và cron.",
+    "workspace_plan": "Gói workspace",
+    "plan_status": "Trạng thái: {status}",
+    "ends_on": "Dùng đến hết {date}",
+    "renews_on": "Gia hạn ngày {date}",
+    "billing_coming": "Tự gia hạn PayPal đang tắt. Bạn vẫn mua gói kỳ này bằng Casso hoặc PayPal.",
+    "upgrade_plan": "Nâng cấp gói",
+    "cancel_plan": "Hủy gói",
+    "cancel_title": "Hủy cuối kỳ",
+    "cancel_body": "Bạn đang dùng {plan}. Sau khi xác nhận, PayPal sẽ không thu kỳ sau. Bạn giữ gói đến {date} rồi về Free.",
+    "cancel_lose_credits": "Bạn sẽ không mua thêm Credit. Credit tặng vẫn hết cuối tháng UTC.",
+    "cancel_lose_share": "Chia sẻ công khai, webhook production và cron dừng sau khi hết kỳ.",
+    "cancel_lose_hooks": "Grace always-on và min-plan bạn đã gán trên workflow chia sẻ về Free.",
+    "resume_plan": "Hoàn tác hủy",
+    "cancel_reason": "Lý do tùy chọn (giá, không dùng, thiếu tính năng, khác)",
+    "keep_plan": "Giữ gói này",
+    "cancel_scheduled": "Đã lên lịch hủy cuối kỳ",
+    "resume_ok": "Gói sẽ gia hạn như bình thường",
+    "subscription_success": "Đã cập nhật gói",
+    "plan_past_due_title": "Thanh toán quá hạn",
+    "plan_past_due_description": "Cập nhật thẻ hoặc ví PayPal để subscription tiếp tục. Quyền gói có thể bị tạm ngưng đến khi PayPal thu được tiền.",
     "coeff_notice_title": "Hệ số Credit model sắp đổi",
     "coeff_notice_emergency_title": "Cập nhật hệ số Credit khẩn",
     "coeff_notice_description": "Hệ số lớp {modelClass} thay đổi {delta}% vào {date}. Credit đã nạp vẫn dùng được; lượt chạy mới dùng hệ số mới.",
@@ -4295,7 +4369,7 @@
     "hub_builder_title": "Builder",
     "hub_builder_body": "Canvas chính là sản phẩm. Thêm trigger, agent, RAG, HTTP và flow. Version nằm trong workspace; graph chia sẻ có thể nhận royalty khi người khác chạy.",
     "hub_credits_title": "Credit",
-    "hub_credits_body": "Mức dùng AI trừ Credit — một đơn vị cho mọi model. Bạn không thấy USD/1 triệu token. Credit tặng hết hạn mỗi kỳ; Pro mua thêm được.",
+    "hub_credits_body": "Mức dùng AI trừ Credit — một đơn vị cho mọi model. Bạn không thấy USD/1 triệu token. Credit tặng hết hạn mỗi tháng UTC; Starter trở lên mua thêm được.",
     "quickstart_title": "Quickstart",
     "quickstart_description": "Từ workspace trống đến agent đang chạy, tính bằng Credit.",
     "quickstart_open_dashboard": "Mở dashboard",

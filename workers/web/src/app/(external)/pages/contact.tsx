@@ -33,7 +33,7 @@ import Layout from "../components/layout/main-layout";
 
 const CONTACT_EMAIL = "support@aiagents-hub.vn";
 
-const TOPIC_KEYS = ["general", "billing", "technical", "partnership", "other"] as const;
+const TOPIC_KEYS = ["general", "billing", "technical", "enterprise", "partnership", "other"] as const;
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());

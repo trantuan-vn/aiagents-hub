@@ -237,7 +237,8 @@ export function memberCoeffNotices(proposals: CoeffProposalRecord[], planId: str
   return proposals
     .filter((p) => p.status === 'proposed' || (p.status === 'applied' && p.emergency))
     .map((p) => {
-      const effectiveAt = planId === 'enterprise' ? (p.effectiveAtEnt ?? p.createdAt) : (p.effectiveAtPro ?? p.createdAt);
+      const effectiveAt =
+        planId === 'enterprise' || planId === 'business' ? (p.effectiveAtEnt ?? p.createdAt) : (p.effectiveAtPro ?? p.createdAt);
       return {
         modelClass: p.modelClass,
         emergency: p.emergency,

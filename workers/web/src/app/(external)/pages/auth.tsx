@@ -151,16 +151,15 @@ const Auth = () => {
             <Zap className="text-primary-foreground h-10 w-10" />
           </div>
           <h2 className="mb-4 text-3xl font-bold">
-            Power Your Apps with <span className="gradient-text">Enterprise APIs</span>
+            Build agents on <span className="gradient-text">four plans</span>
           </h2>
           <p className="text-muted-foreground">
-            Join 10,000+ developers building with our reliable, scalable API infrastructure. Get started in minutes with
-            our comprehensive documentation.
+            Start Free with no card. Upgrade on PayPal when you need sharing, webhooks, cron, and extra Credits.
           </p>
 
           {/* Feature list */}
           <div className="mt-8 space-y-3">
-            {["99.9% uptime guarantee", "Global CDN distribution", "24/7 dedicated support"].map((feature) => (
+            {["Free · Starter · Pro · Business", "Included Credits expire each UTC month", "Visa / Mastercard via PayPal"].map((feature) => (
               <div key={feature} className="flex items-center justify-center gap-2 text-sm">
                 <div className="bg-accent/20 flex h-5 w-5 items-center justify-center rounded-full">
                   <div className="bg-accent h-2 w-2 rounded-full" />

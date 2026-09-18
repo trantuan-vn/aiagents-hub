@@ -1,12 +1,15 @@
 # Spec: One Platform, One Credit, Unlimited Models
 
-> **Trạng thái:** Draft v0.2 — chuẩn bị chỉnh sửa repo  
-> **Phiên bản:** 0.2  
-> **Ngày:** 2026-09-16  
+> **Trạng thái:** Draft v0.3 — catalog gói chốt ở spec subscription  
+> **Phiên bản:** 0.3  
+> **Ngày:** 2026-09-18  
 > **Phạm vi:** Billing, wallet, service pricing, workflow charge, marketing packages, admin economics  
+> **Gói / PayPal Subscriptions / hủy / grace / minPlan:** → [`subscription-packages-spec.md`](./subscription-packages-spec.md)  
 > **Không thay thế:** luồng workflow → [`workflow-how-it-works.md`](./workflow-how-it-works.md); plugin → [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md)
 
-**v0.2 chỉnh theo hai đánh giá:** thông lệ quốc tế + shock Cloudflare; chiến lược giá và biên lãi. Nguyên tắc One Credit giữ nguyên. Đổi chính: Credit là đơn vị dịch vụ neo USD nội bộ; GM theo **dải lớp model** (không phẳng 55%); một định nghĩa contribution (không trừ trùng support/risk); Credit hết hạn + trần tồn; van hệ số có SLA; Enterprise được thấy model family.
+**v0.3:** catalog self-serve **Free / Starter ($4.90) / Pro ($19.90) / Business ($99.90)** — không còn placeholder $49 / Free–Pro–Enterprise trên `/packages`. Enterprise = lớp hợp đồng (SLA/SSO/BYOK), không phải card giá. Chi tiết entitlement, PayPal Subscriptions, chiết khấu nhiều tháng → spec gói.
+
+**v0.2** (giữ): thông lệ quốc tế + shock Cloudflare; Credit neo USD nội bộ; GM theo **dải lớp model**; contribution một định nghĩa; Credit hết hạn + trần tồn; van hệ số có SLA. Model family: **Business** (self-serve) và hợp đồng Enterprise.
 
 ---
 
@@ -22,10 +25,10 @@ Hệ quả bắt buộc:
 
 1. AI Agents Hub **không** bán token/model của Cloudflare, AI Gateway, GPT, Claude, Llama. Không cạnh tranh OpenRouter trên USD/1M.
 2. Hub bán **năng lực hoàn thành công việc bằng AI** (agent run, workflow run, job done).
-3. Model rẻ hay đắt là vấn đề nội bộ trên **hệ số**. Khách SMB/Pro chỉ thấy: việc này tốn bao nhiêu Credit. Enterprise/compliance được thấy **model family** (Llama / GPT-4o / Claude …) — không thấy USD/1M, không thấy feePercent.
+3. Model rẻ hay đắt là vấn đề nội bộ trên **hệ số**. Khách Free / Starter / Pro chỉ thấy: việc này tốn bao nhiêu Credit. Business (self-serve) và hợp đồng Enterprise/compliance được thấy **model family** (Llama / GPT-4o / Claude …) — không thấy USD/1M, không thấy feePercent.
 4. D1 / R2 / Workers / Queue / Vectorize / log / retry / support **không bán riêng**. Hấp thụ vào Subscription + hệ số Credit. Mỗi gói có quota chống abuse.
 5. Khi Cloudflare/provider tăng giá: **đổi hệ số**, không đổi giá gói, không đổi `creditPriceUsd`, không biến Credit thành pass-through token.
-6. Lãi bền nằm ở **Subscription + Enterprise**. Credit là van bảo vệ COGS, không phải động cơ nuôi công ty bằng Llama.
+6. Lãi bền nằm ở **Subscription (Starter/Pro/Business) + hợp đồng Enterprise**. Credit là van bảo vệ COGS, không phải động cơ nuôi công ty bằng Llama.
 
 Ba lớp thu tiền — và **chỉ** ba lớp này:
 
@@ -33,7 +36,7 @@ Ba lớp thu tiền — và **chỉ** ba lớp này:
 |-----|-------------------|------------|
 | **Subscription** | Quyền dùng nền tảng (workspace, builder, API, sharing, support mức gói) | Token, model, hay chi phí Cloudflare |
 | **Credit** | Mức tiêu thụ AI/Agent — đơn vị dịch vụ trả trước (deferred revenue), không phải e-money | Hóa đơn AI Gateway, USD/1M tokens |
-| **Enterprise** | Sự đảm bảo (SLA, dedicated, custom quota, SSO, audit) + tùy chọn BYOK | Giá token sỉ / gói “rẻ hơn Pro” |
+| **Enterprise** (hợp đồng, không phải card `/packages`) | Sự đảm bảo (SLA, dedicated, custom quota, SSO, audit) + tùy chọn BYOK | Giá token sỉ / gói “rẻ hơn Business” |
 
 Khi khách lớn lên, không tăng giá gói một cách khó chịu. Họ trả nhiều hơn vì tiêu thụ nhiều hơn:
 
@@ -42,6 +45,8 @@ Khi khách lớn lên, không tăng giá gói một cách khó chịu. Họ tr�
 10,000 users → nhiều credits
 Enterprise   → credits + dedicated infrastructure + SLA fee
 ```
+
+Giá và quota từng gói self-serve: [`subscription-packages-spec.md`](./subscription-packages-spec.md) mục 1.
 
 ---
 
@@ -55,8 +60,8 @@ Hệ thống **đang bán gần với chi phí model**, không bán năng lực 
 |----------|----------|
 | Ví `walletBalance` = **USD** | Ví = **Credit** (đơn vị dịch vụ) |
 | Charge = `tokens × USD/1M × feePercent` | Charge = `usage × hệ số model (theo lớp GM) → Credit` |
-| UI hiện `priceInput` / `priceOutput` / `feePercent` | UI hiện `X credits/run` (+ model family với Enterprise) |
-| Packages marketing = API calls / tháng | Packages = Subscription + included credits (nhỏ, có trần COGS) + quota |
+| UI hiện `priceInput` / `priceOutput` / `feePercent` | UI hiện `X credits/run` (+ model family với Business / Enterprise) |
+| Packages marketing = API calls / tháng, card Pro $49 | Packages = 4 gói self-serve + included credits (nhỏ, có trần COGS) + quota — spec gói |
 | Membership tier theo top-up VND/tháng | Giữ loyalty; **không** thay subscription |
 
 ### 1.2 Luồng charge hiện tại
@@ -83,7 +88,7 @@ File cốt lõi:
 | `workers/auth-worker/src/features/admin/service/domain.ts` | Schema `priceInput/Output/Cache`, `feePercent` |
 | `workers/web/.../service-pricing-label.tsx` | Hiện giá token + profit % cho user |
 | `workers/web/.../control/billing/` | Top-up ví USD (VNPay/Casso/PayPal) |
-| `workers/web/.../packages.tsx` + `packages-preview.tsx` | Bán “API calls”, không phải Credit |
+| `workers/web/.../packages.tsx` + `packages-preview.tsx` | Marketing 3 card Free / Pro $49 / Enterprise — **lệch** catalog 4 gói; CTA login không checkout |
 | `workers/auth-worker/.../assistant/tools/get-services-tool.ts` | Assistant trả `priceInput` / `feePercent` |
 
 ### 1.3 Những gì **giữ**
@@ -108,8 +113,8 @@ Member UI / public docs / assistant **không** được thấy:
 
 | Ai | Thấy gì |
 |----|---------|
-| Free / Pro | Credit, ước lượng/run, số trừ ví, gói, quota |
-| Enterprise / compliance | như Pro **+ model family** (không USD/1M) |
+| Free / Starter / Pro | Credit, ước lượng/run, số trừ ví, gói, quota |
+| Business / Enterprise compliance | như Pro **+ model family** (không USD/1M) |
 | Admin | full: hệ số, lớp GM, COGS, contribution, alert |
 
 ---
@@ -122,11 +127,17 @@ Subscription **không** tính theo token. Nó mở khóa workspace, builder, sha
 
 Giá subscription **ổn định theo gói**, không nhảy vì catalog Cloudflare. Nó phải **mang opex**: Llama-class không nuôi công ty (lãi tuyệt đối quá nhỏ dù GM % cao).
 
-| Gói | Ý nghĩa | Credit | Quota | Đảm bảo |
-|-----|---------|--------|-------|---------|
-| **Free** | Trial | Tặng ít, hết kỳ là hết, **không** mua thêm (hoặc mua rất hạn chế) | Thấp | Best effort |
-| **Pro** | Đội ngũ dùng thật | Tặng **nhỏ** + được mua thêm (có trần ví) | Trung bình | Standard, notice 7 ngày khi hệ số tăng ≥10% |
-| **Enterprise** | Tiền cho sự đảm bảo | Committed volume + on-demand; hợp đồng có điều khoản reprice COGS | Dedicated / custom | SLA + notice 30 ngày (trừ emergency lỗ) |
+Catalog self-serve **đã chốt** — SSOT và PayPal Billing Plans: [`subscription-packages-spec.md`](./subscription-packages-spec.md). Không hard-code giá trên UI.
+
+| Gói | Giá / tháng | Ý nghĩa | Credit tặng | Quota | Đảm bảo |
+|-----|-------------|---------|-------------|-------|---------|
+| **Free** | $0 | Trial | 150 / tháng UTC, hết kỳ là hết, **không** mua thêm | 15 run/ngày; không share/webhook/cron | Best effort |
+| **Starter** | $4.90 | Vào cửa trả phí | 500 + được mua thêm (trần ví 20_000) | 50 run/ngày; share, webhook, 3 cron | Standard; notice hệ số +7 ngày khi \|Δ\| ≥10% |
+| **Pro** | $19.90 | Phổ biến — đội ngũ dùng thật | 2_000 + mua thêm (trần 50_000) | 200 run/ngày; 15 cron; always-on grace | Priority copy; notice +7 ngày |
+| **Business** | $99.90 | Team / power | 10_000 + mua thêm (trần 200_000) | 1_000 run/ngày; 100 cron; grace rộng; model family | Notice hệ số +30 ngày |
+| **Enterprise** | Hợp đồng (không lên `/packages`) | SLA / SSO / BYOK / quota custom | Committed + on-demand | Dedicated | SLA + notice 30 ngày (trừ emergency lỗ) |
+
+Chiết khấu trả trước 3 / 6 / 12 tháng (10% / 15% / 20%). Credit tặng vẫn reset mỗi tháng UTC.
 
 Credit tặng trong gói:
 
@@ -134,7 +145,7 @@ Credit tặng trong gói:
 - Có **trần COGS USD** (`includedCogsUsdCap`) song song với số Credit. Nếu agent đốt model frontier, hết trần COGS thì lần sau trừ Credit đã mua — dù vẫn còn Credit tặng trên giấy.
 - Lý do: bài học Cursor 2025 — included pool sized cho completion, bị agentic/frontier đốt sạch và lỗ.
 
-> Copy `$49` / `100,000 API calls` hiện tại là placeholder. Engine chỉ cần `planId`. Số tiền gói chốt Phase 0; **không** hard-code. Free không được thiết kế như sản phẩm chính.
+Engine chỉ cần `planId`: `free | starter | pro | business`. **Không** suy luận gói từ top-up Credit. Free không được thiết kế như sản phẩm chính.
 
 ### 2.2 Credit = mức tiêu thụ AI/Agent
 
@@ -151,13 +162,15 @@ Người dùng thấy: **Agent này tốn X credits/run** (ước lượng trư�
 
 Credit là **đơn vị dịch vụ trả trước** (IFRS 15 deferred revenue), không phải tiền điện tử / e-wallet. Không quy đổi ngược ra tiền mặt, trừ payout royalty/earnings (sổ riêng).
 
-### 2.3 Enterprise = đảm bảo, không phải token sỉ
+### 2.3 Enterprise = đảm bảo, không phải token sỉ (và không phải card thứ 5)
 
-Khách trả thêm cho SLA, dedicated infra, custom quota, invoice/SSO/audit, committed volume.
+Khách trả thêm cho SLA, dedicated infra, custom quota, invoice/SSO/audit, committed volume. Trên `/packages` chỉ footer “Cần SLA / hóa đơn công ty? Liên hệ” — **không** thay card Business $99.90.
 
 Hợp đồng Enterprise **phải** có điều khoản: khi provider tăng giá làm contribution dưới sàn lớp model, Hub được reprice hệ số sau notice 30 ngày (hoặc ngay nếu contribution < 0%).
 
-**BYOK** chỉ là add-on Enterprise: khách trả provider trực tiếp; Hub thu platform fee (subscription), không pass-through hóa đơn token. Usage model do Hub host vẫn trừ Credit. BYOK không mở cho Free/Pro — tránh biến Hub thành gateway.
+**BYOK** chỉ là add-on Enterprise: khách trả provider trực tiếp; Hub thu platform fee (subscription), không pass-through hóa đơn token. Usage model do Hub host vẫn trừ Credit. BYOK không mở cho Free / Starter / Pro / Business self-serve — tránh biến Hub thành gateway.
+
+Self-serve **Business** được thấy model family (không USD/1M). Quyền compliance sâu (SSO, audit log, SLA) vẫn ở hợp đồng.
 
 ---
 
@@ -192,9 +205,9 @@ Không index `creditPriceUsd` theo FX hàng ngày — khách đang dùng Credit 
 |---------|----------|
 | Hết hạn Credit **mua** | 12 tháng kể từ ngày credited; trừ FIFO (cũ trước) |
 | Credit **tặng** theo gói | Hết vào cuối chu kỳ subscription; không chuyển kỳ |
-| Trần ví Pro | `maxCreditBalance` cấu hình (Phase 0). Vượt → không nạp thêm đến khi dùng bớt |
-| Free | Không (hoặc rất hạn chế) mua pack lớn |
-| Enterprise | Committed volume theo hợp đồng; on-demand có trần thỏa thuận |
+| Trần ví Starter / Pro / Business | `maxCreditBalance` per plan (spec gói: 20k / 50k / 200k). Vượt → không nạp thêm đến khi dùng bớt |
+| Free | Không mua pack |
+| Enterprise (hợp đồng) | Committed volume theo hợp đồng; on-demand có trần thỏa thuận |
 | Breakage | Credit hết hạn = doanh thu breakage (IFRS 15); ghi sổ, không “tặng lại” im lặng |
 
 Trần tồn chặn tích trữ Credit trước đợt Cloudflare tăng giá — đó là lỗ hổng lớn nhất của v0.1.
@@ -292,7 +305,7 @@ Giá Credit (`creditPriceUsd`) **không** phải van hàng ngày. Van là hệ s
 | Điều kiện | Hành vi |
 |-----------|---------|
 | `|Δcoeff| < 10%` và contribution ≥ sàn lớp | Admin lưu; audit; không bắt buộc notify |
-| `|Δcoeff| ≥ 10%` và contribution vẫn ≥ 0 | Notice in-app; **Pro +7 ngày**, **Enterprise +30 ngày**; rồi `effectiveAt` |
+| `|Δcoeff| ≥ 10%` và contribution vẫn ≥ 0 | Notice in-app; **Starter/Pro +7 ngày**, **Business / Enterprise +30 ngày**; rồi `effectiveAt` |
 | Rolling 24h `contribution_pct` &lt; sàn lớp | Hệ thống **đề xuất** coeff mới để về target lớp; admin confirm. Nếu im 24h thêm và vẫn dưới sàn → escalate |
 | Rolling 24h `contribution_pct` &lt; **0%** | `emergency=true`, hiệu lực ngay, notice sau, post-mortem 48h |
 | Model mới | Hệ số mới; không có “thay đổi” với user cũ |
@@ -348,7 +361,7 @@ Company contribution ≈
   − Opex còn lại (R&D, sales, G&A không nằm trong buffer)
 ```
 
-Kỳ vọng: chỉ bán Credit → net dễ mỏng hoặc âm lúc build. Có Pro/Enterprise thật → blended GM có thể lên dải SaaS. Included credit nuốt hết giá gói → kịch bản lỗ (cấm bằng trần COGS).
+Kỳ vọng: chỉ bán Credit → net dễ mỏng hoặc âm lúc build. Có Starter/Pro/Business + Enterprise thật → blended GM có thể lên dải SaaS. Included credit nuốt hết giá gói → kịch bản lỗ (cấm bằng trần COGS).
 
 ### 4.2 Sổ kép trên mỗi usage
 
@@ -390,14 +403,15 @@ Sức chịu toán: với buffer 12% + contribution 52% (mid), đóng băng hệ
 
 Vượt trần → chặn hoặc upgrade — **không** hóa đơn D1/R2.
 
-| Quota | Free | Pro | Enterprise |
-|-------|------|-----|------------|
-| Credits tặng / kỳ | thấp, hết kỳ là hết | nhỏ + trần COGS USD | custom + trần COGS |
-| Mua thêm Credit | khóa hoặc rất hạn chế | có, trần ví | committed + on-demand |
-| Workflow runs / ngày | trần | trần cao | custom |
-| Vectorize / R2 / concurrent / retention / seats | thấp | trung bình | dedicated / SSO |
+| Quota | Free | Starter | Pro | Business | Enterprise hợp đồng |
+|-------|------|---------|-----|----------|---------------------|
+| Credits tặng / kỳ | 150, hết kỳ là hết | 500 + trần COGS $1.20 | 2_000 + trần $4 | 10_000 + trần $25 | custom + trần COGS |
+| Mua thêm Credit | khóa | có, trần ví 20_000 | có, trần 50_000 | có, trần 200_000 | committed + on-demand |
+| Workflow runs / ngày | 15 | 50 | 200 | 1_000 | custom |
+| Share / webhook / cron | không | 3 cron | 15 cron | 100 cron | dedicated / SSO |
+| Always-on grace | không | không | có (trần spec gói) | có (trần rộng hơn) | thỏa thuận |
 
-Membership tier chỉ nới quota hoặc tặng credit **trong trần COGS**, không tạo đơn vị tính tiền thứ tư.
+Số chi tiết và PayPal Billing Plan: spec gói mục 1–2. Membership tier chỉ nới quota hoặc tặng credit **trong trần COGS**, không tạo đơn vị tính tiền thứ tư.
 
 ---
 
@@ -409,7 +423,7 @@ Membership tier chỉ nới quota hoặc tặng credit **trong trần COGS**, kh
 2. Agent/workflow tốn khoảng bao nhiêu Credit / run?
 3. Lần chạy vừa rồi trừ bao nhiêu? (usage + royalty)
 4. Gói cho phép gì? — không phải “model nào giá USD bao nhiêu”
-5. (Enterprise) Agent đang chạy family nào? Llama / GPT / Claude — vẫn trừ Credit
+5. (Business / Enterprise) Agent đang chạy family nào? Llama / GPT / Claude — vẫn trừ Credit
 
 Published burn-rate: trang billing/docs liệt kê **ước lượng Credit/run theo template agent**, không bảng USD/1M.
 
@@ -421,11 +435,11 @@ Published burn-rate: trang billing/docs liệt kê **ước lượng Credit/run 
 | Billing | USD volume | Credit còn / đã dùng / sắp hết hạn / đã nạp |
 | Top-up | Nạp USD | Nạp VND/USD → nhận Credit; hiện quy đổi **đóng băng trên lệnh** |
 | Service list | `model · $in/$out · profit %` | Năng lực + `~X CR / run` |
-| Agent config | endpoint + giá model | Ước lượng Credit; Enterprise thấy model family |
+| Agent config | endpoint + giá model | Ước lượng Credit; Business / Enterprise thấy model family |
 | Execution | `formatUsd` | `12.40 CR` |
 | Earnings | USD | Credit accrued → payout VND/USD |
-| Packages | API calls | Subscription + included (nhỏ) + quota |
-| Assistant `get-services` | token price | `estimatedCreditsPerRun`; Enterprise thêm `modelFamily` |
+| Packages | API calls / Pro $49 | 4 gói Subscription + included (nhỏ) + quota — spec gói |
+| Assistant `get-services` | token price | `estimatedCreditsPerRun`; Business thêm `modelFamily` |
 
 ### 6.3 Admin
 
@@ -452,10 +466,10 @@ billing: {
   PAYMENT_FEE_PCT: number              // default 2
   INFRA_BUFFER_PCT: number             // default 12 — chỉ variable infra/support/retry
   COEFF_NOTIFY_CHANGE_PCT: number      // default 10
-  COEFF_NOTIFY_LEAD_DAYS_PRO: number   // default 7
-  COEFF_NOTIFY_LEAD_DAYS_ENT: number   // default 30
+  COEFF_NOTIFY_LEAD_DAYS_PRO: number   // default 7 — Starter + Pro
+  COEFF_NOTIFY_LEAD_DAYS_ENT: number   // default 30 — Business + Enterprise hợp đồng
   CREDIT_EXPIRY_DAYS: number           // default 365
-  MAX_CREDIT_BALANCE_PRO?: number
+  MAX_CREDIT_BALANCE_PRO?: number      // legacy; ưu tiên maxCreditBalance per plan trong spec gói
   FX_RELIST_THRESHOLD_PCT: number      // default 10 — niêm yết VND/Credit
 
   TARGET_CONTRIBUTION_PCT: {
@@ -549,11 +563,11 @@ Trừ FIFO lot; included lot tôn trọng `includedCogsUsdCap` của kỳ.
 
 Cấm: `priceInput`, `priceOutput`, `priceInputCache`, `feePercent`, `cogsAiUsd`, `contributionPct`.
 
-Được: `creditBalance`, `creditsExpiring`, `estimatedCreditsPerRun`, `creditsCharged`, `plan`, `quotaRemaining`. Enterprise: `modelFamily`.
+Được: `creditBalance`, `creditsExpiring`, `estimatedCreditsPerRun`, `creditsCharged`, `plan`, `quotaRemaining`. Business / Enterprise: `modelFamily`.
 
 ### 8.3 Marketing
 
-`packages.tsx` / `packages-preview.tsx`: Subscription + included nhỏ + quota. Bỏ “unlimited API calls”.
+`packages.tsx` / `packages-preview.tsx`: đọc `GET /public/plans`. Bốn gói + chiết khấu interval. Bỏ “unlimited API calls” và copy **$49**. Chi tiết CTA/PayPal: spec gói mục 9.
 
 ---
 
@@ -567,7 +581,7 @@ Không nằm trong spec:
 - Bán token từng provider như SKU
 - Metering per-request D1/R2 để invoice
 - Tự đổi `creditPriceUsd` theo FX hay theo Cloudflare hàng ngày
-- BYOK cho Free/Pro
+- BYOK cho Free / Starter / Pro / Business self-serve
 - Grandfather hệ số cũ vô hạn cho Credit đã nạp
 
 FX: nạp VND dùng rate đóng băng trên order; COGS so USD; payout dùng rate ngày chi. Khách VN thấy VND lúc checkout; lúc dùng thấy Credit.
@@ -577,7 +591,7 @@ FX: nạp VND dùng rate đóng băng trên order; COGS so USD; payout dùng rat
 ## 10. Migration
 
 ```
-Phase 0  Chốt creditPriceUsd, dải GM, buffer, quota, included COGS cap, giá gói, trần ví
+Phase 0  Chốt creditPriceUsd, dải GM, buffer; **giá 4 gói + quota + included + trần ví = spec subscription v1.0**
 Phase 1  Dual-write Credit + USD; UI Credit; ẩn token price; FIFO lots + expiry
 Phase 2  Catalog lớp+hệ số versioned; auto-propose; notice theo gói; quota; dashboard
 Phase 3  Ngừng đọc cost USD như giá khách; xóa member fields giá token
@@ -611,13 +625,13 @@ Wallet, billing (hết hạn), execution, top-up “nhận X Credit”, ẩn tok
 
 Admin CRUD; scan CF → class → coeff; member form không nhập USD/1M.
 
-### PR 5 — Subscription + quota + included COGS cap
+### PR 5 — Subscription + quota + included COGS cap + PayPal Subscriptions
 
-Packages copy; entitlements; cap included; trần ví Pro.
+Bốn gói; entitlements; cap included; trần ví theo gói; PayPal approve / webhook / cancel — bám [`subscription-packages-spec.md`](./subscription-packages-spec.md).
 
 ### PR 6 — Contribution observability + van tự đề xuất
 
-Ghi sổ kép; dashboard; alert sàn; emergency; notice Pro 7 / Ent 30.
+Ghi sổ kép; dashboard; alert sàn; emergency; notice Starter/Pro 7 / Business+Ent 30.
 
 ---
 
@@ -635,7 +649,7 @@ Giữ map v0.1. Thêm khi implement: schema lots/expiry (`users` hoặc bảng `
 - [ ] Ví = Credit; nạp hiện số Credit; lot sắp hết hạn hiện được.
 - [ ] Ước lượng credits/run ≠ số trừ sau run, và UI nói rõ.
 - [ ] Đổi model chỉ đổi Credit/run; không đổi `creditPriceUsd` hay giá gói.
-- [ ] Enterprise thấy model family; Free/Pro không bắt buộc.
+- [ ] Business / Enterprise thấy model family; Free / Starter / Pro không bắt buộc.
 - [ ] Scale usage → trả nhiều Credit hơn.
 
 **Hệ thống**
@@ -644,7 +658,7 @@ Giữ map v0.1. Thêm khi implement: schema lots/expiry (`users` hoặc bảng `
 - [ ] Mỗi usage có `creditsCharged`, `cogsAiUsd`, `contributionPct`, `modelClass`.
 - [ ] Contribution **không** trừ support/risk lần hai sau buffer.
 - [ ] Hệ số theo lớp tiny/mid/frontier; versioned; van 3.5.
-- [ ] Credit mua hết hạn 12 tháng FIFO; included hết kỳ; Pro có trần ví.
+- [ ] Credit mua hết hạn 12 tháng FIFO; included hết kỳ; Starter/Pro/Business có trần ví.
 - [ ] Included có trần COGS USD.
 - [ ] Infra không có SKU trên hóa đơn khách.
 - [ ] Flag rollback USD đến hết Phase 3.
@@ -653,35 +667,36 @@ Giữ map v0.1. Thêm khi implement: schema lots/expiry (`users` hoặc bảng `
 
 - [ ] Thêm model = 1 dòng hệ số + lớp.
 - [ ] Cloudflare tăng giá → hệ số, không pass-through, không tăng gói trong đêm.
-- [ ] Enterprise = SLA/dedicated/BYOK fee, không bán token sỉ.
+- [ ] Enterprise hợp đồng = SLA/dedicated/BYOK fee, không bán token sỉ; không thay card Business trên `/packages`.
 - [ ] Blended contribution Credit mục tiêu ~50%; frontier markup &lt; tiny markup.
 
 ---
 
 ## 14. Đã chốt vs để mở
 
-### Đã chốt (v0.2)
+### Đã chốt (v0.2 + v0.3 gói)
 
 1. Một Credit; không bán token Cloudflare.
-2. Ba lớp thu tiền; lãi bền ở Subscription/Enterprise.
+2. Ba lớp thu tiền; lãi bền ở Subscription (Starter/Pro/Business) + hợp đồng Enterprise.
 3. `creditPriceUsd` SSOT; VND chỉ checkout, freeze trên order.
 4. GM/contribution **theo lớp** (65 / 52 / 38), blended ~50%; không phẳng 55%.
 5. Một công thức contribution; buffer không double-count.
 6. Hết hạn 12 tháng + trần tồn + included COGS cap.
-7. Van hệ số: đề xuất khi dưới sàn; emergency khi lỗ; notice Pro 7 / Ent 30.
-8. Enterprise thấy model family; BYOK chỉ Enterprise.
+7. Van hệ số: đề xuất khi dưới sàn; emergency khi lỗ; notice Starter/Pro 7 / Business+Ent 30.
+8. Business (self-serve) và Enterprise hợp đồng thấy model family; BYOK chỉ Enterprise hợp đồng.
 9. Dual-write rồi cắt.
+10. **v0.3** Bốn gói self-serve Free / Starter $4.90 / Pro $19.90 / Business $99.90; chiết khấu 3/6/12 tháng; PayPal Subscriptions (Visa/Mastercard trên PayPal); không placeholder $49. Chi tiết [`subscription-packages-spec.md`](./subscription-packages-spec.md).
 
-### Mở — Phase 0 trước PR 1
+### Mở — còn lại trước / trong PR Credit
 
-| # | Câu hỏi | Gợi ý |
-|---|---------|--------|
-| A | `CREDIT_PRICE_USD` chính thức? | 0.0077 (≈ 200 VND @ 26k) |
-| B | Included credits + `includedCogsUsdCap` Free/Pro? | Tặng nhỏ; cap COGS &lt;&lt; giá gói |
-| C | Giá subscription Pro / Enterprise? | Phải mang opex; engine cần plan id |
-| D | `MAX_CREDIT_BALANCE_PRO`? | Cỡ 6–12 tháng usage điển hình |
+| # | Câu hỏi | Trạng thái |
+|---|---------|------------|
+| A | `CREDIT_PRICE_USD` chính thức? | Gợi ý 0.0077 (≈ 200 VND @ 26k) — chưa đổi v0.3 |
+| B | Included credits + `includedCogsUsdCap`? | **Chốt** spec gói mục 1 |
+| C | Giá subscription? | **Chốt** $4.90 / $19.90 / $99.90 + interval; Enterprise = hợp đồng |
+| D | Trần ví? | **Chốt** 20k / 50k / 200k |
 | E | Member tự chọn model trên service? | Có; không tự set giá; hệ số Hub |
-| F | Quota số (R2 GB, runs/ngày)? | Khung mục 5 |
+| F | Quota runs/ngày, cron, share? | **Chốt** spec gói mục 1; R2 GB vẫn khung mục 5 |
 | G | Referral? | Giữ top-up VND đến PR riêng |
 | H | Heuristic gán `tiny/mid/frontier` có cần bảng tay không? | Heuristic + override admin |
 | I | Pre-auth reserve từ Phase 1? | Không; Phase 2 |
@@ -702,5 +717,7 @@ Giữ map v0.1. Thêm khi implement: schema lots/expiry (`users` hoặc bảng `
 
 ## 16. Tóm tắt một dòng
 
-Khách trả **Credit cho việc hoàn thành**; giá gói bán quyền dùng; Enterprise bán đảm bảo.  
+Khách trả **Credit cho việc hoàn thành**; **Starter / Pro / Business** bán quyền dùng; hợp đồng Enterprise bán đảm bảo.  
 Hệ thống đổi model → Credit theo **dải biên** (không 55% phẳng), neo Credit bằng USD, tự giữ contribution ở phía sau — và không bao giờ hóa đơn D1/R2/Workers hay token Cloudflare như một sản phẩm.
+
+Catalog gói, PayPal Subscriptions, hủy, grace, minPlan: [`subscription-packages-spec.md`](./subscription-packages-spec.md).

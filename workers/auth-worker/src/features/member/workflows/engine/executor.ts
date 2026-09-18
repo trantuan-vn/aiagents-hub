@@ -44,7 +44,8 @@ import {
 import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
 import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
-import { consumeDailyWorkflowRun } from '../billing/billing.js';
+import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
+import { runnerMeetsMinPlan } from '../billing/plan.js';
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -98,6 +99,7 @@ export interface ExecuteWorkflowParams {
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
   /** Merge into initial runContext (form trigger fan-out per-table payload). */
   runContextOverride?: Record<string, unknown>;
+  triggerKind?: string;
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -775,7 +777,57 @@ export async function executeWorkflowGraph(
 
   let record: { id: number };
   try {
-    await consumeDailyWorkflowRun(userDO, c.env);
+    const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+    const minPlanId = resolved.workflow.minPlanId ?? resolved.workflow.min_plan_id ?? 'free';
+    if (!resolved.isOwnedByUser && !runnerMeetsMinPlan(quota.planId, minPlanId)) {
+      return {
+        status: 'failed',
+        executionKey,
+        workflowId: resolved.workflowId,
+        workflowOwnerId: resolved.ownerId,
+        output: {
+          error: `Plan ${minPlanId} required`,
+          code: 'PLAN_REQUIRED',
+          minPlanId,
+          checkoutPath: '/packages',
+        },
+        steps: [],
+        totalCostVnd: 0,
+      };
+    }
+    const triggerKind = params.triggerKind ?? (params.webhookItem ? 'webhook' : 'manual');
+    if (resolved.isOwnedByUser) {
+      if (triggerKind === 'cron' && !quota.entitlement.canUseCron) {
+        return {
+          status: 'failed',
+          executionKey,
+          workflowId: resolved.workflowId,
+          workflowOwnerId: resolved.ownerId,
+          output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
+          steps: [],
+          totalCostVnd: 0,
+        };
+      }
+      if (
+        (triggerKind === 'webhook' || triggerKind === 'telegram' || triggerKind === 'slack' || triggerKind === 'discord') &&
+        !quota.entitlement.canUseWebhooks
+      ) {
+        return {
+          status: 'failed',
+          executionKey,
+          workflowId: resolved.workflowId,
+          workflowOwnerId: resolved.ownerId,
+          output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
+          steps: [],
+          totalCostVnd: 0,
+        };
+      }
+    }
+    await consumeDailyWorkflowRun(userDO, c.env, {
+      triggerKind,
+      graceWhenExhausted: resolved.workflow.graceWhenExhausted === true || resolved.workflow.graceWhenExhausted === 1,
+      workflowId: resolved.workflowId,
+    });
     record = await createExecution(userDO, {
       executionKey,
       workflowId: resolved.workflowId,

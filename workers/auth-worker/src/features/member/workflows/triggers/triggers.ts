@@ -1178,6 +1178,7 @@ export async function runTrigger(
     requestMeta: { userAgent: `trigger:${trigger.type}` },
     entryNodeIds,
     webhookItem,
+    triggerKind: trigger.type,
   });
 }
 

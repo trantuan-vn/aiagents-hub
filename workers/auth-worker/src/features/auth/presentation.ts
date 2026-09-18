@@ -72,6 +72,7 @@ import { EKYC_SERVICES } from '../member/ekyc/constant';
 import { processFormData, processDocumentFormData, processFaceFormData, mergeImages, hashIdentifier, saveToEkycR2, getFromEkycR2 } from '../member/ekyc/utils';
 import { resolveCreditBalance, soonestExpiry } from '../member/workflows/billing/credit-wallet';
 import { loadUserAndSyncPlan } from '../member/workflows/billing/billing';
+import { publicPlansCatalog } from '../member/workflows/billing/catalog';
 import { loadProposals, memberCoeffNotices } from '../admin/billing/contribution';
 import { createOTPService } from './infrastructure';
 import { createWalletService } from './infrastructure';
@@ -1016,6 +1017,20 @@ export function createAuthRoutes(bindingName: string) {
         workflowRunsRemaining: quota.workflowRunsRemaining,
         includedCredits: quota.entitlement.includedCredits,
         notices: memberCoeffNotices(proposals, quota.planId),
+        planRank: quota.planRank,
+        planInterval: row.planInterval ?? row.plan_interval ?? null,
+        planCurrentPeriodEnd: row.planCurrentPeriodEnd ?? row.plan_current_period_end ?? null,
+        planStatus: row.planStatus ?? row.plan_status ?? 'none',
+        cancelAtPeriodEnd: row.cancelAtPeriodEnd === true || row.cancelAtPeriodEnd === 1,
+        canShareWorkflows: quota.entitlement.canShareWorkflows,
+        canUseWebhooks: quota.entitlement.canUseWebhooks,
+        canUseCron: quota.entitlement.canUseCron,
+        canGraceWhenExhausted: quota.entitlement.canGraceWhenExhausted,
+        maxCronJobs: quota.entitlement.maxCronJobs,
+        maxAssignableMinPlanId: quota.entitlement.maxAssignableMinPlanId,
+        showModelFamily: quota.entitlement.showModelFamily,
+        billingEnabled: publicPlansCatalog(c.env as unknown as Record<string, unknown> & { PAYPAL_BILLING_ENABLED?: string }).billingEnabled,
+        gateway: 'paypal',
         earningsPayoutCurrency,
         requiresStrongAuthSetup: needsStrongAuthSetup,
       });

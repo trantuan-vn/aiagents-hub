@@ -11,6 +11,8 @@ import {
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
 import { cancelWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
+import { loadUserAndSyncPlan } from '../billing/billing.js';
+import { clampMinPlanId, runnerMeetsMinPlan } from '../billing/plan.js';
 import {
   findFormDatabaseTriggerNode,
   runFormDatabaseTrigger,
@@ -23,6 +25,7 @@ import {
   findChatTriggerByNodeId,
   findFormTriggerByNodeId,
   findWebhookTriggerByNodeId,
+  getTrigger,
   isChannelTriggerType,
   listTriggers,
   summarizeEnabledCrons,
@@ -631,6 +634,20 @@ export function createWorkflowRoutes(bindingName: string) {
       if (!db) throw new Error('D1 database binding not configured');
       const body = CreateTriggerSchema.parse(await c.req.json());
       const ownerId = getUserId(c, user.identifier);
+      const userDO = getUserDO(c, user.identifier);
+      const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+      if ((body.type === 'webhook' || isChannelTriggerType(body.type)) && !quota.entitlement.canUseWebhooks) {
+        return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+      }
+      if (body.type === 'cron') {
+        if (!quota.entitlement.canUseCron) {
+          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        }
+        const existingCrons = (await listTriggers(db, ownerId, id)).filter((row) => row.type === 'cron');
+        if (existingCrons.length >= quota.entitlement.maxCronJobs) {
+          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        }
+      }
       if (body.type === 'webhook' && body.nodeId) {
         const existing = await findWebhookTriggerByNodeId(db, id, ownerId, body.nodeId);
         if (existing) {
@@ -711,6 +728,18 @@ export function createWorkflowRoutes(bindingName: string) {
       if (!db) throw new Error('D1 database binding not configured');
       const body = UpdateTriggerSchema.parse(await c.req.json());
       const ownerId = getUserId(c, user.identifier);
+      const existingTrigger = await getTrigger(db, ownerId, triggerId);
+      if (!existingTrigger) return c.json({ error: 'Trigger not found' }, 404);
+      if (body.enabled !== false) {
+        const userDO = getUserDO(c, user.identifier);
+        const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+        if ((existingTrigger.type === 'webhook' || isChannelTriggerType(existingTrigger.type)) && !quota.entitlement.canUseWebhooks) {
+          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        }
+        if (existingTrigger.type === 'cron' && !quota.entitlement.canUseCron) {
+          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        }
+      }
       const trigger = await updateTrigger(db, ownerId, triggerId, body);
       if (!trigger) return c.json({ error: 'Trigger not found' }, 404);
       if (trigger.type === 'cron') await touchScheduler(c.env, ownerId);
@@ -754,10 +783,20 @@ export function createWorkflowRoutes(bindingName: string) {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const body = UpdateWorkflowSchema.parse(await c.req.json());
+      const userDO = getUserDO(c, user.identifier);
+      const { quota } = await loadUserAndSyncPlan(userDO, c.env);
       if (body.isShared === true) {
+        if (!quota.entitlement.canShareWorkflows) {
+          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        }
         body.status = 'published';
       }
-      const userDO = getUserDO(c, user.identifier);
+      if (body.minPlanId != null) {
+        body.minPlanId = clampMinPlanId(body.minPlanId, quota.planId);
+      }
+      if (body.graceWhenExhausted === true && !quota.entitlement.canGraceWhenExhausted) {
+        body.graceWhenExhausted = false;
+      }
       const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
         where: { field: 'id', operator: '=', value: id },
       }, 'agent_workflows');
@@ -795,7 +834,7 @@ export function createWorkflowRoutes(bindingName: string) {
             const ownerId = getUserId(c, user.identifier);
             await syncCronTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
             await touchScheduler(c.env, ownerId);
-            if (workflowDefinitionHasWebhookTrigger(definition)) {
+            if (quota.entitlement.canUseWebhooks && workflowDefinitionHasWebhookTrigger(definition)) {
               await syncWebhookTriggersForWorkflow(c.env, bindingName, db, ownerId, id);
             }
           }
@@ -956,10 +995,23 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at
+      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`;
-      const result = await db.prepare(sql).bind(ownerId, workflowId).first();
+      const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);
+      const userDO = getUserDO(c, user.identifier);
+      const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+      const minPlanId = result.minPlanId ?? 'free';
+      if (!runnerMeetsMinPlan(quota.planId, minPlanId)) {
+        const { definition: _drop, ...rest } = result;
+        return c.json({
+          error: 'PLAN_REQUIRED',
+          code: 'PLAN_REQUIRED',
+          minPlanId,
+          checkoutPath: '/packages',
+          workflow: { ...rest, definition: undefined },
+        }, 403);
+      }
       const starStats = await getWorkflowCommunityStarStats(db, ownerId, workflowId);
       return c.json({ workflow: { ...result, ...starStats } });
     }, 'Failed to get shared workflow'),

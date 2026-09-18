@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { convertUsdToVnd } from '../../admin/service/pricing';
 import { roundCredits, usdToCredits } from '../../admin/service/credit';
+import { encodePlanOrderNotes, planChargeUsd } from '../billing/plan-order';
 
 export const OrderStatusSchema = z.enum(['PENDING', 'CONFIRMED', 'PROCESSING', 'COMPLETED', 'CANCELLED']);
 
@@ -61,6 +62,8 @@ export const CreateOrderSchema = z.object({
   voucherCode: z.string().optional(),
   notes: z.string().optional(),
   paymentMethod: z.string().optional(),
+  planId: z.enum(['starter', 'pro', 'business']).optional(),
+  interval: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)]).optional(),
 });
 
 const MIN_TOP_UP_USD = 1;
@@ -68,6 +71,17 @@ const MIN_TOP_UP_USD = 1;
 export function parseCreateOrderRequest(body: unknown, minTopUpVnd: number): CreateOrder {
   const parsed = CreateOrderSchema.parse(body);
   const currency = (parsed.currency ?? 'USD').toUpperCase();
+  if (parsed.planId) {
+    const interval = parsed.interval === 3 || parsed.interval === 6 || parsed.interval === 12 ? parsed.interval : 1;
+    const amount = planChargeUsd(parsed.planId, interval);
+    return {
+      ...parsed,
+      currency: 'USD',
+      amount,
+      interval,
+      notes: encodePlanOrderNotes({ planId: parsed.planId, interval }),
+    };
+  }
 
   if (currency === 'USD') {
     const cents = Math.round(parsed.amount * 100);

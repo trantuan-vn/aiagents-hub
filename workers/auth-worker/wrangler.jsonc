@@ -94,7 +94,8 @@
 		"ADMIN_IDENTIFIERS": "tuanta2021@gmail.com",
 		"PRIMARY_ADMIN_IDENTIFIER": "tuanta2021@gmail.com",
 		"TURNSTILE_SITE_KEY": "0x4AAAAAADXOWPMRtW0XIcLk",
-		"ORACLE_PROXY_URL": "http://138.2.99.43.nip.io"
+		"ORACLE_PROXY_URL": "http://138.2.99.43.nip.io",
+		"PAYPAL_BILLING_ENABLED": "true"
 	},
 	// ========== QUEUE CONFIGURATION ==========
 	"queues": {

@@ -189,8 +189,31 @@ export const UserSchema = BaseUserSchema.extend({
   referrerId: z.string().optional(),
   /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */
   referralCode: z.string().min(6).max(32).optional(),
-  /** Subscription plan. Missing values are inferred then stamped on first billing sync. */
-  planId: z.enum(['free', 'pro', 'enterprise']).optional(),
+  /** Subscription plan. Paid plans require paypal or admin source. */
+  planId: z.preprocess((v) => {
+    if (v == null || v === '') return undefined;
+    const s = String(v).toLowerCase();
+    if (s === 'enterprise') return 'business';
+    return s;
+  }, z.enum(['free', 'starter', 'pro', 'business']).optional()),
+  planSource: z.enum(['free', 'paypal', 'admin', 'order']).optional(),
+  paypalSubscriptionId: z.string().max(64).optional(),
+  paypalPayerId: z.string().max(64).optional(),
+  paypalPlanId: z.string().max(64).optional(),
+  planInterval: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)]).optional(),
+  planCurrentPeriodEnd: z.string().optional(),
+  planStatus: z.enum(['active', 'approval_pending', 'past_due', 'suspended', 'canceled', 'none']).optional(),
+  cancelAtPeriodEnd: z.boolean().optional(),
+  pendingPlanId: z.enum(['free', 'starter', 'pro', 'business']).optional(),
+  enterpriseContract: z.boolean().optional(),
+  autoTopUpEnabled: z.boolean().optional(),
+  autoTopUpUsd: z.union([z.literal(5), z.literal(20), z.literal(50)]).optional(),
+  graceCreditsUsedMonth: z.number().min(0).optional(),
+  graceCogsUsdMonth: z.number().min(0).optional(),
+  graceMonthYm: z.string().optional(),
+  graceRunsToday: z.number().int().min(0).optional(),
+  graceRunsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  graceLastByWorkflowJson: z.string().max(20_000).optional(),
   /** UTC YYYY-MM of the current included-credit grant. */
   planPeriodYm: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   workflowRunsToday: z.preprocess(

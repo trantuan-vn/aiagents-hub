@@ -11,6 +11,12 @@ export const PAYPAL_ERROR_MESSAGES = {
   CAPTURE_NOT_COMPLETED: 'PayPal payment was not completed',
   AMOUNT_MISMATCH: 'PayPal payment amount does not match the order',
   ORDER_MISMATCH: 'PayPal order does not match the internal order',
+  SUBSCRIPTION_DISABLED: 'Plan checkout is not enabled yet',
+  SUBSCRIPTION_PLAN_MISSING: 'PayPal billing plan is not configured',
+  SUBSCRIPTION_CREATE_FAILED: 'Failed to create PayPal subscription',
+  SUBSCRIPTION_NOT_FOUND: 'Subscription not found',
+  SUBSCRIPTION_CANCEL_FAILED: 'Failed to cancel subscription',
+  WEBHOOK_INVALID: 'PayPal webhook verification failed',
 } as const;
 
 /** Live PayPal REST API base. Override with PAYPAL_API_BASE (e.g. sandbox) if ever needed. */
