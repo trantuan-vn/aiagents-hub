@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { billingEconomicsFromConfig } from '../../admin/service/credit.js';
+import { UserSchema } from '../../auth/domain.js';
 import {
   encodePlanOrderNotes,
   paidPlanGrantPatch,
@@ -26,5 +28,44 @@ describe('plan prepaid order', () => {
     expect(patch.planSource).toBe('order');
     expect(patch.planStatus).toBe('active');
     expect(String(patch.planCurrentPeriodEnd)).toContain('2026-12-18');
+  });
+
+  it('UserSchema accepts paidPlanGrantPatch that clears pendingPlanId with null', () => {
+    const patch = paidPlanGrantPatch(
+      { kind: 'plan', planId: 'starter', interval: 1 },
+      new Date('2026-09-18T00:00:00.000Z'),
+    );
+    const parsed = UserSchema.parse({
+      identifier: 'user-1',
+      role: 'member',
+      pendingPlanId: 'pro',
+      ...patch,
+    });
+    expect(parsed.planId).toBe('starter');
+    expect(parsed.pendingPlanId).toBeNull();
+  });
+
+  it('credits Starter included CR when granting a prepaid plan', () => {
+    const patch = paidPlanGrantPatch(
+      { kind: 'plan', planId: 'starter', interval: 1 },
+      new Date('2026-09-18T00:00:00.000Z'),
+      {
+        user: {
+          identifier: 'user-1',
+          planPeriodYm: '2026-09',
+          creditLotsJson: JSON.stringify([
+            { credits: 150, remaining: 40, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+          ]),
+        },
+        eco: billingEconomicsFromConfig(),
+      },
+    );
+    expect(patch.walletBalance).toBe(540);
+    expect(patch.walletCurrency).toBe('CR');
+    expect(patch.planIncludedGrantPlanId).toBe('starter');
+    const lots = JSON.parse(String(patch.creditLotsJson));
+    expect(lots).toEqual([
+      expect.objectContaining({ credits: 650, remaining: 540, source: 'included' }),
+    ]);
   });
 });

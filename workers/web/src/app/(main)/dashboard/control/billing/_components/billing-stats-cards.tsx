@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCredits, formatUsd } from "@/lib/utils";
 
+import type { CreditLotView } from "./billing-api";
+
 interface BillingStatsCardsProps {
   /** Wallet balance in Credits */
   walletBalanceUsd: number;
@@ -13,6 +15,7 @@ interface BillingStatsCardsProps {
   /** Sum of finalAmount (USD) for completed top-up orders on this page */
   completedVolumeUsd: number;
   creditsExpiring?: string | null;
+  creditLots?: CreditLotView[];
   planId?: "free" | "starter" | "pro" | "business";
   workflowRunsRemaining?: number | null;
 }
@@ -22,6 +25,7 @@ export function BillingStatsCards({
   pendingTopUps,
   completedVolumeUsd,
   creditsExpiring,
+  creditLots = [],
   planId,
   workflowRunsRemaining,
 }: BillingStatsCardsProps) {
@@ -36,7 +40,24 @@ export function BillingStatsCards({
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{formatCredits(walletBalanceUsd)}</div>
-          {creditsExpiring ? (
+          {creditLots.length > 0 ? (
+            <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
+              {creditLots.map((lot, index) => (
+                <li key={`${lot.source}-${lot.expiresAt ?? "never"}-${lot.remaining}-${index}`}>
+                  {lot.source === "purchased" || !lot.expiresAt
+                    ? t("stats.lot_line_never", {
+                        amount: formatCredits(lot.remaining),
+                        source: t(`stats.lot_${lot.source}`),
+                      })
+                    : t("stats.lot_line", {
+                        amount: formatCredits(lot.remaining),
+                        source: t(`stats.lot_${lot.source}`),
+                        date: new Date(lot.expiresAt).toLocaleDateString(),
+                      })}
+                </li>
+              ))}
+            </ul>
+          ) : creditsExpiring ? (
             <p className="text-muted-foreground text-xs">
               {t("stats.expires", { date: new Date(creditsExpiring).toLocaleDateString() })}
             </p>

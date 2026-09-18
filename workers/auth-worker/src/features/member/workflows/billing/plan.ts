@@ -277,6 +277,7 @@ export function runnerMeetsMinPlan(runnerPlan: PlanId, minPlanId: unknown): bool
 export type PlanSyncPatch = {
   planId: PlanId;
   planPeriodYm: string;
+  planIncludedGrantPlanId?: PlanId;
   workflowRunsToday: number;
   workflowRunsOn: string;
   walletBalance?: number;
@@ -287,7 +288,65 @@ export type PlanSyncPatch = {
   planStatus?: string;
 };
 
-/** Roll included credits at month boundary and reset the daily run counter. */
+function storedIncludedGrantPlanId(user: Record<string, unknown>): string {
+  return String(user.planIncludedGrantPlanId ?? user.plan_included_grant_plan_id ?? '').toLowerCase();
+}
+
+function liveIncludedGrantSize(user: Record<string, unknown>, now: Date): number {
+  const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now).filter(
+    (lot) => lot.source === 'included',
+  );
+  if (!lots.length) return 0;
+  return Math.max(...lots.map((lot) => lot.credits));
+}
+
+/** Append this plan's included allotment as a new lot; keep every live lot (included, grace, purchased). */
+export function grantIncludedWalletPatch(
+  user: Record<string, unknown>,
+  planId: PlanId,
+  eco: BillingEconomics = billingEconomicsFromConfig(),
+  now = new Date(),
+): {
+  walletBalance: number;
+  walletCurrency: 'CR';
+  creditLotsJson: string;
+  planPeriodYm: string;
+  planIncludedGrantPlanId: PlanId;
+} {
+  const entitlement = entitlementFor(planId, eco);
+  const ym = periodYm(now);
+  const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now);
+  const nextLots: CreditLot[] =
+    entitlement.includedCredits > 0
+      ? creditIncludedLots(lots, entitlement.includedCredits, periodEndIso(ym), entitlement.includedCogsUsdCap, now)
+      : lots;
+  return {
+    planPeriodYm: ym,
+    planIncludedGrantPlanId: planId,
+    walletBalance: creditBalanceFromLots(nextLots, now),
+    walletCurrency: 'CR',
+    creditLotsJson: serializeCreditLots(nextLots),
+  };
+}
+
+function shouldGrantIncludedThisPeriod(
+  user: Record<string, unknown>,
+  planId: PlanId,
+  entitlement: PlanEntitlement,
+  storedYm: string,
+  ym: string,
+  now: Date,
+): boolean {
+  if (storedYm !== ym) return true;
+  const grantPlan = storedIncludedGrantPlanId(user);
+  if (grantPlan === planId) return false;
+  if (grantPlan && grantPlan !== planId) return entitlement.includedCredits > 0;
+  // Legacy rows (no marker): paid upgrade this month still has Free's smaller included lot (or none).
+  if (planId === 'free') return false;
+  return liveIncludedGrantSize(user, now) < entitlement.includedCredits;
+}
+
+/** Roll included credits at month boundary, and on mid-cycle plan upgrades. */
 export function syncPlanPeriod(
   user: Record<string, unknown>,
   eco: BillingEconomics = billingEconomicsFromConfig(),
@@ -313,20 +372,20 @@ export function syncPlanPeriod(
     patch.planStatus = 'none';
   }
 
-  if (storedYm === ym) return patch;
+  if (!shouldGrantIncludedThisPeriod(user, planId, entitlement, storedYm, ym, now)) {
+    if (!storedIncludedGrantPlanId(user) && storedYm === ym) {
+      patch.planIncludedGrantPlanId = planId;
+    }
+    return patch;
+  }
 
-  const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now).filter(
-    (lot) => lot.source !== 'included' && lot.source !== 'grace',
-  );
-  const nextLots: CreditLot[] =
-    entitlement.includedCredits > 0
-      ? creditIncludedLots(lots, entitlement.includedCredits, periodEndIso(ym), entitlement.includedCogsUsdCap, now)
-      : lots;
-  patch.planPeriodYm = ym;
+  const wallet = grantIncludedWalletPatch(user, planId, eco, now);
+  patch.planPeriodYm = wallet.planPeriodYm;
+  patch.planIncludedGrantPlanId = wallet.planIncludedGrantPlanId;
   patch.grantedIncluded = entitlement.includedCredits > 0;
-  patch.walletBalance = creditBalanceFromLots(nextLots, now);
-  patch.walletCurrency = 'CR';
-  patch.creditLotsJson = serializeCreditLots(nextLots);
+  patch.walletBalance = wallet.walletBalance;
+  patch.walletCurrency = wallet.walletCurrency;
+  patch.creditLotsJson = wallet.creditLotsJson;
   return patch;
 }
 

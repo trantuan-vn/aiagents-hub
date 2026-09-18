@@ -4,9 +4,12 @@ import { billingEconomicsFromConfig } from '../../../admin/service/credit.js';
 import {
   applyWalletCreditDebit,
   applyWalletCreditTopUp,
+  coalesceCreditLots,
   creditIncludedLots,
   debitCreditLots,
+  expireCreditLots,
   resolveCreditBalance,
+  sweepExpiredWalletPatch,
 } from './credit-wallet.js';
 
 const eco = billingEconomicsFromConfig();
@@ -17,30 +20,114 @@ describe('credit lots FIFO', () => {
     expect(resolved.migrated).toBe(true);
     expect(resolved.credits).toBe(1000);
     expect(resolved.lots[0]?.source).toBe('purchased');
+    expect(resolved.lots[0]?.expiresAt).toBeUndefined();
   });
 
-  it('debits the earliest-expiring lot first', () => {
+  it('debits expiring plan lots before never-expiring top-up lots', () => {
     const { lots, remainingToDebit } = debitCreditLots(
       [
-        { credits: 10, remaining: 10, expiresAt: '2028-01-02T00:00:00.000Z', source: 'purchased' },
-        { credits: 5, remaining: 5, expiresAt: '2027-01-01T00:00:00.000Z', source: 'purchased' },
+        { credits: 10, remaining: 10, source: 'purchased' },
+        { credits: 5, remaining: 5, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
       ],
       6,
       new Date('2026-09-16T00:00:00.000Z'),
     );
     expect(remainingToDebit).toBe(0);
-    expect(lots).toHaveLength(1);
-    expect(lots[0]?.remaining).toBe(9);
-    expect(lots[0]?.expiresAt).toBe('2028-01-02T00:00:00.000Z');
+    expect(lots).toEqual([expect.objectContaining({ source: 'purchased', remaining: 9 })]);
   });
 
-  it('skips expired lots', () => {
+  it('merges lots that share a source and expiry day', () => {
+    const merged = coalesceCreditLots([
+      { credits: 500, remaining: 500, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+      { credits: 2000, remaining: 2000, expiresAt: '2026-10-01T12:00:00.000Z', source: 'included' },
+      { credits: 259.74, remaining: 259.74, source: 'purchased' },
+      { credits: 649.35, remaining: 649.35, source: 'purchased' },
+    ]);
+    expect(merged).toEqual([
+      expect.objectContaining({ source: 'included', remaining: 2500, credits: 2500 }),
+      expect.objectContaining({ source: 'purchased', remaining: 909.09 }),
+    ]);
+  });
+
+  it('does not merge included lots that expire on different days', () => {
+    expect(
+      coalesceCreditLots([
+        { credits: 500, remaining: 500, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+        { credits: 2000, remaining: 2000, expiresAt: '2026-11-01T00:00:00.000Z', source: 'included' },
+      ]),
+    ).toHaveLength(2);
+  });
+
+  it('zeros expired lots and keeps live blocks', () => {
+    const now = new Date('2026-10-01T00:00:00.000Z');
+    const { lots, expired } = expireCreditLots(
+      [
+        { credits: 150, remaining: 80, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+        { credits: 500, remaining: 500, expiresAt: '2026-11-01T00:00:00.000Z', source: 'included' },
+        { credits: 10, remaining: 10, expiresAt: '2020-01-01T00:00:00.000Z', source: 'purchased' },
+      ],
+      now,
+    );
+    expect(expired).toEqual([expect.objectContaining({ remaining: 0, credits: 150, source: 'included' })]);
+    expect(lots.map((lot) => lot.remaining).sort((a, b) => a - b)).toEqual([10, 500]);
+    expect(lots.find((lot) => lot.source === 'purchased')?.remaining).toBe(10);
+  });
+
+  it('persists a wallet patch that drops expired blocks only', () => {
+    const patch = sweepExpiredWalletPatch(
+      {
+        walletBalance: 90,
+        walletCurrency: 'CR',
+        creditLotsJson: JSON.stringify([
+          { credits: 80, remaining: 80, expiresAt: '2020-01-01T00:00:00.000Z', source: 'included' },
+          { credits: 10, remaining: 10, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+        ]),
+      },
+      new Date('2026-09-16T00:00:00.000Z'),
+    );
+    expect(patch?.walletBalance).toBe(10);
+    expect(JSON.parse(String(patch?.creditLotsJson))).toEqual([
+      expect.objectContaining({ remaining: 10, source: 'purchased' }),
+    ]);
+    expect(
+      sweepExpiredWalletPatch(
+        {
+          walletCurrency: 'CR',
+          creditLotsJson: JSON.stringify([
+            { credits: 10, remaining: 10, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+          ]),
+        },
+        new Date('2026-09-16T00:00:00.000Z'),
+      ),
+    ).toBeNull();
+  });
+
+  it('never expires purchased top-up lots, even if a stale expiresAt is stored', () => {
+    const now = new Date('2026-09-16T00:00:00.000Z');
     const resolved = resolveCreditBalance(
       {
         walletCurrency: 'CR',
         creditLotsJson: JSON.stringify([
           { credits: 8, remaining: 8, expiresAt: '2020-01-01T00:00:00.000Z', source: 'purchased' },
-          { credits: 3, remaining: 3, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+          { credits: 3, remaining: 3, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+        ]),
+      },
+      eco,
+      now,
+    );
+    expect(resolved.credits).toBe(11);
+    const { expired, lots } = expireCreditLots(resolved.lots, new Date('2026-10-01T00:00:00.000Z'));
+    expect(expired).toEqual([expect.objectContaining({ source: 'included', remaining: 0 })]);
+    expect(lots).toEqual([expect.objectContaining({ source: 'purchased', remaining: 8 })]);
+  });
+
+  it('skips expired plan lots', () => {
+    const resolved = resolveCreditBalance(
+      {
+        walletCurrency: 'CR',
+        creditLotsJson: JSON.stringify([
+          { credits: 8, remaining: 8, expiresAt: '2020-01-01T00:00:00.000Z', source: 'included' },
+          { credits: 3, remaining: 3, source: 'purchased' },
         ]),
       },
       eco,
@@ -69,6 +156,9 @@ describe('credit lots FIFO', () => {
       eco,
     );
     expect(added.walletBalance).toBe(20);
+    const lots = JSON.parse(String(added.creditLotsJson)) as Array<{ source: string; expiresAt?: string }>;
+    expect(lots).toEqual([expect.objectContaining({ source: 'purchased', remaining: 20 })]);
+    expect(lots[0]?.expiresAt).toBeUndefined();
   });
 
   it('skips included lots when the COGS cap is exhausted', () => {

@@ -108,6 +108,7 @@ export function createPaypalService(
 
     const planIntent = parsePlanOrderIntent(order);
     if (planIntent) {
+      const eco = await getBillingEconomicsFromEnv(options.env);
       await executeUtils.executeDynamicAction(userDO, 'multi-table', {
         operations: [
           {
@@ -120,7 +121,10 @@ export function createPaypalService(
             table: 'users',
             operation: 'update',
             id: dbUser.id,
-            data: { ...paidPlanGrantPatch(planIntent), queueStatus: 'pending' },
+            data: {
+              ...paidPlanGrantPatch(planIntent, new Date(), { user: dbUser, eco }),
+              queueStatus: 'pending',
+            },
           },
         ],
       });

@@ -29,6 +29,7 @@ import { consumeWorkflowCronRun } from './features/member/workflows/triggers/tri
 import { scanContributionAndPropose } from './features/admin/billing/scan';
 import { processPendingCancels } from './features/member/paypal/subscriptions';
 import { rollupMarketingStats } from './features/admin/system-config/marketing-stats';
+import { expireCreditLotsForAllUsers } from './features/member/workflows/billing/expire-lots';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -186,7 +187,7 @@ export default {
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   },
-  // Daily contribution van (`20 17 * * *` = 00:20 ICT). Admin can also POST /dashboard/admin/billing/contribution/scan.
+  // Daily cron (`20 17 * * *` = 00:20 ICT): contribution scan, PayPal pending cancels, marketing rollup, expired credit lots.
   async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
     try {
       await scanContributionAndPropose(env);
@@ -206,6 +207,13 @@ export default {
       await rollupMarketingStats(env);
     } catch (err) {
       log.warn('marketing.stats_rollup_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await expireCreditLotsForAllUsers(env);
+    } catch (err) {
+      log.warn('billing.credit_lots_expire_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

@@ -5,7 +5,7 @@ import { computeUsageCredits, type BillingEconomics } from '../../../admin/servi
 import { getBillingEconomicsFromEnv } from '../../../admin/service/get-billing-economics.js';
 import { computeUsageChargeUsd, getServiceModel } from '../../../admin/service/pricing.js';
 import { chargeServiceUsage, type UsageCharge } from './charge.js';
-import { resolveCreditBalance } from './credit-wallet.js';
+import { resolveCreditBalance, sweepExpiredWalletPatch, compactCreditLotsPatch } from './credit-wallet.js';
 import {
   quotaFromUser,
   syncPlanPeriod,
@@ -159,6 +159,7 @@ function applyPlanPatch(row: Record<string, unknown>, patch: ReturnType<typeof s
     planPeriodYm: patch.planPeriodYm,
     workflowRunsToday: patch.workflowRunsToday,
     workflowRunsOn: patch.workflowRunsOn,
+    ...(patch.planIncludedGrantPlanId ? { planIncludedGrantPlanId: patch.planIncludedGrantPlanId } : {}),
     ...(patch.planSource ? { planSource: patch.planSource } : {}),
     ...(patch.planStatus ? { planStatus: patch.planStatus } : {}),
     ...(patch.creditLotsJson
@@ -181,9 +182,21 @@ export async function loadUserAndSyncPlan(
   if (!u?.id) throw new Error('User profile not found');
   const row = u as Record<string, unknown>;
   const patch = syncPlanPeriod(row, eco);
-  const merged = applyPlanPatch(row, patch);
+  const mergedPlan = applyPlanPatch(row, patch);
+  const expiredPatch = sweepExpiredWalletPatch(mergedPlan);
+  const afterExpiry = expiredPatch ? { ...mergedPlan, ...expiredPatch } : mergedPlan;
+  const compactPatch = compactCreditLotsPatch(afterExpiry);
+  const merged = compactPatch ? { ...afterExpiry, ...compactPatch } : afterExpiry;
   const storedYm = String(row.planPeriodYm ?? row.plan_period_ym ?? '');
-  if (patch.grantedIncluded || patch.planPeriodYm !== storedYm || row.planId == null) {
+  const storedGrant = String(row.planIncludedGrantPlanId ?? row.plan_included_grant_plan_id ?? '');
+  if (
+    patch.grantedIncluded ||
+    patch.planPeriodYm !== storedYm ||
+    row.planId == null ||
+    (patch.planIncludedGrantPlanId != null && patch.planIncludedGrantPlanId !== storedGrant) ||
+    expiredPatch != null ||
+    compactPatch != null
+  ) {
     await executeUtils.executeDynamicAction(
       userDO,
       'update',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -17,6 +17,7 @@ import { PaymentPaypalPanel } from "./payment-paypal-panel";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
 import { CreatePaymentSchema, getOrderPayableVnd, type CreatePayment, type Order } from "./schema";
 import { useCassoQr } from "./use-casso-qr";
+import { usePaymentIpnWs } from "./use-payment-ipn-ws";
 
 interface PaymentDialogProps {
   order: Order;
@@ -51,6 +52,8 @@ export function PaymentDialog({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>(initialTab);
+  const [ipnSuccess, setIpnSuccess] = useState(false);
+  const ipnHandledRef = useRef(false);
 
   const payableVnd = getOrderPayableVnd(order, usdVndRate);
 
@@ -87,10 +90,41 @@ export function PaymentDialog({
     }
   };
 
-  const handlePaidDone = (): void => {
+  const handlePaidDone = useCallback((): void => {
     onPaidDone?.();
     onOpenChange(false);
-  };
+  }, [onPaidDone, onOpenChange]);
+
+  const handleIpnSuccess = useCallback((): void => {
+    if (ipnHandledRef.current) return;
+    ipnHandledRef.current = true;
+    setIpnSuccess(true);
+    toast({
+      title: t("payment_success"),
+      description: t("payment_success_description"),
+    });
+  }, [t, toast]);
+
+  usePaymentIpnWs({
+    enabled: open,
+    orderId: order.id,
+    onSuccess: handleIpnSuccess,
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setIpnSuccess(false);
+      ipnHandledRef.current = false;
+    }
+  }, [open, order.id]);
+
+  useEffect(() => {
+    if (!open || !ipnSuccess) return undefined;
+    const timer = window.setTimeout(() => {
+      handlePaidDone();
+    }, 1400);
+    return () => window.clearTimeout(timer);
+  }, [open, ipnSuccess, handlePaidDone]);
 
   return (
     <Dialog
@@ -148,6 +182,8 @@ export function PaymentDialog({
                   loadingLabel={t("processing")}
                   error={cassoError}
                   qrSrc={cassoQr}
+                  success={ipnSuccess}
+                  successLabel={t("casso_confirmed")}
                   cancelLabel={t("cancel")}
                   paidDoneLabel={t("paid_done")}
                   onCancel={() => onOpenChange(false)}

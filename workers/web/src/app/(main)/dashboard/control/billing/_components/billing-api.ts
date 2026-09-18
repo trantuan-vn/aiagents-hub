@@ -24,9 +24,17 @@ export type CoeffNotice = {
   deltaPct: number;
 };
 
+export type CreditLotView = {
+  remaining: number;
+  credits: number;
+  expiresAt: string | null;
+  source: "purchased" | "included" | "grace";
+};
+
 export type WalletSnapshot = {
   creditBalance: number;
   creditsExpiring: string | null;
+  creditLots: CreditLotView[];
   planId: "free" | "starter" | "pro" | "business";
   canBuyCredits: boolean;
   workflowRunsToday: number;
@@ -61,10 +69,50 @@ function parseNotices(raw: unknown): CoeffNotice[] {
     .filter((n) => n.modelClass);
 }
 
+function parseCreditLots(raw: unknown): CreditLotView[] {
+  if (!Array.isArray(raw)) return [];
+  const lots: CreditLotView[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== "object") continue;
+    const o = row as Record<string, unknown>;
+    const remaining = typeof o.remaining === "number" && Number.isFinite(o.remaining) ? o.remaining : 0;
+    if (remaining <= 0) continue;
+    const source = o.source === "included" || o.source === "grace" ? o.source : "purchased";
+    const expiresAt = typeof o.expiresAt === "string" && o.expiresAt ? o.expiresAt : null;
+    if (source !== "purchased" && !expiresAt) continue;
+    const credits = typeof o.credits === "number" && Number.isFinite(o.credits) ? o.credits : remaining;
+    const expiryMs = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+    const expiryDay =
+      source === "purchased" || Number.isNaN(expiryMs) ? "never" : new Date(expiryMs).toISOString().slice(0, 10);
+    const key = `${source}:${expiryDay}`;
+    const existing = lots.find((lot) => {
+      const existingMs = lot.expiresAt ? Date.parse(lot.expiresAt) : Number.NaN;
+      const day =
+        lot.source === "purchased" || Number.isNaN(existingMs)
+          ? "never"
+          : new Date(existingMs).toISOString().slice(0, 10);
+      return `${lot.source}:${day}` === key;
+    });
+    if (existing) {
+      existing.remaining += remaining;
+      existing.credits += credits;
+      continue;
+    }
+    lots.push({ remaining, credits, expiresAt: source === "purchased" ? null : expiresAt, source });
+  }
+  return lots.sort((a, b) => {
+    if (!a.expiresAt && !b.expiresAt) return 0;
+    if (!a.expiresAt) return 1;
+    if (!b.expiresAt) return -1;
+    return a.expiresAt.localeCompare(b.expiresAt);
+  });
+}
+
 export async function fetchWalletSnapshot(): Promise<WalletSnapshot> {
   const empty: WalletSnapshot = {
     creditBalance: 0,
     creditsExpiring: null,
+    creditLots: [],
     planId: "free",
     canBuyCredits: false,
     workflowRunsToday: 0,
@@ -87,6 +135,7 @@ export async function fetchWalletSnapshot(): Promise<WalletSnapshot> {
   return {
     creditBalance,
     creditsExpiring,
+    creditLots: parseCreditLots(o.creditLots),
     planId: parsePlanId(o.planId),
     canBuyCredits: o.canBuyCredits === true,
     workflowRunsToday: typeof o.workflowRunsToday === "number" ? Math.max(0, o.workflowRunsToday) : 0,
@@ -320,6 +369,20 @@ export async function postCreateOrder(data: CreateOrder, createErrorFallback: st
   });
   if (!response.ok) throw new Error((await response.text()) || createErrorFallback);
   return response.json();
+}
+
+export function parseCreatedOrderId(raw: unknown): number | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const nested = o.order && typeof o.order === "object" ? (o.order as Record<string, unknown>).id : undefined;
+  for (const value of [o.id, nested]) {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return Math.trunc(value);
+    if (typeof value === "string" && /^\d+$/.test(value)) {
+      const n = Number(value);
+      if (n > 0) return n;
+    }
+  }
+  return null;
 }
 
 export async function postCancelOrder(orderId: number, cancelErrorFallback: string): Promise<void> {

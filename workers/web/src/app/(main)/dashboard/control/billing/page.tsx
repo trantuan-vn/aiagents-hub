@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useSearchParams, useRouter } from "next/navigation";
 
@@ -22,10 +22,12 @@ import {
   fetchWalletSnapshot,
   loadHistoryFromApi,
   postCancelOrder,
+  parseCreatedOrderId,
   postCreateOrder,
   requestCassoQr,
   requestVnpayPaymentUrl,
   type CoeffNotice,
+  type CreditLotView,
 } from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
 import { BillingPlanCard, type BillingPlanId } from "./_components/billing-plan-card";
@@ -42,6 +44,7 @@ export default function BillingPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [walletBalanceUsd, setWalletBalanceUsd] = useState(0);
   const [creditsExpiring, setCreditsExpiring] = useState<string | null>(null);
+  const [creditLots, setCreditLots] = useState<CreditLotView[]>([]);
   const [canBuyCredits, setCanBuyCredits] = useState<boolean | null>(null);
   const [planId, setPlanId] = useState<BillingPlanId>("free");
   const [planStatus, setPlanStatus] = useState<string | null>(null);
@@ -67,6 +70,7 @@ export default function BillingPage() {
   const [toDate, setToDate] = useState("");
   const [topUpOpen, setTopUpOpen] = useState(false);
   const [payOrderId, setPayOrderId] = useState<number | null>(null);
+  const pendingPayOrderIdRef = useRef<number | null>(null);
   const [paypalConfig, setPaypalConfig] = useState<{ clientId: string; enabled: boolean }>({
     clientId: "",
     enabled: false,
@@ -95,6 +99,7 @@ export default function BillingPage() {
     void fetchWalletSnapshot().then((snap) => {
       setWalletBalanceUsd(snap.creditBalance);
       setCreditsExpiring(snap.creditsExpiring);
+      setCreditLots(snap.creditLots);
       setCanBuyCredits(snap.canBuyCredits);
       setPlanId(snap.planId);
       setPlanStatus(snap.planStatus ?? null);
@@ -112,18 +117,21 @@ export default function BillingPage() {
     });
   };
 
-  const fetchOrders = async (): Promise<void> => {
-    setIsLoading(true);
-    setError(null);
+  const fetchOrders = async (opts?: { silent?: boolean }): Promise<void> => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setIsLoading(true);
+      setError(null);
+    }
     try {
       const data = await fetchOrdersList({ status, page, limit, fetchErrorFallback: t("fetch_error") });
       setOrders(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : t("fetch_error");
-      setError(errorMessage);
+      if (!silent) setError(errorMessage);
       toast({ title: t("error"), description: errorMessage, variant: "destructive" });
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -231,43 +239,73 @@ export default function BillingPage() {
 
   const handleCreateOrder = async (data: CreateOrder): Promise<unknown> => {
     const result = await postCreateOrder({ ...data, currency: "USD" }, t("create_error"));
-    void fetchOrders();
+    await fetchOrders({ silent: true });
     refreshWallet();
     refreshBillingParams();
+    const orderId = parseCreatedOrderId(result);
+    if (orderId) pendingPayOrderIdRef.current = orderId;
     return result;
   };
+
+  const handleTopUpOpenChange = (open: boolean): void => {
+    setTopUpOpen(open);
+  };
+
+  useEffect(() => {
+    if (topUpOpen) return;
+    const orderId = pendingPayOrderIdRef.current;
+    if (orderId == null) return;
+    pendingPayOrderIdRef.current = null;
+    const timer = window.setTimeout(() => setPayOrderId(orderId), 80);
+    return () => window.clearTimeout(timer);
+  }, [topUpOpen]);
+
+  const handleAutoPayConsumed = useCallback((): void => {
+    setPayOrderId(null);
+  }, []);
 
   const handleCancelOrder = async (orderId: number): Promise<void> => {
     await postCancelOrder(orderId, t("cancel_error"));
     void fetchOrders();
   };
 
-  const handlePayment = async (orderId: number, amount: number, bankCode: string, language: string): Promise<void> => {
-    try {
-      window.location.href = await requestVnpayPaymentUrl(
-        orderId,
-        amount,
-        bankCode,
-        language,
-        t("payment_error"),
-        t("payment_url_error"),
-      );
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : t("payment_error");
-      toast({ title: t("error"), description: errorMessage, variant: "destructive" });
-      throw err;
-    }
-  };
+  const handlePayment = useCallback(
+    async (orderId: number, amount: number, bankCode: string, language: string): Promise<void> => {
+      try {
+        window.location.href = await requestVnpayPaymentUrl(
+          orderId,
+          amount,
+          bankCode,
+          language,
+          t("payment_error"),
+          t("payment_url_error"),
+        );
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : t("payment_error");
+        toast({ title: t("error"), description: errorMessage, variant: "destructive" });
+        throw err;
+      }
+    },
+    [t, toast],
+  );
 
-  const handleCassoQr = (orderId: number, amount: number): Promise<{ qr: string }> =>
-    requestCassoQr(orderId, amount, t("payment_error"), t("casso_qr_error"));
+  const handleCassoQr = useCallback(
+    (orderId: number, amount: number): Promise<{ qr: string }> =>
+      requestCassoQr(orderId, amount, t("payment_error"), t("casso_qr_error")),
+    [t],
+  );
 
-  const handlePaypalCreateOrder = (orderId: number): Promise<string> =>
-    createPaypalOrder(orderId, t("paypal_error"));
+  const handlePaypalCreateOrder = useCallback(
+    (orderId: number): Promise<string> => createPaypalOrder(orderId, t("paypal_error")),
+    [t],
+  );
 
-  const handlePaypalCapture = async (orderId: number, paypalOrderId: string): Promise<void> => {
-    await capturePaypalOrder(orderId, paypalOrderId, t("paypal_error"));
-  };
+  const handlePaypalCapture = useCallback(
+    async (orderId: number, paypalOrderId: string): Promise<void> => {
+      await capturePaypalOrder(orderId, paypalOrderId, t("paypal_error"));
+    },
+    [t],
+  );
 
   const handleBillingRefresh = (): void => {
     void fetchOrders();
@@ -286,7 +324,7 @@ export default function BillingPage() {
           <p className="text-muted-foreground">{t("description")}</p>
         </div>
         {canBuyCredits === true ? (
-          <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={setTopUpOpen} />
+          <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={handleTopUpOpenChange} />
         ) : null}
       </div>
 
@@ -305,6 +343,7 @@ export default function BillingPage() {
           .filter((o) => o.status === "COMPLETED")
           .reduce((s, o) => s + o.finalAmount, 0)}
         creditsExpiring={creditsExpiring}
+        creditLots={creditLots}
         planId={planId}
         workflowRunsRemaining={workflowRunsRemaining}
       />
@@ -404,6 +443,7 @@ export default function BillingPage() {
               paypalEnabled={paypalConfig.enabled}
               onPaidDone={handleBillingRefresh}
               autoPayOrderId={payOrderId}
+              onAutoPayConsumed={handleAutoPayConsumed}
             />
           )}
         </TabsContent>

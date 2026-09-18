@@ -25,6 +25,7 @@ import { verifyCassoWebhookSignature, extractCassoTransfer } from './casso-signa
 import { processEarningsPayoutCassoIPN } from '../../admin/earnings-payout/service';
 import { PAYMENT_ERROR_MESSAGES } from './constant';
 import { appendCassoIpnLog } from './casso-ipn-log';
+import { notifyPaymentIpnSuccess } from './payment-ipn-notify';
 
 interface IPaymentApplicationService {
   createPaymentUrlUseCase(identifier: string, request: CreatePayment, ipAddr: string): Promise<string>;
@@ -199,6 +200,9 @@ export function createPaymentApplicationService(c: Context, bindingName: string)
             transferCode: transfer.code,
             identifier,
           });
+          if (typeof result.orderId === 'number' && result.orderId > 0) {
+            await notifyPaymentIpnSuccess(userDO, { orderId: result.orderId, paymentId });
+          }
         }
         return result;
       } catch (e) {

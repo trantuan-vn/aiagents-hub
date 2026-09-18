@@ -70,7 +70,7 @@ import {
 import { createDocumentAIService } from '../member/ekyc/application';
 import { EKYC_SERVICES } from '../member/ekyc/constant';
 import { processFormData, processDocumentFormData, processFaceFormData, mergeImages, hashIdentifier, saveToEkycR2, getFromEkycR2 } from '../member/ekyc/utils';
-import { resolveCreditBalance, soonestExpiry } from '../member/workflows/billing/credit-wallet';
+import { publicCreditLots, resolveCreditBalance, soonestExpiry } from '../member/workflows/billing/credit-wallet';
 import { loadUserAndSyncPlan } from '../member/workflows/billing/billing';
 import { publicPlansCatalog } from '../member/workflows/billing/catalog';
 import { loadProposals, memberCoeffNotices } from '../admin/billing/contribution';
@@ -1011,6 +1011,7 @@ export function createAuthRoutes(bindingName: string) {
         creditBalance,
         walletCurrency: 'CR',
         creditsExpiring: soonestExpiry(resolved.lots),
+        creditLots: publicCreditLots(resolved.lots),
         planId: quota.planId,
         canBuyCredits: quota.canBuyCredits,
         workflowRunsToday: quota.workflowRunsToday,

@@ -1,4 +1,5 @@
-import { DEFAULT_PLAN_ENTITLEMENTS, prepaidUsd, type PlanId, type PlanInterval } from '../workflows/billing/plan';
+import type { BillingEconomics } from '../../admin/service/credit';
+import { DEFAULT_PLAN_ENTITLEMENTS, grantIncludedWalletPatch, prepaidUsd, type PlanId, type PlanInterval } from '../workflows/billing/plan';
 
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 
@@ -36,8 +37,12 @@ export function addUtcMonths(from: Date, months: number): Date {
   return new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + months, from.getUTCDate(), from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds()));
 }
 
-export function paidPlanGrantPatch(intent: PlanOrderIntent, now = new Date()): Record<string, unknown> {
-  return {
+export function paidPlanGrantPatch(
+  intent: PlanOrderIntent,
+  now = new Date(),
+  opts?: { user: Record<string, unknown>; eco: BillingEconomics },
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
     planId: intent.planId,
     planSource: 'order',
     planInterval: intent.interval,
@@ -45,5 +50,10 @@ export function paidPlanGrantPatch(intent: PlanOrderIntent, now = new Date()): R
     planCurrentPeriodEnd: addUtcMonths(now, intent.interval).toISOString(),
     cancelAtPeriodEnd: true,
     pendingPlanId: null,
+  };
+  if (!opts?.user) return base;
+  return {
+    ...base,
+    ...grantIncludedWalletPatch({ ...opts.user, ...base }, intent.planId, opts.eco, now),
   };
 }

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-import { Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -13,6 +13,8 @@ interface PaymentCassoPanelProps {
   loadingLabel: string;
   error: string | null;
   qrSrc: string | null;
+  success?: boolean;
+  successLabel?: string;
   cancelLabel: string;
   paidDoneLabel: string;
   onCancel: () => void;
@@ -25,6 +27,8 @@ export function PaymentCassoPanel({
   loadingLabel,
   error,
   qrSrc,
+  success = false,
+  successLabel,
   cancelLabel,
   paidDoneLabel,
   onCancel,
@@ -34,14 +38,20 @@ export function PaymentCassoPanel({
     <>
       <p className="text-muted-foreground text-sm">{hint}</p>
       <div className="bg-muted flex min-h-[220px] items-center justify-center rounded-lg border p-4">
-        {loading && (
+        {success && (
+          <div className="flex flex-col items-center gap-2 text-center">
+            <CheckCircle2 className="h-12 w-12 text-emerald-500" />
+            <span className="text-sm font-medium">{successLabel}</span>
+          </div>
+        )}
+        {!success && loading && !qrSrc && (
           <div className="flex flex-col items-center gap-2">
             <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
             <span className="text-muted-foreground text-sm">{loadingLabel}</span>
           </div>
         )}
-        {!loading && error && <p className="text-destructive text-center text-sm">{error}</p>}
-        {!loading && !error && qrSrc && (
+        {!success && !qrSrc && error && <p className="text-destructive text-center text-sm">{error}</p>}
+        {!success && qrSrc && (
           <Image
             src={qrSrc}
             alt=""
@@ -53,10 +63,10 @@ export function PaymentCassoPanel({
         )}
       </div>
       <DialogFooter className="gap-2 sm:gap-0">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={success}>
           {cancelLabel}
         </Button>
-        <Button type="button" onClick={onPaidDone}>
+        <Button type="button" onClick={onPaidDone} disabled={success}>
           {paidDoneLabel}
         </Button>
       </DialogFooter>

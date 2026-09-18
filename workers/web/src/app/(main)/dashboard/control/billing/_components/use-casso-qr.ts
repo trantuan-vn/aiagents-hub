@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useTranslations } from "next-intl";
 
@@ -27,44 +27,53 @@ export function useCassoQr({
   const [cassoLoading, setCassoLoading] = useState(false);
   const [cassoError, setCassoError] = useState<string | null>(null);
 
+  const onCassoQrRef = useRef(onCassoQr);
+  onCassoQrRef.current = onCassoQr;
+  const tRef = useRef(t);
+  tRef.current = t;
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+  const loadedKeyRef = useRef<string | null>(null);
+
+  const requestKey = `${orderId}:${orderPayableVnd}`;
+
   useEffect(() => {
     if (!open) {
       setCassoQr(null);
       setCassoError(null);
       setCassoLoading(false);
+      loadedKeyRef.current = null;
     }
   }, [open]);
 
   useEffect(() => {
-    if (!open || paymentTab !== "casso") {
-      return;
-    }
+    if (!open || paymentTab !== "casso") return;
+    if (loadedKeyRef.current === requestKey) return;
+
     let cancelled = false;
     setCassoLoading(true);
     setCassoError(null);
     setCassoQr(null);
-    void onCassoQr(orderId, orderPayableVnd)
+    void onCassoQrRef
+      .current(orderId, orderPayableVnd)
       .then((res) => {
-        if (!cancelled) {
-          setCassoQr(res.qr);
-        }
+        if (cancelled) return;
+        loadedKeyRef.current = requestKey;
+        setCassoQr(res.qr);
       })
       .catch((error: unknown) => {
-        if (!cancelled) {
-          const message = error instanceof Error ? error.message : t("casso_qr_error");
-          setCassoError(message);
-          toast({ title: t("error"), description: message, variant: "destructive" });
-        }
+        if (cancelled) return;
+        const message = error instanceof Error ? error.message : tRef.current("casso_qr_error");
+        setCassoError(message);
+        toastRef.current({ title: tRef.current("error"), description: message, variant: "destructive" });
       })
       .finally(() => {
-        if (!cancelled) {
-          setCassoLoading(false);
-        }
+        if (!cancelled) setCassoLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [open, paymentTab, orderId, onCassoQr, orderPayableVnd, t, toast]);
+  }, [open, paymentTab, orderId, orderPayableVnd, requestKey]);
 
   return { cassoQr, cassoLoading, cassoError };
 }

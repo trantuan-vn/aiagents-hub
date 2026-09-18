@@ -3,6 +3,7 @@ import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { AdminGrantPlanSchema, grantAdminPlan } from '../../member/paypal/subscriptions';
+import { expireCreditLotsForAllUsers } from '../../member/workflows/billing/expire-lots';
 import { confirmCoeffProposal, dismissCoeffProposal, getContributionReport, scanContributionAndPropose } from './scan';
 import {
   getUserEconomicsReport,
@@ -37,6 +38,17 @@ export function createAdminBillingRoutes() {
         return c.json({ error: e.message }, 404);
       }
       const { errorResponse, status } = await handleError(c, e, 'Failed to load user economics');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/credit-lots/expire', async (c) => {
+    try {
+      requireAdmin(c);
+      const result = await expireCreditLotsForAllUsers(c.env);
+      return c.json(result);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to expire credit lots');
       return c.json(errorResponse, status);
     }
   });

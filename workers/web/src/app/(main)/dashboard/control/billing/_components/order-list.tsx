@@ -40,6 +40,7 @@ interface OrderListProps {
   paypalEnabled?: boolean;
   onPaidDone?: () => void;
   autoPayOrderId?: number | null;
+  onAutoPayConsumed?: () => void;
   /** Read-only mode: không hiển thị nút thanh toán và hủy (dùng cho tab History) */
   readOnly?: boolean;
 }
@@ -58,6 +59,7 @@ export function OrderList({
   paypalEnabled = false,
   onPaidDone,
   autoPayOrderId = null,
+  onAutoPayConsumed,
   readOnly = false,
 }: OrderListProps) {
   const t = useTranslations("BillingPage");
@@ -72,8 +74,9 @@ export function OrderList({
     if (order && (order.status === "PENDING" || order.status === "CONFIRMED")) {
       setSelectedOrder(order);
       setPaymentTab("casso");
+      onAutoPayConsumed?.();
     }
-  }, [autoPayOrderId, orders, readOnly]);
+  }, [autoPayOrderId, orders, readOnly, onAutoPayConsumed]);
 
   const getStatusBadgeVariant = (status: OrderStatus): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {

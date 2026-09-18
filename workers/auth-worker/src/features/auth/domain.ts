@@ -172,7 +172,7 @@ export const UserSchema = BaseUserSchema.extend({
     z.number().min(0),
   ).optional(),
   walletCurrency: z.enum(['USD', 'CR']).optional(),
-  /** FIFO lots JSON: [{ credits, remaining, expiresAt, source }] */
+  /** FIFO lots JSON: [{ credits, remaining, expiresAt?, source }]. Purchased lots never expire. */
   creditLotsJson: z.string().max(100_000).optional(),
   /** Membership tier from monthly top-up volume (VND). */
   membershipTier: z.enum(['member', 'silver', 'gold', 'diamond']).default('member').optional(),
@@ -204,7 +204,8 @@ export const UserSchema = BaseUserSchema.extend({
   planCurrentPeriodEnd: z.string().optional(),
   planStatus: z.enum(['active', 'approval_pending', 'past_due', 'suspended', 'canceled', 'none']).optional(),
   cancelAtPeriodEnd: z.boolean().optional(),
-  pendingPlanId: z.enum(['free', 'starter', 'pro', 'business']).optional(),
+  /** `null` clears a scheduled plan change (SQLite NULL). `.optional()` rejects null. */
+  pendingPlanId: z.enum(['free', 'starter', 'pro', 'business']).nullish(),
   enterpriseContract: z.boolean().optional(),
   autoTopUpEnabled: z.boolean().optional(),
   autoTopUpUsd: z.union([z.literal(5), z.literal(20), z.literal(50)]).optional(),
@@ -216,6 +217,8 @@ export const UserSchema = BaseUserSchema.extend({
   graceLastByWorkflowJson: z.string().max(20_000).optional(),
   /** UTC YYYY-MM of the current included-credit grant. */
   planPeriodYm: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  /** Plan whose included credits were granted in `planPeriodYm` (detects mid-cycle upgrades). */
+  planIncludedGrantPlanId: z.enum(['free', 'starter', 'pro', 'business']).optional(),
   workflowRunsToday: z.preprocess(
     (v) => (v === undefined || v === null || v === "" ? 0 : Number(v)),
     z.number().int().min(0),

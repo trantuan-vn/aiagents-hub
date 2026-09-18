@@ -63,8 +63,53 @@ describe('plan entitlements', () => {
     );
     expect(patch.grantedIncluded).toBe(true);
     expect(patch.planPeriodYm).toBe('2026-09');
+    expect(patch.planIncludedGrantPlanId).toBe('pro');
     expect(patch.walletBalance).toBe(2_000);
     expect(periodEndIso('2026-09')).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it('grants the new plan included credits on a same-month upgrade from Free', () => {
+    const now = new Date('2026-09-18T15:00:00.000Z');
+    const patch = syncPlanPeriod(
+      {
+        planId: 'starter',
+        planSource: 'order',
+        planCurrentPeriodEnd: '2099-01-01T00:00:00.000Z',
+        planPeriodYm: '2026-09',
+        walletCurrency: 'CR',
+        creditLotsJson: JSON.stringify([
+          { credits: 150, remaining: 80, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+          { credits: 10, remaining: 10, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+        ]),
+      },
+      eco,
+      now,
+    );
+    expect(patch.grantedIncluded).toBe(true);
+    expect(patch.planIncludedGrantPlanId).toBe('starter');
+    expect(patch.walletBalance).toBe(590);
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{ remaining: number; source: string; credits: number }>;
+    expect(lots.filter((lot) => lot.source === 'included')).toEqual([
+      expect.objectContaining({ remaining: 580, credits: 650, source: 'included' }),
+    ]);
+    expect(lots.find((lot) => lot.source === 'purchased')?.remaining).toBe(10);
+  });
+
+  it('does not re-grant included credits after they were spent this period', () => {
+    const patch = syncPlanPeriod(
+      {
+        planId: 'starter',
+        planSource: 'order',
+        planCurrentPeriodEnd: '2099-01-01T00:00:00.000Z',
+        planPeriodYm: '2026-09',
+        planIncludedGrantPlanId: 'starter',
+        creditLotsJson: '[]',
+      },
+      eco,
+      new Date('2026-09-18T15:00:00.000Z'),
+    );
+    expect(patch.grantedIncluded).toBe(false);
+    expect(patch.walletBalance).toBeUndefined();
   });
 
   it('resets daily runs on a new UTC day', () => {

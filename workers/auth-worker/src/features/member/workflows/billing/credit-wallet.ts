@@ -5,7 +5,8 @@ export type CreditLotSource = 'purchased' | 'included' | 'grace';
 export type CreditLot = {
   credits: number;
   remaining: number;
-  expiresAt: string;
+  /** Plan included/grace lots expire. Purchased (top-up) lots never expire. */
+  expiresAt?: string;
   source: CreditLotSource;
   includedCogsUsdCap?: number;
   includedCogsUsdSpent?: number;
@@ -30,18 +31,18 @@ function normalizeLots(rows: unknown[]): CreditLot[] {
     const r = row as Record<string, unknown>;
     const remaining = roundCredits(Number(r.remaining ?? r.credits ?? 0));
     if (remaining <= 0) continue;
-    const expiresAt = String(r.expiresAt ?? r.expires_at ?? '');
-    if (!expiresAt) continue;
     const source: CreditLotSource =
       r.source === 'included' ? 'included' : r.source === 'grace' ? 'grace' : 'purchased';
+    const expiresAt = String(r.expiresAt ?? r.expires_at ?? '');
+    if (source !== 'purchased' && !expiresAt) continue;
     const capRaw = Number(r.includedCogsUsdCap ?? r.included_cogs_usd_cap);
     const spentRaw = Number(r.includedCogsUsdSpent ?? r.included_cogs_usd_spent);
     const lot: CreditLot = {
       credits: roundCredits(Number(r.credits ?? remaining)),
       remaining,
-      expiresAt,
       source,
     };
+    if (expiresAt) lot.expiresAt = expiresAt;
     if (source === 'included' && Number.isFinite(capRaw) && capRaw > 0) lot.includedCogsUsdCap = capRaw;
     if (source === 'included' && Number.isFinite(spentRaw) && spentRaw > 0) lot.includedCogsUsdSpent = spentRaw;
     lots.push(lot);
@@ -49,8 +50,47 @@ function normalizeLots(rows: unknown[]): CreditLot[] {
   return lots;
 }
 
+function lotMergeKey(lot: CreditLot): string {
+  if (lot.source === 'purchased') return 'purchased:never';
+  const exp = Date.parse(lot.expiresAt ?? '');
+  const day = Number.isNaN(exp) ? '' : new Date(exp).toISOString().slice(0, 10);
+  return `${lot.source}:${day}`;
+}
+
+/** Merge lots of the same source that expire on the same UTC day (purchased lots always merge). */
+export function coalesceCreditLots(lots: CreditLot[]): CreditLot[] {
+  const merged = new Map<string, CreditLot>();
+  for (const lot of lots) {
+    if (lot.remaining <= 0) continue;
+    const key = lotMergeKey(lot);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { ...lot });
+      continue;
+    }
+    existing.credits = roundCredits(existing.credits + lot.credits);
+    existing.remaining = roundCredits(existing.remaining + lot.remaining);
+    if (lot.expiresAt && (!existing.expiresAt || lot.expiresAt < existing.expiresAt)) {
+      existing.expiresAt = lot.expiresAt;
+    }
+    if (existing.source === 'included') {
+      const cap = (Number(existing.includedCogsUsdCap ?? 0) || 0) + (Number(lot.includedCogsUsdCap ?? 0) || 0);
+      const spent = (Number(existing.includedCogsUsdSpent ?? 0) || 0) + (Number(lot.includedCogsUsdSpent ?? 0) || 0);
+      if (cap > 0) existing.includedCogsUsdCap = Math.round(cap * 1e8) / 1e8;
+      if (spent > 0) existing.includedCogsUsdSpent = Math.round(spent * 1e8) / 1e8;
+    }
+  }
+  return [...merged.values()];
+}
+
 export function serializeCreditLots(lots: CreditLot[]): string {
-  return JSON.stringify(lots.filter((l) => l.remaining > 0));
+  return JSON.stringify(
+    coalesceCreditLots(lots.filter((l) => l.remaining > 0)).map((lot) => {
+      if (lot.source !== 'purchased') return lot;
+      const { expiresAt: _expiresAt, ...rest } = lot;
+      return rest;
+    }),
+  );
 }
 
 export function isCreditWallet(user: Record<string, unknown>): boolean {
@@ -64,9 +104,22 @@ export function expiryIso(days: number, from = new Date()): string {
   return d.toISOString();
 }
 
+/** Purchased top-up lots never expire. Included/grace lots expire at expiresAt. */
+export function isLotExpired(lot: CreditLot, now = new Date()): boolean {
+  if (lot.source === 'purchased') return false;
+  const exp = Date.parse(lot.expiresAt ?? '');
+  if (Number.isNaN(exp)) return false;
+  return exp <= now.getTime();
+}
+
+export function lotExpiryTime(lot: CreditLot): number {
+  if (lot.source === 'purchased') return Number.POSITIVE_INFINITY;
+  const exp = Date.parse(lot.expiresAt ?? '');
+  return Number.isNaN(exp) ? Number.POSITIVE_INFINITY : exp;
+}
+
 export function liveLots(lots: CreditLot[], now = new Date()): CreditLot[] {
-  const t = now.getTime();
-  return lots.filter((lot) => lot.remaining > 0 && !Number.isNaN(Date.parse(lot.expiresAt)) && Date.parse(lot.expiresAt) > t);
+  return lots.filter((lot) => lot.remaining > 0 && !isLotExpired(lot, now));
 }
 
 export function creditBalanceFromLots(lots: CreditLot[], now = new Date()): number {
@@ -74,9 +127,77 @@ export function creditBalanceFromLots(lots: CreditLot[], now = new Date()): numb
 }
 
 export function soonestExpiry(lots: CreditLot[], now = new Date()): string | null {
-  const live = liveLots(lots, now);
-  if (!live.length) return null;
-  return live.reduce((min, lot) => (lot.expiresAt < min ? lot.expiresAt : min), live[0].expiresAt);
+  const dates = liveLots(lots, now)
+    .map((lot) => (lot.source === 'purchased' ? '' : lot.expiresAt ?? ''))
+    .filter(Boolean)
+    .sort();
+  return dates[0] ?? null;
+}
+
+export type CreditLotView = {
+  remaining: number;
+  credits: number;
+  expiresAt: string | null;
+  source: CreditLotSource;
+};
+
+export function publicCreditLots(lots: CreditLot[], now = new Date()): CreditLotView[] {
+  return coalesceCreditLots(liveLots(lots, now))
+    .slice()
+    .sort((a, b) => lotExpiryTime(a) - lotExpiryTime(b))
+    .map((lot) => ({
+      remaining: lot.remaining,
+      credits: lot.credits,
+      expiresAt: lot.source === 'purchased' ? null : lot.expiresAt ?? null,
+      source: lot.source,
+    }));
+}
+
+/** Zero remaining on lots past expiresAt; drop those blocks from the live list. */
+export function expireCreditLots(
+  lots: CreditLot[],
+  now = new Date(),
+): { lots: CreditLot[]; expired: CreditLot[] } {
+  const live: CreditLot[] = [];
+  const expired: CreditLot[] = [];
+  for (const lot of lots) {
+    if (isLotExpired(lot, now)) {
+      if (lot.remaining > 0) expired.push({ ...lot, remaining: 0 });
+      continue;
+    }
+    if (lot.remaining > 0) live.push(lot);
+  }
+  return { lots: coalesceCreditLots(live), expired };
+}
+
+export function sweepExpiredWalletPatch(
+  user: Record<string, unknown>,
+  now = new Date(),
+): { walletBalance: number; walletCurrency: 'CR'; creditLotsJson: string } | null {
+  const parsed = parseCreditLots(user.creditLotsJson ?? user.credit_lots_json);
+  if (!parsed.length) return null;
+  const { lots, expired } = expireCreditLots(parsed, now);
+  if (!expired.length) return null;
+  return {
+    walletBalance: creditBalanceFromLots(lots, now),
+    walletCurrency: 'CR',
+    creditLotsJson: serializeCreditLots(lots),
+  };
+}
+
+export function compactCreditLotsPatch(
+  user: Record<string, unknown>,
+  now = new Date(),
+): { walletBalance: number; walletCurrency: 'CR'; creditLotsJson: string } | null {
+  const parsed = parseCreditLots(user.creditLotsJson ?? user.credit_lots_json);
+  const live = liveLots(parsed, now);
+  const compacted = coalesceCreditLots(live);
+  if (compacted.length >= live.length) return null;
+  return {
+    walletBalance: creditBalanceFromLots(compacted, now),
+    walletCurrency: 'CR',
+    creditLotsJson: serializeCreditLots(compacted),
+  };
 }
 
 /** Interpret wallet as Credit; lazy-convert leftover USD balances. */
@@ -86,7 +207,7 @@ export function resolveCreditBalance(
   now = new Date(),
 ): { credits: number; lots: CreditLot[]; migrated: boolean } {
   const lots = parseCreditLots(user.creditLotsJson ?? user.credit_lots_json);
-  const live = liveLots(lots, now);
+  const live = coalesceCreditLots(liveLots(lots, now));
   if (isCreditWallet(user) || live.length) {
     return { credits: creditBalanceFromLots(live, now), lots: live, migrated: false };
   }
@@ -99,7 +220,6 @@ export function resolveCreditBalance(
       {
         credits,
         remaining: credits,
-        expiresAt: expiryIso(eco.creditExpiryDays, now),
         source: 'purchased',
       },
     ],
@@ -116,7 +236,7 @@ export function debitCreditLots(
   let left = roundCredits(amount);
   const cogs = Number(opts?.cogsAiUsd ?? 0) || 0;
   const next: CreditLot[] = [];
-  const ordered = liveLots(lots, now).sort((a, b) => a.expiresAt.localeCompare(b.expiresAt));
+  const ordered = coalesceCreditLots(liveLots(lots, now)).sort((a, b) => lotExpiryTime(a) - lotExpiryTime(b));
   for (const lot of ordered) {
     if (left <= 0) {
       next.push(lot);
@@ -161,16 +281,15 @@ export function creditPurchasedLots(
   now = new Date(),
 ): CreditLot[] {
   const add = roundCredits(credits);
-  if (add <= 0) return liveLots(lots, now);
-  return [
+  if (add <= 0) return coalesceCreditLots(liveLots(lots, now));
+  return coalesceCreditLots([
     ...liveLots(lots, now),
     {
       credits: add,
       remaining: add,
-      expiresAt: expiryIso(eco.creditExpiryDays, now),
       source: 'purchased',
     },
-  ];
+  ]);
 }
 
 export function creditIncludedLots(
@@ -181,7 +300,7 @@ export function creditIncludedLots(
   now = new Date(),
 ): CreditLot[] {
   const add = roundCredits(credits);
-  if (add <= 0) return liveLots(lots, now);
+  if (add <= 0) return coalesceCreditLots(liveLots(lots, now));
   const lot: CreditLot = {
     credits: add,
     remaining: add,
@@ -189,7 +308,7 @@ export function creditIncludedLots(
     source: 'included',
   };
   if (includedCogsUsdCap != null && includedCogsUsdCap > 0) lot.includedCogsUsdCap = includedCogsUsdCap;
-  return [...liveLots(lots, now), lot];
+  return coalesceCreditLots([...liveLots(lots, now), lot]);
 }
 
 export function applyWalletCreditDebit(

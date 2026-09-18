@@ -363,6 +363,12 @@ export class UserDO extends DurableObject {
       throw new Error(`Unknown path: ${url.pathname}`);
     } catch (error) {
       handleErrorWithoutIp(error, `UserDO ${this.userId} fetch error`);
+      if (error instanceof z.ZodError) {
+        const detail = error.issues
+          .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
+          .join('; ');
+        return this.jsonResponse({ success: false, error: detail }, 400);
+      }
       return this.jsonResponse({ success: false, error: 'Internal Server Error' }, 500);
     }
   }

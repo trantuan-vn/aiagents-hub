@@ -117,6 +117,9 @@ export function createVNPayService(
       }
       const planIntent = parsePlanOrderIntent(orderRow);
       if (planIntent) {
+        const eco = walletOptions?.env
+          ? await getBillingEconomicsFromEnv(walletOptions.env)
+          : undefined;
         operations.push({
           table: 'orders',
           operation: 'update',
@@ -127,7 +130,10 @@ export function createVNPayService(
           table: 'users',
           operation: 'update',
           id: dbUser.id,
-          data: { ...paidPlanGrantPatch(planIntent), queueStatus: 'pending' },
+          data: {
+            ...paidPlanGrantPatch(planIntent, new Date(), eco ? { user: dbUser, eco } : undefined),
+            queueStatus: 'pending',
+          },
         });
         await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
         return;
@@ -648,6 +654,8 @@ export function createVNPayService(
       success: true,
       code: "00",
       message: "Success",
+      orderId: order.id,
+      amount: creditedVnd,
     };
   };
 
