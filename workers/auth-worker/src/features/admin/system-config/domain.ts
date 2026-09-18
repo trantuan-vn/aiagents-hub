@@ -67,12 +67,24 @@ export const BillingConfigSchema = z.object({
 });
 export type BillingConfig = z.infer<typeof BillingConfigSchema>;
 
+/** Số liệu marketing trang chủ: seed + (số thật hàng ngày × hệ số). Hệ số = 1 khi số thật đã đủ lớn. */
+export const MarketingConfigSchema = z.object({
+	/** Số user khởi điểm (marketing). */
+	USERS_SEED: z.number().int().min(0).max(100_000_000).optional(),
+	/** Số lượt chạy workflow khởi điểm (marketing). */
+	WORKFLOW_RUNS_SEED: z.number().int().min(0).max(10_000_000_000).optional(),
+	/** Nhân số liệu thật cộng dồn mỗi ngày. 1 = phản ánh trung thực. */
+	STATS_COEFF: z.number().min(0).max(100).optional(),
+});
+export type MarketingConfig = z.infer<typeof MarketingConfigSchema>;
+
 /** Toàn bộ cấu hình hệ thống */
 export const SystemConfigSchema = z.object({
 	auth_worker: AuthWorkerConfigSchema.optional(),
 	queue_worker: QueueWorkerConfigSchema.optional(),
 	d1tor2_cron: D1tor2CronConfigSchema.optional(),
 	billing: BillingConfigSchema.optional(),
+	marketing: MarketingConfigSchema.optional(),
 });
 export type SystemConfig = z.infer<typeof SystemConfigSchema>;
 
@@ -122,4 +134,12 @@ export const DEFAULT_BILLING_CONFIG: BillingConfig = {
 	FLOOR_CONTRIBUTION_FRONTIER_PCT: 30,
 };
 
+export const DEFAULT_MARKETING_CONFIG: MarketingConfig = {
+	USERS_SEED: 18_400,
+	WORKFLOW_RUNS_SEED: 3_280_000,
+	STATS_COEFF: 8,
+};
+
 export const KV_KEY = 'aiagents-hub-system-config';
+export const MARKETING_STATS_ACC_KEY = 'aiagents-hub-marketing-stats-acc';
+export const MARKETING_STATS_RUNS_TOTAL_KEY = 'aiagents-hub-marketing-runs-total';

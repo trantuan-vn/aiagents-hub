@@ -1,5 +1,6 @@
 import { executeUtils } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
+import { bumpMarketingWorkflowRun } from '../../../admin/system-config/marketing-stats.js';
 import { computeUsageCredits, type BillingEconomics } from '../../../admin/service/credit.js';
 import { getBillingEconomicsFromEnv } from '../../../admin/service/get-billing-economics.js';
 import { computeUsageChargeUsd, getServiceModel } from '../../../admin/service/pricing.js';
@@ -229,6 +230,7 @@ export async function consumeDailyWorkflowRun(
       { id: row.id, ...row, ...bumped, queueStatus: 'pending' },
       'users',
     );
+    await bumpMarketingWorkflowRun(env);
     return { usedGrace: false };
   } catch {
     const lastMap = parseGraceLastByWorkflow(row.graceLastByWorkflowJson ?? row.grace_last_by_workflow_json);
@@ -260,6 +262,7 @@ export async function consumeDailyWorkflowRun(
       },
       'users',
     );
+    await bumpMarketingWorkflowRun(env);
     return { usedGrace: true };
   }
 }

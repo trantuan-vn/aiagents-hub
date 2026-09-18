@@ -12,11 +12,18 @@ import { useToast } from "@/hooks/use-toast";
 import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { ConfigCard } from "./_components/config-card";
-import { getAuthFields, getBillingFields, getD1tor2Fields, getQueueFields } from "./_components/field-definitions";
+import {
+  getAuthFields,
+  getBillingFields,
+  getD1tor2Fields,
+  getMarketingFields,
+  getQueueFields,
+} from "./_components/field-definitions";
 import type {
   AuthWorkerConfig,
   BillingConfig,
   D1tor2CronConfig,
+  MarketingConfig,
   QueueWorkerConfig,
   SystemConfigData,
 } from "./_components/types";
@@ -53,6 +60,7 @@ export default function SystemConfigPage() {
           queue_worker?: QueueWorkerConfig;
           d1tor2_cron?: D1tor2CronConfig;
           billing?: BillingConfig;
+          marketing?: MarketingConfig;
         };
       }
       const result: ApiResponse = await response.json();
@@ -62,6 +70,7 @@ export default function SystemConfigPage() {
         queue_worker: { ...data.queue_worker },
         d1tor2_cron: { ...data.d1tor2_cron },
         billing: { ...data.billing },
+        marketing: { ...data.marketing },
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : t("fetch_error");
@@ -121,6 +130,10 @@ export default function SystemConfigPage() {
     setConfig((prev) => (prev ? { ...prev, billing: { ...prev.billing, [key]: value } } : prev));
   }, []);
 
+  const updateMarketing = useCallback((key: keyof MarketingConfig, value: number) => {
+    setConfig((prev) => (prev ? { ...prev, marketing: { ...prev.marketing, [key]: value } } : prev));
+  }, []);
+
   if (isLoading || !config) {
     return (
       <div className="flex flex-col gap-4">
@@ -138,11 +151,13 @@ export default function SystemConfigPage() {
   const handleQueueChange = (key: string, value: number) => updateQueue(key as keyof QueueWorkerConfig, value);
   const handleD1tor2Change = (key: string, value: number) => updateD1tor2(key as keyof D1tor2CronConfig, value);
   const handleBillingChange = (key: string, value: number) => updateBilling(key as keyof BillingConfig, value);
+  const handleMarketingChange = (key: string, value: number) => updateMarketing(key as keyof MarketingConfig, value);
 
   const authFields = getAuthFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
   const queueFields = getQueueFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
   const d1tor2Fields = getD1tor2Fields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
   const billingFields = getBillingFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
+  const marketingFields = getMarketingFields(config).map((f) => ({ ...f, label: t(`fields.${f.key}`) }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -165,7 +180,7 @@ export default function SystemConfigPage() {
         </Alert>
       )}
 
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
         <ConfigCard
           title={t("auth_worker")}
           description={t("auth_worker_desc")}
@@ -189,6 +204,12 @@ export default function SystemConfigPage() {
           description={t("billing_desc")}
           fields={billingFields}
           onFieldChange={handleBillingChange}
+        />
+        <ConfigCard
+          title={t("marketing")}
+          description={t("marketing_desc")}
+          fields={marketingFields}
+          onFieldChange={handleMarketingChange}
         />
       </div>
     </div>

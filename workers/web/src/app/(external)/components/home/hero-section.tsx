@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import NextLink from "next/link";
 
-import { ArrowRight, Coins, Play, Shield, Sparkles, Workflow } from "lucide-react";
+import { ArrowRight, Play, Sparkles, Webhook, Workflow } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Link } from "react-router-dom";
 
@@ -13,13 +13,48 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { Button } from "../ui/button";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
+
+function formatMarketingCount(n: number): string {
+  if (!Number.isFinite(n) || n < 0) return "—";
+  if (n >= 1_000_000) {
+    const m = n / 1_000_000;
+    return `${m >= 10 ? Math.round(m) : Math.round(m * 10) / 10}M+`;
+  }
+  if (n >= 1_000) {
+    const k = n / 1_000;
+    return `${k >= 10 ? Math.round(k) : Math.round(k * 10) / 10}K+`;
+  }
+  return `${Math.round(n)}+`;
+}
+
 const HeroSection = () => {
   const t = useTranslations("Hero");
   const themeMode = usePreferencesStore((s) => s.themeMode);
+  const [usersLabel, setUsersLabel] = useState(t("stat_users_value"));
+  const [runsLabel, setRunsLabel] = useState(t("stat_runs_value"));
 
   useEffect(() => {
     updateThemeMode(themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`${API_BASE}/public/stats`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: unknown) => {
+        const body = json as { data?: { users?: number; workflowRuns?: number } } | null;
+        if (cancelled || !body?.data) return;
+        if (typeof body.data.users === "number") setUsersLabel(formatMarketingCount(body.data.users));
+        if (typeof body.data.workflowRuns === "number") setRunsLabel(formatMarketingCount(body.data.workflowRuns));
+      })
+      .catch(() => {
+        /* keep seed fallback from i18n */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <section className="relative flex min-h-screen items-center justify-center overflow-hidden pt-20">
@@ -65,14 +100,14 @@ const HeroSection = () => {
             </Link>
           </div>
 
-          <div className="animate-fade-in mx-auto grid max-w-lg grid-cols-3 gap-8" style={{ animationDelay: "0.4s" }}>
+          <div className="animate-fade-in mx-auto grid max-w-2xl grid-cols-3 gap-6 md:gap-8" style={{ animationDelay: "0.4s" }}>
             <div className="text-center">
-              <div className="text-foreground mb-1 text-3xl font-bold md:text-4xl">{t("stat_credit_value")}</div>
-              <div className="text-muted-foreground text-sm">{t("stat_credit_label")}</div>
+              <div className="text-foreground mb-1 text-3xl font-bold md:text-4xl">{usersLabel}</div>
+              <div className="text-muted-foreground text-sm">{t("stat_users_label")}</div>
             </div>
             <div className="text-center">
-              <div className="text-foreground mb-1 text-3xl font-bold md:text-4xl">{t("stat_models_value")}</div>
-              <div className="text-muted-foreground text-sm">{t("stat_models_label")}</div>
+              <div className="text-foreground mb-1 text-3xl font-bold md:text-4xl">{runsLabel}</div>
+              <div className="text-muted-foreground text-sm">{t("stat_runs_label")}</div>
             </div>
             <div className="text-center">
               <div className="text-foreground mb-1 text-3xl font-bold md:text-4xl">{t("stat_plans_value")}</div>
@@ -87,8 +122,8 @@ const HeroSection = () => {
         >
           {[
             { icon: Workflow, label: t("pill_builder") },
-            { icon: Coins, label: t("pill_credits") },
-            { icon: Shield, label: t("pill_enterprise") },
+            { icon: Sparkles, label: t("pill_credits") },
+            { icon: Webhook, label: t("pill_enterprise") },
           ].map((feature) => (
             <div
               key={feature.label}

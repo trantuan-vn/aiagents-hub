@@ -50,9 +50,16 @@ export interface BillingConfig {
   FLOOR_CONTRIBUTION_FRONTIER_PCT?: number;
 }
 
+export interface MarketingConfig {
+  USERS_SEED?: number;
+  WORKFLOW_RUNS_SEED?: number;
+  STATS_COEFF?: number;
+}
+
 export interface SystemConfigData {
   auth_worker?: AuthWorkerConfig;
   queue_worker?: QueueWorkerConfig;
   d1tor2_cron?: D1tor2CronConfig;
   billing?: BillingConfig;
+  marketing?: MarketingConfig;
 }

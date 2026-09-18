@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { getIdFromName, handleError } from '../../../shared/utils';
 import { requireAuth } from '../../auth/authMiddleware';
 import { UserDO } from '../../ws/infrastructure/UserDO';
+import { rollupMarketingStats } from '../../admin/system-config/marketing-stats';
 import { publicPlansCatalog, paypalPlanIdFor, isPaypalBillingEnabled } from '../workflows/billing/catalog';
 import { loadUserAndSyncPlan } from '../workflows/billing/billing';
 import { graceMonthSpent } from '../workflows/billing/plan';
@@ -23,6 +24,11 @@ import {
 export function createPublicPlanRoutes() {
   const app = new Hono<{ Bindings: Env }>();
   app.get('/plans', (c) => c.json(publicPlansCatalog(c.env as unknown as Record<string, unknown> & { PAYPAL_BILLING_ENABLED?: string })));
+  app.get('/stats', async (c) => {
+    const stats = await rollupMarketingStats(c.env);
+    c.header('Cache-Control', 'public, max-age=300');
+    return c.json({ success: true, data: stats });
+  });
   return app;
 }
 

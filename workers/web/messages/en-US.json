@@ -539,7 +539,7 @@
     "terms": "Terms",
     "api_reference": "Workflow API",
     "community": "Community",
-    "description": "Build AI agents and workflows on one platform. Pay in Credits for completed work — not tokens, not infrastructure line items.",
+    "description": "Build AI agents and workflows on one platform. Agents answer customers, handle requests, and run the busywork — billed for jobs that finish.",
     "copyright": "© {year} AI Agents Hub. All rights reserved.",
     "privacy_policy": "Privacy Policy",
     "terms_of_service": "Terms of Service",
@@ -547,10 +547,10 @@
     "quickstart": "Quickstart"
   },
   "Hero": {
-    "badge": "One Platform, One Credit, Unlimited Models",
+    "badge": "Agents that finish work, not just chat",
     "title": "Build AI agents that",
     "title_gradient": "finish the job",
-    "subtitle": "Design workflows, run agents with tools and memory, then pay in Credits for the work they complete. We handle models, cost, and infrastructure behind the scenes.",
+    "subtitle": "Give agents tools and memory so they answer customers, handle requests, retrieve documents, and run the busywork — finished jobs, not half-done chats.",
     "explore_apis": "View pricing",
     "view_demo": "Read the docs",
     "uptime_sla": "Uptime SLA",
@@ -565,41 +565,45 @@
     "stat_credit_label": "Credit for every model",
     "stat_models_value": "∞",
     "stat_models_label": "Models, one meter",
-    "stat_plans_value": "3",
-    "stat_plans_label": "Plans: Free · Pro · Enterprise",
+    "stat_users_value": "18.4K+",
+    "stat_users_label": "Users",
+    "stat_runs_value": "3.3M+",
+    "stat_runs_label": "Workflow runs",
+    "stat_plans_value": "4",
+    "stat_plans_label": "$0 · $4.9 · $19.9 · $99.9",
     "pill_builder": "Visual workflow builder",
-    "pill_credits": "Billed in Credits",
-    "pill_enterprise": "Enterprise SLA"
+    "pill_credits": "Billed for finished work",
+    "pill_enterprise": "Webhooks, cron, hosted chat"
   },
   "Features": {
     "badge": "The platform",
     "title": "Everything to ship",
     "title_gradient": "working agents",
-    "subtitle": "A workspace for building, running, and sharing AI workflows — with one Credit meter instead of token invoices.",
+    "subtitle": "A workspace for building, running, and sharing AI workflows — agents that do the work, with cost you can read before you run.",
     "lightning_fast": "Visual workflow builder",
     "lightning_fast_desc": "Compose agents, tools, RAG, HTTP, and logic on a canvas.",
     "enterprise_security": "Security by default",
     "enterprise_security_desc": "Encrypted in transit, scoped API keys, and least-privilege dashboard access.",
-    "global_cdn": "Runs on the edge",
-    "global_cdn_desc": "Workflows execute on Cloudflare Workers close to your users.",
+    "global_cdn": "Fast replies",
+    "global_cdn_desc": "Agents answer close to your customers — no waiting on a server halfway around the world.",
     "realtime_analytics": "Usage you can explain",
     "realtime_analytics_desc": "Credit estimates before a run and actual charges after.",
     "developer_first": "Developer friendly",
     "developer_first_desc": "Webhook triggers, API keys, and docs that match the product you actually use.",
     "support_24_7": "Support by plan",
-    "support_24_7_desc": "Community on Free, priority on Pro, dedicated SLA on Enterprise.",
+    "support_24_7_desc": "Community on Free. Priority from Starter. Business for teams running real volume.",
     "ai_integration": "Agents, memory, RAG",
     "ai_integration_desc": "Agent nodes with tools, session memory, Vectorize, and database lookups.",
-    "rate_limiting": "Quotas, not surprise bills",
-    "rate_limiting_desc": "Infrastructure quotas come with the plan. AI usage is metered in Credits.",
+    "rate_limiting": "No surprise bills",
+    "rate_limiting_desc": "See what a run costs before it runs. Hit a limit? Upgrade or top up Credits.",
     "workflow_builder": "Visual workflow builder",
     "workflow_builder_desc": "Compose agents, tools, RAG, HTTP, and logic on a canvas. Save versions and run from the dashboard.",
     "agents_rag": "Agents, memory, RAG",
     "agents_rag_desc": "Agent and reasoning-agent nodes with tools, session memory, Vectorize, and database lookups.",
-    "one_credit": "One Credit",
-    "one_credit_desc": "Every model bills in Credits. You see cost per run, not USD per million tokens.",
-    "unlimited_models": "Unlimited models",
-    "unlimited_models_desc": "Swap tiny, mid, or frontier models without changing your plan. We manage coefficients internally.",
+    "one_credit": "Cost you can read",
+    "one_credit_desc": "See what a run costs before it runs — not a token invoice after the fact.",
+    "unlimited_models": "The right power for the job",
+    "unlimited_models_desc": "Pick a faster or deeper model for each task without changing your plan.",
     "webhooks_cron": "Webhooks & cron",
     "webhooks_cron_desc": "Trigger workflows from HTTP, schedules, or hosted chat — same graph, same Credit wallet.",
     "sharing_royalty": "Share & earn",
@@ -607,7 +611,7 @@
     "usage_visibility": "Usage you can explain",
     "usage_visibility_desc": "See Credit estimates before a run and actual charges after — plus logs for each execution.",
     "support_levels": "Support by plan",
-    "support_levels_desc": "Community on Free, priority on Pro, dedicated channels and SLA on Enterprise."
+    "support_levels_desc": "Community on Free. Priority from Starter. Business for teams running real volume."
   },
   "CTA": {
     "title": "Ready to run your",
@@ -615,7 +619,7 @@
     "subtitle": "Start Free with no card. Four plans — Starter, Pro, and Business unlock sharing, webhooks, cron, and extra Credits.",
     "get_started_free": "Start free",
     "talk_to_sales": "Talk to sales",
-    "trusted_by": "Built for teams who want agents that complete work — billed in one Credit."
+    "trusted_by": "Built for teams who want agents that complete work — not another stack to operate."
   },
   "Packages": {
     "badge": "Pricing",
@@ -719,21 +723,21 @@
     "more_features": "+{count} more features",
     "no_packages_found": "No plans found matching your criteria.",
     "layers": {
-      "kicker": "How we charge",
+      "kicker": "How you pay",
       "title": "Three layers.",
       "title_gradient": "That's it.",
-      "subtitle": "We sell platform access, AI/agent consumption, and enterprise guarantees — not Cloudflare invoices.",
+      "subtitle": "Pick a plan for how much work you need done. Pay for the workspace and the agent runs — not a token line item.",
       "subscription": {
-        "title": "Subscription",
-        "body": "The right to use the workspace, builder, sharing, webhooks, cron, and plan-level support. Price stays put when model catalogs move."
+        "title": "Workspace plan",
+        "body": "The right to build, share, and run agents on webhooks or a schedule. Four tiers: $0, $4.9, $19.9, $99.9 — pick by how much work you need done."
       },
       "credit": {
-        "title": "Credit",
-        "body": "Prepaid service units for agent and model usage. Cheap models cost few Credits; frontier models cost more. You never see USD/1M tokens."
+        "title": "Credits",
+        "body": "Pay for agent runs. See the estimate before it runs. Hit a limit? Top up — no surprise bill at month end."
       },
       "enterprise": {
-        "title": "Enterprise",
-        "body": "SLA, dedicated capacity, custom quotas, SSO/audit, and committed Credit volume. Optional BYOK is an add-on — not a token reseller."
+        "title": "Contract",
+        "body": "Need SLA, SSO, or a company invoice? Contact us — not a fifth card on the pricing page."
       }
     },
     "packages": {
@@ -761,15 +765,15 @@
   },
   "AboutPage": {
     "badge": "AI Agents Hub",
-    "title": "We sell completed work,",
-    "title_gradient": "not tokens",
-    "subtitle": "AI Agents Hub is the platform behind aiagents-hub.vn: visual workflows, agents with tools and memory, and one Credit for every model. Customers pay for the job done; we manage cost and infrastructure.",
+    "title": "We help agents",
+    "title_gradient": "finish the job",
+    "subtitle": "AI Agents Hub is where teams design the work once, then let agents answer customers, retrieve documents, and run on a schedule — you care about outcomes, not operating every moving part.",
     "mission": {
       "title": "Why we exist",
       "lead": "Teams should not become token accountants. They should ship agents that answer, retrieve, and act.",
-      "body": "We built a workspace where you design the work once, run it on webhooks, cron, or chat, and see a Credit estimate — not USD per million tokens, not D1/R2 line items. Cheap or frontier models are an internal coefficient. Your plan stays readable.",
+      "body": "We built a workspace where you design the work once, then run it from chat, webhooks, or a schedule. You see the estimate before it runs. Free / Starter / Pro / Business match how much work you need — not a model catalog.",
       "terminal": "POST /hooks/workflows/wf_42/run\nAuthorization: Bearer •••••\n\n200 OK\n{\n  \"status\": \"succeeded\",\n  \"credits\": 1.24,\n  \"job\": \"support_summary\"\n}",
-      "terminal_caption": "Estimate before the run. Charge after. One Credit for every model."
+      "terminal_caption": "Estimate before the run. Charge after the job finishes."
     },
     "values_section": {
       "title": "What we optimize",
@@ -779,11 +783,11 @@
     "values": {
       "job_done": {
         "title": "Charge the job",
-        "description": "Customers buy agent runs and workflow outcomes. We never sell Cloudflare, GPT, or Claude tokens as a product."
+        "description": "You buy agent runs and workflow outcomes — answers, summaries, retrieval — not a token line item."
       },
       "api_first": {
         "title": "Charge the job",
-        "description": "Customers buy agent runs and workflow outcomes. We never sell Cloudflare, GPT, or Claude tokens as a product."
+        "description": "You buy agent runs and workflow outcomes — answers, summaries, retrieval — not a token line item."
       },
       "trust": {
         "title": "Security & trust",
@@ -795,7 +799,7 @@
       },
       "scale": {
         "title": "Grow with usage",
-        "description": "When you serve more users, you spend more Credits — not a surprise jump in plan price. Enterprise adds SLA on top."
+        "description": "When you serve more people, you run more — pick a plan for that volume, without a surprise jump in price."
       }
     },
     "stats": {
@@ -805,15 +809,15 @@
       },
       "latency": {
         "value": "4 plans",
-        "label": "Free · Starter · Pro · Business"
+        "label": "$0 · $4.9 · $19.9 · $99.9"
       },
       "regions": {
         "value": "Edge",
-        "label": "Runs on Cloudflare Workers"
+        "label": "Close to your customers"
       },
       "sla": {
         "value": "SLA",
-        "label": "On Enterprise, with notice"
+        "label": "Contract when you need a guarantee"
       }
     },
     "cta": {
@@ -861,7 +865,7 @@
       },
       "packages": {
         "title": "Pricing",
-        "description": "Free, Pro, Enterprise — Subscription plus Credits."
+        "description": "Free $0, Starter $4.9, Pro $19.9, Business $99.9."
       },
       "support": {
         "title": "Support",
@@ -942,7 +946,7 @@
     "badge": "Join the agent platform team",
     "title": "Build the workspace where",
     "title_gradient": "agents go to work",
-    "subtitle": "We operate aiagents-hub.vn as an AI agent platform: visual workflows, one Credit meter, and infrastructure customers never have to invoice. Help us ship the product teams run every day.",
+    "subtitle": "We operate aiagents-hub.vn so customer teams can put agents to work every day: answering, retrieving, running on a schedule. Help us ship the product they open each morning.",
     "why": {
       "title": "Why",
       "title_gradient": "AI Agents Hub",
@@ -2309,7 +2313,7 @@
   },
   "SystemConfigPage": {
     "title": "System Configuration",
-    "description": "Configure parameters for Auth Worker, Queue Worker, D1tor2-Cron, and billing (USD/VND rate). Changes take effect immediately when saved.",
+    "description": "Configure Auth Worker, Queue Worker, D1tor2-Cron, billing, and homepage marketing stats. USD/VND rate is managed under Exchange rates.",
     "loading": "Loading configuration...",
     "save_config": "Save Configuration",
     "saving": "Saving...",
@@ -2326,6 +2330,8 @@
     "d1tor2_worker_desc": "Pipeline and D1 → R2 retention",
     "billing": "Billing",
     "billing_desc": "Credit price, contribution bands, expiry, and wallet caps. Members see Credits only.",
+    "marketing": "Homepage marketing",
+    "marketing_desc": "Displayed = seed + (daily real totals × coefficient). Set the coefficient to 1 when real volume is large enough.",
     "fields": {
       "QUEUE_BATCH_SIZE": "Queue Batch Size (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Queue Flush Threshold",
@@ -2361,7 +2367,10 @@
       "FX_RELIST_THRESHOLD_PCT": "FX relist threshold (%)",
       "FLOOR_CONTRIBUTION_TINY_PCT": "Floor contribution tiny (%)",
       "FLOOR_CONTRIBUTION_MID_PCT": "Floor contribution mid (%)",
-      "FLOOR_CONTRIBUTION_FRONTIER_PCT": "Floor contribution frontier (%)"
+      "FLOOR_CONTRIBUTION_FRONTIER_PCT": "Floor contribution frontier (%)",
+      "USERS_SEED": "Homepage users seed",
+      "WORKFLOW_RUNS_SEED": "Homepage workflow-runs seed",
+      "STATS_COEFF": "Daily real-stats coefficient (1 = authentic)"
     }
   },
   "WorkflowNodeCatalogAdminPage": {
@@ -4384,7 +4393,7 @@
     "quickstart_try_title": "What a Credit covers",
     "quickstart_try_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not.",
     "quickstart_credits_title": "What a Credit covers",
-    "quickstart_credits_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not. Infrastructure (storage, queues) is absorbed into the plan plus quotas — not a separate invoice.",
+    "quickstart_credits_body": "Model calls (LLM, embed, vision, speech) and AI tools debit Credits. Saving a graph, listing runs, or reading logs does not.",
     "quickstart_more": "Trigger the same graph from HTTP in",
     "api_page_title": "Workflow API",
     "api_page_description": "Authenticate with a Bearer token and POST to a workflow webhook. Usage still bills in Credits on the workspace that owns the run.",
@@ -4439,12 +4448,12 @@
     "posts": {
       "one-platform-one-credit-unlimited-models": {
         "title": "One Platform, One Credit, Unlimited Models",
-        "excerpt": "Why we bill completed agent work in Credits — and refuse to sell tokens or Cloudflare invoices.",
+        "excerpt": "Why we bill completed agent work in Credits — so you know what a run costs before it runs.",
         "body": [
-          "AI Agents Hub is not a model reseller. We do not compete on USD per million tokens. Customers should see one question: how much Credit does this job take?",
-          "Subscription pays for the workspace — builder, sharing, webhooks, cron, support, and infrastructure quotas. Credits pay for AI and agent consumption. Enterprise pays for the guarantee: SLA, dedicated capacity, custom terms.",
-          "Cheap models cost few Credits; frontier models cost more. That difference is an internal coefficient, not a catalog you have to re-negotiate when a provider raises prices. We change coefficients with notice. We do not change your plan price on that path.",
-          "Included Credits expire each period so a gifted pool cannot be stockpiled against a cost shock. Pro can buy more, with a wallet cap. Free is a trial, not the product we intend to live on."
+          "AI Agents Hub is not a model reseller. Customers should see one question: what does this job cost, and did the agent finish it?",
+          "The plan pays for the workspace — builder, sharing, webhooks, cron, and support. Credits pay for agent runs. Need SLA / SSO? That's a contract — not a fifth card.",
+          "Faster or deeper models are a per-job choice, not a reason to change plans. Free $0, Starter $4.9, Pro $19.9, Business $99.9.",
+          "Included Credits expire each period. Starter and above can buy more. Free is a trial of the builder, not the product we live on."
         ]
       },
       "build-your-first-agent-workflow": {
@@ -4492,9 +4501,9 @@
         "excerpt": "Three layers of revenue — and why we keep them separate on purpose.",
         "body": [
           "Free is how you try the builder. Included Credits are small and expire. We do not design Free as the main product.",
-          "Pro is for teams doing real work: more quota, the right to buy Credits, webhooks, and priority support. Plan price should feel boring. Usage should scale with how much the agents actually run.",
-          "Enterprise is the guarantee: SLA, dedicated or custom capacity, committed Credit volume, SSO/audit, and optional BYOK as an add-on. It is not a cheaper token wholesale deal.",
-          "When a provider raises prices, we adjust coefficients with notice. We do not rename Credits into pass-through tokens. That is the whole point of one meter."
+          "Starter $4.9 unlocks sharing, webhooks, cron, and buying Credits. Pro $19.9 is for teams running agents every day. Business $99.9 is for higher volume.",
+          "Need SLA, SSO, or a company invoice? That's a contract — contact us, not a fifth card on /packages.",
+          "Pick a plan for the work you need done. Hit a limit? Top up Credits or upgrade — don't wait for a surprise bill."
         ]
       }
     }

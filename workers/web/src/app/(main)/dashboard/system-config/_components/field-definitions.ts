@@ -225,6 +225,33 @@ export function getBillingFields(config: SystemConfigData): FieldDef[] {
   ];
 }
 
+export function getMarketingFields(config: SystemConfigData): FieldDef[] {
+  const m = config.marketing ?? {};
+  return [
+    {
+      key: "USERS_SEED",
+      label: "Homepage users seed",
+      value: m.USERS_SEED ?? 18_400,
+      min: 0,
+      max: 100_000_000,
+    },
+    {
+      key: "WORKFLOW_RUNS_SEED",
+      label: "Homepage workflow-runs seed",
+      value: m.WORKFLOW_RUNS_SEED ?? 3_280_000,
+      min: 0,
+      max: 10_000_000_000,
+    },
+    {
+      key: "STATS_COEFF",
+      label: "Daily real-stats coefficient (1 = authentic)",
+      value: m.STATS_COEFF ?? 8,
+      min: 0,
+      max: 100,
+    },
+  ];
+}
+
 export function getD1tor2Fields(config: SystemConfigData): FieldDef[] {
   const dc = config.d1tor2_cron ?? {};
   return [

@@ -28,6 +28,7 @@ import { createChatHookRoutes } from './features/member/workflows/api/chat-hooks
 import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
 import { scanContributionAndPropose } from './features/admin/billing/scan';
 import { processPendingCancels } from './features/member/paypal/subscriptions';
+import { rollupMarketingStats } from './features/admin/system-config/marketing-stats';
 import { createServiceRoutes } from './features/admin/service/presentation';
 import { createVoucherRoutes } from './features/admin/voucher/presentation';
 import { createVersionRoutes } from './features/admin/version/presentation';
@@ -198,6 +199,13 @@ export default {
       await processPendingCancels(env, 'USER_DO');
     } catch (err) {
       log.warn('billing.subscription_cancel_scan_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await rollupMarketingStats(env);
+    } catch (err) {
+      log.warn('marketing.stats_rollup_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

@@ -539,7 +539,7 @@
     "terms": "Điều khoản",
     "api_reference": "API workflow",
     "community": "Cộng đồng",
-    "description": "Xây agent và workflow AI trên một nền tảng. Trả Credit cho công việc hoàn thành — không hóa đơn token, không tách dòng hạ tầng.",
+    "description": "Xây agent và workflow AI trên một nền tảng. Agent trả lời khách, xử lý yêu cầu và chạy việc lặp lại — tính theo việc đã xong.",
     "copyright": "© {year} AI Agents Hub. Tất cả quyền được bảo lưu.",
     "privacy_policy": "Chính sách bảo mật",
     "terms_of_service": "Điều khoản dịch vụ",
@@ -547,10 +547,10 @@
     "quickstart": "Bắt đầu nhanh"
   },
   "Hero": {
-    "badge": "One Platform, One Credit, Unlimited Models",
+    "badge": "Agent làm việc thật, không chỉ chat",
     "title": "Xây agent AI",
     "title_gradient": "hoàn thành việc",
-    "subtitle": "Thiết kế workflow, chạy agent với tool và bộ nhớ, rồi trả Credit theo việc đã làm xong. Model, chi phí và hạ tầng do chúng tôi quản lý phía sau.",
+    "subtitle": "Ghép agent với tool và bộ nhớ để trả lời khách, xử lý yêu cầu, truy xuất tài liệu và chạy việc lặp lại — xong việc, không kẹt nửa chừng.",
     "explore_apis": "Xem giá",
     "view_demo": "Đọc tài liệu",
     "uptime_sla": "SLA uptime",
@@ -565,41 +565,45 @@
     "stat_credit_label": "Credit cho mọi model",
     "stat_models_value": "∞",
     "stat_models_label": "Model, một đồng hồ đo",
-    "stat_plans_value": "3",
-    "stat_plans_label": "Gói: Free · Pro · Enterprise",
+    "stat_users_value": "18.4K+",
+    "stat_users_label": "Người dùng",
+    "stat_runs_value": "3.3M+",
+    "stat_runs_label": "Lượt chạy workflow",
+    "stat_plans_value": "4",
+    "stat_plans_label": "$0 · $4.9 · $19.9 · $99.9",
     "pill_builder": "Workflow builder trực quan",
-    "pill_credits": "Tính bằng Credit",
-    "pill_enterprise": "SLA Enterprise"
+    "pill_credits": "Tính theo việc hoàn thành",
+    "pill_enterprise": "Webhook, cron, chat host"
   },
   "Features": {
     "badge": "Nền tảng",
     "title": "Đủ thứ để đưa",
     "title_gradient": "agent vào việc",
-    "subtitle": "Workspace để xây, chạy và chia sẻ workflow AI — một đồng hồ Credit thay vì hóa đơn token.",
+    "subtitle": "Workspace để xây, chạy và chia sẻ workflow AI — agent làm việc giúp bạn, chi phí đọc được trước khi chạy.",
     "lightning_fast": "Workflow builder trực quan",
     "lightning_fast_desc": "Ghép agent, tool, RAG, HTTP và logic trên canvas.",
     "enterprise_security": "Bảo mật mặc định",
     "enterprise_security_desc": "Mã hóa khi truyền, API key theo phạm vi, và quyền dashboard tối thiểu.",
-    "global_cdn": "Chạy ở edge",
-    "global_cdn_desc": "Workflow chạy trên Cloudflare Workers gần người dùng.",
+    "global_cdn": "Phản hồi nhanh",
+    "global_cdn_desc": "Agent trả lời gần khách của bạn — không chờ máy chủ ở nửa kia trái đất.",
     "realtime_analytics": "Mức dùng giải thích được",
     "realtime_analytics_desc": "Ước lượng Credit trước khi chạy và số trừ thật sau.",
     "developer_first": "Thân thiện với developer",
     "developer_first_desc": "Webhook, API key và tài liệu khớp sản phẩm bạn đang dùng.",
     "support_24_7": "Hỗ trợ theo gói",
-    "support_24_7_desc": "Cộng đồng ở Free, ưu tiên ở Pro, SLA riêng ở Enterprise.",
+    "support_24_7_desc": "Cộng đồng ở Free. Ưu tiên từ Starter. Business cho đội chạy nhiều việc mỗi ngày.",
     "ai_integration": "Agent, bộ nhớ, RAG",
     "ai_integration_desc": "Node agent với tool, memory phiên, Vectorize và truy vấn CSDL.",
-    "rate_limiting": "Quota, không hóa đơn bất ngờ",
-    "rate_limiting_desc": "Quota hạ tầng theo gói. Mức dùng AI đo bằng Credit.",
+    "rate_limiting": "Không hóa đơn bất ngờ",
+    "rate_limiting_desc": "Biết trước mỗi lần chạy tốn bao nhiêu. Hết hạn mức thì nâng gói hoặc nạp Credit.",
     "workflow_builder": "Workflow builder trực quan",
     "workflow_builder_desc": "Ghép agent, tool, RAG, HTTP và logic trên canvas. Lưu phiên bản và chạy từ dashboard.",
     "agents_rag": "Agent, bộ nhớ, RAG",
     "agents_rag_desc": "Node agent và reasoning-agent với tool, memory phiên, Vectorize và truy vấn CSDL.",
-    "one_credit": "Một Credit",
-    "one_credit_desc": "Mọi model trừ Credit. Bạn thấy chi phí mỗi lần chạy, không phải USD/1 triệu token.",
-    "unlimited_models": "Không giới hạn model",
-    "unlimited_models_desc": "Đổi model tiny, mid hay frontier mà không đổi gói. Hệ số do chúng tôi quản lý nội bộ.",
+    "one_credit": "Chi phí đọc được",
+    "one_credit_desc": "Biết trước mỗi lần chạy tốn bao nhiêu — không đọc hóa đơn token từng dòng.",
+    "unlimited_models": "Đúng sức cho từng việc",
+    "unlimited_models_desc": "Chọn model phù hợp từng việc — trả lời nhanh hay suy luận sâu — mà không phải đổi gói.",
     "webhooks_cron": "Webhook & cron",
     "webhooks_cron_desc": "Kích hoạt workflow từ HTTP, lịch, hoặc chat host — cùng graph, cùng ví Credit.",
     "sharing_royalty": "Chia sẻ & nhận royalty",
@@ -607,7 +611,7 @@
     "usage_visibility": "Mức dùng giải thích được",
     "usage_visibility_desc": "Ước lượng Credit trước khi chạy và số trừ thật sau — kèm log từng execution.",
     "support_levels": "Hỗ trợ theo gói",
-    "support_levels_desc": "Cộng đồng ở Free, ưu tiên ở Pro, kênh riêng và SLA ở Enterprise."
+    "support_levels_desc": "Cộng đồng ở Free. Ưu tiên từ Starter. Business cho đội chạy nhiều việc mỗi ngày."
   },
   "CTA": {
     "title": "Sẵn sàng chạy",
@@ -615,7 +619,7 @@
     "subtitle": "Bắt đầu Free không cần thẻ. Bốn gói — Starter, Pro và Business mở chia sẻ, webhook, cron và mua thêm Credit.",
     "get_started_free": "Bắt đầu miễn phí",
     "talk_to_sales": "Nói chuyện với sales",
-    "trusted_by": "Dành cho đội muốn agent hoàn thành việc — tính bằng một Credit."
+    "trusted_by": "Dành cho đội muốn agent hoàn thành việc — không muốn tự vận hành từng mảnh."
   },
   "Packages": {
     "badge": "Giá",
@@ -719,21 +723,21 @@
     "more_features": "+{count} tính năng khác",
     "no_packages_found": "Không tìm thấy gói phù hợp.",
     "layers": {
-      "kicker": "Cách chúng tôi thu",
+      "kicker": "Cách bạn trả",
       "title": "Ba lớp.",
       "title_gradient": "Hết.",
-      "subtitle": "Chúng tôi bán quyền dùng nền tảng, mức tiêu thụ AI/agent, và đảm bảo doanh nghiệp — không bán hóa đơn Cloudflare.",
+      "subtitle": "Chọn gói theo khối lượng việc cần xong. Trả cho workspace và lần chạy agent — không đếm token từng dòng.",
       "subscription": {
-        "title": "Subscription",
-        "body": "Quyền dùng workspace, builder, chia sẻ, webhook, cron và hỗ trợ theo gói. Giá gói không nhảy khi catalog model đổi."
+        "title": "Gói workspace",
+        "body": "Quyền xây, chia sẻ và chạy agent theo webhook hay lịch. Bốn mức: $0, $4.9, $19.9, $99.9 — chọn theo khối lượng việc."
       },
       "credit": {
         "title": "Credit",
-        "body": "Đơn vị dịch vụ trả trước cho agent và model. Model rẻ tốn ít Credit; frontier tốn nhiều hơn. Bạn không thấy USD/1 triệu token."
+        "body": "Trả cho lần chạy agent. Ước lượng hiện trước khi chạy. Hết thì nạp thêm — không hóa đơn bất ngờ cuối tháng."
       },
       "enterprise": {
-        "title": "Enterprise",
-        "body": "SLA, dung lượng riêng, quota tùy chỉnh, SSO/audit và Credit cam kết. BYOK là add-on — không phải bán sỉ token."
+        "title": "Hợp đồng",
+        "body": "Cần SLA, SSO hay hóa đơn công ty? Liên hệ — không phải card thứ năm trên trang giá."
       }
     },
     "packages": {
@@ -761,15 +765,15 @@
   },
   "AboutPage": {
     "badge": "AI Agents Hub",
-    "title": "Chúng tôi bán việc hoàn thành,",
-    "title_gradient": "không bán token",
-    "subtitle": "AI Agents Hub là nền tảng sau aiagents-hub.vn: workflow trực quan, agent với tool và bộ nhớ, một Credit cho mọi model. Khách trả cho việc đã làm; chúng tôi quản lý chi phí và hạ tầng.",
+    "title": "Chúng tôi giúp agent",
+    "title_gradient": "làm xong việc",
+    "subtitle": "AI Agents Hub là nơi đội ngũ thiết kế việc một lần rồi để agent trả lời khách, truy xuất tài liệu và chạy theo lịch — bạn quan tâm kết quả, không phải vận hành từng mảnh.",
     "mission": {
       "title": "Sứ mệnh",
       "lead": "Đội ngũ không nên thành kế toán token. Họ nên đưa agent đi trả lời, truy xuất và hành động.",
-      "body": "Chúng tôi xây workspace để bạn thiết kế việc một lần, chạy bằng webhook, cron hoặc chat, và thấy ước lượng Credit — không USD/1 triệu token, không dòng D1/R2. Model rẻ hay frontier là hệ số nội bộ. Gói của bạn vẫn đọc được.",
+      "body": "Chúng tôi xây workspace để bạn thiết kế việc một lần, rồi chạy bằng chat, webhook hoặc lịch. Ước lượng hiện trước khi chạy. Gói Free / Starter / Pro / Business theo mức việc bạn cần — không phải theo catalog model.",
       "terminal": "POST /hooks/workflows/wf_42/run\nAuthorization: Bearer •••••\n\n200 OK\n{\n  \"status\": \"succeeded\",\n  \"credits\": 1.24,\n  \"job\": \"support_summary\"\n}",
-      "terminal_caption": "Ước lượng trước khi chạy. Trừ thật sau. Một Credit cho mọi model."
+      "terminal_caption": "Ước lượng trước khi chạy. Việc xong thì trừ."
     },
     "values_section": {
       "title": "Điều chúng tôi tối ưu",
@@ -779,11 +783,11 @@
     "values": {
       "job_done": {
         "title": "Thu theo việc",
-        "description": "Khách mua lần chạy agent và kết quả workflow. Chúng tôi không bán token Cloudflare, GPT hay Claude như sản phẩm."
+        "description": "Bạn mua lần chạy agent và kết quả workflow — trả lời khách, tóm tắt, truy xuất — không mua token từng dòng."
       },
       "api_first": {
         "title": "Thu theo việc",
-        "description": "Khách mua lần chạy agent và kết quả workflow. Chúng tôi không bán token Cloudflare, GPT hay Claude như sản phẩm."
+        "description": "Bạn mua lần chạy agent và kết quả workflow — trả lời khách, tóm tắt, truy xuất — không mua token từng dòng."
       },
       "trust": {
         "title": "Bảo mật & tin cậy",
@@ -795,7 +799,7 @@
       },
       "scale": {
         "title": "Lớn theo mức dùng",
-        "description": "Khi phục vụ nhiều người hơn, bạn dùng nhiều Credit hơn — không bị nhảy giá gói bất ngờ. Enterprise thêm SLA."
+        "description": "Khi phục vụ nhiều người hơn, bạn chạy nhiều hơn — chọn gói theo khối lượng, không bị nhảy giá bất ngờ."
       }
     },
     "stats": {
@@ -805,15 +809,15 @@
       },
       "latency": {
         "value": "4 gói",
-        "label": "Free · Starter · Pro · Business"
+        "label": "$0 · $4.9 · $19.9 · $99.9"
       },
       "regions": {
         "value": "Edge",
-        "label": "Chạy trên Cloudflare Workers"
+        "label": "Chạy gần khách của bạn"
       },
       "sla": {
         "value": "SLA",
-        "label": "Ở Enterprise, có thông báo"
+        "label": "Hợp đồng khi cần đảm bảo"
       }
     },
     "cta": {
@@ -861,7 +865,7 @@
       },
       "packages": {
         "title": "Giá",
-        "description": "Free, Pro, Enterprise — Subscription cộng Credit."
+        "description": "Free $0, Starter $4.9, Pro $19.9, Business $99.9."
       },
       "support": {
         "title": "Hỗ trợ",
@@ -942,7 +946,7 @@
     "badge": "Gia nhập đội nền tảng agent",
     "title": "Xây workspace nơi",
     "title_gradient": "agent đi làm",
-    "subtitle": "Chúng tôi vận hành aiagents-hub.vn như nền tảng agent AI: workflow trực quan, một đồng hồ Credit, và hạ tầng khách không phải xuất hóa đơn. Hãy cùng đưa sản phẩm đội khách chạy mỗi ngày.",
+    "subtitle": "Chúng tôi vận hành aiagents-hub.vn để đội khách đưa agent vào việc hàng ngày: trả lời, truy xuất, chạy theo lịch. Hãy cùng xây sản phẩm họ mở mỗi sáng.",
     "why": {
       "title": "Vì sao chọn",
       "title_gradient": "AI Agents Hub",
@@ -2309,7 +2313,7 @@
   },
   "SystemConfigPage": {
     "title": "Cấu hình hệ thống",
-    "description": "Thiết lập các tham số cho Auth Worker, Queue Worker, D1tor2-Cron và thanh toán. Tỉ giá USD/VND quản lý tại mục Quản lý tỉ giá.",
+    "description": "Thiết lập Auth Worker, Queue Worker, D1tor2-Cron, thanh toán, và số liệu marketing trang chủ. Tỉ giá USD/VND quản lý tại mục Quản lý tỉ giá.",
     "loading": "Đang tải cấu hình...",
     "save_config": "Lưu cấu hình",
     "saving": "Đang lưu...",
@@ -2326,6 +2330,8 @@
     "d1tor2_worker_desc": "Pipeline và retention D1 → R2",
     "billing": "Thanh toán",
     "billing_desc": "Giá Credit, dải contribution, hết hạn, và trần ví. Khách chỉ thấy Credit.",
+    "marketing": "Marketing trang chủ",
+    "marketing_desc": "Số hiển thị = seed + (số thật cộng dồn mỗi ngày × hệ số). Khi số thật đã lớn, đặt hệ số = 1.",
     "fields": {
       "QUEUE_BATCH_SIZE": "Kích thước Batch Queue (1-1000)",
       "QUEUE_FLUSH_THRESHOLD": "Ngưỡng Flush Queue",
@@ -2361,7 +2367,10 @@
       "FX_RELIST_THRESHOLD_PCT": "Ngưỡng niêm yết lại FX (%)",
       "FLOOR_CONTRIBUTION_TINY_PCT": "Sàn contribution tiny (%)",
       "FLOOR_CONTRIBUTION_MID_PCT": "Sàn contribution mid (%)",
-      "FLOOR_CONTRIBUTION_FRONTIER_PCT": "Sàn contribution frontier (%)"
+      "FLOOR_CONTRIBUTION_FRONTIER_PCT": "Sàn contribution frontier (%)",
+      "USERS_SEED": "Số user khởi điểm (marketing)",
+      "WORKFLOW_RUNS_SEED": "Số lượt chạy workflow khởi điểm (marketing)",
+      "STATS_COEFF": "Hệ số nhân số liệu thật hàng ngày (1 = trung thực)"
     }
   },
   "WorkflowNodeCatalogAdminPage": {
@@ -4384,7 +4393,7 @@
     "quickstart_try_title": "Credit trừ những gì",
     "quickstart_try_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không.",
     "quickstart_credits_title": "Credit trừ những gì",
-    "quickstart_credits_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không. Hạ tầng (lưu trữ, hàng đợi) nằm trong gói cộng quota — không phải hóa đơn riêng.",
+    "quickstart_credits_body": "Lời gọi model (LLM, embed, vision, speech) và tool AI trừ Credit. Lưu graph, liệt kê lần chạy hoặc đọc log thì không.",
     "quickstart_more": "Kích hoạt cùng graph qua HTTP trong",
     "api_page_title": "API workflow",
     "api_page_description": "Xác thực Bearer token và POST tới webhook workflow. Mức dùng vẫn trừ Credit trên workspace sở hữu lần chạy.",
@@ -4439,12 +4448,12 @@
     "posts": {
       "one-platform-one-credit-unlimited-models": {
         "title": "One Platform, One Credit, Unlimited Models",
-        "excerpt": "Vì sao chúng tôi tính việc agent hoàn thành bằng Credit — và từ chối bán token hay hóa đơn Cloudflare.",
+        "excerpt": "Vì sao chúng tôi tính việc agent hoàn thành bằng Credit — để bạn biết trước mỗi lần chạy tốn bao nhiêu.",
         "body": [
-          "AI Agents Hub không phải nơi bán lại model. Chúng tôi không cạnh tranh USD/1 triệu token. Khách chỉ cần một câu hỏi: việc này tốn bao nhiêu Credit?",
-          "Subscription trả cho workspace — builder, chia sẻ, webhook, cron, hỗ trợ và quota hạ tầng. Credit trả cho mức tiêu thụ AI và agent. Enterprise trả cho sự đảm bảo: SLA, dung lượng riêng, điều khoản tùy chỉnh.",
-          "Model rẻ tốn ít Credit; frontier tốn nhiều hơn. Khác biệt đó là hệ số nội bộ, không phải catalog bạn phải đàm phán lại khi nhà cung cấp tăng giá. Chúng tôi đổi hệ số kèm thông báo. Chúng tôi không đổi giá gói trên đường đó.",
-          "Credit tặng hết hạn mỗi kỳ để không tích trữ trước cú sốc chi phí. Pro mua thêm được, có trần ví. Free là dùng thử, không phải sản phẩm chúng tôi sống nhờ."
+          "AI Agents Hub không phải nơi bán lại model. Khách chỉ cần một câu hỏi: việc này tốn bao nhiêu, và agent có làm xong không?",
+          "Gói trả cho workspace — builder, chia sẻ, webhook, cron và hỗ trợ. Credit trả cho lần chạy agent. Cần SLA / SSO thì liên hệ hợp đồng — không phải card thứ năm.",
+          "Model nhanh hay sâu là lựa chọn theo từng việc, không phải lý do đổi gói. Free $0, Starter $4.9, Pro $19.9, Business $99.9.",
+          "Credit tặng hết hạn mỗi kỳ. Starter trở lên mua thêm được. Free là để thử builder, không phải sản phẩm chính."
         ]
       },
       "build-your-first-agent-workflow": {
@@ -4492,9 +4501,9 @@
         "excerpt": "Ba lớp thu — và vì sao chúng tôi cố tình tách.",
         "body": [
           "Free là cách thử builder. Credit tặng ít và hết hạn. Chúng tôi không thiết kế Free thành sản phẩm chính.",
-          "Pro cho đội làm việc thật: quota cao hơn, quyền mua Credit, webhook, hỗ trợ ưu tiên. Giá gói nên nhàm. Mức dùng nên lớn theo việc agent thực sự chạy.",
-          "Enterprise là sự đảm bảo: SLA, dung lượng riêng hoặc tùy chỉnh, Credit cam kết, SSO/audit, và BYOK tùy chọn. Không phải bán sỉ token rẻ hơn.",
-          "Khi nhà cung cấp tăng giá, chúng tôi chỉnh hệ số kèm thông báo. Chúng tôi không đổi Credit thành token chuyển tiếp. Đó là ý nghĩa của một đồng hồ đo."
+          "Starter $4.9 mở chia sẻ, webhook, cron và mua Credit. Pro $19.9 cho đội chạy agent thật mỗi ngày. Business $99.9 cho khối lượng lớn.",
+          "Cần SLA, SSO hay hóa đơn công ty? Đó là hợp đồng — liên hệ, không phải card thứ năm trên /packages.",
+          "Chọn gói theo việc cần xong. Hết hạn mức thì nạp Credit hoặc nâng gói — không đợi hóa đơn bất ngờ cuối tháng."
         ]
       }
     }

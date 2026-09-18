@@ -7,9 +7,31 @@ import {
 	DEFAULT_QUEUE_CONFIG,
 	DEFAULT_D1TOR2_CONFIG,
 	DEFAULT_BILLING_CONFIG,
+	DEFAULT_MARKETING_CONFIG,
 	KV_KEY,
 	type SystemConfig,
 } from './domain';
+
+function defaultSystemConfig(): SystemConfig {
+	return {
+		auth_worker: DEFAULT_AUTH_CONFIG,
+		queue_worker: DEFAULT_QUEUE_CONFIG,
+		d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
+		billing: DEFAULT_BILLING_CONFIG,
+		marketing: DEFAULT_MARKETING_CONFIG,
+	};
+}
+
+function mergeSystemConfig(parsed: Partial<SystemConfig> | Record<string, unknown>): SystemConfig {
+	const p = parsed as Partial<SystemConfig>;
+	return {
+		auth_worker: { ...DEFAULT_AUTH_CONFIG, ...(p.auth_worker || {}) },
+		queue_worker: { ...DEFAULT_QUEUE_CONFIG, ...(p.queue_worker || {}) },
+		d1tor2_cron: { ...DEFAULT_D1TOR2_CONFIG, ...(p.d1tor2_cron || {}) },
+		billing: { ...DEFAULT_BILLING_CONFIG, ...(p.billing || {}) },
+		marketing: { ...DEFAULT_MARKETING_CONFIG, ...(p.marketing || {}) },
+	};
+}
 
 export function createSystemConfigRoutes(_bindingName: string) {
 	const app = new Hono<{ Bindings: Env }>();
@@ -34,47 +56,17 @@ export function createSystemConfigRoutes(_bindingName: string) {
 	app.get('/', createRouteHandler(async (c) => {
 		const kv = c.env.SYSTEM_CONFIG_KV;
 		if (!kv) {
-			return c.json({
-				success: true,
-				data: {
-					auth_worker: DEFAULT_AUTH_CONFIG,
-					queue_worker: DEFAULT_QUEUE_CONFIG,
-					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
-					billing: DEFAULT_BILLING_CONFIG,
-				},
-			});
+			return c.json({ success: true, data: defaultSystemConfig() });
 		}
 		const raw = await kv.get(KV_KEY);
 		if (!raw) {
-			return c.json({
-				success: true,
-				data: {
-					auth_worker: DEFAULT_AUTH_CONFIG,
-					queue_worker: DEFAULT_QUEUE_CONFIG,
-					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
-					billing: DEFAULT_BILLING_CONFIG,
-				},
-			});
+			return c.json({ success: true, data: defaultSystemConfig() });
 		}
 		try {
 			const parsed = JSON.parse(raw);
-			const merged: SystemConfig = {
-				auth_worker: { ...DEFAULT_AUTH_CONFIG, ...(parsed.auth_worker || {}) },
-				queue_worker: { ...DEFAULT_QUEUE_CONFIG, ...(parsed.queue_worker || {}) },
-				d1tor2_cron: { ...DEFAULT_D1TOR2_CONFIG, ...(parsed.d1tor2_cron || {}) },
-				billing: { ...DEFAULT_BILLING_CONFIG, ...(parsed.billing || {}) },
-			};
-			return c.json({ success: true, data: merged });
+			return c.json({ success: true, data: mergeSystemConfig(parsed) });
 		} catch {
-			return c.json({
-				success: true,
-				data: {
-					auth_worker: DEFAULT_AUTH_CONFIG,
-					queue_worker: DEFAULT_QUEUE_CONFIG,
-					d1tor2_cron: DEFAULT_D1TOR2_CONFIG,
-					billing: DEFAULT_BILLING_CONFIG,
-				},
-			});
+			return c.json({ success: true, data: defaultSystemConfig() });
 		}
 	}, 'Failed to get system config', true));
 
@@ -86,8 +78,24 @@ export function createSystemConfigRoutes(_bindingName: string) {
 		}
 		const body = await c.req.json();
 		const validated = SystemConfigSchema.parse(body);
-		await kv.put(KV_KEY, JSON.stringify(validated));
-		return c.json({ success: true, message: 'Config saved. Changes take effect immediately.' });
+		let existing: Record<string, unknown> = {};
+		try {
+			const raw = await kv.get(KV_KEY);
+			if (raw) existing = JSON.parse(raw) as Record<string, unknown>;
+		} catch {
+			existing = {};
+		}
+		const merged = mergeSystemConfig({
+			...existing,
+			...validated,
+			auth_worker: { ...(existing.auth_worker as object | undefined), ...validated.auth_worker },
+			queue_worker: { ...(existing.queue_worker as object | undefined), ...validated.queue_worker },
+			d1tor2_cron: { ...(existing.d1tor2_cron as object | undefined), ...validated.d1tor2_cron },
+			billing: { ...(existing.billing as object | undefined), ...validated.billing },
+			marketing: { ...(existing.marketing as object | undefined), ...validated.marketing },
+		});
+		await kv.put(KV_KEY, JSON.stringify(merged));
+		return c.json({ success: true, message: 'Config saved. Changes take effect immediately.', data: merged });
 	}, 'Failed to save system config', true));
 
 	return app;
