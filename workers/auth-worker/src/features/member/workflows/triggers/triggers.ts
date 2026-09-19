@@ -366,6 +366,14 @@ export async function listTriggers(
   return results ?? [];
 }
 
+/** Account-wide cron jobs. The published plan cap is per workspace, not per workflow. */
+export function countAccountCronJobs(
+  rows: Array<Pick<WorkflowTriggerRow, 'type' | 'triggerId'>>,
+  excludeTriggerId?: string,
+): number {
+  return rows.filter((row) => row.type === 'cron' && (!excludeTriggerId || row.triggerId !== excludeTriggerId)).length;
+}
+
 export interface WorkflowActiveCronSummary {
   cronCount: number;
   cronExpr: string;

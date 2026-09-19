@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { defaultScheduleRule, scheduleRuleToCron } from '@aiagents-hub/workflow-nodes';
 
 import {
+  countAccountCronJobs,
   cronJitterMs,
   cronMatches,
   cronQueueDelaySeconds,
@@ -144,5 +145,18 @@ describe('summarizeEnabledCrons', () => {
       cronExpr: '0 8 * * 1',
       nextRunAt: null,
     });
+  });
+});
+
+describe('countAccountCronJobs', () => {
+  it('counts cron rows across workflows against the published plan cap', () => {
+    const rows = [
+      { type: 'cron' as const, triggerId: 'a' },
+      { type: 'cron' as const, triggerId: 'b' },
+      { type: 'webhook' as const, triggerId: 'w' },
+      { type: 'cron' as const, triggerId: 'c' },
+    ];
+    expect(countAccountCronJobs(rows)).toBe(3);
+    expect(countAccountCronJobs(rows, 'b')).toBe(2);
   });
 });

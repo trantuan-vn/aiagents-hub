@@ -71,6 +71,7 @@ export default function EditWorkflowPage() {
   const [graceWhenExhausted, setGraceWhenExhausted] = useState(false);
   const [maxAssignableMinPlanId, setMaxAssignableMinPlanId] = useState<"free" | "starter" | "pro" | "business">("free");
   const [canGraceWhenExhausted, setCanGraceWhenExhausted] = useState(false);
+  const [canShareWorkflows, setCanShareWorkflows] = useState(true);
   const [starCount, setStarCount] = useState(0);
   const [starLabel, setStarLabel] = useState("");
   const [status, setStatus] = useState<"draft" | "published">("draft");
@@ -151,12 +152,16 @@ export default function EditWorkflowPage() {
           const me = (await meRes.json()) as {
             maxAssignableMinPlanId?: string;
             canGraceWhenExhausted?: boolean;
+            canShareWorkflows?: boolean;
           };
           const cap = me.maxAssignableMinPlanId;
           if (cap === "starter" || cap === "pro" || cap === "business" || cap === "free") {
             setMaxAssignableMinPlanId(cap);
           }
           setCanGraceWhenExhausted(me.canGraceWhenExhausted === true);
+          const canShare = me.canShareWorkflows === true;
+          setCanShareWorkflows(canShare);
+          if (!canShare) setIsShared(false);
         }
       } catch {
         /* keep defaults */
@@ -373,9 +378,11 @@ export default function EditWorkflowPage() {
           onDescriptionChange: (v) => recordAndSet("description", v),
           isShared,
           onSharedChange: (v) => {
+            if (!canShareWorkflows && v) return;
             recordAndSet("isShared", v);
             if (v) recordAndSet("status", "published");
           },
+          canShareWorkflows,
           minPlanId,
           onMinPlanIdChange: (v) => recordAndSet("minPlanId", v),
           maxAssignableMinPlanId,

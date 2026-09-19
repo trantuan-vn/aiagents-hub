@@ -28,6 +28,7 @@ import {
   getTrigger,
   isChannelTriggerType,
   listTriggers,
+  countAccountCronJobs,
   summarizeEnabledCrons,
   syncCronTriggersForWorkflow,
   syncWebhookTriggersForWorkflow,
@@ -643,8 +644,8 @@ export function createWorkflowRoutes(bindingName: string) {
         if (!quota.entitlement.canUseCron) {
           return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
         }
-        const existingCrons = (await listTriggers(db, ownerId, id)).filter((row) => row.type === 'cron');
-        if (existingCrons.length >= quota.entitlement.maxCronJobs) {
+        const existingCrons = countAccountCronJobs(await listTriggers(db, ownerId));
+        if (existingCrons >= quota.entitlement.maxCronJobs) {
           return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
         }
       }
@@ -736,8 +737,17 @@ export function createWorkflowRoutes(bindingName: string) {
         if ((existingTrigger.type === 'webhook' || isChannelTriggerType(existingTrigger.type)) && !quota.entitlement.canUseWebhooks) {
           return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
         }
-        if (existingTrigger.type === 'cron' && !quota.entitlement.canUseCron) {
-          return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+        if (existingTrigger.type === 'cron') {
+          if (!quota.entitlement.canUseCron) {
+            return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+          }
+          const enabling = body.enabled !== false && existingTrigger.enabled !== 1;
+          if (enabling) {
+            const existingCrons = countAccountCronJobs(await listTriggers(db, ownerId), existingTrigger.triggerId);
+            if (existingCrons >= quota.entitlement.maxCronJobs) {
+              return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
+            }
+          }
         }
       }
       const trigger = await updateTrigger(db, ownerId, triggerId, body);
@@ -785,10 +795,12 @@ export function createWorkflowRoutes(bindingName: string) {
       const body = UpdateWorkflowSchema.parse(await c.req.json());
       const userDO = getUserDO(c, user.identifier);
       const { quota } = await loadUserAndSyncPlan(userDO, c.env);
-      if (body.isShared === true) {
-        if (!quota.entitlement.canShareWorkflows) {
+      if (!quota.entitlement.canShareWorkflows) {
+        if (body.isShared === true) {
           return c.json({ error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' }, 403);
         }
+        body.isShared = false;
+      } else if (body.isShared === true) {
         body.status = 'published';
       }
       if (body.minPlanId != null) {

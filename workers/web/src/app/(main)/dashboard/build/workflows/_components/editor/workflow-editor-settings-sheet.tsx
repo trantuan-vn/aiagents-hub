@@ -23,6 +23,7 @@ export interface WorkflowEditorSettingsSheetProps {
   onDescriptionChange: (v: string) => void;
   isShared: boolean;
   onSharedChange: (v: boolean) => void;
+  canShareWorkflows?: boolean;
   minPlanId: "free" | "starter" | "pro" | "business";
   onMinPlanIdChange: (v: "free" | "starter" | "pro" | "business") => void;
   maxAssignableMinPlanId?: "free" | "starter" | "pro" | "business";
@@ -45,6 +46,7 @@ export function WorkflowEditorSettingsSheet({
   onDescriptionChange,
   isShared,
   onSharedChange,
+  canShareWorkflows = true,
   minPlanId,
   onMinPlanIdChange,
   maxAssignableMinPlanId = "free",
@@ -85,9 +87,16 @@ export function WorkflowEditorSettingsSheet({
           <div className="space-y-2 rounded-lg border p-3">
             <div className="flex items-center justify-between gap-2">
               <Label htmlFor="wf-share">{t("share_toggle")}</Label>
-              <Switch id="wf-share" checked={isShared} onCheckedChange={onSharedChange} />
+              <Switch
+                id="wf-share"
+                checked={isShared}
+                disabled={!canShareWorkflows}
+                onCheckedChange={onSharedChange}
+              />
             </div>
-            <p className="text-muted-foreground text-xs">{t("share_hint")}</p>
+            <p className="text-muted-foreground text-xs">
+              {canShareWorkflows ? t("share_hint") : t("share_requires_plan")}
+            </p>
           </div>
           <div className="space-y-2 rounded-lg border p-3">
             <Label htmlFor="wf-min-plan">{t("min_plan")}</Label>

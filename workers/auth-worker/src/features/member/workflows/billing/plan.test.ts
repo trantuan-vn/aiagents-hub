@@ -410,4 +410,28 @@ describe('plan entitlements', () => {
     expect(catalog.plans[1]?.canUseCron).toBe(true);
     expect(resolvePlanId({ planId: 'pro' })).toBe('free');
   });
+
+  it('matches the published packages card numbers', () => {
+    const catalog = publicPlansCatalog();
+    expect(
+      catalog.plans.map((p) => ({
+        planId: p.planId,
+        price: p.listPriceUsdPerMonth,
+        credits: p.includedCredits,
+        runs: p.workflowRunsPerDay,
+        cron: p.maxCronJobs,
+        buy: p.canBuyCredits,
+        share: p.canShareWorkflows,
+        webhook: p.canUseWebhooks,
+        grace: p.canGraceWhenExhausted,
+        popular: p.popular,
+        modelFamily: p.showModelFamily,
+      })),
+    ).toEqual([
+      { planId: 'free', price: 0, credits: 150, runs: 15, cron: 0, buy: false, share: false, webhook: false, grace: false, popular: false, modelFamily: false },
+      { planId: 'starter', price: 4.9, credits: 500, runs: 50, cron: 3, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: false },
+      { planId: 'pro', price: 19.9, credits: 2000, runs: 200, cron: 15, buy: true, share: true, webhook: true, grace: true, popular: true, modelFamily: false },
+      { planId: 'business', price: 99.9, credits: 10000, runs: 1000, cron: 100, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: true },
+    ]);
+  });
 });
