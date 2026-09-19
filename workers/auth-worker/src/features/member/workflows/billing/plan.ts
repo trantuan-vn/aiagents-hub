@@ -1,4 +1,4 @@
-import { billingEconomicsFromConfig, type BillingEconomics } from '../../../admin/service/credit.js';
+import { billingEconomicsFromConfig, roundCredits, type BillingEconomics } from '../../../admin/service/credit.js';
 import {
   creditBalanceFromLots,
   creditIncludedLots,
@@ -197,6 +197,35 @@ export function periodEndIso(ym: string): string {
   return new Date(Date.UTC(y, m, 1)).toISOString();
 }
 
+function utcDay(iso: string): string {
+  const ms = Date.parse(iso);
+  return Number.isNaN(ms) ? '' : new Date(ms).toISOString().slice(0, 10);
+}
+
+function paidPeriodEndIso(user: Record<string, unknown>): string {
+  const raw = String(user.planCurrentPeriodEnd ?? user.plan_current_period_end ?? '');
+  const ms = Date.parse(raw);
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
+}
+
+/** ~1 month + buffer. Far prepaid ends (3/6/12) still use UTC month-end lots. */
+const INCLUDED_PAID_HORIZON_MS = 45 * 24 * 60 * 60 * 1000;
+
+/**
+ * New included lots expire at the paid anniversary when that is the current 1-month cycle.
+ * Otherwise they expire at UTC month-end, clipped to `planCurrentPeriodEnd` if sooner.
+ */
+export function includedGrantExpiresAt(user: Record<string, unknown>, now = new Date()): string {
+  const calendarEnd = periodEndIso(periodYm(now));
+  const paidEnd = paidPeriodEndIso(user);
+  const paidEndMs = Date.parse(paidEnd);
+  if (!Number.isFinite(paidEndMs) || paidEndMs <= now.getTime()) return calendarEnd;
+  const calendarEndMs = Date.parse(calendarEnd);
+  if (paidEndMs <= calendarEndMs) return paidEnd;
+  if (paidEndMs - now.getTime() <= INCLUDED_PAID_HORIZON_MS) return paidEnd;
+  return calendarEnd;
+}
+
 export function todayUtc(now = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
@@ -300,7 +329,10 @@ function liveIncludedGrantSize(user: Record<string, unknown>, now: Date): number
   return Math.max(...lots.map((lot) => lot.credits));
 }
 
-/** Append this plan's included allotment as a new lot; keep every live lot (included, grace, purchased). */
+/**
+ * Append this plan's included allotment as a new lot; keep every live lot (included, grace, purchased).
+ * Leftover lots keep their own expiry so a mid-cycle upgrade is two blocks, not one merged date.
+ */
 export function grantIncludedWalletPatch(
   user: Record<string, unknown>,
   planId: PlanId,
@@ -318,7 +350,13 @@ export function grantIncludedWalletPatch(
   const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now);
   const nextLots: CreditLot[] =
     entitlement.includedCredits > 0
-      ? creditIncludedLots(lots, entitlement.includedCredits, periodEndIso(ym), entitlement.includedCogsUsdCap, now)
+      ? creditIncludedLots(
+          lots,
+          entitlement.includedCredits,
+          includedGrantExpiresAt(user, now),
+          entitlement.includedCogsUsdCap,
+          now,
+        )
       : lots;
   return {
     planPeriodYm: ym,
@@ -329,6 +367,59 @@ export function grantIncludedWalletPatch(
   };
 }
 
+/**
+ * If a 1-month upgrade already merged leftover + new grant onto UTC month-end, peel the new
+ * plan's allotment onto `planCurrentPeriodEnd` and leave the remainder on the original date.
+ */
+function repairMergedIncludedLots(
+  user: Record<string, unknown>,
+  planId: PlanId,
+  eco: BillingEconomics,
+  now: Date,
+): CreditLot[] | null {
+  const paidEnd = includedGrantExpiresAt(user, now);
+  const calendarEnd = periodEndIso(periodYm(now));
+  if (!utcDay(paidEnd) || utcDay(paidEnd) === utcDay(calendarEnd)) return null;
+  const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now);
+  if (lots.some((lot) => lot.source === 'included' && utcDay(lot.expiresAt ?? '') === utcDay(paidEnd))) {
+    return null;
+  }
+  const entitlement = entitlementFor(planId, eco);
+  const calendarDay = utcDay(calendarEnd);
+  const calendarRemaining = lots
+    .filter((lot) => lot.source === 'included' && utcDay(lot.expiresAt ?? '') === calendarDay)
+    .reduce((sum, lot) => sum + lot.remaining, 0);
+  const move = roundCredits(Math.min(entitlement.includedCredits, calendarRemaining));
+  if (move <= 0) return null;
+
+  let leftToMove = move;
+  const next = lots.map((lot) => ({ ...lot }));
+  for (let i = next.length - 1; i >= 0 && leftToMove > 0; i--) {
+    const lot = next[i];
+    if (!lot || lot.source !== 'included' || utcDay(lot.expiresAt ?? '') !== calendarDay) continue;
+    const take = Math.min(lot.remaining, leftToMove);
+    leftToMove = roundCredits(leftToMove - take);
+    lot.remaining = roundCredits(lot.remaining - take);
+    lot.credits = roundCredits(lot.credits - take);
+  }
+  const moved: CreditLot = {
+    credits: move,
+    remaining: move,
+    expiresAt: paidEnd,
+    source: 'included',
+  };
+  if (entitlement.includedCogsUsdCap > 0) moved.includedCogsUsdCap = entitlement.includedCogsUsdCap;
+  return [...next.filter((lot) => lot.remaining > 0), moved];
+}
+
+function hasIncludedLotOnPaidPeriodEnd(user: Record<string, unknown>, now: Date): boolean {
+  const paidDay = utcDay(paidPeriodEndIso(user));
+  if (!paidDay) return false;
+  return liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now).some(
+    (lot) => lot.source === 'included' && utcDay(lot.expiresAt ?? '') === paidDay,
+  );
+}
+
 function shouldGrantIncludedThisPeriod(
   user: Record<string, unknown>,
   planId: PlanId,
@@ -337,7 +428,13 @@ function shouldGrantIncludedThisPeriod(
   ym: string,
   now: Date,
 ): boolean {
-  if (storedYm !== ym) return true;
+  if (storedYm !== ym) {
+    // 1-month grant already follows planCurrentPeriodEnd — do not add another UTC-month lot.
+    if (storedIncludedGrantPlanId(user) === planId && hasIncludedLotOnPaidPeriodEnd(user, now)) {
+      return false;
+    }
+    return true;
+  }
   const grantPlan = storedIncludedGrantPlanId(user);
   if (grantPlan === planId) return false;
   if (grantPlan && grantPlan !== planId) return entitlement.includedCredits > 0;
@@ -375,6 +472,13 @@ export function syncPlanPeriod(
   if (!shouldGrantIncludedThisPeriod(user, planId, entitlement, storedYm, ym, now)) {
     if (!storedIncludedGrantPlanId(user) && storedYm === ym) {
       patch.planIncludedGrantPlanId = planId;
+    }
+    if (storedYm && storedYm !== ym) patch.planPeriodYm = ym;
+    const repaired = repairMergedIncludedLots(user, planId, eco, now);
+    if (repaired) {
+      patch.walletBalance = creditBalanceFromLots(repaired, now);
+      patch.walletCurrency = 'CR';
+      patch.creditLotsJson = serializeCreditLots(repaired);
     }
     return patch;
   }

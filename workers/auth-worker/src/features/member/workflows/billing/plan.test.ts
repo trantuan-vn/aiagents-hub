@@ -68,18 +68,19 @@ describe('plan entitlements', () => {
     expect(periodEndIso('2026-09')).toBe('2026-10-01T00:00:00.000Z');
   });
 
-  it('grants the new plan included credits on a same-month upgrade from Free', () => {
-    const now = new Date('2026-09-18T15:00:00.000Z');
+  it('keeps leftover included credits on month-end and grants Starter until the paid period end', () => {
+    const now = new Date('2026-09-19T12:00:00.000Z');
     const patch = syncPlanPeriod(
       {
         planId: 'starter',
         planSource: 'order',
-        planCurrentPeriodEnd: '2099-01-01T00:00:00.000Z',
+        planInterval: 1,
+        planCurrentPeriodEnd: '2026-10-19T12:00:00.000Z',
         planPeriodYm: '2026-09',
         walletCurrency: 'CR',
         creditLotsJson: JSON.stringify([
-          { credits: 150, remaining: 80, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
-          { credits: 10, remaining: 10, expiresAt: '2028-01-01T00:00:00.000Z', source: 'purchased' },
+          { credits: 200, remaining: 200, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+          { credits: 10, remaining: 10, source: 'purchased' },
         ]),
       },
       eco,
@@ -87,12 +88,66 @@ describe('plan entitlements', () => {
     );
     expect(patch.grantedIncluded).toBe(true);
     expect(patch.planIncludedGrantPlanId).toBe('starter');
-    expect(patch.walletBalance).toBe(590);
-    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{ remaining: number; source: string; credits: number }>;
+    expect(patch.walletBalance).toBe(710);
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{
+      remaining: number;
+      source: string;
+      credits: number;
+      expiresAt?: string;
+    }>;
     expect(lots.filter((lot) => lot.source === 'included')).toEqual([
-      expect.objectContaining({ remaining: 580, credits: 650, source: 'included' }),
+      expect.objectContaining({ remaining: 200, credits: 200, expiresAt: '2026-10-01T00:00:00.000Z' }),
+      expect.objectContaining({ remaining: 500, credits: 500, expiresAt: '2026-10-19T12:00:00.000Z' }),
     ]);
     expect(lots.find((lot) => lot.source === 'purchased')?.remaining).toBe(10);
+  });
+
+  it('splits a merged 700 CR lot so leftover stays 01/10 and Starter follows 19/10', () => {
+    const now = new Date('2026-09-19T12:00:00.000Z');
+    const patch = syncPlanPeriod(
+      {
+        planId: 'starter',
+        planSource: 'order',
+        planInterval: 1,
+        planCurrentPeriodEnd: '2026-10-19T12:00:00.000Z',
+        planPeriodYm: '2026-09',
+        planIncludedGrantPlanId: 'starter',
+        walletCurrency: 'CR',
+        creditLotsJson: JSON.stringify([
+          { credits: 700, remaining: 700, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+        ]),
+      },
+      eco,
+      now,
+    );
+    expect(patch.grantedIncluded).toBe(false);
+    expect(patch.walletBalance).toBe(700);
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{ remaining: number; expiresAt?: string; source: string }>;
+    expect(lots.filter((lot) => lot.source === 'included')).toEqual([
+      expect.objectContaining({ remaining: 200, expiresAt: '2026-10-01T00:00:00.000Z' }),
+      expect.objectContaining({ remaining: 500, expiresAt: '2026-10-19T12:00:00.000Z' }),
+    ]);
+  });
+
+  it('does not grant another included lot in the next UTC month while the 1-month paid lot is live', () => {
+    const patch = syncPlanPeriod(
+      {
+        planId: 'starter',
+        planSource: 'order',
+        planInterval: 1,
+        planCurrentPeriodEnd: '2026-10-19T12:00:00.000Z',
+        planPeriodYm: '2026-09',
+        planIncludedGrantPlanId: 'starter',
+        creditLotsJson: JSON.stringify([
+          { credits: 500, remaining: 500, expiresAt: '2026-10-19T12:00:00.000Z', source: 'included' },
+        ]),
+      },
+      eco,
+      new Date('2026-10-01T00:00:00.000Z'),
+    );
+    expect(patch.grantedIncluded).toBe(false);
+    expect(patch.planPeriodYm).toBe('2026-10');
+    expect(patch.creditLotsJson).toBeUndefined();
   });
 
   it('does not re-grant included credits after they were spent this period', () => {

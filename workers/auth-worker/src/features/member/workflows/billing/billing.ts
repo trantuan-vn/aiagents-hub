@@ -191,6 +191,7 @@ export async function loadUserAndSyncPlan(
   const storedGrant = String(row.planIncludedGrantPlanId ?? row.plan_included_grant_plan_id ?? '');
   if (
     patch.grantedIncluded ||
+    patch.creditLotsJson != null ||
     patch.planPeriodYm !== storedYm ||
     row.planId == null ||
     (patch.planIncludedGrantPlanId != null && patch.planIncludedGrantPlanId !== storedGrant) ||

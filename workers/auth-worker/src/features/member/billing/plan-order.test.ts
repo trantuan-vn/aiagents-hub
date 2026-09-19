@@ -45,27 +45,35 @@ describe('plan prepaid order', () => {
     expect(parsed.pendingPlanId).toBeNull();
   });
 
-  it('credits Starter included CR when granting a prepaid plan', () => {
+  it('credits Starter included CR as a separate lot until the paid period end', () => {
+    const now = new Date('2026-09-19T00:00:00.000Z');
     const patch = paidPlanGrantPatch(
       { kind: 'plan', planId: 'starter', interval: 1 },
-      new Date('2026-09-18T00:00:00.000Z'),
+      now,
       {
         user: {
           identifier: 'user-1',
           planPeriodYm: '2026-09',
           creditLotsJson: JSON.stringify([
-            { credits: 150, remaining: 40, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+            { credits: 200, remaining: 200, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
           ]),
         },
         eco: billingEconomicsFromConfig(),
       },
     );
-    expect(patch.walletBalance).toBe(540);
+    expect(patch.walletBalance).toBe(700);
     expect(patch.walletCurrency).toBe('CR');
     expect(patch.planIncludedGrantPlanId).toBe('starter');
-    const lots = JSON.parse(String(patch.creditLotsJson));
+    expect(String(patch.planCurrentPeriodEnd)).toContain('2026-10-19');
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{
+      remaining: number;
+      credits: number;
+      source: string;
+      expiresAt?: string;
+    }>;
     expect(lots).toEqual([
-      expect.objectContaining({ credits: 650, remaining: 540, source: 'included' }),
+      expect.objectContaining({ remaining: 200, credits: 200, source: 'included', expiresAt: '2026-10-01T00:00:00.000Z' }),
+      expect.objectContaining({ remaining: 500, credits: 500, source: 'included', expiresAt: String(patch.planCurrentPeriodEnd) }),
     ]);
   });
 });
