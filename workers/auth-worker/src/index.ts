@@ -45,6 +45,8 @@ import { createAdminCrmRoutes } from './features/admin/crm/presentation';
 import { createAdminFinanceRoutes } from './features/admin/finance/presentation';
 import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payout/presentation';
 import { createAdminBillingRoutes } from './features/admin/billing/presentation';
+import { createAdminCloudflareUsageRoutes } from './features/admin/cloudflare-usage/presentation';
+import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
 import {
   createWorkflowNodeCatalogAdminRoutes,
@@ -121,6 +123,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/finance-stats', createAdminFinanceRoutes());
   routes.route('/dashboard/admin/earnings-payouts', createAdminEarningsPayoutRoutes(bindingName));
   routes.route('/dashboard/admin/billing', createAdminBillingRoutes());
+  routes.route('/dashboard/admin/cloudflare', createAdminCloudflareUsageRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());
@@ -214,6 +217,13 @@ export default {
       await expireCreditLotsForAllUsers(env);
     } catch (err) {
       log.warn('billing.credit_lots_expire_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await dailyUsageSync(env);
+    } catch (err) {
+      log.warn('cloudflare.usage_sync_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

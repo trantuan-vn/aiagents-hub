@@ -58,6 +58,7 @@ declare namespace Cloudflare {
 		AI: Ai;
 		IMAGES: ImagesBinding;
         CF_AI_API_TOKEN: SecretsStoreSecret;
+		CLOUDFLARE_USAGE_API_TOKEN: SecretsStoreSecret;
 		VIETQR_ACCOUNT_NO: SecretsStoreSecret;
 		VIETQR_ACCOUNT_NAME: SecretsStoreSecret;
 		VIETQR_ACQ_ID: SecretsStoreSecret;

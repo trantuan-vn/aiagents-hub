@@ -5,6 +5,7 @@ import {
   Bot,
   ChartBar,
   CircleDollarSign,
+  Cloud,
   Code,
   Coins,
   CreditCard,
@@ -105,6 +106,12 @@ export const sidebarItems: NavGroup[] = [
         title: "Contribution",
         url: "/dashboard/contribution",
         icon: BarChart3,
+        adminOnly: true,
+      },
+      {
+        title: "Cloudflare usage",
+        url: "/dashboard/cloudflare-usage",
+        icon: Cloud,
         adminOnly: true,
       },
       {
