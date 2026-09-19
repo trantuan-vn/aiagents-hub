@@ -1,5 +1,14 @@
 import type { BillingEconomics } from '../../admin/service/credit';
-import { DEFAULT_PLAN_ENTITLEMENTS, grantIncludedWalletPatch, prepaidUsd, type PlanId, type PlanInterval } from '../workflows/billing/plan';
+import {
+  addUtcMonths,
+  DEFAULT_PLAN_ENTITLEMENTS,
+  grantIncludedWalletPatch,
+  prepaidUsd,
+  type PlanId,
+  type PlanInterval,
+} from '../workflows/billing/plan';
+
+export { addUtcMonths };
 
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 
@@ -31,10 +40,6 @@ export function parsePlanOrderIntent(order: { notes?: unknown; internalNotes?: u
 
 export function planChargeUsd(planId: PaidPlanId, interval: PlanInterval): number {
   return prepaidUsd(DEFAULT_PLAN_ENTITLEMENTS[planId].listPriceUsdPerMonth, interval);
-}
-
-export function addUtcMonths(from: Date, months: number): Date {
-  return new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + months, from.getUTCDate(), from.getUTCHours(), from.getUTCMinutes(), from.getUTCSeconds()));
 }
 
 export function paidPlanGrantPatch(

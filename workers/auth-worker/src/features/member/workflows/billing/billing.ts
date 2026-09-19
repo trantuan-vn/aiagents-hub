@@ -162,6 +162,7 @@ function applyPlanPatch(row: Record<string, unknown>, patch: ReturnType<typeof s
     ...(patch.planIncludedGrantPlanId ? { planIncludedGrantPlanId: patch.planIncludedGrantPlanId } : {}),
     ...(patch.planSource ? { planSource: patch.planSource } : {}),
     ...(patch.planStatus ? { planStatus: patch.planStatus } : {}),
+    ...(patch.planCurrentPeriodEnd ? { planCurrentPeriodEnd: patch.planCurrentPeriodEnd } : {}),
     ...(patch.creditLotsJson
       ? {
           walletBalance: patch.walletBalance,
@@ -189,12 +190,14 @@ export async function loadUserAndSyncPlan(
   const merged = compactPatch ? { ...afterExpiry, ...compactPatch } : afterExpiry;
   const storedYm = String(row.planPeriodYm ?? row.plan_period_ym ?? '');
   const storedGrant = String(row.planIncludedGrantPlanId ?? row.plan_included_grant_plan_id ?? '');
+  const storedPeriodEnd = String(row.planCurrentPeriodEnd ?? row.plan_current_period_end ?? '');
   if (
     patch.grantedIncluded ||
     patch.creditLotsJson != null ||
     patch.planPeriodYm !== storedYm ||
     row.planId == null ||
     (patch.planIncludedGrantPlanId != null && patch.planIncludedGrantPlanId !== storedGrant) ||
+    (patch.planCurrentPeriodEnd != null && patch.planCurrentPeriodEnd !== storedPeriodEnd) ||
     expiredPatch != null ||
     compactPatch != null
   ) {

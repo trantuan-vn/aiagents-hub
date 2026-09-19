@@ -9,8 +9,10 @@ export const BANK_CODES = [
 /** Bật khi set `NEXT_PUBLIC_ENABLE_VNPAY_BILLING=true` (VNPay production). */
 export const IS_VNPAY_PAYMENT_ENABLED = process.env.NEXT_PUBLIC_ENABLE_VNPAY_BILLING === "true";
 
-export const PAYMENT_TABS_LIST_CLASS =
-  "border-border bg-muted/40 grid h-auto w-full grid-cols-3 gap-1 rounded-lg border p-1";
+export function paymentTabsListClass(tabCount: 2 | 3): string {
+  const cols = tabCount === 3 ? "grid-cols-3" : "grid-cols-2";
+  return `border-border bg-muted/40 grid h-auto w-full ${cols} gap-1 rounded-lg border p-1`;
+}
 
 export const PAYMENT_TAB_TRIGGER_CLASS =
   "border-border/70 data-[state=active]:border-primary data-[state=active]:bg-background bg-background/60 rounded-md border data-[state=active]:shadow-sm";

@@ -275,7 +275,10 @@ export function OrderList({
           onPaypalSubscribe={onPaypalSubscribe}
           paypalClientId={paypalClientId}
           paypalEnabled={paypalEnabled}
-          onPaidDone={onPaidDone}
+          onPaidDone={() => {
+            setSelectedOrder(null);
+            onPaidDone?.();
+          }}
           onPayment={async (orderId, amount, bankCode, language) => {
             await onPayment(orderId, amount, bankCode, language);
             setSelectedOrder(null);

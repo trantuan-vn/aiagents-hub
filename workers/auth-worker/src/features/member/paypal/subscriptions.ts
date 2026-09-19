@@ -21,7 +21,7 @@ export const CheckoutSubscriptionSchema = z.object({
   interval: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)]).default(1),
   /** Subscribe is opt-in. Packages upgrade and omitted method create a prepaid order (Casso / one-time PayPal). */
   method: z.enum(['subscription', 'order']).optional(),
-  /** Re-open the Casso/PayPal chooser if the user cancels hosted Subscribe. */
+  /** Re-open the Casso/PayPal chooser if the user cancels hosted Subscribe. Success returns without payOrder. */
   returnOrderId: z.number().int().positive().optional(),
   /** RFC 3339. Future start skips the first charge until that instant (prepaid → auto-renew). */
   startTime: z.string().min(20).max(40).optional(),
@@ -230,7 +230,7 @@ export async function createPaypalCheckout(params: {
         landing_page: 'NO_PREFERENCE',
         shipping_preference: 'NO_SHIPPING',
         user_action: 'SUBSCRIBE_NOW',
-        return_url: `${billing}?subscription=success${orderQ}`,
+        return_url: `${billing}?subscription=success`,
         cancel_url: `${billing}?checkout=cancelled${orderQ}`,
       },
     }),

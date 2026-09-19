@@ -175,7 +175,7 @@ export default function BillingPage() {
     const hasPay = Number.isFinite(payId) && payId > 0;
     if (!checkout && !sub && !hasPay) return;
 
-    if (hasPay) setPayOrderId(payId);
+    if (hasPay && sub !== "success") setPayOrderId(payId);
 
     if (checkout === "cancelled") {
       toast({
@@ -199,7 +199,6 @@ export default function BillingPage() {
             const entitled = snap.planId && snap.planId !== "free" && snap.planStatus !== "approval_pending";
             if (entitled) {
               toast({ title: t("subscription_success") });
-              if (hasPay) setPayOrderId(null);
             } else {
               toast({
                 title: t("payment_failed"),

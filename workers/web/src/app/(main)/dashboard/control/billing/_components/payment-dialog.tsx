@@ -11,7 +11,12 @@ import { Form } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 
 import { PaymentCassoPanel } from "./payment-casso-panel";
-import { formatPaymentCurrency, formatVndCheckoutAmount, type PaymentMethodTab } from "./payment-dialog-constants";
+import {
+  formatPaymentCurrency,
+  formatVndCheckoutAmount,
+  IS_VNPAY_PAYMENT_ENABLED,
+  type PaymentMethodTab,
+} from "./payment-dialog-constants";
 import { PaymentMethodTabs } from "./payment-method-tabs";
 import { PaymentPaypalPanel } from "./payment-paypal-panel";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
@@ -53,7 +58,9 @@ export function PaymentDialog({
   const t = useTranslations("BillingPage");
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>(initialTab);
+  const [paymentTab, setPaymentTab] = useState<PaymentMethodTab>(
+    initialTab === "vnpay" && !IS_VNPAY_PAYMENT_ENABLED ? "casso" : initialTab,
+  );
   const [ipnSuccess, setIpnSuccess] = useState(false);
   const ipnHandledRef = useRef(false);
 
@@ -94,8 +101,8 @@ export function PaymentDialog({
   };
 
   const handlePaidDone = useCallback((): void => {
-    onPaidDone?.();
     onOpenChange(false);
+    onPaidDone?.();
   }, [onPaidDone, onOpenChange]);
 
   const handleIpnSuccess = useCallback((): void => {
@@ -176,7 +183,7 @@ export function PaymentDialog({
               onValueChange={setPaymentTab}
               paypalEnabled={paypalEnabled}
               cassoLabel={t("tab_casso")}
-              vnpayLabel={t("tab_vnpay")}
+              vnpayLabel={IS_VNPAY_PAYMENT_ENABLED ? t("tab_vnpay") : undefined}
               paypalLabel={t("tab_paypal")}
               cassoPanel={
                 <PaymentCassoPanel
@@ -194,19 +201,21 @@ export function PaymentDialog({
                 />
               }
               vnpayPanel={
-                <PaymentVnpayPanel
-                  control={form.control}
-                  isLoading={isLoading}
-                  cancelLabel={t("cancel")}
-                  payNowLabel={t("pay_now")}
-                  processingLabel={t("processing")}
-                  bankCodeLabel={t("bank_code")}
-                  selectBankPlaceholder={t("select_bank")}
-                  bankCodeDescription={t("bank_code_description")}
-                  languageLabel={t("language")}
-                  languageDescription={t("language_description")}
-                  onCancel={() => onOpenChange(false)}
-                />
+                IS_VNPAY_PAYMENT_ENABLED ? (
+                  <PaymentVnpayPanel
+                    control={form.control}
+                    isLoading={isLoading}
+                    cancelLabel={t("cancel")}
+                    payNowLabel={t("pay_now")}
+                    processingLabel={t("processing")}
+                    bankCodeLabel={t("bank_code")}
+                    selectBankPlaceholder={t("select_bank")}
+                    bankCodeDescription={t("bank_code_description")}
+                    languageLabel={t("language")}
+                    languageDescription={t("language_description")}
+                    onCancel={() => onOpenChange(false)}
+                  />
+                ) : undefined
               }
               paypalPanel={
                 <PaymentPaypalPanel

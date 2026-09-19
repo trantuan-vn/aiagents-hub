@@ -208,6 +208,19 @@ export function periodEndIso(ym: string): string {
   return new Date(Date.UTC(y, m, 1)).toISOString();
 }
 
+export function addUtcMonths(from: Date, months: number): Date {
+  return new Date(
+    Date.UTC(
+      from.getUTCFullYear(),
+      from.getUTCMonth() + months,
+      from.getUTCDate(),
+      from.getUTCHours(),
+      from.getUTCMinutes(),
+      from.getUTCSeconds(),
+    ),
+  );
+}
+
 function utcDay(iso: string): string {
   const ms = Date.parse(iso);
   return Number.isNaN(ms) ? '' : new Date(ms).toISOString().slice(0, 10);
@@ -222,19 +235,27 @@ function paidPeriodEndIso(user: Record<string, unknown>): string {
 /** ~1 month + buffer. Far prepaid ends (3/6/12) still use UTC month-end lots. */
 const INCLUDED_PAID_HORIZON_MS = 45 * 24 * 60 * 60 * 1000;
 
+function rollingMonthEndIso(now: Date): string {
+  return addUtcMonths(now, 1).toISOString();
+}
+
+function defaultIncludedExpiryIso(user: Record<string, unknown>, now: Date): string {
+  return resolvePlanId(user, now) === 'free' ? rollingMonthEndIso(now) : periodEndIso(periodYm(now));
+}
+
 /**
  * New included lots expire at the paid anniversary when that is the current 1-month cycle.
- * Otherwise they expire at UTC month-end, clipped to `planCurrentPeriodEnd` if sooner.
+ * Free lots follow signup + 1 month (19/09 → 19/10). Paid 3/6/12 still use UTC month-end.
  */
 export function includedGrantExpiresAt(user: Record<string, unknown>, now = new Date()): string {
-  const calendarEnd = periodEndIso(periodYm(now));
+  const fallback = defaultIncludedExpiryIso(user, now);
   const paidEnd = paidPeriodEndIso(user);
   const paidEndMs = Date.parse(paidEnd);
-  if (!Number.isFinite(paidEndMs) || paidEndMs <= now.getTime()) return calendarEnd;
-  const calendarEndMs = Date.parse(calendarEnd);
-  if (paidEndMs <= calendarEndMs) return paidEnd;
+  if (!Number.isFinite(paidEndMs) || paidEndMs <= now.getTime()) return fallback;
+  const fallbackMs = Date.parse(fallback);
+  if (paidEndMs <= fallbackMs) return paidEnd;
   if (paidEndMs - now.getTime() <= INCLUDED_PAID_HORIZON_MS) return paidEnd;
-  return calendarEnd;
+  return fallback;
 }
 
 export function todayUtc(now = new Date()): string {
@@ -326,6 +347,7 @@ export type PlanSyncPatch = {
   grantedIncluded: boolean;
   planSource?: string;
   planStatus?: string;
+  planCurrentPeriodEnd?: string;
 };
 
 function storedIncludedGrantPlanId(user: Record<string, unknown>): string {
@@ -388,6 +410,7 @@ function repairMergedIncludedLots(
   eco: BillingEconomics,
   now: Date,
 ): CreditLot[] | null {
+  if (planId === 'free') return null;
   const paidEnd = includedGrantExpiresAt(user, now);
   const calendarEnd = periodEndIso(periodYm(now));
   if (!utcDay(paidEnd) || utcDay(paidEnd) === utcDay(calendarEnd)) return null;
@@ -431,6 +454,37 @@ function hasIncludedLotOnPaidPeriodEnd(user: Record<string, unknown>, now: Date)
   );
 }
 
+function hasLiveIncludedLot(user: Record<string, unknown>, now: Date): boolean {
+  return liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now).some(
+    (lot) => lot.source === 'included',
+  );
+}
+
+/** Move leftover Free lots off UTC month-end onto the rolling +1 month horizon. */
+function rebaseFreeCalendarIncludedLots(
+  user: Record<string, unknown>,
+  now: Date,
+): { creditLotsJson: string; walletBalance: number; planCurrentPeriodEnd: string } | null {
+  if (resolvePlanId(user, now) !== 'free') return null;
+  const calendarEnd = periodEndIso(periodYm(now));
+  const nextEnd = rollingMonthEndIso(now);
+  if (utcDay(nextEnd) === utcDay(calendarEnd)) return null;
+  const lots = liveLots(parseCreditLots(user.creditLotsJson ?? user.credit_lots_json), now);
+  const included = lots.filter((lot) => lot.source === 'included');
+  if (!included.length) return null;
+  if (!included.every((lot) => utcDay(lot.expiresAt ?? '') === utcDay(calendarEnd))) return null;
+  const next = lots.map((lot) =>
+    lot.source === 'included' && utcDay(lot.expiresAt ?? '') === utcDay(calendarEnd)
+      ? { ...lot, expiresAt: nextEnd }
+      : lot,
+  );
+  return {
+    creditLotsJson: serializeCreditLots(next),
+    walletBalance: creditBalanceFromLots(next, now),
+    planCurrentPeriodEnd: nextEnd,
+  };
+}
+
 function shouldGrantIncludedThisPeriod(
   user: Record<string, unknown>,
   planId: PlanId,
@@ -447,10 +501,15 @@ function shouldGrantIncludedThisPeriod(
     return true;
   }
   const grantPlan = storedIncludedGrantPlanId(user);
-  if (grantPlan === planId) return false;
+  if (grantPlan === planId) {
+    if (planId === 'free' && !paidPeriodStillOpen(user, now) && !hasLiveIncludedLot(user, now)) {
+      return true;
+    }
+    return false;
+  }
   if (grantPlan && grantPlan !== planId) return entitlement.includedCredits > 0;
   // Legacy rows (no marker): paid upgrade this month still has Free's smaller included lot (or none).
-  if (planId === 'free') return false;
+  if (planId === 'free') return !hasLiveIncludedLot(user, now);
   return liveIncludedGrantSize(user, now) < entitlement.includedCredits;
 }
 
@@ -491,6 +550,23 @@ export function syncPlanPeriod(
       patch.walletCurrency = 'CR';
       patch.creditLotsJson = serializeCreditLots(repaired);
     }
+    const rebased = rebaseFreeCalendarIncludedLots(
+      patch.creditLotsJson ? { ...user, creditLotsJson: patch.creditLotsJson } : user,
+      now,
+    );
+    if (rebased) {
+      patch.walletBalance = rebased.walletBalance;
+      patch.walletCurrency = 'CR';
+      patch.creditLotsJson = rebased.creditLotsJson;
+      patch.planCurrentPeriodEnd = rebased.planCurrentPeriodEnd;
+    } else if (planId === 'free' && !paidPeriodEndIso(user)) {
+      const source = patch.creditLotsJson ? { ...user, creditLotsJson: patch.creditLotsJson } : user;
+      const live = liveLots(parseCreditLots(source.creditLotsJson ?? source.credit_lots_json), now).filter(
+        (lot) => lot.source === 'included' && lot.expiresAt,
+      );
+      const latest = live.map((lot) => String(lot.expiresAt)).sort().at(-1);
+      if (latest) patch.planCurrentPeriodEnd = latest;
+    }
     return patch;
   }
 
@@ -501,6 +577,9 @@ export function syncPlanPeriod(
   patch.walletBalance = wallet.walletBalance;
   patch.walletCurrency = wallet.walletCurrency;
   patch.creditLotsJson = wallet.creditLotsJson;
+  if (planId === 'free') {
+    patch.planCurrentPeriodEnd = includedGrantExpiresAt(user, now);
+  }
   return patch;
 }
 

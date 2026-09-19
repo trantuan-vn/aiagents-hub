@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   IS_VNPAY_PAYMENT_ENABLED,
   PAYMENT_TAB_TRIGGER_CLASS,
-  PAYMENT_TABS_LIST_CLASS,
+  paymentTabsListClass,
   type PaymentMethodTab,
 } from "./payment-dialog-constants";
 
@@ -16,10 +16,10 @@ interface PaymentMethodTabsProps {
   onValueChange: (tab: PaymentMethodTab) => void;
   paypalEnabled: boolean;
   cassoLabel: string;
-  vnpayLabel: string;
+  vnpayLabel?: string;
   paypalLabel: string;
   cassoPanel: ReactNode;
-  vnpayPanel: ReactNode;
+  vnpayPanel?: ReactNode;
   paypalPanel: ReactNode;
 }
 
@@ -34,24 +34,27 @@ export function PaymentMethodTabs({
   vnpayPanel,
   paypalPanel,
 }: PaymentMethodTabsProps) {
+  const showVnpay = IS_VNPAY_PAYMENT_ENABLED;
   return (
     <Tabs
-      value={value}
+      value={value === "vnpay" && !showVnpay ? "casso" : value}
       onValueChange={(v) => {
         const next = v as PaymentMethodTab;
-        if (next === "vnpay" && !IS_VNPAY_PAYMENT_ENABLED) return;
+        if (next === "vnpay" && !showVnpay) return;
         if (next === "paypal" && !paypalEnabled) return;
         onValueChange(next);
       }}
       className="w-full"
     >
-      <TabsList className={PAYMENT_TABS_LIST_CLASS}>
+      <TabsList className={paymentTabsListClass(showVnpay ? 3 : 2)}>
         <TabsTrigger value="casso" className={PAYMENT_TAB_TRIGGER_CLASS}>
           {cassoLabel}
         </TabsTrigger>
-        <TabsTrigger value="vnpay" disabled={!IS_VNPAY_PAYMENT_ENABLED} className={PAYMENT_TAB_TRIGGER_CLASS}>
-          {vnpayLabel}
-        </TabsTrigger>
+        {showVnpay ? (
+          <TabsTrigger value="vnpay" className={PAYMENT_TAB_TRIGGER_CLASS}>
+            {vnpayLabel}
+          </TabsTrigger>
+        ) : null}
         <TabsTrigger value="paypal" disabled={!paypalEnabled} className={PAYMENT_TAB_TRIGGER_CLASS}>
           {paypalLabel}
         </TabsTrigger>
@@ -61,9 +64,11 @@ export function PaymentMethodTabs({
         {cassoPanel}
       </TabsContent>
 
-      <TabsContent value="vnpay" className="mt-4 space-y-4">
-        {vnpayPanel}
-      </TabsContent>
+      {showVnpay ? (
+        <TabsContent value="vnpay" className="mt-4 space-y-4">
+          {vnpayPanel}
+        </TabsContent>
+      ) : null}
 
       <TabsContent value="paypal" className="mt-4 space-y-4">
         {paypalPanel}

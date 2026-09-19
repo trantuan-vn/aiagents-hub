@@ -7,6 +7,7 @@ import {
   canEnterGrace,
   clampMinPlanId,
   incrementDailyWorkflowRuns,
+  includedGrantExpiresAt,
   parsePlanId,
   periodEndIso,
   prepaidUsd,
@@ -86,6 +87,79 @@ describe('plan entitlements', () => {
     expect(patch.planIncludedGrantPlanId).toBe('pro');
     expect(patch.walletBalance).toBe(2_000);
     expect(periodEndIso('2026-09')).toBe('2026-10-01T00:00:00.000Z');
+  });
+
+  it('grants Free included credits for +1 month from first login, not UTC month-end', () => {
+    const now = new Date('2026-09-19T00:00:00.000Z');
+    const patch = syncPlanPeriod({}, eco, now);
+    expect(patch.grantedIncluded).toBe(true);
+    expect(patch.planId).toBe('free');
+    expect(patch.walletBalance).toBe(150);
+    expect(patch.planCurrentPeriodEnd).toBe('2026-10-19T00:00:00.000Z');
+    expect(includedGrantExpiresAt({}, now)).toBe('2026-10-19T00:00:00.000Z');
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{ source: string; expiresAt?: string }>;
+    expect(lots).toEqual([
+      expect.objectContaining({ source: 'included', remaining: 150, expiresAt: '2026-10-19T00:00:00.000Z' }),
+    ]);
+  });
+
+  it('rebases an existing Free month-end lot to +1 month', () => {
+    const now = new Date('2026-09-19T12:00:00.000Z');
+    const patch = syncPlanPeriod(
+      {
+        planId: 'free',
+        planPeriodYm: '2026-09',
+        planIncludedGrantPlanId: 'free',
+        creditLotsJson: JSON.stringify([
+          { credits: 150, remaining: 150, expiresAt: '2026-10-01T00:00:00.000Z', source: 'included' },
+        ]),
+      },
+      eco,
+      now,
+    );
+    expect(patch.grantedIncluded).toBe(false);
+    expect(patch.planCurrentPeriodEnd).toBe('2026-10-19T12:00:00.000Z');
+    const lots = JSON.parse(String(patch.creditLotsJson)) as Array<{ source: string; expiresAt?: string }>;
+    expect(lots).toEqual([
+      expect.objectContaining({ source: 'included', remaining: 150, expiresAt: '2026-10-19T12:00:00.000Z' }),
+    ]);
+  });
+
+  it('does not grant another Free lot before the rolling period ends', () => {
+    const patch = syncPlanPeriod(
+      {
+        planId: 'free',
+        planPeriodYm: '2026-09',
+        planIncludedGrantPlanId: 'free',
+        planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+        creditLotsJson: JSON.stringify([
+          { credits: 150, remaining: 150, expiresAt: '2026-10-19T00:00:00.000Z', source: 'included' },
+        ]),
+      },
+      eco,
+      new Date('2026-10-01T00:00:00.000Z'),
+    );
+    expect(patch.grantedIncluded).toBe(false);
+    expect(patch.planPeriodYm).toBe('2026-10');
+    expect(patch.creditLotsJson).toBeUndefined();
+  });
+
+  it('renews Free included credits after the rolling period ends', () => {
+    const now = new Date('2026-10-19T00:00:00.000Z');
+    const patch = syncPlanPeriod(
+      {
+        planId: 'free',
+        planPeriodYm: '2026-10',
+        planIncludedGrantPlanId: 'free',
+        planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+        creditLotsJson: '[]',
+      },
+      eco,
+      now,
+    );
+    expect(patch.grantedIncluded).toBe(true);
+    expect(patch.planCurrentPeriodEnd).toBe('2026-11-19T00:00:00.000Z');
+    expect(patch.walletBalance).toBe(150);
   });
 
   it('keeps leftover included credits on month-end and grants Starter until the paid period end', () => {
