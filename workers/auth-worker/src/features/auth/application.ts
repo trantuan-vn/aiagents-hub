@@ -57,6 +57,11 @@ import {
   resolvePasskeyLoginDeviceId,
 } from './device-trust';
 import {
+  evaluateReplayTelemetry,
+  parseReplayTelemetry,
+  persistReplayTelemetry,
+} from './replay-telemetry';
+import {
   ipFingerprintsMatch,
   normalizeIpFingerprint,
   normalizeLoginCountry,
@@ -784,42 +789,35 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       const telemetryKey = `${REPLAY_TELEMETRY_PREFIX}${identifier}:${sessionId}`;
-      const currentIpFp = normalizeIpFingerprint(clientIp || session.ipAddress || '');
-      const currentUaFp = normalizeUaFingerprint(clientUserAgent || session.userAgent || '');
-      const currentCountry = normalizeLoginCountry(clientCountry) ?? normalizeLoginCountry(session.country) ?? 'XX';
-      const now = Date.now();
-      const previousRaw = await c.env.NONCE_KV.get(telemetryKey);
-      if (previousRaw) {
-        const previous = JSON.parse(previousRaw) as {
-          ts: number;
-          ipFp: string;
-          uaFp: string;
-          country: string;
-        };
-        const fingerprintChanged = previous.ipFp !== currentIpFp || previous.uaFp !== currentUaFp;
-        const countryChanged = previous.country !== 'XX' && currentCountry !== 'XX' && previous.country !== currentCountry;
-        const rapidCountrySwitch = countryChanged && now - previous.ts < 2 * 60 * 60 * 1000;
-        if (fingerprintChanged && rapidCountrySwitch) {
-          log.warn('session.replay_geo_velocity_revoked', {
-            identifier,
-            sessionId,
-            previousCountry: previous.country,
-            currentCountry,
-            previousIpFp: previous.ipFp,
-            currentIpFp,
-            previousUaFp: previous.uaFp,
-            currentUaFp,
-            deltaMs: now - previous.ts,
-          });
-          await this.logoutAllUseCase(identifier);
-          throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
+      const current = {
+        ts: Date.now(),
+        ipFp: normalizeIpFingerprint(clientIp || session.ipAddress || ''),
+        uaFp: normalizeUaFingerprint(clientUserAgent || session.userAgent || ''),
+        country: normalizeLoginCountry(clientCountry) ?? normalizeLoginCountry(session.country) ?? 'XX',
+      };
+      const previous = parseReplayTelemetry(await c.env.NONCE_KV.get(telemetryKey));
+      const decision = evaluateReplayTelemetry(previous, current);
+      if (decision.revoke && previous) {
+        log.warn('session.replay_geo_velocity_revoked', {
+          identifier,
+          sessionId,
+          previousCountry: previous.country,
+          currentCountry: current.country,
+          previousIpFp: previous.ipFp,
+          currentIpFp: current.ipFp,
+          previousUaFp: previous.uaFp,
+          currentUaFp: current.uaFp,
+          deltaMs: current.ts - previous.ts,
+        });
+        await this.logoutAllUseCase(identifier);
+        throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
+      }
+      if (decision.shouldWrite) {
+        const putError = await persistReplayTelemetry(c.env.NONCE_KV, telemetryKey, current);
+        if (putError) {
+          log.warn('session.replay_telemetry_put_failed', { identifier, error: putError });
         }
       }
-      await c.env.NONCE_KV.put(
-        telemetryKey,
-        JSON.stringify({ ts: now, ipFp: currentIpFp, uaFp: currentUaFp, country: currentCountry }),
-        { expirationTtl: 7 * 24 * 60 * 60 },
-      );
 
       return { ok: true, user };
     }
