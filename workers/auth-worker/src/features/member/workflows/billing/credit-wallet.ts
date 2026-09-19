@@ -1,4 +1,5 @@
 import { billingEconomicsFromConfig, roundCredits, usdToCredits, type BillingEconomics } from '../../../admin/service/credit.js';
+import { resolvePlanId } from './plan.js';
 
 export type CreditLotSource = 'purchased' | 'included' | 'grace';
 
@@ -328,12 +329,7 @@ export function applyWalletCreditDebit(
 }
 
 function paidPlanTopUpGate(user: Record<string, unknown>, eco: BillingEconomics): { canBuy: boolean; cap?: number } {
-  const source = String(user.planSource ?? user.plan_source ?? '').toLowerCase();
-  const sub = String(user.paypalSubscriptionId ?? user.paypal_subscription_id ?? '').trim();
-  let plan = String(user.planId ?? user.plan_id ?? '').toLowerCase();
-  if (plan === 'enterprise') plan = 'business';
-  const entitled = source === 'admin' || source === 'paypal' || source === 'order' || sub.length > 0;
-  if (!entitled) return { canBuy: false };
+  const plan = resolvePlanId(user);
   if (plan === 'starter') return { canBuy: true, cap: 20_000 };
   if (plan === 'pro') return { canBuy: true, cap: eco.maxCreditBalancePro ?? 50_000 };
   if (plan === 'business') return { canBuy: true, cap: 200_000 };

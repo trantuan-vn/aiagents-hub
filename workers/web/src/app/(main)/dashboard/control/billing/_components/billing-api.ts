@@ -44,7 +44,24 @@ export type WalletSnapshot = {
   planCurrentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
   billingEnabled?: boolean;
+  planSource?: string | null;
+  planInterval?: number | null;
+  paypalSubscriptionId?: string | null;
 };
+
+const PLAN_LIST_USD: Record<Exclude<WalletSnapshot["planId"], "free">, number> = {
+  starter: 4.9,
+  pro: 19.9,
+  business: 99.9,
+};
+
+const INTERVAL_DISCOUNT: Record<1 | 3 | 6 | 12, number> = { 1: 0, 3: 0.1, 6: 0.15, 12: 0.2 };
+
+export function planRenewalUsd(planId: WalletSnapshot["planId"], interval: 1 | 3 | 6 | 12): number {
+  if (planId === "free") return 0;
+  const list = PLAN_LIST_USD[planId];
+  return Math.round(list * interval * (1 - INTERVAL_DISCOUNT[interval]) * 100) / 100;
+}
 
 function parsePlanId(raw: unknown): "free" | "starter" | "pro" | "business" {
   const s = String(raw ?? "").toLowerCase();
@@ -145,6 +162,12 @@ export async function fetchWalletSnapshot(): Promise<WalletSnapshot> {
     planCurrentPeriodEnd: typeof o.planCurrentPeriodEnd === "string" ? o.planCurrentPeriodEnd : null,
     cancelAtPeriodEnd: o.cancelAtPeriodEnd === true,
     billingEnabled: o.billingEnabled === true,
+    planSource: typeof o.planSource === "string" ? o.planSource : null,
+    planInterval:
+      o.planInterval === 3 || o.planInterval === 6 || o.planInterval === 12 || o.planInterval === 1
+        ? o.planInterval
+        : null,
+    paypalSubscriptionId: typeof o.paypalSubscriptionId === "string" && o.paypalSubscriptionId ? o.paypalSubscriptionId : null,
   };
 }
 
@@ -302,6 +325,34 @@ export async function capturePaypalOrder(
     return result as { success: boolean; orderId: number; creditedUsd: number };
   }
   throw new Error(paymentErrorFallback);
+}
+
+export async function startPaypalSubscribe(
+  params: {
+    planId: "starter" | "pro" | "business";
+    interval: 1 | 3 | 6 | 12;
+    returnOrderId?: number;
+    startTime?: string;
+  },
+  errorFallback: string,
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/dashboard/billing/subscriptions/checkout`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      planId: params.planId,
+      interval: params.interval,
+      method: "subscription",
+      ...(params.returnOrderId ? { returnOrderId: params.returnOrderId } : {}),
+      ...(params.startTime ? { startTime: params.startTime } : {}),
+    }),
+  });
+  const json = (await response.json()) as { approvalUrl?: string; error?: string };
+  if (!response.ok || !json.approvalUrl) {
+    throw new Error(json.error || errorFallback);
+  }
+  return json.approvalUrl;
 }
 
 export async function requestCassoQr(

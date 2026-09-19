@@ -35,6 +35,7 @@ interface OrderListProps {
   /** Optional: only used in non-readOnly mode where the PayPal pay button is shown. */
   onPaypalCreateOrder?: (orderId: number) => Promise<string>;
   onPaypalCapture?: (orderId: number, paypalOrderId: string) => Promise<void>;
+  onPaypalSubscribe?: (order: Order) => Promise<void>;
   /** Runtime PayPal config (fetched from the backend). */
   paypalClientId?: string;
   paypalEnabled?: boolean;
@@ -55,6 +56,7 @@ export function OrderList({
     throw new Error("PayPal is not available");
   },
   onPaypalCapture = async () => {},
+  onPaypalSubscribe,
   paypalClientId = "",
   paypalEnabled = false,
   onPaidDone,
@@ -270,6 +272,7 @@ export function OrderList({
           onCassoQr={onCassoQr}
           onPaypalCreateOrder={onPaypalCreateOrder}
           onPaypalCapture={onPaypalCapture}
+          onPaypalSubscribe={onPaypalSubscribe}
           paypalClientId={paypalClientId}
           paypalEnabled={paypalEnabled}
           onPaidDone={onPaidDone}

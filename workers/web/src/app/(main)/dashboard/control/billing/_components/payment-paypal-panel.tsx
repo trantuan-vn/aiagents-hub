@@ -20,6 +20,7 @@ interface PaymentPaypalPanelProps {
   unavailableLabel: string;
   processingLabel: string;
   cancelLabel: string;
+  onSubscribe?: () => Promise<void>;
   onCreateOrder: () => Promise<string>;
   onApprove: (paypalOrderId: string) => Promise<void>;
   onError: (message: string) => void;
@@ -36,22 +37,38 @@ export function PaymentPaypalPanel({
   unavailableLabel,
   processingLabel,
   cancelLabel,
+  onSubscribe,
   onCreateOrder,
   onApprove,
   onError,
   onCancel,
 }: PaymentPaypalPanelProps) {
-  const status = usePaypalSdk(active, clientId);
+  const subscribeOnly = Boolean(onSubscribe);
+  const status = usePaypalSdk(active && !subscribeOnly, clientId);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const buttonsRef = useRef<PaypalButtonsInstance | null>(null);
   const [processing, setProcessing] = useState(false);
 
   // Keep latest callbacks without forcing a buttons re-render.
-  const handlersRef = useRef({ onCreateOrder, onApprove, onError });
-  handlersRef.current = { onCreateOrder, onApprove, onError };
+  const handlersRef = useRef({ onCreateOrder, onApprove, onError, onSubscribe });
+  handlersRef.current = { onCreateOrder, onApprove, onError, onSubscribe };
 
   useEffect(() => {
-    if (status !== "ready" || !active) return;
+    if (!active || !subscribeOnly) return;
+    let alive = true;
+    setProcessing(true);
+    void handlersRef.current.onSubscribe?.().catch((e) => {
+      if (!alive) return;
+      handlersRef.current.onError(e instanceof Error ? e.message : "PayPal error");
+      setProcessing(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [active, subscribeOnly]);
+
+  useEffect(() => {
+    if (subscribeOnly || status !== "ready" || !active) return;
     const paypal = window.paypal;
     const container = containerRef.current;
     if (!paypal || !container) return;
@@ -69,6 +86,9 @@ export function PaymentPaypalPanel({
         } finally {
           setProcessing(false);
         }
+      },
+      onCancel: () => {
+        setProcessing(false);
       },
       onError: (err) => {
         setProcessing(false);
@@ -88,7 +108,24 @@ export function PaymentPaypalPanel({
       }
       buttonsRef.current = null;
     };
-  }, [status, active]);
+  }, [status, active, subscribeOnly]);
+
+  if (subscribeOnly) {
+    return (
+      <>
+        <p className="text-muted-foreground text-sm">{hint}</p>
+        <div className="bg-muted/70 flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-lg border p-4">
+          <Loader2 className="text-muted-foreground h-7 w-7 animate-spin" />
+          <span className="text-muted-foreground text-sm">{processing ? processingLabel : loadingLabel}</span>
+        </div>
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button type="button" variant="outline" onClick={onCancel}>
+            {cancelLabel}
+          </Button>
+        </DialogFooter>
+      </>
+    );
+  }
 
   return (
     <>

@@ -4,12 +4,14 @@ import { getIdFromName, handleError } from '../../../shared/utils';
 import { requireAuth } from '../../auth/authMiddleware';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { rollupMarketingStats } from '../../admin/system-config/marketing-stats';
-import { publicPlansCatalog, paypalPlanIdFor, isPaypalBillingEnabled } from '../workflows/billing/catalog';
+import { publicPlansCatalog, isPaypalBillingEnabled } from '../workflows/billing/catalog';
 import { loadUserAndSyncPlan } from '../workflows/billing/billing';
 import { graceMonthSpent } from '../workflows/billing/plan';
 import { PAYPAL_ERROR_MESSAGES } from '../paypal/config';
 import { createOrderApplicationService } from '../order/application';
 import { parseCreateOrderRequest } from '../order/domain';
+import { createLogger } from '../../../shared/logger';
+import { ensurePaypalCatalog, planIdFromMap } from '../paypal/catalog-bootstrap';
 import {
   CancelSubscriptionSchema,
   CheckoutSubscriptionSchema,
@@ -17,9 +19,12 @@ import {
   createPaypalCheckout,
   markCancelAtPeriodEnd,
   resumePaypalSubscription,
+  shouldCreatePaypalSubscription,
   subscriptionSnapshot,
   syncPaypalSubscription,
 } from '../paypal/subscriptions';
+
+const log = createLogger('auth-worker', 'billing-sub');
 
 export function createPublicPlanRoutes() {
   const app = new Hono<{ Bindings: Env }>();
@@ -73,22 +78,28 @@ export function createBillingSubscriptionRoutes(bindingName: string) {
       const body = CheckoutSubscriptionSchema.parse(await c.req.json());
       const locale = String(c.req.header('accept-language') ?? '').toLowerCase().startsWith('vi') ? 'vi' : 'en';
       const env = c.env as unknown as Record<string, unknown> & { PAYPAL_BILLING_ENABLED?: string };
-      const wantSub = body.method !== 'order';
-      const paypalPlanId = paypalPlanIdFor(body.planId, body.interval, env);
-      if (wantSub && isPaypalBillingEnabled(env) && paypalPlanId) {
-        try {
-          const result = await createPaypalCheckout({
-            env: c.env,
-            userDO: userDOOf(c, user.identifier),
-            identifier: String(user.identifier),
-            planId: body.planId,
-            interval: body.interval,
-            locale,
-          });
-          return c.json({ mode: 'paypal', ...result });
-        } catch {
-          /* fall through to Casso / PayPal Orders prepaid */
-        }
+      const billingEnabled = isPaypalBillingEnabled(env);
+      const wantSub = body.method === 'subscription';
+      let paypalPlanId = '';
+      if (wantSub && billingEnabled) {
+        const planMap = await ensurePaypalCatalog(c.env);
+        paypalPlanId = planIdFromMap(body.planId, body.interval, planMap, env);
+      }
+      if (shouldCreatePaypalSubscription({ method: body.method, billingEnabled, paypalPlanId })) {
+        const result = await createPaypalCheckout({
+          env: c.env,
+          userDO: userDOOf(c, user.identifier),
+          identifier: String(user.identifier),
+          planId: body.planId,
+          interval: body.interval,
+          locale,
+          startTime: body.startTime,
+          returnOrderId: body.returnOrderId,
+        });
+        return c.json({ mode: 'paypal', ...result });
+      }
+      if (wantSub && billingEnabled && !paypalPlanId) {
+        log.warn('paypal.sub.plan_missing_fallback_order', { planId: body.planId, interval: body.interval });
       }
       const orderApp = createOrderApplicationService(c, bindingName);
       const created = await orderApp.createOrder(

@@ -127,6 +127,7 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
   const [loggedIn, setLoggedIn] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -159,44 +160,35 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
       return;
     }
     const iv = Number(searchParams.get("interval") ?? 1);
-    const method = searchParams.get("method") === "order" ? "order" as const : undefined;
     if (wanted === "starter" || wanted === "pro" || wanted === "business") {
       if (iv === 3 || iv === 6 || iv === 12) setInterval(iv);
-      if (loggedIn) void startCheckout(wanted, (iv === 3 || iv === 6 || iv === 12 ? iv : 1) as 1 | 3 | 6 | 12, method);
+      if (loggedIn) void startCheckout(wanted, (iv === 3 || iv === 6 || iv === 12 ? iv : 1) as 1 | 3 | 6 | 12);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, searchParams]);
 
-  const startCheckout = async (
-    id: "starter" | "pro" | "business",
-    iv: 1 | 3 | 6 | 12,
-    method?: "subscription" | "order",
-  ) => {
+  const startCheckout = async (id: "starter" | "pro" | "business", iv: 1 | 3 | 6 | 12) => {
     if (!loggedIn) {
-      const q = method === "order" ? `&method=order` : "";
-      window.location.href = loginRedirect(`/packages?checkout=${id}&interval=${iv}${q}`);
+      window.location.href = loginRedirect(`/packages?checkout=${id}&interval=${iv}`);
       return;
     }
     setBusy(id);
+    setCheckoutError(null);
     try {
       const res = await fetch(`${API_BASE}/dashboard/billing/subscriptions/checkout`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId: id, interval: iv, ...(method ? { method } : {}) }),
+        body: JSON.stringify({ planId: id, interval: iv, method: "order" }),
       });
-      const json = (await res.json()) as { approvalUrl?: string; checkoutPath?: string; error?: string };
-      if (json.approvalUrl) {
-        window.location.href = json.approvalUrl;
-        return;
+      const json = (await res.json()) as { checkoutPath?: string; error?: string };
+      if (!res.ok || !json.checkoutPath) {
+        throw new Error(json.error ?? t("checkout_error"));
       }
-      if (json.checkoutPath) {
-        window.location.href = json.checkoutPath;
-        return;
-      }
-      throw new Error(json.error ?? "Checkout failed");
-    } catch {
+      window.location.href = json.checkoutPath;
+    } catch (e) {
       setBusy(null);
+      setCheckoutError(e instanceof Error ? e.message : t("checkout_error"));
     }
   };
 
@@ -208,6 +200,9 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
     <div>
       {cancelled ? (
         <p className="text-muted-foreground mb-6 text-center text-sm">{t("checkout_cancelled")}</p>
+      ) : null}
+      {checkoutError ? (
+        <p className="text-destructive mb-6 text-center text-sm">{checkoutError}</p>
       ) : null}
       <div className="mb-8 flex flex-wrap items-center justify-center gap-2">
         {([1, 3, 6, 12] as const).map((n) => (
@@ -299,16 +294,6 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
               >
                 {busy === plan.planId ? t("redirecting") : cta}
               </Button>
-              {paidId && !current ? (
-                <button
-                  type="button"
-                  className="text-muted-foreground hover:text-primary mt-3 w-full text-center text-xs underline-offset-4 hover:underline"
-                  disabled={busy === plan.planId}
-                  onClick={() => void startCheckout(paidId, interval, "order")}
-                >
-                  {t("pay_order")}
-                </button>
-              ) : null}
             </div>
           );
         })}

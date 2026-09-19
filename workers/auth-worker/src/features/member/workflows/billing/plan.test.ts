@@ -14,7 +14,7 @@ import {
   resolvePlanId,
   syncPlanPeriod,
 } from './plan.js';
-import { publicPlansCatalog } from './catalog.js';
+import { paypalBillingPlanMatrix, publicPlansCatalog } from './catalog.js';
 
 const eco = billingEconomicsFromConfig();
 
@@ -52,6 +52,26 @@ describe('plan entitlements', () => {
     expect(q.planId).toBe('starter');
     expect(q.canBuyCredits).toBe(true);
     expect(q.entitlement.includedCredits).toBe(500);
+  });
+
+  it('does not treat a pending PayPal Subscribe as paid', () => {
+    const pending = quotaFromUser(
+      {
+        planId: 'business',
+        planSource: 'paypal',
+        planStatus: 'approval_pending',
+        paypalSubscriptionId: 'I-PENDING',
+      },
+      eco,
+    );
+    expect(pending.planId).toBe('free');
+    expect(pending.canBuyCredits).toBe(false);
+    expect(
+      resolvePlanId({
+        planId: 'business',
+        paypalSubscriptionId: 'I-PENDING',
+      }),
+    ).toBe('free');
   });
 
   it('grants included credits at the period boundary for the resolved plan', () => {
@@ -231,6 +251,14 @@ describe('plan entitlements', () => {
       new Date('2026-09-18T00:00:00.000Z'),
     );
     expect(expired.planId).toBe('free');
+  });
+
+  it('charges the prepaid matrix amounts on PayPal Billing Plans', () => {
+    const byKey = Object.fromEntries(paypalBillingPlanMatrix().map((row) => [row.envKey, row.chargeUsd]));
+    expect(byKey.PAYPAL_PLAN_STARTER_1).toBe(4.9);
+    expect(byKey.PAYPAL_PLAN_STARTER_3).toBe(13.23);
+    expect(byKey.PAYPAL_PLAN_PRO_1).toBe(19.9);
+    expect(byKey.PAYPAL_PLAN_BUSINESS_12).toBe(959.04);
   });
 
   it('builds a public catalog of four plans', () => {

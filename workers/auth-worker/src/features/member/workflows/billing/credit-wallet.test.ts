@@ -149,6 +149,23 @@ describe('credit lots FIFO', () => {
     );
   });
 
+  it('blocks credit pack top-up until a PayPal Subscribe is active', () => {
+    expect(() =>
+      applyWalletCreditTopUp(
+        {
+          planId: 'business',
+          planSource: 'paypal',
+          planStatus: 'approval_pending',
+          paypalSubscriptionId: 'I-PENDING',
+          walletBalance: 0,
+          walletCurrency: 'CR',
+        },
+        20,
+        eco,
+      ),
+    ).toThrow(/Free plan/);
+  });
+
   it('allows credit pack top-up on a PayPal Starter plan', () => {
     const added = applyWalletCreditTopUp(
       { planId: 'starter', planSource: 'paypal', paypalSubscriptionId: 'I-1', walletBalance: 0, walletCurrency: 'CR' },

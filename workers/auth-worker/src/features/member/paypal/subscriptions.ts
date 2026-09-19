@@ -4,21 +4,27 @@ import { createLogger } from '../../../shared/logger';
 import { executeUtils } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import {
-  parsePlanId,
   parsePlanInterval,
   periodYm,
+  resolvePlanId,
   type PlanId,
   type PlanInterval,
 } from '../workflows/billing/plan';
-import { isPaypalBillingEnabled, mapPaypalPlanId, paypalPlanIdFor } from '../workflows/billing/catalog';
+import { isPaypalBillingEnabled } from '../workflows/billing/catalog';
 import { getPaypalApiBase, getPaypalCredentials, PAYPAL_ERROR_MESSAGES } from './config';
+import { loadPaypalPlanMap, mapPaypalPlanIdWithMap, planIdFromMap, resolvePaypalWebhookId } from './catalog-bootstrap';
 
 const log = createLogger('auth-worker', 'paypal-sub');
 
 export const CheckoutSubscriptionSchema = z.object({
   planId: z.enum(['starter', 'pro', 'business']),
   interval: z.union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)]).default(1),
+  /** Subscribe is opt-in. Packages upgrade and omitted method create a prepaid order (Casso / one-time PayPal). */
   method: z.enum(['subscription', 'order']).optional(),
+  /** Re-open the Casso/PayPal chooser if the user cancels hosted Subscribe. */
+  returnOrderId: z.number().int().positive().optional(),
+  /** RFC 3339. Future start skips the first charge until that instant (prepaid → auto-renew). */
+  startTime: z.string().min(20).max(40).optional(),
 });
 
 export const CancelSubscriptionSchema = z.object({
@@ -40,7 +46,7 @@ export const AdminGrantPlanSchema = z.object({
 });
 
 type PaypalLink = { href?: string; rel?: string };
-type PaypalSubJson = {
+export type PaypalSubJson = {
   id?: string;
   status?: string;
   plan_id?: string;
@@ -73,13 +79,66 @@ function approvalUrlFrom(json: PaypalSubJson): string | undefined {
   return json.links?.find((l) => l.rel === 'approve' || l.rel === 'payer-action')?.href;
 }
 
-function mapPaypalStatus(raw: string | undefined): 'active' | 'approval_pending' | 'past_due' | 'suspended' | 'canceled' | 'none' {
+export function mapPaypalStatus(
+  raw: string | undefined,
+): 'active' | 'approval_pending' | 'past_due' | 'suspended' | 'canceled' | 'none' {
   const s = String(raw ?? '').toUpperCase();
   if (s === 'ACTIVE' || s === 'APPROVED') return 'active';
   if (s === 'APPROVAL_PENDING') return 'approval_pending';
   if (s === 'SUSPENDED') return 'suspended';
   if (s === 'CANCELLED' || s === 'EXPIRED') return 'canceled';
   return 'none';
+}
+
+export function paypalSubscriptionStubFromWebhook(
+  type: string,
+  resource: Record<string, unknown>,
+): PaypalSubJson {
+  if (type.startsWith('BILLING.SUBSCRIPTION') || resource.plan_id) {
+    return resource as PaypalSubJson;
+  }
+  const agreement = resource.billing_agreement_id;
+  if (typeof agreement === 'string' && agreement.trim()) {
+    return { id: agreement.trim() };
+  }
+  return resource as PaypalSubJson;
+}
+
+export function shouldCreatePaypalSubscription(params: {
+  method?: 'subscription' | 'order';
+  billingEnabled: boolean;
+  paypalPlanId: string;
+}): boolean {
+  return params.method === 'subscription' && params.billingEnabled && params.paypalPlanId.trim().length > 0;
+}
+
+/** Grant the workspace plan only after PayPal reports a paid/active subscription. */
+export function subscriptionEntitlementPatch(params: {
+  mapped: { planId: PlanId; interval: PlanInterval } | null;
+  status: ReturnType<typeof mapPaypalStatus>;
+  nextBillingTime?: string;
+  existingPeriodEnd?: unknown;
+  now?: Date;
+}): Record<string, unknown> {
+  const now = params.now ?? new Date();
+  const patch: Record<string, unknown> = {};
+  if (params.status !== 'none') patch.planStatus = params.status;
+  if (params.mapped && params.status === 'active') {
+    patch.planId = params.mapped.planId;
+    patch.planInterval = params.mapped.interval;
+    patch.planSource = 'paypal';
+    patch.cancelAtPeriodEnd = false;
+    if (params.nextBillingTime) patch.planCurrentPeriodEnd = params.nextBillingTime;
+  }
+  if (params.status === 'canceled') {
+    const end = String(params.nextBillingTime ?? params.existingPeriodEnd ?? '');
+    const stillPaid = Boolean(end) && Date.parse(end) > now.getTime();
+    if (!stillPaid) {
+      patch.planId = 'free';
+      patch.planSource = 'free';
+    }
+  }
+  return patch;
 }
 
 async function loadUserRow(userDO: DurableObjectStub<UserDO>): Promise<Record<string, unknown>> {
@@ -100,7 +159,7 @@ async function saveUserPatch(userDO: DurableObjectStub<UserDO>, row: Record<stri
 
 export function subscriptionSnapshot(row: Record<string, unknown>) {
   return {
-    planId: parsePlanId(row.planId ?? row.plan_id),
+    planId: resolvePlanId(row),
     planSource: String(row.planSource ?? row.plan_source ?? 'free'),
     planInterval: parsePlanInterval(row.planInterval ?? row.plan_interval),
     planStatus: String(row.planStatus ?? row.plan_status ?? 'none'),
@@ -121,31 +180,49 @@ export async function createPaypalCheckout(params: {
   planId: 'starter' | 'pro' | 'business';
   interval: PlanInterval;
   locale?: string;
+  startTime?: string;
+  returnOrderId?: number;
 }): Promise<{ approvalUrl: string; paypalSubscriptionId: string }> {
   if (!isPaypalBillingEnabled(params.env)) {
     throw new Error(PAYPAL_ERROR_MESSAGES.SUBSCRIPTION_DISABLED);
   }
-  const paypalPlanId = paypalPlanIdFor(params.planId, params.interval, params.env as unknown as Record<string, unknown>);
+  const planMap = await loadPaypalPlanMap(params.env);
+  const paypalPlanId = planIdFromMap(
+    params.planId,
+    params.interval,
+    planMap,
+    params.env as unknown as Record<string, unknown>,
+  );
   if (!paypalPlanId) throw new Error(PAYPAL_ERROR_MESSAGES.SUBSCRIPTION_PLAN_MISSING);
 
   const frontend = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
+  const billing = `${frontend}/dashboard/control/billing`;
+  const orderQ = params.returnOrderId ? `&payOrder=${params.returnOrderId}` : '';
   const token = await paypalAccessToken(params.env);
+  const startMs = params.startTime ? Date.parse(params.startTime) : Number.NaN;
+  const startTime =
+    Number.isFinite(startMs) && startMs - Date.now() >= 24 * 60 * 60 * 1000
+      ? new Date(startMs).toISOString()
+      : undefined;
   const res = await fetch(`${getPaypalApiBase()}/v1/billing/subscriptions`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
+      Prefer: 'return=representation',
     },
     body: JSON.stringify({
       plan_id: paypalPlanId,
       custom_id: params.identifier,
+      ...(startTime ? { start_time: startTime } : {}),
       application_context: {
         brand_name: 'AI Agents Hub',
         locale: params.locale === 'vi' ? 'vi-VN' : 'en-US',
+        landing_page: 'NO_PREFERENCE',
         shipping_preference: 'NO_SHIPPING',
         user_action: 'SUBSCRIBE_NOW',
-        return_url: `${frontend}/dashboard/control/billing?subscription=success`,
-        cancel_url: `${frontend}/packages?checkout=cancelled`,
+        return_url: `${billing}?subscription=success${orderQ}`,
+        cancel_url: `${billing}?checkout=cancelled${orderQ}`,
       },
     }),
   });
@@ -162,7 +239,6 @@ export async function createPaypalCheckout(params: {
     paypalSubscriptionId: json.id,
     paypalPlanId,
     planInterval: params.interval,
-    planStatus: 'approval_pending',
   });
   return { approvalUrl, paypalSubscriptionId: json.id };
 }
@@ -172,31 +248,33 @@ export async function applyPaypalSubscriptionToUser(params: {
   userDO: DurableObjectStub<UserDO>;
   sub: PaypalSubJson;
 }): Promise<void> {
-  const mapped = mapPaypalPlanId(String(params.sub.plan_id ?? ''), params.env as unknown as Record<string, unknown>);
+  if (params.sub.id && !params.sub.plan_id) {
+    try {
+      params = { ...params, sub: await fetchPaypalSubscription(params.env, String(params.sub.id)) };
+    } catch (err) {
+      log.warn('paypal.sub.hydrate_failed', { id: params.sub.id, err });
+      return;
+    }
+  }
+  const planMap = await loadPaypalPlanMap(params.env);
+  const mapped = mapPaypalPlanIdWithMap(
+    String(params.sub.plan_id ?? ''),
+    planMap,
+    params.env as unknown as Record<string, unknown>,
+  );
   const row = await loadUserRow(params.userDO);
   const status = mapPaypalStatus(params.sub.status);
-  const periodEnd = params.sub.billing_info?.next_billing_time ?? row.planCurrentPeriodEnd;
   const patch: Record<string, unknown> = {
     paypalSubscriptionId: params.sub.id ?? row.paypalSubscriptionId,
     paypalPayerId: params.sub.subscriber?.payer_id ?? row.paypalPayerId,
     paypalPlanId: params.sub.plan_id ?? row.paypalPlanId,
-    planStatus: status,
-    planCurrentPeriodEnd: periodEnd,
+    ...subscriptionEntitlementPatch({
+      mapped,
+      status,
+      nextBillingTime: params.sub.billing_info?.next_billing_time,
+      existingPeriodEnd: row.planCurrentPeriodEnd ?? row.plan_current_period_end,
+    }),
   };
-  if (mapped && (status === 'active' || status === 'approval_pending')) {
-    patch.planId = mapped.planId;
-    patch.planInterval = mapped.interval;
-    patch.planSource = 'paypal';
-    if (status === 'active') patch.cancelAtPeriodEnd = false;
-  }
-  if (status === 'canceled') {
-    const end = String(periodEnd ?? '');
-    const stillPaid = end && Date.parse(end) > Date.now();
-    if (!stillPaid) {
-      patch.planId = 'free';
-      patch.planSource = 'free';
-    }
-  }
   await saveUserPatch(params.userDO, row, patch);
 }
 
@@ -294,8 +372,7 @@ export async function grantAdminPlan(params: {
 }
 
 export async function verifyPaypalWebhook(env: Env, headers: Headers, event: unknown): Promise<boolean> {
-  const webhookId =
-    (env as unknown as { PAYPAL_WEBHOOK_ID?: string }).PAYPAL_WEBHOOK_ID || process.env.PAYPAL_WEBHOOK_ID || '';
+  const webhookId = await resolvePaypalWebhookId(env);
   if (!webhookId) return false;
   const token = await paypalAccessToken(env);
   const res = await fetch(`${getPaypalApiBase()}/v1/notifications/verify-webhook-signature`, {

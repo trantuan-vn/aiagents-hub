@@ -5,6 +5,8 @@ import { createPaypalApplicationService } from './application';
 import { PAYPAL_ERROR_MESSAGES } from './config';
 import {
   applyPaypalSubscriptionToUser,
+  fetchPaypalSubscription,
+  paypalSubscriptionStubFromWebhook,
   rememberPaypalEvent,
   resolveUserDoForPaypalEvent,
   verifyPaypalWebhook,
@@ -67,22 +69,18 @@ export function createPaypalRoutes(bindingName: string) {
       if (!ok) return c.json({ error: PAYPAL_ERROR_MESSAGES.WEBHOOK_INVALID }, 400);
       const eventId = String(event.id ?? '');
       const type = String(event.event_type ?? '');
-      const resource = (event.resource ?? {}) as {
-        id?: string;
-        status?: string;
-        plan_id?: string;
-        custom_id?: string;
-        subscriber?: { payer_id?: string };
-        billing_info?: { next_billing_time?: string };
-      };
-      const sub =
-        type.startsWith('BILLING.SUBSCRIPTION') || resource.plan_id
-          ? resource
-          : ((resource as { billing_agreement_id?: string }).billing_agreement_id
-            ? { id: String((resource as { billing_agreement_id?: string }).billing_agreement_id) }
-            : resource);
-      const fresh = await rememberPaypalEvent(c.env.D1DB, eventId, type, String(sub.custom_id ?? ''));
+      const resource = (event.resource ?? {}) as Record<string, unknown>;
+      const stub = paypalSubscriptionStubFromWebhook(type, resource);
+      const fresh = await rememberPaypalEvent(c.env.D1DB, eventId, type, String(stub.custom_id ?? ''));
       if (!fresh) return c.json({ ok: true, duplicate: true });
+      let sub = stub;
+      if (sub.id && (!sub.plan_id || type === 'PAYMENT.SALE.COMPLETED')) {
+        try {
+          sub = await fetchPaypalSubscription(c.env, String(sub.id));
+        } catch {
+          if (!type.startsWith('BILLING.SUBSCRIPTION')) return c.json({ ok: true, skipped: true });
+        }
+      }
       const userDO = await resolveUserDoForPaypalEvent(c.env, bindingName, sub);
       if (userDO && (type.startsWith('BILLING.SUBSCRIPTION') || type === 'PAYMENT.SALE.COMPLETED')) {
         await applyPaypalSubscriptionToUser({ env: c.env, userDO, sub });

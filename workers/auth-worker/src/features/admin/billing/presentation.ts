@@ -3,6 +3,7 @@ import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError, getIdFromName } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import { AdminGrantPlanSchema, grantAdminPlan } from '../../member/paypal/subscriptions';
+import { ensurePaypalCatalog } from '../../member/paypal/catalog-bootstrap';
 import { expireCreditLotsForAllUsers } from '../../member/workflows/billing/expire-lots';
 import { confirmCoeffProposal, dismissCoeffProposal, getContributionReport, scanContributionAndPropose } from './scan';
 import {
@@ -96,6 +97,17 @@ export function createAdminBillingRoutes() {
       return c.json(snap);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to grant plan');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/paypal/catalog', async (c) => {
+    try {
+      requireAdmin(c);
+      const map = await ensurePaypalCatalog(c.env);
+      return c.json({ success: true, plans: map });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to bootstrap PayPal catalog');
       return c.json(errorResponse, status);
     }
   });

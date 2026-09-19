@@ -16,7 +16,7 @@ export function isPaypalBillingEnabled(env?: { PAYPAL_BILLING_ENABLED?: string }
   return s !== 'false' && s !== '0' && s !== 'off';
 }
 
-const PLAN_ENV_KEYS: Record<Exclude<PlanId, 'free'>, Record<PlanInterval, string>> = {
+export const PAYPAL_PLAN_ENV_KEYS: Record<Exclude<PlanId, 'free'>, Record<PlanInterval, string>> = {
   starter: {
     1: 'PAYPAL_PLAN_STARTER_1',
     3: 'PAYPAL_PLAN_STARTER_3',
@@ -37,6 +37,31 @@ const PLAN_ENV_KEYS: Record<Exclude<PlanId, 'free'>, Record<PlanInterval, string
   },
 };
 
+export type PaypalBillingPlanSpec = {
+  envKey: string;
+  planId: Exclude<PlanId, 'free'>;
+  interval: PlanInterval;
+  chargeUsd: number;
+  name: string;
+};
+
+export function paypalBillingPlanMatrix(): PaypalBillingPlanSpec[] {
+  const paid = ['starter', 'pro', 'business'] as const;
+  const out: PaypalBillingPlanSpec[] = [];
+  for (const planId of paid) {
+    for (const interval of PLAN_INTERVALS) {
+      out.push({
+        envKey: PAYPAL_PLAN_ENV_KEYS[planId][interval],
+        planId,
+        interval,
+        chargeUsd: prepaidUsd(DEFAULT_PLAN_ENTITLEMENTS[planId].listPriceUsdPerMonth, interval),
+        name: `AI Agents Hub ${planId} ${interval}mo`,
+      });
+    }
+  }
+  return out;
+}
+
 function envString(env: Record<string, unknown> | undefined, key: string): string {
   const fromEnv = env?.[key];
   if (typeof fromEnv === 'string' && fromEnv.trim()) return fromEnv.trim();
@@ -49,7 +74,7 @@ export function paypalPlanIdFor(
   interval: PlanInterval,
   env?: Record<string, unknown>,
 ): string {
-  return envString(env, PLAN_ENV_KEYS[planId][interval]);
+  return envString(env, PAYPAL_PLAN_ENV_KEYS[planId][interval]);
 }
 
 export function mapPaypalPlanId(

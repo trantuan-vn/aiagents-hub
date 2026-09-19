@@ -166,23 +166,34 @@ function planSourceOf(user: Record<string, unknown>): string {
   return String(user.planSource ?? user.plan_source ?? '').toLowerCase();
 }
 
-function hasPaypalSub(user: Record<string, unknown>): boolean {
-  return String(user.paypalSubscriptionId ?? user.paypal_subscription_id ?? '').trim().length > 0;
+function planStatusOf(user: Record<string, unknown>): string {
+  return String(user.planStatus ?? user.plan_status ?? '').toLowerCase();
+}
+
+function paidPeriodStillOpen(user: Record<string, unknown>, now: Date): boolean {
+  const end = Date.parse(String(user.planCurrentPeriodEnd ?? user.plan_current_period_end ?? ''));
+  return Number.isFinite(end) && end > now.getTime();
 }
 
 /**
- * Explicit PayPal / admin / prepaid-order plan wins. Never infer from Credit top-up, lots, or USD wallet.
- * Unpaid leftover `pro`/`enterprise` rows without a paid source resolve to free.
+ * Explicit PayPal / admin / prepaid-order plan wins. Never infer from Credit top-up, lots, USD wallet,
+ * or a PayPal subscription that is only approval_pending (user has not paid).
  */
 export function resolvePlanId(user: Record<string, unknown>, now = new Date()): PlanId {
   const source = planSourceOf(user);
-  const paid = source === 'admin' || source === 'paypal' || source === 'order' || hasPaypalSub(user);
-  if (!paid) return 'free';
-  if (source === 'order') {
-    const end = Date.parse(String(user.planCurrentPeriodEnd ?? user.plan_current_period_end ?? ''));
-    if (!Number.isFinite(end) || end <= now.getTime()) return 'free';
+  if (source === 'admin') return parsePlanId(user.planId ?? user.plan_id);
+  if (source === 'paypal') {
+    const status = planStatusOf(user);
+    if (status === 'approval_pending') return 'free';
+    const id = parsePlanId(user.planId ?? user.plan_id);
+    if (status === 'canceled' && !paidPeriodStillOpen(user, now)) return 'free';
+    return id;
   }
-  return parsePlanId(user.planId ?? user.plan_id);
+  if (source === 'order') {
+    if (!paidPeriodStillOpen(user, now)) return 'free';
+    return parsePlanId(user.planId ?? user.plan_id);
+  }
+  return 'free';
 }
 
 /** @deprecated Use resolvePlanId — kept so leftover imports compile during the cutover. */

@@ -15,7 +15,7 @@ import { formatPaymentCurrency, formatVndCheckoutAmount, type PaymentMethodTab }
 import { PaymentMethodTabs } from "./payment-method-tabs";
 import { PaymentPaypalPanel } from "./payment-paypal-panel";
 import { PaymentVnpayPanel } from "./payment-vnpay-panel";
-import { CreatePaymentSchema, getOrderPayableVnd, type CreatePayment, type Order } from "./schema";
+import { CreatePaymentSchema, getOrderPayableVnd, parsePlanOrderNotes, type CreatePayment, type Order } from "./schema";
 import { useCassoQr } from "./use-casso-qr";
 import { usePaymentIpnWs } from "./use-payment-ipn-ws";
 
@@ -28,6 +28,7 @@ interface PaymentDialogProps {
   onCassoQr: (orderId: number, amount: number) => Promise<{ qr: string }>;
   onPaypalCreateOrder: (orderId: number) => Promise<string>;
   onPaypalCapture: (orderId: number, paypalOrderId: string) => Promise<void>;
+  onPaypalSubscribe?: (order: Order) => Promise<void>;
   paypalClientId: string;
   paypalEnabled: boolean;
   onPaidDone?: () => void;
@@ -43,6 +44,7 @@ export function PaymentDialog({
   onCassoQr,
   onPaypalCreateOrder,
   onPaypalCapture,
+  onPaypalSubscribe,
   paypalClientId,
   paypalEnabled,
   onPaidDone,
@@ -56,6 +58,7 @@ export function PaymentDialog({
   const ipnHandledRef = useRef(false);
 
   const payableVnd = getOrderPayableVnd(order, usdVndRate);
+  const planIntent = parsePlanOrderNotes(order.notes);
 
   const form = useForm<CreatePayment>({
     resolver: zodResolver(CreatePaymentSchema) as Resolver<CreatePayment>,
@@ -209,13 +212,18 @@ export function PaymentDialog({
                 <PaymentPaypalPanel
                   active={paymentTab === "paypal"}
                   clientId={paypalClientId}
-                  hint={t("paypal_hint")}
+                  hint={planIntent ? t("paypal_plan_hint") : t("paypal_hint")}
                   amountLabel={t("paypal_amount", { amount: formatPaymentCurrency(order.finalAmount) })}
                   loadingLabel={t("processing")}
                   errorLabel={t("paypal_error")}
                   unavailableLabel={t("paypal_unavailable")}
-                  processingLabel={t("processing")}
+                  processingLabel={planIntent ? t("paypal_redirecting") : t("processing")}
                   cancelLabel={t("cancel")}
+                  onSubscribe={
+                    planIntent && onPaypalSubscribe
+                      ? () => onPaypalSubscribe(order)
+                      : undefined
+                  }
                   onCreateOrder={() => onPaypalCreateOrder(order.id)}
                   onApprove={async (paypalOrderId) => {
                     await onPaypalCapture(order.id, paypalOrderId);

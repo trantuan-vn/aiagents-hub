@@ -26,6 +26,7 @@ import {
   postCreateOrder,
   requestCassoQr,
   requestVnpayPaymentUrl,
+  startPaypalSubscribe,
   type CoeffNotice,
   type CreditLotView,
 } from "./_components/billing-api";
@@ -33,7 +34,7 @@ import { BillingStatsCards } from "./_components/billing-stats-cards";
 import { BillingPlanCard, type BillingPlanId } from "./_components/billing-plan-card";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
 import { OrderList } from "./_components/order-list";
-import type { CreateOrder, Order } from "./_components/schema";
+import { parsePlanOrderNotes, type CreateOrder, type Order } from "./_components/schema";
 import { WalletTopUpDialog } from "./_components/wallet-top-up-dialog";
 
 export default function BillingPage() {
@@ -50,6 +51,9 @@ export default function BillingPage() {
   const [planStatus, setPlanStatus] = useState<string | null>(null);
   const [planCurrentPeriodEnd, setPlanCurrentPeriodEnd] = useState<string | null>(null);
   const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false);
+  const [planSource, setPlanSource] = useState<string | null>(null);
+  const [planInterval, setPlanInterval] = useState<number | null>(null);
+  const [paypalSubscriptionId, setPaypalSubscriptionId] = useState<string | null>(null);
   const [billingEnabled, setBillingEnabled] = useState(true);
   const [workflowRunsRemaining, setWorkflowRunsRemaining] = useState<number | null>(null);
   const [notices, setNotices] = useState<CoeffNotice[]>([]);
@@ -105,6 +109,9 @@ export default function BillingPage() {
       setPlanStatus(snap.planStatus ?? null);
       setPlanCurrentPeriodEnd(snap.planCurrentPeriodEnd ?? null);
       setCancelAtPeriodEnd(snap.cancelAtPeriodEnd === true);
+      setPlanSource(snap.planSource ?? null);
+      setPlanInterval(typeof snap.planInterval === "number" ? snap.planInterval : null);
+      setPaypalSubscriptionId(snap.paypalSubscriptionId ?? null);
       setBillingEnabled(snap.billingEnabled === true);
       setWorkflowRunsRemaining(snap.workflowRunsRemaining);
       setNotices(snap.notices);
@@ -161,40 +168,72 @@ export default function BillingPage() {
   }, [canBuyCredits]);
 
   useEffect(() => {
-    const raw = searchParams.get("payOrder");
-    if (!raw) return;
-    const id = Number(raw);
-    if (!Number.isFinite(id) || id <= 0) return;
-    setPayOrderId(id);
-    const next = new URLSearchParams(searchParams.toString());
-    next.delete("payOrder");
-    const newUrl = next.toString() ? `?${next.toString()}` : "";
-    router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  useEffect(() => {
+    const checkout = searchParams.get("checkout");
     const sub = searchParams.get("subscription");
+    const raw = searchParams.get("payOrder");
+    const payId = Number(raw);
+    const hasPay = Number.isFinite(payId) && payId > 0;
+    if (!checkout && !sub && !hasPay) return;
+
+    if (hasPay) setPayOrderId(payId);
+
+    if (checkout === "cancelled") {
+      toast({
+        title: t("payment_failed"),
+        description: t("subscription_incomplete"),
+        variant: "destructive",
+      });
+    }
+
     if (sub === "success") {
-      const sid = searchParams.get("subscription_id") ?? searchParams.get("ba_token");
-      toast({ title: t("subscription_success") });
+      const sid = searchParams.get("subscription_id") ?? searchParams.get("ba_token") ?? "";
       if (sid) {
         void fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn"}/dashboard/billing/subscriptions/sync`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ paypalSubscriptionId: searchParams.get("subscription_id") ?? "" }),
-        }).finally(() => refreshWallet());
+          body: JSON.stringify({ paypalSubscriptionId: searchParams.get("subscription_id") ?? sid }),
+        })
+          .then(async (res) => {
+            const snap = (await res.json()) as { planId?: string; planStatus?: string };
+            const entitled = snap.planId && snap.planId !== "free" && snap.planStatus !== "approval_pending";
+            if (entitled) {
+              toast({ title: t("subscription_success") });
+              if (hasPay) setPayOrderId(null);
+            } else {
+              toast({
+                title: t("payment_failed"),
+                description: t("subscription_incomplete"),
+                variant: "destructive",
+              });
+            }
+          })
+          .catch(() => {
+            toast({
+              title: t("payment_failed"),
+              description: t("subscription_incomplete"),
+              variant: "destructive",
+            });
+          })
+          .finally(() => refreshWallet());
       } else {
+        toast({
+          title: t("payment_failed"),
+          description: t("subscription_incomplete"),
+          variant: "destructive",
+        });
         refreshWallet();
       }
-      const next = new URLSearchParams(searchParams.toString());
-      next.delete("subscription");
-      next.delete("subscription_id");
-      next.delete("ba_token");
-      const newUrl = next.toString() ? `?${next.toString()}` : "";
-      router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
     }
+
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("payOrder");
+    next.delete("checkout");
+    next.delete("subscription");
+    next.delete("subscription_id");
+    next.delete("ba_token");
+    const newUrl = next.toString() ? `?${next.toString()}` : "";
+    router.replace(`/dashboard/control/billing${newUrl}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   useEffect(() => {
@@ -307,6 +346,18 @@ export default function BillingPage() {
     [t],
   );
 
+  const handlePaypalSubscribe = useCallback(
+    async (order: Order): Promise<void> => {
+      const intent = parsePlanOrderNotes(order.notes);
+      if (!intent) throw new Error(t("subscribe_error"));
+      window.location.href = await startPaypalSubscribe(
+        { planId: intent.planId, interval: intent.interval, returnOrderId: order.id },
+        t("subscribe_error"),
+      );
+    },
+    [t],
+  );
+
   const handleBillingRefresh = (): void => {
     void fetchOrders();
     refreshWallet();
@@ -334,6 +385,10 @@ export default function BillingPage() {
         planCurrentPeriodEnd={planCurrentPeriodEnd}
         cancelAtPeriodEnd={cancelAtPeriodEnd}
         billingEnabled={billingEnabled}
+        planSource={planSource}
+        planInterval={planInterval}
+        paypalSubscriptionId={paypalSubscriptionId}
+        onChanged={handleBillingRefresh}
       />
 
       <BillingStatsCards
@@ -439,6 +494,7 @@ export default function BillingPage() {
               onCassoQr={handleCassoQr}
               onPaypalCreateOrder={handlePaypalCreateOrder}
               onPaypalCapture={handlePaypalCapture}
+              onPaypalSubscribe={handlePaypalSubscribe}
               paypalClientId={paypalConfig.clientId}
               paypalEnabled={paypalConfig.enabled}
               onPaidDone={handleBillingRefresh}

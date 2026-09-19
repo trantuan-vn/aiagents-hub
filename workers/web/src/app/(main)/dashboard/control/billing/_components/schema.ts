@@ -133,3 +133,16 @@ export function getOrderPayableVnd(
   }
   return Math.round(order.finalAmount);
 }
+
+const PLAN_NOTE = /^plan:(starter|pro|business):(1|3|6|12)$/;
+
+export function parsePlanOrderNotes(
+  notes?: string | null,
+): { planId: "starter" | "pro" | "business"; interval: 1 | 3 | 6 | 12 } | null {
+  const m = PLAN_NOTE.exec(String(notes ?? "").trim());
+  if (!m) return null;
+  return {
+    planId: m[1] as "starter" | "pro" | "business",
+    interval: Number(m[2]) as 1 | 3 | 6 | 12,
+  };
+}

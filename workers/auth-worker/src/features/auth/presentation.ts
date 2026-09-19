@@ -1023,6 +1023,8 @@ export function createAuthRoutes(bindingName: string) {
         planCurrentPeriodEnd: row.planCurrentPeriodEnd ?? row.plan_current_period_end ?? null,
         planStatus: row.planStatus ?? row.plan_status ?? 'none',
         cancelAtPeriodEnd: row.cancelAtPeriodEnd === true || row.cancelAtPeriodEnd === 1,
+        planSource: row.planSource ?? row.plan_source ?? 'free',
+        paypalSubscriptionId: row.paypalSubscriptionId ?? row.paypal_subscription_id ?? null,
         canShareWorkflows: quota.entitlement.canShareWorkflows,
         canUseWebhooks: quota.entitlement.canUseWebhooks,
         canUseCron: quota.entitlement.canUseCron,
