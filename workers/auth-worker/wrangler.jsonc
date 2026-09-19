@@ -144,6 +144,10 @@
 		{
 		"binding": "R2_EKYC_BUCKET",
 		"bucket_name": "aiagents-hub-ekyc-storage-bucket"
+		},
+		{
+		"binding": "R2_LAKEHOUSE",
+		"bucket_name": "aiagents-hub-lakehouse"
 		}
 	],	
 	"kv_namespaces": [

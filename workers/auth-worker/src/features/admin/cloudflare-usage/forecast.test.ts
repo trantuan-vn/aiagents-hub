@@ -5,6 +5,7 @@ import { allotmentsForPlan, seedPricingCatalog, utcMonthPeriod } from './domain.
 import { forecastMetric, overageUsd } from './forecast.js';
 import { HUB_WRANGLER_FACTS } from './inventory.js';
 import { buildRecommendations } from './recommendations.js';
+import { SNAPSHOT_ARCHIVE_PREFIX } from './infrastructure.js';
 import type { UsageMetricRow } from './domain.js';
 
 const catalog = seedPricingCatalog();
@@ -236,5 +237,135 @@ describe('recommendations', () => {
     expect(recs.map((r) => r.id)).toEqual(
       expect.arrayContaining(['d1.retention_96', 'do.ws_duration', 'ai.neurons_daily', 'kv.split_system_config']),
     );
+  });
+
+  it('fires d1.full_scan when rows read / written exceeds 100', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [
+        stubMetric({ metricId: 'd1.rows_read', usageMtd: 250_000, status: 'under' }),
+        stubMetric({ metricId: 'd1.rows_written', usageMtd: 1_000, status: 'under' }),
+      ],
+      inventory: [],
+    });
+    expect(recs.some((r) => r.id === 'd1.full_scan')).toBe(true);
+  });
+
+  it('fires workers.requests_auth when auth-worker dominates projected overage', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [
+        stubMetric({
+          metricId: 'workers.requests',
+          status: 'projected_over',
+          usageMtd: 10_000_000,
+          overageUsdProjected: 3,
+          breakdown: [
+            { key: 'aiagents-hub-auth-worker', label: 'aiagents-hub-auth-worker', usage: 7_000_000, unit: 'request' },
+            { key: 'aiagents-hub-trading-sto', label: 'aiagents-hub-trading-sto', usage: 3_000_000, unit: 'request' },
+          ],
+        }),
+      ],
+      inventory: [],
+    });
+    expect(recs.some((r) => r.id === 'workers.requests_auth')).toBe(true);
+  });
+
+  it('fires do.shard_1000 only when duration is over and UserShardDO is majority', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [
+        stubMetric({
+          metricId: 'do.duration_gb_s',
+          status: 'over',
+          usageMtd: 500_000,
+          overageUsdProjected: 20,
+          breakdown: [
+            { key: 'UserShardDO', label: 'UserShardDO', usage: 400_000, unit: 'GB-s' },
+            { key: 'UserDO', label: 'UserDO', usage: 100_000, unit: 'GB-s' },
+          ],
+        }),
+      ],
+      inventory: [],
+    });
+    expect(recs.some((r) => r.id === 'do.shard_1000')).toBe(true);
+  });
+
+  it('fires r2.lakehouse_standard when storage is projected over and lakehouse is majority', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [
+        stubMetric({
+          metricId: 'r2.storage_gb',
+          status: 'projected_over',
+          usageMtd: 80,
+          overageUsdProjected: 4,
+          breakdown: [
+            { key: 'aiagents-hub-lakehouse', label: 'aiagents-hub-lakehouse', usage: 70, unit: 'GB' },
+            { key: 'aiagents-hub-ekyc-storage-bucket', label: 'ekyc', usage: 10, unit: 'GB' },
+          ],
+        }),
+      ],
+      inventory: [],
+    });
+    expect(recs.some((r) => r.id === 'r2.lakehouse_standard')).toBe(true);
+  });
+
+  it('fires zone.paid_unused for a Pro zone', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [],
+      inventory: [],
+      plans: {
+        workers: {
+          planId: 'workers_paid',
+          publicName: 'Workers Paid',
+          subscriptionUsdPerMonth: 5,
+          periodStart: '2026-09-01T00:00:00.000Z',
+          periodEnd: '2026-10-01T00:00:00.000Z',
+          state: 'Paid',
+          source: 'subscriptions_api',
+          periodAssumedUtc: false,
+        },
+        zones: [
+          {
+            zoneName: 'aiagents-hub.vn',
+            zoneId: 'z',
+            planId: 'pro',
+            publicName: 'Pro',
+            subscriptionUsdPerMonth: 20,
+          },
+        ],
+        addOns: [],
+      },
+    });
+    expect(recs.some((r) => r.id === 'zone.paid_unused')).toBe(true);
+  });
+
+  it('fires infra_buffer.recalibrate when projected COGS is more than 2× the 30-day estimate', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [],
+      inventory: [],
+      totalUsdProjected: 40,
+      cogsInfraUsdEst30d: 10,
+    });
+    expect(recs.some((r) => r.id === 'infra_buffer.recalibrate')).toBe(true);
+  });
+
+  it('fires cpu.cron_d1tor2 on a 16:59 UTC CPU spike', () => {
+    const recs = buildRecommendations({
+      planId: 'workers_paid',
+      metrics: [stubMetric({ metricId: 'workers.cpu_ms', status: 'watch', usageMtd: 1_000_000 })],
+      inventory: [],
+      cronCpuByUtcHour: { 10: 100, 16: 9_000, 17: 80 },
+    });
+    expect(recs.some((r) => r.id === 'cpu.cron_d1tor2')).toBe(true);
+  });
+});
+
+describe('snapshot archive path', () => {
+  it('writes lakehouse objects under cloudflare-usage/snapshots', () => {
+    expect(SNAPSHOT_ARCHIVE_PREFIX).toBe('cloudflare-usage/snapshots');
   });
 });

@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, Cloud, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,12 @@ export default function ContributionPage() {
           <p className="text-muted-foreground">{t("page_description")}</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/cloudflare-usage">
+              <Cloud className="mr-2 h-4 w-4" />
+              {t("cloudflare_cogs_link")}
+            </Link>
+          </Button>
           <Button variant="outline" onClick={() => void fetchReport()} disabled={isLoading}>
             <RefreshCw className="mr-2 h-4 w-4" />
             {t("refresh")}

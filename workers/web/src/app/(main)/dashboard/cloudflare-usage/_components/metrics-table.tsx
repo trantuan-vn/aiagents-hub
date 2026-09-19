@@ -1,11 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -29,6 +31,16 @@ const STATUS_KEYS: Record<
   unavailable: "status_unavailable",
 };
 
+const STATUS_FILTERS: Array<MetricStatus | "all"> = [
+  "all",
+  "under",
+  "watch",
+  "projected_over",
+  "over",
+  "hard_stop_today",
+  "unavailable",
+];
+
 function statusVariant(status: MetricStatus): "default" | "secondary" | "destructive" | "outline" {
   if (status === "over" || status === "hard_stop_today") return "destructive";
   if (status === "projected_over" || status === "watch") return "outline";
@@ -38,10 +50,19 @@ function statusVariant(status: MetricStatus): "default" | "secondary" | "destruc
 export function MetricsTable({ data }: { data: OverviewDto }) {
   const t = useTranslations("CloudflareUsageAdmin");
   const [family, setFamily] = useState<string>("all");
-  const rows = useMemo(() => {
-    return family === "all" ? data.metrics : data.metrics.filter((m) => m.family === family);
-  }, [data.metrics, family]);
+  const [status, setStatus] = useState<MetricStatus | "all">("all");
+  const [query, setQuery] = useState("");
   const families = useMemo(() => Array.from(new Set(data.metrics.map((m) => m.family))), [data.metrics]);
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.metrics.filter((m) => {
+      if (family !== "all" && m.family !== family) return false;
+      if (status !== "all" && m.status !== status) return false;
+      if (!q) return true;
+      const hay = `${m.metricId} ${m.label} ${(m.breakdown ?? []).map((b) => `${b.key} ${b.label}`).join(" ")}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [data.metrics, family, status, query]);
 
   return (
     <Card>
@@ -50,6 +71,12 @@ export function MetricsTable({ data }: { data: OverviewDto }) {
           <CardTitle>{t("metrics")}</CardTitle>
           <CardDescription>{t("metrics_desc")}</CardDescription>
         </div>
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("search_metrics")}
+          className="max-w-sm"
+        />
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -66,6 +93,22 @@ export function MetricsTable({ data }: { data: OverviewDto }) {
               onClick={() => setFamily(f)}
             >
               {f}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {STATUS_FILTERS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={
+                s === status
+                  ? "text-sm underline-offset-4 underline"
+                  : "text-muted-foreground text-sm underline-offset-4 hover:underline"
+              }
+              onClick={() => setStatus(s)}
+            >
+              {s === "all" ? t("status_all") : t(STATUS_KEYS[s])}
             </button>
           ))}
         </div>
@@ -105,33 +148,84 @@ export function MetricsTable({ data }: { data: OverviewDto }) {
 
 function MetricRow({ row }: { row: UsageMetricRow }) {
   const t = useTranslations("CloudflareUsageAdmin");
+  const [open, setOpen] = useState(false);
   const pct = row.pctOfIncluded ?? 0;
+  const hasBreakdown = (row.breakdown?.length ?? 0) > 0;
   return (
-    <TableRow>
-      <TableCell className="font-medium">
-        <div>{row.label}</div>
-        <div className="text-muted-foreground text-xs">{row.metricId}</div>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {formatCompact(row.included)} / {row.includedPeriod}
-      </TableCell>
-      <TableCell className="min-w-[140px]">
-        <div className="mb-1 text-sm">
-          {formatCompact(row.usageMtd)} {row.unit}
-        </div>
-        <Progress value={Math.min(100, pct)} />
-      </TableCell>
-      <TableCell className="text-right">{row.pctOfIncluded == null ? "—" : `${row.pctOfIncluded.toFixed(1)}%`}</TableCell>
-      <TableCell className="text-right">{formatCompact(row.projectedEom)}</TableCell>
-      <TableCell className="whitespace-nowrap text-sm">{row.exhaustAt ? formatWhen(row.exhaustAt) : t("no_exhaust_this_period")}</TableCell>
-      <TableCell className="text-right">{formatMoney(row.overageUsdNow)}</TableCell>
-      <TableCell className="text-right">{formatMoney(row.overageUsdProjected)}</TableCell>
-      <TableCell>
-        <Badge variant="outline">{row.costSource === "invoice" ? t("cost_invoice") : t("cost_estimate")}</Badge>
-      </TableCell>
-      <TableCell>
-        <Badge variant={statusVariant(row.status)}>{t(STATUS_KEYS[row.status])}</Badge>
-      </TableCell>
-    </TableRow>
+    <Fragment>
+      <TableRow
+        className={hasBreakdown ? "cursor-pointer" : undefined}
+        onClick={() => hasBreakdown && setOpen((v) => !v)}
+      >
+        <TableCell className="font-medium">
+          <div className="flex items-start gap-2">
+            {hasBreakdown ? (
+              open ? (
+                <ChevronDown className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+              ) : (
+                <ChevronRight className="text-muted-foreground mt-0.5 size-4 shrink-0" />
+              )
+            ) : null}
+            <div>
+              <div>{row.label}</div>
+              <div className="text-muted-foreground text-xs">{row.metricId}</div>
+            </div>
+          </div>
+        </TableCell>
+        <TableCell className="whitespace-nowrap">
+          {formatCompact(row.included)} / {row.includedPeriod}
+        </TableCell>
+        <TableCell className="min-w-[140px]">
+          <div className="mb-1 text-sm">
+            {formatCompact(row.usageMtd)} {row.unit}
+          </div>
+          <Progress value={Math.min(100, pct)} />
+        </TableCell>
+        <TableCell className="text-right">{row.pctOfIncluded == null ? "—" : `${row.pctOfIncluded.toFixed(1)}%`}</TableCell>
+        <TableCell className="text-right">{formatCompact(row.projectedEom)}</TableCell>
+        <TableCell className="whitespace-nowrap text-sm">{row.exhaustAt ? formatWhen(row.exhaustAt) : t("no_exhaust_this_period")}</TableCell>
+        <TableCell className="text-right">{formatMoney(row.overageUsdNow)}</TableCell>
+        <TableCell className="text-right">{formatMoney(row.overageUsdProjected)}</TableCell>
+        <TableCell>
+          <Badge variant="outline">{row.costSource === "invoice" ? t("cost_invoice") : t("cost_estimate")}</Badge>
+        </TableCell>
+        <TableCell>
+          <Badge variant={statusVariant(row.status)}>{t(STATUS_KEYS[row.status])}</Badge>
+        </TableCell>
+      </TableRow>
+      {open && hasBreakdown ? (
+        <TableRow>
+          <TableCell colSpan={10} className="bg-muted/40">
+            <div className="text-muted-foreground mb-2 text-xs font-medium uppercase">{t("breakdown")}</div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("col_name")}</TableHead>
+                  <TableHead className="text-right">{t("col_usage")}</TableHead>
+                  <TableHead className="text-right">{t("share")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(row.breakdown ?? []).map((item) => {
+                  const share = row.usageMtd > 0 ? (item.usage / row.usageMtd) * 100 : 0;
+                  return (
+                    <TableRow key={item.key}>
+                      <TableCell>
+                        <div>{item.label}</div>
+                        <div className="text-muted-foreground text-xs">{item.key}</div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {formatCompact(item.usage)} {item.unit}
+                      </TableCell>
+                      <TableCell className="text-right">{share.toFixed(1)}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableCell>
+        </TableRow>
+      ) : null}
+    </Fragment>
   );
 }

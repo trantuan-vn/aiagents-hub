@@ -152,18 +152,22 @@ export async function syncUsageSnapshot(env: Env, now = new Date()): Promise<Usa
   } else {
     for (const allotment of allotments) {
       const raw = fetched.usage[allotment.metricId];
-      const unavailable = !raw && invoiceUsd[allotment.metricId] == null && fetched.partialErrors.some((e) => e.startsWith('graphql') || e.startsWith('billable'));
+      const usageMtd = raw ? raw.mtd : 0;
+      const unavailable =
+        !raw &&
+        invoiceUsd[allotment.metricId] == null &&
+        fetched.partialErrors.some((e) => e.startsWith('graphql') || e.startsWith('billable'));
       metrics.push(
         forecastMetric({
           allotment,
           planId,
-          usageMtd: raw?.mtd ?? 0,
+          usageMtd,
           usageToday: raw?.today,
           now,
           periodStart,
           periodEnd,
           invoiceUsd: invoiceUsd[allotment.metricId],
-          unavailable: Boolean(unavailable && (raw?.mtd ?? 0) === 0),
+          unavailable: Boolean(unavailable && usageMtd === 0),
           unavailableReason: unavailable ? fetched.partialErrors.join(', ') : undefined,
           breakdown: raw?.breakdown,
         }),
@@ -199,12 +203,21 @@ export async function syncUsageSnapshot(env: Env, now = new Date()): Promise<Usa
 
   const sorted = sortMetrics(metrics);
   const inventory = reconcileInventory(fetched.inventory);
-  const recommendations = buildRecommendations({ planId, metrics: sorted, inventory });
   const flatUsd =
     fetched.plans.workers.subscriptionUsdPerMonth +
     fetched.plans.zones.reduce((s, z) => s + z.subscriptionUsdPerMonth, 0) +
     fetched.plans.addOns.reduce((s, a) => s + a.usdPerMonth, 0);
   const summary = buildSummary(sorted, flatUsd);
+  const cogsInfraUsdEst30d = await queryCogsInfraUsdEst30d(env.D1DB, now);
+  const recommendations = buildRecommendations({
+    planId,
+    metrics: sorted,
+    inventory,
+    plans: fetched.plans,
+    totalUsdProjected: summary.totalUsdProjected,
+    cogsInfraUsdEst30d,
+    cronCpuByUtcHour: fetched.usage['workers.cpu_ms']?.hourUtcCpuMs,
+  });
   const hasInvoice = sorted.some((m) => m.costSource === 'invoice' && m.overageUsdNow > 0);
 
   const payload: UsageSnapshotPayload = {
@@ -320,6 +333,63 @@ async function writeAudit(env: Env, actor: string, action: string, detail: strin
   }
 }
 
+const SNAPSHOT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+export const SNAPSHOT_ARCHIVE_PREFIX = 'cloudflare-usage/snapshots';
+
+async function queryCogsInfraUsdEst30d(db: D1Database, now: Date): Promise<number> {
+  const from = now.getTime() - 30 * 86_400_000;
+  try {
+    const row = await db
+      .prepare(
+        `SELECT SUM(COALESCE("cogsInfraUsdEst", 0)) as usd
+         FROM service_usages
+         WHERE created_at >= ? AND created_at <= ?
+           AND (isError = 0 OR isError IS NULL)`,
+      )
+      .bind(from, now.getTime())
+      .first<{ usd: number | null }>();
+    const usd = Number(row?.usd);
+    return Number.isFinite(usd) ? usd : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function archiveOldSnapshots(env: Env, now = new Date()): Promise<number> {
+  const bucket = env.R2_LAKEHOUSE;
+  if (!bucket) return 0;
+  await ensureUsageTables(env.D1DB);
+  const cutoff = now.getTime() - SNAPSHOT_RETENTION_MS;
+  const latest = await env.D1DB.prepare(
+    `SELECT MAX(captured_at) as maxAt FROM cloudflare_usage_snapshots`,
+  ).first<{ maxAt: number | null }>();
+  const keepAt = Number(latest?.maxAt ?? 0);
+  const rows = await env.D1DB.prepare(
+    `SELECT id, captured_at as capturedAt, payload
+     FROM cloudflare_usage_snapshots
+     WHERE captured_at < ? AND captured_at != ?
+     ORDER BY captured_at ASC
+     LIMIT 50`,
+  )
+    .bind(cutoff, keepAt)
+    .all<{ id: number; capturedAt: number; payload: string }>();
+
+  let archived = 0;
+  for (const row of rows.results ?? []) {
+    const day = new Date(row.capturedAt).toISOString().slice(0, 10);
+    const key = `${SNAPSHOT_ARCHIVE_PREFIX}/${day}/${row.capturedAt}.json`;
+    await bucket.put(key, row.payload, { httpMetadata: { contentType: 'application/json' } });
+    await env.D1DB.prepare(`DELETE FROM cloudflare_usage_snapshots WHERE id = ?`).bind(row.id).run();
+    archived += 1;
+  }
+  return archived;
+}
+
 export async function dailyUsageSync(env: Env): Promise<void> {
   await syncUsageSnapshot(env);
+  try {
+    await archiveOldSnapshots(env);
+  } catch {
+    /* keep D1 snapshots if R2 archive fails */
+  }
 }

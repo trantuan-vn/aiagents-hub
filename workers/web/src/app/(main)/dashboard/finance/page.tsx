@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useTranslations } from "next-intl";
 
+import { FinanceCloudflareCogsCard } from "./_components/finance-cloudflare-cogs-card";
 import { FinanceDataTables } from "./_components/finance-data-tables";
 import { FinanceInsightCharts } from "./_components/finance-insight-charts";
 import { FinanceOverviewCards } from "./_components/finance-overview-cards";
@@ -100,6 +101,7 @@ export default function FinancePage() {
         <p className="text-muted-foreground">{t("page_description")}</p>
       </div>
       <FinanceOverviewCards stats={data} />
+      <FinanceCloudflareCogsCard />
       <FinanceInsightCharts stats={data} />
       <FinanceDataTables stats={data} />
     </div>

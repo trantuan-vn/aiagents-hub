@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,11 @@ export function RecommendationList({ data }: { data: OverviewDto }) {
                   <li key={action}>{action}</li>
                 ))}
               </ul>
+              {rec.id === "infra_buffer.recalibrate" ? (
+                <Link href="/dashboard/contribution" className="text-primary text-sm underline-offset-4 hover:underline">
+                  Contribution
+                </Link>
+              ) : null}
             </CardContent>
           </Card>
         ))

@@ -31,6 +31,7 @@ declare namespace Cloudflare {
 		WORKFLOW_CRON_QUEUE: Queue;
 		R2_VERSION_BUCKET: R2Bucket;
 		R2_EKYC_BUCKET: R2Bucket;
+		R2_LAKEHOUSE: R2Bucket;
 		D1DB: D1Database;
 		JWT_SECRET: SecretsStoreSecret;
 		EMAIL_API_KEY: SecretsStoreSecret;

@@ -289,6 +289,11 @@
     "commission_paid": "Hoa hồng đã trả",
     "total_discounts": "Tổng giảm giá",
     "average_order_value": "Giá trị đơn TB",
+    "cloudflare_cogs": "COGS Cloudflare dự kiến",
+    "cloudflare_cogs_desc": "Chi phí hạ tầng trên gói Cloudflare hiện tại — không phải line item khách hàng",
+    "cloudflare_cogs_now": "Đến nay trong kỳ",
+    "cloudflare_cogs_unavailable": "Mở màn usage",
+    "cloudflare_cogs_link": "Tài nguyên Cloudflare",
     "this_month": "Tháng này",
     "vs_previous_month_up": "so với tháng trước",
     "vs_previous_month_down": "so với tháng trước",
@@ -343,7 +348,8 @@
     "losing": "Workflow lỗ",
     "losing_description": "Workflow có contribution âm trong cửa sổ",
     "workflow": "Workflow",
-    "no_data": "Không có dữ liệu trong cửa sổ này"
+    "no_data": "Không có dữ liệu trong cửa sổ này",
+    "cloudflare_cogs_link": "COGS Cloudflare"
   },
   "CloudflareUsageAdmin": {
     "page_title": "Tài nguyên Cloudflare",
@@ -412,7 +418,11 @@
     "token_missing": "Cấp API token Billing Read, Account Settings Read và Analytics Read rồi Refresh. Màn này không giả định Workers Paid.",
     "partial_data": "Một số API Cloudflare lỗi; metric còn lại vẫn hiện.",
     "disclaimer": "Không phải hóa đơn Cloudflare. Chi phí billed lấy từ Billable Usage API khi có; không thì từ catalog giá versioned. GraphQL có thể gồm traffic không bill.",
-    "no_data": "Chưa có metric"
+    "no_data": "Chưa có metric",
+    "search_metrics": "Tìm tài nguyên, script, bucket, queue…",
+    "status_all": "Mọi trạng thái",
+    "breakdown": "Chi tiết",
+    "share": "Tỷ trọng"
   },
   "UserEconomicsAdmin": {
     "page_title": "Kinh tế người dùng",

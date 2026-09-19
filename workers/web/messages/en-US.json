@@ -289,6 +289,11 @@
     "commission_paid": "Commission Paid",
     "total_discounts": "Total Discounts",
     "average_order_value": "Avg. Order Value",
+    "cloudflare_cogs": "Cloudflare COGS projected",
+    "cloudflare_cogs_desc": "Infrastructure cost on the current Cloudflare plan — not a customer line item",
+    "cloudflare_cogs_now": "So far this period",
+    "cloudflare_cogs_unavailable": "Open usage screen",
+    "cloudflare_cogs_link": "Cloudflare usage",
     "this_month": "This month",
     "vs_previous_month_up": "vs previous month",
     "vs_previous_month_down": "vs previous month",
@@ -343,7 +348,8 @@
     "losing": "Losing workflows",
     "losing_description": "Workflows with negative contribution in the window",
     "workflow": "Workflow",
-    "no_data": "No data in this window"
+    "no_data": "No data in this window",
+    "cloudflare_cogs_link": "Cloudflare COGS"
   },
   "CloudflareUsageAdmin": {
     "page_title": "Cloudflare usage",
@@ -412,7 +418,11 @@
     "token_missing": "Grant the API token Billing Read, Account Settings Read, and Analytics Read, then Refresh. This screen will not assume Workers Paid.",
     "partial_data": "Some Cloudflare APIs failed; remaining metrics still shown.",
     "disclaimer": "Not a Cloudflare invoice. Billed cost comes from the Billable Usage API when populated; otherwise from the versioned price catalog. GraphQL analytics can include non-billable traffic.",
-    "no_data": "No metrics yet"
+    "no_data": "No metrics yet",
+    "search_metrics": "Search resource, script, bucket, queue…",
+    "status_all": "All statuses",
+    "breakdown": "Breakdown",
+    "share": "Share"
   },
   "UserEconomicsAdmin": {
     "page_title": "User Economics",

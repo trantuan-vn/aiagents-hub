@@ -19,6 +19,7 @@ export type RawMetricUsage = {
   today?: number;
   breakdown?: UsageBreakdown[];
   source: 'graphql' | 'billable';
+  hourUtcCpuMs?: Record<number, number>;
 };
 
 export type BillableRow = {
@@ -292,9 +293,17 @@ async function graphql<T>(token: string, query: string, variables: Record<string
 
 type GqlGroup = {
   sum?: Record<string, unknown>;
+  max?: Record<string, unknown>;
   uniq?: Record<string, unknown>;
+  count?: number;
   quantiles?: Record<string, unknown>;
   dimensions?: Record<string, unknown>;
+};
+
+const KV_NAMESPACE_LABELS: Record<string, string> = {
+  e80315e1a3fb47e2959d645a15ac534a: 'SYSTEM_CONFIG_KV (auth)',
+  '529353fcfe7641c9bcbd5dda5d01d5da': 'SYSTEM_CONFIG_KV (queue/d1tor2)',
+  dfbfc6ec8f75482bbf54854d86442e27: 'NONCE_KV',
 };
 
 function addUsage(map: Record<string, RawMetricUsage>, metricId: string, amount: number, breakdown?: UsageBreakdown): void {
@@ -310,6 +319,18 @@ function addUsage(map: Record<string, RawMetricUsage>, metricId: string, amount:
   map[metricId] = cur;
 }
 
+function sortAndCapBreakdowns(usage: Record<string, RawMetricUsage>, cap = 40): void {
+  for (const row of Object.values(usage)) {
+    if (!row.breakdown?.length) continue;
+    row.breakdown.sort((a, b) => b.usage - a.usage);
+    if (row.breakdown.length > cap) row.breakdown = row.breakdown.slice(0, cap);
+  }
+}
+
+function gqlField(data: { viewer?: { accounts?: Array<Record<string, GqlGroup[] | undefined>> } } | null, field: string): GqlGroup[] {
+  return data?.viewer?.accounts?.[0]?.[field] ?? [];
+}
+
 async function fetchGraphQlUsage(
   token: string,
   accountId: string,
@@ -322,6 +343,8 @@ async function fetchGraphQlUsage(
   const start = gqlDate(periodStart);
   const end = gqlDate(now < periodEnd ? now : periodEnd);
   const today = gqlDate(now);
+  const vars = { accountTag: accountId, start, end };
+  const todayVars = { accountTag: accountId, start: today, end: today };
 
   const workersQuery = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
@@ -334,22 +357,6 @@ async function fetchGraphQlUsage(
         }
       }
     }`;
-
-  const workers = await graphql<{ viewer?: { accounts?: Array<{ workersInvocationsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    workersQuery,
-    { accountTag: accountId, start, end },
-  );
-  if (!workers) errors.push('graphql:workers');
-  else {
-    const groups = workers.viewer?.accounts?.[0]?.workersInvocationsAdaptiveGroups ?? [];
-    for (const g of groups) {
-      const name = str(g.dimensions?.scriptName) || 'unknown';
-      addUsage(usage, 'workers.requests', num(g.sum?.requests), { key: name, label: name, usage: num(g.sum?.requests), unit: 'request' });
-      addUsage(usage, 'workers.cpu_ms', num(g.sum?.cpuTimeMs), { key: name, label: name, usage: num(g.sum?.cpuTimeMs), unit: 'cpu_ms' });
-    }
-  }
-
   const d1Query = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
@@ -361,49 +368,18 @@ async function fetchGraphQlUsage(
         }
       }
     }`;
-  const d1 = await graphql<{ viewer?: { accounts?: Array<{ d1AnalyticsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    d1Query,
-    { accountTag: accountId, start, end },
-  );
-  if (!d1) errors.push('graphql:d1');
-  else {
-    for (const g of d1.viewer?.accounts?.[0]?.d1AnalyticsAdaptiveGroups ?? []) {
-      const id = str(g.dimensions?.databaseId) || 'd1';
-      addUsage(usage, 'd1.rows_read', num(g.sum?.rowsRead), { key: id, label: id, usage: num(g.sum?.rowsRead), unit: 'row' });
-      addUsage(usage, 'd1.rows_written', num(g.sum?.rowsWritten), { key: id, label: id, usage: num(g.sum?.rowsWritten), unit: 'row' });
-    }
-  }
-
   const kvQuery = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
           kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
             sum { requests }
-            dimensions { actionType }
+            dimensions { actionType namespaceId }
           }
         }
       }
     }`;
-  const kv = await graphql<{ viewer?: { accounts?: Array<{ kvOperationsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    kvQuery,
-    { accountTag: accountId, start, end },
-  );
-  if (!kv) errors.push('graphql:kv');
-  else {
-    for (const g of kv.viewer?.accounts?.[0]?.kvOperationsAdaptiveGroups ?? []) {
-      const action = str(g.dimensions?.actionType).toLowerCase();
-      const n = num(g.sum?.requests);
-      if (action.includes('read') || action === 'get') addUsage(usage, 'kv.reads', n);
-      else if (action.includes('write') || action === 'put') addUsage(usage, 'kv.writes', n);
-      else if (action.includes('delete')) addUsage(usage, 'kv.deletes', n);
-      else if (action.includes('list')) addUsage(usage, 'kv.lists', n);
-    }
-  }
-
-  const r2Query = `
+  const r2OpsQuery = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
@@ -414,23 +390,17 @@ async function fetchGraphQlUsage(
         }
       }
     }`;
-  const r2 = await graphql<{ viewer?: { accounts?: Array<{ r2OperationsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    r2Query,
-    { accountTag: accountId, start, end },
-  );
-  if (!r2) errors.push('graphql:r2');
-  else {
-    for (const g of r2.viewer?.accounts?.[0]?.r2OperationsAdaptiveGroups ?? []) {
-      const action = str(g.dimensions?.actionType).toLowerCase();
-      const bucket = str(g.dimensions?.bucketName) || 'r2';
-      const n = num(g.sum?.requests);
-      const classA = action.includes('put') || action.includes('list') || action.includes('copy') || action.includes('create');
-      const metric = classA ? 'r2.class_a' : 'r2.class_b';
-      addUsage(usage, metric, n, { key: bucket, label: bucket, usage: n, unit: 'request' });
-    }
-  }
-
+  const r2StorageQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          r2StorageAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            max { payloadSize }
+            dimensions { bucketName }
+          }
+        }
+      }
+    }`;
   const doQuery = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
@@ -442,29 +412,247 @@ async function fetchGraphQlUsage(
         }
       }
     }`;
-  const durable = await graphql<{ viewer?: { accounts?: Array<{ durableObjectsInvocationsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    doQuery,
-    { accountTag: accountId, start, end },
-  );
+  const queuesQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          queueMessageOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            count
+            sum { count }
+            dimensions { queueId queueName actionType }
+          }
+        }
+      }
+    }`;
+  const vectorizeQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          vectorizeQueryAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            sum { queryCount queriedDimensions }
+            dimensions { indexName }
+          }
+        }
+      }
+    }`;
+  const aiQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          workersAiInferenceAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            sum { neurons requests }
+            dimensions { modelName }
+          }
+        }
+      }
+    }`;
+  const imagesQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          imagesAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            uniq { uniqueTransformations }
+            sum { transformations requests }
+          }
+        }
+      }
+    }`;
+  const cronQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!, $script: string!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          workersInvocationsAdaptiveGroups(
+            limit: 10000,
+            filter: { date_geq: $start, date_leq: $end, scriptName: $script }
+          ) {
+            sum { cpuTimeMs }
+            dimensions { datetimeHour }
+          }
+        }
+      }
+    }`;
+  const aeQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          workersAnalyticsEngineAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            count
+            sum { count }
+            dimensions { dataset }
+          }
+        }
+      }
+    }`;
+
+  type GqlAccounts = { viewer?: { accounts?: Array<Record<string, GqlGroup[] | undefined>> } };
+
+  const [
+    workers,
+    d1,
+    kv,
+    r2,
+    r2Storage,
+    durable,
+    queues,
+    vectorize,
+    ai,
+    images,
+    cron,
+    ae,
+    todayWorkers,
+    todayD1,
+    todayAi,
+    todayAe,
+  ] = await Promise.all([
+    graphql<GqlAccounts>(token, workersQuery, vars),
+    graphql<GqlAccounts>(token, d1Query, vars),
+    graphql<GqlAccounts>(token, kvQuery, vars),
+    graphql<GqlAccounts>(token, r2OpsQuery, vars),
+    graphql<GqlAccounts>(token, r2StorageQuery, vars),
+    graphql<GqlAccounts>(token, doQuery, vars),
+    graphql<GqlAccounts>(token, queuesQuery, vars),
+    graphql<GqlAccounts>(token, vectorizeQuery, vars),
+    graphql<GqlAccounts>(token, aiQuery, vars),
+    graphql<GqlAccounts>(token, imagesQuery, vars),
+    graphql<GqlAccounts>(token, cronQuery, { ...vars, script: 'aiagents-hub-d1tor2-cron' }),
+    graphql<GqlAccounts>(token, aeQuery, vars),
+    graphql<GqlAccounts>(token, workersQuery, todayVars),
+    graphql<GqlAccounts>(token, d1Query, todayVars),
+    graphql<GqlAccounts>(token, aiQuery, todayVars),
+    graphql<GqlAccounts>(token, aeQuery, todayVars),
+  ]);
+
+  if (!workers) errors.push('graphql:workers');
+  else {
+    for (const g of gqlField(workers, 'workersInvocationsAdaptiveGroups')) {
+      const name = str(g.dimensions?.scriptName) || 'unknown';
+      addUsage(usage, 'workers.requests', num(g.sum?.requests), { key: name, label: name, usage: num(g.sum?.requests), unit: 'request' });
+      addUsage(usage, 'workers.cpu_ms', num(g.sum?.cpuTimeMs), { key: name, label: name, usage: num(g.sum?.cpuTimeMs), unit: 'cpu_ms' });
+    }
+  }
+
+  if (!d1) errors.push('graphql:d1');
+  else {
+    for (const g of gqlField(d1, 'd1AnalyticsAdaptiveGroups')) {
+      const id = str(g.dimensions?.databaseId) || 'd1';
+      addUsage(usage, 'd1.rows_read', num(g.sum?.rowsRead), { key: id, label: id, usage: num(g.sum?.rowsRead), unit: 'row' });
+      addUsage(usage, 'd1.rows_written', num(g.sum?.rowsWritten), { key: id, label: id, usage: num(g.sum?.rowsWritten), unit: 'row' });
+    }
+  }
+
+  if (!kv) errors.push('graphql:kv');
+  else {
+    for (const g of gqlField(kv, 'kvOperationsAdaptiveGroups')) {
+      const action = str(g.dimensions?.actionType).toLowerCase();
+      const ns = str(g.dimensions?.namespaceId);
+      const n = num(g.sum?.requests);
+      const label = KV_NAMESPACE_LABELS[ns] || ns || 'kv';
+      const bd = ns ? { key: ns, label, usage: n, unit: 'request' } : undefined;
+      if (action.includes('read') || action === 'get') addUsage(usage, 'kv.reads', n, bd);
+      else if (action.includes('write') || action === 'put') addUsage(usage, 'kv.writes', n, bd);
+      else if (action.includes('delete')) addUsage(usage, 'kv.deletes', n, bd);
+      else if (action.includes('list')) addUsage(usage, 'kv.lists', n, bd);
+    }
+  }
+
+  if (!r2) errors.push('graphql:r2');
+  else {
+    for (const g of gqlField(r2, 'r2OperationsAdaptiveGroups')) {
+      const action = str(g.dimensions?.actionType).toLowerCase();
+      const bucket = str(g.dimensions?.bucketName) || 'r2';
+      const n = num(g.sum?.requests);
+      const classA = action.includes('put') || action.includes('list') || action.includes('copy') || action.includes('create');
+      const metric = classA ? 'r2.class_a' : 'r2.class_b';
+      addUsage(usage, metric, n, { key: bucket, label: bucket, usage: n, unit: 'request' });
+    }
+  }
+
+  if (!r2Storage) errors.push('graphql_optional:r2_storage');
+  else {
+    const byBucket = new Map<string, number>();
+    for (const g of gqlField(r2Storage, 'r2StorageAdaptiveGroups')) {
+      const bucket = str(g.dimensions?.bucketName) || 'r2';
+      const bytes = num(g.max?.payloadSize);
+      byBucket.set(bucket, Math.max(byBucket.get(bucket) ?? 0, bytes));
+    }
+    for (const [bucket, bytes] of byBucket) {
+      const gb = bytes / 1_000_000_000;
+      addUsage(usage, 'r2.storage_gb', gb, { key: bucket, label: bucket, usage: gb, unit: 'GB' });
+    }
+  }
+
   if (!durable) errors.push('graphql:do');
   else {
-    for (const g of durable.viewer?.accounts?.[0]?.durableObjectsInvocationsAdaptiveGroups ?? []) {
+    for (const g of gqlField(durable, 'durableObjectsInvocationsAdaptiveGroups')) {
       const ns = str(g.dimensions?.namespaceName) || 'do';
       addUsage(usage, 'do.requests', num(g.sum?.requests), { key: ns, label: ns, usage: num(g.sum?.requests), unit: 'request' });
       addUsage(usage, 'do.duration_gb_s', num(g.sum?.duration), { key: ns, label: ns, usage: num(g.sum?.duration), unit: 'GB-s' });
     }
   }
 
-  const todayWorkers = await graphql<{ viewer?: { accounts?: Array<{ workersInvocationsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    workersQuery,
-    { accountTag: accountId, start: today, end: today },
-  );
+  if (!queues) errors.push('graphql_optional:queues');
+  else {
+    for (const g of gqlField(queues, 'queueMessageOperationsAdaptiveGroups')) {
+      const name = str(g.dimensions?.queueName) || str(g.dimensions?.queueId) || 'queue';
+      const n = num(g.sum?.count) || num(g.count);
+      addUsage(usage, 'queues.operations', n, { key: name, label: name, usage: n, unit: 'operation' });
+    }
+  }
+
+  if (!vectorize) errors.push('graphql_optional:vectorize');
+  else {
+    for (const g of gqlField(vectorize, 'vectorizeQueryAdaptiveGroups')) {
+      const name = str(g.dimensions?.indexName) || 'vectorize';
+      const dims = num(g.sum?.queriedDimensions);
+      addUsage(usage, 'vectorize.queried_dims', dims, { key: name, label: name, usage: dims, unit: 'dimension' });
+    }
+  }
+
+  if (!ai) errors.push('graphql_optional:workers_ai');
+  else {
+    for (const g of gqlField(ai, 'workersAiInferenceAdaptiveGroups')) {
+      const model = str(g.dimensions?.modelName) || 'workers-ai';
+      const neurons = num(g.sum?.neurons);
+      addUsage(usage, 'workers_ai.neurons', neurons, { key: model, label: model, usage: neurons, unit: 'neuron' });
+    }
+  }
+
+  if (!images) errors.push('graphql_optional:images');
+  else {
+    for (const g of gqlField(images, 'imagesAdaptiveGroups')) {
+      const unique = num(g.uniq?.uniqueTransformations) || num(g.sum?.transformations) || num(g.sum?.requests);
+      addUsage(usage, 'images.unique_transformations', unique);
+    }
+  }
+
+  if (cron) {
+    const hours: Record<number, number> = {};
+    for (const g of gqlField(cron, 'workersInvocationsAdaptiveGroups')) {
+      const hourRaw = str(g.dimensions?.datetimeHour);
+      const hour = hourRaw ? new Date(hourRaw).getUTCHours() : Number.NaN;
+      if (!Number.isFinite(hour)) continue;
+      hours[hour] = (hours[hour] ?? 0) + num(g.sum?.cpuTimeMs);
+    }
+    if (Object.keys(hours).length) {
+      const cpu = usage['workers.cpu_ms'] ?? { mtd: 0, source: 'graphql' as const };
+      cpu.hourUtcCpuMs = hours;
+      usage['workers.cpu_ms'] = cpu;
+    }
+  }
+
+  if (!ae) errors.push('graphql_optional:ae');
+  else {
+    for (const g of gqlField(ae, 'workersAnalyticsEngineAdaptiveGroups')) {
+      const dataset = str(g.dimensions?.dataset) || 'ae';
+      const n = num(g.sum?.count) || num(g.count);
+      addUsage(usage, 'ae.datapoints_written', n, { key: dataset, label: dataset, usage: n, unit: 'datapoint' });
+    }
+  }
+
   if (todayWorkers) {
     let todayReq = 0;
     let todayCpu = 0;
-    for (const g of todayWorkers.viewer?.accounts?.[0]?.workersInvocationsAdaptiveGroups ?? []) {
+    for (const g of gqlField(todayWorkers, 'workersInvocationsAdaptiveGroups')) {
       todayReq += num(g.sum?.requests);
       todayCpu += num(g.sum?.cpuTimeMs);
     }
@@ -472,15 +660,10 @@ async function fetchGraphQlUsage(
     if (usage['workers.cpu_ms']) usage['workers.cpu_ms'].today = todayCpu;
   }
 
-  const todayD1 = await graphql<{ viewer?: { accounts?: Array<{ d1AnalyticsAdaptiveGroups?: GqlGroup[] }> } }>(
-    token,
-    d1Query,
-    { accountTag: accountId, start: today, end: today },
-  );
   if (todayD1) {
     let read = 0;
     let written = 0;
-    for (const g of todayD1.viewer?.accounts?.[0]?.d1AnalyticsAdaptiveGroups ?? []) {
+    for (const g of gqlField(todayD1, 'd1AnalyticsAdaptiveGroups')) {
       read += num(g.sum?.rowsRead);
       written += num(g.sum?.rowsWritten);
     }
@@ -488,6 +671,23 @@ async function fetchGraphQlUsage(
     if (usage['d1.rows_written']) usage['d1.rows_written'].today = written;
   }
 
+  if (todayAi) {
+    let neurons = 0;
+    for (const g of gqlField(todayAi, 'workersAiInferenceAdaptiveGroups')) {
+      neurons += num(g.sum?.neurons);
+    }
+    if (usage['workers_ai.neurons']) usage['workers_ai.neurons'].today = neurons;
+  }
+
+  if (todayAe) {
+    let points = 0;
+    for (const g of gqlField(todayAe, 'workersAnalyticsEngineAdaptiveGroups')) {
+      points += num(g.sum?.count) || num(g.count);
+    }
+    if (usage['ae.datapoints_written']) usage['ae.datapoints_written'].today = points;
+  }
+
+  sortAndCapBreakdowns(usage);
   return usage;
 }
 

@@ -34,9 +34,18 @@ export function createAdminCloudflareUsageRoutes() {
       const data = await getOverview(c.env);
       const family = c.req.query('family');
       const status = c.req.query('status');
+      const q = (c.req.query('q') ?? '').trim().toLowerCase();
       let metrics = data.metrics;
       if (family) metrics = metrics.filter((m) => m.family === family);
       if (status) metrics = metrics.filter((m) => m.status === status);
+      if (q) {
+        metrics = metrics.filter(
+          (m) =>
+            m.metricId.toLowerCase().includes(q) ||
+            m.label.toLowerCase().includes(q) ||
+            (m.breakdown ?? []).some((b) => `${b.key} ${b.label}`.toLowerCase().includes(q)),
+        );
+      }
       return c.json({
         metrics,
         asOf: data.asOf,
