@@ -48,24 +48,39 @@ export function BillingPlanCard({
   const { toast } = useToast();
   const paid = planId !== "free";
   const interval = planInterval === 3 || planInterval === 6 || planInterval === 12 ? planInterval : 1;
-  const hasSubscribe =
-    paid && planSource === "paypal" && planStatus !== "approval_pending" && Boolean(paypalSubscriptionId);
+  const subscribeLive =
+    paid &&
+    planSource === "paypal" &&
+    planStatus === "active" &&
+    !cancelAtPeriodEnd &&
+    Boolean(paypalSubscriptionId);
+  const subscribeCancelled =
+    paid &&
+    !subscribeLive &&
+    planSource === "paypal" &&
+    (planStatus === "canceled" || cancelAtPeriodEnd === true);
   const periodLabel = planCurrentPeriodEnd ? new Date(planCurrentPeriodEnd).toLocaleDateString() : "";
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
 
-  const postSub = async (path: "cancel" | "resume") => {
+  const hint = subscribeLive
+    ? t("next_period_subscribe_hint")
+    : subscribeCancelled
+      ? t("next_period_cancelled_hint")
+      : t("next_period_prepaid_hint");
+
+  const postCancel = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/dashboard/billing/subscriptions/${path}`, {
+      const res = await fetch(`${API_BASE_URL}/dashboard/billing/subscriptions/cancel`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: path === "cancel" ? JSON.stringify({ reason }) : "{}",
+        body: JSON.stringify({ reason }),
       });
       if (!res.ok) throw new Error(t("cancel_error"));
-      toast({ title: path === "cancel" ? t("cancel_scheduled") : t("resume_ok") });
+      toast({ title: t("cancel_scheduled") });
       setOpen(false);
       onChanged?.();
     } catch (e) {
@@ -116,16 +131,20 @@ export function BillingPlanCard({
         <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-2xl font-bold capitalize">{planId}</p>
-            {planStatus ? <p className="text-muted-foreground text-xs">{t("plan_status", { status: planStatus })}</p> : null}
+            {subscribeLive ? (
+              <p className="text-muted-foreground text-xs">{t("subscribe_status_active")}</p>
+            ) : subscribeCancelled ? (
+              <p className="text-muted-foreground text-xs">{t("subscribe_status_cancelled")}</p>
+            ) : planStatus && planStatus !== "none" && planStatus !== "canceled" ? (
+              <p className="text-muted-foreground text-xs">{t("plan_status", { status: planStatus })}</p>
+            ) : null}
             {planCurrentPeriodEnd ? (
               <button
                 type="button"
                 className="text-primary text-xs underline-offset-4 hover:underline"
                 onClick={() => setOpen(true)}
               >
-                {cancelAtPeriodEnd || !hasSubscribe
-                  ? t("ends_on", { date: periodLabel })
-                  : t("renews_on", { date: periodLabel })}
+                {subscribeLive ? t("renews_on", { date: periodLabel }) : t("ends_on", { date: periodLabel })}
                 {" · "}
                 {t("view_next_period")}
               </button>
@@ -138,7 +157,7 @@ export function BillingPlanCard({
             </Button>
             {paid ? (
               <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-                {t("cancel_plan")}
+                {subscribeLive ? t("cancel_plan") : t("view_next_period")}
               </Button>
             ) : null}
           </div>
@@ -149,13 +168,19 @@ export function BillingPlanCard({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("next_period_title")}</DialogTitle>
-            <DialogDescription>
-              {hasSubscribe ? t("next_period_subscribe_hint") : t("next_period_prepaid_hint")}
-            </DialogDescription>
+            <DialogDescription>{hint}</DialogDescription>
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">{t("next_period_plan")}</dt>
             <dd className="capitalize">{planId}</dd>
+            <dt className="text-muted-foreground">{t("next_period_subscribe")}</dt>
+            <dd>
+              {subscribeLive
+                ? t("subscribe_status_active")
+                : subscribeCancelled
+                  ? t("subscribe_status_cancelled")
+                  : t("subscribe_status_off")}
+            </dd>
             <dt className="text-muted-foreground">{t("next_period_interval")}</dt>
             <dd>{t("next_period_interval_value", { n: String(interval) })}</dd>
             {paid ? (
@@ -167,27 +192,21 @@ export function BillingPlanCard({
             {planCurrentPeriodEnd ? (
               <>
                 <dt className="text-muted-foreground">
-                  {hasSubscribe && !cancelAtPeriodEnd ? t("next_period_charge_on") : t("next_period_access_until")}
+                  {subscribeLive ? t("next_period_charge_on") : t("next_period_access_until")}
                 </dt>
                 <dd>{periodLabel}</dd>
               </>
             ) : null}
           </dl>
-          {paid && hasSubscribe && !cancelAtPeriodEnd ? (
+          {subscribeLive ? (
             <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("cancel_reason")} />
           ) : null}
           <DialogFooter className="gap-2 sm:justify-between">
-            {paid && hasSubscribe && cancelAtPeriodEnd ? (
-              <Button disabled={busy} onClick={() => void postSub("resume")}>
-                {t("resume_plan")}
-              </Button>
-            ) : null}
-            {paid && hasSubscribe && !cancelAtPeriodEnd ? (
-              <Button variant="destructive" disabled={busy} onClick={() => void postSub("cancel")}>
+            {subscribeLive ? (
+              <Button variant="destructive" disabled={busy} onClick={() => void postCancel()}>
                 {t("cancel_subscribe")}
               </Button>
-            ) : null}
-            {paid && !hasSubscribe ? (
+            ) : paid ? (
               <Button disabled={busy || !billingEnabled} onClick={() => void startSubscribe()}>
                 {t("enable_subscribe")}
               </Button>

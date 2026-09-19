@@ -204,6 +204,15 @@ export async function createPaypalCheckout(params: {
     Number.isFinite(startMs) && startMs - Date.now() >= 24 * 60 * 60 * 1000
       ? new Date(startMs).toISOString()
       : undefined;
+  const row = await loadUserRow(params.userDO);
+  const existingId = String(row.paypalSubscriptionId ?? '').trim();
+  if (existingId) {
+    try {
+      await paypalCancel(params.env, existingId, 'Replaced by a new Subscribe');
+    } catch (err) {
+      log.warn('paypal.sub.replace_cancel_failed', { existingId, err });
+    }
+  }
   const res = await fetch(`${getPaypalApiBase()}/v1/billing/subscriptions`, {
     method: 'POST',
     headers: {
@@ -234,7 +243,6 @@ export async function createPaypalCheckout(params: {
   const approvalUrl = approvalUrlFrom(json);
   if (!approvalUrl) throw new Error(PAYPAL_ERROR_MESSAGES.SUBSCRIPTION_CREATE_FAILED);
 
-  const row = await loadUserRow(params.userDO);
   await saveUserPatch(params.userDO, row, {
     paypalSubscriptionId: json.id,
     paypalPlanId,
@@ -301,19 +309,24 @@ export async function syncPaypalSubscription(params: {
   return subscriptionSnapshot(row);
 }
 
+export function paypalCancelHttpAccepted(status: number): boolean {
+  return status === 204 || status === 200 || status === 404 || status === 422;
+}
+
 export async function markCancelAtPeriodEnd(params: {
   env: Env;
   userDO: DurableObjectStub<UserDO>;
   reason?: string;
 }): Promise<Record<string, unknown>> {
   const row = await loadUserRow(params.userDO);
-  const subId = String(row.paypalSubscriptionId ?? '');
-  if (!subId) {
-    await saveUserPatch(params.userDO, row, { cancelAtPeriodEnd: true });
-    return subscriptionSnapshot(await loadUserRow(params.userDO));
+  const subId = String(row.paypalSubscriptionId ?? '').trim();
+  if (subId) {
+    await paypalCancel(params.env, subId, params.reason);
   }
-  await saveUserPatch(params.userDO, row, { cancelAtPeriodEnd: true });
-  await maybeCancelPaypalNow(params.env, params.userDO, params.reason);
+  await saveUserPatch(params.userDO, row, {
+    cancelAtPeriodEnd: true,
+    ...(subId ? { planStatus: 'canceled' } : {}),
+  });
   return subscriptionSnapshot(await loadUserRow(params.userDO));
 }
 
@@ -327,7 +340,7 @@ async function paypalCancel(env: Env, subscriptionId: string, reason?: string): 
     },
     body: JSON.stringify({ reason: (reason ?? 'User cancelled at period end').slice(0, 128) }),
   });
-  if (!res.ok && res.status !== 204) {
+  if (!paypalCancelHttpAccepted(res.status)) {
     log.error('paypal.sub.cancel_failed', { status: res.status, body: await res.text() });
     throw new Error(PAYPAL_ERROR_MESSAGES.SUBSCRIPTION_CANCEL_FAILED);
   }
@@ -336,12 +349,12 @@ async function paypalCancel(env: Env, subscriptionId: string, reason?: string): 
 export async function maybeCancelPaypalNow(env: Env, userDO: DurableObjectStub<UserDO>, reason?: string): Promise<void> {
   const row = await loadUserRow(userDO);
   if (!(row.cancelAtPeriodEnd === true || row.cancelAtPeriodEnd === 1)) return;
-  const subId = String(row.paypalSubscriptionId ?? '');
+  const subId = String(row.paypalSubscriptionId ?? '').trim();
   if (!subId) return;
-  const end = Date.parse(String(row.planCurrentPeriodEnd ?? ''));
-  if (!Number.isFinite(end)) return;
-  if (end - Date.now() > 36 * 60 * 60 * 1000) return;
+  const status = String(row.planStatus ?? row.plan_status ?? '').toLowerCase();
+  if (status === 'canceled' || status === 'approval_pending') return;
   await paypalCancel(env, subId, reason);
+  await saveUserPatch(userDO, row, { planStatus: 'canceled', cancelAtPeriodEnd: true });
 }
 
 export async function resumePaypalSubscription(userDO: DurableObjectStub<UserDO>): Promise<Record<string, unknown>> {

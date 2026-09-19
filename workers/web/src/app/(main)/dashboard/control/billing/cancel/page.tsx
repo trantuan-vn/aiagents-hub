@@ -70,9 +70,7 @@ export default function CancelPlanPage() {
             <li>{t("cancel_lose_hooks")}</li>
           </ul>
           {me?.cancelAtPeriodEnd ? (
-            <Button disabled={busy} onClick={() => void post("resume")}>
-              {t("resume_plan")}
-            </Button>
+            <p className="text-muted-foreground text-sm">{t("cancel_scheduled")}</p>
           ) : (
             <>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("cancel_reason")} />

@@ -18,6 +18,7 @@ import {
   SyncSubscriptionSchema,
   createPaypalCheckout,
   markCancelAtPeriodEnd,
+  maybeCancelPaypalNow,
   resumePaypalSubscription,
   shouldCreatePaypalSubscription,
   subscriptionSnapshot,
@@ -58,6 +59,11 @@ export function createBillingSubscriptionRoutes(bindingName: string) {
     '/me',
     handler(async (c, user) => {
       const userDO = userDOOf(c, user.identifier);
+      try {
+        await maybeCancelPaypalNow(c.env, userDO);
+      } catch (err) {
+        log.warn('paypal.sub.flush_cancel_failed', { err });
+      }
       const { row, quota } = await loadUserAndSyncPlan(userDO, c.env);
       const spent = graceMonthSpent(row);
       return c.json({

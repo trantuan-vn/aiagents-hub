@@ -73,6 +73,7 @@ import { processFormData, processDocumentFormData, processFaceFormData, mergeIma
 import { publicCreditLots, resolveCreditBalance, soonestExpiry } from '../member/workflows/billing/credit-wallet';
 import { loadUserAndSyncPlan } from '../member/workflows/billing/billing';
 import { publicPlansCatalog } from '../member/workflows/billing/catalog';
+import { maybeCancelPaypalNow } from '../member/paypal/subscriptions';
 import { loadProposals, memberCoeffNotices } from '../admin/billing/contribution';
 import { createOTPService } from './infrastructure';
 import { createWalletService } from './infrastructure';
@@ -986,6 +987,11 @@ export function createAuthRoutes(bindingName: string) {
     try {
       const user = requireAuth(c);
       const userDO = getIdFromName(c, String(user.identifier), bindingName) as DurableObjectStub<UserDO>;
+      try {
+        await maybeCancelPaypalNow(c.env, userDO);
+      } catch {
+        /* cron retries; do not fail profile */
+      }
       const { row, quota, eco } = await loadUserAndSyncPlan(userDO, c.env);
       const resolved = resolveCreditBalance(row, eco);
       const creditBalance = resolved.credits;

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { paypalBillingPlanMatrix } from '../workflows/billing/catalog';
 import {
   mapPaypalStatus,
+  paypalCancelHttpAccepted,
   paypalSubscriptionStubFromWebhook,
   shouldCreatePaypalSubscription,
   subscriptionEntitlementPatch,
@@ -76,6 +77,15 @@ describe('paypal subscription helpers', () => {
         now: new Date('2026-09-19T00:00:00.000Z'),
       }),
     ).toMatchObject({ planId: 'free', planSource: 'free', planStatus: 'canceled' });
+  });
+
+  it('treats PayPal cancel as done when the subscription is already gone', () => {
+    expect(paypalCancelHttpAccepted(204)).toBe(true);
+    expect(paypalCancelHttpAccepted(200)).toBe(true);
+    expect(paypalCancelHttpAccepted(404)).toBe(true);
+    expect(paypalCancelHttpAccepted(422)).toBe(true);
+    expect(paypalCancelHttpAccepted(500)).toBe(false);
+    expect(paypalCancelHttpAccepted(401)).toBe(false);
   });
 
   it('charges the prepaid matrix amounts on PayPal Billing Plans', () => {
