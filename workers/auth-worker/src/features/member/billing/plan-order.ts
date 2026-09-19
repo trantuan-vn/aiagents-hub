@@ -38,6 +38,29 @@ export function parsePlanOrderIntent(order: { notes?: unknown; internalNotes?: u
   return null;
 }
 
+function openOrderStatus(raw: unknown): boolean {
+  const status = String(raw ?? '').toUpperCase();
+  return status === 'PENDING' || status === 'CONFIRMED';
+}
+
+/** Open prepaid plan orders already paid by an Active PayPal Subscribe of the same plan + interval. */
+export function openPlanOrderIdsCoveredBySubscribe(
+  orders: Array<Record<string, unknown>>,
+  planId: PlanId,
+  interval: PlanInterval,
+): number[] {
+  if (planId === 'free') return [];
+  const ids: number[] = [];
+  for (const order of orders) {
+    if (!openOrderStatus(order.status)) continue;
+    const intent = parsePlanOrderIntent(order);
+    if (!intent || intent.planId !== planId || intent.interval !== interval) continue;
+    const id = Number(order.id);
+    if (Number.isInteger(id) && id > 0) ids.push(id);
+  }
+  return ids;
+}
+
 export function planChargeUsd(planId: PaidPlanId, interval: PlanInterval): number {
   return prepaidUsd(DEFAULT_PLAN_ENTITLEMENTS[planId].listPriceUsdPerMonth, interval);
 }

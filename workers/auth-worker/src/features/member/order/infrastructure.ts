@@ -9,6 +9,7 @@ import type { MembershipTier } from '../../admin/membership-tier/domain';
 import { processCommissionOnOrder } from '../referral/commission-service';
 import { assertCanBuyCredits, quotaFromUser } from '../workflows/billing/plan';
 import { parsePlanOrderIntent } from '../billing/plan-order';
+import { settleOpenPlanOrdersIfPaypalActive } from '../billing/settle-subscribe-orders';
 import {
   CreateOrder,
   UpdateOrderStatus,
@@ -175,6 +176,11 @@ export function createOrderInfrastructureService(
     },
 
     async getOrders(filters: any): Promise<any[]> {
+      try {
+        await settleOpenPlanOrdersIfPaypalActive(userDO);
+      } catch {
+        /* listing still returns; webhook/sync retries */
+      }
       const queryParams: any = {
         orderBy: { field: 'created_at', direction: 'DESC' },
         limit: filters.limit,

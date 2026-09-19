@@ -63,6 +63,19 @@ export function planRenewalUsd(planId: WalletSnapshot["planId"], interval: 1 | 3
   return Math.round(list * interval * (1 - INTERVAL_DISCOUNT[interval]) * 100) / 100;
 }
 
+/** Matches auth-worker `PAYPAL_CANCEL_LEAD_MS`: cancel on PayPal 36h before next charge. */
+export const PAYPAL_CANCEL_LEAD_MS = 36 * 60 * 60 * 1000;
+
+export function paypalCancelAtFromPeriodEnd(periodEnd: string | null | undefined): Date | null {
+  const ms = periodEnd ? Date.parse(periodEnd) : Number.NaN;
+  if (!Number.isFinite(ms)) return null;
+  return new Date(ms - PAYPAL_CANCEL_LEAD_MS);
+}
+
+export function formatPaypalCancelAt(at: Date, locale?: string): string {
+  return at.toLocaleString(locale || undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
 function parsePlanId(raw: unknown): "free" | "starter" | "pro" | "business" {
   const s = String(raw ?? "").toLowerCase();
   if (s === "starter" || s === "pro" || s === "business") return s;

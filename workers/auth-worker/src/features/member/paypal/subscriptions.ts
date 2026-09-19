@@ -12,6 +12,7 @@ import {
   type PlanInterval,
 } from '../workflows/billing/plan';
 import { isPaypalBillingEnabled } from '../workflows/billing/catalog';
+import { completePlanOrdersCoveredByPaypalSubscribe } from '../billing/settle-subscribe-orders';
 import { getPaypalApiBase, getPaypalCredentials, PAYPAL_ERROR_MESSAGES } from './config';
 import { loadPaypalPlanMap, mapPaypalPlanIdWithMap, planIdFromMap, resolvePaypalWebhookId } from './catalog-bootstrap';
 
@@ -329,6 +330,18 @@ export async function applyPaypalSubscriptionToUser(params: {
     }),
   };
   await saveUserPatch(params.userDO, row, patch);
+  if (status === 'active' && mapped && mapped.planId !== 'free') {
+    try {
+      await completePlanOrdersCoveredByPaypalSubscribe({
+        userDO: params.userDO,
+        planId: mapped.planId,
+        interval: mapped.interval,
+        paypalSubscriptionId: String(params.sub.id ?? row.paypalSubscriptionId ?? ''),
+      });
+    } catch (err) {
+      log.warn('paypal.sub.complete_plan_orders_failed', { err });
+    }
+  }
 }
 
 export async function fetchPaypalSubscription(env: Env, subscriptionId: string): Promise<PaypalSubJson> {

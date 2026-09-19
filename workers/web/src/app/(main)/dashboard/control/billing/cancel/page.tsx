@@ -5,14 +5,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
-import { API_BASE_URL } from "../_components/billing-api";
+import { API_BASE_URL, formatPaypalCancelAt, paypalCancelAtFromPeriodEnd } from "../_components/billing-api";
 
 type Me = {
   planId?: string;
@@ -23,6 +23,7 @@ type Me = {
 
 export default function CancelPlanPage() {
   const t = useTranslations("BillingPage");
+  const locale = useLocale();
   const { toast } = useToast();
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
@@ -37,6 +38,15 @@ export default function CancelPlanPage() {
   }, []);
 
   const end = me?.planCurrentPeriodEnd ? new Date(me.planCurrentPeriodEnd).toLocaleDateString() : "—";
+  const paypalCancelAt = paypalCancelAtFromPeriodEnd(me?.planCurrentPeriodEnd);
+  const paypalCancelLabel =
+    paypalCancelAt && paypalCancelAt.getTime() > Date.now() ? formatPaypalCancelAt(paypalCancelAt, locale) : "";
+  const paypalCancelNote =
+    me?.planStatus === "canceled"
+      ? t("paypal_cancel_already")
+      : paypalCancelLabel
+        ? t("paypal_cancel_scheduled_note", { date: paypalCancelLabel })
+        : t("paypal_cancel_soon");
 
   const post = async (path: "cancel" | "resume") => {
     setBusy(true);
@@ -48,7 +58,10 @@ export default function CancelPlanPage() {
         body: path === "cancel" ? JSON.stringify({ reason }) : "{}",
       });
       if (!res.ok) throw new Error(t("cancel_error"));
-      toast({ title: path === "cancel" ? t("cancel_scheduled") : t("resume_ok") });
+      toast({
+        title: path === "cancel" ? t("cancel_scheduled") : t("resume_ok"),
+        description: path === "cancel" ? paypalCancelNote : undefined,
+      });
       router.push("/dashboard/control/billing");
     } catch (e) {
       toast({ title: t("error"), description: e instanceof Error ? e.message : t("cancel_error"), variant: "destructive" });
@@ -65,6 +78,9 @@ export default function CancelPlanPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground text-sm">{t("cancel_body", { plan: me?.planId ?? "free", date: end })}</p>
+          <p className="text-muted-foreground text-sm">
+            {paypalCancelLabel ? t("paypal_cancel_if_confirm", { date: paypalCancelLabel }) : t("paypal_cancel_soon")}
+          </p>
           <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
             <li>{t("cancel_lose_credits")}</li>
             <li>{t("cancel_lose_share")}</li>
@@ -73,6 +89,7 @@ export default function CancelPlanPage() {
           {me?.cancelAtPeriodEnd ? (
             <>
               <p className="text-muted-foreground text-sm">{t("cancel_scheduled")}</p>
+              <p className="text-muted-foreground text-sm">{paypalCancelNote}</p>
               {me.planStatus !== "canceled" ? (
                 <Button disabled={busy} onClick={() => void post("resume")}>
                   {t("resume_plan")}

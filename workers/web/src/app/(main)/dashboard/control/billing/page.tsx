@@ -214,7 +214,10 @@ export default function BillingPage() {
               variant: "destructive",
             });
           })
-          .finally(() => refreshWallet());
+          .finally(() => {
+            refreshWallet();
+            void fetchOrders({ silent: true });
+          });
       } else {
         toast({
           title: t("payment_failed"),

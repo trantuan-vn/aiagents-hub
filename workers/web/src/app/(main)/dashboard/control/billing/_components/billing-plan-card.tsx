@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Package } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatUsd } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
-import { API_BASE_URL, planRenewalUsd } from "./billing-api";
+import { API_BASE_URL, formatPaypalCancelAt, paypalCancelAtFromPeriodEnd, planRenewalUsd } from "./billing-api";
 
 export type BillingPlanId = "free" | "starter" | "pro" | "business";
 
@@ -45,6 +45,7 @@ export function BillingPlanCard({
   onChanged?: () => void;
 }) {
   const t = useTranslations("BillingPage");
+  const locale = useLocale();
   const { toast } = useToast();
   const paid = planId !== "free";
   const interval = planInterval === 3 || planInterval === 6 || planInterval === 12 ? planInterval : 1;
@@ -60,6 +61,15 @@ export function BillingPlanCard({
     planSource === "paypal" &&
     (planStatus === "canceled" || cancelAtPeriodEnd === true);
   const periodLabel = planCurrentPeriodEnd ? new Date(planCurrentPeriodEnd).toLocaleDateString() : "";
+  const paypalCancelAt = paypalCancelAtFromPeriodEnd(planCurrentPeriodEnd);
+  const paypalCancelSoon = Boolean(paypalCancelAt && paypalCancelAt.getTime() <= Date.now());
+  const paypalCancelLabel = paypalCancelAt && !paypalCancelSoon ? formatPaypalCancelAt(paypalCancelAt, locale) : "";
+  const paypalCancelNote =
+    planStatus === "canceled"
+      ? t("paypal_cancel_already")
+      : paypalCancelLabel
+        ? t("paypal_cancel_scheduled_note", { date: paypalCancelLabel })
+        : t("paypal_cancel_soon");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
@@ -80,7 +90,7 @@ export function BillingPlanCard({
         body: JSON.stringify({ reason }),
       });
       if (!res.ok) throw new Error(t("cancel_error"));
-      toast({ title: t("cancel_scheduled") });
+      toast({ title: t("cancel_scheduled"), description: paypalCancelNote });
       setOpen(false);
       onChanged?.();
     } catch (e) {
@@ -221,9 +231,29 @@ export function BillingPlanCard({
                 <dd>{periodLabel}</dd>
               </>
             ) : null}
+            {subscribeCancelled ? (
+              <>
+                <dt className="text-muted-foreground">{t("next_period_paypal_cancel_on")}</dt>
+                <dd>
+                  {planStatus === "canceled"
+                    ? t("paypal_cancel_already_short")
+                    : paypalCancelLabel
+                      ? paypalCancelLabel
+                      : t("paypal_cancel_soon_short")}
+                </dd>
+              </>
+            ) : null}
           </dl>
+          {subscribeCancelled ? <p className="text-muted-foreground text-sm">{paypalCancelNote}</p> : null}
           {subscribeLive ? (
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("cancel_reason")} />
+            <>
+              <p className="text-muted-foreground text-sm">
+                {paypalCancelLabel
+                  ? t("paypal_cancel_if_confirm", { date: paypalCancelLabel })
+                  : t("paypal_cancel_soon")}
+              </p>
+              <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("cancel_reason")} />
+            </>
           ) : null}
           <DialogFooter className="gap-2 sm:justify-between">
             {subscribeLive ? (

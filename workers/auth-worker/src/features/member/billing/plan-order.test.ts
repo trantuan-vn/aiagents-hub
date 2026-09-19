@@ -4,6 +4,7 @@ import { billingEconomicsFromConfig } from '../../admin/service/credit.js';
 import { UserSchema } from '../../auth/domain.js';
 import {
   encodePlanOrderNotes,
+  openPlanOrderIdsCoveredBySubscribe,
   paidPlanGrantPatch,
   parsePlanOrderIntent,
   planChargeUsd,
@@ -15,6 +16,25 @@ describe('plan prepaid order', () => {
     expect(notes).toBe('plan:pro:6');
     expect(parsePlanOrderIntent({ notes })).toEqual({ kind: 'plan', planId: 'pro', interval: 6 });
     expect(parsePlanOrderIntent({ notes: 'wallet top up' })).toBeNull();
+  });
+
+  it('closes open prepaid plan orders that match an Active PayPal Subscribe', () => {
+    expect(
+      openPlanOrderIdsCoveredBySubscribe(
+        [
+          { id: 11, status: 'PENDING', notes: 'plan:starter:1' },
+          { id: 12, status: 'COMPLETED', notes: 'plan:starter:1' },
+          { id: 13, status: 'PENDING', notes: 'plan:pro:1' },
+          { id: 14, status: 'CONFIRMED', notes: 'plan:starter:1' },
+          { id: 15, status: 'PENDING', notes: 'plan:starter:12' },
+        ],
+        'starter',
+        1,
+      ),
+    ).toEqual([11, 14]);
+    expect(openPlanOrderIdsCoveredBySubscribe([{ id: 11, status: 'PENDING', notes: 'plan:starter:1' }], 'free', 1)).toEqual(
+      [],
+    );
   });
 
   it('charges the discounted prepaid amount', () => {
