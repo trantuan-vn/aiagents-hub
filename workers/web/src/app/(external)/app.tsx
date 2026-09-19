@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Routes, Route } from "react-router-dom";
 
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -30,6 +30,7 @@ import DocsSharing from "./pages/docs/sharing";
 import DocsTriggers from "./pages/docs/triggers";
 import DocsWorkflows from "./pages/docs/workflows";
 import Index from "./pages/index";
+import NotFound from "./pages/not-found";
 import Packages from "./pages/packages";
 import Privacy from "./pages/privacy";
 import Support from "./pages/support";
@@ -62,45 +63,62 @@ function ThemeSync() {
   return null;
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <ThemeSync />
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/packages" element={<Packages />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/careers" element={<Careers />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/community" element={<Community />} />
-          {/* <Route path="/auth" element={<Auth />} /> */}
-          {/* <Route path="/demo-dashboard" element={<Dashboard />} /> */}
-          <Route path="/support" element={<Support />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/cookies" element={<Cookies />} />
-          <Route path="/docs" element={<DocsIndex />} />
-          <Route path="/docs/quickstart" element={<DocsQuickstart />} />
-          <Route path="/docs/platform" element={<DocsPlatform />} />
-          <Route path="/docs/workflows" element={<DocsWorkflows />} />
-          <Route path="/docs/agents" element={<DocsAgents />} />
-          <Route path="/docs/triggers" element={<DocsTriggers />} />
-          <Route path="/docs/credits" element={<DocsCredits />} />
-          <Route path="/docs/plans" element={<DocsPlans />} />
-          <Route path="/docs/sharing" element={<DocsSharing />} />
-          <Route path="/docs/api" element={<DocsApi />} />
-          <Route path="/docs/enterprise" element={<DocsEnterprise />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE
-          <Route path="*" element={<NotFound />} /> */}
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function ExternalRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/packages" element={<Packages />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/blog" element={<Blog />} />
+      <Route path="/blog/:slug" element={<BlogPost />} />
+      <Route path="/careers" element={<Careers />} />
+      <Route path="/contact" element={<Contact />} />
+      <Route path="/community" element={<Community />} />
+      <Route path="/support" element={<Support />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/cookies" element={<Cookies />} />
+      <Route path="/docs" element={<DocsIndex />} />
+      <Route path="/docs/quickstart" element={<DocsQuickstart />} />
+      <Route path="/docs/platform" element={<DocsPlatform />} />
+      <Route path="/docs/workflows" element={<DocsWorkflows />} />
+      <Route path="/docs/agents" element={<DocsAgents />} />
+      <Route path="/docs/triggers" element={<DocsTriggers />} />
+      <Route path="/docs/credits" element={<DocsCredits />} />
+      <Route path="/docs/plans" element={<DocsPlans />} />
+      <Route path="/docs/sharing" element={<DocsSharing />} />
+      <Route path="/docs/api" element={<DocsApi />} />
+      <Route path="/docs/enterprise" element={<DocsEnterprise />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
+const App = ({ ssrLocation = "/" }: { ssrLocation?: string }) => {
+  const [clientReady, setClientReady] = useState(false);
+
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <ThemeSync />
+        <Toaster />
+        <Sonner />
+        {clientReady ? (
+          <BrowserRouter>
+            <ExternalRoutes />
+          </BrowserRouter>
+        ) : (
+          <MemoryRouter initialEntries={[ssrLocation]}>
+            <ExternalRoutes />
+          </MemoryRouter>
+        )}
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

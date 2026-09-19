@@ -123,7 +123,7 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
   const t = useTranslations("Packages");
   const [catalog, setCatalog] = useState<PublicCatalog>(FALLBACK);
   const [interval, setInterval] = useState<1 | 3 | 6 | 12>(1);
-  const [planId, setPlanId] = useState<PublicPlan["planId"]>("free");
+  const [planId, setPlanId] = useState<PublicPlan["planId"] | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
@@ -228,8 +228,8 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
       <div className={`mx-auto grid max-w-6xl gap-6 ${compact ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-2 lg:grid-cols-4"}`}>
         {cards.map((plan) => {
           const price = plan.prices[String(interval)];
-          const current = plan.planId === planId;
-          const lower = PLAN_RANK[plan.planId] > PLAN_RANK[planId];
+          const current = planId != null && plan.planId === planId;
+          const lower = planId != null && PLAN_RANK[plan.planId] > PLAN_RANK[planId];
           const features = [
             t("features.included_credits", { count: plan.includedCredits.toLocaleString() }),
             t("features.runs_per_day", { count: String(plan.workflowRunsPerDay) }),
@@ -242,7 +242,7 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
           const cta = (() => {
             if (plan.planId === "free") return loggedIn ? t("go_dashboard") : t("start_free");
             if (current) return t("current_plan");
-            if (lower) return t("upgrade");
+            if (planId == null || lower) return t("upgrade");
             return t("downgrade_end");
           })();
           const paidId = plan.planId === "free" ? null : plan.planId;
