@@ -299,7 +299,7 @@ export function quotaFromUser(
   eco: BillingEconomics = billingEconomicsFromConfig(),
   now = new Date(),
 ): QuotaSnapshot {
-  const planId = resolvePlanId(user);
+  const planId = resolvePlanId(user, now);
   const entitlement = entitlementFor(planId, eco);
   const runs = dailyRuns(user, 'workflowRunsToday', 'workflowRunsOn', now);
   const graceRuns = dailyRuns(user, 'graceRunsToday', 'graceRunsOn', now);
@@ -519,7 +519,7 @@ export function syncPlanPeriod(
   eco: BillingEconomics = billingEconomicsFromConfig(),
   now = new Date(),
 ): PlanSyncPatch {
-  const planId = resolvePlanId(user);
+  const planId = resolvePlanId(user, now);
   const entitlement = entitlementFor(planId, eco);
   const ym = periodYm(now);
   const storedYm = String(user.planPeriodYm ?? user.plan_period_ym ?? '');
@@ -534,7 +534,11 @@ export function syncPlanPeriod(
     workflowRunsOn: today,
     grantedIncluded: false,
   };
-  if (planId === 'free' && planSourceOf(user) === 'order') {
+  if (
+    planId === 'free' &&
+    (planSourceOf(user) === 'order' ||
+      (planSourceOf(user) === 'paypal' && planStatusOf(user) === 'canceled' && !paidPeriodStillOpen(user, now)))
+  ) {
     patch.planSource = 'free';
     patch.planStatus = 'none';
   }
@@ -655,7 +659,7 @@ export function canEnterGrace(params: {
   if (!quota.entitlement.canGraceWhenExhausted) return false;
   if (quota.planRank < 1) return false;
   const status = String(params.planStatus ?? 'active').toLowerCase();
-  if (status && status !== 'active' && status !== 'none' && status !== '') return false;
+  if (status && status !== 'active' && status !== 'none' && status !== '' && status !== 'canceled') return false;
   if (!isProductionTriggerKind(params.triggerKind)) return false;
   if (params.workflowGrace !== true) return false;
   if (quota.graceRunsRemaining <= 0) return false;

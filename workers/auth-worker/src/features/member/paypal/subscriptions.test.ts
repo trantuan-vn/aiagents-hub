@@ -5,6 +5,7 @@ import {
   mapPaypalStatus,
   paypalCancelHttpAccepted,
   paypalSubscriptionStubFromWebhook,
+  shouldCancelPaypalNow,
   shouldCreatePaypalSubscription,
   subscriptionEntitlementPatch,
 } from './subscriptions';
@@ -74,9 +75,45 @@ describe('paypal subscription helpers', () => {
       subscriptionEntitlementPatch({
         mapped: { planId: 'business', interval: 1 },
         status: 'canceled',
+        existingPeriodEnd: '2026-10-19T00:00:00.000Z',
+        now: new Date('2026-09-19T00:00:00.000Z'),
+      }),
+    ).toMatchObject({
+      planId: 'business',
+      planSource: 'paypal',
+      planStatus: 'canceled',
+      cancelAtPeriodEnd: true,
+      planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+    });
+    expect(
+      subscriptionEntitlementPatch({
+        mapped: { planId: 'business', interval: 1 },
+        status: 'canceled',
+        existingPeriodEnd: '2026-09-01T00:00:00.000Z',
         now: new Date('2026-09-19T00:00:00.000Z'),
       }),
     ).toMatchObject({ planId: 'free', planSource: 'free', planStatus: 'canceled' });
+    expect(
+      subscriptionEntitlementPatch({
+        mapped: { planId: 'business', interval: 1 },
+        status: 'canceled',
+        now: new Date('2026-09-19T00:00:00.000Z'),
+      }),
+    ).toMatchObject({
+      planId: 'business',
+      planSource: 'paypal',
+      planStatus: 'canceled',
+      cancelAtPeriodEnd: true,
+      planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+    });
+  });
+
+  it('cancels on PayPal only inside the 36h lead before period end', () => {
+    const now = new Date('2026-09-19T00:00:00.000Z');
+    expect(shouldCancelPaypalNow('2026-10-19T00:00:00.000Z', now)).toBe(false);
+    expect(shouldCancelPaypalNow('2026-09-20T11:00:00.000Z', now)).toBe(true);
+    expect(shouldCancelPaypalNow('2026-09-18T00:00:00.000Z', now)).toBe(true);
+    expect(shouldCancelPaypalNow('', now)).toBe(true);
   });
 
   it('treats PayPal cancel as done when the subscription is already gone', () => {

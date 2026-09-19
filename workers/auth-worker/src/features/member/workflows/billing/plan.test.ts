@@ -280,6 +280,7 @@ describe('plan entitlements', () => {
     const quota = quotaFromUser({ planId: 'pro', planSource: 'paypal', paypalSubscriptionId: 'I-1' }, eco);
     expect(canEnterGrace({ quota, triggerKind: 'webhook', workflowGrace: true })).toBe(true);
     expect(canEnterGrace({ quota, triggerKind: 'manual', workflowGrace: true })).toBe(false);
+    expect(canEnterGrace({ quota, planStatus: 'canceled', triggerKind: 'webhook', workflowGrace: true })).toBe(true);
     const free = quotaFromUser({ planId: 'free' }, eco);
     expect(canEnterGrace({ quota: free, triggerKind: 'webhook', workflowGrace: true })).toBe(false);
   });
@@ -302,6 +303,71 @@ describe('plan entitlements', () => {
   it('enables billing by default and can be opted out', () => {
     expect(publicPlansCatalog({}).billingEnabled).toBe(true);
     expect(publicPlansCatalog({ PAYPAL_BILLING_ENABLED: 'false' }).billingEnabled).toBe(false);
+  });
+
+  it('keeps a cancelled PayPal plan until the paid period ends', () => {
+    const now = new Date('2026-09-19T00:00:00.000Z');
+    expect(
+      resolvePlanId(
+        {
+          planId: 'pro',
+          planSource: 'paypal',
+          planStatus: 'canceled',
+          planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+        },
+        now,
+      ),
+    ).toBe('pro');
+    expect(
+      quotaFromUser(
+        {
+          planId: 'pro',
+          planSource: 'paypal',
+          planStatus: 'canceled',
+          planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+        },
+        eco,
+        now,
+      ).planId,
+    ).toBe('pro');
+    expect(
+      syncPlanPeriod(
+        {
+          planId: 'pro',
+          planSource: 'paypal',
+          planStatus: 'canceled',
+          planCurrentPeriodEnd: '2026-10-19T00:00:00.000Z',
+          planPeriodYm: '2026-09',
+          planIncludedGrantPlanId: 'pro',
+        },
+        eco,
+        now,
+      ),
+    ).toMatchObject({ planId: 'pro', grantedIncluded: false });
+    expect(
+      resolvePlanId(
+        {
+          planId: 'pro',
+          planSource: 'paypal',
+          planStatus: 'canceled',
+          planCurrentPeriodEnd: '2026-09-01T00:00:00.000Z',
+        },
+        now,
+      ),
+    ).toBe('free');
+    const expired = syncPlanPeriod(
+      {
+        planId: 'pro',
+        planSource: 'paypal',
+        planStatus: 'canceled',
+        planCurrentPeriodEnd: '2026-09-01T00:00:00.000Z',
+        planPeriodYm: '2026-08',
+      },
+      eco,
+      now,
+    );
+    expect(expired.planId).toBe('free');
+    expect(expired.planSource).toBe('free');
   });
 
   it('honours prepaid order source until period end', () => {

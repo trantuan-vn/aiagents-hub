@@ -4,6 +4,7 @@ import { createLogger } from '../../../shared/logger';
 import { executeUtils } from '../../../shared/utils';
 import { UserDO } from '../../ws/infrastructure/UserDO';
 import {
+  addUtcMonths,
   parsePlanInterval,
   periodYm,
   resolvePlanId,
@@ -112,12 +113,44 @@ export function shouldCreatePaypalSubscription(params: {
   return params.method === 'subscription' && params.billingEnabled && params.paypalPlanId.trim().length > 0;
 }
 
+/** Cancel on PayPal this close to next_billing_time so the next cycle is not charged. */
+export const PAYPAL_CANCEL_LEAD_MS = 36 * 60 * 60 * 1000;
+
+export function shouldCancelPaypalNow(periodEnd: unknown, now = new Date()): boolean {
+  const end = Date.parse(String(periodEnd ?? ''));
+  if (!Number.isFinite(end)) return true;
+  return now.getTime() + PAYPAL_CANCEL_LEAD_MS >= end;
+}
+
+function parseIsoOrEmpty(raw: unknown): string {
+  const ms = Date.parse(String(raw ?? ''));
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : '';
+}
+
+function fallbackPeriodEnd(interval: PlanInterval, now: Date): string {
+  return addUtcMonths(now, interval).toISOString();
+}
+
+function keepPaidPaypalPatch(
+  mapped: { planId: PlanId; interval: PlanInterval } | null,
+  periodEnd: string,
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = { planCurrentPeriodEnd: periodEnd, cancelAtPeriodEnd: true };
+  if (mapped) {
+    patch.planId = mapped.planId;
+    patch.planInterval = mapped.interval;
+    patch.planSource = 'paypal';
+  }
+  return patch;
+}
+
 /** Grant the workspace plan only after PayPal reports a paid/active subscription. */
 export function subscriptionEntitlementPatch(params: {
   mapped: { planId: PlanId; interval: PlanInterval } | null;
   status: ReturnType<typeof mapPaypalStatus>;
   nextBillingTime?: string;
   existingPeriodEnd?: unknown;
+  existingInterval?: PlanInterval;
   now?: Date;
 }): Record<string, unknown> {
   const now = params.now ?? new Date();
@@ -128,14 +161,25 @@ export function subscriptionEntitlementPatch(params: {
     patch.planInterval = params.mapped.interval;
     patch.planSource = 'paypal';
     patch.cancelAtPeriodEnd = false;
-    if (params.nextBillingTime) patch.planCurrentPeriodEnd = params.nextBillingTime;
+    const next = parseIsoOrEmpty(params.nextBillingTime);
+    const existing = parseIsoOrEmpty(params.existingPeriodEnd);
+    if (next) patch.planCurrentPeriodEnd = next;
+    else if (!existing || Date.parse(existing) <= now.getTime()) {
+      patch.planCurrentPeriodEnd = fallbackPeriodEnd(params.mapped.interval, now);
+    }
   }
   if (params.status === 'canceled') {
-    const end = String(params.nextBillingTime ?? params.existingPeriodEnd ?? '');
-    const stillPaid = Boolean(end) && Date.parse(end) > now.getTime();
-    if (!stillPaid) {
+    const end = parseIsoOrEmpty(params.nextBillingTime) || parseIsoOrEmpty(params.existingPeriodEnd);
+    const endMs = Date.parse(end);
+    if (Number.isFinite(endMs) && endMs > now.getTime()) {
+      Object.assign(patch, keepPaidPaypalPatch(params.mapped, end));
+    } else if (Number.isFinite(endMs)) {
       patch.planId = 'free';
       patch.planSource = 'free';
+      patch.cancelAtPeriodEnd = true;
+    } else {
+      const interval = params.mapped?.interval ?? params.existingInterval ?? 1;
+      Object.assign(patch, keepPaidPaypalPatch(params.mapped, fallbackPeriodEnd(interval, now)));
     }
   }
   return patch;
@@ -281,6 +325,7 @@ export async function applyPaypalSubscriptionToUser(params: {
       status,
       nextBillingTime: params.sub.billing_info?.next_billing_time,
       existingPeriodEnd: row.planCurrentPeriodEnd ?? row.plan_current_period_end,
+      existingInterval: parsePlanInterval(row.planInterval ?? row.plan_interval),
     }),
   };
   await saveUserPatch(params.userDO, row, patch);
@@ -320,13 +365,28 @@ export async function markCancelAtPeriodEnd(params: {
 }): Promise<Record<string, unknown>> {
   const row = await loadUserRow(params.userDO);
   const subId = String(row.paypalSubscriptionId ?? '').trim();
+  const interval = parsePlanInterval(row.planInterval ?? row.plan_interval);
+  let periodEnd = parseIsoOrEmpty(row.planCurrentPeriodEnd ?? row.plan_current_period_end);
   if (subId) {
-    await paypalCancel(params.env, subId, params.reason);
+    try {
+      const sub = await fetchPaypalSubscription(params.env, subId);
+      const next = parseIsoOrEmpty(sub.billing_info?.next_billing_time);
+      if (next) periodEnd = next;
+    } catch (err) {
+      log.warn('paypal.sub.cancel_hydrate_failed', { subId, err });
+    }
   }
-  await saveUserPatch(params.userDO, row, {
+  if (!periodEnd) periodEnd = fallbackPeriodEnd(interval, new Date());
+
+  const patch: Record<string, unknown> = {
     cancelAtPeriodEnd: true,
-    ...(subId ? { planStatus: 'canceled' } : {}),
-  });
+    planCurrentPeriodEnd: periodEnd,
+  };
+  if (subId && shouldCancelPaypalNow(periodEnd)) {
+    await paypalCancel(params.env, subId, params.reason);
+    patch.planStatus = 'canceled';
+  }
+  await saveUserPatch(params.userDO, row, patch);
   return subscriptionSnapshot(await loadUserRow(params.userDO));
 }
 
@@ -353,6 +413,7 @@ export async function maybeCancelPaypalNow(env: Env, userDO: DurableObjectStub<U
   if (!subId) return;
   const status = String(row.planStatus ?? row.plan_status ?? '').toLowerCase();
   if (status === 'canceled' || status === 'approval_pending') return;
+  if (!shouldCancelPaypalNow(row.planCurrentPeriodEnd ?? row.plan_current_period_end)) return;
   await paypalCancel(env, subId, reason);
   await saveUserPatch(userDO, row, { planStatus: 'canceled', cancelAtPeriodEnd: true });
 }

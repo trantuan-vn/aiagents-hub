@@ -16,6 +16,7 @@ import { API_BASE_URL } from "../_components/billing-api";
 
 type Me = {
   planId?: string;
+  planStatus?: string | null;
   planCurrentPeriodEnd?: string | null;
   cancelAtPeriodEnd?: boolean;
 };
@@ -70,7 +71,14 @@ export default function CancelPlanPage() {
             <li>{t("cancel_lose_hooks")}</li>
           </ul>
           {me?.cancelAtPeriodEnd ? (
-            <p className="text-muted-foreground text-sm">{t("cancel_scheduled")}</p>
+            <>
+              <p className="text-muted-foreground text-sm">{t("cancel_scheduled")}</p>
+              {me.planStatus !== "canceled" ? (
+                <Button disabled={busy} onClick={() => void post("resume")}>
+                  {t("resume_plan")}
+                </Button>
+              ) : null}
+            </>
           ) : (
             <>
               <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("cancel_reason")} />

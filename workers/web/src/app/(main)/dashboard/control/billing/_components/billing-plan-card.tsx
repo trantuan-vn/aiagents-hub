@@ -94,6 +94,30 @@ export function BillingPlanCard({
     }
   };
 
+  const postResume = async () => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/dashboard/billing/subscriptions/resume`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!res.ok) throw new Error(t("subscribe_error"));
+      toast({ title: t("resume_ok") });
+      setOpen(false);
+      onChanged?.();
+    } catch (e) {
+      toast({
+        title: t("error"),
+        description: e instanceof Error ? e.message : t("subscribe_error"),
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const startSubscribe = async () => {
     if (planId === "free") return;
     setBusy(true);
@@ -205,6 +229,10 @@ export function BillingPlanCard({
             {subscribeLive ? (
               <Button variant="destructive" disabled={busy} onClick={() => void postCancel()}>
                 {t("cancel_subscribe")}
+              </Button>
+            ) : subscribeCancelled && planStatus !== "canceled" ? (
+              <Button disabled={busy || !billingEnabled} onClick={() => void postResume()}>
+                {t("resume_plan")}
               </Button>
             ) : paid ? (
               <Button disabled={busy || !billingEnabled} onClick={() => void startSubscribe()}>
