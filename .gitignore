@@ -60,6 +60,9 @@ coverage/
 # IDE
 .idea/
 .vscode/
+.cursor/hooks/
+.cursor/hooks.json
+.cursor/rules/production-safari-session.mdc
 *.swp
 *.swo
 *~
