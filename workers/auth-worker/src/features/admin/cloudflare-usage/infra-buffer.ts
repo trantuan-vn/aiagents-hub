@@ -4,6 +4,7 @@ import {
   KV_KEY,
   SystemConfigSchema,
 } from '../system-config/domain.js';
+import { readSystemConfigText, rememberSystemConfigText } from '../system-config/read-cached.js';
 import {
   CloudflareUsageError,
   INFRA_BUFFER_PROPOSAL_KV_KEY,
@@ -134,7 +135,7 @@ async function patchBillingInfraBuffer(env: Env, infraBufferPct: number): Promis
   const kv = env.SYSTEM_CONFIG_KV;
   let existing: Record<string, unknown> = {};
   try {
-    const raw = await kv.get(KV_KEY);
+    const raw = await readSystemConfigText(kv);
     if (raw) existing = JSON.parse(raw) as Record<string, unknown>;
   } catch {
     existing = {};
@@ -149,12 +150,11 @@ async function patchBillingInfraBuffer(env: Env, infraBufferPct: number): Promis
     billing,
   };
   const validated = SystemConfigSchema.parse(merged);
-  await kv.put(
-    KV_KEY,
-    JSON.stringify({
-      ...existing,
-      ...validated,
-      billing: { ...(existing.billing as object), ...validated.billing },
-    }),
-  );
+  const payload = JSON.stringify({
+    ...existing,
+    ...validated,
+    billing: { ...(existing.billing as object), ...validated.billing },
+  });
+  await kv.put(KV_KEY, payload);
+  rememberSystemConfigText(payload);
 }

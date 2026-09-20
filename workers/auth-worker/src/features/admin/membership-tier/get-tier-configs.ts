@@ -6,6 +6,7 @@ import {
   type MembershipTierConfig,
   type TierThresholds,
 } from './domain';
+import { getKvTextCached, setKvTextCached } from '../../../shared/kv-ttl-cache';
 
 export async function getTierConfigsFromEnv(
   env: { SYSTEM_CONFIG_KV?: KVNamespace },
@@ -13,7 +14,7 @@ export async function getTierConfigsFromEnv(
   const kv = env.SYSTEM_CONFIG_KV;
   if (!kv) return buildTierConfigs(DEFAULT_TIER_THRESHOLDS);
 
-  const raw = await kv.get(MEMBERSHIP_TIER_KV_KEY);
+  const raw = await getKvTextCached(kv, MEMBERSHIP_TIER_KV_KEY);
   if (!raw) return buildTierConfigs(DEFAULT_TIER_THRESHOLDS);
 
   try {
@@ -31,6 +32,8 @@ export async function saveTierConfigsToKv(
 ): Promise<MembershipTierConfig[]> {
   const validated = TierThresholdsSchema.parse(thresholds);
   const configs = buildTierConfigs(validated);
-  await kv.put(MEMBERSHIP_TIER_KV_KEY, JSON.stringify({ thresholds: validated }));
+  const payload = JSON.stringify({ thresholds: validated });
+  await kv.put(MEMBERSHIP_TIER_KV_KEY, payload);
+  setKvTextCached(MEMBERSHIP_TIER_KV_KEY, payload);
   return configs;
 }

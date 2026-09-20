@@ -1,4 +1,5 @@
-import { DEFAULT_AUTH_CONFIG, KV_KEY } from './domain';
+import { DEFAULT_AUTH_CONFIG } from './domain';
+import { readSystemConfigText } from './read-cached';
 import { AUTH_CONSTANTS } from '../../auth/constant';
 
 export interface AuthExpiryConfig {
@@ -20,7 +21,7 @@ export async function getAuthExpiryFromConfig(env: Env): Promise<AuthExpiryConfi
 			sessionExpiry: AUTH_CONSTANTS.SESSION_EXPIRY,
 		};
 	}
-	const raw = await kv.get(KV_KEY);
+	const raw = await readSystemConfigText(kv);
 	if (!raw) {
 		return {
 			tokenExpiry: DEFAULT_AUTH_CONFIG.TOKEN_EXPIRY ?? AUTH_CONSTANTS.ACCESS_TOKEN_EXPIRY,

@@ -11,6 +11,7 @@ import {
   ensureTriggerTable,
   resolveAlarmTime,
 } from '../../member/workflows/triggers/triggers.js';
+import { readSystemConfigText } from '../../admin/system-config/read-cached.js';
 import {
   groupRecordsForQueueFlush,
   isNonRetryableFlushError,
@@ -40,7 +41,13 @@ const RETRY_ALARM_INTERVAL = 60000;
 const QUEUE_FLUSH_INTERVAL = 5000;
 const QUEUE_FLUSH_THRESHOLD = 200;
 
-const KV_KEY = 'aiagents-hub-system-config';
+type AuthQueueConfig = {
+  QUEUE_BATCH_SIZE: number;
+  QUEUE_FLUSH_THRESHOLD: number;
+  QUEUE_FLUSH_INTERVAL: number;
+  MAX_SEND_FAILURE_COUNT: number;
+  RETRY_ALARM_INTERVAL: number;
+};
 
 const TableStateSchema = z.object({
   tableName: z.string(),
@@ -270,27 +277,21 @@ export class UserDO extends DurableObject {
     return false;
   }
 
-  /** Đọc cấu hình auth_worker từ KV (override) hoặc env vars. Có hiệu lực ngay khi admin thiết lập. */
-  private async getAuthQueueConfig(): Promise<{
-    QUEUE_BATCH_SIZE: number;
-    QUEUE_FLUSH_THRESHOLD: number;
-    QUEUE_FLUSH_INTERVAL: number;
-    MAX_SEND_FAILURE_COUNT: number;
-    RETRY_ALARM_INTERVAL: number;
-  }> {
-    const defaults = {
+  /** Đọc cấu hình auth_worker từ KV (override) hoặc env vars. Isolate cache 60s. */
+  private async getAuthQueueConfig(): Promise<AuthQueueConfig> {
+    const defaults: AuthQueueConfig = {
       QUEUE_BATCH_SIZE: parseInt(this.env.QUEUE_BATCH_SIZE || '100', 10),
       QUEUE_FLUSH_THRESHOLD: parseInt(this.env.QUEUE_FLUSH_THRESHOLD || QUEUE_FLUSH_THRESHOLD.toString(), 10),
       QUEUE_FLUSH_INTERVAL: parseInt(this.env.QUEUE_FLUSH_INTERVAL || QUEUE_FLUSH_INTERVAL.toString(), 10),
       MAX_SEND_FAILURE_COUNT: parseInt(this.env.MAX_SEND_FAILURE_COUNT || MAX_SEND_FAILURE_COUNT.toString(), 10),
       RETRY_ALARM_INTERVAL: parseInt(this.env.RETRY_ALARM_INTERVAL || RETRY_ALARM_INTERVAL.toString(), 10),
     };
-    const kv = (this.env as any).SYSTEM_CONFIG_KV;
+    const kv = (this.env as { SYSTEM_CONFIG_KV?: { get(key: string): Promise<string | null> } }).SYSTEM_CONFIG_KV;
     if (!kv) return defaults;
     try {
-      const raw = await kv.get(KV_KEY);
+      const raw = await readSystemConfigText(kv);
       if (!raw) return defaults;
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as { auth_worker?: Partial<AuthQueueConfig> };
       const auth = parsed.auth_worker || {};
       return {
         QUEUE_BATCH_SIZE: auth.QUEUE_BATCH_SIZE ?? defaults.QUEUE_BATCH_SIZE,
@@ -304,15 +305,15 @@ export class UserDO extends DurableObject {
     }
   }
 
-  private async shouldFlushTable(tableName: string): Promise<boolean> {
+  private tableNeedsFlush(tableName: string, config: AuthQueueConfig): boolean {
     const state = this.tableStates.get(tableName);
     if (!state) return false;
-
-    const config = await this.getAuthQueueConfig();
-    const now = Date.now();
     const lastFlushTime = state.lastFlushTime || 0;
+    return state.pendingCount >= config.QUEUE_FLUSH_THRESHOLD || (Date.now() - lastFlushTime) > config.QUEUE_FLUSH_INTERVAL;
+  }
 
-    return state.pendingCount >= config.QUEUE_FLUSH_THRESHOLD || (now - lastFlushTime) > config.QUEUE_FLUSH_INTERVAL;
+  private async shouldFlushTable(tableName: string, config?: AuthQueueConfig): Promise<boolean> {
+    return this.tableNeedsFlush(tableName, config ?? await this.getAuthQueueConfig());
   }
 
   // ========== FETCH HANDLER ==========
@@ -562,9 +563,10 @@ export class UserDO extends DurableObject {
         .map(op => op.table)
     );
     
+    const flushConfig = updatedTables.size > 0 ? await this.getAuthQueueConfig() : null;
     for (const tableName of updatedTables) {
       await this.updateTablePendingCount(tableName);
-      if (await this.shouldFlushTable(tableName)) {
+      if (flushConfig && this.tableNeedsFlush(tableName, flushConfig)) {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
     }
@@ -637,8 +639,9 @@ export class UserDO extends DurableObject {
     }
     
     const results = [];
+    const flushConfig = await this.getAuthQueueConfig();
     for (const tableName of this.SYNC_TABLE_NAMES) {
-      if (force || (await this.shouldFlushTable(tableName))) {
+      if (force || this.tableNeedsFlush(tableName, flushConfig)) {
         await this.flushPendingRecords(tableName, force);
         results.push({
           table: tableName,
@@ -963,6 +966,7 @@ export class UserDO extends DurableObject {
   private async handleQueueStats(): Promise<Response> {
     const now = Date.now();
     const stats: Record<string, any> = {};
+    const flushConfig = await this.getAuthQueueConfig();
     
     for (const tableName of this.SYNC_TABLE_NAMES) {
       const state = this.tableStates.get(tableName);
@@ -971,7 +975,7 @@ export class UserDO extends DurableObject {
       stats[tableName] = {
         tableState: state,
         ...this.calculateTableMetrics(statusStats, now, state),
-        shouldFlush: await this.shouldFlushTable(tableName)
+        shouldFlush: this.tableNeedsFlush(tableName, flushConfig)
       };
     }
 
@@ -1171,8 +1175,9 @@ export class UserDO extends DurableObject {
 
   private async flushAllPendingRecords(): Promise<void> {
     const tablesToFlush: string[] = [];
+    const flushConfig = await this.getAuthQueueConfig();
     for (const tableName of this.SYNC_TABLE_NAMES) {
-      if (await this.shouldFlushTable(tableName)) tablesToFlush.push(tableName);
+      if (this.tableNeedsFlush(tableName, flushConfig)) tablesToFlush.push(tableName);
     }
     const promises = tablesToFlush.map(tableName => {
         return this.flushPendingRecords(tableName);

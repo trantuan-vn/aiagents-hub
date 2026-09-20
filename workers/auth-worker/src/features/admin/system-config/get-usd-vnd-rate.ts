@@ -1,4 +1,5 @@
-import { DEFAULT_BILLING_CONFIG, KV_KEY, type SystemConfig } from './domain';
+import { DEFAULT_BILLING_CONFIG, type SystemConfig } from './domain';
+import { readSystemConfigText } from './read-cached';
 import { getUsdSellRate } from '../exchange-rate/get-rate';
 
 export type MemberBillingParams = {
@@ -16,7 +17,7 @@ export async function getMemberBillingParamsFromEnv(
 	let billing = { ...defaults };
 	const kv = env.SYSTEM_CONFIG_KV;
 	if (kv) {
-		const raw = await kv.get(KV_KEY);
+		const raw = await readSystemConfigText(kv);
 		if (raw) {
 			try {
 				const parsed = JSON.parse(raw) as Partial<SystemConfig>;

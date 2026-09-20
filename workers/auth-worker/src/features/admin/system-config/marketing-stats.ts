@@ -1,11 +1,11 @@
 import {
 	DEFAULT_MARKETING_CONFIG,
-	KV_KEY,
 	MARKETING_STATS_ACC_KEY,
 	MARKETING_STATS_RUNS_TOTAL_KEY,
 	SystemConfigSchema,
 	type MarketingConfig,
 } from './domain';
+import { readSystemConfigJson } from './read-cached';
 
 export type MarketingAccumulator = {
 	usersReal: number;
@@ -52,7 +52,7 @@ export async function getMarketingConfigFromEnv(env: Env): Promise<MarketingConf
 	const kv = env.SYSTEM_CONFIG_KV;
 	if (!kv) return fallback;
 	try {
-		const raw = await kv.get(KV_KEY, 'json');
+		const raw = await readSystemConfigJson(kv);
 		if (!raw) return fallback;
 		const parsed = SystemConfigSchema.safeParse(raw);
 		const m = parsed.success ? parsed.data.marketing : undefined;

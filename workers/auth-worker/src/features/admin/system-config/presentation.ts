@@ -11,6 +11,7 @@ import {
 	KV_KEY,
 	type SystemConfig,
 } from './domain';
+import { readSystemConfigText, rememberSystemConfigText } from './read-cached';
 
 function defaultSystemConfig(): SystemConfig {
 	return {
@@ -58,7 +59,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 		if (!kv) {
 			return c.json({ success: true, data: defaultSystemConfig() });
 		}
-		const raw = await kv.get(KV_KEY);
+		const raw = await readSystemConfigText(kv);
 		if (!raw) {
 			return c.json({ success: true, data: defaultSystemConfig() });
 		}
@@ -80,7 +81,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 		const validated = SystemConfigSchema.parse(body);
 		let existing: Record<string, unknown> = {};
 		try {
-			const raw = await kv.get(KV_KEY);
+			const raw = await readSystemConfigText(kv);
 			if (raw) existing = JSON.parse(raw) as Record<string, unknown>;
 		} catch {
 			existing = {};
@@ -95,6 +96,7 @@ export function createSystemConfigRoutes(_bindingName: string) {
 			marketing: { ...(existing.marketing as object | undefined), ...validated.marketing },
 		});
 		await kv.put(KV_KEY, JSON.stringify(merged));
+		rememberSystemConfigText(JSON.stringify(merged));
 		return c.json({ success: true, message: 'Config saved. Changes take effect immediately.', data: merged });
 	}, 'Failed to save system config', true));
 

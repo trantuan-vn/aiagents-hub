@@ -1,4 +1,5 @@
-import { DEFAULT_BILLING_CONFIG, KV_KEY, SystemConfigSchema } from './domain.js';
+import { DEFAULT_BILLING_CONFIG, SystemConfigSchema } from './domain.js';
+import { readSystemConfigJson } from './read-cached.js';
 
 const MAX_SERVICE_FEE_MARKUP_PERCENT = 500;
 
@@ -13,7 +14,7 @@ export async function getServiceFeeMarkupPercentFromEnv(env: Env): Promise<numbe
   const kv = env.SYSTEM_CONFIG_KV;
   if (!kv) return fallback;
   try {
-    const raw = await kv.get(KV_KEY, 'json');
+    const raw = await readSystemConfigJson(kv);
     if (!raw) return fallback;
     const parsed = SystemConfigSchema.safeParse(raw);
     const pct = parsed.success ? parsed.data.billing?.SERVICE_FEE_MARKUP_PERCENT : undefined;
