@@ -9,7 +9,7 @@ import {
   dispatchDueCronTriggersForOwner,
   earliestCronNextRunAtForOwner,
   ensureTriggerTable,
-  resolveAlarmTime,
+  nextAlarmAfterTick,
 } from '../../member/workflows/triggers/triggers.js';
 import { readSystemConfigText } from '../../admin/system-config/read-cached.js';
 import {
@@ -1090,12 +1090,13 @@ export class UserDO extends DurableObject {
 
   // ========== ALARM HANDLER ==========
   async alarm() {
-    const hasWebSockets = this.state.getWebSockets().length > 0;
     const hasPending = this.hasPendingQueueWork();
     try {
       const tasks: Promise<unknown>[] = [];
-      if (hasWebSockets || hasPending) {
-        tasks.push(this.sendHeartbeat(), this.flushAllPendingRecords(), this.cleanupOldProcessedRecords());
+      // WS is hibernation-safe; do not keep the DO awake just to ping. The dashboard
+      // client ignores `heartbeat` and already sends `ping` on connect.
+      if (hasPending) {
+        tasks.push(this.flushAllPendingRecords(), this.cleanupOldProcessedRecords());
       }
       tasks.push(this.dispatchDueWorkflowCrons());
       await Promise.all(tasks);
@@ -1109,7 +1110,7 @@ export class UserDO extends DurableObject {
     }
   }
 
-  /** Recompute this user's next wake: cron nextRunAt and/or WS/queue retry. */
+  /** Recompute this user's next wake: cron nextRunAt and/or queue retry. */
   async touchCronSchedule(): Promise<void> {
     await this.refreshCronWakeCache();
     await this.reschedule();
@@ -1117,11 +1118,13 @@ export class UserDO extends DurableObject {
 
   private async dispatchDueWorkflowCrons(): Promise<void> {
     try {
-      const sent = await dispatchDueCronTriggersForOwner(this.env, this.userId);
-      if (sent > 0) await this.refreshCronWakeCache();
+      await dispatchDueCronTriggersForOwner(this.env, this.userId);
     } catch (error) {
       handleErrorWithoutIp(error, "Workflow cron dispatch error");
     }
+    // Always refresh. If D1 nextRunAt moved (or cron was deleted) but `sent === 0`,
+    // a stale past cache would otherwise `setAlarm(now)` and tight-loop.
+    await this.refreshCronWakeCache();
   }
 
   private async refreshCronWakeCache(): Promise<number | null> {
@@ -1149,14 +1152,13 @@ export class UserDO extends DurableObject {
   }
 
   private async reschedule(): Promise<void> {
-    const hasWebSockets = this.state.getWebSockets().length > 0;
     const hasPending = this.hasPendingQueueWork();
     let queueWake: number | null = null;
-    if (hasWebSockets || hasPending) {
+    if (hasPending) {
       const config = await this.getAuthQueueConfig();
       queueWake = Date.now() + config.RETRY_ALARM_INTERVAL;
     }
-    const target = resolveAlarmTime(await this.cronWakeAt(), queueWake ?? undefined);
+    const target = nextAlarmAfterTick(await this.cronWakeAt(), queueWake ?? undefined);
     if (target == null) {
       await this.storage.deleteAlarm();
       return;
@@ -1504,15 +1506,6 @@ export class UserDO extends DurableObject {
     } catch (e) {
       handleErrorWithoutIp(e, 'sendPendingFirstLoginNotificationIfAny error');
     }
-  }
-
-  private async sendHeartbeat(): Promise<void> {
-    const webSockets = this.state.getWebSockets();
-    this.broadcast('heartbeat', { 
-      type: 'periodic', 
-      activeConnections: webSockets.length, 
-      timestamp: Date.now()
-    });
   }
 
   // ========== WORKFLOW CANVAS COLLABORATION ==========

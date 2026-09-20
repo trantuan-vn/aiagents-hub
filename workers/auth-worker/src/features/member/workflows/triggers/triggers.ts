@@ -201,6 +201,21 @@ export function resolveAlarmTime(
   return Math.max(Math.min(...candidates), now);
 }
 
+/** Floor after a tick that already ran dispatch, so a stale/overdue cache cannot `setAlarm(now)`. */
+export const ALARM_OVERDUE_BACKOFF_MS = 15_000;
+
+export function nextAlarmAfterTick(
+  earliestNextRunAt: number | null,
+  hintMs?: number,
+  now = Date.now(),
+  overdueBackoffMs = ALARM_OVERDUE_BACKOFF_MS,
+): number | null {
+  const target = resolveAlarmTime(earliestNextRunAt, hintMs, now);
+  if (target == null) return null;
+  if (target <= now) return now + overdueBackoffMs;
+  return target;
+}
+
 export async function earliestCronNextRunAtForOwner(
   db: D1Database,
   ownerId: string,

@@ -10,6 +10,8 @@ import {
   minuteKey,
   nextCronOccurrence,
   resolveAlarmTime,
+  nextAlarmAfterTick,
+  ALARM_OVERDUE_BACKOFF_MS,
   summarizeEnabledCrons,
 } from './triggers.js';
 
@@ -67,6 +69,24 @@ describe('resolveAlarmTime', () => {
 
   it('keeps the earlier D1 nextRunAt over a later hint', () => {
     expect(resolveAlarmTime(4_000, 9_000, 1_000)).toBe(4_000);
+  });
+});
+
+describe('nextAlarmAfterTick', () => {
+  it('does not arm when nothing is scheduled', () => {
+    expect(nextAlarmAfterTick(null)).toBeNull();
+  });
+
+  it('keeps a future nextRunAt', () => {
+    expect(nextAlarmAfterTick(10_000, undefined, 1_000)).toBe(10_000);
+  });
+
+  it('backs off instead of clamping overdue cache to now', () => {
+    expect(nextAlarmAfterTick(1000, undefined, 5000)).toBe(5000 + ALARM_OVERDUE_BACKOFF_MS);
+  });
+
+  it('backs off when an overdue cron would win over a later queue hint', () => {
+    expect(nextAlarmAfterTick(1000, 65_000, 5000)).toBe(5000 + ALARM_OVERDUE_BACKOFF_MS);
   });
 });
 
