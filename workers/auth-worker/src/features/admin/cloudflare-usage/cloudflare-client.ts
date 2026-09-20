@@ -36,6 +36,8 @@ export type CloudflareFetchResult = {
   usage: Record<string, RawMetricUsage>;
   billable: BillableRow[];
   partialErrors: string[];
+  /** metricId -> why GraphQL could not provide it */
+  unreadableMetrics: Record<string, string>;
 };
 
 type Json = Record<string, unknown>;
@@ -280,15 +282,20 @@ function gqlDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-async function graphql<T>(token: string, query: string, variables: Record<string, unknown>): Promise<T | null> {
+async function graphql<T>(
+  token: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<{ data: T | null; error?: string }> {
   const res = await cfFetch(token, '/graphql', {
     method: 'POST',
     body: JSON.stringify({ query, variables }),
   });
-  if (!res.ok) return null;
-  const errors = asArray<unknown>(res.body.errors);
-  if (errors.length) return null;
-  return (res.body.data as T) ?? null;
+  if (!res.ok) return { data: null, error: `http_${res.status}` };
+  const errors = asArray<{ message?: string }>(res.body.errors);
+  if (errors.length) return { data: null, error: errors[0]?.message || 'graphql_error' };
+  const data = (res.body.data as T) ?? null;
+  return data ? { data } : { data: null, error: 'empty_data' };
 }
 
 type GqlGroup = {
@@ -298,6 +305,8 @@ type GqlGroup = {
   count?: number;
   quantiles?: Record<string, unknown>;
   dimensions?: Record<string, unknown>;
+  date?: unknown;
+  transformations?: unknown;
 };
 
 const KV_NAMESPACE_LABELS: Record<string, string> = {
@@ -327,19 +336,66 @@ function sortAndCapBreakdowns(usage: Record<string, RawMetricUsage>, cap = 40): 
   }
 }
 
-function gqlField(data: { viewer?: { accounts?: Array<Record<string, GqlGroup[] | undefined>> } } | null, field: string): GqlGroup[] {
+type GqlAccounts = { viewer?: { accounts?: Array<Record<string, GqlGroup[] | undefined>> } };
+
+function gqlField(data: GqlAccounts | null, field: string): GqlGroup[] {
   return data?.viewer?.accounts?.[0]?.[field] ?? [];
 }
 
-async function fetchGraphQlUsage(
+/** Metrics with no account-scoped GraphQL dataset — only Billable Usage can fill them. */
+export const NO_GRAPHQL_METRIC_IDS = ['workers.logs_events', 'pipelines.sql_gb', 'pipelines.sink_parquet_gb'];
+
+type QueryContext = { errors: string[]; unreadable: Map<string, string> };
+
+async function runAccountQuery(
+  token: string,
+  ctx: QueryContext,
+  spec: { node: string; metricIds: string[]; query: string; variables: Record<string, unknown> },
+): Promise<GqlGroup[] | null> {
+  const { data, error } = await graphql<GqlAccounts>(token, spec.query, spec.variables);
+  if (!data) {
+    const reason = `${spec.node}: ${error ?? 'unknown'}`;
+    ctx.errors.push(`graphql:${reason}`);
+    for (const id of spec.metricIds) ctx.unreadable.set(id, reason);
+    return null;
+  }
+  return gqlField(data, spec.node);
+}
+
+/** Sums the per-key maximum, for point-in-time metrics such as stored bytes. */
+function addMaxByKey(
+  usage: Record<string, RawMetricUsage>,
+  metricId: string,
+  groups: GqlGroup[],
+  read: (g: GqlGroup) => { key: string; label?: string; value: number },
+  unit: string,
+): void {
+  const byKey = new Map<string, { label: string; value: number }>();
+  for (const g of groups) {
+    const { key, label, value } = read(g);
+    const prev = byKey.get(key);
+    if (!prev || value > prev.value) byKey.set(key, { label: label ?? key, value });
+  }
+  for (const [key, { label, value }] of byKey) {
+    addUsage(usage, metricId, value, { key, label, usage: value, unit });
+  }
+}
+
+const BYTES_PER_GB = 1_000_000_000;
+
+export async function fetchGraphQlUsage(
   token: string,
   accountId: string,
   periodStart: Date,
   periodEnd: Date,
   now: Date,
   errors: string[],
-): Promise<Record<string, RawMetricUsage>> {
+): Promise<{ usage: Record<string, RawMetricUsage>; unreadableMetrics: Record<string, string> }> {
   const usage: Record<string, RawMetricUsage> = {};
+  const ctx: QueryContext = {
+    errors,
+    unreadable: new Map(NO_GRAPHQL_METRIC_IDS.map((id) => [id, 'no_graphql_dataset'])),
+  };
   const start = gqlDate(periodStart);
   const end = gqlDate(now < periodEnd ? now : periodEnd);
   const today = gqlDate(now);
@@ -350,8 +406,8 @@ async function fetchGraphQlUsage(
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          workersInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            sum { requests errors cpuTimeMs }
+          workersInvocationsAdaptive(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            sum { requests errors cpuTimeUs }
             dimensions { scriptName }
           }
         }
@@ -362,7 +418,18 @@ async function fetchGraphQlUsage(
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
           d1AnalyticsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            sum { rowsRead rowsWritten queryCount }
+            sum { rowsRead rowsWritten }
+            dimensions { databaseId }
+          }
+        }
+      }
+    }`;
+  const d1StorageQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          d1StorageAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            max { databaseSizeBytes }
             dimensions { databaseId }
           }
         }
@@ -375,6 +442,17 @@ async function fetchGraphQlUsage(
           kvOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
             sum { requests }
             dimensions { actionType namespaceId }
+          }
+        }
+      }
+    }`;
+  const kvStorageQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          kvStorageAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            max { byteCount }
+            dimensions { namespaceId }
           }
         }
       }
@@ -406,8 +484,30 @@ async function fetchGraphQlUsage(
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
           durableObjectsInvocationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            sum { requests duration }
-            dimensions { namespaceName }
+            sum { requests }
+            dimensions { namespaceId scriptName }
+          }
+        }
+      }
+    }`;
+  const doPeriodicQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          durableObjectsPeriodicGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            sum { duration rowsRead rowsWritten }
+            dimensions { namespaceId }
+          }
+        }
+      }
+    }`;
+  const doSqlStorageQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          durableObjectsSqlStorageGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            max { storedBytes }
+            dimensions { namespaceId }
           }
         }
       }
@@ -417,19 +517,32 @@ async function fetchGraphQlUsage(
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
           queueMessageOperationsAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            count
-            sum { count }
-            dimensions { queueId queueName actionType }
+            sum { billableOperations }
+            dimensions { queueId actionType }
           }
         }
       }
     }`;
-  const vectorizeQuery = `
+  const vectorizeQueriesQuery = `
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          vectorizeQueryAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            sum { queryCount queriedDimensions }
+          vectorizeV2QueriesAdaptiveGroups(
+            limit: 10000,
+            filter: { date_geq: $start, date_leq: $end, requestStatus: "2xx" }
+          ) {
+            sum { queriedVectorDimensions }
+            dimensions { indexName }
+          }
+        }
+      }
+    }`;
+  const vectorizeStorageQuery = `
+    query ($accountTag: string!, $start: Date!, $end: Date!) {
+      viewer {
+        accounts(filter: { accountTag: $accountTag }) {
+          vectorizeV2StorageAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            max { storedVectorDimensions }
             dimensions { indexName }
           }
         }
@@ -439,9 +552,9 @@ async function fetchGraphQlUsage(
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          workersAiInferenceAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            sum { neurons requests }
-            dimensions { modelName }
+          aiInferenceAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
+            sum { totalNeurons }
+            dimensions { modelId }
           }
         }
       }
@@ -450,9 +563,12 @@ async function fetchGraphQlUsage(
     query ($accountTag: string!, $start: Date!, $end: Date!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          imagesAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
-            uniq { uniqueTransformations }
-            sum { transformations requests }
+          imagesUniqueTransformationsAccumulatedSinceStartOfMonth(
+            limit: 10000,
+            filter: { date_geq: $start, date_leq: $end }
+          ) {
+            date
+            transformations
           }
         }
       }
@@ -461,11 +577,11 @@ async function fetchGraphQlUsage(
     query ($accountTag: string!, $start: Date!, $end: Date!, $script: string!) {
       viewer {
         accounts(filter: { accountTag: $accountTag }) {
-          workersInvocationsAdaptiveGroups(
+          workersInvocationsAdaptive(
             limit: 10000,
             filter: { date_geq: $start, date_leq: $end, scriptName: $script }
           ) {
-            sum { cpuTimeMs }
+            sum { cpuTimeUs }
             dimensions { datetimeHour }
           }
         }
@@ -477,24 +593,29 @@ async function fetchGraphQlUsage(
         accounts(filter: { accountTag: $accountTag }) {
           workersAnalyticsEngineAdaptiveGroups(limit: 10000, filter: { date_geq: $start, date_leq: $end }) {
             count
-            sum { count }
             dimensions { dataset }
           }
         }
       }
     }`;
 
-  type GqlAccounts = { viewer?: { accounts?: Array<Record<string, GqlGroup[] | undefined>> } };
+  const run = (node: string, metricIds: string[], query: string, variables: Record<string, unknown> = vars) =>
+    runAccountQuery(token, ctx, { node, metricIds, query, variables });
 
   const [
     workers,
     d1,
+    d1Storage,
     kv,
+    kvStorage,
     r2,
     r2Storage,
     durable,
+    durablePeriodic,
+    durableSqlStorage,
     queues,
-    vectorize,
+    vectorizeQueries,
+    vectorizeStorage,
     ai,
     images,
     cron,
@@ -504,45 +625,63 @@ async function fetchGraphQlUsage(
     todayAi,
     todayAe,
   ] = await Promise.all([
-    graphql<GqlAccounts>(token, workersQuery, vars),
-    graphql<GqlAccounts>(token, d1Query, vars),
-    graphql<GqlAccounts>(token, kvQuery, vars),
-    graphql<GqlAccounts>(token, r2OpsQuery, vars),
-    graphql<GqlAccounts>(token, r2StorageQuery, vars),
-    graphql<GqlAccounts>(token, doQuery, vars),
-    graphql<GqlAccounts>(token, queuesQuery, vars),
-    graphql<GqlAccounts>(token, vectorizeQuery, vars),
-    graphql<GqlAccounts>(token, aiQuery, vars),
-    graphql<GqlAccounts>(token, imagesQuery, vars),
-    graphql<GqlAccounts>(token, cronQuery, { ...vars, script: 'aiagents-hub-d1tor2-cron' }),
-    graphql<GqlAccounts>(token, aeQuery, vars),
-    graphql<GqlAccounts>(token, workersQuery, todayVars),
-    graphql<GqlAccounts>(token, d1Query, todayVars),
-    graphql<GqlAccounts>(token, aiQuery, todayVars),
-    graphql<GqlAccounts>(token, aeQuery, todayVars),
+    run('workersInvocationsAdaptive', ['workers.requests', 'workers.cpu_ms'], workersQuery),
+    run('d1AnalyticsAdaptiveGroups', ['d1.rows_read', 'd1.rows_written'], d1Query),
+    run('d1StorageAdaptiveGroups', ['d1.storage_gb'], d1StorageQuery),
+    run('kvOperationsAdaptiveGroups', ['kv.reads', 'kv.writes', 'kv.deletes', 'kv.lists'], kvQuery),
+    run('kvStorageAdaptiveGroups', ['kv.storage_gb'], kvStorageQuery),
+    run('r2OperationsAdaptiveGroups', ['r2.class_a', 'r2.class_b'], r2OpsQuery),
+    run('r2StorageAdaptiveGroups', ['r2.storage_gb'], r2StorageQuery),
+    run('durableObjectsInvocationsAdaptiveGroups', ['do.requests'], doQuery),
+    run(
+      'durableObjectsPeriodicGroups',
+      ['do.duration_gb_s', 'do.sqlite.rows_read', 'do.sqlite.rows_written'],
+      doPeriodicQuery,
+    ),
+    run('durableObjectsSqlStorageGroups', ['do.sqlite.storage_gb'], doSqlStorageQuery),
+    run('queueMessageOperationsAdaptiveGroups', ['queues.operations'], queuesQuery),
+    run('vectorizeV2QueriesAdaptiveGroups', ['vectorize.queried_dims'], vectorizeQueriesQuery),
+    run('vectorizeV2StorageAdaptiveGroups', ['vectorize.stored_dims'], vectorizeStorageQuery),
+    run('aiInferenceAdaptiveGroups', ['workers_ai.neurons'], aiQuery),
+    run('imagesUniqueTransformationsAccumulatedSinceStartOfMonth', ['images.unique_transformations'], imagesQuery),
+    run('workersInvocationsAdaptive', [], cronQuery, { ...vars, script: 'aiagents-hub-d1tor2-cron' }),
+    run('workersAnalyticsEngineAdaptiveGroups', ['ae.datapoints_written'], aeQuery),
+    run('workersInvocationsAdaptive', [], workersQuery, todayVars),
+    run('d1AnalyticsAdaptiveGroups', [], d1Query, todayVars),
+    run('aiInferenceAdaptiveGroups', [], aiQuery, todayVars),
+    run('workersAnalyticsEngineAdaptiveGroups', [], aeQuery, todayVars),
   ]);
 
-  if (!workers) errors.push('graphql:workers');
-  else {
-    for (const g of gqlField(workers, 'workersInvocationsAdaptiveGroups')) {
+  if (workers) {
+    for (const g of workers) {
       const name = str(g.dimensions?.scriptName) || 'unknown';
-      addUsage(usage, 'workers.requests', num(g.sum?.requests), { key: name, label: name, usage: num(g.sum?.requests), unit: 'request' });
-      addUsage(usage, 'workers.cpu_ms', num(g.sum?.cpuTimeMs), { key: name, label: name, usage: num(g.sum?.cpuTimeMs), unit: 'cpu_ms' });
+      const requests = num(g.sum?.requests);
+      const cpuMs = num(g.sum?.cpuTimeUs) / 1000;
+      addUsage(usage, 'workers.requests', requests, { key: name, label: name, usage: requests, unit: 'request' });
+      addUsage(usage, 'workers.cpu_ms', cpuMs, { key: name, label: name, usage: cpuMs, unit: 'cpu_ms' });
     }
   }
 
-  if (!d1) errors.push('graphql:d1');
-  else {
-    for (const g of gqlField(d1, 'd1AnalyticsAdaptiveGroups')) {
+  if (d1) {
+    for (const g of d1) {
       const id = str(g.dimensions?.databaseId) || 'd1';
       addUsage(usage, 'd1.rows_read', num(g.sum?.rowsRead), { key: id, label: id, usage: num(g.sum?.rowsRead), unit: 'row' });
       addUsage(usage, 'd1.rows_written', num(g.sum?.rowsWritten), { key: id, label: id, usage: num(g.sum?.rowsWritten), unit: 'row' });
     }
   }
 
-  if (!kv) errors.push('graphql:kv');
-  else {
-    for (const g of gqlField(kv, 'kvOperationsAdaptiveGroups')) {
+  if (d1Storage) {
+    addMaxByKey(
+      usage,
+      'd1.storage_gb',
+      d1Storage,
+      (g) => ({ key: str(g.dimensions?.databaseId) || 'd1', value: num(g.max?.databaseSizeBytes) / BYTES_PER_GB }),
+      'GB',
+    );
+  }
+
+  if (kv) {
+    for (const g of kv) {
       const action = str(g.dimensions?.actionType).toLowerCase();
       const ns = str(g.dimensions?.namespaceId);
       const n = num(g.sum?.requests);
@@ -555,9 +694,21 @@ async function fetchGraphQlUsage(
     }
   }
 
-  if (!r2) errors.push('graphql:r2');
-  else {
-    for (const g of gqlField(r2, 'r2OperationsAdaptiveGroups')) {
+  if (kvStorage) {
+    addMaxByKey(
+      usage,
+      'kv.storage_gb',
+      kvStorage,
+      (g) => {
+        const ns = str(g.dimensions?.namespaceId) || 'kv';
+        return { key: ns, label: KV_NAMESPACE_LABELS[ns] || ns, value: num(g.max?.byteCount) / BYTES_PER_GB };
+      },
+      'GB',
+    );
+  }
+
+  if (r2) {
+    for (const g of r2) {
       const action = str(g.dimensions?.actionType).toLowerCase();
       const bucket = str(g.dimensions?.bucketName) || 'r2';
       const n = num(g.sum?.requests);
@@ -567,71 +718,92 @@ async function fetchGraphQlUsage(
     }
   }
 
-  if (!r2Storage) errors.push('graphql_optional:r2_storage');
-  else {
-    const byBucket = new Map<string, number>();
-    for (const g of gqlField(r2Storage, 'r2StorageAdaptiveGroups')) {
-      const bucket = str(g.dimensions?.bucketName) || 'r2';
-      const bytes = num(g.max?.payloadSize);
-      byBucket.set(bucket, Math.max(byBucket.get(bucket) ?? 0, bytes));
-    }
-    for (const [bucket, bytes] of byBucket) {
-      const gb = bytes / 1_000_000_000;
-      addUsage(usage, 'r2.storage_gb', gb, { key: bucket, label: bucket, usage: gb, unit: 'GB' });
-    }
+  if (r2Storage) {
+    addMaxByKey(
+      usage,
+      'r2.storage_gb',
+      r2Storage,
+      (g) => ({ key: str(g.dimensions?.bucketName) || 'r2', value: num(g.max?.payloadSize) / BYTES_PER_GB }),
+      'GB',
+    );
   }
 
-  if (!durable) errors.push('graphql:do');
-  else {
-    for (const g of gqlField(durable, 'durableObjectsInvocationsAdaptiveGroups')) {
-      const ns = str(g.dimensions?.namespaceName) || 'do';
+  if (durable) {
+    for (const g of durable) {
+      const ns = str(g.dimensions?.scriptName) || str(g.dimensions?.namespaceId) || 'do';
       addUsage(usage, 'do.requests', num(g.sum?.requests), { key: ns, label: ns, usage: num(g.sum?.requests), unit: 'request' });
-      addUsage(usage, 'do.duration_gb_s', num(g.sum?.duration), { key: ns, label: ns, usage: num(g.sum?.duration), unit: 'GB-s' });
     }
   }
 
-  if (!queues) errors.push('graphql_optional:queues');
-  else {
-    for (const g of gqlField(queues, 'queueMessageOperationsAdaptiveGroups')) {
-      const name = str(g.dimensions?.queueName) || str(g.dimensions?.queueId) || 'queue';
-      const n = num(g.sum?.count) || num(g.count);
+  if (durablePeriodic) {
+    for (const g of durablePeriodic) {
+      const ns = str(g.dimensions?.namespaceId) || 'do';
+      const duration = num(g.sum?.duration);
+      const rowsRead = num(g.sum?.rowsRead);
+      const rowsWritten = num(g.sum?.rowsWritten);
+      addUsage(usage, 'do.duration_gb_s', duration, { key: ns, label: ns, usage: duration, unit: 'GB-s' });
+      addUsage(usage, 'do.sqlite.rows_read', rowsRead, { key: ns, label: ns, usage: rowsRead, unit: 'row' });
+      addUsage(usage, 'do.sqlite.rows_written', rowsWritten, { key: ns, label: ns, usage: rowsWritten, unit: 'row' });
+    }
+  }
+
+  if (durableSqlStorage) {
+    addMaxByKey(
+      usage,
+      'do.sqlite.storage_gb',
+      durableSqlStorage,
+      (g) => ({ key: str(g.dimensions?.namespaceId) || 'do', value: num(g.max?.storedBytes) / BYTES_PER_GB }),
+      'GB',
+    );
+  }
+
+  if (queues) {
+    for (const g of queues) {
+      const name = str(g.dimensions?.queueId) || 'queue';
+      const n = num(g.sum?.billableOperations);
       addUsage(usage, 'queues.operations', n, { key: name, label: name, usage: n, unit: 'operation' });
     }
   }
 
-  if (!vectorize) errors.push('graphql_optional:vectorize');
-  else {
-    for (const g of gqlField(vectorize, 'vectorizeQueryAdaptiveGroups')) {
+  if (vectorizeQueries) {
+    for (const g of vectorizeQueries) {
       const name = str(g.dimensions?.indexName) || 'vectorize';
-      const dims = num(g.sum?.queriedDimensions);
+      const dims = num(g.sum?.queriedVectorDimensions);
       addUsage(usage, 'vectorize.queried_dims', dims, { key: name, label: name, usage: dims, unit: 'dimension' });
     }
   }
 
-  if (!ai) errors.push('graphql_optional:workers_ai');
-  else {
-    for (const g of gqlField(ai, 'workersAiInferenceAdaptiveGroups')) {
-      const model = str(g.dimensions?.modelName) || 'workers-ai';
-      const neurons = num(g.sum?.neurons);
+  if (vectorizeStorage) {
+    addMaxByKey(
+      usage,
+      'vectorize.stored_dims',
+      vectorizeStorage,
+      (g) => ({ key: str(g.dimensions?.indexName) || 'vectorize', value: num(g.max?.storedVectorDimensions) }),
+      'dimension',
+    );
+  }
+
+  if (ai) {
+    for (const g of ai) {
+      const model = str(g.dimensions?.modelId) || 'workers-ai';
+      const neurons = num(g.sum?.totalNeurons);
       addUsage(usage, 'workers_ai.neurons', neurons, { key: model, label: model, usage: neurons, unit: 'neuron' });
     }
   }
 
-  if (!images) errors.push('graphql_optional:images');
-  else {
-    for (const g of gqlField(images, 'imagesAdaptiveGroups')) {
-      const unique = num(g.uniq?.uniqueTransformations) || num(g.sum?.transformations) || num(g.sum?.requests);
-      addUsage(usage, 'images.unique_transformations', unique);
-    }
+  if (images) {
+    // The dataset already accumulates unique transformations since the start of the month.
+    const peak = images.reduce((max, g) => Math.max(max, num(g.transformations)), 0);
+    addUsage(usage, 'images.unique_transformations', peak);
   }
 
   if (cron) {
     const hours: Record<number, number> = {};
-    for (const g of gqlField(cron, 'workersInvocationsAdaptiveGroups')) {
+    for (const g of cron) {
       const hourRaw = str(g.dimensions?.datetimeHour);
       const hour = hourRaw ? new Date(hourRaw).getUTCHours() : Number.NaN;
       if (!Number.isFinite(hour)) continue;
-      hours[hour] = (hours[hour] ?? 0) + num(g.sum?.cpuTimeMs);
+      hours[hour] = (hours[hour] ?? 0) + num(g.sum?.cpuTimeUs) / 1000;
     }
     if (Object.keys(hours).length) {
       const cpu = usage['workers.cpu_ms'] ?? { mtd: 0, source: 'graphql' as const };
@@ -640,11 +812,10 @@ async function fetchGraphQlUsage(
     }
   }
 
-  if (!ae) errors.push('graphql_optional:ae');
-  else {
-    for (const g of gqlField(ae, 'workersAnalyticsEngineAdaptiveGroups')) {
+  if (ae) {
+    for (const g of ae) {
       const dataset = str(g.dimensions?.dataset) || 'ae';
-      const n = num(g.sum?.count) || num(g.count);
+      const n = num(g.count);
       addUsage(usage, 'ae.datapoints_written', n, { key: dataset, label: dataset, usage: n, unit: 'datapoint' });
     }
   }
@@ -652,9 +823,9 @@ async function fetchGraphQlUsage(
   if (todayWorkers) {
     let todayReq = 0;
     let todayCpu = 0;
-    for (const g of gqlField(todayWorkers, 'workersInvocationsAdaptiveGroups')) {
+    for (const g of todayWorkers) {
       todayReq += num(g.sum?.requests);
-      todayCpu += num(g.sum?.cpuTimeMs);
+      todayCpu += num(g.sum?.cpuTimeUs) / 1000;
     }
     if (usage['workers.requests']) usage['workers.requests'].today = todayReq;
     if (usage['workers.cpu_ms']) usage['workers.cpu_ms'].today = todayCpu;
@@ -663,7 +834,7 @@ async function fetchGraphQlUsage(
   if (todayD1) {
     let read = 0;
     let written = 0;
-    for (const g of gqlField(todayD1, 'd1AnalyticsAdaptiveGroups')) {
+    for (const g of todayD1) {
       read += num(g.sum?.rowsRead);
       written += num(g.sum?.rowsWritten);
     }
@@ -673,22 +844,22 @@ async function fetchGraphQlUsage(
 
   if (todayAi) {
     let neurons = 0;
-    for (const g of gqlField(todayAi, 'workersAiInferenceAdaptiveGroups')) {
-      neurons += num(g.sum?.neurons);
+    for (const g of todayAi) {
+      neurons += num(g.sum?.totalNeurons);
     }
     if (usage['workers_ai.neurons']) usage['workers_ai.neurons'].today = neurons;
   }
 
   if (todayAe) {
     let points = 0;
-    for (const g of gqlField(todayAe, 'workersAnalyticsEngineAdaptiveGroups')) {
-      points += num(g.sum?.count) || num(g.count);
+    for (const g of todayAe) {
+      points += num(g.count);
     }
     if (usage['ae.datapoints_written']) usage['ae.datapoints_written'].today = points;
   }
 
   sortAndCapBreakdowns(usage);
-  return usage;
+  return { usage, unreadableMetrics: Object.fromEntries(ctx.unreadable) };
 }
 
 export const BILLABLE_METRIC_MAP: Record<string, string> = {
@@ -846,13 +1017,20 @@ export async function fetchCloudflareUsage(env: Env, now: Date): Promise<Cloudfl
   const periodStart = parseIsoDate(plans.workers.periodStart) ?? utcMonthPeriod(now).start;
   const periodEnd = parseIsoDate(plans.workers.periodEnd) ?? utcMonthPeriod(now).end;
 
-  const [inventory, usage, billable] = await Promise.all([
+  const [inventory, graphqlUsage, billable] = await Promise.all([
     fetchInventory(token, accountId, partialErrors),
     fetchGraphQlUsage(token, accountId, periodStart, periodEnd, now, partialErrors),
     fetchBillableUsage(token, accountId, periodStart, now, partialErrors),
   ]);
 
-  return { plans, inventory, usage, billable, partialErrors };
+  return {
+    plans,
+    inventory,
+    usage: graphqlUsage.usage,
+    billable,
+    partialErrors,
+    unreadableMetrics: graphqlUsage.unreadableMetrics,
+  };
 }
 
 export type WorkerObservabilitySettings = {

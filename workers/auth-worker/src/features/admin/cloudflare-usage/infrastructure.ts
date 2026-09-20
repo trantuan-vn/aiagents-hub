@@ -20,6 +20,7 @@ import {
 import { fetchCloudflareUsage, mergeBillableIntoUsage } from './cloudflare-client.js';
 import { forecastMetric, sortMetrics } from './forecast.js';
 import { reconcileInventory } from './inventory.js';
+import { buildRecommendations } from './recommendations.js';
 import { dispatchProjectedOverAlerts } from './alerts.js';
 import { upsertInfraBufferProposal } from './infra-buffer.js';
 import { projectedOverEarlyWarnings } from './phase3.js';
@@ -155,10 +156,8 @@ export async function syncUsageSnapshot(env: Env, now = new Date()): Promise<Usa
     for (const allotment of allotments) {
       const raw = fetched.usage[allotment.metricId];
       const usageMtd = raw ? raw.mtd : 0;
-      const unavailable =
-        !raw &&
-        invoiceUsd[allotment.metricId] == null &&
-        fetched.partialErrors.some((e) => e.startsWith('graphql') || e.startsWith('billable'));
+      const unreadableReason = fetched.unreadableMetrics[allotment.metricId];
+      const unavailable = !raw && invoiceUsd[allotment.metricId] == null && Boolean(unreadableReason);
       metrics.push(
         forecastMetric({
           allotment,
@@ -169,8 +168,8 @@ export async function syncUsageSnapshot(env: Env, now = new Date()): Promise<Usa
           periodStart,
           periodEnd,
           invoiceUsd: invoiceUsd[allotment.metricId],
-          unavailable: Boolean(unavailable && usageMtd === 0),
-          unavailableReason: unavailable ? fetched.partialErrors.join(', ') : undefined,
+          unavailable,
+          unavailableReason: unavailable ? unreadableReason : undefined,
           breakdown: raw?.breakdown,
         }),
       );

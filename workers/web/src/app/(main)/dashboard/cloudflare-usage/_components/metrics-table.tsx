@@ -190,7 +190,9 @@ function MetricRow({ row }: { row: UsageMetricRow }) {
           <Badge variant="outline">{row.costSource === "invoice" ? t("cost_invoice") : t("cost_estimate")}</Badge>
         </TableCell>
         <TableCell>
-          <Badge variant={statusVariant(row.status)}>{t(STATUS_KEYS[row.status])}</Badge>
+          <Badge variant={statusVariant(row.status)} title={row.unavailableReason}>
+            {t(STATUS_KEYS[row.status])}
+          </Badge>
         </TableCell>
       </TableRow>
       {open && hasBreakdown ? (
