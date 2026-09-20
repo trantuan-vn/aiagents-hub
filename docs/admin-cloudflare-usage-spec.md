@@ -56,8 +56,8 @@ Nguồn: wrangler của 5 Worker. Màn hình phải **đối chiếu** inventory
 | R2 | `aiagents-hub-ekyc-storage-bucket` | auth |
 | R2 | `aiagents-hub-lakehouse` | d1tor2 (+ Data Catalog / Iceberg) |
 | KV | `NONCE_KV` `dfbfc6ec-…` | auth |
-| KV | `SYSTEM_CONFIG_KV` `e80315e1-…` | auth |
-| KV | `SYSTEM_CONFIG_KV` `529353fc-…` | queue-worker **và** d1tor2 — **namespace thứ hai** |
+| KV | `SYSTEM_CONFIG_KV` `e80315e1-…` | auth, queue-worker, d1tor2 — **một namespace** |
+| KV | `529353fc-…` (không còn trong wrangler) | leftover trên account; xóa tay khi chắc không còn binding |
 | DO SQLite | `UserDO`, `UserShardDO`, `BroadcastServiceDO` | auth (class); queue bind `UserDO`; consumer bind `UserShardDO` |
 | Queue | `aiagents-hub-input-part-0` | queue-worker consume; auth produce |
 | Queue | `aiagents-hub-error-queue-dlq` | queue-worker |
@@ -450,9 +450,9 @@ Filter: family (Compute / Storage / Data / AI / Observability / Zone), status, s
 
 **E. Inventory**
 
-Tab hoặc card dưới bảng: 5 Worker, D1, 3 R2, 3 KV, 3 DO class, 6 queue, Vectorize, AI Gateway, Images, AE, Pipelines, crons. Badge orphan/missing. Ghi chú Hub:
+Tab hoặc card dưới bảng: 5 Worker, D1, 3 R2, 2 KV (NONCE + SYSTEM_CONFIG), leftover `529353fc` orphan nếu còn trên CF, 3 DO class, 6 queue, Vectorize, AI Gateway, Images, AE, Pipelines, crons. Badge orphan/missing. Ghi chú Hub:
 
-- 2 KV `SYSTEM_CONFIG_KV` khác id
+- 1 KV `SYSTEM_CONFIG_KV` (`e80315e1`) dùng chung auth / queue / d1tor2; leftover `529353fc` nếu còn trên CF thì orphan
 - `SHARD_COUNT = 1000`
 - `D1_RETENTION_DAYS = 96`
 - Observability full, không sampling
@@ -586,7 +586,7 @@ Mỗi rule: `id`, `when` (predicate trên metrics + inventory + wrangler facts),
 | id | Khi | Vì sao / hành động |
 |----|-----|---------------------|
 | `obs.unsampled` | `workers.logs_events` ≥ 50% included hoặc projected_over | 5 Worker `observability.enabled` không `head_sampling_rate`. Sampling 1–10% queue/consumer/cron; giữ 100% auth nếu debug. Tiết kiệm ≈ overage logs. |
-| `kv.split_system_config` | 2 namespace SYSTEM_CONFIG | **Correctness, không phải tiết kiệm storage.** Admin System Config ghi `aiagents-hub-system-config` vào KV auth `e80315e1`; queue-worker + d1tor2 đọc cùng key từ `529353fc` nên `BATCH_SIZE` / `D1_RETENTION_DAYS` không bao giờ tới. Trỏ wrangler 2 worker kia về id auth, deploy, rồi xóa namespace thừa. **Cấm** copy `529353fc` đè lên auth. USD tiết kiệm = $0 (không gắn overage). Severity high. |
+| `kv.split_system_config` | wrangler facts có ≥ 2 `SYSTEM_CONFIG_KV` id | **Correctness.** Admin ghi `aiagents-hub-system-config` một chỗ; worker khác không được đọc namespace khác. Hub hiện **một** id `e80315e1` (auth + queue + d1tor2). Rule chỉ hiện lại nếu wrangler tách namespace. **Cấm** copy leftover `529353fc` đè lên auth. USD = $0. Severity high. |
 | `kv.hot_config_reads` | `kv.reads` watch/over | `SYSTEM_CONFIG_KV` đọc trên đường nóng (royalty, FX, queue config). Cache memory TTL 30–60s trong Worker isolate. |
 | `d1.retention_96` | `d1.storage_gb` watch/over **hoặc** rows_read watch | `D1_RETENTION_DAYS = 96`. Hạ 30–45 ngày nếu lakehouse đã tin cậy; index `created_at` trên bảng scan lớn (`service_usages`). |
 | `d1.full_scan` | rows_read / rows_written > 100 | Cảnh báo query không index (không tự EXPLAIN). Link Contribution scan / queue sync tables. |
@@ -711,7 +711,7 @@ Không sửa màn Contribution trừ link “Cloudflare COGS” (phase 2).
 - [ ] Tổng USD = $5 + sum overage, không nhân $5 theo metric
 - [ ] Queue: 100k messages success ≈ 300k ops; included 1M → under
 - [ ] Map billable id lạ → row `unmapped`, không throw cả overview
-- [ ] Recommendation `kv.split_system_config` fire khi inventory có 2 SYSTEM_CONFIG id
+- [ ] Recommendation `kv.split_system_config` **không** fire khi wrangler chỉ còn 1 SYSTEM_CONFIG id; fire nếu facts có ≥ 2 id
 - [ ] `vectorize.small` không fire nếu queried_dims > 20% included
 
 ### 13.2 Tích hợp (dev)

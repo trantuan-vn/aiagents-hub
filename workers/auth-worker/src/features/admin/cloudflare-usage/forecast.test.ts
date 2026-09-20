@@ -195,16 +195,10 @@ function stubMetric(partial: Partial<UsageMetricRow> & Pick<UsageMetricRow, 'met
 }
 
 describe('recommendations', () => {
-  it('flags the split SYSTEM_CONFIG_KV as a config-routing bug, not a storage saving', () => {
-    expect(HUB_WRANGLER_FACTS.systemConfigKvIds).toHaveLength(2);
+  it('does not flag SYSTEM_CONFIG_KV after queue and d1tor2 share the auth namespace', () => {
+    expect(HUB_WRANGLER_FACTS.systemConfigKvIds).toEqual(['e80315e1a3fb47e2959d645a15ac534a']);
     const recs = buildRecommendations({ planId: 'workers_paid', metrics: [], inventory: [] });
-    const rec = recs.find((r) => r.id === 'kv.split_system_config');
-    expect(rec).toBeDefined();
-    expect(rec?.severity).toBe('high');
-    expect(rec?.usdSavedPerMonth).toEqual({ min: 0, max: 0 });
-    expect(rec?.because).toMatch(/config-routing bug/i);
-    expect(rec?.because).not.toMatch(/storage and ops are doubled/i);
-    expect(rec?.actions.some((a) => /do not copy/i.test(a))).toBe(true);
+    expect(recs.some((r) => r.id === 'kv.split_system_config')).toBe(false);
   });
 
   it('fires plan.free_hardstop only on Workers Free', () => {
@@ -241,7 +235,7 @@ describe('recommendations', () => {
       inventory: [],
     });
     expect(recs.map((r) => r.id)).toEqual(
-      expect.arrayContaining(['d1.retention_96', 'do.ws_duration', 'ai.neurons_daily', 'kv.split_system_config']),
+      expect.arrayContaining(['d1.retention_96', 'do.ws_duration', 'ai.neurons_daily']),
     );
   });
 

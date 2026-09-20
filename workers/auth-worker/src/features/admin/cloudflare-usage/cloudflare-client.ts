@@ -310,8 +310,8 @@ type GqlGroup = {
 };
 
 const KV_NAMESPACE_LABELS: Record<string, string> = {
-  e80315e1a3fb47e2959d645a15ac534a: 'SYSTEM_CONFIG_KV (auth)',
-  '529353fcfe7641c9bcbd5dda5d01d5da': 'SYSTEM_CONFIG_KV (queue/d1tor2)',
+  e80315e1a3fb47e2959d645a15ac534a: 'SYSTEM_CONFIG_KV',
+  '529353fcfe7641c9bcbd5dda5d01d5da': 'SYSTEM_CONFIG_KV (unused leftover)',
   dfbfc6ec8f75482bbf54854d86442e27: 'NONCE_KV',
 };
 

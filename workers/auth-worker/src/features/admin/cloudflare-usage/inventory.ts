@@ -6,7 +6,7 @@ export type ExpectedResource = {
 };
 
 export const HUB_WRANGLER_FACTS = {
-  systemConfigKvIds: ['e80315e1a3fb47e2959d645a15ac534a', '529353fcfe7641c9bcbd5dda5d01d5da'] as const,
+  systemConfigKvIds: ['e80315e1a3fb47e2959d645a15ac534a'] as const,
   shardCount: 1000,
   d1RetentionDays: 96,
   observabilityUnsampled: true,
@@ -37,8 +37,7 @@ export const EXPECTED_INVENTORY: ExpectedResource[] = [
   { kind: 'r2', id: 'aiagents-hub-ekyc-storage-bucket', name: 'aiagents-hub-ekyc-storage-bucket', notes: [] },
   { kind: 'r2', id: 'aiagents-hub-lakehouse', name: 'aiagents-hub-lakehouse', notes: ['Data Catalog / Iceberg'] },
   { kind: 'kv', id: 'dfbfc6ec8f75482bbf54854d86442e27', name: 'NONCE_KV', notes: ['auth'] },
-  { kind: 'kv', id: 'e80315e1a3fb47e2959d645a15ac534a', name: 'SYSTEM_CONFIG_KV (auth)', notes: ['auth-worker'] },
-  { kind: 'kv', id: '529353fcfe7641c9bcbd5dda5d01d5da', name: 'SYSTEM_CONFIG_KV (queue/d1tor2)', notes: ['second namespace'] },
+  { kind: 'kv', id: 'e80315e1a3fb47e2959d645a15ac534a', name: 'SYSTEM_CONFIG_KV', notes: ['auth + queue + d1tor2'] },
   { kind: 'do', id: 'UserDO', name: 'UserDO', notes: ['SQLite', 'WebSocket hibernation'] },
   { kind: 'do', id: 'UserShardDO', name: 'UserShardDO', notes: ['SHARD_COUNT = 1000'] },
   { kind: 'do', id: 'BroadcastServiceDO', name: 'BroadcastServiceDO', notes: [] },
