@@ -6,6 +6,8 @@ import { AdminGrantPlanSchema, grantAdminPlan } from '../../member/paypal/subscr
 import { ensurePaypalCatalog } from '../../member/paypal/catalog-bootstrap';
 import { expireCreditLotsForAllUsers } from '../../member/workflows/billing/expire-lots';
 import { confirmCoeffProposal, dismissCoeffProposal, getContributionReport, scanContributionAndPropose } from './scan';
+import { confirmInfraBufferProposal, dismissInfraBufferProposal } from '../cloudflare-usage/infra-buffer.js';
+import { CloudflareUsageError } from '../cloudflare-usage/domain.js';
 import {
   getUserEconomicsReport,
   parseEconomicsHours,
@@ -83,6 +85,43 @@ export function createAdminBillingRoutes() {
       return c.json(row);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to dismiss proposal');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/contribution/infra-buffer/confirm', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      let body: { confirm?: boolean } = {};
+      try {
+        body = (await c.req.json()) as { confirm?: boolean };
+      } catch {
+        body = {};
+      }
+      if (body.confirm !== true) {
+        throw new CloudflareUsageError('apply_confirm_required', 'Pass { confirm: true } to apply infra_buffer', 400);
+      }
+      const proposal = await confirmInfraBufferProposal(c.env, String(user.identifier ?? 'admin'));
+      return c.json({ success: true, proposal });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json({ error: e.message, code: e.code }, e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to confirm infra_buffer');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/contribution/infra-buffer/dismiss', async (c) => {
+    try {
+      requireAdmin(c);
+      const proposal = await dismissInfraBufferProposal(c.env);
+      return c.json({ success: true, proposal });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json({ error: e.message, code: e.code }, e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to dismiss infra_buffer');
       return c.json(errorResponse, status);
     }
   });

@@ -854,3 +854,92 @@ export async function fetchCloudflareUsage(env: Env, now: Date): Promise<Cloudfl
 
   return { plans, inventory, usage, billable, partialErrors };
 }
+
+export type WorkerObservabilitySettings = {
+  scriptName: string;
+  enabled: boolean;
+  headSamplingRate: number | null;
+  readable: boolean;
+  writableHint: boolean;
+  error?: string;
+};
+
+function parseHeadSamplingRate(obs: Json | undefined): number | null {
+  if (!obs) return null;
+  if (typeof obs.head_sampling_rate === 'number' && Number.isFinite(obs.head_sampling_rate)) {
+    return obs.head_sampling_rate;
+  }
+  const logs = obs.logs && typeof obs.logs === 'object' ? (obs.logs as Json).head_sampling_rate : undefined;
+  if (typeof logs === 'number' && Number.isFinite(logs)) return logs;
+  return null;
+}
+
+async function fetchScriptSettings(
+  token: string,
+  accountId: string,
+  scriptName: string,
+): Promise<{ ok: boolean; status: number; body: Json }> {
+  const primary = await cfFetch(token, `/accounts/${accountId}/workers/scripts/${encodeURIComponent(scriptName)}/script-settings`);
+  if (primary.ok || (primary.status !== 404 && primary.status !== 405)) return primary;
+  return cfFetch(token, `/accounts/${accountId}/workers/scripts/${encodeURIComponent(scriptName)}/settings`);
+}
+
+export async function getWorkerObservability(
+  token: string,
+  accountId: string,
+  scriptName: string,
+): Promise<WorkerObservabilitySettings> {
+  const res = await fetchScriptSettings(token, accountId, scriptName);
+  if (!res.ok) {
+    return {
+      scriptName,
+      enabled: false,
+      headSamplingRate: null,
+      readable: false,
+      writableHint: res.status !== 403 && res.status !== 401,
+      error: `settings:${res.status}`,
+    };
+  }
+  const result = (res.body.result ?? {}) as Json;
+  const obs = (result.observability ?? {}) as Json;
+  const enabled = Boolean(obs.enabled);
+  return {
+    scriptName,
+    enabled,
+    headSamplingRate: parseHeadSamplingRate(obs) ?? (enabled ? 1 : null),
+    readable: true,
+    writableHint: true,
+  };
+}
+
+export async function patchWorkerObservability(
+  token: string,
+  accountId: string,
+  scriptName: string,
+  headSamplingRate: number,
+): Promise<{ ok: boolean; status: number; error?: string }> {
+  const payload = {
+    observability: {
+      enabled: true,
+      head_sampling_rate: headSamplingRate,
+      logs: {
+        enabled: true,
+        invocation_logs: true,
+        head_sampling_rate: headSamplingRate,
+      },
+    },
+  };
+  let res = await cfFetch(token, `/accounts/${accountId}/workers/scripts/${encodeURIComponent(scriptName)}/script-settings`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok && (res.status === 404 || res.status === 405)) {
+    res = await cfFetch(token, `/accounts/${accountId}/workers/scripts/${encodeURIComponent(scriptName)}/settings`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  }
+  if (res.ok) return { ok: true, status: res.status };
+  const err = asArray<{ message?: string }>(res.body.errors)[0];
+  return { ok: false, status: res.status, error: err?.message || `patch:${res.status}` };
+}

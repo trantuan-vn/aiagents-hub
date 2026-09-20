@@ -4,6 +4,14 @@ export const REFRESH_AT_KV_KEY = 'cloudflare-usage-refresh-at';
 export const OVERVIEW_CACHE_TTL_SECONDS = 15 * 60;
 export const REFRESH_MIN_INTERVAL_MS = 2 * 60 * 1000;
 export const CF_API_TIMEOUT_MS = 8_000;
+export const SAMPLING_APPLY_KV_KEY = 'cloudflare-usage-sampling-apply';
+export const INFRA_BUFFER_PROPOSAL_KV_KEY = 'cloudflare-usage-infra-buffer-proposal';
+export const ALERTS_SENT_KV_KEY = 'cloudflare-usage-alerts-sent';
+export const SAMPLING_MIN_RATE = 0.01;
+export const SAMPLING_MAX_RATE = 0.1;
+export const SAMPLING_DEFAULT_RATE = 0.05;
+export const PROJECTED_OVER_ALERT_MIN_DAYS = 5;
+export const INFRA_BUFFER_PROPOSE_DELTA_PCT = 2;
 
 export type WorkersPlanId = 'workers_free' | 'workers_paid' | 'workers_enterprise';
 export type ZonePlanId = 'free' | 'lite' | 'pro' | 'pro_plus' | 'business' | 'enterprise' | 'unknown';
@@ -16,13 +24,16 @@ export type CloudflareUsageErrorCode =
   | 'plans_unreadable'
   | 'token_missing'
   | 'rate_limited'
-  | 'catalog_confirm_required';
+  | 'catalog_confirm_required'
+  | 'apply_confirm_required'
+  | 'apply_forbidden'
+  | 'rollback_unavailable';
 
 export class CloudflareUsageError extends Error {
   readonly code: CloudflareUsageErrorCode;
-  readonly status: 400 | 429 | 503;
+  readonly status: 400 | 403 | 429 | 503;
 
-  constructor(code: CloudflareUsageErrorCode, message: string, status: 400 | 429 | 503) {
+  constructor(code: CloudflareUsageErrorCode, message: string, status: 400 | 403 | 429 | 503) {
     super(message);
     this.name = 'CloudflareUsageError';
     this.code = code;
@@ -170,6 +181,13 @@ export type UsageSnapshotPayload = {
 export type OverviewDto = UsageSnapshotPayload & {
   cachedAt: string;
   stale: boolean;
+  alerts?: Array<{
+    metricId: string;
+    label: string;
+    exhaustAt: string;
+    daysAhead: number;
+    overageUsdProjected: number;
+  }>;
 };
 
 export const CATALOG_SOURCE_URLS = [

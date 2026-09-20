@@ -51,6 +51,15 @@ export type ContributionReport = {
   revenueUsd: number;
   cogsAiUsd: number;
   proposals: CoeffProposalRecord[];
+  infraBuffer?: {
+    status: 'none' | 'proposed' | 'applied' | 'dismissed';
+    currentPct: number;
+    proposedPct: number | null;
+    totalUsdProjected: number;
+    cogsAiUsd30d: number;
+    because: string;
+    updatedAt: string;
+  };
 };
 
 function num(v: unknown): number {

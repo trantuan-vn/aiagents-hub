@@ -2,7 +2,10 @@ import { Hono } from 'hono';
 import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 import { CloudflareUsageError, isPricingCatalog, type PricingCatalog } from './domain.js';
-import { getOverview, refreshOverview, refreshPricingCatalog } from './infrastructure.js';
+import { getOverview, latestSnapshot, refreshOverview, refreshPricingCatalog } from './infrastructure.js';
+import { applySampling, listSampling, rollbackSampling } from './sampling.js';
+import { confirmInfraBufferProposal, dismissInfraBufferProposal, getInfraBufferProposal } from './infra-buffer.js';
+import { projectedOverEarlyWarnings } from './phase3.js';
 
 function usageErrorResponse(e: CloudflareUsageError) {
   return {
@@ -127,6 +130,127 @@ export function createAdminCloudflareUsageRoutes() {
         return c.json(usageErrorResponse(e), e.status);
       }
       const { errorResponse, status } = await handleError(c, e, 'Failed to refresh pricing catalog');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/sampling', async (c) => {
+    try {
+      requireAdmin(c);
+      const data = await listSampling(c.env);
+      return c.json(data);
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load sampling');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sampling/apply', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      let body: { confirm?: boolean; rate?: number; scripts?: string[] } = {};
+      try {
+        body = (await c.req.json()) as { confirm?: boolean; rate?: number; scripts?: string[] };
+      } catch {
+        body = {};
+      }
+      const data = await applySampling(c.env, String(user.identifier ?? 'admin'), body);
+      return c.json({ success: true, apply: data });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to apply sampling');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sampling/rollback', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      let body: { confirm?: boolean } = {};
+      try {
+        body = (await c.req.json()) as { confirm?: boolean };
+      } catch {
+        body = {};
+      }
+      const data = await rollbackSampling(c.env, String(user.identifier ?? 'admin'), body);
+      return c.json({ success: true, rolledBack: data });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to roll back sampling');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/alerts', async (c) => {
+    try {
+      requireAdmin(c);
+      const data = await getOverview(c.env);
+      return c.json({ alerts: projectedOverEarlyWarnings(data.metrics), cachedAt: data.cachedAt });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load Cloudflare alerts');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/infra-buffer', async (c) => {
+    try {
+      requireAdmin(c);
+      const snap = await latestSnapshot(c.env);
+      const totalUsdProjected = snap?.payload.summary.totalUsdProjected ?? 0;
+      const proposal = await getInfraBufferProposal(c.env, totalUsdProjected);
+      return c.json(proposal);
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load infra_buffer proposal');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/infra-buffer/confirm', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      let body: { confirm?: boolean } = {};
+      try {
+        body = (await c.req.json()) as { confirm?: boolean };
+      } catch {
+        body = {};
+      }
+      if (body.confirm !== true) {
+        throw new CloudflareUsageError('apply_confirm_required', 'Pass { confirm: true } to apply infra_buffer', 400);
+      }
+      const proposal = await confirmInfraBufferProposal(c.env, String(user.identifier ?? 'admin'));
+      return c.json({ success: true, proposal });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to confirm infra_buffer');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/infra-buffer/dismiss', async (c) => {
+    try {
+      requireAdmin(c);
+      const proposal = await dismissInfraBufferProposal(c.env);
+      return c.json({ success: true, proposal });
+    } catch (e) {
+      if (e instanceof CloudflareUsageError) {
+        return c.json(usageErrorResponse(e), e.status);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to dismiss infra_buffer');
       return c.json(errorResponse, status);
     }
   });

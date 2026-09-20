@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { useRequireAdmin } from "../_hooks/use-require-admin";
+import { AlertsBanner } from "./_components/alerts-banner";
 import { ExhaustTimeline } from "./_components/exhaust-timeline";
 import { InventoryTable } from "./_components/inventory-table";
 import { MetricsTable } from "./_components/metrics-table";
 import { OverviewCards } from "./_components/overview-cards";
 import { RecommendationList } from "./_components/recommendation-list";
+import { SamplingPanel } from "./_components/sampling-panel";
 import type { OverviewDto, UsageApiError } from "./_components/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
@@ -152,8 +154,10 @@ export default function CloudflareUsagePage() {
       ) : data ? (
         <>
           <OverviewCards data={data} />
+          <AlertsBanner data={data} />
           <ExhaustTimeline data={data} />
           <MetricsTable data={data} />
+          <SamplingPanel />
           <RecommendationList data={data} />
           <InventoryTable data={data} />
           <p className="text-muted-foreground text-xs">{t("disclaimer")}</p>

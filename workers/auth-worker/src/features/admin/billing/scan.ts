@@ -13,6 +13,8 @@ import {
   type CoeffProposalRecord,
   type ContributionReport,
 } from './contribution.js';
+import { upsertInfraBufferProposal } from '../cloudflare-usage/infra-buffer.js';
+import { latestSnapshot } from '../cloudflare-usage/infrastructure.js';
 
 const CLASSES: ModelClass[] = ['tiny', 'mid', 'frontier'];
 
@@ -28,6 +30,8 @@ export async function getContributionReport(
   const revenueUsd = byClass.reduce((s, r) => s + r.revenueUsd, 0);
   const contributionUsd = byClass.reduce((s, r) => s + r.contributionUsd, 0);
   const proposals = await loadProposals(env.SYSTEM_CONFIG_KV);
+  const snap = await latestSnapshot(env);
+  const infraBuffer = await upsertInfraBufferProposal(env, snap?.payload.summary.totalUsdProjected ?? 0);
   return {
     hours,
     byClass,
@@ -37,6 +41,7 @@ export async function getContributionReport(
     revenueUsd,
     cogsAiUsd: byClass.reduce((s, r) => s + r.cogsAiUsd, 0),
     proposals,
+    infraBuffer,
   };
 }
 

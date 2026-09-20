@@ -20,7 +20,9 @@ import {
 import { fetchCloudflareUsage, mergeBillableIntoUsage } from './cloudflare-client.js';
 import { forecastMetric, sortMetrics } from './forecast.js';
 import { reconcileInventory } from './inventory.js';
-import { buildRecommendations } from './recommendations.js';
+import { dispatchProjectedOverAlerts } from './alerts.js';
+import { upsertInfraBufferProposal } from './infra-buffer.js';
+import { projectedOverEarlyWarnings } from './phase3.js';
 
 const SNAPSHOT_DDL = `
 CREATE TABLE IF NOT EXISTS cloudflare_usage_snapshots (
@@ -276,7 +278,7 @@ export async function latestSnapshot(env: Env): Promise<{ payload: UsageSnapshot
 }
 
 function asOverview(payload: UsageSnapshotPayload, cachedAt: string, stale: boolean): OverviewDto {
-  return { ...payload, cachedAt, stale };
+  return { ...payload, cachedAt, stale, alerts: projectedOverEarlyWarnings(payload.metrics) };
 }
 
 export async function getOverview(env: Env, opts?: { force?: boolean }): Promise<OverviewDto> {
@@ -333,6 +335,10 @@ async function writeAudit(env: Env, actor: string, action: string, detail: strin
   }
 }
 
+export async function writeUsageAudit(env: Env, actor: string, action: string, detail: string): Promise<void> {
+  await writeAudit(env, actor, action, detail);
+}
+
 const SNAPSHOT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 export const SNAPSHOT_ARCHIVE_PREFIX = 'cloudflare-usage/snapshots';
 
@@ -386,10 +392,20 @@ export async function archiveOldSnapshots(env: Env, now = new Date()): Promise<n
 }
 
 export async function dailyUsageSync(env: Env): Promise<void> {
-  await syncUsageSnapshot(env);
+  const payload = await syncUsageSnapshot(env);
   try {
     await archiveOldSnapshots(env);
   } catch {
     /* keep D1 snapshots if R2 archive fails */
+  }
+  try {
+    await dispatchProjectedOverAlerts(env, payload.metrics);
+  } catch {
+    /* alerts are best-effort */
+  }
+  try {
+    await upsertInfraBufferProposal(env, payload.summary.totalUsdProjected);
+  } catch {
+    /* proposal is advisory */
   }
 }

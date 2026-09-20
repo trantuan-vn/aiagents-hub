@@ -106,9 +106,16 @@ export type OverviewDto = {
   accountIdMasked: string;
   cachedAt: string;
   stale: boolean;
+  alerts?: Array<{
+    metricId: string;
+    label: string;
+    exhaustAt: string;
+    daysAhead: number;
+    overageUsdProjected: number;
+  }>;
 };
 
 export type UsageApiError = {
   error?: string;
-  code?: "plans_unreadable" | "token_missing" | "rate_limited" | "catalog_confirm_required";
+  code?: "plans_unreadable" | "token_missing" | "rate_limited" | "catalog_confirm_required" | "apply_confirm_required" | "apply_forbidden" | "rollback_unavailable";
 };

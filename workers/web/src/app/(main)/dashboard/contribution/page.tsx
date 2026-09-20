@@ -52,6 +52,15 @@ type ContributionReport = {
   revenueUsd: number;
   cogsAiUsd: number;
   proposals: ProposalRow[];
+  infraBuffer?: {
+    status: "none" | "proposed" | "applied" | "dismissed";
+    currentPct: number;
+    proposedPct: number | null;
+    totalUsdProjected: number;
+    cogsAiUsd30d: number;
+    because: string;
+    updatedAt: string;
+  };
 };
 
 export default function ContributionPage() {
@@ -121,6 +130,24 @@ export default function ContributionPage() {
     }
   };
 
+  const actBuffer = async (action: "confirm" | "dismiss"): Promise<void> => {
+    setActingId("infra-buffer");
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard/admin/billing/contribution/infra-buffer/${action}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!response.ok) throw new Error((await response.text()) || t("action_error"));
+      await fetchReport();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("action_error"));
+    } finally {
+      setActingId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4 md:gap-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -179,6 +206,41 @@ export default function ContributionPage() {
               <CardContent className="text-2xl font-bold">{formatUsd(data.cogsAiUsd)}</CardContent>
             </Card>
           </div>
+
+          {data.infraBuffer ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("infra_buffer_title")}</CardTitle>
+                <CardDescription>{data.infraBuffer.because || t("infra_buffer_desc")}</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <p>
+                    {t("infra_buffer_current")}: <span className="font-medium">{data.infraBuffer.currentPct}%</span>
+                    {data.infraBuffer.proposedPct != null ? (
+                      <>
+                        {" · "}
+                        {t("infra_buffer_proposed")}: <span className="font-medium">{data.infraBuffer.proposedPct}%</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="text-muted-foreground mt-1">
+                    Cloudflare COGS {formatUsd(data.infraBuffer.totalUsdProjected)} · AI COGS 30d {formatUsd(data.infraBuffer.cogsAiUsd30d)} · {data.infraBuffer.status}
+                  </p>
+                </div>
+                {data.infraBuffer.status === "proposed" ? (
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={actingId === "infra-buffer"} onClick={() => void actBuffer("confirm")}>
+                      {t("confirm")}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={actingId === "infra-buffer"} onClick={() => void actBuffer("dismiss")}>
+                      {t("dismiss")}
+                    </Button>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader>

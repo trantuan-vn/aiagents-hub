@@ -11,6 +11,11 @@ export const HUB_WRANGLER_FACTS = {
   d1RetentionDays: 96,
   observabilityUnsampled: true,
   webCpuMs: 300_000,
+  samplingSafeWorkerNames: [
+    'aiagents-hub-queue-worker',
+    'aiagents-hub-consumer-worker',
+    'aiagents-hub-d1tor2-cron',
+  ] as const,
   workerNames: [
     'aiagents-hub-auth-worker',
     'aiagents-hub-trading-sto',

@@ -349,7 +349,11 @@
     "losing_description": "Workflows with negative contribution in the window",
     "workflow": "Workflow",
     "no_data": "No data in this window",
-    "cloudflare_cogs_link": "Cloudflare COGS"
+    "cloudflare_cogs_link": "Cloudflare COGS",
+    "infra_buffer_title": "infra_buffer from measured Cloudflare COGS",
+    "infra_buffer_desc": "Proposed from projected Cloudflare COGS / (AI COGS + Cloudflare COGS). Confirm writes INFRA_BUFFER_PCT. Does not change creditPriceUsd.",
+    "infra_buffer_current": "Current",
+    "infra_buffer_proposed": "Proposed"
   },
   "CloudflareUsageAdmin": {
     "page_title": "Cloudflare usage",
@@ -411,7 +415,7 @@
     "missing_resource": "Missing on Cloudflare",
     "ok": "OK",
     "recommendations": "Recommendations",
-    "advisory_only": "Advisory only in v1 — this screen does not change wrangler, sampling, or retention.",
+    "advisory_only": "Sampling apply is confirm + rollback on queue/consumer/cron only. infra_buffer confirm is on Contribution. Retention still advisory.",
     "no_recommendations": "No recommendations fired for the current usage.",
     "effort": "Effort",
     "usd_saved": "Estimated USD saved / month",
@@ -422,7 +426,23 @@
     "search_metrics": "Search resource, script, bucket, queue…",
     "status_all": "All statuses",
     "breakdown": "Breakdown",
-    "share": "Share"
+    "share": "Share",
+    "alerts_title": "Projected over with ≥5 days notice",
+    "alerts_desc": "These metrics are projected to exhaust included allotment at least 5 days from now. Email is sent once per exhaust date.",
+    "alerts_days": "{days} days",
+    "sampling_title": "Workers Logs sampling",
+    "sampling_desc": "Apply head_sampling_rate 1–10% on queue, consumer, and d1tor2. Auth and web stay at 100%. Next wrangler deploy of those workers can overwrite this unless wrangler.jsonc is updated too.",
+    "sampling_rate": "head_sampling_rate",
+    "sampling_safe": "Apply allowed",
+    "sampling_keep_full": "Keep 100%",
+    "sampling_apply": "Apply 5% sampling",
+    "sampling_rollback": "Roll back last apply",
+    "sampling_apply_confirm": "This PATCHes Cloudflare script settings now. Auth-worker and the OpenNext web worker are not changed. Confirm to continue.",
+    "sampling_rollback_confirm": "Restore the previous head_sampling_rate from the last apply.",
+    "sampling_confirm": "Confirm",
+    "sampling_cancel": "Cancel",
+    "sampling_last": "Last apply",
+    "sampling_error": "Failed to update sampling"
   },
   "UserEconomicsAdmin": {
     "page_title": "User Economics",

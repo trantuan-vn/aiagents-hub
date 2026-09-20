@@ -349,7 +349,11 @@
     "losing_description": "Workflow có contribution âm trong cửa sổ",
     "workflow": "Workflow",
     "no_data": "Không có dữ liệu trong cửa sổ này",
-    "cloudflare_cogs_link": "COGS Cloudflare"
+    "cloudflare_cogs_link": "COGS Cloudflare",
+    "infra_buffer_title": "infra_buffer từ COGS Cloudflare đo được",
+    "infra_buffer_desc": "Đề xuất từ projected Cloudflare COGS / (AI COGS + Cloudflare COGS). Confirm ghi INFRA_BUFFER_PCT. Không đổi creditPriceUsd.",
+    "infra_buffer_current": "Hiện tại",
+    "infra_buffer_proposed": "Đề xuất"
   },
   "CloudflareUsageAdmin": {
     "page_title": "Tài nguyên Cloudflare",
@@ -411,7 +415,7 @@
     "missing_resource": "Thiếu trên Cloudflare",
     "ok": "OK",
     "recommendations": "Khuyến nghị",
-    "advisory_only": "Chỉ advisory ở v1 — màn này không đổi wrangler, sampling, hay retention.",
+    "advisory_only": "Apply sampling là confirm + rollback, chỉ queue/consumer/cron. Confirm infra_buffer trên Contribution. Retention vẫn advisory.",
     "no_recommendations": "Không có khuyến nghị cho usage hiện tại.",
     "effort": "Effort",
     "usd_saved": "USD tiết kiệm ước tính / tháng",
@@ -422,7 +426,23 @@
     "search_metrics": "Tìm tài nguyên, script, bucket, queue…",
     "status_all": "Mọi trạng thái",
     "breakdown": "Chi tiết",
-    "share": "Tỷ trọng"
+    "share": "Tỷ trọng",
+    "alerts_title": "Dự kiến vượt, còn ≥5 ngày",
+    "alerts_desc": "Các metric này được dự báo cạn included ít nhất 5 ngày nữa. Email gửi một lần cho mỗi ngày exhaust.",
+    "alerts_days": "{days} ngày",
+    "sampling_title": "Sampling Workers Logs",
+    "sampling_desc": "Apply head_sampling_rate 1–10% trên queue, consumer và d1tor2. Auth và web giữ 100%. Lần wrangler deploy sau của các worker đó có thể ghi đè nếu wrangler.jsonc chưa cập nhật.",
+    "sampling_rate": "head_sampling_rate",
+    "sampling_safe": "Được apply",
+    "sampling_keep_full": "Giữ 100%",
+    "sampling_apply": "Apply sampling 5%",
+    "sampling_rollback": "Rollback lần apply trước",
+    "sampling_apply_confirm": "PATCH ngay script settings trên Cloudflare. Auth-worker và OpenNext web không đổi. Xác nhận để tiếp tục.",
+    "sampling_rollback_confirm": "Khôi phục head_sampling_rate của lần apply trước.",
+    "sampling_confirm": "Xác nhận",
+    "sampling_cancel": "Hủy",
+    "sampling_last": "Apply gần nhất",
+    "sampling_error": "Không cập nhật được sampling"
   },
   "UserEconomicsAdmin": {
     "page_title": "Kinh tế người dùng",
