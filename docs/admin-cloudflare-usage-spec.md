@@ -586,7 +586,7 @@ Mỗi rule: `id`, `when` (predicate trên metrics + inventory + wrangler facts),
 | id | Khi | Vì sao / hành động |
 |----|-----|---------------------|
 | `obs.unsampled` | `workers.logs_events` ≥ 50% included hoặc projected_over | 5 Worker `observability.enabled` không `head_sampling_rate`. Sampling 1–10% queue/consumer/cron; giữ 100% auth nếu debug. Tiết kiệm ≈ overage logs. |
-| `kv.split_system_config` | 2 namespace SYSTEM_CONFIG | auth `e80315e1` vs queue+d1tor2 `529353fc` — storage + ops nhân đôi, config lệch. Gộp 1 namespace. |
+| `kv.split_system_config` | 2 namespace SYSTEM_CONFIG | **Correctness, không phải tiết kiệm storage.** Admin System Config ghi `aiagents-hub-system-config` vào KV auth `e80315e1`; queue-worker + d1tor2 đọc cùng key từ `529353fc` nên `BATCH_SIZE` / `D1_RETENTION_DAYS` không bao giờ tới. Trỏ wrangler 2 worker kia về id auth, deploy, rồi xóa namespace thừa. **Cấm** copy `529353fc` đè lên auth. USD tiết kiệm = $0 (không gắn overage). Severity high. |
 | `kv.hot_config_reads` | `kv.reads` watch/over | `SYSTEM_CONFIG_KV` đọc trên đường nóng (royalty, FX, queue config). Cache memory TTL 30–60s trong Worker isolate. |
 | `d1.retention_96` | `d1.storage_gb` watch/over **hoặc** rows_read watch | `D1_RETENTION_DAYS = 96`. Hạ 30–45 ngày nếu lakehouse đã tin cậy; index `created_at` trên bảng scan lớn (`service_usages`). |
 | `d1.full_scan` | rows_read / rows_written > 100 | Cảnh báo query không index (không tự EXPLAIN). Link Contribution scan / queue sync tables. |
@@ -607,7 +607,7 @@ Mỗi rule: `id`, `when` (predicate trên metrics + inventory + wrangler facts),
 | `plan.free_hardstop` | `workers_free` | Nâng Workers Paid **trước** khi D1/KV/Queue đụng daily cap (sản xuất Hub gần như **phải** Paid). Nếu đã Paid, ẩn rule. |
 | `infra_buffer.recalibrate` | `totalUsdProjected` lệch > 2× so với `sum(cogsInfraUsdEst)` 30 ngày | Gợi ý mở Contribution; **không** tự đổi buffer. |
 
-USD tiết kiệm: `min = 0.3 * overageUsdProjected` (conservative), `max = overageUsdProjected` của metric rule nhắm tới. Rule không gắn metric overage → `max` catalog (vd gộp KV: $0.50/GB-mo × bytes namespace thừa).
+USD tiết kiệm: `min = 0.3 * overageUsdProjected` (conservative), `max = overageUsdProjected` của metric rule nhắm tới. Rule không gắn metric overage → `$0` nếu là correctness (vd `kv.split_system_config`); rule cost không có overage thì `max` catalog.
 
 v1 **cấm** LLM gọi Workers AI chỉ để viết khuyến nghị (tốn neuron). v2 optional: paraphrase `because` sau khi rule đã chốt số.
 

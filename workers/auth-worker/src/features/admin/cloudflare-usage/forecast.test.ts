@@ -195,10 +195,16 @@ function stubMetric(partial: Partial<UsageMetricRow> & Pick<UsageMetricRow, 'met
 }
 
 describe('recommendations', () => {
-  it('always flags the split SYSTEM_CONFIG_KV namespaces', () => {
+  it('flags the split SYSTEM_CONFIG_KV as a config-routing bug, not a storage saving', () => {
     expect(HUB_WRANGLER_FACTS.systemConfigKvIds).toHaveLength(2);
     const recs = buildRecommendations({ planId: 'workers_paid', metrics: [], inventory: [] });
-    expect(recs.some((r) => r.id === 'kv.split_system_config')).toBe(true);
+    const rec = recs.find((r) => r.id === 'kv.split_system_config');
+    expect(rec).toBeDefined();
+    expect(rec?.severity).toBe('high');
+    expect(rec?.usdSavedPerMonth).toEqual({ min: 0, max: 0 });
+    expect(rec?.because).toMatch(/config-routing bug/i);
+    expect(rec?.because).not.toMatch(/storage and ops are doubled/i);
+    expect(rec?.actions.some((a) => /do not copy/i.test(a))).toBe(true);
   });
 
   it('fires plan.free_hardstop only on Workers Free', () => {

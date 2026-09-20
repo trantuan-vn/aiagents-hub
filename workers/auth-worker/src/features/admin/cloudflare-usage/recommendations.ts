@@ -127,19 +127,19 @@ export function buildRecommendations(input: RecommendationInput): Recommendation
   }
 
   if (HUB_WRANGLER_FACTS.systemConfigKvIds.length >= 2) {
+    const [authKvId, queueKvId] = HUB_WRANGLER_FACTS.systemConfigKvIds;
     out.push(
       score({
         id: 'kv.split_system_config',
-        title: 'Merge the two SYSTEM_CONFIG_KV namespaces',
-        severity: 'medium',
-        metricId: 'kv.storage_gb',
+        title: 'System Config never reaches queue-worker or d1tor2',
+        severity: 'high',
         because:
-          'auth-worker uses SYSTEM_CONFIG_KV e80315e1… while queue-worker and d1tor2-cron use 529353fc…. Storage and ops are doubled and config can drift.',
+          `Admin System Config writes key aiagents-hub-system-config to auth-worker KV ${authKvId.slice(0, 8)}…, but queue-worker and d1tor2-cron read that same key from ${queueKvId.slice(0, 8)}…. BATCH_SIZE / D1_RETENTION_DAYS from the admin screen stay on wrangler defaults. This is a config-routing bug, not a $0.50 storage merge.`,
         actions: [
-          'Point queue-worker and d1tor2-cron wrangler KV id at the auth-worker namespace',
-          'Copy keys once, then delete the unused namespace',
+          `Point queue-worker and d1tor2-cron wrangler SYSTEM_CONFIG_KV id to ${authKvId} (auth)`,
+          'Deploy those two workers, then delete namespace 529353fc… — do not copy it onto auth (auth is the source of truth)',
         ],
-        usdSavedPerMonth: { min: 0.15, max: 0.5 },
+        usdSavedPerMonth: { min: 0, max: 0 },
         effort: 'M',
       }),
     );

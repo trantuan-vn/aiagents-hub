@@ -46,6 +46,11 @@ export function RecommendationList({ data }: { data: OverviewDto }) {
                   Contribution
                 </Link>
               ) : null}
+              {rec.id === "kv.split_system_config" ? (
+                <Link href="/dashboard/system-config" className="text-primary text-sm underline-offset-4 hover:underline">
+                  System Config
+                </Link>
+              ) : null}
             </CardContent>
           </Card>
         ))
