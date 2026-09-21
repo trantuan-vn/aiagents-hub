@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { createLogger } from './shared/logger';
+import { isScannerProbePath } from './shared/scanner-paths';
 
 import {
   createAuthMiddleware,
@@ -190,6 +191,9 @@ export type WorkflowCronRunMessage = {
 // III. CREATE MAIN APP
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    if (isScannerProbePath(new URL(request.url).pathname)) {
+      return new Response(null, { status: 404 });
+    }
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   },

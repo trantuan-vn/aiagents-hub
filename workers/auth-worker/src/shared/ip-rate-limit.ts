@@ -4,6 +4,10 @@ import { AUTH_CONSTANTS, ERROR_MESSAGES } from '../features/auth/constant';
 import { getClientIp } from './utils';
 import { applyCorsHeadersIfAllowed } from './cors-headers';
 import { isAuthBootstrapGet } from './dashboard-public-paths';
+import { createLogger } from './logger';
+import { isScannerProbePath } from './scanner-paths';
+
+const log = createLogger('auth-worker', 'ip-rate-limit');
 
 /** Per-IP request flood limit (all routes). */
 export const IP_RATE_LIMIT = {
@@ -16,6 +20,8 @@ export const IP_RATE_LIMIT = {
   /** Cap any IP block (flood or auth) — legacy bug could set 24h blocks. */
   MAX_BLOCK_MS: 15 * 60 * 1000,
   KV_TTL_SEC: 24 * 60 * 60,
+  /** KV allows 1 write/second per key. */
+  KV_WRITE_MIN_INTERVAL_MS: 1_000,
 } as const;
 
 export type IpRateLimitRecord = {
@@ -25,6 +31,17 @@ export type IpRateLimitRecord = {
   windowStart?: number;
   requestCount?: number;
 };
+
+type MemoryEntry = {
+  record: IpRateLimitRecord;
+  lastKvWriteAt: number;
+  lastKvReadAt: number;
+};
+
+/** Isolate-local counters — not request-scoped user data. Cuts KV writes below 1/s per key. */
+const memory = new Map<string, MemoryEntry>();
+const MEMORY_MAX = 2_000;
+const MEMORY_IDLE_MS = 2 * 60 * 1000;
 
 export function ipRateLimitKey(ip: string): string {
   return `rate_limit:${ip}`;
@@ -36,6 +53,84 @@ export function isAuthLoginPath(path: string): boolean {
 }
 
 export { isAuthBootstrapGet } from './dashboard-public-paths';
+
+export function resetIpRateLimitMemory(): void {
+  memory.clear();
+}
+
+export function shouldPersistIpRateLimit(params: {
+  lastKvWriteAt: number;
+  now: number;
+  force: boolean;
+  minIntervalMs?: number;
+}): boolean {
+  if (params.force) return true;
+  const minInterval = params.minIntervalMs ?? IP_RATE_LIMIT.KV_WRITE_MIN_INTERVAL_MS;
+  return params.now - params.lastKvWriteAt >= minInterval;
+}
+
+function kvErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message || error.name || 'kv_binding_error';
+  return String(error) || 'kv_binding_error';
+}
+
+function pruneMemory(now: number): void {
+  if (memory.size <= MEMORY_MAX) return;
+  for (const [ip, entry] of memory) {
+    if (now - entry.record.lastAttempt > MEMORY_IDLE_MS) memory.delete(ip);
+  }
+  if (memory.size <= MEMORY_MAX) return;
+  const overflow = memory.size - MEMORY_MAX;
+  let dropped = 0;
+  for (const ip of memory.keys()) {
+    memory.delete(ip);
+    if (++dropped >= overflow) break;
+  }
+}
+
+function remember(
+  ip: string,
+  record: IpRateLimitRecord,
+  now: number,
+  touch: { read?: boolean; write?: boolean },
+): void {
+  const prev = memory.get(ip);
+  memory.set(ip, {
+    record,
+    lastKvReadAt: touch.read ? now : (prev?.lastKvReadAt ?? 0),
+    lastKvWriteAt: touch.write ? now : (prev?.lastKvWriteAt ?? 0),
+  });
+  pruneMemory(now);
+}
+
+function mergeIpRateLimitRecords(
+  a: IpRateLimitRecord | null,
+  b: IpRateLimitRecord | null,
+): IpRateLimitRecord | null {
+  if (!a) return b;
+  if (!b) return a;
+  const aWin = a.windowStart ?? 0;
+  const bWin = b.windowStart ?? 0;
+  let requestCount: number;
+  let windowStart: number | undefined;
+  if (aWin === bWin) {
+    windowStart = aWin || undefined;
+    requestCount = Math.max(a.requestCount ?? 0, b.requestCount ?? 0);
+  } else if (aWin > bWin) {
+    windowStart = a.windowStart;
+    requestCount = a.requestCount ?? 0;
+  } else {
+    windowStart = b.windowStart;
+    requestCount = b.requestCount ?? 0;
+  }
+  return {
+    failCount: Math.max(a.failCount, b.failCount),
+    blockUntil: Math.max(a.blockUntil, b.blockUntil),
+    lastAttempt: Math.max(a.lastAttempt, b.lastAttempt),
+    windowStart,
+    requestCount,
+  };
+}
 
 function blockDurationForFailCount(failCount: number): number {
   let blockDuration = 5 * 60 * 1000;
@@ -58,21 +153,89 @@ export function isIpCurrentlyBlocked(record: IpRateLimitRecord | null, now = Dat
   return now < record.blockUntil;
 }
 
-async function saveIpRateLimitRecord(env: Env, ip: string, record: IpRateLimitRecord): Promise<void> {
-  await env.NONCE_KV.put(ipRateLimitKey(ip), JSON.stringify(record), {
-    expirationTtl: IP_RATE_LIMIT.KV_TTL_SEC,
-  });
+export function healIpRateLimitRecord(
+  record: IpRateLimitRecord,
+  now: number,
+): { record: IpRateLimitRecord; persist: boolean } | null {
+  if (record.blockUntil > 0 && now >= record.blockUntil) {
+    return null;
+  }
+
+  const remaining = record.blockUntil > 0 ? record.blockUntil - now : 0;
+  const needsHeal =
+    remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ||
+    record.failCount > AUTH_CONSTANTS.RATE_LIMIT_MAX * 4;
+
+  if (!needsHeal) return { record, persist: false };
+
+  return {
+    record: {
+      failCount: Math.min(record.failCount, AUTH_CONSTANTS.RATE_LIMIT_MAX - 1),
+      blockUntil: remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ? 0 : record.blockUntil,
+      lastAttempt: now,
+      windowStart: record.windowStart,
+      requestCount: record.requestCount,
+    },
+    persist: true,
+  };
+}
+
+async function kvGet(env: Env, key: string): Promise<string | null> {
+  try {
+    return await env.NONCE_KV.get(key);
+  } catch (error) {
+    log.warn('ip_rate_limit.kv_get_failed', { error: kvErrorMessage(error) });
+    return null;
+  }
+}
+
+async function kvDelete(env: Env, key: string): Promise<void> {
+  try {
+    await env.NONCE_KV.delete(key);
+  } catch (error) {
+    log.warn('ip_rate_limit.kv_delete_failed', { error: kvErrorMessage(error) });
+  }
+}
+
+async function saveIpRateLimitRecord(env: Env, ip: string, record: IpRateLimitRecord): Promise<boolean> {
+  try {
+    await env.NONCE_KV.put(ipRateLimitKey(ip), JSON.stringify(record), {
+      expirationTtl: IP_RATE_LIMIT.KV_TTL_SEC,
+    });
+    return true;
+  } catch (error) {
+    log.warn('ip_rate_limit.kv_put_failed', { error: kvErrorMessage(error) });
+    return false;
+  }
+}
+
+async function persistIpRateLimitRecord(
+  env: Env,
+  ip: string,
+  record: IpRateLimitRecord,
+  now: number,
+  force: boolean,
+): Promise<void> {
+  const lastKvWriteAt = memory.get(ip)?.lastKvWriteAt ?? 0;
+  remember(ip, record, now, {});
+  if (!shouldPersistIpRateLimit({ lastKvWriteAt, now, force })) return;
+  await saveIpRateLimitRecord(env, ip, record);
+  remember(ip, record, now, { write: true });
 }
 
 /** Read record; migrate legacy key (raw IP) to `rate_limit:${ip}`. */
 export async function getIpRateLimitRecord(env: Env, ip: string): Promise<IpRateLimitRecord | null> {
   const key = ipRateLimitKey(ip);
-  let raw = await env.NONCE_KV.get(key);
+  let raw = await kvGet(env, key);
   if (!raw) {
-    raw = await env.NONCE_KV.get(ip);
+    raw = await kvGet(env, ip);
     if (raw) {
-      await env.NONCE_KV.put(key, raw, { expirationTtl: IP_RATE_LIMIT.KV_TTL_SEC });
-      await env.NONCE_KV.delete(ip);
+      try {
+        await env.NONCE_KV.put(key, raw, { expirationTtl: IP_RATE_LIMIT.KV_TTL_SEC });
+        await kvDelete(env, ip);
+      } catch (error) {
+        log.warn('ip_rate_limit.kv_migrate_failed', { error: kvErrorMessage(error) });
+      }
     }
   }
   if (!raw) return null;
@@ -89,27 +252,43 @@ async function getHealedIpRateLimitRecord(env: Env, ip: string): Promise<IpRateL
   if (!record) return null;
 
   const now = Date.now();
-  if (record.blockUntil > 0 && now >= record.blockUntil) {
-    await env.NONCE_KV.delete(ipRateLimitKey(ip));
+  const healed = healIpRateLimitRecord(record, now);
+  if (!healed) {
+    await kvDelete(env, ipRateLimitKey(ip));
     return null;
   }
+  if (healed.persist) {
+    await persistIpRateLimitRecord(env, ip, healed.record, now, true);
+  }
+  return healed.record;
+}
 
-  const remaining = record.blockUntil > 0 ? record.blockUntil - now : 0;
-  const needsHeal =
-    remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ||
-    record.failCount > AUTH_CONSTANTS.RATE_LIMIT_MAX * 4;
+async function loadIpRateLimitRecord(env: Env, ip: string, now: number): Promise<IpRateLimitRecord | null> {
+  const cached = memory.get(ip);
+  const lastSyncedAt = Math.max(cached?.lastKvReadAt ?? 0, cached?.lastKvWriteAt ?? 0);
+  const cacheFresh = !!cached && now - lastSyncedAt < IP_RATE_LIMIT.KV_WRITE_MIN_INTERVAL_MS;
+  if (cacheFresh) {
+    const healed = healIpRateLimitRecord(cached.record, now);
+    if (!healed) {
+      memory.delete(ip);
+      return null;
+    }
+    return healed.record;
+  }
 
-  if (!needsHeal) return record;
-
-  const healed: IpRateLimitRecord = {
-    failCount: Math.min(record.failCount, AUTH_CONSTANTS.RATE_LIMIT_MAX - 1),
-    blockUntil: remaining > IP_RATE_LIMIT.MAX_BLOCK_MS ? 0 : record.blockUntil,
-    lastAttempt: now,
-    windowStart: record.windowStart,
-    requestCount: record.requestCount,
-  };
-  await saveIpRateLimitRecord(env, ip, healed);
-  return healed;
+  const fromKv = await getHealedIpRateLimitRecord(env, ip);
+  const merged = mergeIpRateLimitRecords(cached?.record ?? null, fromKv);
+  if (!merged) {
+    if (cached) memory.delete(ip);
+    return null;
+  }
+  const healed = healIpRateLimitRecord(merged, now);
+  if (!healed) {
+    memory.delete(ip);
+    return null;
+  }
+  remember(ip, healed.record, now, { read: true });
+  return healed.record;
 }
 
 export async function checkIpBlocked(
@@ -120,7 +299,7 @@ export async function checkIpBlocked(
   if (!ip) return { blocked: false };
 
   const now = Date.now();
-  const record = await getHealedIpRateLimitRecord(env, ip);
+  const record = await loadIpRateLimitRecord(env, ip, now);
 
   if (!record) return { blocked: false };
 
@@ -139,7 +318,8 @@ export async function checkIpBlocked(
     const authBlocked = record.failCount >= AUTH_CONSTANTS.RATE_LIMIT_MAX;
     const floodBlocked = (record.requestCount ?? 0) > IP_RATE_LIMIT.REQUEST_LIMIT_MAX;
     if (!authBlocked && !floodBlocked) {
-      await env.NONCE_KV.delete(ipRateLimitKey(ip));
+      await kvDelete(env, ipRateLimitKey(ip));
+      memory.delete(ip);
       return { blocked: false };
     }
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
@@ -162,7 +342,7 @@ export async function trackIpRequest(
   if (!ip || isAuthLoginPath(path)) return null;
 
   const now = Date.now();
-  let record = await getHealedIpRateLimitRecord(env, ip);
+  let record = await loadIpRateLimitRecord(env, ip, now);
 
   if (record && isIpCurrentlyBlocked(record, now)) {
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
@@ -190,12 +370,12 @@ export async function trackIpRequest(
   if ((record.requestCount ?? 0) > requestLimitMax) {
     record.blockUntil = capBlockUntil(now + IP_RATE_LIMIT.REQUEST_BURST_BLOCK_MS, now);
     record.lastAttempt = now;
-    await saveIpRateLimitRecord(env, ip, record);
+    await persistIpRateLimitRecord(env, ip, record, now, true);
     return { blocked: true, retryAfter: retryAfterSeconds(record, now) };
   }
 
   record.lastAttempt = now;
-  await saveIpRateLimitRecord(env, ip, record);
+  await persistIpRateLimitRecord(env, ip, record, now, false);
   return null;
 }
 
@@ -204,7 +384,7 @@ export async function recordIpAuthFailure(env: Env, ip: string): Promise<void> {
   if (!ip) return;
 
   const now = Date.now();
-  const existing = await getIpRateLimitRecord(env, ip);
+  const existing = await loadIpRateLimitRecord(env, ip, now);
 
   const failCount = (existing?.failCount ?? 0) + 1;
   let blockUntil = existing?.blockUntil ?? 0;
@@ -225,7 +405,7 @@ export async function recordIpAuthFailure(env: Env, ip: string): Promise<void> {
     requestCount: existing?.requestCount,
   };
 
-  await saveIpRateLimitRecord(env, ip, record);
+  await persistIpRateLimitRecord(env, ip, record, now, true);
 }
 
 function rateLimitExceededResponse(c: Context, retryAfter: number) {
@@ -253,6 +433,10 @@ function rateLimitExceededResponse(c: Context, retryAfter: number) {
   );
 }
 
+function scannerProbeResponse(): Response {
+  return new Response(null, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+}
+
 /** Global per-IP flood + auth-failure blocks (all routes). */
 export function createIpRateLimitMiddleware() {
   return async (c: Context, next: Next) => {
@@ -260,6 +444,10 @@ export function createIpRateLimitMiddleware() {
     if (c.req.method === 'OPTIONS') {
       await next();
       return;
+    }
+
+    if (isScannerProbePath(c.req.path)) {
+      return scannerProbeResponse();
     }
 
     const ip = getClientIp(c);
