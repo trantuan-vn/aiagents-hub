@@ -43,6 +43,7 @@ export {
 export {
   FLOW_NODE_DEFINITION,
   FLOW_LOOP_OVER_ITEMS_DEFINITION,
+  FLOW_FILTER_DEFINITION,
   FLOW_KIND_DEFINITIONS,
   createFlowKindDefinition,
   FLOW_KINDS,
@@ -65,6 +66,7 @@ export { ACTION_IN_APP_DEFINITION } from "./action-in-app/definition";
 export {
   DATA_TRANSFORMATION_DEFINITION,
   TRANSFORM_KIND_DEFINITIONS,
+  TRANSFORM_FILTER_DEFINITION,
   createTransformKindDefinition,
   TRANSFORM_KINDS,
   TRANSFORM_KIND_FIELD,
@@ -113,6 +115,21 @@ export {
 } from "./tool/definition";
 export { FORM_DATABASE_TRIGGER_DEFINITION } from "./trigger/form-database";
 export { WEBHOOK_NODE_DEFAULTS, type WebhookNodeData } from "./webhook/schema";
+export {
+  defaultFilterCondition,
+  defaultFilterNodeData,
+  defaultFilterValue,
+  evaluateFilterFromNodeData,
+  evaluateFilterValue,
+  parseFilterValue,
+  isSingleValueOperation,
+  newFilterConditionId,
+  type FilterCombinator,
+  type FilterCondition,
+  type FilterOperator,
+  type FilterOperatorType,
+  type FilterValue,
+} from "./filter-conditions";
 export {
   SQL_AGENT_PROMPT,
   SQL_AGENT_SYSTEM_PROMPT,

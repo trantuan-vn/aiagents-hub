@@ -1,6 +1,7 @@
 import {
   TRANSFORM_KINDS,
   TRANSFORM_OVERRIDE_KINDS,
+  defaultFilterNodeData,
   type TransformKind,
 } from "@aiagents-hub/workflow-nodes";
 
@@ -35,12 +36,13 @@ export function createTransformKindUIPlugin(kind: TransformKind): WorkflowNodeUI
       label,
       transformKind: kind,
       mode: "manual",
+      ...(kind === "filter" ? defaultFilterNodeData() : {}),
     }),
     catalog: {
       category: "transform",
       labelKey: `transform_kind_${kind}`,
       descriptionKey: `transform_kind_${kind}_desc`,
-      icon: "Wrench",
+      icon: kind === "filter" ? "ListFilter" : "Wrench",
       keywords: [kind, "transform"],
     },
   };
@@ -49,3 +51,6 @@ export function createTransformKindUIPlugin(kind: TransformKind): WorkflowNodeUI
 export const TRANSFORM_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TRANSFORM_KINDS.filter(
   (kind) => !TRANSFORM_OVERRIDE_KINDS.has(kind),
 ).map(createTransformKindUIPlugin);
+
+/** Override slot for Filter — n8n conditions UI. */
+export const transformFilterUIPlugin: WorkflowNodeUIPlugin = createTransformKindUIPlugin("filter");

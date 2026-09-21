@@ -37,3 +37,11 @@ export const flowLoopOverItemsPlugin: WorkflowNodePlugin = {
   kind: 'loop_over_items',
   execute: executeFlow,
 };
+
+/** Dedicated filter plugin (override slot — shares execute). */
+export const flowFilterPlugin: WorkflowNodePlugin = {
+  id: 'flow:filter',
+  runtimeType: 'flow',
+  kind: 'filter',
+  execute: executeFlow,
+};

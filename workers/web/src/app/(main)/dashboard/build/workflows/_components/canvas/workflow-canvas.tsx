@@ -564,6 +564,20 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   );
 }
 
+function pluginIdForNewNode(type: string, extraData?: Record<string, unknown>): string {
+  if (typeof extraData?.triggerKind === "string") return `trigger:${extraData.triggerKind}`;
+  if (typeof extraData?.coreKind === "string") return `core:${extraData.coreKind}`;
+  if (typeof extraData?.memoryKind === "string") return `memory_node:${extraData.memoryKind}`;
+  if (typeof extraData?.flowKind === "string") return `flow:${extraData.flowKind}`;
+  if (typeof extraData?.transformKind === "string") {
+    return `data_transformation:${extraData.transformKind}`;
+  }
+  if (typeof extraData?.channel === "string" && type === "human_review") {
+    return `human_review:${extraData.channel}`;
+  }
+  return type;
+}
+
 export function addNodeToDefinition(
   def: WorkflowDefinition,
   type: string,
@@ -572,16 +586,7 @@ export function addNodeToDefinition(
   workflowId?: number,
 ): WorkflowDefinition {
   const id = `${type}-${Date.now()}`;
-  const pluginId = extraData?.triggerKind
-    ? `trigger:${extraData.triggerKind}`
-    : extraData?.coreKind
-      ? `core:${extraData.coreKind}`
-      : extraData?.memoryKind
-        ? `memory_node:${extraData.memoryKind}`
-        : extraData?.channel && type === "human_review"
-          ? `human_review:${extraData.channel}`
-          : type;
-  const plugin = resolveUIPluginById(String(pluginId));
+  const plugin = resolveUIPluginById(pluginIdForNewNode(type, extraData));
   const vectorizeDefaults =
     type === "memory_node" && String(extraData?.memoryKind ?? "vectorize") === "vectorize"
       ? buildVectorizeNodeData(workflowId, id, label)

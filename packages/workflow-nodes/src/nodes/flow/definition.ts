@@ -9,6 +9,7 @@ import { FLOW_KIND_FIELD, FLOW_KINDS, FLOW_OVERRIDE_KINDS, type FlowKind } from 
 import { LOOP_ITEMS_FIELD } from "../workflow-presets";
 
 export { FLOW_KIND_FIELD, FLOW_KINDS, FLOW_OVERRIDE_KINDS, type FlowKind } from "./kinds";
+export { FLOW_FILTER_DEFINITION } from "./filter";
 
 /** Base family definition — fallback when no flowKind is set. */
 export const FLOW_NODE_DEFINITION: WorkflowNodeDefinition = createBuiltin({

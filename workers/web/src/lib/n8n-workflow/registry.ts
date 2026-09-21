@@ -7,6 +7,7 @@ import { CORE_N8N_DESCRIPTION } from "./descriptions/core";
 import { DATA_TRANSFORMATION_N8N_DESCRIPTION } from "./descriptions/transform";
 import { FLOW_N8N_DESCRIPTION } from "./descriptions/flow";
 import { FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION } from "./descriptions/flow-loop-over-items";
+import { FILTER_N8N_DESCRIPTION } from "./descriptions/filter";
 import { HUMAN_REVIEW_N8N_DESCRIPTION } from "./descriptions/human-review";
 import { HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION } from "./descriptions/human-review-gmail";
 import { HTTP_REQUEST_N8N_DESCRIPTION } from "./descriptions/http-request";
@@ -45,6 +46,8 @@ const BY_KIND: Record<string, N8nNodeTypeDescription> = {
   "tool_node:get-rag": GET_RAG_TOOL_N8N_DESCRIPTION,
   "tool_node:get-db-info": GET_DB_INFO_TOOL_N8N_DESCRIPTION,
   "flow:loop_over_items": FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION,
+  "flow:filter": FILTER_N8N_DESCRIPTION,
+  "data_transformation:filter": FILTER_N8N_DESCRIPTION,
   "human_review:gmail": HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION,
 };
 

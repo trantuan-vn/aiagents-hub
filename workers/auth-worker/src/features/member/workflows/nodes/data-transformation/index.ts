@@ -28,3 +28,11 @@ export function createTransformKindPlugin(kind: TransformKind): WorkflowNodePlug
 export const TRANSFORM_KIND_PLUGINS: WorkflowNodePlugin[] = TRANSFORM_KINDS.filter(
   (kind) => !TRANSFORM_OVERRIDE_KINDS.has(kind),
 ).map(createTransformKindPlugin);
+
+/** Dedicated Filter plugin (override slot — shares execute). */
+export const transformFilterPlugin: WorkflowNodePlugin = {
+  id: 'data_transformation:filter',
+  runtimeType: 'data_transformation',
+  kind: 'filter',
+  execute: executeDataTransformation,
+};

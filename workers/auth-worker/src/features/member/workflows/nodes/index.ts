@@ -7,8 +7,9 @@ import { corePlugin, CORE_KIND_PLUGINS } from './core/index.js';
 import {
   dataTransformationPlugin,
   TRANSFORM_KIND_PLUGINS,
+  transformFilterPlugin,
 } from './data-transformation/index.js';
-import { flowPlugin, FLOW_KIND_PLUGINS, flowLoopOverItemsPlugin } from './flow/index.js';
+import { flowPlugin, FLOW_KIND_PLUGINS, flowLoopOverItemsPlugin, flowFilterPlugin } from './flow/index.js';
 import { coreHttpRequestPlugin, httpRequestPlugin } from './http-request/index.js';
 import { humanReviewPlugin, HUMAN_REVIEW_CHANNEL_PLUGINS } from './human-review/index.js';
 import {
@@ -70,8 +71,10 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   triggerChatPlugin,
   ...FLOW_KIND_PLUGINS,
   flowLoopOverItemsPlugin,
+  flowFilterPlugin,
   ...CORE_KIND_PLUGINS,
   ...TRANSFORM_KIND_PLUGINS,
+  transformFilterPlugin,
   ...HUMAN_REVIEW_CHANNEL_PLUGINS,
   ...AGENT_KIND_PLUGINS,
   agentReasoningPlugin,

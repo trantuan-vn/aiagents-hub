@@ -18,6 +18,7 @@ export {
   TRANSFORM_OVERRIDE_KINDS,
   type TransformKind,
 } from "./kinds";
+export { TRANSFORM_FILTER_DEFINITION } from "./filter";
 
 /** Base family definition — fallback when no transformKind is set. */
 export const DATA_TRANSFORMATION_DEFINITION: WorkflowNodeDefinition = createBuiltin({

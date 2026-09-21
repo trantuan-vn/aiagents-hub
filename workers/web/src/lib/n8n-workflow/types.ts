@@ -8,7 +8,9 @@ export type N8nNodePropertyTypes =
   | "number"
   | "json"
   | "string"
-  | "hidden";
+  | "hidden"
+  | "filter"
+  | "collection";
 
 export type N8nDisplayOptions = {
   show?: Record<string, Array<string | number | boolean>>;
@@ -37,7 +39,7 @@ export type N8nNodeProperty = {
   placeholder?: string;
   required?: boolean;
   noDataExpression?: boolean;
-  options?: N8nNodePropertyOption[];
+  options?: Array<N8nNodePropertyOption | N8nNodeProperty>;
   displayOptions?: N8nDisplayOptions;
   typeOptions?: N8nNodePropertyTypeOptions;
 };

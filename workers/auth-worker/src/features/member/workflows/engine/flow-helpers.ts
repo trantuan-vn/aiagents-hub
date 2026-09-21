@@ -1,3 +1,5 @@
+import { evaluateFilterFromNodeData } from '@aiagents-hub/workflow-nodes';
+
 import { interpolate } from '../execution/node-runtime.js';
 
 type NodeOutput = Record<string, unknown>;
@@ -91,7 +93,8 @@ export function resolveActiveBranchHandles(
   }
 
   if (flowKind === 'filter') {
-    const pass = evaluateFlowCondition(String(data.condition ?? ''), scope);
+    const structured = evaluateFilterFromNodeData(data, scope);
+    const pass = structured ?? evaluateFlowCondition(String(data.condition ?? ''), scope);
     if (pass) active.add('out');
     return active;
   }

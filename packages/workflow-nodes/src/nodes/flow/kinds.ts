@@ -17,4 +17,4 @@ export type FlowKind = (typeof FLOW_KINDS)[number];
 export const FLOW_KIND_FIELD = "flowKind" as const;
 
 /** Kinds with dedicated override definitions/plugins (not factory-generated). */
-export const FLOW_OVERRIDE_KINDS = new Set<FlowKind>(["loop_over_items"]);
+export const FLOW_OVERRIDE_KINDS = new Set<FlowKind>(["loop_over_items", "filter"]);

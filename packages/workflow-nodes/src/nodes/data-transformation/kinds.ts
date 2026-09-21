@@ -29,5 +29,5 @@ export type TransformKind = (typeof TRANSFORM_KINDS)[number];
 /** Kind field stored on `node.data` for data_transformation. */
 export const TRANSFORM_KIND_FIELD = "transformKind" as const;
 
-/** Kinds with dedicated override modules (none yet — all factory-generated). */
-export const TRANSFORM_OVERRIDE_KINDS = new Set<TransformKind>([]);
+/** Kinds with dedicated override modules (not factory-generated). */
+export const TRANSFORM_OVERRIDE_KINDS = new Set<TransformKind>(["filter"]);

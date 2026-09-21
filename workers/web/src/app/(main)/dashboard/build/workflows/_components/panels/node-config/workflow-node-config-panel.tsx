@@ -19,7 +19,7 @@ import { N8nParameterRenderer } from "./n8n-parameter-renderer";
 import { NodeConfigFieldRenderer } from "./node-config-field-renderer";
 import { AgentUpstreamInputPanel } from "./agent-upstream-input-panel";
 import { NodeMockOutputSection } from "./node-mock-output-section";
-import { resolveUIPlugin } from "../../nodes";
+import { kindFromNode, resolveUIPlugin } from "../../nodes";
 import { WorkflowExecuteStepButton } from "../../node-ui/workflow-execute-step-button";
 import { warnLegacyRuntimeType } from "../../../_lib/runtime-type";
 
@@ -116,17 +116,7 @@ export function WorkflowNodeConfigPanel({
 
   const nodeData = (node?.data ?? {}) as Record<string, unknown>;
   const runtimeType = node?.type ?? "";
-  const kind = typeof nodeData.coreKind === "string"
-    ? nodeData.coreKind
-    : typeof nodeData.flowKind === "string"
-      ? nodeData.flowKind
-      : typeof nodeData.triggerKind === "string"
-        ? nodeData.triggerKind
-        : typeof nodeData.toolKind === "string"
-          ? nodeData.toolKind
-          : typeof nodeData.channel === "string" && runtimeType === "human_review"
-            ? nodeData.channel
-            : undefined;
+  const kind = kindFromNode(node);
 
   const definition = useMemo(
     () => (runtimeType ? resolveNodeDefinition(runtimeType, kind, registry) : undefined),

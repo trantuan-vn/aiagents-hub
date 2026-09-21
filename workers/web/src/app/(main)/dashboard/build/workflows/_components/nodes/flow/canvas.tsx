@@ -3,7 +3,7 @@
 import { memo } from "react";
 
 import { Position, type NodeProps } from "@xyflow/react";
-import { Check, GitBranch, RotateCw, X } from "lucide-react";
+import { Check, GitBranch, ListFilter, RotateCw, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
@@ -270,7 +270,7 @@ export const FlowNode = memo((props: NodeProps) => {
   return (
     <SimpleNode
       label={String(label)}
-      icon={GitBranch}
+      icon={flowKind === "filter" ? ListFilter : GitBranch}
       accent="border-sky-500/40"
       selected={props.selected}
       handleAccent="!bg-sky-500"

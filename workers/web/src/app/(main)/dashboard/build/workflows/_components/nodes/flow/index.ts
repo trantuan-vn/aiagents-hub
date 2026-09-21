@@ -1,6 +1,7 @@
 import {
   FLOW_KINDS,
   FLOW_OVERRIDE_KINDS,
+  defaultFilterNodeData,
   type FlowKind,
 } from "@aiagents-hub/workflow-nodes";
 
@@ -35,12 +36,13 @@ export function createFlowKindUIPlugin(kind: FlowKind): WorkflowNodeUIPlugin {
       label,
       flowKind: kind,
       ...(kind === "loop_over_items" ? { batchSize: 1, itemsField: "{{ $json.items }}" } : {}),
+      ...(kind === "filter" ? defaultFilterNodeData() : {}),
     }),
     catalog: {
       category: "flow",
       labelKey: `flow_kind_${kind}`,
       descriptionKey: `flow_kind_${kind}_desc`,
-      icon: kind === "loop_over_items" ? "RotateCw" : "GitBranch",
+      icon: kind === "loop_over_items" ? "RotateCw" : kind === "filter" ? "ListFilter" : "GitBranch",
       keywords: [kind, "flow"],
     },
   };
@@ -52,3 +54,6 @@ export const FLOW_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = FLOW_KINDS.filter(
 
 /** Override slot for loop_over_items — shares canvas; richer defaults. */
 export const flowLoopOverItemsUIPlugin: WorkflowNodeUIPlugin = createFlowKindUIPlugin("loop_over_items");
+
+/** Override slot for filter — n8n conditions UI. */
+export const flowFilterUIPlugin: WorkflowNodeUIPlugin = createFlowKindUIPlugin("filter");

@@ -6,7 +6,7 @@ import {
   isWorkflowClientId,
   resolveHttpRequestPlaceholder,
 } from "@/lib/n8n-workflow/descriptions/http-request";
-import type { N8nNodeParameters, N8nNodeProperty, N8nNodeTypeDescription } from "@/lib/n8n-workflow/types";
+import type { N8nNodeParameters, N8nNodeProperty, N8nNodePropertyOption, N8nNodeTypeDescription } from "@/lib/n8n-workflow/types";
 
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,6 +14,8 @@ import { Switch } from "@/components/ui/switch";
 
 import { ServiceEndpointSelect } from "../../node-ui/service-endpoint-select";
 import { ExpressionDropField } from "./expression-drop-field";
+import { N8nCollectionParameter } from "./n8n-collection-parameter";
+import { N8nFilterParameter } from "./n8n-filter-parameter";
 
 type N8nParameterRendererProps = {
   description: N8nNodeTypeDescription;
@@ -90,6 +92,14 @@ function N8nPropertyField({
     );
   }
 
+  if (property.type === "filter") {
+    return <N8nFilterParameter property={property} value={value} onChange={onChange} />;
+  }
+
+  if (property.type === "collection") {
+    return <N8nCollectionParameter property={property} value={value} onChange={onChange} />;
+  }
+
   if (property.type === "boolean") {
     return (
       <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2">
@@ -105,7 +115,9 @@ function N8nPropertyField({
   }
 
   if (property.type === "options") {
-    const options = property.options ?? [];
+    const options = (property.options ?? []).filter(
+      (opt): opt is N8nNodePropertyOption => "value" in opt && !("type" in opt),
+    );
     return (
       <div className="space-y-1.5">
         <Label>{property.displayName}</Label>

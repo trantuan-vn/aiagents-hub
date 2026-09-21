@@ -7,8 +7,9 @@ import { coreUIPlugin, CORE_KIND_UI_PLUGINS } from "./core";
 import {
   dataTransformationUIPlugin,
   TRANSFORM_KIND_UI_PLUGINS,
+  transformFilterUIPlugin,
 } from "./data-transformation";
-import { flowUIPlugin, FLOW_KIND_UI_PLUGINS, flowLoopOverItemsUIPlugin } from "./flow";
+import { flowUIPlugin, FLOW_KIND_UI_PLUGINS, flowLoopOverItemsUIPlugin, flowFilterUIPlugin } from "./flow";
 import { formTriggerUIPlugin } from "./form";
 import { chatTriggerUIPlugin } from "./chat";
 import { humanReviewUIPlugin, HUMAN_REVIEW_CHANNEL_UI_PLUGINS } from "./human-review";
@@ -67,8 +68,10 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   ...TRIGGER_KIND_UI_PLUGINS,
   ...FLOW_KIND_UI_PLUGINS,
   flowLoopOverItemsUIPlugin,
+  flowFilterUIPlugin,
   ...CORE_KIND_UI_PLUGINS,
   ...TRANSFORM_KIND_UI_PLUGINS,
+  transformFilterUIPlugin,
   ...HUMAN_REVIEW_CHANNEL_UI_PLUGINS,
   ...AGENT_KIND_UI_PLUGINS,
   agentReasoningUIPlugin,
@@ -121,15 +124,23 @@ export const NODE_CATALOG: Record<NodeCatalogCategory, NodeCatalogEntry[]> = BUI
   {} as Record<NodeCatalogCategory, NodeCatalogEntry[]>,
 );
 
-function kindFromNode(node: Node): string | undefined {
-  const data = (node.data ?? {}) as Record<string, unknown>;
-  if (typeof data.coreKind === "string") return data.coreKind;
-  if (typeof data.flowKind === "string") return data.flowKind;
-  if (typeof data.triggerKind === "string") return data.triggerKind;
-  if (typeof data.toolKind === "string") return data.toolKind;
-  if (typeof data.transformKind === "string") return data.transformKind;
-  if (typeof data.memoryKind === "string") return data.memoryKind;
-  if (typeof data.agentKind === "string") return data.agentKind;
+const NODE_KIND_FIELDS = [
+  "coreKind",
+  "flowKind",
+  "triggerKind",
+  "toolKind",
+  "transformKind",
+  "memoryKind",
+  "agentKind",
+] as const;
+
+export function kindFromNode(node: Node | null | undefined): string | undefined {
+  if (!node) return undefined;
+  const data = node.data ?? {};
+  for (const field of NODE_KIND_FIELDS) {
+    const value = data[field];
+    if (typeof value === "string") return value;
+  }
   if (typeof data.channel === "string" && node.type === "human_review") return data.channel;
   return undefined;
 }
