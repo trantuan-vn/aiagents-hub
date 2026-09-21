@@ -46,6 +46,8 @@ import { createAdminFinanceRoutes } from './features/admin/finance/presentation'
 import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payout/presentation';
 import { createAdminBillingRoutes } from './features/admin/billing/presentation';
 import { createAdminCloudflareUsageRoutes } from './features/admin/cloudflare-usage/presentation';
+import { createAdminCloudflareLogsRoutes } from './features/admin/cloudflare-logs/presentation';
+import { dailyLogsSync } from './features/admin/cloudflare-logs/infrastructure';
 import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
 import {
@@ -124,6 +126,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/earnings-payouts', createAdminEarningsPayoutRoutes(bindingName));
   routes.route('/dashboard/admin/billing', createAdminBillingRoutes());
   routes.route('/dashboard/admin/cloudflare', createAdminCloudflareUsageRoutes());
+  routes.route('/dashboard/admin/cloudflare-logs', createAdminCloudflareLogsRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());
@@ -224,6 +227,13 @@ export default {
       await dailyUsageSync(env);
     } catch (err) {
       log.warn('cloudflare.usage_sync_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await dailyLogsSync(env);
+    } catch (err) {
+      log.warn('cloudflare.logs_sync_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

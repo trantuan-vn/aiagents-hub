@@ -3,6 +3,7 @@ import {
   BarChart3,
   Bell,
   Bot,
+  Bug,
   ChartBar,
   CircleDollarSign,
   Cloud,
@@ -112,6 +113,12 @@ export const sidebarItems: NavGroup[] = [
         title: "Cloudflare usage",
         url: "/dashboard/cloudflare-usage",
         icon: Cloud,
+        adminOnly: true,
+      },
+      {
+        title: "Worker errors",
+        url: "/dashboard/cloudflare-logs",
+        icon: Bug,
         adminOnly: true,
       },
       {

@@ -27,6 +27,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     "Workflow Nodes": t("workflow_nodes"),
     Contribution: t("contribution"),
     "Cloudflare usage": t("cloudflare_usage"),
+    "Worker errors": t("cloudflare_logs"),
     "User Economics": t("user_economics"),
     Commissions: t("commissions"),
     "Ask AI": t("ask_ai"),

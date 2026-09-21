@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
@@ -161,6 +162,9 @@ export default function CloudflareUsagePage() {
           <RecommendationList data={data} />
           <InventoryTable data={data} />
           <p className="text-muted-foreground text-xs">{t("disclaimer")}</p>
+          <Link href="/dashboard/cloudflare-logs" className="text-primary text-sm underline-offset-4 hover:underline">
+            {t("link_logs")}
+          </Link>
         </>
       ) : null}
     </div>
