@@ -5,11 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-
-import { useDashboardUser } from "../../_context/dashboard-user-context";
 
 import { LogsFiltersCard } from "./_components/logs-filters-card";
 import { LogsOverviewChart } from "./_components/logs-overview-chart";
@@ -53,7 +50,6 @@ function parseServicesResponse(raw: unknown): Array<Service | Record<string, unk
 export default function MonitorLogsPage() {
   const t = useTranslations("MonitorLogsPage");
   const { toast } = useToast();
-  const user = useDashboardUser();
   const [logs, setLogs] = useState<ServiceUsageLog[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -200,12 +196,6 @@ export default function MonitorLogsPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">{t("title")}</h1>
           <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">{t("description")}</p>
-          <p className="text-muted-foreground max-w-2xl text-xs">{t("not_worker_crash")}</p>
-          {user?.role === "admin" ? (
-            <Link href="/dashboard/cloudflare-logs" className="text-primary text-sm underline-offset-4 hover:underline">
-              {t("worker_errors_link")}
-            </Link>
-          ) : null}
         </div>
         <Button
           variant="outline"

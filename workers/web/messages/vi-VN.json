@@ -2204,9 +2204,7 @@
   },
   "MonitorLogsPage": {
     "title": "Nhật ký Sử dụng Dịch vụ",
-    "description": "Xem và quản lý nhật ký sử dụng API. Tìm kiếm, lọc và theo dõi từng lượt gọi API. Đây là log Credit, không phải crash Worker.",
-    "not_worker_crash": "Đây là log gọi dịch vụ tính Credit, không phải lỗi kỹ thuật Worker.",
-    "worker_errors_link": "Admin: Lỗi Worker",
+    "description": "Xem và quản lý nhật ký sử dụng API. Tìm kiếm, lọc và theo dõi từng lượt gọi API.",
     "fetch_error": "Không thể tải nhật ký",
     "error": "Lỗi",
     "refresh": "Làm mới",

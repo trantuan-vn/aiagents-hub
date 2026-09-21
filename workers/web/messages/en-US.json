@@ -2204,9 +2204,7 @@
   },
   "MonitorLogsPage": {
     "title": "Service Usage Logs",
-    "description": "View and manage your API service usage logs. Search, filter, and track every API call. This is Credit usage, not Worker crashes.",
-    "not_worker_crash": "These are service call logs used for Credits — not technical Worker errors.",
-    "worker_errors_link": "Admin: Worker errors",
+    "description": "View and manage your API service usage logs. Search, filter, and track every API call.",
     "fetch_error": "Failed to load logs",
     "error": "Error",
     "refresh": "Refresh",
