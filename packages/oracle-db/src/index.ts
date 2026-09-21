@@ -1,5 +1,6 @@
-export type { DbColumnInfo, DbForeignKey, OracleConnectConfig } from './types.js';
+export type { DbColumnInfo, DbForeignKey, OracleConnectConfig, OracleSqlHistoryEntry } from './types.js';
 export {
+  fetchOracleSqlHistoriesDirect,
   introspectOracleTableDirect,
   introspectOracleTablesDirect,
   listOracleTablesDirect,

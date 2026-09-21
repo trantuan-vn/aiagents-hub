@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import { ragDocumentsFromDbInfo } from './documents.js';
-import { executeGetDbInfoPipeline, type GetDbInfoResult } from './execute.js';
+import {
+  executeGetDbInfo,
+  executeGetDbInfoPipeline,
+  introspectTableToRagDocuments,
+  introspectTablesToRagDocuments,
+  type GetDbInfoResult,
+} from './execute.js';
 import type { NodeContext } from '../../types.js';
 
 const directMock = vi.hoisted(() => ({
@@ -15,6 +21,30 @@ const directMock = vi.hoisted(() => ({
     sampleRows: [{ ID: 1 }],
     rowCountEstimate: 3,
   })),
+  introspectOracleTablesDirect: vi.fn(async (_config: unknown, _schema: string, tables: string[]) =>
+    tables.map((tableName) => ({
+      tableName,
+      columns: [{ name: 'ID', type: 'NUMBER(10)', nullable: false, comment: 'pk' }],
+      primaryKey: ['ID'],
+      foreignKeys: [],
+      ddl: `CREATE TABLE "ADMIN"."${tableName}" (\n  "ID" NUMBER(10) NOT NULL\n);`,
+      sampleRows: [{ ID: 1 }],
+      rowCountEstimate: 3,
+    })),
+  ),
+  fetchOracleSqlHistoriesDirect: vi.fn(async (_config: unknown, tables: string[]) =>
+    Object.fromEntries(
+      tables.map((table) => [
+        String(table).toUpperCase(),
+        [
+          {
+            sql: `SELECT * FROM ADMIN.${String(table).toUpperCase()} WHERE ROWNUM <= 10`,
+            executedAt: '2026-09-21T10:00:00.000Z',
+          },
+        ],
+      ]),
+    ),
+  ),
 }));
 
 vi.mock('@aiagents-hub/oracle-db', () => directMock);
@@ -44,6 +74,24 @@ describe('get-db-info documents', () => {
     expect(items[0]?.content).toContain('# Table: public.orders');
     expect(items[0]?.content.indexOf('## DDL')).toBeLessThan(items[0]!.content.indexOf('## Sample shape'));
     expect(items[1]?.content).toContain('SELECT * FROM public.orders');
+    expect(items[1]?.content).toContain('_No historical queries recorded._');
+  });
+
+  it('renders historical SQL from Oracle execution history', () => {
+    const items = ragDocumentsFromDbInfo({
+      ...info,
+      sqlHistory: [
+        {
+          sql: 'SELECT * FROM public.orders WHERE total > 100',
+          executedAt: '2026-09-21T10:00:00.000Z',
+          rowCount: 4,
+        },
+      ],
+    });
+    expect(items[1]?.content).toContain('### 1. Historical query');
+    expect(items[1]?.content).toContain('SELECT * FROM public.orders WHERE total > 100');
+    expect(items[1]?.content).toContain('Executed: 2026-09-21T10:00:00.000Z');
+    expect(items[1]?.content).not.toContain('_No historical queries recorded._');
   });
 });
 
@@ -51,6 +99,8 @@ describe('executeGetDbInfoPipeline', () => {
   beforeEach(() => {
     directMock.listOracleTablesDirect.mockClear();
     directMock.introspectOracleTableDirect.mockClear();
+    directMock.introspectOracleTablesDirect.mockClear();
+    directMock.fetchOracleSqlHistoriesDirect.mockClear();
   });
 
   it('lists a named table as a loop item without introspecting', async () => {
@@ -456,5 +506,187 @@ describe('executeGetDbInfoPipeline', () => {
 
     await expect(executeGetDbInfoPipeline(ctx)).rejects.toThrow(/will not list the platform database/i);
     expect(db.prepare).not.toHaveBeenCalled();
+  });
+});
+
+const oracleConn = {
+  type: 'oracle',
+  user: 'ADMIN',
+  password: 'secret',
+  connectString: 'dbname_high',
+};
+
+describe('Oracle SQL history', () => {
+  beforeEach(() => {
+    directMock.listOracleTablesDirect.mockClear();
+    directMock.introspectOracleTableDirect.mockClear();
+    directMock.introspectOracleTablesDirect.mockClear();
+    directMock.fetchOracleSqlHistoriesDirect.mockClear();
+  });
+  const dbinfoDefinition = (data: Record<string, unknown> = {}): WorkflowDefinition => ({
+    nodes: [
+      {
+        id: 'dbinfo',
+        type: 'tool_node',
+        position: { x: 0, y: 0 },
+        data: { toolKind: 'get-db-info', sqlHistoryLimit: 10, includeSqlHistory: true, ...data },
+      },
+    ],
+    edges: [],
+  });
+
+  it('loads SQL history from ADMIN.DBTOOLS$EXECUTION_HISTORY using the configured limit', async () => {
+    const definition = dbinfoDefinition({ sqlHistoryLimit: 7 });
+    const info = await executeGetDbInfo({
+      env: {} as Env,
+      definition,
+      agentId: 'dbinfo',
+      triggerContext: {
+        tableName: 'CHUNG_KHOAN',
+        schemaName: 'ADMIN',
+        connection: oracleConn,
+      },
+      input: { tableName: 'CHUNG_KHOAN' },
+    });
+
+    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
+      expect.objectContaining({ user: 'ADMIN', connectString: 'dbname_high' }),
+      ['CHUNG_KHOAN'],
+      7,
+    );
+    expect(info.sqlHistory).toEqual([
+      {
+        sql: 'SELECT * FROM ADMIN.CHUNG_KHOAN WHERE ROWNUM <= 10',
+        executedAt: '2026-09-21T10:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('skips SQL history when includeSqlHistory is false', async () => {
+    const definition = dbinfoDefinition({ includeSqlHistory: false });
+    const info = await executeGetDbInfo({
+      env: {} as Env,
+      definition,
+      agentId: 'dbinfo',
+      triggerContext: {
+        tableName: 'CHUNG_KHOAN',
+        schemaName: 'ADMIN',
+        connection: oracleConn,
+      },
+      input: { tableName: 'CHUNG_KHOAN' },
+    });
+
+    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
+    expect(info.sqlHistory).toEqual([]);
+  });
+
+  it('does not query D1 workflow_sql_audit for SQL history', async () => {
+    const db = {
+      prepare: vi.fn((sql: string) => ({
+        bind: (..._args: unknown[]) => ({
+          all: async () => ({ results: [] }),
+          first: async () => ({ cnt: 1 }),
+        }),
+        all: async () => {
+          if (sql.includes('PRAGMA table_info')) {
+            return { results: [{ name: 'id', type: 'TEXT', notnull: 1, dflt_value: null, pk: 1 }] };
+          }
+          if (sql.includes('PRAGMA foreign_key_list')) return { results: [] };
+          if (sql.includes('SELECT *')) return { results: [{ id: '1' }] };
+          return { results: [] };
+        },
+        first: async () => ({ cnt: 1 }),
+      })),
+    };
+
+    const info = await executeGetDbInfo({
+      env: { D1DB: db } as unknown as Env,
+      definition: dbinfoDefinition(),
+      agentId: 'dbinfo',
+      triggerContext: {
+        tableName: 'orders',
+        schemaName: 'public',
+        connection: { type: 'd1' },
+        dbId: 'analytics-db',
+      },
+      input: { tableName: 'orders' },
+    });
+
+    expect(info.sqlHistory).toEqual([]);
+    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
+    const sqlCalls = db.prepare.mock.calls.map((c) => String(c[0]));
+    expect(sqlCalls.some((s) => s.includes('workflow_sql_audit'))).toBe(false);
+  });
+
+  it('Save RAG uses get-db-info config instead of hard-coded history limit 0', async () => {
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'dbinfo',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-db-info', sqlHistoryLimit: 5, includeSqlHistory: true },
+        },
+        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag' } },
+      ],
+      edges: [],
+    };
+
+    const docs = await introspectTableToRagDocuments({
+      env: {} as Env,
+      definition,
+      agentId: 'save',
+      triggerContext: {
+        tableName: 'ORDERS',
+        schemaName: 'ADMIN',
+        connection: oracleConn,
+      },
+      tableName: 'ORDERS',
+      schemaName: 'ADMIN',
+    });
+
+    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
+      expect.objectContaining({ user: 'ADMIN' }),
+      ['ORDERS'],
+      5,
+    );
+    expect(docs[1]?.content).toContain('SELECT * FROM ADMIN.ORDERS WHERE ROWNUM <= 10');
+    expect(docs[1]?.content).toContain('### 1. Historical query');
+  });
+
+  it('batch RAG introspect attaches Oracle SQL history per table', async () => {
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'dbinfo',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-db-info', sqlHistoryLimit: 4, includeSqlHistory: true },
+        },
+        { id: 'save', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'save-rag' } },
+      ],
+      edges: [],
+    };
+
+    const docs = await introspectTablesToRagDocuments({
+      env: {} as Env,
+      definition,
+      agentId: 'save',
+      triggerContext: { schemaName: 'ADMIN', connection: oracleConn },
+      tables: [
+        { tableName: 'CHUNG_KHOAN', schemaName: 'ADMIN' },
+        { tableName: 'NHA_DAU_TU', schemaName: 'ADMIN' },
+      ],
+    });
+
+    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
+      expect.objectContaining({ user: 'ADMIN' }),
+      ['CHUNG_KHOAN', 'NHA_DAU_TU'],
+      4,
+    );
+    const examples = docs.filter((d) => d.metadata.docType === 'sqlexample');
+    expect(examples).toHaveLength(2);
+    expect(examples[0]?.content).toContain('ADMIN.CHUNG_KHOAN');
+    expect(examples[1]?.content).toContain('ADMIN.NHA_DAU_TU');
   });
 });

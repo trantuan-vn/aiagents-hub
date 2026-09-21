@@ -2,9 +2,11 @@ import type { OracleConnectConfig } from './connect-config.js';
 import type { DbColumnInfo, DbForeignKey } from './execute.js';
 import {
   oracleProxyConfigured,
+  proxyFetchOracleSqlHistories,
   proxyIntrospectOracleTable,
   proxyIntrospectOracleTables,
   proxyListOracleTables,
+  type ProxySqlHistoryEntry,
   type ProxyTableIntrospection,
 } from './oracle-proxy-client.js';
 
@@ -168,4 +170,28 @@ function emptyTableResult(tableName: string, error: string): OracleTableIntrospe
     sampleRows: [],
     error,
   };
+}
+
+export async function fetchOracleSqlHistories(
+  config: OracleConnectConfig,
+  tableNames: string[],
+  limit: number,
+  env?: unknown,
+): Promise<Record<string, ProxySqlHistoryEntry[]>> {
+  if (resolveOraclePath(env) === 'proxy') {
+    try {
+      return await proxyFetchOracleSqlHistories(requireProxyEnv(env), config, tableNames, limit);
+    } catch (err) {
+      if (isUnknownProxyAction(err)) return {};
+      const message = err instanceof Error ? err.message : String(err);
+      throw new Error(`get_db_info: Oracle connection failed — ${message}`);
+    }
+  }
+  try {
+    const { fetchOracleSqlHistoriesDirect } = await import('@aiagents-hub/oracle-db');
+    return await fetchOracleSqlHistoriesDirect(config, tableNames, limit);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`get_db_info: Oracle connection failed — ${message}`);
+  }
 }

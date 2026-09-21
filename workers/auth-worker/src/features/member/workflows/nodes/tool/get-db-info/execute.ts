@@ -12,7 +12,7 @@ import {
   type OracleConnectConfig,
 } from './connect-config.js';
 import { ragDocumentsFromDbInfo, type RagDocumentItem } from './documents.js';
-import { introspectOracleTable, introspectOracleTables, listOracleTables } from './oracle.js';
+import { fetchOracleSqlHistories, introspectOracleTable, introspectOracleTables, listOracleTables } from './oracle.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 
 export type DbColumnInfo = {
@@ -142,28 +142,68 @@ async function introspectD1Table(
   };
 }
 
-async function fetchSqlHistory(
-  env: Env,
-  dbId: string,
-  tableName: string,
-  limit: number,
-  source: string,
-): Promise<SqlHistoryEntry[]> {
-  const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
-  if (!db || source !== 'audit_log') return [];
+const SQL_HISTORY_LIMIT_DEFAULT = 10;
+const SQL_HISTORY_LIMIT_MAX = 50;
 
+function getDbInfoConfig(
+  definition: import('../../../domain/domain.js').WorkflowDefinition,
+  agentId: string,
+): Record<string, unknown> {
+  const linked = toolNodeConfig(definition, agentId, 'get-db-info');
+  if (linked) return linked;
+  const node = definition.nodes.find((n) => {
+    if (n.type !== 'tool_node') return false;
+    return String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-db-info';
+  });
+  return (node?.data ?? {}) as Record<string, unknown>;
+}
+
+function resolveSqlHistorySettings(
+  config: Record<string, unknown>,
+  triggerContext: Record<string, unknown>,
+  input?: GetDbInfoInput,
+): { include: boolean; limit: number } {
+  const limits = asRecord(triggerContext.limits);
+  const include = input?.includeSqlHistory ?? config.includeSqlHistory !== false;
+  const raw = input?.sqlHistoryLimit ?? config.sqlHistoryLimit ?? limits.sqlHistoryLimit ?? SQL_HISTORY_LIMIT_DEFAULT;
+  const parsed = Number(raw);
+  const limit = Number.isFinite(parsed)
+    ? Math.min(Math.max(0, Math.floor(parsed)), SQL_HISTORY_LIMIT_MAX)
+    : SQL_HISTORY_LIMIT_DEFAULT;
+  return { include, limit };
+}
+
+function historyKey(tableName: string): string {
+  return tableName.trim().toUpperCase();
+}
+
+async function fetchSqlHistory(params: {
+  oracleConfig: OracleConnectConfig | null;
+  tableNames: string[];
+  limit: number;
+  env: Env;
+}): Promise<Record<string, SqlHistoryEntry[]>> {
+  if (!params.oracleConfig || params.limit <= 0 || !params.tableNames.length) return {};
   try {
-    const { results } = await db
-      .prepare(
-        `SELECT sql, executedAt, durationMs, rowCount FROM workflow_sql_audit
-         WHERE dbId = ? AND (sql LIKE ? OR tableName = ?)
-         ORDER BY executedAt DESC LIMIT ?`,
-      )
-      .bind(dbId, `%${tableName}%`, tableName, limit)
-      .all<SqlHistoryEntry>();
-    return results ?? [];
-  } catch {
-    return [];
+    const rows = await fetchOracleSqlHistories(
+      params.oracleConfig,
+      params.tableNames,
+      params.limit,
+      params.env,
+    );
+    const out: Record<string, SqlHistoryEntry[]> = {};
+    for (const [table, entries] of Object.entries(rows)) {
+      out[historyKey(table)] = (entries ?? []).map((entry) => ({
+        sql: String(entry.sql ?? ''),
+        ...(entry.executedAt ? { executedAt: String(entry.executedAt) } : {}),
+        ...(entry.durationMs != null ? { durationMs: Number(entry.durationMs) } : {}),
+        ...(entry.rowCount != null ? { rowCount: Number(entry.rowCount) } : {}),
+      })).filter((entry) => entry.sql.trim());
+    }
+    return out;
+  } catch (err) {
+    console.warn('[get-db-info] Oracle SQL history failed:', err);
+    return {};
   }
 }
 
@@ -227,7 +267,7 @@ function filterTables(tables: string[], tableFilter: string): string[] {
 
 export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<GetDbInfoResult> {
   const { env, definition, agentId, triggerContext, input } = params;
-  const config = toolNodeConfig(definition, agentId, 'get-db-info') ?? {};
+  const config = getDbInfoConfig(definition, agentId);
 
   const connection = (triggerContext.connection ?? {}) as DbConnection;
   const oracleConfig = oracleConfigFrom(triggerContext, connection);
@@ -244,10 +284,11 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
   const sampleLimit =
     input.sampleRowLimit ??
     (Number(config.sampleRowLimit ?? limits.sampleRowLimit ?? 10) || 10);
-  const historyLimit =
-    input.sqlHistoryLimit ??
-    (Number(config.sqlHistoryLimit ?? limits.sqlHistoryLimit ?? 10) || 10);
-  const historySource = String(config.sqlHistorySource ?? 'audit_log');
+  const { include: includeSqlHistory, limit: historyLimit } = resolveSqlHistorySettings(
+    config,
+    triggerContext,
+    input,
+  );
 
   const explicitType = String(connection.type ?? triggerContext.connectionType ?? '').trim().toLowerCase();
   const connType = explicitType || (oracleConfig ? 'oracle' : '');
@@ -271,10 +312,16 @@ export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<
     );
   }
 
-  const includeSqlHistory = input.includeSqlHistory ?? config.includeSqlHistory !== false;
-  const sqlHistory = includeSqlHistory
-    ? await fetchSqlHistory(env, dbId, tableName, historyLimit, historySource)
-    : [];
+  const historyByTable =
+    includeSqlHistory && oracleConfig
+      ? await fetchSqlHistory({
+          oracleConfig,
+          tableNames: [tableName],
+          limit: historyLimit,
+          env,
+        })
+      : {};
+  const sqlHistory = historyByTable[historyKey(tableName)] ?? [];
 
   const sampleRows =
     config.includeSampleRows !== false ? introspection.sampleRows : [];
@@ -407,6 +454,11 @@ export async function introspectTableToRagDocuments(params: {
     Number(limits.sampleRowLimit ?? RAG_SAMPLE_LIMIT) || RAG_SAMPLE_LIMIT,
     RAG_SAMPLE_LIMIT,
   );
+  const config = getDbInfoConfig(params.definition, params.agentId);
+  const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
+    config,
+    params.triggerContext,
+  );
   const info = await executeGetDbInfo({
     env: params.env,
     definition: params.definition,
@@ -416,14 +468,14 @@ export async function introspectTableToRagDocuments(params: {
       tableName: params.tableName,
       schemaName: params.schemaName,
       sampleRowLimit: sampleLimit,
-      sqlHistoryLimit: 0,
-      includeSqlHistory: false,
+      sqlHistoryLimit,
+      includeSqlHistory,
     },
   });
   return ragDocumentsFromDbInfo(truncateSampleRows(info, sampleLimit));
 }
 
-/** Batch-introspect many tables for RAG (one Oracle session; skip SQL history). */
+/** Batch-introspect many tables for RAG (one Oracle session). */
 export async function introspectTablesToRagDocuments(params: {
   env: Env;
   definition: import('../../../domain/domain.js').WorkflowDefinition;
@@ -458,13 +510,27 @@ export async function introspectTablesToRagDocuments(params: {
       );
     }
     const schemaName = resolveOracleSchema(tables[0]!.schemaName, oracleConfig.user);
+    const tableNames = tables.map((t) => t.tableName);
     const introspected = await introspectOracleTables(
       oracleConfig,
       schemaName,
-      tables.map((t) => t.tableName),
+      tableNames,
       sampleLimit,
       params.env,
     );
+    const config = getDbInfoConfig(params.definition, params.agentId);
+    const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
+      config,
+      params.triggerContext,
+    );
+    const historyByTable = includeSqlHistory
+      ? await fetchSqlHistory({
+          oracleConfig,
+          tableNames,
+          limit: sqlHistoryLimit,
+          env: params.env,
+        })
+      : {};
     const docs: RagDocumentItem[] = [];
     for (const row of introspected) {
       if (row.error || !row.columns.length) {
@@ -483,7 +549,7 @@ export async function introspectTablesToRagDocuments(params: {
               foreignKeys: row.foreignKeys,
               ddl: row.ddl,
               sampleRows: row.sampleRows,
-              sqlHistory: [],
+              sqlHistory: historyByTable[historyKey(row.tableName)] ?? [],
               rowCountEstimate: row.rowCountEstimate,
             },
             sampleLimit,
@@ -552,6 +618,11 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
     count: items.length,
     tableCount: selected.length,
     connection: connectionOut,
+    limits: {
+      sampleRowLimit: data.sampleRowLimit ?? 10,
+      sqlHistoryLimit: data.sqlHistoryLimit ?? 10,
+    },
+    includeSqlHistory: data.includeSqlHistory !== false,
     ...(oracleConfig
       ? {
           user: oracleConfig.user,

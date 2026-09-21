@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import {
+  fetchOracleSqlHistoriesDirect,
   introspectOracleTableDirect,
   introspectOracleTablesDirect,
   listOracleTablesDirect,
@@ -58,7 +59,7 @@ app.post('/oracle', async (c) => {
   const label =
     action === 'introspectTable'
       ? `${action} ${body.tableName}`
-      : action === 'introspectTables'
+      : action === 'introspectTables' || action === 'sqlHistory'
         ? `${action} x${tableCount}`
         : action;
   console.log(`[oracle-proxy] START ${label}`);
@@ -86,6 +87,18 @@ app.post('/oracle', async (c) => {
       const sampleLimit = Number(body.sampleLimit ?? 3);
       if (!tableNames.length) return badRequest('Missing tableNames');
       const result = await introspectOracleTablesDirect(config, schemaName, tableNames, sampleLimit);
+      console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
+      return jsonResponse({ ok: true, result });
+    }
+    if (action === 'sqlHistory') {
+      const tableNames = Array.isArray(body.tableNames)
+        ? body.tableNames.map((name) => String(name ?? '').trim()).filter(Boolean)
+        : String(body.tableName ?? '').trim()
+          ? [String(body.tableName)]
+          : [];
+      const limit = Number(body.limit ?? 10);
+      if (!tableNames.length) return badRequest('Missing tableNames');
+      const result = await fetchOracleSqlHistoriesDirect(config, tableNames, limit);
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }

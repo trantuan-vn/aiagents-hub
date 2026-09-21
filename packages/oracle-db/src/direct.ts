@@ -1,6 +1,6 @@
 import type { Connection } from 'oracledb';   
 
-import type { DbColumnInfo, DbForeignKey, OracleConnectConfig } from './types.js';
+import type { DbColumnInfo, DbForeignKey, OracleConnectConfig, OracleSqlHistoryEntry } from './types.js';
 
 type OracleDbApi = typeof import('oracledb').default;
 
@@ -393,5 +393,119 @@ export async function introspectOracleTablesDirect(
       }
     }
     return results;
+  });
+}
+
+const EXECUTION_HISTORY_OWNER = 'ADMIN';
+const EXECUTION_HISTORY_TABLE = 'DBTOOLS$EXECUTION_HISTORY';
+const SQL_HISTORY_TEXT_MAX = 4000;
+
+type ExecutionHistoryColumns = {
+  sqlExpr: string;
+  orderExpr: string;
+  executedAtIdent?: string;
+};
+
+async function resolveExecutionHistoryColumns(
+  connection: Connection,
+  oracledb: OracleDbApi,
+): Promise<ExecutionHistoryColumns | null> {
+  const rows = await executeRows(
+    connection,
+    `SELECT column_name, data_type FROM all_tab_columns
+      WHERE owner = :owner AND table_name = :table_name`,
+    { owner: EXECUTION_HISTORY_OWNER, table_name: EXECUTION_HISTORY_TABLE },
+    oracledb.OUT_FORMAT_OBJECT,
+  );
+  if (!rows.length) return null;
+
+  const byName = new Map(
+    rows.map((row) => [rowStr(row, 'COLUMN_NAME').toUpperCase(), rowStr(row, 'DATA_TYPE').toUpperCase()]),
+  );
+  const sqlCol = ['STATEMENT', 'SQL_TEXT', 'SQL', 'TEXT'].find((name) => byName.has(name));
+  if (!sqlCol) return null;
+
+  const sqlType = byName.get(sqlCol) ?? '';
+  const sqlIdent = quoteIdent(sqlCol);
+  const sqlExpr = /CLOB|NCLOB|LOB/.test(sqlType)
+    ? `DBMS_LOB.SUBSTR(${sqlIdent}, ${SQL_HISTORY_TEXT_MAX}, 1)`
+    : `SUBSTR(${sqlIdent}, 1, ${SQL_HISTORY_TEXT_MAX})`;
+
+  const executedAtCol = ['UPDATED', 'LAST_UPDATED', 'CREATED', 'CREATED_ON', 'LAST_ACTIVE'].find((name) =>
+    byName.has(name),
+  );
+  const orderCol = executedAtCol ?? ['ID', 'HASH'].find((name) => byName.has(name));
+  return {
+    sqlExpr,
+    orderExpr: orderCol ? `${quoteIdent(orderCol)} DESC` : `${sqlExpr} DESC`,
+    ...(executedAtCol ? { executedAtIdent: quoteIdent(executedAtCol) } : {}),
+  };
+}
+
+function historyEntryFromRow(row: Record<string, unknown>): OracleSqlHistoryEntry | null {
+  const sql = rowStr(row, 'SQL_TEXT').trim();
+  if (!sql) return null;
+  const executedAt = rowStr(row, 'EXECUTED_AT').trim();
+  return {
+    sql,
+    ...(executedAt ? { executedAt } : {}),
+  };
+}
+
+async function fetchSqlHistoryForTable(
+  connection: Connection,
+  oracledb: OracleDbApi,
+  columns: ExecutionHistoryColumns,
+  tableName: string,
+  limit: number,
+): Promise<OracleSqlHistoryEntry[]> {
+  const table = oracleName(tableName);
+  if (!table) return [];
+  const selectTime = columns.executedAtIdent
+    ? `, ${columns.executedAtIdent} AS executed_at`
+    : ', NULL AS executed_at';
+  const rows = await executeRows(
+    connection,
+    `SELECT ${columns.sqlExpr} AS sql_text${selectTime}
+       FROM ${quoteIdent(EXECUTION_HISTORY_OWNER)}.${quoteIdent(EXECUTION_HISTORY_TABLE)}
+      WHERE UPPER(${columns.sqlExpr}) LIKE :pattern
+      ORDER BY ${columns.orderExpr}
+      FETCH FIRST ${limit} ROWS ONLY`,
+    { pattern: `%${table}%` },
+    oracledb.OUT_FORMAT_OBJECT,
+    limit,
+  );
+  return rows.map(historyEntryFromRow).filter((entry): entry is OracleSqlHistoryEntry => entry != null);
+}
+
+/** SQL Developer Web / Database Actions history: ADMIN.DBTOOLS$EXECUTION_HISTORY. */
+export async function fetchOracleSqlHistoriesDirect(
+  config: OracleConnectConfig,
+  tableNames: string[],
+  limit: number,
+): Promise<Record<string, OracleSqlHistoryEntry[]>> {
+  const unique = [...new Set(tableNames.map(oracleName).filter(Boolean))];
+  const empty = Object.fromEntries(unique.map((table) => [table, [] as OracleSqlHistoryEntry[]]));
+  const capped = Math.min(Math.max(0, Math.floor(limit) || 0), 50);
+  if (!unique.length || capped <= 0) return empty;
+
+  return withOracleConnection(config, async (connection, oracledb) => {
+    let columns: ExecutionHistoryColumns | null;
+    try {
+      columns = await resolveExecutionHistoryColumns(connection, oracledb);
+    } catch {
+      return empty;
+    }
+    if (!columns) return empty;
+
+    const out: Record<string, OracleSqlHistoryEntry[]> = { ...empty };
+    for (const table of unique) {
+      try {
+        out[table] = await fetchSqlHistoryForTable(connection, oracledb, columns, table, capped);
+      } catch {
+        out[table] = [];
+      }
+    }
+    return out;
   });
 }

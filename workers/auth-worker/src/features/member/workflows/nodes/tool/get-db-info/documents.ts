@@ -112,7 +112,7 @@ export function buildSqlExampleDocument(info: GetDbInfoResult): RagDocumentItem 
 
   const content = `${yamlHeader(info, 'sqlexample')}# SQL examples: ${table}
 
-## Historical queries (from audit log)
+## Historical queries (from SQL history)
 
 ${history}
 

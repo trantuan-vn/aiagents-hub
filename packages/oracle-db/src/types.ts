@@ -20,3 +20,10 @@ export type DbForeignKey = {
   refTable: string;
   refColumn: string;
 };
+
+export type OracleSqlHistoryEntry = {
+  sql: string;
+  executedAt?: string;
+  durationMs?: number;
+  rowCount?: number;
+};

@@ -93,3 +93,19 @@ export async function proxyIntrospectOracleTables(
 ): Promise<ProxyTableIntrospection[]> {
   return proxyCall(env, { action: 'introspectTables', config, schemaName, tableNames, sampleLimit });
 }
+
+export type ProxySqlHistoryEntry = {
+  sql: string;
+  executedAt?: string;
+  durationMs?: number;
+  rowCount?: number;
+};
+
+export async function proxyFetchOracleSqlHistories(
+  env: ProxyEnv,
+  config: OracleConnectConfig,
+  tableNames: string[],
+  limit: number,
+): Promise<Record<string, ProxySqlHistoryEntry[]>> {
+  return proxyCall(env, { action: 'sqlHistory', config, tableNames, limit });
+}
