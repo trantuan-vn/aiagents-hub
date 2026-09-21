@@ -11,7 +11,14 @@ import type { ExecutionStepLog } from "../../../_lib/api";
 
 import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { WorkflowExecutionDataPane } from "./workflow-execution-data-view";
-import { formatDuration, nodeKindLabel, nodeLabel } from "./workflow-execution-utils";
+import {
+  formatDuration,
+  nodeKindLabel,
+  nodeLabel,
+  resolveSelectedStep,
+  stepOccurrence,
+  stepTableHint,
+} from "./workflow-execution-utils";
 import { WorkflowIoPanelPopout } from "./workflow-io-panel-popout";
 import { WorkflowIoPanelToolbar } from "./workflow-io-panel-toolbar";
 
@@ -31,13 +38,13 @@ function StepStatusIcon({ status }: { status: ExecutionStepLog["status"] }) {
 function StepList({
   steps,
   nodeById,
-  selectedNodeId,
-  onSelectNode,
+  selectedIndex,
+  onSelectStep,
 }: {
   steps: ExecutionStepLog[];
   nodeById: Map<string, Node>;
-  selectedNodeId: string | null;
-  onSelectNode: (nodeId: string) => void;
+  selectedIndex: number;
+  onSelectStep: (index: number) => void;
 }) {
   const t = useTranslations("WorkflowEditorPage");
   if (steps.length === 0) {
@@ -45,16 +52,25 @@ function StepList({
   }
   return (
     <ul>
-      {steps.map((step) => {
+      {steps.map((step, index) => {
         const node = nodeById.get(step.nodeId);
+        const occ = stepOccurrence(steps, index);
+        const table = stepTableHint(step);
+        const extra = [
+          occ.total > 1 ? `${occ.n}/${occ.total}` : null,
+          table || null,
+          step.durationMs != null ? formatDuration(step.durationMs) : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
         return (
-          <li key={step.nodeId}>
+          <li key={`${step.nodeId}:${index}`}>
             <button
               type="button"
-              onClick={() => onSelectNode(step.nodeId)}
+              onClick={() => onSelectStep(index)}
               className={cn(
                 "flex w-full items-start gap-2 px-3 py-2 text-left transition-colors",
-                selectedNodeId === step.nodeId ? "bg-muted" : "hover:bg-muted/50",
+                selectedIndex === index ? "bg-muted" : "hover:bg-muted/50",
               )}
             >
               <span className="mt-0.5">
@@ -64,7 +80,7 @@ function StepList({
                 <span className="block truncate text-[12px] font-medium">{nodeLabel(node, step.nodeId)}</span>
                 <span className="text-muted-foreground block truncate text-[10px] capitalize">
                   {nodeKindLabel(node, step.nodeType)}
-                  {step.durationMs != null ? ` · ${formatDuration(step.durationMs)}` : ""}
+                  {extra ? ` · ${extra}` : ""}
                 </span>
               </span>
             </button>
@@ -211,7 +227,9 @@ export function WorkflowExecutionIoPanel({
   steps,
   nodes,
   selectedNodeId,
+  selectedStepIndex,
   onSelectNode,
+  onSelectStep,
   collapsed = false,
   onCollapsedChange,
   hideHeader = false,
@@ -228,7 +246,9 @@ export function WorkflowExecutionIoPanel({
   steps: ExecutionStepLog[];
   nodes: Node[];
   selectedNodeId: string | null;
+  selectedStepIndex?: number | null;
   onSelectNode: (nodeId: string) => void;
+  onSelectStep?: (index: number) => void;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
   hideHeader?: boolean;
@@ -243,17 +263,33 @@ export function WorkflowExecutionIoPanel({
 }) {
   const t = useTranslations("WorkflowEditorPage");
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const selectedStep = steps.find((s) => s.nodeId === selectedNodeId) ?? null;
+  const resolved = resolveSelectedStep(steps, selectedNodeId, selectedStepIndex);
+  const selectedStep = resolved.step;
+  const selectedIndex = resolved.index;
   const selectedNode = selectedNodeId ? nodeById.get(selectedNodeId) : undefined;
-  const title =
-    selectedNode || selectedStep ? nodeLabel(selectedNode, selectedStep?.nodeId ?? selectedNodeId ?? "") : null;
+  const occ = selectedIndex >= 0 ? stepOccurrence(steps, selectedIndex) : { n: 1, total: 1 };
+  const table = selectedStep ? stepTableHint(selectedStep) : "";
+  const titleParts = [
+    selectedNode || selectedStep ? nodeLabel(selectedNode, selectedStep?.nodeId ?? selectedNodeId ?? "") : null,
+    occ.total > 1 ? `${occ.n}/${occ.total}` : null,
+    table || null,
+  ].filter(Boolean);
+  const title = titleParts.length ? titleParts.join(" · ") : null;
   const showBody = hideHeader || poppedOut || !collapsed;
   const showIo = showInput || showOutput;
-  const dataKey = `${executionKey ?? "run"}:${selectedNodeId ?? "none"}:${selectedStep?.status ?? ""}:${selectedStep?.durationMs ?? ""}`;
+  const dataKey = `${executionKey ?? "run"}:${selectedIndex}:${selectedStep?.nodeId ?? "none"}:${selectedStep?.status ?? ""}:${selectedStep?.durationMs ?? ""}`;
+  const handleSelectStep = (index: number) => {
+    if (onSelectStep) {
+      onSelectStep(index);
+      return;
+    }
+    const step = steps[index];
+    if (step) onSelectNode(step.nodeId);
+  };
 
   const body = !showBody ? null : !showIo ? (
     <div className="h-full min-h-0 flex-1 overflow-y-auto">
-      <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+      <StepList steps={steps} nodeById={nodeById} selectedIndex={selectedIndex} onSelectStep={handleSelectStep} />
     </div>
   ) : (
     <ResizablePanelGroup
@@ -263,7 +299,7 @@ export function WorkflowExecutionIoPanel({
     >
       <ResizablePanel id="steps" order={1} defaultSize={22} minSize={12} maxSize={42} className={workflowResizePanelClassName}>
         <div className="h-full min-h-0 overflow-y-auto">
-          <StepList steps={steps} nodeById={nodeById} selectedNodeId={selectedNodeId} onSelectNode={onSelectNode} />
+          <StepList steps={steps} nodeById={nodeById} selectedIndex={selectedIndex} onSelectStep={handleSelectStep} />
         </div>
       </ResizablePanel>
       <WorkflowResizeHandle />

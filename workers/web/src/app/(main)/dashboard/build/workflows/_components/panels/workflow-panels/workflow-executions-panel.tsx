@@ -58,7 +58,9 @@ export function WorkflowExecutionsPanel({
     selectedKey,
     setSelectedKey,
     selectedNodeId,
+    selectedStepIndex,
     setSelectedNodeId,
+    selectStep,
     autoRefresh,
     setAutoRefresh,
     load,
@@ -94,8 +96,10 @@ export function WorkflowExecutionsPanel({
       selected={selected}
       graphDefinition={graphDefinition}
       selectedNodeId={selectedNodeId}
+      selectedStepIndex={selectedStepIndex}
       stopping={stoppingKey === selected.executionKey}
       onSelectNode={setSelectedNodeId}
+      onSelectStep={selectStep}
       onApplyDefinition={onApplyDefinition}
       onCopiedToEditor={onCopiedToEditor}
       onReload={() => load(true)}

@@ -231,6 +231,77 @@ export function stepsByNodeId(steps: ExecutionStepLog[]): Map<string, ExecutionS
   return map;
 }
 
+export function lastStepIndexForNode(steps: ExecutionStepLog[], nodeId: string): number {
+  for (let i = steps.length - 1; i >= 0; i--) {
+    if (steps[i]?.nodeId === nodeId) return i;
+  }
+  return -1;
+}
+
+export function resolveSelectedStep(
+  steps: ExecutionStepLog[],
+  nodeId: string | null,
+  stepIndex: number | null | undefined,
+): { step: ExecutionStepLog | null; index: number } {
+  if (stepIndex != null && steps[stepIndex] && (!nodeId || steps[stepIndex]!.nodeId === nodeId)) {
+    return { step: steps[stepIndex]!, index: stepIndex };
+  }
+  if (!nodeId) return { step: null, index: -1 };
+  const index = lastStepIndexForNode(steps, nodeId);
+  return { step: index >= 0 ? steps[index]! : null, index };
+}
+
+function stringField(value: unknown, key: string): string {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const raw = (value as Record<string, unknown>)[key];
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+/** Loop / Save RAG: show which table this step ran for. */
+export function stepTableHint(step: ExecutionStepLog): string {
+  const fromInput = stringField(step.input, "tableName");
+  if (fromInput) return fromInput;
+  const inputItems = step.input && typeof step.input === "object" ? (step.input as { items?: unknown }).items : undefined;
+  if (Array.isArray(inputItems) && inputItems[0]) {
+    const nested = stringField(inputItems[0], "tableName");
+    if (nested) return nested;
+  }
+  const outputItems = step.output && typeof step.output === "object" ? (step.output as { items?: unknown }).items : undefined;
+  if (Array.isArray(outputItems) && outputItems[0]) {
+    const nested = stringField(outputItems[0], "tableName");
+    if (nested) return nested;
+    const documentId = stringField(outputItems[0], "documentId");
+    const fromDoc = tableNameFromDocumentId(documentId);
+    if (fromDoc) return fromDoc;
+  }
+  const documentIds =
+    step.output && typeof step.output === "object" ? (step.output as { documentIds?: unknown }).documentIds : undefined;
+  if (Array.isArray(documentIds) && typeof documentIds[0] === "string") {
+    const fromDoc = tableNameFromDocumentId(documentIds[0]);
+    if (fromDoc) return fromDoc;
+  }
+  return "";
+}
+
+function tableNameFromDocumentId(documentId: string): string {
+  const parts = documentId.split(".");
+  if (parts.length >= 3) return parts[2] ?? "";
+  return "";
+}
+
+export function stepOccurrence(steps: ExecutionStepLog[], index: number): { n: number; total: number } {
+  const nodeId = steps[index]?.nodeId;
+  if (!nodeId) return { n: 1, total: 1 };
+  let n = 0;
+  let total = 0;
+  for (let i = 0; i < steps.length; i++) {
+    if (steps[i]?.nodeId !== nodeId) continue;
+    total += 1;
+    if (i <= index) n += 1;
+  }
+  return { n, total };
+}
+
 export function executionExportPayload(selected: WorkflowExecutionRecord): string {
   return JSON.stringify(
     {

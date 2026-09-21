@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { getWorkflowExecution, listWorkflowExecutions, type WorkflowExecutionRecord } from "../../../_lib/api";
 
-import { mergeListedExecution, parseDefinitionJson } from "./workflow-execution-utils";
+import { mergeListedExecution, lastStepIndexForNode, parseDefinitionJson } from "./workflow-execution-utils";
 
 const AUTO_REFRESH_MS = 4000;
 
@@ -14,9 +14,13 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
   const [executions, setExecutions] = useState<WorkflowExecutionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<{ nodeId: string | null; index: number }>({
+    nodeId: null,
+    index: -1,
+  });
   const [autoRefresh, setAutoRefresh] = useState(false);
   const detailFetchGen = useRef(0);
+  const prevSelectedKey = useRef<string | null>(null);
 
   const load = useCallback(
     async (silent = false) => {
@@ -75,15 +79,49 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
 
   useEffect(() => {
     if (!selectedKey || !selected) {
-      setSelectedNodeId(null);
+      prevSelectedKey.current = selectedKey;
+      setSelection({ nodeId: null, index: -1 });
       return;
     }
-    setSelectedNodeId((prev) => {
-      if (prev && selected.steps.some((s) => s.nodeId === prev)) return prev;
-      if (selected.steps[0]) return selected.steps[0].nodeId;
-      return selected.pendingNodeId ?? null;
+    const keyChanged = prevSelectedKey.current !== selectedKey;
+    prevSelectedKey.current = selectedKey;
+    if (keyChanged) {
+      const first = selected.steps[0];
+      setSelection({ nodeId: first?.nodeId ?? selected.pendingNodeId ?? null, index: first ? 0 : -1 });
+      return;
+    }
+    setSelection((prev) => {
+      if (prev.index >= 0 && selected.steps[prev.index]) {
+        return { nodeId: selected.steps[prev.index]!.nodeId, index: prev.index };
+      }
+      if (prev.nodeId) {
+        const index = selected.steps.findIndex((s) => s.nodeId === prev.nodeId);
+        if (index >= 0) return { nodeId: prev.nodeId, index };
+      }
+      const first = selected.steps[0];
+      return { nodeId: first?.nodeId ?? selected.pendingNodeId ?? null, index: first ? 0 : -1 };
     });
   }, [selected, selectedKey, stepNodeIds]);
+
+  const selectNode = useCallback(
+    (nodeId: string | null) => {
+      if (!nodeId || !selected) {
+        setSelection({ nodeId, index: -1 });
+        return;
+      }
+      setSelection({ nodeId, index: lastStepIndexForNode(selected.steps, nodeId) });
+    },
+    [selected],
+  );
+
+  const selectStep = useCallback(
+    (index: number) => {
+      const step = selected?.steps[index];
+      if (!step) return;
+      setSelection({ nodeId: step.nodeId, index });
+    },
+    [selected],
+  );
 
   const fallbackDefinition = useMemo(() => parseDefinitionJson(fallbackDefinitionJson), [fallbackDefinitionJson]);
 
@@ -93,8 +131,10 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
     selected,
     selectedKey,
     setSelectedKey,
-    selectedNodeId,
-    setSelectedNodeId,
+    selectedNodeId: selection.nodeId,
+    selectedStepIndex: selection.index,
+    setSelectedNodeId: selectNode,
+    selectStep,
     autoRefresh,
     setAutoRefresh,
     load,

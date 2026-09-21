@@ -220,12 +220,16 @@ function ExecutionSplit({
   selected,
   graphDefinition,
   selectedNodeId,
+  selectedStepIndex,
   onSelectNode,
+  onSelectStep,
 }: {
   selected: WorkflowExecutionRecord;
   graphDefinition: ExecutionGraph | undefined;
   selectedNodeId: string | null;
+  selectedStepIndex: number;
   onSelectNode: (nodeId: string | null) => void;
+  onSelectStep: (index: number) => void;
 }) {
   const t = useTranslations("WorkflowEditorPage");
   const [ioCollapsed, setIoCollapsed] = useState(false);
@@ -258,13 +262,21 @@ function ExecutionSplit({
     if (syncWithCanvas) setCanvasNodeId(nodeId);
   };
 
+  const onPanelSelectStep = (index: number) => {
+    const step = selected.steps[index];
+    onSelectStep(index);
+    if (step && syncWithCanvas) setCanvasNodeId(step.nodeId);
+  };
+
   const ioPanel = (
     <WorkflowExecutionIoPanel
       executionKey={selected.executionKey}
       steps={selected.steps}
       nodes={graphNodes}
       selectedNodeId={selectedNodeId}
+      selectedStepIndex={selectedStepIndex}
       onSelectNode={onPanelSelect}
+      onSelectStep={onPanelSelectStep}
       collapsed={ioCollapsed && !poppedOut}
       onCollapsedChange={(next) => {
         setIoCollapsed(next);
@@ -328,8 +340,10 @@ export function WorkflowExecutionWorkspace({
   selected,
   graphDefinition,
   selectedNodeId,
+  selectedStepIndex,
   stopping,
   onSelectNode,
+  onSelectStep,
   onApplyDefinition,
   onCopiedToEditor,
   onReload,
@@ -339,8 +353,10 @@ export function WorkflowExecutionWorkspace({
   selected: WorkflowExecutionRecord;
   graphDefinition: ExecutionGraph | undefined;
   selectedNodeId: string | null;
+  selectedStepIndex: number;
   stopping?: boolean;
   onSelectNode: (nodeId: string | null) => void;
+  onSelectStep: (index: number) => void;
   onApplyDefinition?: (definitionJson: string) => void;
   onCopiedToEditor?: () => void;
   onReload: () => Promise<void>;
@@ -367,7 +383,9 @@ export function WorkflowExecutionWorkspace({
         selected={selected}
         graphDefinition={graphDefinition}
         selectedNodeId={selectedNodeId}
+        selectedStepIndex={selectedStepIndex}
         onSelectNode={onSelectNode}
+        onSelectStep={onSelectStep}
       />
     </div>
   );

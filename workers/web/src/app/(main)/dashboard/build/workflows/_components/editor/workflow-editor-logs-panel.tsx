@@ -66,6 +66,7 @@ export function WorkflowEditorLogsPanel({
   const steps = belongsToWorkflow ? logs.steps : [];
   const running = belongsToWorkflow && logs.running;
   const selectedNodeId = belongsToWorkflow ? logs.selectedNodeId : null;
+  const selectedStepIndex = belongsToWorkflow ? logs.selectedStepIndex : -1;
   const nodes = useMemo(() => graphNodesFromDefinition(definitionJson), [definitionJson]);
   const hasData = steps.length > 0;
   const poppedOut = logs.poppedOut;
@@ -153,7 +154,9 @@ export function WorkflowEditorLogsPanel({
               steps={steps}
               nodes={nodes}
               selectedNodeId={selectedNodeId}
+              selectedStepIndex={selectedStepIndex}
               onSelectNode={workflowEditorLogsStore.selectNode}
+              onSelectStep={workflowEditorLogsStore.selectStep}
               showInput={logs.showInput}
               showOutput={logs.showOutput}
             />
