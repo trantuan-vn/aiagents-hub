@@ -23,8 +23,20 @@ import { HIDDEN_NAV_URLS, NavItemCollapsed, NavItemExpanded } from "./nav-menu-i
 const GROUP_LABEL_CLASS =
   "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground h-9 cursor-pointer px-2 text-sm font-semibold tracking-wide select-none [&>svg]:size-4";
 
+function isPathMatch(url: string, path: string) {
+  if (!url || url === "#") {
+    return false;
+  }
+  return path === url || path.startsWith(`${url}/`);
+}
+
 function isGroupActive(group: NavGroup, path: string) {
-  return group.items.some((item) => path === item.url || path.startsWith(`${item.url}/`));
+  return group.items.some((item) => {
+    if (item.subItems?.length) {
+      return item.subItems.some((sub) => isPathMatch(sub.url, path));
+    }
+    return isPathMatch(item.url, path);
+  });
 }
 
 export interface NavGroupSectionProps {

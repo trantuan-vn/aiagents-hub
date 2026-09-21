@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import Link from "next/link";
 
 import { ChevronRight } from "lucide-react";
@@ -39,6 +41,15 @@ export const NavItemExpanded = ({
   t: (key: string) => string;
   translateTitle: (title: string) => string;
 }) => {
+  const submenuShouldOpen = isSubmenuOpen(item.subItems);
+  const [open, setOpen] = useState(submenuShouldOpen);
+
+  useEffect(() => {
+    if (submenuShouldOpen) {
+      setOpen(true);
+    }
+  }, [submenuShouldOpen]);
+
   if (!item.subItems?.length) {
     return (
       <SidebarMenuItem>
@@ -59,7 +70,7 @@ export const NavItemExpanded = ({
   }
 
   return (
-    <Collapsible asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
+    <Collapsible asChild open={open} onOpenChange={setOpen} className="group/collapsible">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
           <SidebarMenuButton

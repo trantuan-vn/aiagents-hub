@@ -20,6 +20,7 @@ import {
   Settings,
   Ticket,
   UserCircle,
+  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -80,100 +81,60 @@ export const sidebarItems: NavGroup[] = [
     label: "Dashboards",
     items: [
       {
-        title: "Default",
-        url: "/dashboard/default",
-        icon: LayoutDashboard,
-        adminOnly: true,
-      },
-      {
-        title: "CRM",
-        url: "/dashboard/crm",
+        title: "Reports",
+        url: "#",
         icon: ChartBar,
         adminOnly: true,
+        subItems: [
+          { title: "Default", url: "/dashboard/default", icon: LayoutDashboard, adminOnly: true },
+          { title: "CRM", url: "/dashboard/crm", icon: ChartBar, adminOnly: true },
+          { title: "Finance", url: "/dashboard/finance", icon: Banknote, adminOnly: true },
+          { title: "Contribution", url: "/dashboard/contribution", icon: BarChart3, adminOnly: true },
+          { title: "User Economics", url: "/dashboard/user-economics", icon: CircleDollarSign, adminOnly: true },
+        ],
       },
       {
-        title: "Finance",
-        url: "/dashboard/finance",
-        icon: Banknote,
+        title: "Members & Revenue",
+        url: "#",
+        icon: Users,
         adminOnly: true,
+        subItems: [
+          { title: "User Groups", url: "/dashboard/user-groups", icon: UserCircle, adminOnly: true },
+          { title: "Earnings Payouts", url: "/dashboard/earnings-payouts", icon: Wallet, adminOnly: true },
+          { title: "Commission Policy", url: "/dashboard/commission-policy", icon: Banknote, adminOnly: true },
+          { title: "Discount Vouchers", url: "/dashboard/voucher", icon: Ticket, adminOnly: true },
+        ],
       },
       {
-        title: "Earnings Payouts",
-        url: "/dashboard/earnings-payouts",
-        icon: Wallet,
-        adminOnly: true,
-      },
-      {
-        title: "Contribution",
-        url: "/dashboard/contribution",
-        icon: BarChart3,
-        adminOnly: true,
-      },
-      {
-        title: "Cloudflare usage",
-        url: "/dashboard/cloudflare-usage",
+        title: "Platform",
+        url: "#",
         icon: Cloud,
         adminOnly: true,
+        subItems: [
+          { title: "Cloudflare usage", url: "/dashboard/cloudflare-usage", icon: Cloud, adminOnly: true },
+          { title: "Worker errors", url: "/dashboard/cloudflare-logs", icon: Bug, adminOnly: true },
+          { title: "WebSocket Notify", url: "/dashboard/notify", icon: Send, adminOnly: true },
+        ],
       },
       {
-        title: "Worker errors",
-        url: "/dashboard/cloudflare-logs",
-        icon: Bug,
-        adminOnly: true,
-      },
-      {
-        title: "User Economics",
-        url: "/dashboard/user-economics",
-        icon: CircleDollarSign,
-        adminOnly: true,
-      },
-      {
-        title: "User Groups",
-        url: "/dashboard/user-groups",
-        icon: UserCircle,
-        adminOnly: true,
-      },
-      {
-        title: "Commission Policy",
-        url: "/dashboard/commission-policy",
-        icon: Banknote,
-        adminOnly: true,
-      },
-      {
-        title: "Discount Vouchers",
-        url: "/dashboard/voucher",
-        icon: Ticket,
-        adminOnly: true,
-      },
-      {
-        title: "Version Updates",
-        url: "/dashboard/version",
-        icon: RefreshCw,
-        adminOnly: true,
-      },
-      {
-        title: "System Configuration",
-        url: "/dashboard/system-config",
-        icon: Settings,
-        adminOnly: true,
-      },
-      {
-        title: "WebSocket Notify",
-        url: "/dashboard/notify",
-        icon: Send,
-        adminOnly: true,
-      },
-      {
-        title: "Workflow Nodes",
-        url: "/dashboard/workflow-nodes",
+        title: "Workflow",
+        url: "#",
         icon: Layers,
         adminOnly: true,
+        subItems: [
+          { title: "Workflow Nodes", url: "/dashboard/workflow-nodes", icon: Layers, adminOnly: true },
+          { title: "Service Management", url: "/dashboard/workflow/services", icon: Code, adminOnly: true },
+        ],
       },
       {
-        title: "Service Management",
-        url: "/dashboard/workflow/services",
-        icon: Code,
+        title: "System",
+        url: "#",
+        icon: Settings,
         adminOnly: true,
+        subItems: [
+          { title: "System Configuration", url: "/dashboard/system-config", icon: Settings, adminOnly: true },
+          { title: "Version Updates", url: "/dashboard/version", icon: RefreshCw, adminOnly: true },
+        ],
       },
     ],
   },
@@ -200,7 +161,8 @@ export function filterSidebarItemsByRole(items: NavGroup[], userRole?: "member" 
                 subItems: item.subItems.filter((subItem) => !subItem.adminOnly || isAdmin),
               }
             : item,
-        ),
+        )
+        .filter((item) => !item.subItems || item.subItems.length > 0),
     }))
     .filter((group) => group.items.length > 0);
 }

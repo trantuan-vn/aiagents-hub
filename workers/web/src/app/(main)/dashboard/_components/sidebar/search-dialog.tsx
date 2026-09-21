@@ -47,7 +47,20 @@ export function SearchDialog({ user }: SearchDialogProps) {
 
     filteredItems.forEach((group) => {
       group.items.forEach((item) => {
-        // Add main item
+        if (item.subItems?.length) {
+          item.subItems.forEach((subItem) => {
+            items.push({
+              group: item.title,
+              icon: subItem.icon,
+              label: subItem.title,
+              url: subItem.url,
+              disabled: subItem.comingSoon,
+              adminOnly: subItem.adminOnly,
+            });
+          });
+          return;
+        }
+
         items.push({
           group: group.label ?? "",
           icon: item.icon,
@@ -56,20 +69,6 @@ export function SearchDialog({ user }: SearchDialogProps) {
           disabled: item.comingSoon,
           adminOnly: item.adminOnly,
         });
-
-        // Add sub items if any
-        if (item.subItems) {
-          item.subItems.forEach((subItem) => {
-            items.push({
-              group: group.label ?? "",
-              icon: subItem.icon,
-              label: subItem.title,
-              url: subItem.url,
-              disabled: subItem.comingSoon,
-              adminOnly: subItem.adminOnly,
-            });
-          });
-        }
       });
     });
 
@@ -81,6 +80,11 @@ export function SearchDialog({ user }: SearchDialogProps) {
     (title: string): string => {
       const translationMap: Record<string, string> = {
         Dashboards: t("dashboards"),
+        Reports: t("admin_reports"),
+        "Members & Revenue": t("admin_members_revenue"),
+        Platform: t("admin_platform"),
+        Workflow: t("admin_workflow"),
+        System: t("admin_system"),
         Assistant: t("assistant"),
         Pages: t("pages"),
         Misc: t("misc"),

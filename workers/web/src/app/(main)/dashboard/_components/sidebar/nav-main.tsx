@@ -54,15 +54,17 @@ export function NavMain({ items, user }: NavMainProps) {
   const isAdmin = user?.role === "admin";
   const quickCreateItems = QUICK_CREATE_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
+  const isPathMatch = (url: string) => Boolean(url) && url !== "#" && (path === url || path.startsWith(`${url}/`));
+
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
-      return subItems.some((sub) => path.startsWith(sub.url));
+      return subItems.some((sub) => isPathMatch(sub.url));
     }
-    return path === url;
+    return isPathMatch(url);
   };
 
   const isSubmenuOpen = (subItems?: NavMainItem["subItems"]) => {
-    return subItems?.some((sub) => path.startsWith(sub.url)) ?? false;
+    return subItems?.some((sub) => isPathMatch(sub.url)) ?? false;
   };
 
   return (
