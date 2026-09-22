@@ -10,7 +10,7 @@ import {
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
-import { cancelWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
+import { cancelWorkflowExecution, continueFromCheckpointWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
 import { loadUserAndSyncPlan } from '../billing/billing.js';
 import { clampMinPlanId, runnerMeetsMinPlan } from '../billing/plan.js';
 import {
@@ -18,6 +18,7 @@ import {
   runFormDatabaseTrigger,
 } from '../triggers/form-trigger-runner.js';
 import { getExecutionByKey, listExecutions } from '../execution/execution-store.js';
+import { resolveStalledExecutions } from '../execution/execution-stall.js';
 import { createCredential, deleteCredential, listCredentials } from '../storage/credentials.js';
 import {
   createTrigger,
@@ -430,7 +431,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
       const userDO = getUserDO(c, user.identifier);
-      const rows = await listExecutions(userDO, id, limit);
+      const rows = await resolveStalledExecutions(userDO, await listExecutions(userDO, id, limit));
       return c.json({ executions: rows.map(parseExecutionRow) });
     }, 'Failed to list executions'),
   );
@@ -440,8 +441,9 @@ export function createWorkflowRoutes(bindingName: string) {
     createRouteHandler(async (c: any, user: any) => {
       const executionKey = c.req.param('executionKey');
       const userDO = getUserDO(c, user.identifier);
-      const row = await getExecutionByKey(userDO, executionKey);
+      let row = await getExecutionByKey(userDO, executionKey);
       if (!row) return c.json({ error: 'Execution not found' }, 404);
+      [row] = await resolveStalledExecutions(userDO, [row]);
       const parsed = parseExecutionRow(row);
       return c.json({
         execution: parsed,
@@ -457,7 +459,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const limit = Math.min(200, parseInt(c.req.query('limit') || '50', 10));
       const userDO = getUserDO(c, user.identifier);
-      const rows = await listExecutions(userDO, id, limit);
+      const rows = await resolveStalledExecutions(userDO, await listExecutions(userDO, id, limit));
       return c.json({ stats: computeExecutionStats(rows) });
     }, 'Failed to get execution stats'),
   );
@@ -513,6 +515,20 @@ export function createWorkflowRoutes(bindingName: string) {
       });
       return c.json(result);
     }, 'Failed to resume execution'),
+  );
+
+  app.post(
+    '/executions/:executionKey/continue',
+    createRouteHandler(async (c: any, user: any) => {
+      const executionKey = c.req.param('executionKey');
+      const result = await continueFromCheckpointWorkflowExecution({
+        c,
+        bindingName,
+        user,
+        executionKey,
+      });
+      return c.json(result);
+    }, 'Failed to continue execution'),
   );
 
   app.post(

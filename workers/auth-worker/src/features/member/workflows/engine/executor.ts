@@ -46,6 +46,7 @@ import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cance
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
+import { enqueueWorkflowContinue } from '../execution/workflow-continue.js';
 
 /** Wall-clock budget per durable slice (form / continue alarm). */
 export const DURABLE_SLICE_WALL_MS = 18_000;
@@ -495,6 +496,15 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     if (live?.status === 'cancelled') {
       await emitProgress({ type: 'finished', status: 'cancelled' });
       return { status: 'cancelled', output: engine.finalOutput ?? { stopped: true } };
+    }
+    // Stall watchdog (or continue-dispatch error) marked failed while this
+    // slice was still alive — stop between nodes so we do not resurrect it.
+    if (live?.status === 'failed') {
+      await emitProgress({ type: 'finished', status: 'failed' });
+      return {
+        status: 'failed',
+        output: { error: live.error || 'Execution failed', stopped: true },
+      };
     }
 
     const nodeId = engine.queue.shift()!;
@@ -1077,12 +1087,25 @@ export async function continueWorkflowExecution(params: {
     rawState = {};
   }
   if (isTruncatedStub(rawState) || !rawState || typeof rawState !== 'object') {
+    const message = 'Execution state missing; cannot continue';
+    await updateExecution(userDO, record.id, {
+      status: 'failed',
+      error: message,
+      finishedAt: Date.now(),
+      pendingNodeId: '',
+    });
+    await broadcastWorkflowExecutionProgress(userDO, {
+      workflowId: record.workflowId,
+      executionKey,
+      type: 'finished',
+      status: 'failed',
+    });
     return {
       status: 'failed',
       executionKey,
       workflowId: record.workflowId,
       workflowOwnerId: record.workflowOwnerId,
-      output: { error: 'Execution state missing; cannot continue' },
+      output: { error: message },
       steps: [],
       totalCostVnd: record.totalCostVnd ?? 0,
     };
@@ -1267,6 +1290,180 @@ export async function resumeWorkflowExecution(params: {
     totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
     pendingNodeId: result.pendingNodeId,
+  };
+}
+
+/**
+ * Mark a durable execution failed when the continue alarm/slice crashes
+ * without a normal engine result (queue drop / DO kill / uncaught throw).
+ */
+export async function markWorkflowExecutionFailed(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  executionKey: string;
+  error: string;
+  runnerDoIdString?: string;
+}): Promise<void> {
+  const userDO = resolveRunnerDO(
+    params.c,
+    params.bindingName,
+    params.user.identifier,
+    params.runnerDoIdString,
+  );
+  const record = await getExecutionByKey(userDO, params.executionKey);
+  if (!record) return;
+  if (record.status !== 'running' && record.status !== 'pending_human') return;
+
+  const message = String(params.error || 'Execution failed').slice(0, 2000);
+  await updateExecution(userDO, record.id, {
+    status: 'failed',
+    error: message,
+    finishedAt: Date.now(),
+    pendingNodeId: '',
+  });
+  try {
+    await broadcastWorkflowExecutionProgress(userDO, {
+      workflowId: record.workflowId,
+      executionKey: params.executionKey,
+      type: 'finished',
+      status: 'failed',
+    });
+  } catch {
+    /* best-effort */
+  }
+}
+
+/**
+ * If the last step failed, the node was already dequeued and never visited —
+ * put it back so Resume retries that node (Save-RAG then skips indexed tables).
+ */
+function requeueLastFailedStep(engine: PersistedState['engine']): void {
+  const steps = engine.steps ?? [];
+  for (let i = steps.length - 1; i >= 0; i--) {
+    const step = steps[i];
+    if (step?.status !== 'error' || !step.nodeId) continue;
+    const nodeId = step.nodeId;
+    engine.visited = (engine.visited ?? []).filter((id) => id !== nodeId);
+    engine.skipped = (engine.skipped ?? []).filter((id) => id !== nodeId);
+    if (!engine.queue.includes(nodeId)) {
+      engine.queue.unshift(nodeId);
+    }
+    // Drop the failed step so a successful retry does not keep a stale error row.
+    engine.steps = steps.slice(0, i);
+    return;
+  }
+}
+
+/**
+ * Resume a failed (or cancelled-with-checkpoint) run from the persisted engine
+ * snapshot. Enqueues a durable continue slice so long Save-RAG loops do not
+ * block the HTTP request.
+ */
+export async function continueFromCheckpointWorkflowExecution(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  executionKey: string;
+}): Promise<WorkflowExecutionResult> {
+  const { c, bindingName, user, executionKey } = params;
+  const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+
+  const record = await getExecutionByKey(userDO, executionKey);
+  if (!record) throw new Error('Execution not found');
+
+  if (record.status === 'running') {
+    // Idempotent: already continuing (e.g. double-click Resume).
+    return {
+      status: 'running',
+      executionKey,
+      workflowId: record.workflowId,
+      workflowOwnerId: record.workflowOwnerId,
+      steps: [],
+      totalCostVnd: record.totalCostVnd ?? 0,
+      totalCreditsCharged: record.totalCreditsCharged ?? record.totalCostVnd ?? 0,
+      totalCreditsRoyalty: record.totalCreditsRoyalty ?? record.totalRoyaltyUsd ?? 0,
+      totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
+    };
+  }
+
+  if (record.status !== 'failed' && record.status !== 'cancelled') {
+    throw new Error(`Execution cannot be resumed from checkpoint (status: ${record.status})`);
+  }
+
+  let rawState: unknown;
+  try {
+    rawState = JSON.parse(record.state || '{}') as unknown;
+  } catch {
+    rawState = {};
+  }
+  if (isTruncatedStub(rawState) || !rawState || typeof rawState !== 'object') {
+    throw new Error('Execution state missing; cannot resume from checkpoint');
+  }
+
+  const persisted = rawState as PersistedState;
+  if (!persisted.engine || typeof persisted.engine !== 'object') {
+    throw new Error('Execution engine snapshot missing; cannot resume from checkpoint');
+  }
+
+  if (persisted.definitionOmitted || !Array.isArray(persisted.definition?.nodes)) {
+    const resolved = await resolveWorkflow(
+      c,
+      bindingName,
+      user.identifier,
+      record.workflowId,
+      record.workflowOwnerId,
+    );
+    persisted.definition = resolved.definition;
+    persisted.definitionOmitted = false;
+    persisted.meta = persisted.meta ?? {
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      isOwnedByUser: resolved.isOwnedByUser,
+      workflowName: String(resolved.workflow.name ?? ''),
+    };
+  }
+
+  requeueLastFailedStep(persisted.engine);
+
+  const hasWork =
+    (persisted.engine.queue?.length ?? 0) > 0 ||
+    Object.keys(persisted.engine.loopStates ?? {}).length > 0;
+  if (!hasWork) {
+    throw new Error('No remaining work in the checkpoint; start a new run instead');
+  }
+
+  await updateExecution(userDO, record.id, {
+    status: 'running',
+    error: '',
+    finishedAt: 0,
+    pendingNodeId: '',
+    state: serializePersistedState(persisted as unknown as Record<string, unknown>),
+  });
+
+  await enqueueWorkflowContinue(userDO, {
+    executionKey,
+    bindingName,
+    identifier: user.identifier,
+  });
+
+  await broadcastWorkflowExecutionProgress(userDO, {
+    workflowId: record.workflowId,
+    executionKey,
+    type: 'started',
+    status: 'running',
+  });
+
+  return {
+    status: 'running',
+    executionKey,
+    workflowId: record.workflowId,
+    workflowOwnerId: record.workflowOwnerId,
+    steps: persisted.engine.steps ?? [],
+    totalCostVnd: record.totalCostVnd ?? 0,
+    totalCreditsCharged: record.totalCreditsCharged ?? record.totalCostVnd ?? 0,
+    totalCreditsRoyalty: record.totalCreditsRoyalty ?? record.totalRoyaltyUsd ?? 0,
+    totalRoyaltyUsd: record.totalRoyaltyUsd ?? 0,
   };
 }
 

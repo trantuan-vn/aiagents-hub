@@ -49,11 +49,16 @@ export function useWorkflowExecutions(workflowId: number, fallbackDefinitionJson
     void load();
   }, [load]);
 
+  const hasActiveRun = useMemo(
+    () => executions.some((row) => row.status === "running" || row.status === "pending_human"),
+    [executions],
+  );
+
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh && !hasActiveRun) return;
     const id = window.setInterval(() => void load(true), AUTO_REFRESH_MS);
     return () => window.clearInterval(id);
-  }, [autoRefresh, load]);
+  }, [autoRefresh, hasActiveRun, load]);
 
   const selected = useMemo(
     () => executions.find((e) => e.executionKey === selectedKey) ?? null,

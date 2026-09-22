@@ -20,4 +20,10 @@ describe('stop execution', () => {
     expect(persistStatusHonoringCancel('running', 'completed')).toBe('completed');
     expect(persistStatusHonoringCancel('running', 'pending_human')).toBe('pending_human');
   });
+
+  it('keeps stall/failed when a zombie slice later finishes', () => {
+    expect(persistStatusHonoringCancel('failed', 'completed')).toBe('failed');
+    expect(persistStatusHonoringCancel('failed', 'running')).toBe('failed');
+    expect(persistStatusHonoringCancel('failed', 'failed')).toBe('failed');
+  });
 });

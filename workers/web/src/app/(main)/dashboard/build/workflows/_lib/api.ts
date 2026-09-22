@@ -285,6 +285,14 @@ export function resumeWorkflowExecution(
   );
 }
 
+/** Continue a failed/stalled run from the last durable checkpoint. */
+export function continueWorkflowExecution(executionKey: string) {
+  return apiFetch<WorkflowExecutionResult>(
+    `/dashboard/build/workflows/executions/${executionKey}/continue`,
+    { method: "POST" },
+  );
+}
+
 export function cancelWorkflowExecution(executionKey: string) {
   return apiFetch<WorkflowExecutionResult>(
     `/dashboard/build/workflows/executions/${executionKey}/cancel`,

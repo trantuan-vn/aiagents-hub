@@ -1,4 +1,4 @@
-import { continueWorkflowExecution } from '../engine/executor.js';
+import { continueWorkflowExecution, markWorkflowExecutionFailed } from '../engine/executor.js';
 import { broadcastFormSubmissionResult } from '../triggers/form-submission.js';
 import {
   WORKFLOW_CONTINUE_AT_KEY,
@@ -113,11 +113,24 @@ export async function dispatchOneWorkflowContinue(params: {
       await notifyFormIfNeeded(params.env, job, result.status);
     }
   } catch (e) {
-    console.error(
-      '[workflow-continue] dispatch failed',
-      job.executionKey,
-      e instanceof Error ? e.message : String(e),
-    );
+    const message = e instanceof Error ? e.message : String(e);
+    console.error('[workflow-continue] dispatch failed', job.executionKey, message);
+    try {
+      await markWorkflowExecutionFailed({
+        c: { env: params.env },
+        bindingName: job.bindingName,
+        user: { identifier: job.identifier || params.identifier },
+        executionKey: job.executionKey,
+        runnerDoIdString: job.runnerDoIdString ?? params.runnerDoIdString,
+        error: `Continue slice failed: ${message}`,
+      });
+    } catch (markErr) {
+      console.error(
+        '[workflow-continue] mark failed',
+        job.executionKey,
+        markErr instanceof Error ? markErr.message : markErr,
+      );
+    }
     try {
       await notifyFormIfNeeded(params.env, job, 'failed');
     } catch {

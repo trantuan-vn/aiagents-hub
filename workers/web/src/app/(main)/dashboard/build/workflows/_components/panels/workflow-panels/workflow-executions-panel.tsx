@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
-import { cancelWorkflowExecution } from "../../../_lib/api";
+import { cancelWorkflowExecution, continueWorkflowExecution } from "../../../_lib/api";
 
 import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout/workflow-resize-handle";
 import { useWorkflowExecutions } from "./use-workflow-executions";
@@ -51,6 +51,7 @@ export function WorkflowExecutionsPanel({
   const [searchOpen, setSearchOpen] = useState(false);
   const [listCollapsed, setListCollapsed] = useState(false);
   const [stoppingKey, setStoppingKey] = useState<string | null>(null);
+  const [continuingKey, setContinuingKey] = useState<string | null>(null);
   const {
     executions,
     loading,
@@ -80,6 +81,20 @@ export function WorkflowExecutionsPanel({
     }
   };
 
+  const onContinue = async (executionKey: string) => {
+    setContinuingKey(executionKey);
+    try {
+      await continueWorkflowExecution(executionKey);
+      toast.success(t("executions_continue_done"));
+      setAutoRefresh(true);
+      await load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t("executions_continue_failed"));
+    } finally {
+      setContinuingKey(null);
+    }
+  };
+
   useEffect(() => {
     setListCollapsed(readListCollapsed());
   }, []);
@@ -98,12 +113,14 @@ export function WorkflowExecutionsPanel({
       selectedNodeId={selectedNodeId}
       selectedStepIndex={selectedStepIndex}
       stopping={stoppingKey === selected.executionKey}
+      continuing={continuingKey === selected.executionKey}
       onSelectNode={setSelectedNodeId}
       onSelectStep={selectStep}
       onApplyDefinition={onApplyDefinition}
       onCopiedToEditor={onCopiedToEditor}
       onReload={() => load(true)}
       onStop={() => void onStop(selected.executionKey)}
+      onContinue={() => void onContinue(selected.executionKey)}
     />
   ) : (
     <div className="flex h-full items-center justify-center">

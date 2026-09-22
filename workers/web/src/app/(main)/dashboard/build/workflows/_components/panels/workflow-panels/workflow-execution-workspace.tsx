@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Copy, Download, Square, Wand2 } from "lucide-react";
+import { Copy, Download, Play, Square, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -37,13 +37,17 @@ function exportExecution(selected: WorkflowExecutionRecord) {
 function ExecutionMetaBar({
   selected,
   stopping,
+  continuing,
   onStop,
+  onContinue,
   onApplyDefinition,
   onCopiedToEditor,
 }: {
   selected: WorkflowExecutionRecord;
   stopping?: boolean;
+  continuing?: boolean;
   onStop?: () => void;
+  onContinue?: () => void;
   onApplyDefinition?: (definitionJson: string) => void;
   onCopiedToEditor?: () => void;
 }) {
@@ -62,6 +66,8 @@ function ExecutionMetaBar({
       toast.error(selected.executionKey);
     }
   };
+  const canContinue =
+    (selected.status === "failed" || selected.status === "cancelled") && !!onContinue;
 
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-2">
@@ -90,6 +96,18 @@ function ExecutionMetaBar({
         })}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        {canContinue ? (
+          <Button
+            size="sm"
+            variant="default"
+            className="h-7 text-xs"
+            onClick={onContinue}
+            disabled={continuing}
+          >
+            <Play className="size-3 fill-current" />
+            {continuing ? t("executions_resuming") : t("executions_continue")}
+          </Button>
+        ) : null}
         {selected.status === "running" && onStop ? (
           <Button
             size="sm"
@@ -342,12 +360,14 @@ export function WorkflowExecutionWorkspace({
   selectedNodeId,
   selectedStepIndex,
   stopping,
+  continuing,
   onSelectNode,
   onSelectStep,
   onApplyDefinition,
   onCopiedToEditor,
   onReload,
   onStop,
+  onContinue,
 }: {
   workflowId: number;
   selected: WorkflowExecutionRecord;
@@ -355,19 +375,23 @@ export function WorkflowExecutionWorkspace({
   selectedNodeId: string | null;
   selectedStepIndex: number;
   stopping?: boolean;
+  continuing?: boolean;
   onSelectNode: (nodeId: string | null) => void;
   onSelectStep: (index: number) => void;
   onApplyDefinition?: (definitionJson: string) => void;
   onCopiedToEditor?: () => void;
   onReload: () => Promise<void>;
   onStop?: () => void;
+  onContinue?: () => void;
 }) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <ExecutionMetaBar
         selected={selected}
         stopping={stopping}
+        continuing={continuing}
         onStop={onStop}
+        onContinue={onContinue}
         onApplyDefinition={onApplyDefinition}
         onCopiedToEditor={onCopiedToEditor}
       />
