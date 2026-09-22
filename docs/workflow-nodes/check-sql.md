@@ -74,7 +74,7 @@ Khi agent có cả `get_rag` và `check_sql`:
 2. Model viết một SELECT.
 3. `check_sql({ sql })`.
 4. `ok: true` → đưa SQL đó vào output `sql`, kết thúc nhánh SQL.
-5. `ok: false` → reflect, viết lại SQL, gọi `check_sql` lần nữa. Dừng khi hết `maxReflectRetries` hoặc không cải thiện (`noImprovementLimit`).
+5. `ok: false` → gọi lại `get_rag` (query tập trung lỗi Oracle / identifier thiếu), viết lại SQL, gọi `check_sql` lần nữa. Dừng khi hết `maxReflectRetries` hoặc không cải thiện (`noImprovementLimit`).
 6. Hết lượt mà chưa `ok` → output `sql` rỗng, `text` nói câu chưa chạy được và kèm lỗi Oracle cuối. Không bịa là đã chạy thành công.
 
 `extractSql` chỉ nhận SQL từ lần `check_sql` thành công gần nhất, không lấy SQL trong prose chưa được kiểm.

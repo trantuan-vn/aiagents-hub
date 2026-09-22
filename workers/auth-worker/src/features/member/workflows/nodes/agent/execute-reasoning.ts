@@ -568,7 +568,7 @@ export async function executeReasoningAgent(
       ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
       : `If you lack required details, say so and ask. Do not guess.`,
     hasCheckSql
-      ? 'After writing a SELECT, call check_sql to verify it on Oracle. Only treat SQL as final when check_sql returns ok: true. If ok: false, fix the SQL using the Oracle error and call check_sql again. If you cannot get ok: true, say the statement did not run and include the last Oracle error — do not claim success.'
+      ? 'SQL loop: draft SELECT → check_sql. On ok: false, call get_rag again (focused on the Oracle error / missing identifiers), rewrite SQL, then check_sql again. Final answer only after check_sql ok: true; otherwise report the last Oracle error and do not claim success.'
       : '',
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',

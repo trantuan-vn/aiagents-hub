@@ -83,10 +83,18 @@ describe('reasoning plan and tools', () => {
   it('omits get_rag when snippets are already grounded', () => {
     const tools = {
       get_rag: { description: 'search', execute: async () => ({}) },
+      http_search: { description: 'http', execute: async () => ({}) },
+    } as never;
+    expect(Object.keys(omitGetRagWhenGrounded(tools, false)).sort()).toEqual(['get_rag', 'http_search']);
+    expect(Object.keys(omitGetRagWhenGrounded(tools, true))).toEqual(['http_search']);
+  });
+
+  it('keeps get_rag when check_sql is linked even if already grounded', () => {
+    const tools = {
+      get_rag: { description: 'search', execute: async () => ({}) },
       check_sql: { description: 'validate', execute: async () => ({}) },
     } as never;
-    expect(Object.keys(omitGetRagWhenGrounded(tools, false))).toEqual(['get_rag', 'check_sql']);
-    expect(Object.keys(omitGetRagWhenGrounded(tools, true))).toEqual(['check_sql']);
+    expect(Object.keys(omitGetRagWhenGrounded(tools, true)).sort()).toEqual(['check_sql', 'get_rag']);
   });
 
   it('takes sql only from the last successful check_sql observation', () => {

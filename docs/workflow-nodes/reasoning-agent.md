@@ -55,7 +55,7 @@ Giá trị lấy từ panel node (literal hoặc `{{ $json… }}` map từ INPUT
 
 Nguyên tắc mặc định: **giữ bản nháp điểm cao nhất**, thử thêm một vòng sau khi đã đủ chất lượng, **dừng ngay khi vòng sau không tốt hơn**, hoặc hết `maxReflectRetries`. Heuristic SQL (từ câu hỏi + snippet schema, không hardcode tên bảng): thiếu SQL thì chưa coi là đủ dùng.
 
-Prompt mặc định: `REASONING_AGENT_PROMPT` / `REASONING_AGENT_SYSTEM_PROMPT` — **không** dùng SQL preset.
+Prompt mặc định: `REASONING_AGENT_PROMPT` / `REASONING_AGENT_SYSTEM_PROMPT` (Text-to-SQL + vòng `get_rag` / `check_sql`).
 
 ## 4. Runtime files
 
@@ -75,10 +75,12 @@ Khi canvas nối Get RAG và Check SQL vào handle `tools`:
 1. `get_rag` với câu hỏi user — schema cột (mô tả VI/EN) và SQL example của bảng liên quan ([`getRag.md`](./getRag.md)).
 2. Model viết một SELECT từ snippet đó.
 3. `check_sql` chạy thử trên Oracle ([`check-sql.md`](./check-sql.md)).
-4. `ok: false` → sửa SQL và gọi lại, trong `maxReflectRetries`.
+4. `ok: false` → gọi lại `get_rag` (query tập trung vào lỗi Oracle / identifier thiếu), sửa SQL, rồi `check_sql` lại, trong `maxReflectRetries` / tool budget.
 5. Output `sql` chỉ lấy từ lần `check_sql` trả `ok: true`.
 
 `toolClass: validate` không đi qua cổng `persist`. Get DB Info không nằm trên vòng này: agent không introspect catalog lúc hỏi.
+
+Default `REASONING_AGENT_SYSTEM_PROMPT` mô tả vòng get_rag → check_sql → (fail → get_rag lại) → check_sql.
 
 ## 6. Anti-patterns
 

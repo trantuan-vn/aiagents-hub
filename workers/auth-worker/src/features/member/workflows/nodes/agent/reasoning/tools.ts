@@ -82,7 +82,7 @@ export function decorateToolDescription(name: string, description: string): stri
       : kind === 'persist'
         ? 'When to use: only if the user or plan asks to store knowledge. When not: routine Q&A.'
         : kind === 'validate'
-          ? 'When to use: after writing SQL, to verify it runs. When not: before you have a candidate query.'
+          ? 'When to use: after drafting SQL, to verify it on Oracle. When check_sql fails: call get_rag again for more schema/examples, then rewrite and re-check. When not: before you have a candidate query.'
           : kind === 'http_write'
             ? 'When to use: only when the plan explicitly requires a write. When not: guessing IDs or destructive actions.'
             : kind === 'ask'
@@ -91,11 +91,14 @@ export function decorateToolDescription(name: string, description: string): stri
   return `${description} ${when}`.trim();
 }
 
-/** Drop get_rag from the tool loop when upstream / prefetch already supplied snippets. */
+/** Drop get_rag from the tool loop when upstream / prefetch already supplied snippets.
+ * Keep get_rag when check_sql is linked so a failed validate can re-retrieve schema. */
 export function omitGetRagWhenGrounded<T extends ToolSet>(tools: T, alreadyGrounded: boolean): T {
   if (!alreadyGrounded) return tools;
+  const names = Object.keys(tools);
+  if (names.some((n) => /check[_-]?sql/i.test(n))) return tools;
   const next = { ...tools } as T;
-  for (const name of Object.keys(next)) {
+  for (const name of names) {
     if (/get[_-]?rag/i.test(name)) {
       delete (next as Record<string, unknown>)[name];
     }
