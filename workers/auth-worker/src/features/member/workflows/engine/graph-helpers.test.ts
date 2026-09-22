@@ -32,9 +32,41 @@ describe('loop connection passthrough', () => {
     expect(result.output.user).toBe('ADMIN');
     expect(result.output.password).toBe('secret');
     expect(result.output.connectString).toBe('dsn');
-    expect(result.output.tables).toEqual(['ORDERS', 'USERS']);
+    // Full table lists stay on Get DB Info — not copied onto every batch (checkpoint bloat).
+    expect(result.output.tables).toBeUndefined();
+    expect(result.loopState?.connectionCtx?.tables).toBeUndefined();
     expect(result.loopState?.connectionCtx?.password).toBe('secret');
     expect(result.output.tableName).toBe('ORDERS');
+  });
+
+  it('stores slim iteration outputs instead of full Save RAG payloads', () => {
+    const first = executeLoopOverItems(
+      { batchSize: 1, itemsField: '{{ $json.items }}' },
+      {
+        items: [{ tableName: 'ORDERS' }, { tableName: 'USERS' }],
+        connection: { type: 'oracle', user: 'ADMIN', password: 'secret', connectString: 'dsn' },
+      },
+      undefined,
+      false,
+    );
+    const returned = executeLoopOverItems(
+      { batchSize: 1, itemsField: '{{ $json.items }}' },
+      {},
+      first.loopState ?? undefined,
+      true,
+      {
+        ok: true,
+        saved: 4,
+        tables: ['ORDERS'],
+        documentIds: ['a', 'b'],
+        items: [{ content: 'x'.repeat(50_000) }],
+        raw: { usage: { inputTokens: 99 } },
+      },
+    );
+    expect(returned.loopState?.iterationOutputs).toEqual([
+      { ok: true, saved: 4, tables: ['ORDERS'], documentIds: ['a', 'b'] },
+    ]);
+    expect(JSON.stringify(returned.loopState?.iterationOutputs).length).toBeLessThan(500);
   });
 
   it('uses itemsField expression and flattens the current loop item', () => {

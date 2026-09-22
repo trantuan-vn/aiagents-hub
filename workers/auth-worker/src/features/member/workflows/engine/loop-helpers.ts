@@ -53,10 +53,51 @@ function flattenCurrentItem(batch: unknown[]): Record<string, unknown> {
   return {};
 }
 
-/** Forward the previous node's output (minus the iterated list) onto each loop batch. */
+/** Keys that must not be copied onto every loop batch (lists bloat checkpoints). */
+const LOOP_CONTEXT_OMIT = new Set([
+  'items',
+  'parents',
+  'tables',
+  'count',
+  'tableCount',
+  'iterationOutputs',
+  'batchIndex',
+  'batchSize',
+  'totalBatches',
+  'loopCompleted',
+  'flowKind',
+  'activeBranches',
+  '_loopState',
+]);
+
+/** Forward credentials / schema from the previous node onto each loop batch. */
 export function connectionContextFromInput(input: NodeOutput): Record<string, unknown> {
-  const { items, parents, ...rest } = input;
+  const rest: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(input)) {
+    if (LOOP_CONTEXT_OMIT.has(key)) continue;
+    rest[key] = value;
+  }
   return rest;
+}
+
+/** Keep loop return payloads tiny — full Save RAG docs must not accumulate in loopStates. */
+export function slimIterationOutput(output: NodeOutput): Record<string, unknown> {
+  const tables = Array.isArray(output.tables)
+    ? output.tables.map((t) => String(t)).filter(Boolean).slice(0, 50)
+    : undefined;
+  const documentIds = Array.isArray(output.documentIds)
+    ? output.documentIds.map((id) => String(id)).filter(Boolean).slice(0, 20)
+    : undefined;
+  const slim: Record<string, unknown> = {};
+  if (output.ok != null) slim.ok = output.ok;
+  if (output.saved != null) slim.saved = output.saved;
+  if (output.skipped != null) slim.skipped = output.skipped;
+  if (output.error != null) slim.error = String(output.error).slice(0, 500);
+  if (output.tableName != null) slim.tableName = String(output.tableName);
+  if (tables?.length) slim.tables = tables;
+  if (documentIds?.length) slim.documentIds = documentIds;
+  if (output.collection != null) slim.collection = String(output.collection);
+  return slim;
 }
 
 export function executeLoopOverItems(
@@ -88,7 +129,7 @@ export function executeLoopOverItems(
   const connectionCtx = state.connectionCtx ?? incomingConnection;
 
   if (isReturn && returnOutput) {
-    state.iterationOutputs.push(returnOutput);
+    state.iterationOutputs.push(slimIterationOutput(returnOutput));
     state.currentBatchIndex++;
   }
 

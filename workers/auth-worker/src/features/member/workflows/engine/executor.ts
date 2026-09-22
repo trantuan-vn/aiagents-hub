@@ -20,6 +20,7 @@ import {
   isEdgeActiveForBranches,
 } from './flow-helpers.js';
 import {
+  executeLoopOverItems,
   isLoopOverItemsNode,
   resetLoopSubgraphVisited,
   type LoopState,
@@ -47,6 +48,7 @@ import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
 import { enqueueWorkflowContinue } from '../execution/workflow-continue.js';
+import { pipelineItems } from '../nodes/tool/shared/pipeline.js';
 
 /** Wall-clock budget per durable slice (form / continue alarm). */
 export const DURABLE_SLICE_WALL_MS = 18_000;
@@ -1356,6 +1358,31 @@ function requeueLastFailedStep(engine: PersistedState['engine']): void {
 }
 
 /**
+ * Older checkpoints may have clipped loop outputs to `items: []` while still
+ * holding a valid loopStates cursor. Rebuild the current batch so Save RAG
+ * can resume instead of throwing "no table item from upstream".
+ */
+function repairLoopOutputsForResume(engine: PersistedState['engine']): void {
+  const states = engine.loopStates ?? {};
+  for (const [loopId, state] of Object.entries(states)) {
+    if (!state?.items?.length) continue;
+    const existing = engine.outputs[loopId] ?? {};
+    if (pipelineItems(existing).length > 0) continue;
+    const result = executeLoopOverItems(
+      { batchSize: state.batchSize, flowKind: 'loop_over_items' },
+      state.connectionCtx ?? {},
+      state,
+      false,
+    );
+    engine.outputs[loopId] = {
+      ...result.output,
+      flowKind: 'loop_over_items',
+      activeBranches: [...result.activeHandles],
+    };
+  }
+}
+
+/**
  * Resume a failed (or cancelled-with-checkpoint) run from the persisted engine
  * snapshot. Enqueues a durable continue slice so long Save-RAG loops do not
  * block the HTTP request.
@@ -1425,6 +1452,7 @@ export async function continueFromCheckpointWorkflowExecution(params: {
   }
 
   requeueLastFailedStep(persisted.engine);
+  repairLoopOutputsForResume(persisted.engine);
 
   const hasWork =
     (persisted.engine.queue?.length ?? 0) > 0 ||
