@@ -1,7 +1,12 @@
 import { addEdge, type Connection, type Edge, type Node } from "@xyflow/react";
 
 import type { ConnectedNodeSide } from "../canvas/workflow-canvas-ui-context";
-import { isResourceEdge, type WorkflowHandleId } from "../edges/workflow-connection-utils";
+import {
+  isResourceEdge,
+  normalizeResourceConnection,
+  withoutReplacedResourceEdge,
+  type WorkflowHandleId,
+} from "../edges/workflow-connection-utils";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
 import { WORKFLOW_CONNECT_OFFSET_X } from "./workflow-placement-constants";
 import { computeNewResourceNodePosition } from "./workflow-resource-layout";
@@ -43,6 +48,13 @@ function existingResourcesForAgent(nodes: Node[], edges: Edge[], agentId: string
   return nodes.filter((node) => resourceIds.has(node.id) && RESOURCE_NODE_TYPES.has(node.type ?? ""));
 }
 
+/** Host handle on Agent/Save RAG → source handle on the resource node being created. */
+function resourceSourceHandle(hostHandle: WorkflowHandleId): WorkflowHandleId {
+  // Save RAG `llm` accepts a chat Service; service_node only exposes `service`.
+  if (hostHandle === "llm") return "service";
+  return hostHandle;
+}
+
 function buildResourcePlacement(
   fromNode: Node,
   handle: WorkflowHandleId,
@@ -59,7 +71,7 @@ function buildResourcePlacement(
     position,
     connection: {
       source: "",
-      sourceHandle: handle,
+      sourceHandle: resourceSourceHandle(handle),
       target: fromNode.id,
       targetHandle: handle,
     },
@@ -133,14 +145,16 @@ export function applyCreateConnectedNode(
     data: { label: args.label, ...data },
   };
 
+  const nextNodes = [...nodes, newNode];
+  const normalized = normalizeResourceConnection(conn, nextNodes);
   const nextEdges = addEdge(
     normalizeWorkflowEdge({
-      ...conn,
+      ...normalized,
       animated: false,
       style: args.side === "resource" ? { strokeDasharray: "6 4" } : undefined,
     }),
-    edges,
+    withoutReplacedResourceEdge(edges, normalized),
   );
 
-  return { nodes: [...nodes, newNode], edges: nextEdges };
+  return { nodes: nextNodes, edges: nextEdges };
 }

@@ -229,7 +229,17 @@ export function getConnectedAgentId(
     const edge = edges.find(
       (e) => e.source === resourceNodeId && e.sourceHandle === handle && e.targetHandle === handle,
     );
-    return edge?.target ?? null;
+    if (edge) return edge.target ?? null;
+    // Save RAG LLM: service_node.service → save-rag.llm
+    if (handle === "service") {
+      const llmEdge = edges.find(
+        (e) =>
+          e.source === resourceNodeId &&
+          e.sourceHandle === "service" &&
+          e.targetHandle === "llm",
+      );
+      if (llmEdge) return llmEdge.target ?? null;
+    }
   }
 
   for (const resourceHandle of RESOURCE_HANDLES) {
@@ -242,7 +252,13 @@ export function getConnectedAgentId(
     if (edge) return edge.target;
   }
 
-  return null;
+  const llmEdge = edges.find(
+    (e) =>
+      e.source === resourceNodeId &&
+      e.sourceHandle === "service" &&
+      e.targetHandle === "llm",
+  );
+  return llmEdge?.target ?? null;
 }
 
 /** Node id whose upstream data-flow output should populate the INPUT panel. */
