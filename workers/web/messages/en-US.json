@@ -3210,6 +3210,8 @@
     "executions_copy_to_editor": "Copy to editor",
     "executions_copied_to_editor": "Graph copied to the editor.",
     "executions_export": "Export",
+    "executions_export_done": "Support pack downloaded.",
+    "executions_export_failed": "Could not export this run.",
     "executions_copied_id": "Execution ID copied",
     "executions_input": "Input",
     "executions_output": "Output",

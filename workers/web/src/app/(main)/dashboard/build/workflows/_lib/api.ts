@@ -206,10 +206,32 @@ export function executeWorkflow(
 }
 
 export function listWorkflowExecutions(id: number, limit = 50) {
-  return apiFetch<{ executions: WorkflowExecutionRecord[] }>(
-    `/dashboard/build/workflows/${id}/executions?limit=${limit}`,
-    { cache: "no-store" },
+  return apiFetch<{
+    executions: WorkflowExecutionRecord[];
+    retention?: { planId: string; max: number; days: number };
+  }>(`/dashboard/build/workflows/${id}/executions?limit=${limit}`, { cache: "no-store" });
+}
+
+/** Download support ZIP (redacted DO stateCore) for one execution. */
+export async function downloadWorkflowExecutionExport(executionKey: string): Promise<void> {
+  const res = await fetch(
+    `${API_BASE_URL}/dashboard/build/workflows/executions/${executionKey}/export`,
+    { credentials: "include", cache: "no-store" },
   );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const filename = match?.[1] ?? `execution-${executionKey.slice(0, 8)}-support.zip`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export interface WorkflowExecutionStats {

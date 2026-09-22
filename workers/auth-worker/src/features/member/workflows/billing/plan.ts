@@ -62,6 +62,10 @@ export type PlanEntitlement = {
   maxCreditBalance?: number;
   canBuyCredits: boolean;
   workflowRunsPerDay: number;
+  /** Max terminal execution records kept per workflow (Phase 3). */
+  executionHistoryMax: number;
+  /** Drop terminal executions older than this many days (Phase 3). */
+  executionHistoryDays: number;
   maxCronJobs: number;
   canShareWorkflows: boolean;
   canUseWebhooks: boolean;
@@ -84,6 +88,8 @@ export const DEFAULT_PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlement> = {
     includedCogsUsdCap: 0.4,
     canBuyCredits: false,
     workflowRunsPerDay: 15,
+    executionHistoryMax: 20,
+    executionHistoryDays: 7,
     maxCronJobs: 0,
     canShareWorkflows: false,
     canUseWebhooks: false,
@@ -105,6 +111,8 @@ export const DEFAULT_PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlement> = {
     maxCreditBalance: 20_000,
     canBuyCredits: true,
     workflowRunsPerDay: 50,
+    executionHistoryMax: 50,
+    executionHistoryDays: 14,
     maxCronJobs: 3,
     canShareWorkflows: true,
     canUseWebhooks: true,
@@ -126,6 +134,8 @@ export const DEFAULT_PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlement> = {
     maxCreditBalance: 50_000,
     canBuyCredits: true,
     workflowRunsPerDay: 200,
+    executionHistoryMax: 200,
+    executionHistoryDays: 30,
     maxCronJobs: 15,
     canShareWorkflows: true,
     canUseWebhooks: true,
@@ -147,6 +157,8 @@ export const DEFAULT_PLAN_ENTITLEMENTS: Record<PlanId, PlanEntitlement> = {
     maxCreditBalance: 200_000,
     canBuyCredits: true,
     workflowRunsPerDay: 1_000,
+    executionHistoryMax: 500,
+    executionHistoryDays: 90,
     maxCronJobs: 100,
     canShareWorkflows: true,
     canUseWebhooks: true,

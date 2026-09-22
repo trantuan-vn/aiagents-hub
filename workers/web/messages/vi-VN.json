@@ -3210,6 +3210,8 @@
     "executions_copy_to_editor": "Sao chép sang editor",
     "executions_copied_to_editor": "Đã sao chép graph sang editor.",
     "executions_export": "Xuất",
+    "executions_export_done": "Đã tải gói hỗ trợ.",
+    "executions_export_failed": "Không xuất được lần chạy này.",
     "executions_copied_id": "Đã sao chép ID lần chạy",
     "executions_input": "Input",
     "executions_output": "Output",

@@ -52,6 +52,10 @@ import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cance
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
+import {
+  executionHistoryLimitsFromEntitlement,
+  pruneWorkflowExecutionHistory,
+} from '../execution/execution-retention.js';
 import { enqueueWorkflowContinue } from '../execution/workflow-continue.js';
 import { pipelineItems } from '../nodes/tool/shared/pipeline.js';
 
@@ -985,6 +989,15 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
       input: typeof input === 'string' ? input.slice(0, 32_000) : undefined,
       state: serializePersistedState(persisted as unknown as Record<string, unknown>),
     });
+    try {
+      await pruneWorkflowExecutionHistory(
+        userDO,
+        resolved.workflowId,
+        executionHistoryLimitsFromEntitlement(quota.entitlement),
+      );
+    } catch (e) {
+      console.warn('[prepareWorkflowExecution] prune failed:', e instanceof Error ? e.message : e);
+    }
     return { ok: true, executionKey, userDO, persisted, record };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);

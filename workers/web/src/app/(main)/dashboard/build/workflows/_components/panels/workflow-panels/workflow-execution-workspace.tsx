@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 import {
   autofixWorkflow,
+  downloadWorkflowExecutionExport,
   resumeWorkflowExecution,
   type WorkflowExecutionGraph as ExecutionGraph,
   type WorkflowExecutionRecord,
@@ -22,16 +23,10 @@ import { WorkflowResizeHandle, workflowResizePanelClassName } from "../../layout
 import { WorkflowExecutionGraph } from "./workflow-execution-graph";
 import { WorkflowExecutionIoPanel } from "./workflow-execution-io-panel";
 import { ExecutionStatusGlyph } from "./workflow-execution-list";
-import { durationMsOf, executionExportPayload, formatDataSize, formatDuration, formatExecutionWalletCostLabel } from "./workflow-execution-utils";
+import { durationMsOf, formatDataSize, formatDuration, formatExecutionWalletCostLabel } from "./workflow-execution-utils";
 
-function exportExecution(selected: WorkflowExecutionRecord) {
-  const blob = new Blob([executionExportPayload(selected)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `execution-${selected.executionKey.slice(0, 8)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+async function exportExecution(selected: WorkflowExecutionRecord) {
+  await downloadWorkflowExecutionExport(selected.executionKey);
 }
 
 function ExecutionMetaBar({
@@ -125,7 +120,16 @@ function ExecutionMetaBar({
             {t("executions_copy_to_editor")}
           </Button>
         ) : null}
-        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => exportExecution(selected)}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-7 text-xs"
+          onClick={() => {
+            void exportExecution(selected)
+              .then(() => toast.success(t("executions_export_done")))
+              .catch((e) => toast.error(e instanceof Error ? e.message : t("executions_export_failed")));
+          }}
+        >
           <Download className="size-3.5" />
           {t("executions_export")}
         </Button>

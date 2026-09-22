@@ -120,6 +120,8 @@ export function publicPlansCatalog(env?: Record<string, unknown> & { PAYPAL_BILL
         includedCredits: e.includedCredits,
         includedCogsUsdCap: e.includedCogsUsdCap,
         workflowRunsPerDay: e.workflowRunsPerDay,
+        executionHistoryMax: e.executionHistoryMax,
+        executionHistoryDays: e.executionHistoryDays,
         maxCronJobs: e.maxCronJobs,
         canBuyCredits: e.canBuyCredits,
         canShareWorkflows: e.canShareWorkflows,

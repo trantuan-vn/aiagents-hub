@@ -1,7 +1,7 @@
 # Spec: Workflow Execution Logging — an toàn resume + tối ưu lưu trữ
 
-> **Trạng thái:** Draft v1.0 — Phase 0 + Phase 1 implemented  
-> **Phiên bản:** 1.1  
+> **Trạng thái:** Draft v1.2 — Phase 0 + 1 + 3 implemented (Phase 2 R2 offload deferred)  
+> **Phiên bản:** 1.2  
 > **Ngày:** 2026-09-22  
 > **Phạm vi:** Ghi nhận mỗi lần chạy workflow (`workflow_executions` trên UserDO): snapshot resume, step I/O cho Logs UI, output cuối, progress WS  
 > **Bổ sung, không thay thế:** kiến trúc engine → [`workflow-architecture.md`](./workflow-architecture.md); luồng vận hành → [`workflow-how-it-works.md`](./workflow-how-it-works.md)  
@@ -10,6 +10,10 @@
 **Phase 0 (code):** UTF-8 gate, clip deterministic, ladder + fail-closed; `serializeOutputSummary`; resume thống nhất + `persistOrFailRun`; flags `ioClipped` / `legacyStub` / `persistDegraded`.
 
 **Phase 1 (code):** nested `persistMeta`; always `stateCore` normalize (step preview 4KB); `PersistShape` trên plugin (`resumeFields` / `logFields` / `neverPersist`); `HOT_STATE_MAX_BYTES = 1MB`.
+
+**Phase 3 (code):** retention theo gói (`executionHistoryMax` / `Days`); prune terminal khi list/create; `GET .../export` ZIP support (DO redacted — không lakehouse / Phase 2 blobs).
+
+**Phase 2:** deferred — R2 I/O spill riêng, khác `R2_LAKEHOUSE`.
 
 Coding bám spec này. Mục tiêu: **mọi lần persist đều deterministic và resume-safe**; phần “đẹp để xem log” được tối ưu lưu trữ, không được phá control-plane.
 
@@ -383,10 +387,17 @@ Trước mọi persist/offload:
 - [x] `PersistShape` (`resumeFields` / `logFields` / `neverPersist`) trên agent, save-rag, get-rag, get-db-info, loop.
 - [x] `HOT_STATE_MAX_BYTES = 1_000_000` (từ 2MB).
 
+### Phase 3
+- [x] `executionHistoryMax` / `executionHistoryDays` trên `PlanEntitlement`.
+- [x] Prune terminal (không đụng running / pending_human) khi list + sau create.
+- [x] `GET /executions/:key/export` → ZIP support (manifest, record, state, steps; secrets redacted).
+- [x] UI Export tải ZIP từ API.
+
 ### Phase 2+
 - [ ] Blob thiếu không làm corrupt cursor; lỗi có mã rõ.
 - [ ] Không in secret vào DO/R2 theo denylist (credentialId thay password trong loop).
 - [ ] Hạ tiếp hot cap → 512KB sau khi đo phân vị production.
+- [ ] Offload I/O R2 riêng (không lakehouse).
 
 ---
 

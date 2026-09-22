@@ -99,3 +99,10 @@ export async function listExecutions(
   );
   return Array.isArray(rows) ? (rows as ExecutionRow[]) : [];
 }
+
+export async function deleteExecution(
+  userDO: DurableObjectStub<UserDO>,
+  id: number,
+): Promise<void> {
+  await executeUtils.executeDynamicAction(userDO, 'delete', { id }, 'workflow_executions');
+}

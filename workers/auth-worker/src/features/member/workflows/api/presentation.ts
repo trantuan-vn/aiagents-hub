@@ -20,6 +20,11 @@ import {
 } from '../triggers/form-trigger-runner.js';
 import { getExecutionByKey, listExecutions } from '../execution/execution-store.js';
 import { resolveStalledExecutions } from '../execution/execution-stall.js';
+import {
+  executionHistoryLimitsFromEntitlement,
+  pruneWorkflowExecutionHistory,
+} from '../execution/execution-retention.js';
+import { buildExecutionExportPack } from '../execution/execution-export.js';
 import { createCredential, deleteCredential, listCredentials } from '../storage/credentials.js';
 import {
   createTrigger,
@@ -434,10 +439,25 @@ export function createWorkflowRoutes(bindingName: string) {
     createRouteHandler(async (c: any, user: any) => {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
-      const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
       const userDO = getUserDO(c, user.identifier);
+      const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+      const history = executionHistoryLimitsFromEntitlement(quota.entitlement);
+      try {
+        await pruneWorkflowExecutionHistory(userDO, id, history);
+      } catch (e) {
+        console.warn('[executions] prune failed:', e instanceof Error ? e.message : e);
+      }
+      const requested = parseInt(c.req.query('limit') || String(history.max), 10);
+      const limit = Math.min(history.max, Math.max(1, Number.isFinite(requested) ? requested : history.max));
       const rows = await resolveStalledExecutions(userDO, await listExecutions(userDO, id, limit));
-      return c.json({ executions: rows.map(parseExecutionRow) });
+      return c.json({
+        executions: rows.map(parseExecutionRow),
+        retention: {
+          planId: quota.planId,
+          max: history.max,
+          days: history.days,
+        },
+      });
     }, 'Failed to list executions'),
   );
 
@@ -458,12 +478,34 @@ export function createWorkflowRoutes(bindingName: string) {
   );
 
   app.get(
+    '/executions/:executionKey/export',
+    createRouteHandler(async (c: any, user: any) => {
+      const executionKey = c.req.param('executionKey');
+      const userDO = getUserDO(c, user.identifier);
+      const row = await getExecutionByKey(userDO, executionKey);
+      if (!row) return c.json({ error: 'Execution not found' }, 404);
+      const pack = buildExecutionExportPack(row);
+      return new Response(pack.bytes, {
+        status: 200,
+        headers: {
+          'Content-Type': pack.contentType,
+          'Content-Disposition': `attachment; filename="${pack.filename}"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    }, 'Failed to export execution'),
+  );
+
+  app.get(
     '/:id/executions/stats',
     createRouteHandler(async (c: any, user: any) => {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
-      const limit = Math.min(200, parseInt(c.req.query('limit') || '50', 10));
       const userDO = getUserDO(c, user.identifier);
+      const { quota } = await loadUserAndSyncPlan(userDO, c.env);
+      const history = executionHistoryLimitsFromEntitlement(quota.entitlement);
+      const requested = parseInt(c.req.query('limit') || String(history.max), 10);
+      const limit = Math.min(history.max, Math.max(1, Number.isFinite(requested) ? requested : history.max));
       const rows = await resolveStalledExecutions(userDO, await listExecutions(userDO, id, limit));
       return c.json({ stats: computeExecutionStats(rows) });
     }, 'Failed to get execution stats'),
