@@ -227,7 +227,7 @@ Tất cả đường vào hội tụ về **`runTrigger` → `executeWorkflowGra
 | **UserDO** `agent_workflows` | Definition JSON, metadata | Ghi interactive / owned |
 | **D1** `agent_workflows` | Bản sync cho listing / shared / marketplace | Qua `queue-worker` |
 | **D1** `workflow_triggers` | Cron / webhook / channel / form | Lookup ingress |
-| **UserDO** `workflow_executions` | Snapshot engine để resume | Không sync D1 |
+| **UserDO** `workflow_executions` | Snapshot engine để resume | Không sync D1. Spec ghi log / truncation / offload: [`workflow-execution-logging-spec.md`](./workflow-execution-logging-spec.md) |
 | **UserDO** `workflow_credentials` | Secrets mã hóa | Không sync queue |
 | **UserDO** `workflow_versions` | Snapshot publish / manual | Version history |
 | **VECTORIZE** | RAG collections | Scope theo owner/workflow |

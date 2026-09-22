@@ -11,6 +11,7 @@ import {
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
 import { cancelWorkflowExecution, continueFromCheckpointWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
+import { executionPersistFlags } from '../engine/persist-state.js';
 import { loadUserAndSyncPlan } from '../billing/billing.js';
 import { clampMinPlanId, runnerMeetsMinPlan } from '../billing/plan.js';
 import {
@@ -128,15 +129,8 @@ function parseExecutionRow(row: any) {
     }
   };
   const state = safeParse(row.state);
-  const truncated =
-    !!state &&
-    typeof state === 'object' &&
-    !Array.isArray(state) &&
-    ((state as { _truncated?: boolean })._truncated === true ||
-      (state as { ioTruncated?: boolean }).ioTruncated === true);
-  const stub =
-    truncated &&
-    !(state as { engine?: unknown }).engine;
+  const flags = executionPersistFlags(state);
+  const stub = flags.legacyStub;
   const engine =
     !stub && state && typeof state === 'object'
       ? (state as { engine?: { steps?: unknown } }).engine
@@ -153,7 +147,10 @@ function parseExecutionRow(row: any) {
     output: safeParse(row.output),
     steps: Array.isArray(engine?.steps) ? engine.steps : [],
     definition,
-    truncated,
+    truncated: flags.truncated,
+    ioClipped: flags.ioClipped,
+    persistDegraded: flags.persistDegraded,
+    legacyStub: flags.legacyStub,
     // `state` is the internal engine snapshot; expose step trace + graph.
     state: undefined,
   };

@@ -42,7 +42,12 @@ import {
   queueAfterHumanReviewPause,
   queueAfterHumanReviewResume,
 } from './human-review-queue.js';
-import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState, clipValue } from './persist-state.js';
+import {
+  isTruncatedStub,
+  serializePersistedState,
+  serializeOutputSummary,
+  clipValue,
+} from './persist-state.js';
 import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
@@ -161,6 +166,13 @@ interface PersistedState {
   engine: EngineState;
   /** Oversized node I/O was compacted; resume still has queue/visited. */
   ioTruncated?: boolean;
+  /** Alias of ioTruncated for API clarity (Phase 0). */
+  ioClipped?: boolean;
+  /** Core kept but I/O / loop items heavily slimmed. */
+  persistDegraded?: boolean;
+  /** Which compaction step produced this snapshot. */
+  clipPolicy?: string;
+  schemaVersion?: number;
   /** Graph was dropped to fit storage; resume reloads the live workflow. */
   definitionOmitted?: boolean;
 }
@@ -732,17 +744,6 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
 }
 
 /** Persist the latest engine snapshot + result onto the execution record. */
-function capJson(value: unknown, label: string): string | undefined {
-  if (value === undefined) return undefined;
-  if (label === 'state' && value && typeof value === 'object') {
-    return serializePersistedState(value as Record<string, unknown>);
-  }
-  const json = JSON.stringify(value);
-  if (json.length <= MAX_PERSIST_BYTES) return json;
-  console.warn(`[persistResult] ${label} too large (${json.length} bytes), truncating`);
-  return JSON.stringify({ _truncated: true, byteLength: json.length });
-}
-
 async function persistResult(
   userDO: DurableObjectStub<UserDO>,
   executionId: number,
@@ -757,8 +758,8 @@ async function persistResult(
   const terminal = status === 'completed' || status === 'failed' || status === 'cancelled';
   await updateExecution(userDO, executionId, {
     status,
-    state: capJson(persisted, 'state') ?? '{}',
-    output: capJson(result.output, 'output'),
+    state: serializePersistedState(persisted as unknown as Record<string, unknown>),
+    output: serializeOutputSummary(result.output),
     totalCostVnd: persisted.engine.totalCostVnd,
     totalCreditsCharged: persisted.engine.totalCostVnd,
     totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
@@ -771,6 +772,48 @@ async function persistResult(
         : undefined,
     finishedAt: terminal ? (current?.finishedAt || Date.now()) : undefined,
   });
+}
+
+/** Persist failed: mark the run failed so we never silent-continue on stale DO state. */
+async function persistOrFailRun(
+  userDO: DurableObjectStub<UserDO>,
+  executionId: number,
+  persisted: PersistedState,
+  result: RunEngineResult,
+  executionKey: string,
+  logLabel: string,
+): Promise<RunEngineResult> {
+  try {
+    await persistResult(userDO, executionId, persisted, result, executionKey);
+    return result;
+  } catch (e) {
+    const message = `Persist failed: ${String(e instanceof Error ? e.message : e)}`.slice(0, 2000);
+    console.error(`[${logLabel}] ${message}`);
+    try {
+      await updateExecution(userDO, executionId, {
+        status: 'failed',
+        error: message,
+        finishedAt: Date.now(),
+        pendingNodeId: '',
+      });
+    } catch (inner) {
+      console.error(
+        `[${logLabel}] could not mark execution failed after persist error:`,
+        inner instanceof Error ? inner.message : inner,
+      );
+    }
+    try {
+      await broadcastWorkflowExecutionProgress(userDO, {
+        workflowId: persisted.meta.workflowId,
+        executionKey,
+        type: 'finished',
+        status: 'failed',
+      });
+    } catch {
+      /* best-effort */
+    }
+    return { status: 'failed', output: { error: message } };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -932,7 +975,7 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
       workflowOwnerId: resolved.ownerId,
       workflowName: (persisted.meta.workflowName || undefined)?.slice(0, 200),
       input: typeof input === 'string' ? input.slice(0, 32_000) : undefined,
-      state: capJson(persisted, 'state') ?? '{}',
+      state: serializePersistedState(persisted as unknown as Record<string, unknown>),
     });
     return { ok: true, executionKey, userDO, persisted, record };
   } catch (e) {
@@ -1025,11 +1068,14 @@ export async function executeWorkflowGraph(
     const message = String(e instanceof Error ? e.message : e).slice(0, 2000);
     result = { status: 'failed', output: { error: message } };
   }
-  try {
-    await persistResult(userDO, record.id, persisted, result, executionKey);
-  } catch (e) {
-    console.warn('[executeWorkflowGraph] persist failed:', e instanceof Error ? e.message : e);
-  }
+  result = await persistOrFailRun(
+    userDO,
+    record.id,
+    persisted,
+    result,
+    executionKey,
+    'executeWorkflowGraph',
+  );
 
   if (!resolved.isOwnedByUser) {
     try {
@@ -1088,7 +1134,18 @@ export async function continueWorkflowExecution(params: {
   } catch {
     rawState = {};
   }
-  if (isTruncatedStub(rawState) || !rawState || typeof rawState !== 'object') {
+
+  const persisted = await resolvePersistedForResume({
+    c,
+    bindingName,
+    user,
+    record,
+    rawState,
+    pendingNodeId: record.pendingNodeId || '',
+    preferEntryNodesWhenEmpty: true,
+  });
+
+  if (!persisted.engine || typeof persisted.engine !== 'object') {
     const message = 'Execution state missing; cannot continue';
     await updateExecution(userDO, record.id, {
       status: 'failed',
@@ -1110,25 +1167,6 @@ export async function continueWorkflowExecution(params: {
       output: { error: message },
       steps: [],
       totalCostVnd: record.totalCostVnd ?? 0,
-    };
-  }
-
-  const persisted = rawState as PersistedState;
-  if (persisted.definitionOmitted || !Array.isArray(persisted.definition?.nodes)) {
-    const resolved = await resolveWorkflow(
-      c,
-      bindingName,
-      user.identifier,
-      record.workflowId,
-      record.workflowOwnerId,
-    );
-    persisted.definition = resolved.definition;
-    persisted.definitionOmitted = false;
-    persisted.meta = persisted.meta ?? {
-      ownerId: resolved.ownerId,
-      workflowId: resolved.workflowId,
-      isOwnedByUser: resolved.isOwnedByUser,
-      workflowName: String(resolved.workflow.name ?? ''),
     };
   }
 
@@ -1155,11 +1193,14 @@ export async function continueWorkflowExecution(params: {
     });
   }
 
-  try {
-    await persistResult(userDO, record.id, persisted, result, executionKey);
-  } catch (e) {
-    console.warn('[continueWorkflowExecution] persist failed:', e instanceof Error ? e.message : e);
-  }
+  result = await persistOrFailRun(
+    userDO,
+    record.id,
+    persisted,
+    result,
+    executionKey,
+    'continueWorkflowExecution',
+  );
 
   return toPublicResult(result, executionKey, persisted);
 }
@@ -1171,6 +1212,8 @@ async function resolvePersistedForResume(params: {
   record: ExecutionRow;
   rawState: unknown;
   pendingNodeId: string;
+  /** When rebuilding a stub with no pending node, queue workflow entry nodes. */
+  preferEntryNodesWhenEmpty?: boolean;
 }): Promise<PersistedState> {
   const { c, bindingName, user, record, rawState, pendingNodeId } = params;
   const stub = isTruncatedStub(rawState);
@@ -1182,7 +1225,11 @@ async function resolvePersistedForResume(params: {
 
   console.warn(
     `[resume] reconstructing snapshot from live workflow ${record.workflowId}` +
-      (stub ? ' (legacy truncated stub)' : parsed?.definitionOmitted ? ' (definition omitted)' : ' (incomplete snapshot)'),
+      (stub
+        ? ' (legacy truncated stub)'
+        : parsed?.definitionOmitted
+          ? ' (definition omitted)'
+          : ' (incomplete snapshot)'),
   );
 
   const resolved = await resolveWorkflow(
@@ -1193,8 +1240,9 @@ async function resolvePersistedForResume(params: {
     record.workflowOwnerId,
   );
 
-  if (parsed?.engine && parsed.definitionOmitted) {
+  if (parsed?.engine && (parsed.definitionOmitted || !hasGraph)) {
     parsed.definition = resolved.definition;
+    parsed.definitionOmitted = false;
     parsed.meta = parsed.meta ?? {
       ownerId: resolved.ownerId,
       workflowId: resolved.workflowId,
@@ -1205,6 +1253,13 @@ async function resolvePersistedForResume(params: {
     parsed.autoApproveHumanReview = parsed.autoApproveHumanReview ?? false;
     return parsed;
   }
+
+  const entryQueue =
+    pendingNodeId
+      ? [pendingNodeId]
+      : params.preferEntryNodesWhenEmpty
+        ? getWorkflowEntryNodeIds(resolved.definition)
+        : [];
 
   return {
     definition: resolved.definition,
@@ -1218,7 +1273,7 @@ async function resolvePersistedForResume(params: {
     variables: {},
     autoApproveHumanReview: false,
     engine: {
-      queue: [pendingNodeId],
+      queue: entryQueue,
       visited: [],
       skipped: [],
       outputs: {},
@@ -1278,20 +1333,27 @@ export async function resumeWorkflowExecution(params: {
     executionKey,
     decision: { nodeId: pendingNodeId, approved, note },
   });
-  await persistResult(userDO, record.id, persisted, result, executionKey);
+  const persistedResult = await persistOrFailRun(
+    userDO,
+    record.id,
+    persisted,
+    result,
+    executionKey,
+    'resumeWorkflowExecution',
+  );
 
   return {
-    status: result.status === 'continuing' ? 'running' : result.status,
+    status: persistedResult.status === 'continuing' ? 'running' : persistedResult.status,
     executionKey,
     workflowId: persisted.meta.workflowId,
     workflowOwnerId: persisted.meta.ownerId,
-    output: result.output,
+    output: persistedResult.output,
     steps: persisted.engine.steps,
     totalCostVnd: persisted.engine.totalCostVnd,
     totalCreditsCharged: persisted.engine.totalCostVnd,
     totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
     totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
-    pendingNodeId: result.pendingNodeId,
+    pendingNodeId: persistedResult.pendingNodeId,
   };
 }
 
@@ -1424,31 +1486,19 @@ export async function continueFromCheckpointWorkflowExecution(params: {
   } catch {
     rawState = {};
   }
-  if (isTruncatedStub(rawState) || !rawState || typeof rawState !== 'object') {
-    throw new Error('Execution state missing; cannot resume from checkpoint');
-  }
 
-  const persisted = rawState as PersistedState;
+  const persisted = await resolvePersistedForResume({
+    c,
+    bindingName,
+    user,
+    record,
+    rawState,
+    pendingNodeId: record.pendingNodeId || '',
+    preferEntryNodesWhenEmpty: true,
+  });
+
   if (!persisted.engine || typeof persisted.engine !== 'object') {
     throw new Error('Execution engine snapshot missing; cannot resume from checkpoint');
-  }
-
-  if (persisted.definitionOmitted || !Array.isArray(persisted.definition?.nodes)) {
-    const resolved = await resolveWorkflow(
-      c,
-      bindingName,
-      user.identifier,
-      record.workflowId,
-      record.workflowOwnerId,
-    );
-    persisted.definition = resolved.definition;
-    persisted.definitionOmitted = false;
-    persisted.meta = persisted.meta ?? {
-      ownerId: resolved.ownerId,
-      workflowId: resolved.workflowId,
-      isOwnedByUser: resolved.isOwnedByUser,
-      workflowName: String(resolved.workflow.name ?? ''),
-    };
   }
 
   requeueLastFailedStep(persisted.engine);

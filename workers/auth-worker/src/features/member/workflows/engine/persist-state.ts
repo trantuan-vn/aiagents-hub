@@ -1,8 +1,31 @@
-export const MAX_PERSIST_BYTES = 2_000_000;
+/**
+ * Phase 0 execution persist: resume-safe snapshots with deterministic I/O clipping.
+ * Never emit a whole-state `{_truncated}` stub. Measure size in UTF-8 bytes.
+ *
+ * @see docs/workflow-execution-logging-spec.md
+ */
 
+export const MAX_PERSIST_BYTES = 2_000_000;
+export const OUTPUT_SUMMARY_MAX_BYTES = 16_384;
+export const PERSIST_SCHEMA_VERSION = 1;
+
+/** Per-field I/O budgets applied in order until the snapshot fits. */
 const IO_BUDGETS = [96_000, 32_000, 8_000, 2_000] as const;
 
+const textEncoder = new TextEncoder();
+
 export type TruncatedStub = { _truncated: true; byteLength: number };
+
+export class PersistStateTooLargeError extends Error {
+  readonly byteLength: number;
+  constructor(byteLength: number) {
+    super(
+      `Execution state still exceeds ${MAX_PERSIST_BYTES} bytes after compaction (${byteLength} UTF-8 bytes); cannot persist safely`,
+    );
+    this.name = 'PersistStateTooLargeError';
+    this.byteLength = byteLength;
+  }
+}
 
 export function isTruncatedStub(value: unknown): value is TruncatedStub {
   return (
@@ -14,20 +37,41 @@ export function isTruncatedStub(value: unknown): value is TruncatedStub {
   );
 }
 
-function jsonSize(value: unknown): number {
+export function utf8ByteLength(text: string): number {
+  return textEncoder.encode(text).byteLength;
+}
+
+export function utf8JsonSize(value: unknown): number {
   try {
-    return JSON.stringify(value).length;
+    return utf8ByteLength(JSON.stringify(value));
   } catch {
     return Number.POSITIVE_INFINITY;
   }
 }
 
-/** Keep a usable prefix of a value so Logs still show real fields, not a stub. */
+function jsonSize(value: unknown): number {
+  return utf8JsonSize(value);
+}
+
+function clipString(value: string, budget: number): string {
+  if (budget <= 1) return '…';
+  if (utf8ByteLength(value) <= budget) return value;
+  let end = Math.min(value.length, budget);
+  while (end > 0 && utf8ByteLength(value.slice(0, end)) > budget - 1) {
+    end -= 1;
+  }
+  return `${value.slice(0, Math.max(0, end))}…`;
+}
+
+/**
+ * Keep a usable prefix of a value so Logs still show real fields, not a stub.
+ * Object keys are sorted so truncation is deterministic across runs.
+ */
 export function clipValue(value: unknown, budget: number): unknown {
   if (budget <= 8) return null;
   if (value == null || typeof value === 'number' || typeof value === 'boolean') return value;
   if (typeof value === 'string') {
-    return value.length <= budget ? value : `${value.slice(0, Math.max(0, budget - 1))}…`;
+    return clipString(value, budget);
   }
 
   const size = jsonSize(value);
@@ -54,7 +98,9 @@ export function clipValue(value: unknown, budget: number): unknown {
   if (typeof value === 'object') {
     const out: Record<string, unknown> = {};
     let used = 2;
-    for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    const keys = Object.keys(value as Record<string, unknown>).sort();
+    for (const key of keys) {
+      const nested = (value as Record<string, unknown>)[key];
       const keySize = jsonSize(key);
       const remaining = budget - used - keySize - 3;
       if (remaining < 8) break;
@@ -77,6 +123,32 @@ export function clipValue(value: unknown, budget: number): unknown {
   }
 
   return value;
+}
+
+/** Keys that are never needed for resume and often multi-MB (LLM raw, RAG bodies). */
+const BULKY_OUTPUT_KEYS = new Set([
+  'raw',
+  'documents',
+  'docs',
+  'chunks',
+  'embeddings',
+  'webhookItem',
+  'requestMeta',
+]);
+
+/** Drop known bulky / non-resume keys from a value tree (deterministic). */
+function stripBulkyKeys(value: unknown, depth = 0): unknown {
+  if (depth > 8 || value == null) return value;
+  if (Array.isArray(value)) {
+    return value.map((item) => stripBulkyKeys(item, depth + 1));
+  }
+  if (typeof value !== 'object') return value;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    if (BULKY_OUTPUT_KEYS.has(key)) continue;
+    out[key] = stripBulkyKeys((value as Record<string, unknown>)[key], depth + 1);
+  }
+  return out;
 }
 
 function clipSteps(
@@ -103,12 +175,30 @@ function clipSteps(
 
 const RESUME_RUN_CONTEXT_KEYS = ['__saveRagIndexedTables'] as const;
 
+function slimLoopItem(item: unknown): unknown {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+  const o = item as Record<string, unknown>;
+  const slim: Record<string, unknown> = {};
+  if (o.tableName != null) slim.tableName = o.tableName;
+  if (o.schemaName != null) slim.schemaName = o.schemaName;
+  if (o.id != null) slim.id = o.id;
+  if (o.name != null && Object.keys(slim).length === 0) slim.name = o.name;
+  return Object.keys(slim).length ? slim : clipValue(o, 256);
+}
+
+function slimLoopItems(items: unknown[]): unknown[] {
+  return items.map(slimLoopItem);
+}
+
 function clipOutputsPreservingLoops(
   outputs: Record<string, unknown>,
   budget: number,
+  options?: { slimItems?: boolean },
 ): Record<string, unknown> {
   const next: Record<string, unknown> = {};
-  for (const [id, value] of Object.entries(outputs)) {
+  // Stable node order so sibling clipping is deterministic.
+  for (const id of Object.keys(outputs).sort()) {
+    const value = outputs[id];
     if (
       value &&
       typeof value === 'object' &&
@@ -118,9 +208,10 @@ function clipOutputsPreservingLoops(
       // Resume needs the current batch `items` + connection; never stub these away.
       const loop = value as Record<string, unknown>;
       const { items: _items, tables: _tables, ...rest } = loop;
+      const items = Array.isArray(loop.items) ? loop.items : [];
       next[id] = {
-        ...(clipValue(rest, budget) as Record<string, unknown>),
-        items: Array.isArray(loop.items) ? loop.items : [],
+        ...(clipValue(stripBulkyKeys(rest), budget) as Record<string, unknown>),
+        items: options?.slimItems ? slimLoopItems(items) : items,
         tableName: loop.tableName,
         schemaName: loop.schemaName,
         batchIndex: loop.batchIndex,
@@ -137,7 +228,7 @@ function clipOutputsPreservingLoops(
       };
       continue;
     }
-    next[id] = clipValue(value, budget);
+    next[id] = clipValue(stripBulkyKeys(value), budget);
   }
   return next;
 }
@@ -145,7 +236,7 @@ function clipOutputsPreservingLoops(
 function resumeRunContext(engine: Record<string, unknown>, persisted: Record<string, unknown>): Record<string, unknown> {
   const raw = (engine.runContext ?? {}) as Record<string, unknown>;
   const next: Record<string, unknown> = {
-    input: typeof raw.input === 'string' ? raw.input.slice(0, 8_000) : '',
+    input: typeof raw.input === 'string' ? clipString(raw.input, 8_000) : '',
     variables: raw.variables ?? persisted.variables ?? {},
     workflowName: raw.workflowName,
   };
@@ -156,14 +247,19 @@ function resumeRunContext(engine: Record<string, unknown>, persisted: Record<str
 }
 
 /** Drop bulky per-iteration payloads; keep cursor + item list for resume. */
-function compactLoopStates(loopStates: unknown): Record<string, unknown> {
+function compactLoopStates(
+  loopStates: unknown,
+  options?: { slimItems?: boolean },
+): Record<string, unknown> {
   if (!loopStates || typeof loopStates !== 'object' || Array.isArray(loopStates)) return {};
   const out: Record<string, unknown> = {};
-  for (const [id, state] of Object.entries(loopStates as Record<string, unknown>)) {
+  for (const id of Object.keys(loopStates as Record<string, unknown>).sort()) {
+    const state = (loopStates as Record<string, unknown>)[id];
     if (!state || typeof state !== 'object' || Array.isArray(state)) continue;
     const s = state as Record<string, unknown>;
+    const items = Array.isArray(s.items) ? s.items : [];
     out[id] = {
-      items: Array.isArray(s.items) ? s.items : [],
+      items: options?.slimItems ? slimLoopItems(items) : items,
       batchSize: s.batchSize,
       currentBatchIndex: s.currentBatchIndex,
       totalBatches: s.totalBatches,
@@ -197,6 +293,23 @@ function compactLoopStates(loopStates: unknown): Record<string, unknown> {
   return out;
 }
 
+function withPersistMeta(
+  snapshot: Record<string, unknown>,
+  meta: {
+    ioClipped?: boolean;
+    persistDegraded?: boolean;
+    clipPolicy?: string;
+  },
+): Record<string, unknown> {
+  return {
+    ...snapshot,
+    schemaVersion: PERSIST_SCHEMA_VERSION,
+    ...(meta.ioClipped ? { ioTruncated: true, ioClipped: true } : {}),
+    ...(meta.persistDegraded ? { persistDegraded: true, ioTruncated: true, ioClipped: true } : {}),
+    ...(meta.clipPolicy ? { clipPolicy: meta.clipPolicy } : {}),
+  };
+}
+
 function compactPersisted(
   persisted: Record<string, unknown>,
   options: {
@@ -204,6 +317,8 @@ function compactPersisted(
     keepStepIo: boolean;
     omitDefinition: boolean;
     clipOutputs: boolean;
+    stripBulky: boolean;
+    slimLoopItems?: boolean;
   },
 ): Record<string, unknown> {
   const engine = (persisted.engine ?? {}) as Record<string, unknown>;
@@ -212,82 +327,59 @@ function compactPersisted(
       ? (engine.outputs as Record<string, unknown>)
       : {};
   const steps = Array.isArray(engine.steps) ? (engine.steps as Array<Record<string, unknown>>) : [];
+  const preparedOutputs = options.stripBulky
+    ? (stripBulkyKeys(outputs) as Record<string, unknown>)
+    : outputs;
 
   return {
     ...persisted,
-    ioTruncated: true,
     webhookItem: undefined,
     requestMeta: undefined,
     definitionOmitted: options.omitDefinition ? true : persisted.definitionOmitted,
     definition: options.omitDefinition ? { nodes: [], edges: [] } : persisted.definition,
-    input: typeof persisted.input === 'string' ? persisted.input.slice(0, 8_000) : persisted.input,
+    input:
+      typeof persisted.input === 'string' ? clipString(persisted.input, 8_000) : persisted.input,
     engine: {
       ...engine,
-      steps: clipSteps(steps, options.ioBudget, options.keepStepIo),
-      outputs: options.clipOutputs ? clipOutputsPreservingLoops(outputs, options.ioBudget) : outputs,
-      finalOutput: options.clipOutputs ? clipValue(engine.finalOutput, options.ioBudget) : engine.finalOutput,
+      steps: clipSteps(
+        options.stripBulky
+          ? steps.map((s) => ({
+              ...s,
+              input: stripBulkyKeys(s.input),
+              output: stripBulkyKeys(s.output),
+            }))
+          : steps,
+        options.ioBudget,
+        options.keepStepIo,
+      ),
+      outputs: options.clipOutputs
+        ? clipOutputsPreservingLoops(preparedOutputs, options.ioBudget, {
+            slimItems: options.slimLoopItems,
+          })
+        : preparedOutputs,
+      finalOutput: options.clipOutputs
+        ? clipValue(
+            options.stripBulky ? stripBulkyKeys(engine.finalOutput) : engine.finalOutput,
+            options.ioBudget,
+          )
+        : engine.finalOutput,
       // Always keep loop cursor + items — clipping them breaks Resume mid-loop.
-      loopStates: compactLoopStates(engine.loopStates),
+      loopStates: compactLoopStates(engine.loopStates, { slimItems: options.slimLoopItems }),
       pendingLoopReturn: engine.pendingLoopReturn,
       runContext: resumeRunContext(engine, persisted),
     },
   };
 }
 
-/**
- * Persist a resume-capable snapshot. Oversized I/O is clipped to a usable
- * prefix; the engine skeleton is never replaced by a stub.
- */
-export function serializePersistedState(persisted: Record<string, unknown>): string {
-  const full = JSON.stringify(persisted);
-  if (full.length <= MAX_PERSIST_BYTES) return full;
-  console.warn(`[persistResult] state too large (${full.length} bytes), compacting I/O`);
-
-  const stripped: Record<string, unknown> = {
-    ...persisted,
-    webhookItem: undefined,
-    requestMeta: undefined,
-  };
-  let json = JSON.stringify(stripped);
-  if (json.length <= MAX_PERSIST_BYTES) return json;
-
-  for (const ioBudget of IO_BUDGETS) {
-    json = JSON.stringify(
-      compactPersisted(persisted, {
-        ioBudget,
-        keepStepIo: true,
-        omitDefinition: false,
-        clipOutputs: true,
-      }),
-    );
-    if (json.length <= MAX_PERSIST_BYTES) return json;
-  }
-
-  json = JSON.stringify(
-    compactPersisted(persisted, {
-      ioBudget: 2_000,
-      keepStepIo: true,
-      omitDefinition: true,
-      clipOutputs: true,
-    }),
-  );
-  if (json.length <= MAX_PERSIST_BYTES) return json;
-
-  json = JSON.stringify(
-    compactPersisted(persisted, {
-      ioBudget: 0,
-      keepStepIo: false,
-      omitDefinition: true,
-      clipOutputs: true,
-    }),
-  );
-  if (json.length <= MAX_PERSIST_BYTES) return json;
-
+function buildLastResortCore(
+  persisted: Record<string, unknown>,
+  options?: { slimLoopItems?: boolean },
+): Record<string, unknown> {
   const engine = (persisted.engine ?? {}) as Record<string, unknown>;
-  const loopStates = compactLoopStates(engine.loopStates);
-  // Last resort: drop non-loop outputs but never erase loopStates / resume markers.
-  return JSON.stringify({
-    ioTruncated: true,
+  const loopStates = compactLoopStates(engine.loopStates, {
+    slimItems: options?.slimLoopItems,
+  });
+  return {
     definitionOmitted: true,
     definition: { nodes: [], edges: [] },
     meta: persisted.meta,
@@ -299,9 +391,10 @@ export function serializePersistedState(persisted: Record<string, unknown>): str
       skipped: engine.skipped ?? [],
       outputs: clipOutputsPreservingLoops(
         engine.outputs && typeof engine.outputs === 'object' && !Array.isArray(engine.outputs)
-          ? (engine.outputs as Record<string, unknown>)
+          ? (stripBulkyKeys(engine.outputs) as Record<string, unknown>)
           : {},
         2_000,
+        { slimItems: options?.slimLoopItems ?? true },
       ),
       steps: clipSteps(
         Array.isArray(engine.steps) ? (engine.steps as Array<Record<string, unknown>>) : [],
@@ -315,5 +408,161 @@ export function serializePersistedState(persisted: Record<string, unknown>): str
       pendingLoopReturn: engine.pendingLoopReturn,
       entryNodeId: engine.entryNodeId,
     },
+  };
+}
+
+function fitsBudget(json: string): boolean {
+  return utf8ByteLength(json) <= MAX_PERSIST_BYTES;
+}
+
+/**
+ * Persist a resume-capable snapshot. Oversized I/O is clipped via a fixed
+ * priority ladder; the engine skeleton is never replaced by a stub.
+ * Throws {@link PersistStateTooLargeError} if even the degraded core exceeds the cap.
+ */
+export function serializePersistedState(persisted: Record<string, unknown>): string {
+  const full = JSON.stringify(persisted);
+  if (fitsBudget(full)) return full;
+  console.warn(
+    `[persistResult] state too large (${utf8ByteLength(full)} UTF-8 bytes), compacting I/O`,
+  );
+
+  // 1) Strip webhook / request meta
+  const stripped: Record<string, unknown> = {
+    ...persisted,
+    webhookItem: undefined,
+    requestMeta: undefined,
+  };
+  let json = JSON.stringify(
+    withPersistMeta(stripped, { ioClipped: true, clipPolicy: 'v1/strip-meta' }),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 2) Strip bulky keys (raw / dump / docs) without budget clip yet
+  json = JSON.stringify(
+    withPersistMeta(
+      compactPersisted(persisted, {
+        ioBudget: 96_000,
+        keepStepIo: true,
+        omitDefinition: false,
+        clipOutputs: false,
+        stripBulky: true,
+      }),
+      { ioClipped: true, clipPolicy: 'v1/strip-bulky' },
+    ),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 3) Priority ladder of IO budgets
+  for (const ioBudget of IO_BUDGETS) {
+    json = JSON.stringify(
+      withPersistMeta(
+        compactPersisted(persisted, {
+          ioBudget,
+          keepStepIo: true,
+          omitDefinition: false,
+          clipOutputs: true,
+          stripBulky: true,
+        }),
+        { ioClipped: true, clipPolicy: `v1/io-budget-${ioBudget}` },
+      ),
+    );
+    if (fitsBudget(json)) return json;
+  }
+
+  // 4) Omit definition
+  json = JSON.stringify(
+    withPersistMeta(
+      compactPersisted(persisted, {
+        ioBudget: 2_000,
+        keepStepIo: true,
+        omitDefinition: true,
+        clipOutputs: true,
+        stripBulky: true,
+      }),
+      { ioClipped: true, clipPolicy: 'v1/omit-definition' },
+    ),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 5) Drop step I/O entirely
+  json = JSON.stringify(
+    withPersistMeta(
+      compactPersisted(persisted, {
+        ioBudget: 0,
+        keepStepIo: false,
+        omitDefinition: true,
+        clipOutputs: true,
+        stripBulky: true,
+      }),
+      { ioClipped: true, clipPolicy: 'v1/drop-step-io' },
+    ),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 6) Last-resort core (full loop items)
+  json = JSON.stringify(
+    withPersistMeta(buildLastResortCore(persisted, { slimLoopItems: false }), {
+      ioClipped: true,
+      clipPolicy: 'v1/last-resort-core',
+    }),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 7) Degraded: slim loop items to resume keys only
+  json = JSON.stringify(
+    withPersistMeta(buildLastResortCore(persisted, { slimLoopItems: true }), {
+      persistDegraded: true,
+      clipPolicy: 'v1/degraded-slim-loop-items',
+    }),
+  );
+  if (fitsBudget(json)) return json;
+
+  // 8) Fail closed — never write an oversized or stub snapshot
+  throw new PersistStateTooLargeError(utf8ByteLength(json));
+}
+
+/**
+ * Serialize execution `output` column. Never writes a destructive `{_truncated}` stub.
+ */
+export function serializeOutputSummary(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  const full = JSON.stringify(value);
+  if (utf8ByteLength(full) <= OUTPUT_SUMMARY_MAX_BYTES) return full;
+  const clipped = clipValue(value, Math.max(64, OUTPUT_SUMMARY_MAX_BYTES - 128));
+  return JSON.stringify({
+    summary: clipped,
+    clipped: true,
+    byteLength: utf8ByteLength(full),
   });
+}
+
+/** Flags derived from a parsed execution `state` for API / UI. */
+export function executionPersistFlags(state: unknown): {
+  legacyStub: boolean;
+  ioClipped: boolean;
+  persistDegraded: boolean;
+  /** Backward-compatible OR of the above. */
+  truncated: boolean;
+} {
+  if (!state || typeof state !== 'object' || Array.isArray(state)) {
+    return { legacyStub: false, ioClipped: false, persistDegraded: false, truncated: false };
+  }
+  const rec = state as {
+    _truncated?: boolean;
+    ioTruncated?: boolean;
+    ioClipped?: boolean;
+    persistDegraded?: boolean;
+    engine?: unknown;
+  };
+  const legacyStub = isTruncatedStub(state) || (rec._truncated === true && !rec.engine);
+  const persistDegraded = !legacyStub && rec.persistDegraded === true;
+  const ioClipped =
+    !legacyStub && (rec.ioClipped === true || rec.ioTruncated === true || persistDegraded);
+  return {
+    legacyStub,
+    ioClipped,
+    persistDegraded,
+    truncated: legacyStub || ioClipped || persistDegraded,
+  };
 }

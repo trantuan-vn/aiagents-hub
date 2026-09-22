@@ -159,8 +159,14 @@ export interface WorkflowExecutionRecord {
   steps: ExecutionStepLog[];
   /** Graph snapshot captured at run time (from engine state). */
   definition?: WorkflowExecutionGraph;
-  /** True when the persisted engine snapshot was too large and was dropped. */
+  /** True when I/O was clipped, degraded, or legacy stub (backward compatible). */
   truncated?: boolean;
+  /** Oversized I/O was compacted; resume still works. */
+  ioClipped?: boolean;
+  /** Core kept but logs heavily slimmed. */
+  persistDegraded?: boolean;
+  /** Legacy whole-state `{_truncated}` stub — may not resume. */
+  legacyStub?: boolean;
   pendingNodeId?: string;
   startedAt: number;
   finishedAt?: number;

@@ -227,8 +227,18 @@ function ExecutionAlerts({
           ) : null}
         </div>
       ) : null}
-      {selected.truncated ? (
-        <p className="text-muted-foreground shrink-0 border-b px-4 py-1.5 text-[11px]">{t("executions_truncated")}</p>
+      {selected.legacyStub ? (
+        <p className="text-muted-foreground shrink-0 border-b px-4 py-1.5 text-[11px]">
+          {t("executions_legacy_stub")}
+        </p>
+      ) : selected.persistDegraded ? (
+        <p className="text-muted-foreground shrink-0 border-b px-4 py-1.5 text-[11px]">
+          {t("executions_persist_degraded")}
+        </p>
+      ) : selected.ioClipped || selected.truncated ? (
+        <p className="text-muted-foreground shrink-0 border-b px-4 py-1.5 text-[11px]">
+          {t("executions_io_clipped")}
+        </p>
       ) : null}
     </>
   );
