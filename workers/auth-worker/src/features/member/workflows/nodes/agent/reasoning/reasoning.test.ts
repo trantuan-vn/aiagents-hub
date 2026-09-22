@@ -4,7 +4,7 @@ import { claimsNeedCitations, parseCitationIds, buildCitations, groundedTextOrFa
 import { inferMissingSlots, shouldAskClarification, parseTaskFrame } from './frame.js';
 import { shouldPlan, parsePlan, normalizePlannerMode } from './plan.js';
 import { ruleClassify, parseLlmSafety } from './safety.js';
-import { classifyToolName, filterToolsForPolicy, initialToolChoice } from './tools.js';
+import { classifyToolName, filterToolsForPolicy, initialToolChoice, omitGetRagWhenGrounded } from './tools.js';
 import { reflectHeuristics } from './reflect.js';
 import { memoryKey, resolveSessionId } from './memory.js';
 import {
@@ -78,6 +78,15 @@ describe('reasoning plan and tools', () => {
     expect(classifyToolName('save_rag')).toBe('persist');
     expect(initialToolChoice(['http_search', 'get_rag'])).toEqual('required');
     expect(initialToolChoice(['http_search', 'get_rag'], undefined, true)).toEqual('auto');
+  });
+
+  it('omits get_rag when snippets are already grounded', () => {
+    const tools = {
+      get_rag: { description: 'search', execute: async () => ({}) },
+      check_sql: { description: 'validate', execute: async () => ({}) },
+    } as never;
+    expect(Object.keys(omitGetRagWhenGrounded(tools, false))).toEqual(['get_rag', 'check_sql']);
+    expect(Object.keys(omitGetRagWhenGrounded(tools, true))).toEqual(['check_sql']);
   });
 
   it('hides persist tools in strict mode without a low-risk plan step', () => {

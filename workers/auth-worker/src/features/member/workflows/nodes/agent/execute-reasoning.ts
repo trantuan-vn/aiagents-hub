@@ -65,6 +65,7 @@ import {
   filterToolsForPolicy,
   initialToolChoice,
   maxActSteps,
+  omitGetRagWhenGrounded,
 } from './reasoning/tools.js';
 import type {
   AgentCitation,
@@ -484,7 +485,10 @@ export async function executeReasoningAgent(
         }
       : {};
 
-  const baseTools: ToolSet = { ...httpTools, ...ragTools, ...memoryTool, ...buildAskUserTool() };
+  const baseTools: ToolSet = omitGetRagWhenGrounded(
+    { ...httpTools, ...ragTools, ...memoryTool, ...buildAskUserTool() },
+    snippets.length > 0,
+  );
   for (const [name, def] of Object.entries(baseTools)) {
     const description = String((def as { description?: string }).description ?? '');
     (def as { description?: string }).description = decorateToolDescription(name, description);

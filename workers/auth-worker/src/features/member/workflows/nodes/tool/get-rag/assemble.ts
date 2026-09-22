@@ -3,6 +3,12 @@ import { matchToSnippet, type VectorMatch } from '../../../rag/index.js';
 const MAX_CHUNKS_PER_DOCUMENT = 24;
 const MIN_OVERLAP = 8;
 
+/** Phase 3: schema before SQL examples for the Reasoning Agent. */
+const DOC_TYPE_ORDER: Record<string, number> = {
+  schema: 0,
+  sqlexample: 1,
+};
+
 export function vectorChunkId(documentId: string, index: number): string {
   const raw = `${documentId}::chunk-${index}`;
   if (raw.length <= 64) return raw;
@@ -98,9 +104,9 @@ function orderDocuments(
   docs: Array<{ docType: string; documentId: string; text: string; score: number }>,
 ): Array<{ docType: string; documentId: string; text: string; score: number }> {
   return [...docs].sort((a, b) => {
-    const aSchema = /schema|ddl|columns/i.test(`${a.docType} ${a.text.slice(0, 200)}`) ? 0 : 1;
-    const bSchema = /schema|ddl|columns/i.test(`${b.docType} ${b.text.slice(0, 200)}`) ? 0 : 1;
-    return aSchema - bSchema || b.score - a.score || a.documentId.localeCompare(b.documentId);
+    const ao = DOC_TYPE_ORDER[a.docType] ?? 50;
+    const bo = DOC_TYPE_ORDER[b.docType] ?? 50;
+    return ao - bo || b.score - a.score || a.documentId.localeCompare(b.documentId);
   });
 }
 
@@ -111,6 +117,7 @@ export function assembleGroupSnippet(groupKey: string, matches: VectorMatch[]): 
   score?: number;
   docType?: string;
   tableName?: string;
+  schemaName?: string;
 } {
   const byDocument = new Map<string, VectorMatch[]>();
   for (const match of matches) {
@@ -136,6 +143,7 @@ export function assembleGroupSnippet(groupKey: string, matches: VectorMatch[]): 
 
   const ordered = orderDocuments(docs);
   const tableName = matches.map((m) => metadataValue(m, 'tableName')).find(Boolean);
+  const schemaName = matches.map((m) => metadataValue(m, 'schemaName')).find(Boolean);
   const useHeadings = ordered.length > 1 || ordered.some((d) => d.docType) || Boolean(tableName);
   const parts = ordered
     .map((doc) => {
@@ -153,6 +161,7 @@ export function assembleGroupSnippet(groupKey: string, matches: VectorMatch[]): 
     score: first?.score,
     docType: ordered.map((d) => d.docType).filter(Boolean).join(','),
     tableName: tableName || undefined,
+    schemaName: schemaName || undefined,
   };
 }
 

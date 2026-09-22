@@ -2944,7 +2944,7 @@
     "tool_save_rag": "Save RAG",
     "tool_save_rag_desc": "Embed document chunks and upsert into the agent's knowledge base.",
     "tool_get_rag": "Get RAG",
-    "tool_get_rag_desc": "Search the knowledge base for passages relevant to a question.",
+    "tool_get_rag_desc": "Find related table schema and SQL examples for a question so the agent can write SELECT.",
     "tool_get_db_info": "Get DB Info",
     "tool_get_db_info_desc": "List tables in the connected database. Schema is loaded per table in the loop (Save RAG).",
     "tool_category_mcp": "MCP servers",

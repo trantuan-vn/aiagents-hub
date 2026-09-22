@@ -41,6 +41,39 @@ describe('assemble RAG documents', () => {
     expect(pickRelatedGroups(matches, 'tableName', 1)).toEqual(['CHUNG_KHOAN']);
   });
 
+  it('assembles schema before sqlexample and keeps schemaName', () => {
+    const snippet = assembleGroupSnippet('CHUNG_KHOAN', [
+      {
+        score: 0.5,
+        metadata: {
+          tableName: 'CHUNG_KHOAN',
+          schemaName: 'ADMIN',
+          docType: 'sqlexample',
+          documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
+          chunkIndex: '0',
+          text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
+        },
+      },
+      {
+        score: 0.7,
+        metadata: {
+          tableName: 'CHUNG_KHOAN',
+          schemaName: 'ADMIN',
+          docType: 'schema',
+          documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
+          chunkIndex: '0',
+          text: '## Columns\n- MA_CK: Mã chứng khoán / Ticker (aliases: mã CK)',
+        },
+      },
+    ]);
+    expect(snippet.schemaName).toBe('ADMIN');
+    expect(snippet.tableName).toBe('CHUNG_KHOAN');
+    expect(snippet.text).toContain('# CHUNG_KHOAN');
+    expect(snippet.text.indexOf('## schema')).toBeLessThan(snippet.text.indexOf('## sqlexample'));
+    expect(snippet.text).toContain('aliases: mã CK');
+    expect(snippet.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
+  });
+
   it('assembles schema and sample data for one related table', () => {
     const snippet = assembleGroupSnippet('CHUNG_KHOAN', [
       {

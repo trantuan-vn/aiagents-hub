@@ -5,6 +5,9 @@ import { resolveConfiguredText } from '../shared/pipeline.js';
 import type { ToolModule } from '../shared/tool-module.js';
 import { executeGetRag, executeGetRagPipeline } from './execute.js';
 
+const GET_RAG_TOOL_DESCRIPTION =
+  'Find related table schema (VI/EN column descriptions) and SQL examples for the user question so you can write SELECT. Do not call when schema snippets are already in context.';
+
 export const getRagToolModule: ToolModule = {
   kind: 'get-rag',
   toolClass: 'retrieve',
@@ -12,12 +15,11 @@ export const getRagToolModule: ToolModule = {
   createAgentTool: (bind) => ({
     name: bind.toolName,
     tool: tool({
-      description: bind.toolDescription,
+      description: bind.toolDescription || GET_RAG_TOOL_DESCRIPTION,
       inputSchema: z.object({
-        query: z.string().describe('Search query'),
-        topK: z.number().optional(),
+        query: z.string().describe('User question (embed as-is; Vietnamese OK)'),
+        topK: z.number().optional().describe('Max related tables to return'),
         namespace: z.string().optional(),
-        docType: z.string().optional().describe('Filter by docType metadata (schema | sqlexample)'),
       }),
       execute: async (input) => {
         const query =
@@ -27,7 +29,7 @@ export const getRagToolModule: ToolModule = {
           env: bind.env,
           definition: bind.definition,
           agentId: bind.agentId,
-          input: { ...input, query },
+          input: { query, topK: input.topK, namespace: input.namespace },
           embedModel: bind.embedModel,
           userDO: bind.userDO,
           ownerId: bind.ownerId,

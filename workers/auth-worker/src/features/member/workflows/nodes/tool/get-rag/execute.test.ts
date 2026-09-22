@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
-import { executeGetRag, executeGetRagPipeline, preferSqlChunks } from './execute.js';
+import { executeGetRag, executeGetRagPipeline, groupLooksIncomplete, missingSqlRagDocTypes } from './execute.js';
 import { toVectorizeNativeNamespace } from '../../../rag/index.js';
 import { WORKERS_AI_GATEWAY } from '../../../ai/workers-ai.js';
 
@@ -639,33 +639,34 @@ describe('executeGetRagPipeline', () => {
   });
 });
 
-describe('preferSqlChunks', () => {
-  it('keeps the DDL chunk over a sample-row tail for the same table', () => {
-    const picked = preferSqlChunks(
-      [
+describe('sql rag completeness', () => {
+  it('treats sample-rich schema alone as incomplete until sqlexample is present', () => {
+    const schemaOnly = [
+      {
+        score: 0.9,
+        metadata: {
+          text: '## DDL\nCREATE TABLE ADMIN.ORDERS (ID NUMBER);\n## Sample shape\n```json\n[{ "ID": 1 }]\n```',
+          tableName: 'ORDERS',
+          schemaName: 'ADMIN',
+          docType: 'schema',
+        },
+      },
+    ];
+    expect(groupLooksIncomplete(schemaOnly)).toBe(true);
+    expect(missingSqlRagDocTypes(schemaOnly)).toEqual(['sqlexample']);
+    expect(
+      groupLooksIncomplete([
+        ...schemaOnly,
         {
-          score: 0.99,
+          score: 0.5,
           metadata: {
-            text: '"NGAY_MO": "2026-06-24"',
-            tableName: 'TAI_KHOAN_LUU_KY',
-            docType: 'schema',
-            source: 'ADMIN.TAI_KHOAN_LUU_KY.schema.md',
+            text: 'SELECT COUNT(*) FROM ADMIN.ORDERS',
+            tableName: 'ORDERS',
+            docType: 'sqlexample',
           },
         },
-        {
-          score: 0.7,
-          metadata: {
-            text: '## DDL\n```sql\nCREATE TABLE ADMIN.TAI_KHOAN_LUU_KY (SO_TK_LUU_KY VARCHAR2(20));\n```',
-            tableName: 'TAI_KHOAN_LUU_KY',
-            docType: 'schema',
-            source: 'ADMIN.TAI_KHOAN_LUU_KY.schema.md',
-          },
-        },
-      ],
-      5,
-    );
-    expect(picked).toHaveLength(1);
-    expect(picked[0]?.metadata?.text).toContain('CREATE TABLE');
+      ]),
+    ).toBe(false);
   });
 });
 
@@ -680,6 +681,7 @@ describe('related table assembly', () => {
               metadata: {
                 text: '## DDL\n```sql\nCREATE TABLE ADMIN.CHUNG_KHOAN (MA_CK VARCHAR2(20));\n```',
                 tableName: 'CHUNG_KHOAN',
+                schemaName: 'ADMIN',
                 docType: 'schema',
                 documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
                 chunkIndex: '0',
@@ -691,6 +693,7 @@ describe('related table assembly', () => {
               metadata: {
                 text: '## Sample shape (from live data)\n```json\n[{ "MA_CK": "VIC" }]\n```',
                 tableName: 'CHUNG_KHOAN',
+                schemaName: 'ADMIN',
                 docType: 'schema',
                 documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
                 chunkIndex: '1',
@@ -701,6 +704,24 @@ describe('related table assembly', () => {
               metadata: {
                 text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
                 tableName: 'CHUNG_KHOAN',
+                schemaName: 'ADMIN',
+                docType: 'sqlexample',
+                documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
+                chunkIndex: '0',
+              },
+            },
+          ],
+        };
+      }
+      if (opts?.filter?.docType === 'sqlexample') {
+        return {
+          matches: [
+            {
+              score: 0.5,
+              metadata: {
+                text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
+                tableName: 'CHUNG_KHOAN',
+                schemaName: 'ADMIN',
                 docType: 'sqlexample',
                 documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
                 chunkIndex: '0',
@@ -716,6 +737,7 @@ describe('related table assembly', () => {
             metadata: {
               text: '"MA_CK": "VNM", "TEN_CK": "Vinamilk"',
               tableName: 'CHUNG_KHOAN',
+              schemaName: 'ADMIN',
               docType: 'schema',
               documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
               chunkIndex: '1',
@@ -752,6 +774,84 @@ describe('related table assembly', () => {
     expect(result.snippets[0]?.text).toContain('VIC');
     expect(result.snippets[0]?.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
     expect(result.snippets[0]?.tableName).toBe('CHUNG_KHOAN');
+    expect(result.snippets[0]?.schemaName).toBe('ADMIN');
+  });
+
+  it('still pulls sqlexample when the first hit is only a sample-rich schema chunk', async () => {
+    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
+      if (opts?.filter?.docType === 'sqlexample' || opts?.filter?.tableName === 'ORDERS') {
+        const rows = [];
+        if (!opts?.filter?.docType || opts.filter.docType === 'schema' || opts.filter.tableName) {
+          rows.push({
+            score: 0.8,
+            metadata: {
+              text: '## DDL\nCREATE TABLE ADMIN.ORDERS (TOTAL NUMBER);\n## Columns\n- TOTAL: Tổng tiền / Total (aliases: doanh thu)',
+              tableName: 'ORDERS',
+              schemaName: 'ADMIN',
+              docType: 'schema',
+              documentId: 'db.ADMIN.ORDERS.schema',
+              chunkIndex: '0',
+            },
+          });
+        }
+        if (!opts?.filter?.docType || opts.filter.docType === 'sqlexample' || opts.filter.tableName) {
+          rows.push({
+            score: 0.6,
+            metadata: {
+              text: 'SELECT SUM(TOTAL) FROM ADMIN.ORDERS',
+              tableName: 'ORDERS',
+              schemaName: 'ADMIN',
+              docType: 'sqlexample',
+              documentId: 'db.ADMIN.ORDERS.sqlexample',
+              chunkIndex: '0',
+            },
+          });
+        }
+        return { matches: rows.filter((r) => !opts?.filter?.docType || r.metadata.docType === opts.filter.docType) };
+      }
+      return {
+        matches: [
+          {
+            score: 0.95,
+            metadata: {
+              text: '## Sample shape\n```json\n[{ "TOTAL": 10 }]\n```',
+              tableName: 'ORDERS',
+              schemaName: 'ADMIN',
+              docType: 'schema',
+              documentId: 'db.ADMIN.ORDERS.schema',
+              chunkIndex: '1',
+            },
+          },
+        ],
+      };
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.4, 0.5]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const wired: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((n) =>
+        n.id === 'tool_get'
+          ? { ...n, data: { ...n.data, groupByField: 'tableName', topK: 3 } }
+          : n,
+      ),
+    };
+
+    const result = await executeGetRag({
+      env,
+      definition: wired,
+      agentId: 'tool_get',
+      input: { query: 'doanh thu tháng này' },
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.snippets[0]?.text).toContain('doanh thu');
+    expect(result.snippets[0]?.text).toContain('## schema');
+    expect(result.snippets[0]?.text).toContain('## sqlexample');
+    expect(result.snippets[0]?.text).toContain('SELECT SUM(TOTAL)');
+    expect(result.snippets[0]?.schemaName).toBe('ADMIN');
   });
 
   it('uses a mapped groupByField expression for the metadata key name', async () => {

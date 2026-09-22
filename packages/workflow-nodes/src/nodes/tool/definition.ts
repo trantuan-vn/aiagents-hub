@@ -324,7 +324,8 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
   "get-rag": {
     toolKind: "get-rag",
     toolName: "get_rag",
-    toolDescription: "Search the knowledge base for passages relevant to the user question.",
+    toolDescription:
+      "Find related table schema (VI/EN column descriptions) and SQL examples for the user question so you can write SELECT. Do not call when schema snippets are already in context.",
     queryField: GET_RAG_QUERY_FIELD,
     groupByField: GET_RAG_GROUP_BY_FIELD,
     topK: 12,

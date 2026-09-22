@@ -27,6 +27,7 @@ import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 import { executeReasoningAgent } from './execute-reasoning.js';
+import { omitGetRagWhenGrounded } from './reasoning/tools.js';
 import {
   aiParamsFromServiceOptions,
   assertTextGenerationModel,
@@ -131,11 +132,11 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     ctx.node.id,
   );
   const httpTools = buildAgentToolset({ env: ctx.c.env, userDO: ctx.userDO }, ctx.definition);
-  const tools = { ...httpTools, ...ragTools };
-  const toolNames = Object.keys(tools);
-  const useToolLoop = toolNames.length > 0;
   const ragSnippets = Array.isArray(nodeInput.snippets) ? nodeInput.snippets : [];
   const useRetrievedSqlContext = Boolean(String(nodeInput.ragText ?? '').trim() || ragSnippets.length);
+  const tools = omitGetRagWhenGrounded({ ...httpTools, ...ragTools }, useRetrievedSqlContext);
+  const toolNames = Object.keys(tools);
+  const useToolLoop = toolNames.length > 0;
 
   const systemParts = [
     systemPrompt,

@@ -1,7 +1,6 @@
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import {
   embedTextWithUsage,
-  matchToSnippet,
   queryCollection,
   resolveVectorizeIndex,
   VECTORIZE_ALL_METADATA_TOPK,
@@ -30,11 +29,13 @@ import {
   resolveGroupKey,
 } from './assemble.js';
 
+/** Both Phase 2 document types must be present per table for Reasoning Agent SQL. */
+const SQL_RAG_DOC_TYPES = ['schema', 'sqlexample'] as const;
+
 export type GetRagInput = {
   query: string;
   topK?: number;
   namespace?: string;
-  docType?: string;
 };
 
 export type GetRagSnippet = {
@@ -44,6 +45,7 @@ export type GetRagSnippet = {
   score?: number;
   docType?: string;
   tableName?: string;
+  schemaName?: string;
 };
 
 export type GetRagResult = {
@@ -66,46 +68,18 @@ export type GetRagExecuteParams = {
   triggerContext?: Record<string, unknown>;
 };
 
-function sqlChunkScore(match: VectorMatch): number {
-  const text = matchToSnippet(match);
-  const docType = String(match.metadata?.docType ?? '');
-  let score = 0;
-  if (/CREATE TABLE|## DDL/i.test(text)) score += 4;
-  if (/```sql/i.test(text)) score += 2;
-  if (docType === 'sqlexample') score += 2;
-  if (docType === 'schema') score += 1;
-  return score;
+function presentDocTypes(matches: VectorMatch[]): Set<string> {
+  return new Set(matches.map((m) => String(m.metadata?.docType ?? '').trim()).filter(Boolean));
 }
 
-function groupKey(match: VectorMatch): string {
-  return String(
-    match.metadata?.tableName ||
-      match.metadata?.source ||
-      match.metadata?.documentId ||
-      match.id ||
-      matchToSnippet(match).slice(0, 40),
-  );
+/** Missing schema / sqlexample for this table group. */
+export function missingSqlRagDocTypes(matches: VectorMatch[]): string[] {
+  const present = presentDocTypes(matches);
+  return SQL_RAG_DOC_TYPES.filter((t) => !present.has(t));
 }
 
-/** @deprecated Prefer assembleGroupSnippet — kept for ranking which related groups to hydrate. */
-export function preferSqlChunks(matches: VectorMatch[], topK: number): VectorMatch[] {
-  const ranked = [...matches].sort(
-    (a, b) => sqlChunkScore(b) - sqlChunkScore(a) || (b.score ?? 0) - (a.score ?? 0),
-  );
-  const byTable = new Map<string, VectorMatch>();
-  for (const match of ranked) {
-    const key = groupKey(match);
-    if (!byTable.has(key)) byTable.set(key, match);
-  }
-  return [...byTable.values()].slice(0, topK);
-}
-
-function groupLooksIncomplete(matches: VectorMatch[]): boolean {
-  const text = matches.map(matchToSnippet).join('\n');
-  const types = new Set(matches.map((m) => String(m.metadata?.docType ?? '')).filter(Boolean));
-  const hasStructure = /CREATE TABLE|## DDL|## Columns/i.test(text);
-  const hasData = /Sample shape|```json/i.test(text) || types.size > 1;
-  return !hasStructure || !hasData;
+export function groupLooksIncomplete(matches: VectorMatch[]): boolean {
+  return missingSqlRagDocTypes(matches).length > 0;
 }
 
 /** Literal metadata key from node config, or an expression that resolves to a key name. */
@@ -129,6 +103,30 @@ async function loadDocumentRows(
     return matchesFromVectorRows(rows ?? []);
   } catch (e) {
     console.warn('[get-rag] getByIds hydrate failed:', e);
+    return [];
+  }
+}
+
+async function queryTypedForGroup(params: {
+  env: Env;
+  collection: string;
+  queryVector: number[];
+  namespace?: string;
+  groupBy: string;
+  groupValue: string;
+  docType: string;
+}): Promise<VectorMatch[]> {
+  try {
+    const filter: Record<string, string> = { docType: params.docType };
+    if (params.groupBy) filter[params.groupBy] = params.groupValue;
+    return await queryCollection(params.env, params.collection, params.queryVector, {
+      topK: VECTORIZE_ALL_METADATA_TOPK,
+      namespace: params.namespace,
+      docType: params.docType,
+      filter,
+    });
+  } catch (e) {
+    console.warn(`[get-rag] typed ${params.docType} query failed:`, e);
     return [];
   }
 }
@@ -164,6 +162,28 @@ async function hydrateRelatedGroups(params: {
       const catalogued = grouped.some(
         (match) => match.metadata?.tableName || match.metadata?.docType || match.metadata?.schemaName,
       );
+
+      if (catalogued && groupLooksIncomplete(grouped)) {
+        for (const docType of missingSqlRagDocTypes(grouped)) {
+          grouped = mergeMatches(
+            grouped,
+            await queryTypedForGroup({
+              env: params.env,
+              collection: params.collection,
+              queryVector: params.queryVector,
+              namespace: params.namespace,
+              groupBy,
+              groupValue,
+              docType,
+            }),
+          );
+        }
+        grouped = mergeMatches(
+          grouped,
+          await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)),
+        );
+      }
+
       if (catalogued && groupLooksIncomplete(grouped) && params.extraEmbed) {
         try {
           const namedVector = await params.extraEmbed(groupValue);
@@ -176,6 +196,20 @@ async function hydrateRelatedGroups(params: {
               grouped,
               named.filter((match) => resolveGroupKey(match, groupBy) === groupValue),
             );
+            for (const docType of missingSqlRagDocTypes(grouped)) {
+              grouped = mergeMatches(
+                grouped,
+                await queryTypedForGroup({
+                  env: params.env,
+                  collection: params.collection,
+                  queryVector: namedVector,
+                  namespace: params.namespace,
+                  groupBy,
+                  groupValue,
+                  docType,
+                }),
+              );
+            }
             grouped = mergeMatches(
               grouped,
               await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)),
@@ -188,6 +222,37 @@ async function hydrateRelatedGroups(params: {
       return grouped;
     }),
   );
+}
+
+/** Query both schema and sqlexample so table selection is not biased to one docType. */
+async function queryBothDocTypes(
+  env: Env,
+  collection: string,
+  vector: number[],
+  opts: { topK: number; namespace?: string; scoreThreshold?: number },
+): Promise<VectorMatch[]> {
+  const broadTopK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(opts.topK * 4, 16));
+  const perTypeTopK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(opts.topK * 2, 8));
+  const base = {
+    namespace: opts.namespace,
+    scoreThreshold: opts.scoreThreshold,
+  };
+  const [broad, schemaMatches, sqlMatches] = await Promise.all([
+    queryCollection(env, collection, vector, { ...base, topK: broadTopK }),
+    queryCollection(env, collection, vector, {
+      ...base,
+      topK: perTypeTopK,
+      docType: 'schema',
+      filter: { docType: 'schema' },
+    }),
+    queryCollection(env, collection, vector, {
+      ...base,
+      topK: perTypeTopK,
+      docType: 'sqlexample',
+      filter: { docType: 'sqlexample' },
+    }),
+  ]);
+  return mergeMatches(broad, schemaMatches, sqlMatches);
 }
 
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
@@ -208,7 +273,6 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
 
   const topK = input.topK ?? (Number(config.topK ?? 12) || 12);
   const namespace = input.namespace ?? String(config.namespace ?? rag.namespace);
-  const docType = input.docType ?? (config.docTypeFilter ? String(config.docTypeFilter) : undefined);
   const scoreThreshold = config.scoreThreshold != null ? Number(config.scoreThreshold) : undefined;
   const includeMetadata = config.includeMetadata !== false;
 
@@ -225,10 +289,9 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
-    const matches = await queryCollection(env, rag.collection, vector, {
-      topK: Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(topK * 4, 16)),
+    const matches = await queryBothDocTypes(env, rag.collection, vector, {
+      topK,
       namespace: namespace || undefined,
-      docType,
       scoreThreshold,
     });
 
@@ -268,7 +331,11 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
       })
       .filter((snippet) => snippet.text.trim())
       .slice(0, topK)
-      .map((snippet) => (includeMetadata ? snippet : { text: snippet.text, score: snippet.score }));
+      .map((snippet) =>
+        includeMetadata
+          ? snippet
+          : { text: snippet.text, score: snippet.score, tableName: snippet.tableName, schemaName: snippet.schemaName },
+      );
     return { snippets, count: snippets.length, raw: { usage } };
   } catch (e) {
     const message = String(e instanceof Error ? e.message : e).slice(0, 500);

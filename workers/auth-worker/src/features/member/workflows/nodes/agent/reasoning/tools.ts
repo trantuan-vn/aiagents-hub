@@ -91,6 +91,18 @@ export function decorateToolDescription(name: string, description: string): stri
   return `${description} ${when}`.trim();
 }
 
+/** Drop get_rag from the tool loop when upstream / prefetch already supplied snippets. */
+export function omitGetRagWhenGrounded<T extends ToolSet>(tools: T, alreadyGrounded: boolean): T {
+  if (!alreadyGrounded) return tools;
+  const next = { ...tools } as T;
+  for (const name of Object.keys(next)) {
+    if (/get[_-]?rag/i.test(name)) {
+      delete (next as Record<string, unknown>)[name];
+    }
+  }
+  return next;
+}
+
 export function buildAskUserTool(): ToolSet {
   return {
     [ASK_USER_TOOL]: tool({

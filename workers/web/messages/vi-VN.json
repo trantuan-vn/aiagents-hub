@@ -2944,7 +2944,7 @@
     "tool_save_rag": "Save RAG",
     "tool_save_rag_desc": "Nhúng chunk tài liệu và lưu vào knowledge base của agent.",
     "tool_get_rag": "Get RAG",
-    "tool_get_rag_desc": "Tìm kiếm knowledge base để lấy đoạn văn liên quan câu hỏi.",
+    "tool_get_rag_desc": "Tìm schema bảng và SQL mẫu liên quan câu hỏi để agent viết SELECT.",
     "tool_get_db_info": "Get DB Info",
     "tool_get_db_info_desc": "Liệt kê tên bảng. Schema từng bảng được tải trong vòng lặp (Save RAG).",
     "tool_category_mcp": "MCP servers",
