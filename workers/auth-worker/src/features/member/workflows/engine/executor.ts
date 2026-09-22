@@ -173,6 +173,14 @@ interface PersistedState {
   /** Which compaction step produced this snapshot. */
   clipPolicy?: string;
   schemaVersion?: number;
+  /** Nested persist metadata (Phase 1). */
+  persistMeta?: {
+    schemaVersion: number;
+    ioClipped: boolean;
+    persistDegraded: boolean;
+    clipPolicy: string;
+    hotBytes: number;
+  };
   /** Graph was dropped to fit storage; resume reloads the live workflow. */
   definitionOmitted?: boolean;
 }

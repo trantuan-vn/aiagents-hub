@@ -5,6 +5,7 @@ import {
 } from '@aiagents-hub/workflow-nodes';
 
 import type { WorkflowNodePlugin } from '../types.js';
+import { AGENT_PERSIST_SHAPE } from '../../engine/persist-shapes.js';
 import { executeAgent } from './execute.js';
 import { executeReasoningAgent } from './execute-reasoning.js';
 
@@ -16,6 +17,7 @@ export const agentPlugin: WorkflowNodePlugin = {
   id: 'agent',
   runtimeType: 'agent',
   execute: executeAgent,
+  ...AGENT_PERSIST_SHAPE,
 };
 
 export function createAgentKindPlugin(kind: AgentKind): WorkflowNodePlugin {
@@ -24,6 +26,7 @@ export function createAgentKindPlugin(kind: AgentKind): WorkflowNodePlugin {
     runtimeType: 'agent',
     kind,
     execute: executeAgent,
+    ...AGENT_PERSIST_SHAPE,
   };
 }
 
@@ -36,4 +39,5 @@ export const agentReasoningPlugin: WorkflowNodePlugin = {
   runtimeType: 'agent',
   kind: 'reasoning_agent',
   execute: executeReasoningAgent,
+  ...AGENT_PERSIST_SHAPE,
 };

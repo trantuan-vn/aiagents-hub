@@ -3,7 +3,9 @@ import type { z } from 'zod';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { BuildWebhookItemParams } from './webhook/output.js';
+import type { PersistShape } from '../engine/persist-shapes.js';
 
+export type { PersistShape } from '../engine/persist-shapes.js';
 export type NodeOutput = Record<string, unknown>;
 
 export interface WorkflowMeta {
@@ -64,7 +66,7 @@ export interface CreateTriggerOpts {
   config?: Record<string, unknown>;
 }
 
-export interface WorkflowNodePlugin {
+export interface WorkflowNodePlugin extends PersistShape {
   id: string;
   runtimeType: string;
   kind?: string;

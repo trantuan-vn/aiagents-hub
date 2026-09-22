@@ -1,13 +1,15 @@
 # Spec: Workflow Execution Logging — an toàn resume + tối ưu lưu trữ
 
-> **Trạng thái:** Draft v1.0 — Phase 0 implemented  
-> **Phiên bản:** 1.0  
+> **Trạng thái:** Draft v1.0 — Phase 0 + Phase 1 implemented  
+> **Phiên bản:** 1.1  
 > **Ngày:** 2026-09-22  
 > **Phạm vi:** Ghi nhận mỗi lần chạy workflow (`workflow_executions` trên UserDO): snapshot resume, step I/O cho Logs UI, output cuối, progress WS  
 > **Bổ sung, không thay thế:** kiến trúc engine → [`workflow-architecture.md`](./workflow-architecture.md); luồng vận hành → [`workflow-how-it-works.md`](./workflow-how-it-works.md)  
 > **Không thay thế:** Monitor Logs (`service_usages`), Admin Cloudflare Logs ([`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md)), Workers structured logger
 
-**Phase 0 (code):** `persist-state.ts` — UTF-8 gate, clip deterministic, ladder + fail-closed; `serializeOutputSummary` (không stub); `executor` — resume thống nhất + persistOrFailRun; API flags `ioClipped` / `legacyStub` / `persistDegraded`.
+**Phase 0 (code):** UTF-8 gate, clip deterministic, ladder + fail-closed; `serializeOutputSummary`; resume thống nhất + `persistOrFailRun`; flags `ioClipped` / `legacyStub` / `persistDegraded`.
+
+**Phase 1 (code):** nested `persistMeta`; always `stateCore` normalize (step preview 4KB); `PersistShape` trên plugin (`resumeFields` / `logFields` / `neverPersist`); `HOT_STATE_MAX_BYTES = 1MB`.
 
 Coding bám spec này. Mục tiêu: **mọi lần persist đều deterministic và resume-safe**; phần “đẹp để xem log” được tối ưu lưu trữ, không được phá control-plane.
 
@@ -375,9 +377,16 @@ Trước mọi persist/offload:
 - [x] UI phân biệt clipped / degraded / legacy.
 - [x] Persist error: không silent-continue (`persistOrFailRun`).
 
+### Phase 1
+- [x] Nested `persistMeta` + `schemaVersion: 1` trên mọi snapshot normalize.
+- [x] Steps trong DO luôn skeleton + preview ≤ `STEP_IO_INLINE_MAX_BYTES` (4KB).
+- [x] `PersistShape` (`resumeFields` / `logFields` / `neverPersist`) trên agent, save-rag, get-rag, get-db-info, loop.
+- [x] `HOT_STATE_MAX_BYTES = 1_000_000` (từ 2MB).
+
 ### Phase 2+
 - [ ] Blob thiếu không làm corrupt cursor; lỗi có mã rõ.
-- [ ] Không in secret vào DO/R2 theo denylist.
+- [ ] Không in secret vào DO/R2 theo denylist (credentialId thay password trong loop).
+- [ ] Hạ tiếp hot cap → 512KB sau khi đo phân vị production.
 
 ---
 

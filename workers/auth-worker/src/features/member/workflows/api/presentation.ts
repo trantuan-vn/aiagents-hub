@@ -151,6 +151,14 @@ function parseExecutionRow(row: any) {
     ioClipped: flags.ioClipped,
     persistDegraded: flags.persistDegraded,
     legacyStub: flags.legacyStub,
+    persistMeta:
+      !stub &&
+      state &&
+      typeof state === 'object' &&
+      (state as { persistMeta?: unknown }).persistMeta &&
+      typeof (state as { persistMeta?: unknown }).persistMeta === 'object'
+        ? (state as { persistMeta: unknown }).persistMeta
+        : undefined,
     // `state` is the internal engine snapshot; expose step trace + graph.
     state: undefined,
   };

@@ -1,28 +1,70 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyPersistShape,
   clipValue,
   executionPersistFlags,
+  HOT_STATE_MAX_BYTES,
   isTruncatedStub,
   MAX_PERSIST_BYTES,
   OUTPUT_SUMMARY_MAX_BYTES,
   PersistStateTooLargeError,
   serializeOutputSummary,
   serializePersistedState,
+  STEP_IO_INLINE_MAX_BYTES,
+  stripNeverPersistKeys,
   utf8ByteLength,
 } from './persist-state.js';
+import { AGENT_PERSIST_SHAPE, SAVE_RAG_PERSIST_SHAPE } from './persist-shapes.js';
+
+function utf8JsonSizeSafe(value: unknown): number {
+  return utf8ByteLength(JSON.stringify(value));
+}
 
 describe('serializePersistedState', () => {
-  it('keeps a small snapshot intact', () => {
+  it('normalizes a small snapshot with persistMeta (stateCore)', () => {
     const persisted = {
       definition: { nodes: [{ id: 'gmail', type: 'human_review' }], edges: [] },
       meta: { workflowId: 19 },
       engine: { queue: [], visited: ['form'], outputs: { form: { ok: true } }, steps: [] },
     };
     const json = serializePersistedState(persisted);
-    expect(JSON.parse(json).engine.visited).toEqual(['form']);
-    expect(JSON.parse(json)._truncated).toBeUndefined();
-    expect(utf8ByteLength(json)).toBeLessThanOrEqual(MAX_PERSIST_BYTES);
+    const parsed = JSON.parse(json);
+    expect(parsed.engine.visited).toEqual(['form']);
+    expect(parsed._truncated).toBeUndefined();
+    expect(parsed.persistMeta?.schemaVersion).toBe(1);
+    expect(parsed.persistMeta?.hotBytes).toBeGreaterThan(0);
+    expect(utf8ByteLength(json)).toBeLessThanOrEqual(HOT_STATE_MAX_BYTES);
+  });
+
+  it('always previews step I/O under STEP_IO_INLINE_MAX_BYTES', () => {
+    const huge = 'x'.repeat(20_000);
+    const json = serializePersistedState({
+      definition: {
+        nodes: [{ id: 'n1', type: 'tool_node', data: { toolKind: 'save-rag' } }],
+        edges: [],
+      },
+      meta: { workflowId: 1 },
+      engine: {
+        queue: [],
+        visited: ['n1'],
+        outputs: { n1: { ok: true, saved: 1 } },
+        steps: [
+          {
+            nodeId: 'n1',
+            nodeType: 'tool_node',
+            status: 'success',
+            input: { blob: huge },
+            output: { ok: true, dump: huge },
+          },
+        ],
+        runContext: { input: '' },
+        totalCostVnd: 0,
+      },
+    });
+    const step = JSON.parse(json).engine.steps[0];
+    expect(utf8JsonSizeSafe(step.input)).toBeLessThanOrEqual(STEP_IO_INLINE_MAX_BYTES + 64);
+    expect(utf8JsonSizeSafe(step.output)).toBeLessThanOrEqual(STEP_IO_INLINE_MAX_BYTES + 64);
   });
 
   it('does not replace an oversized snapshot with a resume-breaking stub', () => {
@@ -55,11 +97,9 @@ describe('serializePersistedState', () => {
     expect(parsed.engine.visited).toEqual(['form', 'dbinfo']);
     expect(parsed.ioTruncated).toBe(true);
     expect(parsed.ioClipped).toBe(true);
-    expect(parsed.clipPolicy).toBeTruthy();
+    expect(parsed.persistMeta?.ioClipped).toBe(true);
     expect(parsed.engine.steps[0].input).toBeDefined();
     expect(String(parsed.engine.steps[0].input.payload).startsWith('xxx')).toBe(true);
-    expect(parsed.engine.steps[0].output.payload).toBeDefined();
-    expect(parsed.engine.outputs.dbinfo.payload).toBeDefined();
   });
 
   it('keeps a modest loop output when a sibling payload is huge', () => {
@@ -68,7 +108,13 @@ describe('serializePersistedState', () => {
       flowKind: 'loop_over_items',
     };
     const json = serializePersistedState({
-      definition: { nodes: [{ id: 'loop', type: 'flow' }], edges: [] },
+      definition: {
+        nodes: [
+          { id: 'db', type: 'tool_node', data: { toolKind: 'get-db-info' } },
+          { id: 'loop', type: 'flow', data: { flowKind: 'loop_over_items' } },
+        ],
+        edges: [],
+      },
       meta: { workflowId: 19 },
       engine: {
         queue: [],
@@ -78,8 +124,20 @@ describe('serializePersistedState', () => {
           loop: loopOut,
         },
         steps: [
-          { nodeId: 'db', nodeType: 'tool', status: 'success', input: { ok: true }, output: { dump: 'y'.repeat(2_500_000) } },
-          { nodeId: 'loop', nodeType: 'flow', status: 'success', input: { tables: ['EMP'] }, output: loopOut },
+          {
+            nodeId: 'db',
+            nodeType: 'tool_node',
+            status: 'success',
+            input: { ok: true },
+            output: { dump: 'y'.repeat(2_500_000) },
+          },
+          {
+            nodeId: 'loop',
+            nodeType: 'flow',
+            status: 'success',
+            input: { tables: ['EMP'] },
+            output: loopOut,
+          },
         ],
         runContext: { input: '' },
         totalCostVnd: 0,
@@ -119,9 +177,12 @@ describe('serializePersistedState', () => {
     expect(utf8ByteLength(a)).toBeLessThanOrEqual(MAX_PERSIST_BYTES);
   });
 
-  it('strips agent raw / RAG docs before budget clipping', () => {
+  it('strips agent raw / RAG docs via PersistShape before budget clipping', () => {
     const json = serializePersistedState({
-      definition: { nodes: [], edges: [] },
+      definition: {
+        nodes: [{ id: 'agent', type: 'agent', data: { agentKind: 'sql_agent' } }],
+        edges: [],
+      },
       meta: { workflowId: 1 },
       engine: {
         queue: [],
@@ -131,6 +192,7 @@ describe('serializePersistedState', () => {
             text: 'hello',
             raw: { choices: [{ content: 'r'.repeat(1_500_000) }] },
             documents: Array.from({ length: 50 }, () => ({ body: 'd'.repeat(50_000) })),
+            snippets: [{ text: 's'.repeat(10_000) }],
           },
         },
         steps: [
@@ -150,6 +212,39 @@ describe('serializePersistedState', () => {
     expect(parsed.engine.outputs.agent?.raw).toBeUndefined();
     expect(parsed.engine.outputs.agent?.documents).toBeUndefined();
     expect(parsed.engine.outputs.agent?.text).toBe('hello');
+    expect(parsed.engine.outputs.agent?.snippets).toBeDefined();
+  });
+});
+
+describe('applyPersistShape', () => {
+  it('keeps resume fields and drops neverPersist', () => {
+    const shaped = applyPersistShape(
+      { text: 'hi', raw: { x: 1 }, snippets: ['a', 'b'], extra: 'gone' },
+      AGENT_PERSIST_SHAPE,
+    ) as Record<string, unknown>;
+    expect(shaped.text).toBe('hi');
+    expect(shaped.raw).toBeUndefined();
+    expect(shaped.extra).toBeUndefined();
+    expect(shaped.snippets).toEqual(['a', 'b']);
+  });
+
+  it('keeps save-rag resume keys', () => {
+    const shaped = applyPersistShape(
+      { ok: true, saved: 3, raw: { usage: 1 }, docs: [{ t: 'x' }], reason: 'skip' },
+      SAVE_RAG_PERSIST_SHAPE,
+    ) as Record<string, unknown>;
+    expect(shaped).toMatchObject({ ok: true, saved: 3, reason: 'skip' });
+    expect(shaped.raw).toBeUndefined();
+    expect(shaped.docs).toBeUndefined();
+  });
+});
+
+describe('stripNeverPersistKeys', () => {
+  it('strips nested raw', () => {
+    expect(stripNeverPersistKeys({ ok: true, raw: { a: 1 }, nested: { raw: 2, b: 3 } })).toEqual({
+      nested: { b: 3 },
+      ok: true,
+    });
   });
 });
 
@@ -197,6 +292,26 @@ describe('isTruncatedStub', () => {
 });
 
 describe('executionPersistFlags', () => {
+  it('reads nested persistMeta', () => {
+    expect(
+      executionPersistFlags({
+        persistMeta: {
+          schemaVersion: 1,
+          ioClipped: true,
+          persistDegraded: false,
+          clipPolicy: 'x',
+          hotBytes: 10,
+        },
+        engine: { queue: [] },
+      }),
+    ).toEqual({
+      legacyStub: false,
+      ioClipped: true,
+      persistDegraded: false,
+      truncated: true,
+    });
+  });
+
   it('distinguishes legacy stub from ioClipped', () => {
     expect(executionPersistFlags({ _truncated: true, byteLength: 1 })).toEqual({
       legacyStub: true,
@@ -208,14 +323,6 @@ describe('executionPersistFlags', () => {
       legacyStub: false,
       ioClipped: true,
       persistDegraded: false,
-      truncated: true,
-    });
-    expect(
-      executionPersistFlags({ persistDegraded: true, ioClipped: true, engine: { queue: [] } }),
-    ).toEqual({
-      legacyStub: false,
-      ioClipped: true,
-      persistDegraded: true,
       truncated: true,
     });
   });

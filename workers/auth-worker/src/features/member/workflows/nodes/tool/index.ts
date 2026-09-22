@@ -6,6 +6,11 @@ import {
 
 import { executeToolNode } from './execute.js';
 import type { WorkflowNodePlugin } from '../types.js';
+import {
+  GET_DB_INFO_PERSIST_SHAPE,
+  GET_RAG_PERSIST_SHAPE,
+  SAVE_RAG_PERSIST_SHAPE,
+} from '../../engine/persist-shapes.js';
 
 export { executeSaveRag, executeSaveRagPipeline } from './save-rag/execute.js';
 export type {
@@ -84,6 +89,7 @@ export const toolSaveRagPlugin: WorkflowNodePlugin = {
   runtimeType: 'tool_node',
   kind: 'save-rag',
   execute: executeToolNode,
+  ...SAVE_RAG_PERSIST_SHAPE,
 };
 
 export const toolGetRagPlugin: WorkflowNodePlugin = {
@@ -91,6 +97,7 @@ export const toolGetRagPlugin: WorkflowNodePlugin = {
   runtimeType: 'tool_node',
   kind: 'get-rag',
   execute: executeToolNode,
+  ...GET_RAG_PERSIST_SHAPE,
 };
 
 export const toolGetDbInfoPlugin: WorkflowNodePlugin = {
@@ -98,6 +105,7 @@ export const toolGetDbInfoPlugin: WorkflowNodePlugin = {
   runtimeType: 'tool_node',
   kind: 'get-db-info',
   execute: executeToolNode,
+  ...GET_DB_INFO_PERSIST_SHAPE,
 };
 
 /** Agent-only validate tool — no data-flow pipeline. */

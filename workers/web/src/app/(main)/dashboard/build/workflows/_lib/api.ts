@@ -167,6 +167,14 @@ export interface WorkflowExecutionRecord {
   persistDegraded?: boolean;
   /** Legacy whole-state `{_truncated}` stub — may not resume. */
   legacyStub?: boolean;
+  /** Nested persist metadata from engine snapshot (Phase 1). */
+  persistMeta?: {
+    schemaVersion: number;
+    ioClipped: boolean;
+    persistDegraded: boolean;
+    clipPolicy: string;
+    hotBytes: number;
+  };
   pendingNodeId?: string;
   startedAt: number;
   finishedAt?: number;

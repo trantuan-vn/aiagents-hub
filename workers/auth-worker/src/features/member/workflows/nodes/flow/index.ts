@@ -5,6 +5,7 @@ import {
 } from '@aiagents-hub/workflow-nodes';
 
 import type { WorkflowNodePlugin } from '../types.js';
+import { LOOP_OVER_ITEMS_PERSIST_SHAPE } from '../../engine/persist-shapes.js';
 import { executeFlow } from './execute.js';
 
 export { executeFlow } from './execute.js';
@@ -22,6 +23,7 @@ export function createFlowKindPlugin(kind: FlowKind): WorkflowNodePlugin {
     runtimeType: 'flow',
     kind,
     execute: executeFlow,
+    ...(kind === 'loop_over_items' ? LOOP_OVER_ITEMS_PERSIST_SHAPE : {}),
   };
 }
 
@@ -36,6 +38,7 @@ export const flowLoopOverItemsPlugin: WorkflowNodePlugin = {
   runtimeType: 'flow',
   kind: 'loop_over_items',
   execute: executeFlow,
+  ...LOOP_OVER_ITEMS_PERSIST_SHAPE,
 };
 
 /** Dedicated filter plugin (override slot — shares execute). */
