@@ -41,11 +41,15 @@ import {
   queueAfterHumanReviewPause,
   queueAfterHumanReviewResume,
 } from './human-review-queue.js';
-import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState } from './persist-state.js';
+import { isTruncatedStub, MAX_PERSIST_BYTES, serializePersistedState, clipValue } from './persist-state.js';
 import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cancel-helpers.js';
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
+
+/** Wall-clock budget per durable slice (form / continue alarm). */
+export const DURABLE_SLICE_WALL_MS = 18_000;
+const PROGRESS_OUTPUT_BUDGET = 24_000;
 
 type NodeType = z.infer<typeof WorkflowNodeTypeSchema>;
 
@@ -64,7 +68,7 @@ export interface ExecutionStepLog {
 }
 
 export interface WorkflowExecutionResult {
-  status: 'completed' | 'failed' | 'pending_human' | 'cancelled';
+  status: 'completed' | 'failed' | 'pending_human' | 'cancelled' | 'running';
   executionKey: string;
   workflowId: number;
   workflowOwnerId: string;
@@ -100,6 +104,11 @@ export interface ExecuteWorkflowParams {
   /** Merge into initial runContext (form trigger fan-out per-table payload). */
   runContextOverride?: Record<string, unknown>;
   triggerKind?: string;
+  /**
+   * Yield after Save RAG / wall budget so DO alarm can continue.
+   * Used by form durable slices; interactive execute leaves this off.
+   */
+  durableSlices?: boolean;
 }
 
 type NodeOutput = Record<string, unknown>;
@@ -285,12 +294,36 @@ interface RunEngineArgs {
   persisted: PersistedState;
   executionKey: string;
   decision?: HumanDecision;
+  /** Yield after heavy nodes / wall budget (form continue slices). */
+  durableSlices?: boolean;
+  /** Skip progress `started` when resuming a slice (avoid flicker). */
+  skipStarted?: boolean;
 }
 
 interface RunEngineResult {
-  status: WorkflowExecutionResult['status'];
+  status: WorkflowExecutionResult['status'] | 'continuing';
   output?: unknown;
   pendingNodeId?: string;
+}
+
+function isSaveRagToolNode(node: WorkflowDefinition['nodes'][number]): boolean {
+  if (node.type !== 'tool_node') return false;
+  return String((node.data ?? {}).toolKind ?? '') === 'save-rag';
+}
+
+function progressOutput(output: unknown): unknown {
+  return clipValue(output, PROGRESS_OUTPUT_BUDGET);
+}
+
+function shouldYieldSlice(
+  durableSlices: boolean,
+  sliceStartedAt: number,
+  node: WorkflowDefinition['nodes'][number],
+  queueLength: number,
+): boolean {
+  if (!durableSlices || queueLength <= 0) return false;
+  if (isSaveRagToolNode(node)) return true;
+  return Date.now() - sliceStartedAt >= DURABLE_SLICE_WALL_MS;
 }
 
 function migrateEngineState(engine: EngineState, definition: WorkflowDefinition): void {
@@ -396,6 +429,8 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   const { c, bindingName, user, userDO, persisted, executionKey } = args;
   const { definition, meta, engine } = persisted;
   let { decision } = args;
+  const durableSlices = !!args.durableSlices;
+  const sliceStartedAt = Date.now();
 
   const emitProgress = async (
     event: Omit<Parameters<typeof broadcastWorkflowExecutionProgress>[1], 'workflowId' | 'executionKey'>,
@@ -405,6 +440,19 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       executionKey,
       ...event,
       entryNodeId: event.entryNodeId || engine.entryNodeId,
+    });
+  };
+
+  const emitNodeDone = async (
+    nodeId: string,
+    status: NonNullable<Parameters<typeof broadcastWorkflowExecutionProgress>[1]['status']>,
+    output?: unknown,
+  ) => {
+    await emitProgress({
+      type: 'node_done',
+      nodeId,
+      status,
+      ...(output !== undefined ? { output: progressOutput(output) } : {}),
     });
   };
 
@@ -438,7 +486,9 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   }
   engine.entryNodeId = engine.entryNodeId || engine.queue[0] || decision?.nodeId;
 
-  await emitProgress({ type: 'started', nodeId: engine.entryNodeId, status: 'running' });
+  if (!args.skipStarted) {
+    await emitProgress({ type: 'started', nodeId: engine.entryNodeId, status: 'running' });
+  }
 
   while (engine.queue.length > 0) {
     const live = await getExecutionByKey(userDO, executionKey);
@@ -552,7 +602,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
             engine.steps.push({ ...log, durationMs: Date.now() - started });
             engine.outputs[nodeId] = log.output as NodeOutput;
             engine.finalOutput = log.output;
-            await emitProgress({ type: 'node_done', nodeId, status: 'error' });
+            await emitNodeDone(nodeId, 'error', log.output);
             await emitProgress({ type: 'finished', nodeId, status: 'failed' });
             return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
           }
@@ -567,7 +617,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
-        await emitProgress({ type: 'node_done', nodeId, status: 'pending_human' });
+        await emitNodeDone(nodeId, 'pending_human', log.output);
         await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
         // Keep other human_review waits; drop leftover siblings so Approve
         // only continues nodes wired after this one.
@@ -581,7 +631,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
-        await emitProgress({ type: 'node_done', nodeId, status: 'skipped' });
+        await emitNodeDone(nodeId, 'skipped', log.output);
         await emitProgress({ type: 'finished', nodeId, status: 'cancelled' });
         return { status: 'cancelled', output: log.output };
       }
@@ -598,11 +648,14 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
       engine.visited.push(nodeId);
-      await emitProgress({ type: 'node_done', nodeId, status: 'success' });
+      await emitNodeDone(nodeId, 'success', out);
       scheduleDownstream(definition, node, out, {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
       }, engine, nodeById);
+      if (shouldYieldSlice(durableSlices, sliceStartedAt, node, engine.queue.length)) {
+        return { status: 'continuing', output: engine.finalOutput };
+      }
       continue;
     }
 
@@ -641,11 +694,14 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.visited.push(nodeId);
       delete engine.runContext._loop;
       delete engine.runContext._loopStates;
-      await emitProgress({ type: 'node_done', nodeId, status: 'success' });
+      await emitNodeDone(nodeId, 'success', engine.outputs[nodeId]);
       scheduleDownstream(definition, node, engine.outputs[nodeId], {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
       }, engine, nodeById);
+      if (shouldYieldSlice(durableSlices, sliceStartedAt, node, engine.queue.length)) {
+        return { status: 'continuing', output: engine.finalOutput };
+      }
     } catch (e) {
       log.status = 'error';
       log.error = String(e instanceof Error ? e.message : e).slice(0, 2000);
@@ -653,7 +709,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = log.output as NodeOutput;
       engine.finalOutput = log.output;
-      await emitProgress({ type: 'node_done', nodeId, status: 'error' });
+      await emitNodeDone(nodeId, 'error', log.output);
       await emitProgress({ type: 'finished', nodeId, status: 'failed' });
       return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
     }
@@ -683,8 +739,10 @@ async function persistResult(
   executionKey: string,
 ): Promise<void> {
   const current = await getExecutionByKey(userDO, executionKey);
-  const status = persistStatusHonoringCancel(current?.status, result.status);
-  const terminal = status !== 'pending_human';
+  const mappedStatus: WorkflowExecutionResult['status'] =
+    result.status === 'continuing' ? 'running' : result.status;
+  const status = persistStatusHonoringCancel(current?.status, mappedStatus);
+  const terminal = status === 'completed' || status === 'failed' || status === 'cancelled';
   await updateExecution(userDO, executionId, {
     status,
     state: capJson(persisted, 'state') ?? '{}',
@@ -707,9 +765,17 @@ async function persistResult(
 // Public API
 // ---------------------------------------------------------------------------
 
-export async function executeWorkflowGraph(
-  params: ExecuteWorkflowParams,
-): Promise<WorkflowExecutionResult> {
+type PreparedRun =
+  | { ok: false; result: WorkflowExecutionResult }
+  | {
+      ok: true;
+      executionKey: string;
+      userDO: DurableObjectStub<UserDO>;
+      persisted: PersistedState;
+      record: { id: number };
+    };
+
+async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<PreparedRun> {
   const { c, bindingName, user, resolved, input, variables = {}, autoApproveHumanReview } = params;
   const { definition } = resolved;
   const userDO = resolveRunnerDO(c, bindingName, user.identifier, params.runnerDoIdString);
@@ -724,26 +790,32 @@ export async function executeWorkflowGraph(
     const missing = params.entryNodeIds.filter((id) => !nodeIds.has(id));
     if (missing.length) {
       return {
-        status: 'failed',
-        executionKey: crypto.randomUUID(),
-        workflowId: resolved.workflowId,
-        workflowOwnerId: resolved.ownerId,
-        output: { error: `Entry node not found: ${missing.join(', ')}` },
-        steps: [],
-        totalCostVnd: 0,
+        ok: false,
+        result: {
+          status: 'failed',
+          executionKey: crypto.randomUUID(),
+          workflowId: resolved.workflowId,
+          workflowOwnerId: resolved.ownerId,
+          output: { error: `Entry node not found: ${missing.join(', ')}` },
+          steps: [],
+          totalCostVnd: 0,
+        },
       };
     }
   }
 
   if (!definition.nodes.length) {
     return {
-      status: 'failed',
-      executionKey,
-      workflowId: resolved.workflowId,
-      workflowOwnerId: resolved.ownerId,
-      output: { error: 'Workflow has no nodes' },
-      steps: [],
-      totalCostVnd: 0,
+      ok: false,
+      result: {
+        status: 'failed',
+        executionKey,
+        workflowId: resolved.workflowId,
+        workflowOwnerId: resolved.ownerId,
+        output: { error: 'Workflow has no nodes' },
+        steps: [],
+        totalCostVnd: 0,
+      },
     };
   }
 
@@ -781,37 +853,42 @@ export async function executeWorkflowGraph(
     },
   };
 
-  let record: { id: number };
   try {
     const { quota } = await loadUserAndSyncPlan(userDO, c.env);
     const minPlanId = resolved.workflow.minPlanId ?? resolved.workflow.min_plan_id ?? 'free';
     if (!resolved.isOwnedByUser && !runnerMeetsMinPlan(quota.planId, minPlanId)) {
       return {
-        status: 'failed',
-        executionKey,
-        workflowId: resolved.workflowId,
-        workflowOwnerId: resolved.ownerId,
-        output: {
-          error: `Plan ${minPlanId} required`,
-          code: 'PLAN_REQUIRED',
-          minPlanId,
-          checkoutPath: '/packages',
+        ok: false,
+        result: {
+          status: 'failed',
+          executionKey,
+          workflowId: resolved.workflowId,
+          workflowOwnerId: resolved.ownerId,
+          output: {
+            error: `Plan ${minPlanId} required`,
+            code: 'PLAN_REQUIRED',
+            minPlanId,
+            checkoutPath: '/packages',
+          },
+          steps: [],
+          totalCostVnd: 0,
         },
-        steps: [],
-        totalCostVnd: 0,
       };
     }
     const triggerKind = params.triggerKind ?? (params.webhookItem ? 'webhook' : 'manual');
     if (resolved.isOwnedByUser) {
       if (triggerKind === 'cron' && !quota.entitlement.canUseCron) {
         return {
-          status: 'failed',
-          executionKey,
-          workflowId: resolved.workflowId,
-          workflowOwnerId: resolved.ownerId,
-          output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
-          steps: [],
-          totalCostVnd: 0,
+          ok: false,
+          result: {
+            status: 'failed',
+            executionKey,
+            workflowId: resolved.workflowId,
+            workflowOwnerId: resolved.ownerId,
+            output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
+            steps: [],
+            totalCostVnd: 0,
+          },
         };
       }
       if (
@@ -819,13 +896,16 @@ export async function executeWorkflowGraph(
         !quota.entitlement.canUseWebhooks
       ) {
         return {
-          status: 'failed',
-          executionKey,
-          workflowId: resolved.workflowId,
-          workflowOwnerId: resolved.ownerId,
-          output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
-          steps: [],
-          totalCostVnd: 0,
+          ok: false,
+          result: {
+            status: 'failed',
+            executionKey,
+            workflowId: resolved.workflowId,
+            workflowOwnerId: resolved.ownerId,
+            output: { error: 'PLAN_FEATURE', code: 'PLAN_FEATURE', checkoutPath: '/packages' },
+            steps: [],
+            totalCostVnd: 0,
+          },
         };
       }
     }
@@ -834,7 +914,7 @@ export async function executeWorkflowGraph(
       graceWhenExhausted: resolved.workflow.graceWhenExhausted === true || resolved.workflow.graceWhenExhausted === 1,
       workflowId: resolved.workflowId,
     });
-    record = await createExecution(userDO, {
+    const record = await createExecution(userDO, {
       executionKey,
       workflowId: resolved.workflowId,
       workflowOwnerId: resolved.ownerId,
@@ -842,22 +922,93 @@ export async function executeWorkflowGraph(
       input: typeof input === 'string' ? input.slice(0, 32_000) : undefined,
       state: capJson(persisted, 'state') ?? '{}',
     });
+    return { ok: true, executionKey, userDO, persisted, record };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return {
-      status: 'failed',
-      executionKey,
-      workflowId: resolved.workflowId,
-      workflowOwnerId: resolved.ownerId,
-      output: { error: message.slice(0, 2000) },
-      steps: [],
-      totalCostVnd: 0,
+      ok: false,
+      result: {
+        status: 'failed',
+        executionKey,
+        workflowId: resolved.workflowId,
+        workflowOwnerId: resolved.ownerId,
+        output: { error: message.slice(0, 2000) },
+        steps: [],
+        totalCostVnd: 0,
+      },
     };
   }
+}
+
+function toPublicResult(
+  result: RunEngineResult,
+  executionKey: string,
+  persisted: PersistedState,
+): WorkflowExecutionResult {
+  const status: WorkflowExecutionResult['status'] =
+    result.status === 'continuing' ? 'running' : result.status;
+  return {
+    status,
+    executionKey,
+    workflowId: persisted.meta.workflowId,
+    workflowOwnerId: persisted.meta.ownerId,
+    output: result.output,
+    steps: persisted.engine.steps,
+    totalCostVnd: persisted.engine.totalCostVnd,
+    totalCreditsCharged: persisted.engine.totalCostVnd,
+    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
+    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
+    pendingNodeId: result.pendingNodeId,
+  };
+}
+
+/** Create the execution record + snapshot without running nodes (form kick). */
+export async function startWorkflowExecution(
+  params: ExecuteWorkflowParams,
+): Promise<WorkflowExecutionResult> {
+  const prepared = await prepareWorkflowExecution(params);
+  if (!prepared.ok) return prepared.result;
+
+  const { executionKey, userDO, persisted } = prepared;
+  await broadcastWorkflowExecutionProgress(userDO, {
+    workflowId: persisted.meta.workflowId,
+    executionKey,
+    type: 'started',
+    nodeId: persisted.engine.entryNodeId,
+    status: 'running',
+    entryNodeId: persisted.engine.entryNodeId,
+  });
+
+  return {
+    status: 'running',
+    executionKey,
+    workflowId: persisted.meta.workflowId,
+    workflowOwnerId: persisted.meta.ownerId,
+    steps: [],
+    totalCostVnd: 0,
+  };
+}
+
+export async function executeWorkflowGraph(
+  params: ExecuteWorkflowParams,
+): Promise<WorkflowExecutionResult> {
+  const prepared = await prepareWorkflowExecution(params);
+  if (!prepared.ok) return prepared.result;
+
+  const { c, bindingName, user, resolved } = params;
+  const { executionKey, userDO, persisted, record } = prepared;
 
   let result: RunEngineResult;
   try {
-    result = await runEngine({ c, bindingName, user, userDO, persisted, executionKey });
+    result = await runEngine({
+      c,
+      bindingName,
+      user,
+      userDO,
+      persisted,
+      executionKey,
+      durableSlices: params.durableSlices,
+    });
   } catch (e) {
     const message = String(e instanceof Error ? e.message : e).slice(0, 2000);
     result = { status: 'failed', output: { error: message } };
@@ -879,19 +1030,113 @@ export async function executeWorkflowGraph(
     }
   }
 
-  return {
-    status: result.status,
-    executionKey,
-    workflowId: resolved.workflowId,
-    workflowOwnerId: resolved.ownerId,
-    output: result.output,
-    steps: persisted.engine.steps,
-    totalCostVnd: persisted.engine.totalCostVnd,
-    totalCreditsCharged: persisted.engine.totalCostVnd,
-    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
-    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
-    pendingNodeId: result.pendingNodeId,
-  };
+  return toPublicResult(result, executionKey, persisted);
+}
+
+/**
+ * Advance a durable (form) execution by one slice. Caller re-enqueues when
+ * status is `running` and work remains.
+ */
+export async function continueWorkflowExecution(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  executionKey: string;
+  runnerDoIdString?: string;
+}): Promise<WorkflowExecutionResult> {
+  const { c, bindingName, user, executionKey } = params;
+  const userDO = resolveRunnerDO(c, bindingName, user.identifier, params.runnerDoIdString);
+
+  const record = await getExecutionByKey(userDO, executionKey);
+  if (!record) throw new Error('Execution not found');
+  if (record.status === 'cancelled') {
+    return {
+      status: 'cancelled',
+      executionKey,
+      workflowId: record.workflowId,
+      workflowOwnerId: record.workflowOwnerId,
+      steps: [],
+      totalCostVnd: record.totalCostVnd ?? 0,
+    };
+  }
+  if (record.status !== 'running') {
+    return {
+      status: record.status as WorkflowExecutionResult['status'],
+      executionKey,
+      workflowId: record.workflowId,
+      workflowOwnerId: record.workflowOwnerId,
+      steps: [],
+      totalCostVnd: record.totalCostVnd ?? 0,
+    };
+  }
+
+  let rawState: unknown;
+  try {
+    rawState = JSON.parse(record.state || '{}') as unknown;
+  } catch {
+    rawState = {};
+  }
+  if (isTruncatedStub(rawState) || !rawState || typeof rawState !== 'object') {
+    return {
+      status: 'failed',
+      executionKey,
+      workflowId: record.workflowId,
+      workflowOwnerId: record.workflowOwnerId,
+      output: { error: 'Execution state missing; cannot continue' },
+      steps: [],
+      totalCostVnd: record.totalCostVnd ?? 0,
+    };
+  }
+
+  const persisted = rawState as PersistedState;
+  if (persisted.definitionOmitted || !Array.isArray(persisted.definition?.nodes)) {
+    const resolved = await resolveWorkflow(
+      c,
+      bindingName,
+      user.identifier,
+      record.workflowId,
+      record.workflowOwnerId,
+    );
+    persisted.definition = resolved.definition;
+    persisted.definitionOmitted = false;
+    persisted.meta = persisted.meta ?? {
+      ownerId: resolved.ownerId,
+      workflowId: resolved.workflowId,
+      isOwnedByUser: resolved.isOwnedByUser,
+      workflowName: String(resolved.workflow.name ?? ''),
+    };
+  }
+
+  let result: RunEngineResult;
+  try {
+    result = await runEngine({
+      c,
+      bindingName,
+      user,
+      userDO,
+      persisted,
+      executionKey,
+      durableSlices: true,
+      skipStarted: true,
+    });
+  } catch (e) {
+    const message = String(e instanceof Error ? e.message : e).slice(0, 2000);
+    result = { status: 'failed', output: { error: message } };
+    await broadcastWorkflowExecutionProgress(userDO, {
+      workflowId: persisted.meta.workflowId,
+      executionKey,
+      type: 'finished',
+      status: 'failed',
+    });
+  }
+
+  try {
+    await persistResult(userDO, record.id, persisted, result, executionKey);
+  } catch (e) {
+    console.warn('[continueWorkflowExecution] persist failed:', e instanceof Error ? e.message : e);
+  }
+
+  return toPublicResult(result, executionKey, persisted);
 }
 
 async function resolvePersistedForResume(params: {
@@ -1011,7 +1256,7 @@ export async function resumeWorkflowExecution(params: {
   await persistResult(userDO, record.id, persisted, result, executionKey);
 
   return {
-    status: result.status,
+    status: result.status === 'continuing' ? 'running' : result.status,
     executionKey,
     workflowId: persisted.meta.workflowId,
     workflowOwnerId: persisted.meta.ownerId,

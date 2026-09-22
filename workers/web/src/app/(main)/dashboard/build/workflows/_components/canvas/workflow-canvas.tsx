@@ -34,6 +34,9 @@ import { webhookNodeDefaults } from "../nodes/webhook/defaults";
 import { buildVectorizeNodeData } from "../layout/vectorize-node-data";
 import { warnLegacyRuntimeType } from "../../_lib/runtime-type";
 import type { ExecutionStepLog } from "../../_lib/api";
+import { getWorkflowExecution } from "../../_lib/api";
+import { applyStepOutputs } from "../hooks/apply-step-outputs";
+import type { WorkflowExecutionProgressEvent } from "../hooks/workflow-execution-ui";
 
 export type { WorkflowDefinition };
 export { toPersistedDefinition };
@@ -229,7 +232,25 @@ function CanvasInnerWithDrawerUi({
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
-  const executionProgress = useWorkflowExecutionProgress({ workflowId });
+  const onExecutionFinished = useCallback(
+    async (event: WorkflowExecutionProgressEvent) => {
+      try {
+        const { execution: record } = await getWorkflowExecution(event.executionKey);
+        if (record.steps?.length && !readOnly) {
+          applyStepOutputs(record.steps, patchNodeDataById);
+        }
+        if (workflowId) workflowEditorLogsStore.finishRun(workflowId, record.steps);
+      } catch {
+        if (workflowId) workflowEditorLogsStore.finishRun(workflowId);
+      }
+    },
+    [patchNodeDataById, readOnly, workflowId],
+  );
+  const executionProgress = useWorkflowExecutionProgress({
+    workflowId,
+    patchNodeDataById: readOnly ? undefined : patchNodeDataById,
+    onExecutionFinished,
+  });
   const startRun = useCallback(
     (nodeId: string) => {
       if (workflowId) workflowEditorLogsStore.startRun(workflowId, nodeId);

@@ -16,6 +16,8 @@ export type WorkflowExecutionProgressEvent = {
   entryNodeId?: string;
   nodeId?: string;
   status?: string;
+  /** Clipped node output for live canvas pin. */
+  output?: unknown;
 };
 
 export type WorkflowExecutionUiValue = {
@@ -74,8 +76,13 @@ function isProgressEvent(value: unknown): value is WorkflowExecutionProgressEven
 
 export function useWorkflowExecutionProgress({
   workflowId,
+  patchNodeDataById,
+  onExecutionFinished,
 }: {
   workflowId?: number;
+  patchNodeDataById?: (nodeId: string, patch: Record<string, unknown>) => void;
+  /** Called when a run finishes (fetch steps / toast). */
+  onExecutionFinished?: (event: WorkflowExecutionProgressEvent) => void;
 }): WorkflowExecutionUiValue & { bindListeningNodeId: (nodeId: string | null) => void } {
   const user = useDashboardUser();
   const [running, setRunning] = useState(false);
@@ -85,6 +92,10 @@ export function useWorkflowExecutionProgress({
   const executionKeyRef = useRef<string | null>(null);
   const runningRef = useRef(false);
   const listeningRef = useRef<string | null>(null);
+  const patchRef = useRef(patchNodeDataById);
+  const finishedRef = useRef(onExecutionFinished);
+  patchRef.current = patchNodeDataById;
+  finishedRef.current = onExecutionFinished;
   runningRef.current = running;
 
   const bindListeningNodeId = useCallback((nodeId: string | null) => {
@@ -157,6 +168,9 @@ export function useWorkflowExecutionProgress({
               : "success";
           setStatusByNodeId((prev) => ({ ...prev, [data.nodeId!]: status }));
           setCurrentNodeId((current) => (current === data.nodeId ? null : current));
+          if (data.output != null && patchRef.current) {
+            patchRef.current(data.nodeId, { _output: data.output, _outputPinned: true });
+          }
           return;
         }
 
@@ -164,6 +178,7 @@ export function useWorkflowExecutionProgress({
           runningRef.current = false;
           setRunning(false);
           setCurrentNodeId(null);
+          finishedRef.current?.(data);
         }
       },
     }),

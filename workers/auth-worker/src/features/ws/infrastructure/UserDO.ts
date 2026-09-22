@@ -11,6 +11,12 @@ import {
   ensureTriggerTable,
   nextAlarmAfterTick,
 } from '../../member/workflows/triggers/triggers.js';
+import {
+  dispatchOneWorkflowContinue,
+  enqueueContinueJob,
+  workflowContinueWakeAt,
+} from '../../member/workflows/execution/workflow-continue-dispatch.js';
+import type { WorkflowContinueJob } from '../../member/workflows/execution/workflow-continue.js';
 import { readSystemConfigText } from '../../admin/system-config/read-cached.js';
 import {
   groupRecordsForQueueFlush,
@@ -350,6 +356,7 @@ export class UserDO extends DurableObject {
         '/workflow/collab/publish': (req) => this.handleWorkflowCollabPublish(req),
         '/workflow/webhook/broadcast': (req) => this.handleWorkflowWebhookBroadcast(req),
         '/workflow/execution/progress': (req) => this.handleWorkflowExecutionProgress(req),
+        '/workflow/execution/enqueue': (req) => this.handleWorkflowExecutionEnqueue(req),
       };
 
       const handler = routeHandlers[url.pathname];
@@ -1099,6 +1106,7 @@ export class UserDO extends DurableObject {
         tasks.push(this.flushAllPendingRecords(), this.cleanupOldProcessedRecords());
       }
       tasks.push(this.dispatchDueWorkflowCrons());
+      tasks.push(this.dispatchWorkflowContinues());
       await Promise.all(tasks);
     } catch (error) {
       handleErrorWithoutIp(error, "Alarm execution error");
@@ -1158,12 +1166,55 @@ export class UserDO extends DurableObject {
       const config = await this.getAuthQueueConfig();
       queueWake = Date.now() + config.RETRY_ALARM_INTERVAL;
     }
-    const target = nextAlarmAfterTick(await this.cronWakeAt(), queueWake ?? undefined);
+    const continueWake = await workflowContinueWakeAt(this.storage);
+    const hints = [queueWake, continueWake].filter(
+      (v): v is number => typeof v === 'number' && Number.isFinite(v),
+    );
+    const hintMs = hints.length ? Math.min(...hints) : undefined;
+    const target = nextAlarmAfterTick(await this.cronWakeAt(), hintMs);
     if (target == null) {
       await this.storage.deleteAlarm();
       return;
     }
     await this.storage.setAlarm(target);
+  }
+
+  private async dispatchWorkflowContinues(): Promise<void> {
+    try {
+      await dispatchOneWorkflowContinue({
+        env: this.env,
+        storage: this.storage,
+        runnerDoIdString: this.userId,
+        identifier: this.userId,
+      });
+    } catch (error) {
+      handleErrorWithoutIp(error, "Workflow continue dispatch error");
+    }
+  }
+
+  private async handleWorkflowExecutionEnqueue(request: Request): Promise<Response> {
+    const job = (await request.json()) as WorkflowContinueJob;
+    if (!job?.executionKey || !job?.bindingName) {
+      return this.jsonResponse({ success: false, error: 'executionKey and bindingName required' }, 400);
+    }
+    const normalized: WorkflowContinueJob = {
+      ...job,
+      identifier: job.identifier || this.userId,
+      runnerDoIdString: job.runnerDoIdString || this.userId,
+    };
+    await enqueueContinueJob(this.storage, normalized, async (when) => {
+      const existing = await this.storage.getAlarm();
+      if (existing == null || existing > when) {
+        await this.storage.setAlarm(when);
+      }
+    });
+    // Start first slice immediately on the DO (more reliable than form Worker waitUntil).
+    this.state.waitUntil(
+      this.dispatchWorkflowContinues().then(() => this.reschedule()).catch((error) => {
+        handleErrorWithoutIp(error, "Workflow continue immediate dispatch error");
+      }),
+    );
+    return this.jsonResponse({ success: true });
   }
 
   private async ensureAlarmArmed(): Promise<void> {

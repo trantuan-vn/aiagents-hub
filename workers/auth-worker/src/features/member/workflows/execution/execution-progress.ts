@@ -20,6 +20,8 @@ export interface WorkflowExecutionProgressEvent {
   entryNodeId?: string;
   nodeId?: string;
   status?: WorkflowExecutionProgressStatus;
+  /** Clipped node output for live canvas pin (node_done only). */
+  output?: unknown;
 }
 
 /** Push live node progress to the runner's connected WebSocket clients. */

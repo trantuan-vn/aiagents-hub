@@ -229,6 +229,13 @@ export function useWorkflowExecuteEntry({
       setLiveOutput(output);
       patchNodeDataById(listeningNodeId, { _output: output, _outputPinned: true });
 
+      // Durable form kick: fields arrive with status=running before slices finish.
+      // Keep WS listening for the final broadcast; do not finishRun yet.
+      if (isForm && event.status === "running") {
+        toast.message(tRegistry("form_event_received"));
+        return;
+      }
+
       try {
         const { execution: record } = await getWorkflowExecution(event.executionKey);
         if (record.steps?.length) {
@@ -241,6 +248,9 @@ export function useWorkflowExecuteEntry({
         else if (record.status === "cancelled") toast.message(tExecute("cancelled"));
         else if (record.status === "failed") {
           toast.error(String(record.error ?? tExecute("failed")));
+        } else if (record.status === "running") {
+          // Still slicing — wait for progress finished / final form broadcast.
+          return;
         } else if (!isChat) {
           toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
         }
@@ -252,7 +262,7 @@ export function useWorkflowExecuteEntry({
         }
       }
 
-      // n8n behaviour: a test form deactivates after the first submission.
+      // n8n behaviour: a test form deactivates after the first (final) submission result.
       if (isForm) {
         deactivateFormListening(listeningNode);
         setListeningNodeId(null);

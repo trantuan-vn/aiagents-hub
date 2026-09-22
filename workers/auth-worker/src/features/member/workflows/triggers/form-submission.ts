@@ -1,11 +1,15 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
-import { executeWorkflowGraph } from '../engine/executor.js';
+import { startWorkflowExecution } from '../engine/executor.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import {
   bindResolvedToActor,
   ownerRunActor,
+  progressDoIdForActor,
   type WorkflowRunActor,
 } from '../execution/workflow-runner.js';
+import { enqueueWorkflowContinue } from '../execution/workflow-continue.js';
+import { getIdFromName } from '../../../../shared/utils.js';
+import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import { broadcastWorkflowWebhookResult } from './webhook-notify.js';
 
 export type FormElementConfig = {
@@ -331,6 +335,10 @@ export async function parseFormSubmissionRequest(
   return fields;
 }
 
+/**
+ * Kick a durable form run: create execution, enqueue DO slices, broadcast
+ * form fields immediately. Does not await Loop/Save RAG.
+ */
 export async function runFormSubmissionTrigger(params: {
   env: Env;
   bindingName: string;
@@ -342,7 +350,9 @@ export async function runFormSubmissionTrigger(params: {
   executionMode: 'test' | 'production';
   autoApproveHumanReview?: boolean;
   actor?: WorkflowRunActor;
-}): Promise<Awaited<ReturnType<typeof executeWorkflowGraph>>> {
+  workflowId: number;
+  formPath: string;
+}): Promise<Awaited<ReturnType<typeof startWorkflowExecution>>> {
   const output = buildFormSubmissionOutput(params.fields, {
     formUrl: params.formUrl,
     executionMode: params.executionMode,
@@ -354,7 +364,7 @@ export async function runFormSubmissionTrigger(params: {
   const actor = params.actor ?? ownerRunActor(params.ownerId);
   const resolved = bindResolvedToActor(params.resolved, actor, binding);
 
-  return executeWorkflowGraph({
+  const started = await startWorkflowExecution({
     c: { env: params.env } as any,
     bindingName: params.bindingName,
     user: { identifier: actor.identifier },
@@ -365,7 +375,51 @@ export async function runFormSubmissionTrigger(params: {
     requestMeta: { userAgent: 'trigger:form' },
     entryNodeIds: [params.node.id],
     runContextOverride: output,
+    triggerKind: 'form',
   });
+
+  if (started.status === 'failed') {
+    return started;
+  }
+
+  const progressDoId = progressDoIdForActor(actor, binding, params.ownerId);
+  const runnerDO = (
+    actor.runnerDoIdString
+      ? binding.get(binding.idFromString(actor.runnerDoIdString))
+      : (getIdFromName({ env: params.env } as any, actor.identifier, params.bindingName) as DurableObjectStub<UserDO>)
+  ) as DurableObjectStub<UserDO>;
+
+  await enqueueWorkflowContinue(runnerDO, {
+    executionKey: started.executionKey,
+    bindingName: params.bindingName,
+    identifier: actor.identifier,
+    runnerDoIdString: actor.runnerDoIdString ?? progressDoId,
+    formNotify: {
+      workflowId: params.workflowId,
+      nodeId: params.node.id,
+      formPath: params.formPath,
+      fields: params.fields,
+      formUrl: params.formUrl,
+      executionMode: params.executionMode,
+      progressDoId,
+      bindingName: params.bindingName,
+    },
+  });
+
+  // Pin form fields in the editor immediately (status=running). Final status
+  // is broadcast again when the last continue slice finishes.
+  await broadcastFormSubmissionResult(params.env, params.bindingName, progressDoId, {
+    workflowId: params.workflowId,
+    nodeId: params.node.id,
+    formPath: params.formPath,
+    executionKey: started.executionKey,
+    status: 'running',
+    fields: params.fields,
+    formUrl: params.formUrl,
+    executionMode: params.executionMode,
+  });
+
+  return started;
 }
 
 export async function broadcastFormSubmissionResult(
