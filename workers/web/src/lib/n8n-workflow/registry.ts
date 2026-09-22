@@ -13,6 +13,7 @@ import { HUMAN_REVIEW_GMAIL_N8N_DESCRIPTION } from "./descriptions/human-review-
 import { HTTP_REQUEST_N8N_DESCRIPTION } from "./descriptions/http-request";
 import { MEMORY_NODE_N8N_DESCRIPTION } from "./descriptions/memory-node";
 import { SERVICE_NODE_N8N_DESCRIPTION } from "./descriptions/service-node";
+import { CHECK_SQL_TOOL_N8N_DESCRIPTION } from "./descriptions/check-sql-tool";
 import { GET_DB_INFO_TOOL_N8N_DESCRIPTION } from "./descriptions/get-db-info-tool";
 import { GET_RAG_TOOL_N8N_DESCRIPTION } from "./descriptions/get-rag-tool";
 import { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./descriptions/save-rag-tool";
@@ -45,6 +46,7 @@ const BY_KIND: Record<string, N8nNodeTypeDescription> = {
   "tool_node:save-rag": SAVE_RAG_TOOL_N8N_DESCRIPTION,
   "tool_node:get-rag": GET_RAG_TOOL_N8N_DESCRIPTION,
   "tool_node:get-db-info": GET_DB_INFO_TOOL_N8N_DESCRIPTION,
+  "tool_node:check-sql": CHECK_SQL_TOOL_N8N_DESCRIPTION,
   "flow:loop_over_items": FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION,
   "flow:filter": FILTER_N8N_DESCRIPTION,
   "data_transformation:filter": FILTER_N8N_DESCRIPTION,

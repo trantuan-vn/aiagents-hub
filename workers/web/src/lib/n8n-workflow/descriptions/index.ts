@@ -14,6 +14,7 @@ export { TOOL_NODE_N8N_DESCRIPTION } from "./tool-node";
 export { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./save-rag-tool";
 export { GET_RAG_TOOL_N8N_DESCRIPTION } from "./get-rag-tool";
 export { GET_DB_INFO_TOOL_N8N_DESCRIPTION } from "./get-db-info-tool";
+export { CHECK_SQL_TOOL_N8N_DESCRIPTION } from "./check-sql-tool";
 export { FLOW_LOOP_OVER_ITEMS_N8N_DESCRIPTION } from "./flow-loop-over-items";
 export { FILTER_N8N_DESCRIPTION } from "./filter";
 export { CORE_N8N_DESCRIPTION } from "./core";
