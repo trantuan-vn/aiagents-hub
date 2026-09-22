@@ -13,10 +13,8 @@ export const getDbInfoToolModule: ToolModule = {
     tool: tool({
       description: bind.toolDescription,
       inputSchema: z.object({
-        tableName: z.string().optional(),
         schemaName: z.string().optional(),
-        sampleRowLimit: z.number().optional(),
-        sqlHistoryLimit: z.number().optional(),
+        tableFilter: z.string().optional(),
       }),
       execute: async (input) =>
         executeGetDbInfo({

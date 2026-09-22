@@ -12,10 +12,12 @@ import {
 } from '../shared/rag-context.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
-import { introspectTablesToRagDocuments } from './table-docs.js';
 import { resolveOracleConnectConfig } from '../shared/db/index.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 import { chunkText } from './chunk.js';
+import { describeTable } from './describe-table.js';
+import { ragDocumentsFromEnrichment, type RagDocumentItem } from './documents.js';
+import { introspectTablesInfo } from './table-docs.js';
 
 export type SaveRagChunkInput = {
   content: string;
@@ -77,7 +79,10 @@ async function executeSaveRagMany(params: {
   billing?: RagBilling;
 }): Promise<SaveRagManyResult> {
   const toolId = findRagToolNodeId(params.definition, params.agentId, 'save-rag');
-  const config = toolNodeConfig(params.definition, toolId, 'save-rag') ?? toolNodeConfig(params.definition, params.agentId, 'save-rag') ?? {};
+  const config =
+    toolNodeConfig(params.definition, toolId, 'save-rag') ??
+    toolNodeConfig(params.definition, params.agentId, 'save-rag') ??
+    {};
   const rag = resolveRagResources(params.definition, toolId, params.embedModel, {
     ownerId: params.ownerId,
     workflowId: params.workflowId,
@@ -102,10 +107,9 @@ async function executeSaveRagMany(params: {
   const pending: Pending[] = [];
   for (const input of params.docs) {
     const content = String(input.content ?? '').trim();
-    const chunks =
-      input.chunks?.length
-        ? input.chunks.map((c) => ({ content: c.content, index: c.index }))
-        : chunkText(content, chunkSize, chunkOverlap);
+    const chunks = input.chunks?.length
+      ? input.chunks.map((c) => ({ content: c.content, index: c.index }))
+      : chunkText(content, chunkSize, chunkOverlap);
     if (!chunks.length) continue;
     const documentId = String(input.documentId ?? crypto.randomUUID());
     pending.push({
@@ -190,6 +194,7 @@ async function executeSaveRagMany(params: {
   };
 }
 
+/** Embed + upsert prepared documents (internal / tests). */
 export async function executeSaveRag(params: SaveRagExecuteParams): Promise<SaveRagResult> {
   const { results, usage } = await executeSaveRagMany({
     env: params.env,
@@ -225,7 +230,6 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
 }
 
-/** Loop output (current item + forwarded predecessor fields) is the only input. */
 function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>): Record<string, unknown> {
   const merged: Record<string, unknown> = {
     ...asRecord(ctx.nodeInput),
@@ -238,6 +242,7 @@ function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>)
     ...asRecord(item.connection),
   };
   const oracle = resolveOracleConnectConfig({ ...merged, connection });
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   return {
     ...merged,
     ...item,
@@ -248,21 +253,12 @@ function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>)
       : Object.keys(connection).length
         ? connection
         : { type: String(merged.connectionType ?? '') },
+    limits: {
+      ...asRecord(merged.limits),
+      sampleRowLimit: 3,
+      sqlHistoryLimit: data.sqlHistoryLimit ?? asRecord(merged.limits).sqlHistoryLimit ?? 10,
+    },
   };
-}
-
-function metadataFromItem(item: Record<string, unknown>): Record<string, string> {
-  const raw = item.metadata;
-  const out: Record<string, string> = {};
-  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (v != null) out[k] = String(v);
-    }
-  }
-  for (const key of ['docType', 'tableName', 'schemaName', 'dbId', 'namespace']) {
-    if (item[key] != null && out[key] == null) out[key] = String(item[key]);
-  }
-  return out;
 }
 
 function indexedTables(runContext: NodeOutput): Set<string> {
@@ -280,9 +276,7 @@ function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): 
   const done = indexedTables(ctx.runContext);
   return items
     .map((item) => {
-      const content = resolvePipelineField(data.contentField, item, ctx.nodeInput, []);
-      if (String(content).trim()) return null;
-      const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, []);
+      const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, ['tableName']);
       if (!tableName.trim()) return null;
       return { ...item, tableName, schemaName: String(item.schemaName ?? ctx.nodeInput.schemaName ?? '') };
     })
@@ -290,10 +284,7 @@ function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): 
     .filter((item) => !done.has(String(item.tableName ?? '')));
 }
 
-async function saveDocuments(
-  ctx: NodeContext,
-  docs: Array<{ content: string; documentId: string; source: string; metadata: Record<string, string> }>,
-): Promise<SaveRagManyResult> {
+async function saveDocuments(ctx: NodeContext, docs: RagDocumentItem[]): Promise<SaveRagManyResult> {
   const filtered = docs.filter((doc) => String(doc.content).trim());
   if (!filtered.length) return { results: [] };
   return executeSaveRagMany({
@@ -313,61 +304,55 @@ async function saveDocuments(
   });
 }
 
-/** Graph-path execute (loop table / pipeline_auto): chunk + embed + upsert. */
+/** Graph-path: introspect → LLM describe → schema + sqlexample → embed. */
 export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
-  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const items = pipelineItems(ctx.nodeInput);
   if (!items.length) {
-    throw new Error('save_rag: no content to save (upstream item is empty)');
+    throw new Error('save_rag: no table item from upstream (connect Get DB Info → Loop → Save RAG)');
   }
 
   const pendingTables = pendingTableItems(ctx, items);
-  const tableNameSet = new Set(pendingTables.map((item) => String(item.tableName ?? '')));
+  if (!pendingTables.length) {
+    return {
+      ok: true,
+      saved: 0,
+      items: [],
+      documentIds: [],
+      skipped: true,
+      reason: 'no pending tables (already indexed or missing tableName)',
+    };
+  }
 
   const results: SaveRagResult[] = [];
   const usages: AiUsage[] = [];
+  const docs: RagDocumentItem[] = [];
 
-  if (pendingTables.length) {
-    const docs = await introspectTablesToRagDocuments({
-      env: ctx.c.env,
-      definition: ctx.definition,
-      agentId: ctx.node.id,
-      triggerContext: triggerContextForTable(ctx, pendingTables[0]!),
-      tables: pendingTables.map((item) => ({
-        tableName: String(item.tableName ?? ''),
-        schemaName: String(item.schemaName ?? ''),
-      })),
-    });
+  const infos = await introspectTablesInfo({
+    env: ctx.c.env,
+    definition: ctx.definition,
+    agentId: ctx.node.id,
+    triggerContext: triggerContextForTable(ctx, pendingTables[0]!),
+    tables: pendingTables.map((item) => ({
+      tableName: String(item.tableName ?? ''),
+      schemaName: String(item.schemaName ?? ''),
+    })),
+  });
+
+  for (const info of infos) {
+    const enrichment = await describeTable(ctx, info);
+    docs.push(...ragDocumentsFromEnrichment(info, enrichment));
+  }
+
+  if (docs.length) {
     const batch = await saveDocuments(ctx, docs);
     results.push(...batch.results);
     if (batch.usage) usages.push(batch.usage);
-    markIndexedTables(
-      ctx.runContext,
-      pendingTables.map((item) => String(item.tableName ?? '')),
-    );
   }
 
-  const contentDocs: Array<{ content: string; documentId: string; source: string; metadata: Record<string, string> }> =
-    [];
-  for (const item of items) {
-    const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, []);
-    if (tableNameSet.has(tableName) || indexedTables(ctx.runContext).has(tableName)) continue;
-    const content = resolvePipelineField(data.contentField, item, ctx.nodeInput, []);
-    if (!String(content).trim()) continue;
-    const documentId = resolvePipelineField(data.documentIdField, item, ctx.nodeInput, []);
-    const source = resolvePipelineField(data.sourceField, item, ctx.nodeInput, []);
-    contentDocs.push({
-      content,
-      documentId: documentId || crypto.randomUUID(),
-      source: source || '',
-      metadata: metadataFromItem(item),
-    });
-  }
-  if (contentDocs.length) {
-    const batch = await saveDocuments(ctx, contentDocs);
-    results.push(...batch.results);
-    if (batch.usage) usages.push(batch.usage);
-  }
+  markIndexedTables(
+    ctx.runContext,
+    pendingTables.map((item) => String(item.tableName ?? '')),
+  );
 
   const saved = results.reduce((sum, r) => sum + r.saved, 0);
   const usage = mergeAiUsage(...usages);
@@ -377,6 +362,7 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     items: results,
     documentIds: results.map((r) => r.documentId),
     collection: results[0]?.collection,
+    tables: infos.map((i) => i.tableName),
     ...(usage ? { raw: { usage } } : {}),
   };
 }

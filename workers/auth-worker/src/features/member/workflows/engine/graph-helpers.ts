@@ -6,9 +6,9 @@ import { isBranchSourceHandle } from './flow-helpers.js';
 
 export type { VectorizeScopeContext };
 
-export type ResourceHandle = 'service' | 'memory' | 'tools';
+export type ResourceHandle = 'service' | 'memory' | 'tools' | 'llm';
 
-const RESOURCE_HANDLES = new Set<ResourceHandle>(['service', 'memory', 'tools']);
+const RESOURCE_HANDLES = new Set<ResourceHandle>(['service', 'memory', 'tools', 'llm']);
 
 export function isResourceEdge(edge: Pick<WorkflowDefinition['edges'][number], 'sourceHandle' | 'targetHandle'>): boolean {
   const handle = (edge.sourceHandle ?? edge.targetHandle) as ResourceHandle | undefined;
@@ -298,4 +298,28 @@ export function resolveAgentResources(
     memoryContextWindowLength,
     tools,
   };
+}
+
+/** Resolve a service_node wired to `service` or `llm` on a host (agent / save-rag). */
+export function resolveServiceOnHandle(
+  definition: WorkflowDefinition,
+  hostId: string,
+  handle: 'service' | 'llm',
+): { endpoint?: string; serviceOptions?: Record<string, unknown> } {
+  const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
+  for (const edge of definition.edges) {
+    if (edge.target !== hostId || edge.targetHandle !== handle) continue;
+    const source = nodeById.get(edge.source);
+    if (!source || source.type !== 'service_node') continue;
+    const data = (source.data ?? {}) as Record<string, unknown>;
+    const endpoint = String(data.endpoint ?? data.catalogId ?? data.serviceEndpoint ?? '').trim();
+    const opts = data.serviceOptions;
+    return {
+      ...(endpoint ? { endpoint } : {}),
+      ...(opts && typeof opts === 'object' && !Array.isArray(opts)
+        ? { serviceOptions: opts as Record<string, unknown> }
+        : {}),
+    };
+  }
+  return {};
 }

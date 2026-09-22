@@ -1,12 +1,13 @@
 import { resourceNode } from "./common";
 
-/** Save RAG tool — dedicated config without tool kind selector. */
+/** Save RAG tool — table ingest only (schema + SQL examples via LLM + embed). */
 export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
   displayName: "Save RAG",
   name: "tool_node_save_rag",
   icon: "fa:database",
   group: ["transform"],
-  description: "Embed document chunks and upsert into the agent's knowledge base.",
+  description:
+    "Introspect a database table, enrich column descriptions with an LLM, and upsert schema + SQL examples into Vectorize.",
   properties: [
     {
       displayName: "Table name field",
@@ -17,44 +18,11 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       description: "Drag the current loop item table from INPUT. Example: tableName → {{ $json.tableName }}",
     },
     {
-      displayName: "Document ID field",
-      name: "documentIdField",
-      type: "string",
-      default: "",
-      placeholder: "{{ $json.documentId }}",
-      description: "Optional. Drag documentId from INPUT when saving extracted text (not table loops).",
-    },
-    {
-      displayName: "Content field",
-      name: "contentField",
-      type: "string",
-      default: "",
-      placeholder: "{{ $json.content }}",
-      description: "Optional. Drag content/text from INPUT when the previous node already has document text.",
-    },
-    {
-      displayName: "Source field",
-      name: "sourceField",
-      type: "string",
-      default: "",
-      placeholder: "{{ $json.source }}",
-      description: "Optional. Drag source/filename from INPUT for vector metadata.",
-    },
-    {
-      displayName: "User prompt",
-      name: "userPrompt",
-      type: "string",
-      typeOptions: { rows: 4 },
-      default: "When document text is available, call save_rag with the full extracted content.",
-      description: "Instructions appended to the agent user message when this tool is connected.",
-    },
-    {
-      displayName: "System prompt",
-      name: "systemPrompt",
-      type: "string",
-      typeOptions: { rows: 4 },
-      default: "Use save_rag to persist extracted document text into the knowledge base.",
-      description: "System instructions for the agent when this tool is connected.",
+      displayName: "SQL history limit",
+      name: "sqlHistoryLimit",
+      type: "number",
+      default: 10,
+      description: "Max rows from ADMIN.DBTOOLS$EXECUTION_HISTORY to include for typical-query context.",
     },
     {
       displayName: "Tool name",
@@ -67,7 +35,8 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       name: "toolDescription",
       type: "string",
       typeOptions: { rows: 3 },
-      default: "Embed document chunks and upsert into the knowledge base.",
+      default:
+        "Introspect a database table, enrich column descriptions with an LLM, and upsert schema + SQL examples into Vectorize.",
     },
     {
       displayName: "Chunk size",

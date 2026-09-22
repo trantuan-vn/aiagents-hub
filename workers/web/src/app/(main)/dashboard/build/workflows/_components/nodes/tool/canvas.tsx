@@ -14,13 +14,20 @@ import { OracleIcon } from "./oracle-icon";
 const ORACLE_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
 const RAG_TOOL_KINDS = new Set(["save-rag", "get-rag"]);
 
-function useRagMissingConfig(nodeId: string | undefined) {
+function useRagMissingConfig(nodeId: string | undefined, toolKind: string) {
   const edges = useStore((s) => s.edges);
-  if (!nodeId) return { missingService: true, missingMemory: true };
+  if (!nodeId) {
+    return { missingService: true, missingMemory: true, missingLlm: toolKind === "save-rag" };
+  }
 
   const hasService = edges.some((e) => edgeUsesHandle(e, nodeId, "service", "target"));
   const hasMemory = edges.some((e) => edgeUsesHandle(e, nodeId, "memory", "target"));
-  return { missingService: !hasService, missingMemory: !hasMemory };
+  const hasLlm = edges.some((e) => edgeUsesHandle(e, nodeId, "llm", "target"));
+  return {
+    missingService: !hasService,
+    missingMemory: !hasMemory,
+    missingLlm: toolKind === "save-rag" && !hasLlm,
+  };
 }
 
 function ToolNode({ id, data, selected }: NodeProps) {
@@ -29,8 +36,9 @@ function ToolNode({ id, data, selected }: NodeProps) {
   const toolKind = String(d.toolKind ?? "");
   const showOracle = ORACLE_TOOL_KINDS.has(toolKind);
   const isRag = RAG_TOOL_KINDS.has(toolKind);
-  const { missingService, missingMemory } = useRagMissingConfig(isRag ? id : undefined);
-  const showWarning = isRag && (missingService || missingMemory);
+  const isSaveRag = toolKind === "save-rag";
+  const { missingService, missingMemory, missingLlm } = useRagMissingConfig(isRag ? id : undefined, toolKind);
+  const showWarning = isRag && (missingService || missingMemory || missingLlm);
 
   return (
     <WorkflowNodeShell
@@ -51,6 +59,18 @@ function ToolNode({ id, data, selected }: NodeProps) {
               allowedNodeTypes={["service_node"]}
               required
             />
+            {isSaveRag ? (
+              <ConnectionHandle
+                handleId="llm"
+                type="target"
+                position={Position.Bottom}
+                accentClass="!bg-violet-500"
+                label={t("handle_llm")}
+                shape="diamond"
+                allowedNodeTypes={["service_node"]}
+                required
+              />
+            ) : null}
             <ConnectionHandle
               handleId="memory"
               type="target"

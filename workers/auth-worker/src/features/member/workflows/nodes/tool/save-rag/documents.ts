@@ -1,4 +1,5 @@
-import type { GetDbInfoResult } from '../shared/db/types.js';
+import type { GetDbInfoResult, SqlHistoryEntry } from '../shared/db/types.js';
+import type { TableEnrichment, TypicalQuery } from './describe-table.js';
 
 export type RagDocumentItem = {
   content: string;
@@ -24,13 +25,38 @@ function yamlHeader(info: GetDbInfoResult, docType: 'schema' | 'sqlexample'): st
   ].join('\n');
 }
 
-export function buildSchemaDocument(info: GetDbInfoResult): RagDocumentItem {
+function columnDescription(
+  col: GetDbInfoResult['columns'][number],
+  enrichment: TableEnrichment | undefined,
+): { vi: string; en: string; aliases: string[] } {
+  const found = enrichment?.columns.find((c) => c.name === col.name);
+  const en = found?.descriptionEn || col.comment || '';
+  const vi = found?.descriptionVi || '';
+  return { vi, en, aliases: found?.aliasesVi ?? [] };
+}
+
+export function buildSchemaDocument(
+  info: GetDbInfoResult,
+  enrichment?: TableEnrichment,
+): RagDocumentItem {
   const table = qualifiedTable(info);
+  const summaryVi = enrichment?.tableSummaryVi?.trim();
+  const summaryEn = enrichment?.tableSummaryEn?.trim();
+  const summaryBlock =
+    summaryVi || summaryEn
+      ? `## Summary
+${summaryVi ? `- VI: ${summaryVi}` : ''}
+${summaryEn ? `- EN: ${summaryEn}` : ''}
+`
+      : '';
+
   const columns = info.columns
-    .map(
-      (c) =>
-        `| ${c.name} | ${c.type} | ${c.nullable ? 'YES' : 'NO'} | ${c.default ?? ''} | ${c.comment ?? ''} |`,
-    )
+    .map((c) => {
+      const d = columnDescription(c, enrichment);
+      const alias =
+        d.aliases.length > 0 ? ` aliasesVi=[${d.aliases.map((a) => `"${a}"`).join(', ')}]` : '';
+      return `| ${c.name} | ${c.type} | ${c.nullable ? 'YES' : 'NO'} | ${c.default ?? ''} | ${d.vi} | ${d.en}${alias} |`;
+    })
     .join('\n');
   const fks = info.foreignKeys.length
     ? info.foreignKeys.map((fk) => `- \`${fk.column}\` → \`${fk.refTable}(${fk.refColumn})\``).join('\n')
@@ -42,16 +68,16 @@ export function buildSchemaDocument(info: GetDbInfoResult): RagDocumentItem {
 
   const content = `${yamlHeader(info, 'schema')}# Table: ${table}
 
-## DDL
+${summaryBlock}## DDL
 \`\`\`sql
 ${info.ddl}
 \`\`\`
 
 ## Columns
 
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-${columns || '| — | — | — | — | — |'}
+| Column | Type | Nullable | Default | Description (VI) | Description (EN) |
+|--------|------|----------|---------|------------------|------------------|
+${columns || '| — | — | — | — | — | — |'}
 
 ## Primary key
 ${info.primaryKey.length ? info.primaryKey.map((k) => `- \`${k}\``).join('\n') : '- none'}
@@ -77,48 +103,50 @@ ${sample}
   };
 }
 
-function suggestedSelects(info: GetDbInfoResult): string {
-  const table = qualifiedTable(info);
-  const cols = info.columns.map((c) => c.name);
-  const pk = info.primaryKey[0] ?? cols[0] ?? 'id';
-  const dateCol = cols.find((c) => /(_at|date|time)$/i.test(c));
-  const lines = [
-    `SELECT * FROM ${table} LIMIT 50;`,
-    `SELECT COUNT(*) AS row_count FROM ${table};`,
-  ];
-  if (dateCol) {
-    lines.push(`SELECT * FROM ${table} ORDER BY ${dateCol} DESC LIMIT 20;`);
-  } else {
-    lines.push(`SELECT * FROM ${table} ORDER BY ${pk} DESC LIMIT 20;`);
-  }
-  return lines.map((sql, i) => `### ${i + 1}\n\`\`\`sql\n${sql}\n\`\`\``).join('\n\n');
+function renderHistory(history: SqlHistoryEntry[]): string {
+  if (!history.length) return '_No historical queries recorded._';
+  return history
+    .map((entry, i) => {
+      const meta = [
+        entry.executedAt ? `Executed: ${entry.executedAt}` : null,
+        entry.rowCount != null ? `Rows: ${entry.rowCount}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      return `### ${i + 1}. Historical query\n\`\`\`sql\n${entry.sql}\n\`\`\`${meta ? `\n- ${meta}` : ''}`;
+    })
+    .join('\n\n');
 }
 
-export function buildSqlExampleDocument(info: GetDbInfoResult): RagDocumentItem {
-  const table = qualifiedTable(info);
-  const history = info.sqlHistory.length
-    ? info.sqlHistory
-        .map((entry, i) => {
-          const meta = [
-            entry.executedAt ? `Executed: ${entry.executedAt}` : null,
-            entry.rowCount != null ? `Rows: ${entry.rowCount}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ');
-          return `### ${i + 1}. Historical query\n\`\`\`sql\n${entry.sql}\n\`\`\`${meta ? `\n- ${meta}` : ''}`;
-        })
-        .join('\n\n')
-    : '_No historical queries recorded._';
+function renderTypical(queries: TypicalQuery[]): string {
+  if (!queries.length) return '_No typical queries generated._';
+  return queries
+    .map((q, i) => {
+      const title = q.titleVi || q.titleEn || `Query ${i + 1}`;
+      const note = q.noteVi ? `\n- ${q.noteVi}` : '';
+      return `### ${i + 1}. ${title}\n\`\`\`sql\n${q.sql}\n\`\`\`${note}`;
+    })
+    .join('\n\n');
+}
 
+export function buildSqlExampleDocument(
+  info: GetDbInfoResult,
+  enrichment?: TableEnrichment,
+): RagDocumentItem | null {
+  const history = info.sqlHistory ?? [];
+  const typical = enrichment?.typicalQueries ?? [];
+  if (!history.length && !typical.length) return null;
+
+  const table = qualifiedTable(info);
   const content = `${yamlHeader(info, 'sqlexample')}# SQL examples: ${table}
 
-## Historical queries (from SQL history)
+## Historical queries (from ADMIN.DBTOOLS$EXECUTION_HISTORY)
 
-${history}
+${renderHistory(history)}
 
-## Suggested patterns
+## Typical queries
 
-${suggestedSelects(info)}
+${renderTypical(typical)}
 
 ## Anti-patterns / notes
 - Always qualify the table as \`${table}\`
@@ -139,6 +167,13 @@ ${suggestedSelects(info)}
   };
 }
 
-export function ragDocumentsFromDbInfo(info: GetDbInfoResult): RagDocumentItem[] {
-  return [buildSchemaDocument(info), buildSqlExampleDocument(info)];
+/** Build schema (+ optional sqlexample) after LLM enrichment. */
+export function ragDocumentsFromEnrichment(
+  info: GetDbInfoResult,
+  enrichment?: TableEnrichment,
+): RagDocumentItem[] {
+  const docs = [buildSchemaDocument(info, enrichment)];
+  const sqlDoc = buildSqlExampleDocument(info, enrichment);
+  if (sqlDoc) docs.push(sqlDoc);
+  return docs;
 }

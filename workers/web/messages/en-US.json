@@ -2917,6 +2917,7 @@
     "connect_add_node": "Add new node and connect",
     "connect_delete": "Remove connection",
     "handle_service": "Service",
+    "handle_llm": "LLM",
     "handle_memory": "Memory",
     "rag_config_warning": "Connect an embedding service and Cloudflare Vectorize memory",
     "memory_connect_intro": "Memory allows an AI model to remember and reference past interactions with it",

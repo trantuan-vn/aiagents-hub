@@ -1,7 +1,7 @@
 import type { WorkflowNodeDefinition } from "./node-definition";
 import type { GraphNode } from "./graph";
 
-const RESOURCE_HANDLES = new Set(["service", "memory", "tools"]);
+const RESOURCE_HANDLES = new Set(["service", "memory", "tools", "llm"]);
 const RESOURCE_NODE_HANDLE: Record<string, string> = {
   service_node: "service",
   memory_node: "memory",
@@ -33,6 +33,10 @@ function resolveNodeKind(node: GraphNode): string | undefined {
 
 function isRagToolNode(node: GraphNode): boolean {
   return node.type === "tool_node" && RAG_TOOL_KINDS.has(String(nodeData(node).toolKind ?? ""));
+}
+
+function isSaveRagToolNode(node: GraphNode): boolean {
+  return node.type === "tool_node" && String(nodeData(node).toolKind ?? "") === "save-rag";
 }
 
 function isRagResourceHost(node: GraphNode): boolean {
@@ -84,6 +88,16 @@ export function isValidWorkflowConnection(
       return false;
     }
     return true;
+  }
+
+  // Save RAG LLM handle: service_node (source "service") → save-rag target "llm"
+  if (
+    (sourceHandle === "service" && targetHandle === "llm") ||
+    (sourceHandle === "llm" && targetHandle === "service")
+  ) {
+    const forward = sourceNode.type === "service_node" && isSaveRagToolNode(targetNode);
+    const reversed = isSaveRagToolNode(sourceNode) && targetNode.type === "service_node";
+    return forward || reversed;
   }
 
   const sourceDef = getDefinition(sourceNode, definitions);

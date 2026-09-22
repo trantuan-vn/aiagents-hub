@@ -13,7 +13,6 @@ import {
   type SqlHistoryEntry,
 } from '../shared/db/index.js';
 import { toolNodeConfig } from '../shared/rag-context.js';
-import { ragDocumentsFromDbInfo, type RagDocumentItem } from './documents.js';
 
 const RAG_SAMPLE_LIMIT = 3;
 const SQL_HISTORY_LIMIT_DEFAULT = 10;
@@ -37,8 +36,10 @@ function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnec
   });
 }
 
-/** Prefer Get DB Info node settings when present so ingest limits stay consistent. */
 function resolveHistoryConfig(definition: WorkflowDefinition, hostId: string): Record<string, unknown> {
+  const self = definition.nodes.find((n) => n.id === hostId);
+  const selfData = (self?.data ?? {}) as Record<string, unknown>;
+  if (selfData.sqlHistoryLimit != null || selfData.includeSqlHistory != null) return selfData;
   const linked = toolNodeConfig(definition, hostId, 'get-db-info');
   if (linked) return linked;
   const node = definition.nodes.find((n) => {
@@ -176,9 +177,7 @@ async function introspectOneTable(params: {
       nullable: col.notnull === 0,
       default: col.dflt_value ?? undefined,
     }));
-    const primaryKey = (pragma.results ?? [])
-      .filter((c) => Number(c.pk) > 0)
-      .map((c) => c.name);
+    const primaryKey = (pragma.results ?? []).filter((c) => Number(c.pk) > 0).map((c) => c.name);
     const fkRows = await db.prepare(`PRAGMA foreign_key_list("${safeTable}")`).all<{
       from: string;
       table: string;
@@ -233,15 +232,14 @@ async function introspectOneTable(params: {
   };
 }
 
-/** Introspect one table and emit schema + sqlexample documents. */
-export async function introspectTableToRagDocuments(params: {
+export async function introspectTableInfo(params: {
   env: Env;
   definition: WorkflowDefinition;
   agentId: string;
   triggerContext: Record<string, unknown>;
   tableName: string;
   schemaName?: string;
-}): Promise<RagDocumentItem[]> {
+}): Promise<GetDbInfoResult> {
   const limits = asRecord(params.triggerContext.limits);
   const sampleLimit = Math.min(
     Number(limits.sampleRowLimit ?? RAG_SAMPLE_LIMIT) || RAG_SAMPLE_LIMIT,
@@ -261,17 +259,17 @@ export async function introspectTableToRagDocuments(params: {
     sqlHistoryLimit,
     includeSqlHistory,
   });
-  return ragDocumentsFromDbInfo(truncateSampleRows(info, sampleLimit));
+  return truncateSampleRows(info, sampleLimit);
 }
 
-/** Batch-introspect many tables for RAG (one Oracle session when possible). */
-export async function introspectTablesToRagDocuments(params: {
+/** Batch introspect (+ SQL history). Caller runs LLM then builds documents. */
+export async function introspectTablesInfo(params: {
   env: Env;
   definition: WorkflowDefinition;
   agentId: string;
   triggerContext: Record<string, unknown>;
   tables: Array<{ tableName: string; schemaName?: string }>;
-}): Promise<RagDocumentItem[]> {
+}): Promise<GetDbInfoResult[]> {
   const tables = params.tables
     .map((t) => ({
       tableName: String(t.tableName ?? '').trim(),
@@ -280,7 +278,7 @@ export async function introspectTablesToRagDocuments(params: {
     .filter((t) => t.tableName && !isSystemGeneratedTable(t.tableName));
   if (!tables.length) return [];
   if (tables.length === 1) {
-    return introspectTableToRagDocuments({ ...params, ...tables[0]! });
+    return [await introspectTableInfo({ ...params, ...tables[0]! })];
   }
 
   const connection = (params.triggerContext.connection ?? {}) as DbConnection;
@@ -320,33 +318,31 @@ export async function introspectTablesToRagDocuments(params: {
           env: params.env,
         })
       : {};
-    const docs: RagDocumentItem[] = [];
+    const out: GetDbInfoResult[] = [];
     for (const row of introspected) {
       if (row.error || !row.columns.length) {
         console.warn(`[save-rag] skip table ${row.tableName}: ${row.error || 'no columns'}`);
         continue;
       }
-      docs.push(
-        ...ragDocumentsFromDbInfo(
-          truncateSampleRows(
-            {
-              dbId,
-              schemaName,
-              tableName: row.tableName,
-              columns: row.columns,
-              primaryKey: row.primaryKey,
-              foreignKeys: row.foreignKeys,
-              ddl: row.ddl,
-              sampleRows: row.sampleRows,
-              sqlHistory: historyByTable[historyKey(row.tableName)] ?? [],
-              rowCountEstimate: row.rowCountEstimate,
-            },
-            sampleLimit,
-          ),
+      out.push(
+        truncateSampleRows(
+          {
+            dbId,
+            schemaName,
+            tableName: row.tableName,
+            columns: row.columns,
+            primaryKey: row.primaryKey,
+            foreignKeys: row.foreignKeys,
+            ddl: row.ddl,
+            sampleRows: row.sampleRows,
+            sqlHistory: historyByTable[historyKey(row.tableName)] ?? [],
+            rowCountEstimate: row.rowCountEstimate,
+          },
+          sampleLimit,
         ),
       );
     }
-    return docs;
+    return out;
   }
 
   if (connType !== 'd1' && explicitType !== 'd1') {
@@ -355,13 +351,39 @@ export async function introspectTablesToRagDocuments(params: {
     );
   }
 
-  const nested = await mapPool(tables, 4, (table) =>
-    introspectTableToRagDocuments({
+  return mapPool(tables, 4, (table) =>
+    introspectTableInfo({
       ...params,
       tableName: table.tableName,
       schemaName: table.schemaName,
       triggerContext: { ...params.triggerContext, tableName: table.tableName },
     }),
   );
-  return nested.flat();
+}
+
+/** @deprecated Prefer introspectTableInfo + describeTable + ragDocumentsFromEnrichment */
+export async function introspectTableToRagDocuments(params: {
+  env: Env;
+  definition: WorkflowDefinition;
+  agentId: string;
+  triggerContext: Record<string, unknown>;
+  tableName: string;
+  schemaName?: string;
+}) {
+  const { ragDocumentsFromEnrichment } = await import('./documents.js');
+  const info = await introspectTableInfo(params);
+  return ragDocumentsFromEnrichment(info);
+}
+
+/** @deprecated Prefer introspectTablesInfo + describeTable + ragDocumentsFromEnrichment */
+export async function introspectTablesToRagDocuments(params: {
+  env: Env;
+  definition: WorkflowDefinition;
+  agentId: string;
+  triggerContext: Record<string, unknown>;
+  tables: Array<{ tableName: string; schemaName?: string }>;
+}) {
+  const { ragDocumentsFromEnrichment } = await import('./documents.js');
+  const infos = await introspectTablesInfo(params);
+  return infos.flatMap((info) => ragDocumentsFromEnrichment(info));
 }

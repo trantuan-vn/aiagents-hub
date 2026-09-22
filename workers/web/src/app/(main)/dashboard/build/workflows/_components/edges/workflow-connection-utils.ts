@@ -5,6 +5,7 @@ export type WorkflowHandleId =
   | "out"
   | "service"
   | "memory"
+  | "llm"
   | "tools"
   | "true"
   | "false"
@@ -13,7 +14,7 @@ export type WorkflowHandleId =
   | "done"
   | `case_${number}`;
 
-const RESOURCE_HANDLES = new Set<WorkflowHandleId>(["service", "memory", "tools"]);
+const RESOURCE_HANDLES = new Set<WorkflowHandleId>(["service", "memory", "tools", "llm"]);
 
 const BRANCH_SOURCE_HANDLES = new Set<string>(["out", "true", "false", "default", "loop", "done"]);
 
@@ -22,7 +23,7 @@ function isBranchSourceHandle(handle: string): boolean {
   return /^case_\d+$/.test(handle);
 }
 
-const SINGLE_CONNECTION_HANDLES = new Set<WorkflowHandleId>(["service", "memory"]);
+const SINGLE_CONNECTION_HANDLES = new Set<WorkflowHandleId>(["service", "memory", "llm"]);
 
 const RAG_TOOL_KINDS = new Set(["save-rag", "get-rag"]);
 
@@ -41,6 +42,11 @@ function nodeData(node: Node | undefined): Record<string, unknown> {
 export function isRagToolNode(node: Node | undefined): boolean {
   if (!node || node.type !== "tool_node") return false;
   return RAG_TOOL_KINDS.has(String(nodeData(node).toolKind ?? ""));
+}
+
+export function isSaveRagToolNode(node: Node | undefined): boolean {
+  if (!node || node.type !== "tool_node") return false;
+  return String(nodeData(node).toolKind ?? "") === "save-rag";
 }
 
 export function isRagResourceHost(node: Node | undefined): boolean {
@@ -76,6 +82,24 @@ export function normalizeResourceConnection<T extends Connection | Edge>(
   const sourceHandle = connection.sourceHandle ?? null;
   const targetHandle = connection.targetHandle ?? null;
   if (!sourceNode || !targetNode || !sourceHandle || !targetHandle) return connection;
+
+  // Keep service → llm orientation (handles intentionally differ)
+  if (
+    (sourceHandle === "service" && targetHandle === "llm") ||
+    (sourceHandle === "llm" && targetHandle === "service")
+  ) {
+    if (sourceHandle === "llm" && targetHandle === "service") {
+      return {
+        ...connection,
+        source: connection.target,
+        target: connection.source,
+        sourceHandle: "service",
+        targetHandle: "llm",
+      };
+    }
+    return connection;
+  }
+
   if (sourceHandle !== targetHandle) return connection;
   if (!RESOURCE_HANDLES.has(sourceHandle as WorkflowHandleId)) return connection;
 
@@ -111,6 +135,13 @@ function parseWorkflowConnectionHandles(
   if (sourceHandle === "loop" && targetHandle === "in") return { kind: "flow" };
   if (sourceHandle === "done" && targetHandle === "in") return { kind: "flow" };
   if (/^case_\d+$/.test(sourceHandle) && targetHandle === "in") return { kind: "flow" };
+  // service_node → save-rag llm (handles differ by design)
+  if (
+    (sourceHandle === "service" && targetHandle === "llm") ||
+    (sourceHandle === "llm" && targetHandle === "service")
+  ) {
+    return { kind: "resource", handle: "llm" };
+  }
   if (sourceHandle !== targetHandle) return null;
   if (!RESOURCE_HANDLES.has(sourceHandle as WorkflowHandleId)) return null;
   return { kind: "resource", handle: sourceHandle as WorkflowHandleId };
@@ -124,6 +155,12 @@ function isValidResourceWorkflowConnection(
   const sourceNode = nodes.find((n) => n.id === connection.source);
   const targetNode = nodes.find((n) => n.id === connection.target);
 
+  if (handle === "llm") {
+    const forward = sourceNode?.type === "service_node" && isSaveRagToolNode(targetNode);
+    const reversed = isSaveRagToolNode(sourceNode) && targetNode?.type === "service_node";
+    return Boolean(forward || reversed);
+  }
+
   if (!isRagResourceHost(targetNode)) return false;
 
   const expectedSourceHandle = resourceHandleForNodeType(sourceNode?.type);
@@ -133,7 +170,7 @@ function isValidResourceWorkflowConnection(
     return false;
   }
 
-  // Service / memory: one incoming per host. A second drag replaces the existing edge in onConnect.
+  // Service / memory / llm: one incoming per host. A second drag replaces the existing edge in onConnect.
   return true;
 }
 

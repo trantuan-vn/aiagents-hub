@@ -2917,6 +2917,7 @@
     "connect_add_node": "Thêm node mới và kết nối",
     "connect_delete": "Ngắt kết nối",
     "handle_service": "Service",
+    "handle_llm": "LLM",
     "handle_memory": "Memory",
     "rag_config_warning": "Nối service embedding và Cloudflare Vectorize",
     "memory_connect_intro": "Memory giúp mô hình AI ghi nhớ và tham chiếu các tương tác trước đó",

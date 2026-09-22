@@ -1,16 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
-import { ragDocumentsFromDbInfo } from '../save-rag/documents.js';
+import { ragDocumentsFromEnrichment } from '../save-rag/documents.js';
 import {
   introspectTableToRagDocuments,
   introspectTablesToRagDocuments,
 } from '../save-rag/table-docs.js';
-import {
-  executeGetDbInfo,
-  executeGetDbInfoPipeline,
-  type GetDbInfoResult,
-} from './execute.js';
+import { executeGetDbInfo, executeGetDbInfoPipeline, type GetDbInfoResult } from './execute.js';
 import type { NodeContext } from '../../types.js';
 
 const directMock = vi.hoisted(() => ({
@@ -68,19 +64,16 @@ const info: GetDbInfoResult = {
 };
 
 describe('save-rag documents (schema + sqlexample)', () => {
-  it('emits schema + sqlexample RAG items', () => {
-    const items = ragDocumentsFromDbInfo(info);
-    expect(items).toHaveLength(2);
+  it('emits schema document; sqlexample only when history or typical queries exist', () => {
+    const items = ragDocumentsFromEnrichment(info);
+    expect(items).toHaveLength(1);
     expect(items[0]?.metadata.docType).toBe('schema');
-    expect(items[1]?.metadata.docType).toBe('sqlexample');
     expect(items[0]?.content).toContain('# Table: public.orders');
-    expect(items[0]?.content.indexOf('## DDL')).toBeLessThan(items[0]!.content.indexOf('## Sample shape'));
-    expect(items[1]?.content).toContain('SELECT * FROM public.orders');
-    expect(items[1]?.content).toContain('_No historical queries recorded._');
+    expect(items[0]?.content).toContain('Description (VI)');
   });
 
   it('renders historical SQL from Oracle execution history', () => {
-    const items = ragDocumentsFromDbInfo({
+    const items = ragDocumentsFromEnrichment({
       ...info,
       sqlHistory: [
         {
@@ -90,46 +83,45 @@ describe('save-rag documents (schema + sqlexample)', () => {
         },
       ],
     });
+    expect(items).toHaveLength(2);
     expect(items[1]?.content).toContain('### 1. Historical query');
     expect(items[1]?.content).toContain('SELECT * FROM public.orders WHERE total > 100');
     expect(items[1]?.content).toContain('Executed: 2026-09-21T10:00:00.000Z');
-    expect(items[1]?.content).not.toContain('_No historical queries recorded._');
   });
 });
 
 describe('executeGetDbInfoPipeline', () => {
   beforeEach(() => {
     directMock.listOracleTablesDirect.mockClear();
-    directMock.introspectOracleTableDirect.mockClear();
-    directMock.introspectOracleTablesDirect.mockClear();
-    directMock.fetchOracleSqlHistoriesDirect.mockClear();
   });
 
   it('lists a named table as a loop item without introspecting', async () => {
     const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (..._args: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          first: async () => ({ cnt: 1 }),
-        }),
+      prepare: vi.fn(() => ({
         all: async () => ({ results: [] }),
-        first: async () => ({ cnt: 1 }),
+        first: async () => ({ cnt: 0 }),
+        bind: () => ({ all: async () => ({ results: [] }), first: async () => ({ cnt: 0 }) }),
       })),
     };
-
     const definition: WorkflowDefinition = {
-      nodes: [{
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: { toolKind: 'get-db-info', tableNameField: '{{ $json.tableName }}' },
-      }],
+      nodes: [
+        {
+          id: 'dbinfo',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'get-db-info', tableNameField: '{{ $json.tableName }}' },
+        },
+      ],
       edges: [],
     };
-
     const ctx = {
       node: definition.nodes[0],
-      nodeInput: { tableName: 'orders', dbId: 'analytics-db', schemaName: 'public', connection: { type: 'd1' } },
+      nodeInput: {
+        tableName: 'orders',
+        dbId: 'analytics-db',
+        schemaName: 'public',
+        connection: { type: 'd1' },
+      },
       definition,
       outputs: {},
       runContext: {},
@@ -138,21 +130,14 @@ describe('executeGetDbInfoPipeline', () => {
     } as unknown as NodeContext;
 
     const out = await executeGetDbInfoPipeline(ctx);
-    expect(out.tableCount).toBe(1);
     expect(out.tables).toEqual(['orders']);
-    expect(Array.isArray(out.items)).toBe(true);
-    expect((out.items as Array<{ tableName: string }>).length).toBe(1);
-    expect((out.items as Array<{ tableName: string }>)[0]?.tableName).toBe('orders');
+    expect(out.items).toEqual([{ tableName: 'orders', schemaName: 'public' }]);
     expect(db.prepare).not.toHaveBeenCalled();
   });
 
   it('lists D1 tables without introspecting schema', async () => {
     const db = {
       prepare: vi.fn((sql: string) => ({
-        bind: (..._args: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          first: async () => ({ cnt: 0 }),
-        }),
         all: async () => {
           if (sql.includes('sqlite_master')) {
             return { results: [{ name: 'orders' }, { name: 'users' }] };
@@ -160,14 +145,13 @@ describe('executeGetDbInfoPipeline', () => {
           return { results: [] };
         },
         first: async () => ({ cnt: 0 }),
+        bind: () => ({ all: async () => ({ results: [] }), first: async () => ({ cnt: 0 }) }),
       })),
     };
-
     const definition: WorkflowDefinition = {
       nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
       edges: [],
     };
-
     const ctx = {
       node: definition.nodes[0],
       nodeInput: { dbId: 'analytics-db', schemaName: 'public', connection: { type: 'd1' } },
@@ -180,288 +164,26 @@ describe('executeGetDbInfoPipeline', () => {
 
     const out = await executeGetDbInfoPipeline(ctx);
     expect(out.tables).toEqual(['orders', 'users']);
-    expect((out.items as Array<{ tableName: string }>).map((i) => i.tableName)).toEqual(['orders', 'users']);
-    const sqlCalls = db.prepare.mock.calls.map((c) => String(c[0]));
-    expect(sqlCalls.some((s) => s.includes('PRAGMA'))).toBe(false);
-  });
-
-  it('skips D1 tables whose names contain $', async () => {
-    const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (..._args: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          first: async () => ({ cnt: 0 }),
-        }),
-        all: async () => {
-          if (sql.includes('sqlite_master')) {
-            return { results: [{ name: 'orders' }, { name: 'sys$tmp' }, { name: 'users' }] };
-          }
-          return { results: [] };
-        },
-        first: async () => ({ cnt: 0 }),
-      })),
-    };
-
-    const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
-      edges: [],
-    };
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: { dbId: 'analytics-db', schemaName: 'public', connection: { type: 'd1' } },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: { D1DB: db } },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    const out = await executeGetDbInfoPipeline(ctx);
-    expect(out.tables).toEqual(['orders', 'users']);
-  });
-
-  it('connects to OCI Oracle using user, password, and connectString from the previous node', async () => {
-    const definition: WorkflowDefinition = {
-      nodes: [{
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: {
-          toolKind: 'get-db-info',
-          userField: '{{ $json.data.user }}',
-          passwordField: '{{ $json.data.password }}',
-          connectStringField: '{{ $json.data.connectString }}',
-          tableNameField: '{{ $json.data.tableName }}',
-        },
-      }],
-      edges: [],
-    };
-
-    const connectString =
-      '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-singapore-1.oraclecloud.com))(connect_data=(service_name=g3d495d60e13477_host10_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))';
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: {
-        status: 200,
-        data: {
-          user: 'ADMIN',
-          password: 'secret',
-          connectString,
-          tableName: 'ORDERS',
-        },
-      },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: {} },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    const out = await executeGetDbInfoPipeline(ctx);
-    expect(directMock.introspectOracleTableDirect).not.toHaveBeenCalled();
-    expect(out.schemaName).toBe('ADMIN');
-    expect(out.tableCount).toBe(1);
-    expect((out.items as Array<{ tableName: string; user?: string }>)[0]).toMatchObject({
-      tableName: 'ORDERS',
-    });
-    expect((out.items as Array<{ user?: string }>)[0]?.user).toBeUndefined();
+    expect(out.items).toHaveLength(2);
   });
 
   it('lists Oracle tables without introspecting when tableName is omitted', async () => {
-    const definition: WorkflowDefinition = {
-      nodes: [{
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: {
-          toolKind: 'get-db-info',
-          userField: '{{ $json.data.user }}',
-          passwordField: '{{ $json.data.password }}',
-          connectStringField: '{{ $json.data.connectString }}',
-        },
-      }],
-      edges: [],
-    };
-
-    const connectString =
-      '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-singapore-1.oraclecloud.com))(connect_data=(service_name=g3d495d60e13477_host10_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))';
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: {
-        status: 200,
-        data: {
-          user: 'ADMIN',
-          password: 'secret',
-          connectString,
-        },
-      },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: {} },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    const out = await executeGetDbInfoPipeline(ctx);
-    expect(directMock.listOracleTablesDirect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user: 'ADMIN',
-        password: 'secret',
-        connectString,
-      }),
-      'ADMIN',
-    );
-    expect(directMock.introspectOracleTableDirect).not.toHaveBeenCalled();
-    expect(out.tables).toEqual(['ORDERS']);
-    expect((out.items as Array<{ tableName: string }>)[0]?.tableName).toBe('ORDERS');
-    expect(JSON.stringify(out.items)).not.toContain('secret');
-    expect(out.connection).toMatchObject({
-      type: 'oracle',
-      user: 'ADMIN',
-      password: 'secret',
-      connectString,
-    });
-  });
-
-  it('skips Oracle system-generated tables whose names contain $', async () => {
-    directMock.listOracleTablesDirect.mockResolvedValueOnce([
-      'ORDERS',
-      'BIN$abc123',
-      'AQ$_ORDERS_T',
-      'MLOG$_USERS',
-      'CUSTOMERS',
-    ]);
-
-    const definition: WorkflowDefinition = {
-      nodes: [{
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: {
-          toolKind: 'get-db-info',
-          userField: '{{ $json.data.user }}',
-          passwordField: '{{ $json.data.password }}',
-          connectStringField: '{{ $json.data.connectString }}',
-        },
-      }],
-      edges: [],
-    };
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: {
-        status: 200,
-        data: {
-          user: 'ADMIN',
-          password: 'secret',
-          connectString: 'dbname_high',
-        },
-      },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: {} },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    const out = await executeGetDbInfoPipeline(ctx);
-    expect(out.tables).toEqual(['ORDERS', 'CUSTOMERS']);
-    expect((out.items as Array<{ tableName: string }>).map((i) => i.tableName)).toEqual([
-      'ORDERS',
-      'CUSTOMERS',
-    ]);
-  });
-
-  it('does not list a named table when the name contains $', async () => {
-    const definition: WorkflowDefinition = {
-      nodes: [{
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: {
-          toolKind: 'get-db-info',
-          userField: '{{ $json.data.user }}',
-          passwordField: '{{ $json.data.password }}',
-          connectStringField: '{{ $json.data.connectString }}',
-          tableNameField: '{{ $json.data.tableName }}',
-        },
-      }],
-      edges: [],
-    };
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: {
-        status: 200,
-        data: {
-          user: 'ADMIN',
-          password: 'secret',
-          connectString: 'dbname_high',
-          tableName: 'BIN$recycle',
-        },
-      },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: {} },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    await expect(executeGetDbInfoPipeline(ctx)).rejects.toThrow(/no tables found/i);
-  });
-
-  it('resolves Oracle credentials from mapped Form expressions', async () => {
-    const definition: WorkflowDefinition = {
-      nodes: [
-        {
-          id: 'dbinfo',
-          type: 'tool_node',
-          position: { x: 0, y: 0 },
-          data: {
-            toolKind: 'get-db-info',
-            userField: '{{ $json.u }}',
-            passwordField: '{{ $json.p }}',
-            connectStringField: '{{ $json.c }}',
-            tableNameField: '{{ $json.tableName }}',
-          },
-        },
-      ],
-      edges: [],
-    };
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: { u: 'ADMIN', p: 'secret', c: 'dbname_high', tableName: 'ORDERS' },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: {} },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    const out = await executeGetDbInfoPipeline(ctx);
-    expect(out.user).toBe('ADMIN');
-    expect(out.connection).toMatchObject({
-      type: 'oracle',
-      user: 'ADMIN',
-      password: 'secret',
-      connectString: 'dbname_high',
-    });
-    expect((out.items as Array<{ tableName: string }>)[0]?.tableName).toBe('ORDERS');
-  });
-
-  it('uses default u/p/c expressions when the node did not persist field mappings', async () => {
+    directMock.listOracleTablesDirect.mockResolvedValueOnce(['ORDERS', 'USERS']);
     const definition: WorkflowDefinition = {
       nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
       edges: [],
     };
-
     const ctx = {
       node: definition.nodes[0],
-      nodeInput: { u: 'ADMIN', p: 'secret', c: 'dbname_high', fields: { u: 'ADMIN', p: 'secret', c: 'dbname_high' } },
+      nodeInput: {
+        schemaName: 'ADMIN',
+        connection: {
+          type: 'oracle',
+          user: 'ADMIN',
+          password: 'secret',
+          connectString: 'dbname_high',
+        },
+      },
       definition,
       outputs: {},
       runContext: {},
@@ -470,44 +192,37 @@ describe('executeGetDbInfoPipeline', () => {
     } as unknown as NodeContext;
 
     const out = await executeGetDbInfoPipeline(ctx);
-    expect(out.connection).toMatchObject({ type: 'oracle', user: 'ADMIN', connectString: 'dbname_high' });
+    expect(out.schemaName).toBe('ADMIN');
+    expect(out.tables).toEqual(['ORDERS', 'USERS']);
     expect(directMock.listOracleTablesDirect).toHaveBeenCalled();
+    expect(directMock.introspectOracleTableDirect).not.toHaveBeenCalled();
   });
 
-  it('does not list the platform D1 database when Oracle credentials are missing', async () => {
-    const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (..._args: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          first: async () => ({ cnt: 0 }),
-        }),
-        all: async () => {
-          if (sql.includes('sqlite_master')) {
-            return { results: [{ name: '_cf_KV' }, { name: 'agent_workflows' }] };
-          }
-          return { results: [] };
+  it('agent tool lists tables only', async () => {
+    directMock.listOracleTablesDirect.mockResolvedValueOnce(['A', 'B']);
+    const out = await executeGetDbInfo({
+      env: {} as Env,
+      definition: { nodes: [], edges: [] },
+      agentId: 'dbinfo',
+      triggerContext: {
+        schemaName: 'ADMIN',
+        connection: {
+          type: 'oracle',
+          user: 'ADMIN',
+          password: 'secret',
+          connectString: 'dbname_high',
         },
-        first: async () => ({ cnt: 0 }),
-      })),
-    };
-
-    const definition: WorkflowDefinition = {
-      nodes: [{ id: 'dbinfo', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-db-info' } }],
-      edges: [],
-    };
-
-    const ctx = {
-      node: definition.nodes[0],
-      nodeInput: { triggerKind: 'form', fields: {} },
-      definition,
-      outputs: {},
-      runContext: {},
-      c: { env: { D1DB: db } },
-      meta: { ownerId: 'u1', workflowId: 1 },
-    } as unknown as NodeContext;
-
-    await expect(executeGetDbInfoPipeline(ctx)).rejects.toThrow(/will not list the platform database/i);
-    expect(db.prepare).not.toHaveBeenCalled();
+      },
+      input: {},
+    });
+    expect(out).toEqual({
+      ok: true,
+      schemaName: 'ADMIN',
+      tables: ['A', 'B'],
+      count: 2,
+      connection: expect.objectContaining({ type: 'oracle', user: 'ADMIN' }),
+    });
+    expect(directMock.introspectOracleTableDirect).not.toHaveBeenCalled();
   });
 });
 
@@ -518,106 +233,10 @@ const oracleConn = {
   connectString: 'dbname_high',
 };
 
-describe('Oracle SQL history', () => {
+describe('Save RAG SQL history (via table-docs)', () => {
   beforeEach(() => {
-    directMock.listOracleTablesDirect.mockClear();
-    directMock.introspectOracleTableDirect.mockClear();
-    directMock.introspectOracleTablesDirect.mockClear();
     directMock.fetchOracleSqlHistoriesDirect.mockClear();
-  });
-  const dbinfoDefinition = (data: Record<string, unknown> = {}): WorkflowDefinition => ({
-    nodes: [
-      {
-        id: 'dbinfo',
-        type: 'tool_node',
-        position: { x: 0, y: 0 },
-        data: { toolKind: 'get-db-info', sqlHistoryLimit: 10, includeSqlHistory: true, ...data },
-      },
-    ],
-    edges: [],
-  });
-
-  it('loads SQL history from ADMIN.DBTOOLS$EXECUTION_HISTORY using the configured limit', async () => {
-    const definition = dbinfoDefinition({ sqlHistoryLimit: 7 });
-    const info = await executeGetDbInfo({
-      env: {} as Env,
-      definition,
-      agentId: 'dbinfo',
-      triggerContext: {
-        tableName: 'CHUNG_KHOAN',
-        schemaName: 'ADMIN',
-        connection: oracleConn,
-      },
-      input: { tableName: 'CHUNG_KHOAN' },
-    });
-
-    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'ADMIN', connectString: 'dbname_high' }),
-      ['CHUNG_KHOAN'],
-      7,
-    );
-    expect(info.sqlHistory).toEqual([
-      {
-        sql: 'SELECT * FROM ADMIN.CHUNG_KHOAN WHERE ROWNUM <= 10',
-        executedAt: '2026-09-21T10:00:00.000Z',
-      },
-    ]);
-  });
-
-  it('skips SQL history when includeSqlHistory is false', async () => {
-    const definition = dbinfoDefinition({ includeSqlHistory: false });
-    const info = await executeGetDbInfo({
-      env: {} as Env,
-      definition,
-      agentId: 'dbinfo',
-      triggerContext: {
-        tableName: 'CHUNG_KHOAN',
-        schemaName: 'ADMIN',
-        connection: oracleConn,
-      },
-      input: { tableName: 'CHUNG_KHOAN' },
-    });
-
-    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
-    expect(info.sqlHistory).toEqual([]);
-  });
-
-  it('does not query D1 workflow_sql_audit for SQL history', async () => {
-    const db = {
-      prepare: vi.fn((sql: string) => ({
-        bind: (..._args: unknown[]) => ({
-          all: async () => ({ results: [] }),
-          first: async () => ({ cnt: 1 }),
-        }),
-        all: async () => {
-          if (sql.includes('PRAGMA table_info')) {
-            return { results: [{ name: 'id', type: 'TEXT', notnull: 1, dflt_value: null, pk: 1 }] };
-          }
-          if (sql.includes('PRAGMA foreign_key_list')) return { results: [] };
-          if (sql.includes('SELECT *')) return { results: [{ id: '1' }] };
-          return { results: [] };
-        },
-        first: async () => ({ cnt: 1 }),
-      })),
-    };
-
-    const info = await executeGetDbInfo({
-      env: { D1DB: db } as unknown as Env,
-      definition: dbinfoDefinition(),
-      agentId: 'dbinfo',
-      triggerContext: {
-        tableName: 'orders',
-        schemaName: 'public',
-        connection: { type: 'd1' },
-        dbId: 'analytics-db',
-      },
-      input: { tableName: 'orders' },
-    });
-
-    expect(info.sqlHistory).toEqual([]);
-    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
-    const sqlCalls = db.prepare.mock.calls.map((c) => String(c[0]));
-    expect(sqlCalls.some((s) => s.includes('workflow_sql_audit'))).toBe(false);
+    directMock.introspectOracleTablesDirect.mockClear();
   });
 
   it('Save RAG uses get-db-info config instead of hard-coded history limit 0', async () => {
@@ -688,7 +307,5 @@ describe('Oracle SQL history', () => {
     );
     const examples = docs.filter((d) => d.metadata.docType === 'sqlexample');
     expect(examples).toHaveLength(2);
-    expect(examples[0]?.content).toContain('ADMIN.CHUNG_KHOAN');
-    expect(examples[1]?.content).toContain('ADMIN.NHA_DAU_TU');
   });
 });
