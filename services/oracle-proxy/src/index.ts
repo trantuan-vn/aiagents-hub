@@ -11,6 +11,33 @@ import {
 
 const app = new Hono();
 
+/** Slightly under auth-worker client default (60s) so proxy returns JSON before fetch abort. */
+const DEFAULT_ACTION_TIMEOUT_MS = 55_000;
+const MAX_ACTION_TIMEOUT_MS = 115_000;
+const MIN_ACTION_TIMEOUT_MS = 5_000;
+
+function resolveActionTimeoutMs(): number {
+  const raw = Number(process.env.ORACLE_PROXY_TIMEOUT_MS ?? DEFAULT_ACTION_TIMEOUT_MS);
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_ACTION_TIMEOUT_MS;
+  return Math.min(MAX_ACTION_TIMEOUT_MS, Math.max(MIN_ACTION_TIMEOUT_MS, Math.floor(raw)));
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Oracle proxy action timed out after ${timeoutMs}ms (${label})`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function safeJson(value: unknown): string {
   const seen = new WeakSet();
   return JSON.stringify(value, (_key, val) => {
@@ -65,11 +92,12 @@ app.post('/oracle', async (c) => {
         : action === 'executeQuery'
           ? `${action}`
           : action;
-  console.log(`[oracle-proxy] START ${label}`);
+  const timeoutMs = resolveActionTimeoutMs();
+  console.log(`[oracle-proxy] START ${label} (timeout=${timeoutMs}ms)`);
   try {
     if (action === 'listTables') {
       const schemaName = String(body.schemaName ?? config.user);
-      const result = await listOracleTablesDirect(config, schemaName);
+      const result = await withTimeout(listOracleTablesDirect(config, schemaName), timeoutMs, label);
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }
@@ -78,7 +106,11 @@ app.post('/oracle', async (c) => {
       const tableName = String(body.tableName ?? '');
       const sampleLimit = Number(body.sampleLimit ?? 10);
       if (!tableName) return badRequest('Missing tableName');
-      const result = await introspectOracleTableDirect(config, schemaName, tableName, sampleLimit);
+      const result = await withTimeout(
+        introspectOracleTableDirect(config, schemaName, tableName, sampleLimit),
+        timeoutMs,
+        label,
+      );
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }
@@ -89,7 +121,11 @@ app.post('/oracle', async (c) => {
         : [];
       const sampleLimit = Number(body.sampleLimit ?? 3);
       if (!tableNames.length) return badRequest('Missing tableNames');
-      const result = await introspectOracleTablesDirect(config, schemaName, tableNames, sampleLimit);
+      const result = await withTimeout(
+        introspectOracleTablesDirect(config, schemaName, tableNames, sampleLimit),
+        timeoutMs,
+        label,
+      );
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }
@@ -101,7 +137,11 @@ app.post('/oracle', async (c) => {
           : [];
       const limit = Number(body.limit ?? 10);
       if (!tableNames.length) return badRequest('Missing tableNames');
-      const result = await fetchOracleSqlHistoriesDirect(config, tableNames, limit);
+      const result = await withTimeout(
+        fetchOracleSqlHistoriesDirect(config, tableNames, limit),
+        timeoutMs,
+        label,
+      );
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
       return jsonResponse({ ok: true, result });
     }
@@ -109,7 +149,11 @@ app.post('/oracle', async (c) => {
       const sql = String(body.sql ?? '').trim();
       if (!sql) return badRequest('Missing sql');
       const maxRows = Number(body.maxRows ?? 5);
-      const result = await executeOracleQueryDirect(config, sql, maxRows);
+      const result = await withTimeout(
+        executeOracleQueryDirect(config, sql, maxRows),
+        timeoutMs,
+        label,
+      );
       console.log(
         `[oracle-proxy] OK ${label} ok=${result.ok} (${Date.now() - t0}ms)`,
       );

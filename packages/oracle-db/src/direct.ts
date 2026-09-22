@@ -110,6 +110,19 @@ async function executeRows(
   return asRows(result.rows);
 }
 
+/** Per round-trip Oracle call timeout (ms). Override with ORACLE_CALL_TIMEOUT_MS. */
+const DEFAULT_CALL_TIMEOUT_MS = 50_000;
+const MAX_CALL_TIMEOUT_MS = 110_000;
+
+function resolveCallTimeoutMs(): number {
+  const env =
+    typeof process !== 'undefined' && process.env ? process.env : ({} as Record<string, string | undefined>);
+  const raw = Number(env.ORACLE_CALL_TIMEOUT_MS ?? DEFAULT_CALL_TIMEOUT_MS);
+  if (!Number.isFinite(raw) || raw < 0) return DEFAULT_CALL_TIMEOUT_MS;
+  if (raw === 0) return 0;
+  return Math.min(MAX_CALL_TIMEOUT_MS, Math.floor(raw));
+}
+
 /** Same as OCI sample: `oracledb.getConnection({ user, password, connectString })`. */
 export async function withOracleConnection<T>(
   config: OracleConnectConfig,
@@ -126,6 +139,10 @@ export async function withOracleConnection<T>(
       ...(config.walletLocation ? { walletLocation: config.walletLocation } : {}),
       ...(config.walletPassword ? { walletPassword: config.walletPassword } : {}),
     });
+    const callTimeoutMs = resolveCallTimeoutMs();
+    if (callTimeoutMs > 0) {
+      (connection as Connection & { callTimeout?: number }).callTimeout = callTimeoutMs;
+    }
     return await fn(connection, oracledb);
   } finally {
     if (connection) {

@@ -185,6 +185,11 @@ const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.isFinite(n) ? n : min));
 
 /** Run `fn` honoring an optional per-node retry policy (`data.retry`). */
+function isNonRetryableError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /timed out|timeout|AbortError|TimeoutError/i.test(message);
+}
+
 async function withRetry<T>(
   data: Record<string, unknown>,
   fn: () => Promise<T>,
@@ -199,6 +204,7 @@ async function withRetry<T>(
       return { value, attempts: attempt };
     } catch (e) {
       lastErr = e;
+      if (isNonRetryableError(e)) break;
       if (attempt < maxAttempts && backoffMs > 0) {
         await sleep(backoffMs * attempt);
       }
