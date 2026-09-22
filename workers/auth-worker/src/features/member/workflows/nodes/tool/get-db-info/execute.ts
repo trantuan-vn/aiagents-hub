@@ -167,9 +167,7 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
     );
   }
 
-  const maxTables = 25;
-  const selected = tables.slice(0, maxTables);
-  const items = selected.map((tableName) => buildTableLoopItem(tableName, schemaName));
+  const items = tables.map((tableName) => buildTableLoopItem(tableName, schemaName));
 
   const connectionOut = oracleConfig
     ? { type: 'oracle' as const, ...oracleConfig, ...asRecord(connection) }
@@ -178,10 +176,10 @@ export async function executeGetDbInfoPipeline(ctx: NodeContext): Promise<NodeOu
   return {
     dbId: String(triggerContext.dbId ?? ''),
     schemaName,
-    tables: selected,
+    tables,
     items,
     count: items.length,
-    tableCount: selected.length,
+    tableCount: tables.length,
     connection: connectionOut,
     ...(oracleConfig
       ? {
