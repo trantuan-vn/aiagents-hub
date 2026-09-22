@@ -174,12 +174,12 @@ export const WORKFLOW_AGENT_VECTOR_STORES: WorkflowAgentVectorStoreItem[] = [
 ];
 
 /** Hub-built tool_node kinds — extend this list when adding new runtime tools. */
-export type WorkflowAgentBuiltinToolId = "save-rag" | "get-rag" | "get-db-info";
+export type WorkflowAgentBuiltinToolId = "save-rag" | "get-rag" | "get-db-info" | "check-sql";
 
 export type WorkflowAgentBuiltinTool = {
   id: WorkflowAgentBuiltinToolId;
-  nameKey: "tool_save_rag" | "tool_get_rag" | "tool_get_db_info";
-  descKey: "tool_save_rag_desc" | "tool_get_rag_desc" | "tool_get_db_info_desc";
+  nameKey: "tool_save_rag" | "tool_get_rag" | "tool_get_db_info" | "tool_check_sql";
+  descKey: "tool_save_rag_desc" | "tool_get_rag_desc" | "tool_get_db_info_desc" | "tool_check_sql_desc";
   icon: ComponentType<{ className?: string }>;
 };
 
@@ -200,6 +200,12 @@ export const WORKFLOW_AGENT_BUILTIN_TOOLS: WorkflowAgentBuiltinTool[] = [
     id: "get-db-info",
     nameKey: "tool_get_db_info",
     descKey: "tool_get_db_info_desc",
+    icon: OracleIcon,
+  },
+  {
+    id: "check-sql",
+    nameKey: "tool_check_sql",
+    descKey: "tool_check_sql_desc",
     icon: OracleIcon,
   },
 ];

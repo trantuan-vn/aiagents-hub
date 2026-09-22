@@ -27,6 +27,7 @@ import {
   toolSaveRagUIPlugin,
   toolGetRagUIPlugin,
   toolGetDbInfoUIPlugin,
+  toolCheckSqlUIPlugin,
 } from "./tool";
 import { triggerUIPlugin, TRIGGER_KIND_UI_PLUGINS, manualTriggerUIPlugin, scheduleTriggerUIPlugin } from "./trigger";
 import { coreWebhookUIPlugin, webhookTriggerUIPlugin } from "./webhook";
@@ -82,6 +83,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   toolSaveRagUIPlugin,
   toolGetRagUIPlugin,
   toolGetDbInfoUIPlugin,
+  toolCheckSqlUIPlugin,
   // Overrides (dedicated modules — registered last so resolve-by-id wins)
   manualTriggerUIPlugin,
   scheduleTriggerUIPlugin,

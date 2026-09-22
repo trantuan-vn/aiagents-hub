@@ -509,3 +509,81 @@ export async function fetchOracleSqlHistoriesDirect(
     return out;
   });
 }
+
+function clampQueryMaxRows(maxRows: number): number {
+  return Math.min(20, Math.max(1, Math.floor(maxRows) || 5));
+}
+
+/** Wrap user SELECT/WITH so Oracle stops after maxRows (worker never sees a full scan). */
+export function wrapReadOnlyProbeSql(sql: string, maxRows: number): string {
+  const trimmed = sql.trim().replace(/;+\s*$/, '');
+  const limit = clampQueryMaxRows(maxRows);
+  return `SELECT * FROM (${trimmed})\n__check_sql_probe FETCH FIRST ${limit} ROWS ONLY`;
+}
+
+export type OracleQueryOk = {
+  ok: true;
+  columns: string[];
+  rowCount: number;
+  sampleRows: Record<string, unknown>[];
+  elapsedMs: number;
+};
+
+export type OracleQueryErr = {
+  ok: false;
+  error: string;
+  oracleCode?: string;
+};
+
+export type OracleQueryResult = OracleQueryOk | OracleQueryErr;
+
+function oracleErrorResult(err: unknown): OracleQueryErr {
+  const message = err instanceof Error ? err.message : String(err);
+  const code = /ORA-\d+/i.exec(message)?.[0]?.toUpperCase();
+  return {
+    ok: false,
+    error: message.slice(0, 1000),
+    ...(code ? { oracleCode: code } : {}),
+  };
+}
+
+/**
+ * Probe a read-only SELECT/WITH. Oracle errors return `{ ok: false }` (no throw).
+ * Connection failures still throw.
+ */
+export async function executeOracleQueryDirect(
+  config: OracleConnectConfig,
+  sql: string,
+  maxRows = 5,
+): Promise<OracleQueryResult> {
+  const limit = clampQueryMaxRows(maxRows);
+  const t0 = Date.now();
+  return withOracleConnection(config, async (connection, oracledb) => {
+    try {
+      const wrapped = wrapReadOnlyProbeSql(sql, limit);
+      const result = await connection.execute(wrapped, {}, {
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
+        maxRows: limit,
+      });
+      const sampleRows = asRows(result.rows);
+      const metaNames = Array.isArray(result.metaData)
+        ? result.metaData
+            .map((m) => {
+              if (m && typeof m === 'object' && 'name' in m) return String((m as { name?: unknown }).name ?? '');
+              return '';
+            })
+            .filter(Boolean)
+        : [];
+      const columns = metaNames.length ? metaNames : sampleRows[0] ? Object.keys(sampleRows[0]) : [];
+      return {
+        ok: true,
+        columns,
+        rowCount: sampleRows.length,
+        sampleRows,
+        elapsedMs: Date.now() - t0,
+      };
+    } catch (err) {
+      return oracleErrorResult(err);
+    }
+  });
+}

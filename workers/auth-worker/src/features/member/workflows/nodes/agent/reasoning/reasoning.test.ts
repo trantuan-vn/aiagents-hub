@@ -4,7 +4,7 @@ import { claimsNeedCitations, parseCitationIds, buildCitations, groundedTextOrFa
 import { inferMissingSlots, shouldAskClarification, parseTaskFrame } from './frame.js';
 import { shouldPlan, parsePlan, normalizePlannerMode } from './plan.js';
 import { ruleClassify, parseLlmSafety } from './safety.js';
-import { classifyToolName, filterToolsForPolicy, initialToolChoice, omitGetRagWhenGrounded } from './tools.js';
+import { classifyToolName, filterToolsForPolicy, initialToolChoice, omitGetRagWhenGrounded, validatedSqlFromObservations } from './tools.js';
 import { reflectHeuristics } from './reflect.js';
 import { memoryKey, resolveSessionId } from './memory.js';
 import {
@@ -87,6 +87,35 @@ describe('reasoning plan and tools', () => {
     } as never;
     expect(Object.keys(omitGetRagWhenGrounded(tools, false))).toEqual(['get_rag', 'check_sql']);
     expect(Object.keys(omitGetRagWhenGrounded(tools, true))).toEqual(['check_sql']);
+  });
+
+  it('takes sql only from the last successful check_sql observation', () => {
+    expect(
+      validatedSqlFromObservations([
+        {
+          tool: 'check_sql',
+          ok: false,
+          output: JSON.stringify({ ok: false, error: 'ORA-00904', sql: 'SELECT bad FROM dual' }),
+        },
+        {
+          tool: 'check_sql',
+          ok: true,
+          output: JSON.stringify({
+            ok: true,
+            sql: 'SELECT 1 AS n FROM dual',
+            columns: ['N'],
+            rowCount: 1,
+            sampleRows: [{ N: 1 }],
+            elapsedMs: 3,
+          }),
+        },
+      ]),
+    ).toBe('SELECT 1 AS n FROM dual');
+    expect(
+      validatedSqlFromObservations([
+        { tool: 'check_sql', ok: false, output: JSON.stringify({ ok: false, error: 'ORA-00904' }) },
+      ]),
+    ).toBe('');
   });
 
   it('hides persist tools in strict mode without a low-risk plan step', () => {

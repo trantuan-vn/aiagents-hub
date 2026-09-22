@@ -99,3 +99,11 @@ export const toolGetDbInfoPlugin: WorkflowNodePlugin = {
   kind: 'get-db-info',
   execute: executeToolNode,
 };
+
+/** Agent-only validate tool — no data-flow pipeline. */
+export const toolCheckSqlPlugin: WorkflowNodePlugin = {
+  id: 'tool_node:check-sql',
+  runtimeType: 'tool_node',
+  kind: 'check-sql',
+  skipExecution: true,
+};

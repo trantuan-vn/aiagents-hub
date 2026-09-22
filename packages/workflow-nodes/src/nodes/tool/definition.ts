@@ -91,6 +91,16 @@ const GET_RAG_FIELDS = [
   { id: "includeMetadata", type: "toggle" as const, labelKey: "field_include_metadata", defaultValue: true, order: 7 },
 ];
 
+const CHECK_SQL_FIELDS = [
+  {
+    id: "maxRows",
+    type: "number" as const,
+    labelKey: "field_max_rows",
+    defaultValue: 5,
+    order: 3.1,
+  },
+];
+
 const GET_DB_INFO_FIELDS = [
   {
     id: "userField",
@@ -167,6 +177,8 @@ function toolNameKey(kind: ToolKind): string {
       return "tool_get_rag";
     case "get-db-info":
       return "tool_get_db_info";
+    case "check-sql":
+      return "tool_check_sql";
     case "agent":
       return "tool_pick_agent";
     case "workflow":
@@ -190,6 +202,8 @@ function toolDescKey(kind: ToolKind): string {
       return "tool_get_rag_desc";
     case "get-db-info":
       return "tool_get_db_info_desc";
+    case "check-sql":
+      return "tool_check_sql_desc";
     case "agent":
       return "tool_pick_agent_desc";
     case "workflow":
@@ -228,7 +242,7 @@ export function createToolKindDefinition(kind: ToolKind): WorkflowNodeDefinition
     nameKey: toolNameKey(kind),
     descriptionKey: toolDescKey(kind),
     category: "resource",
-    icon: kind === "save-rag" || kind === "get-rag" || kind === "get-db-info" ? "Oracle" : "Wrench",
+    icon: kind === "save-rag" || kind === "get-rag" || kind === "get-db-info" || kind === "check-sql" ? "Oracle" : "Wrench",
     defaultData: {
       label: kind.replace(/-/g, " "),
       [TOOL_KIND_FIELD]: kind,
@@ -307,6 +321,26 @@ export const GET_DB_INFO_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin
   ],
 });
 
+export const CHECK_SQL_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
+  id: "tool_node:check-sql",
+  runtimeType: "tool_node",
+  kind: "check-sql",
+  nameKey: "tool_check_sql",
+  descriptionKey: "tool_check_sql_desc",
+  category: "resource",
+  icon: "Oracle",
+  defaultData: {
+    toolKind: "check-sql",
+    toolName: "check_sql",
+    maxRows: 5,
+  },
+  sections: [
+    defaultInputSection(),
+    defaultParametersSection([...RAG_COMMON_FIELDS, ...CHECK_SQL_FIELDS]),
+    defaultOutputSection(false),
+  ],
+});
+
 export const TOOL_KIND_DEFINITIONS: WorkflowNodeDefinition[] = TOOL_KINDS.filter(
   (kind) => !TOOL_OVERRIDE_KINDS.has(kind),
 ).map(createToolKindDefinition);
@@ -343,5 +377,12 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     schemaNameField: "",
     tableNameField: "",
     tableFilter: "*",
+  },
+  "check-sql": {
+    toolKind: "check-sql",
+    toolName: "check_sql",
+    toolDescription:
+      "Run a SELECT on Oracle and return parser/execution errors if wrong. Call after get_rag, before treating SQL as the final answer.",
+    maxRows: 5,
   },
 };

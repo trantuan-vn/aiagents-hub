@@ -155,7 +155,8 @@ Bốn pha. Pha 2 giao một lượt: Get DB Info bỏ introspect trước khi Sa
 | **1. Nền** | `shared/db` (connect, list, introspect, history, chỗ trống `executeReadOnly`). `ToolModule` + `TOOL_MODULES`. `executeToolNode` và toolset của agent chỉ đọc registry. `toolClass` khai báo trên module | **Done** — ba tool cũ chạy qua registry; hành vi graph giữ. Save RAG không import Get DB Info (`table-docs` + `documents` nằm trong save-rag) |
 | **2. Ingest** | Get DB Info chỉ liệt kê bảng. Save RAG: introspect bảng, đọc `ADMIN.DBTOOLS$EXECUTION_HISTORY`, một lần LLM (mô tả cột + typical query), embed schema và sqlexample. Handle `llm`. Bỏ đường PDF/text | **Done** — Form → Get DB Info → Loop → Save RAG ghi hai document / bảng; handle `llm` + embed + Vectorize; test suite tool không gọi `get-db-info/execute` từ Save RAG |
 | **3. Hỏi** | Get RAG gom theo bảng, trả đủ schema rồi SQL example cho Reasoning Agent | **Done** — dual query schema+sqlexample; hydrate bắt buộc cả hai docType; snippet có `schemaName`; bỏ `get_rag` khi đã prefetch |
-| **4. Kiểm SQL** | Kind `check-sql`, proxy `executeQuery`, tool class `validate`. Reasoning Agent gọi lại khi `ok: false` | SELECT đúng → `ok: true`. ORA-… → agent sửa và gọi lần hai. `DELETE` không tới Oracle |
+| **4. Kiểm SQL** | Kind `check-sql`, proxy `executeQuery`, tool class `validate`. Reasoning Agent gọi lại khi `ok: false` | **Done** — guard từ chối DML; `executeQuery` + `executeReadOnly`; output `sql` chỉ từ `check_sql` ok |
+
 
 Pha 3 đọc index pha 2 đã ghi. Pha 4 không cần đợi đổi nội dung document, chỉ cần agent đã có snippet từ pha 3.
 
@@ -165,6 +166,7 @@ Pha 3 đọc index pha 2 đã ghi. Pha 4 không cần đợi đổi nội dung d
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.7 | 2026-09-22 | Pha 4 Done — Check SQL validate + oracle-proxy executeQuery |
 | 0.6 | 2026-09-22 | Pha 3 Done — Get RAG dual docType + schema trước sqlexample |
 | 0.5 | 2026-09-22 | Pha 2 Done — Get DB Info list-only; Save RAG LLM+history+embed; handle `llm` |
 | 0.4 | 2026-09-22 | Bốn pha lập trình |

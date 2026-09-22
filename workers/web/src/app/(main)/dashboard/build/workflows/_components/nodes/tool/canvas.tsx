@@ -11,7 +11,7 @@ import { edgeUsesHandle } from "../../edges/workflow-connection-utils";
 import { WorkflowNodeShell } from "../../node-ui/workflow-node-shell";
 import { OracleIcon } from "./oracle-icon";
 
-const ORACLE_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info"]);
+const ORACLE_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info", "check-sql"]);
 const RAG_TOOL_KINDS = new Set(["save-rag", "get-rag"]);
 
 function useRagMissingConfig(nodeId: string | undefined, toolKind: string) {

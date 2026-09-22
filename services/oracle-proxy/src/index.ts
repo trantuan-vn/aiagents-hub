@@ -1,6 +1,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import {
+  executeOracleQueryDirect,
   fetchOracleSqlHistoriesDirect,
   introspectOracleTableDirect,
   introspectOracleTablesDirect,
@@ -61,7 +62,9 @@ app.post('/oracle', async (c) => {
       ? `${action} ${body.tableName}`
       : action === 'introspectTables' || action === 'sqlHistory'
         ? `${action} x${tableCount}`
-        : action;
+        : action === 'executeQuery'
+          ? `${action}`
+          : action;
   console.log(`[oracle-proxy] START ${label}`);
   try {
     if (action === 'listTables') {
@@ -100,6 +103,17 @@ app.post('/oracle', async (c) => {
       if (!tableNames.length) return badRequest('Missing tableNames');
       const result = await fetchOracleSqlHistoriesDirect(config, tableNames, limit);
       console.log(`[oracle-proxy] OK ${label} (${Date.now() - t0}ms)`);
+      return jsonResponse({ ok: true, result });
+    }
+    if (action === 'executeQuery') {
+      const sql = String(body.sql ?? '').trim();
+      if (!sql) return badRequest('Missing sql');
+      const maxRows = Number(body.maxRows ?? 5);
+      const result = await executeOracleQueryDirect(config, sql, maxRows);
+      console.log(
+        `[oracle-proxy] OK ${label} ok=${result.ok} (${Date.now() - t0}ms)`,
+      );
+      // Always HTTP 200 with nested result so ORA-* reaches the agent as ok:false (not a throw).
       return jsonResponse({ ok: true, result });
     }
     return badRequest(`Unknown action "${action}"`);

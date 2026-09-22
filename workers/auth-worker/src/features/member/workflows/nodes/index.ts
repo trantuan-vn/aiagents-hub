@@ -26,6 +26,7 @@ import {
   toolSaveRagPlugin,
   toolGetRagPlugin,
   toolGetDbInfoPlugin,
+  toolCheckSqlPlugin,
 } from './tool/index.js';
 import {
   triggerPlugin,
@@ -85,6 +86,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   toolSaveRagPlugin,
   toolGetRagPlugin,
   toolGetDbInfoPlugin,
+  toolCheckSqlPlugin,
   // Overrides (dedicated modules — win by id over any factory duplicate)
   webhookTriggerPlugin,
   coreWebhookPlugin,

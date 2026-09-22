@@ -66,6 +66,7 @@ import {
   initialToolChoice,
   maxActSteps,
   omitGetRagWhenGrounded,
+  validatedSqlFromObservations,
 } from './reasoning/tools.js';
 import type {
   AgentCitation,
@@ -215,12 +216,21 @@ function clarificationResult(questions: string[], why: string, frame: TaskFrame)
 
 function toNodeOutput(
   result: ReasoningResult,
-  extra: { query: string; snippets: string[]; endpoint: string },
+  extra: {
+    query: string;
+    snippets: string[];
+    endpoint: string;
+    validatedSql?: string;
+    hasCheckSql?: boolean;
+  },
 ): NodeOutput {
+  const sql = extra.hasCheckSql
+    ? String(extra.validatedSql ?? '').trim()
+    : extractSql(result.text);
   return {
     status: result.status,
     text: result.text,
-    sql: extractSql(result.text),
+    sql,
     citations: result.citations,
     plan: result.plan,
     questions: result.questions,
@@ -549,6 +559,7 @@ export async function executeReasoningAgent(
 
   const policyTools = filterToolsForPolicy(baseTools, { plan, safetyLevel: options.safetyLevel });
   const policyNames = Object.keys(policyTools);
+  const hasCheckSql = policyNames.some((n) => /check[_-]?sql/i.test(n));
   const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
   const systemParts = [
     userSystem,
@@ -556,6 +567,9 @@ export async function executeReasoningAgent(
     policyNames.length
       ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
       : `If you lack required details, say so and ask. Do not guess.`,
+    hasCheckSql
+      ? 'After writing a SELECT, call check_sql to verify it on Oracle. Only treat SQL as final when check_sql returns ok: true. If ok: false, fix the SQL using the Oracle error and call check_sql again. If you cannot get ok: true, say the statement did not run and include the last Oracle error — do not claim success.'
+      : '',
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
     formatRagContext(snippets) ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}` : '',
@@ -581,12 +595,15 @@ export async function executeReasoningAgent(
   const finish = async (text: string, cites: AgentCitation[]) => {
     const outText = groundedTextOrFallback(text, cites);
     const outputSafety = ruleClassify(outText);
+    const outputExtra = {
+      query: userText,
+      snippets,
+      endpoint,
+      hasCheckSql,
+      validatedSql: validatedSqlFromObservations(observations),
+    };
     if (outputSafety.action === 'refuse') {
-      return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), {
-        query: userText,
-        snippets,
-        endpoint,
-      });
+      return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), outputExtra);
     }
     const result: ReasoningResult = {
       status: 'ok',
@@ -607,7 +624,7 @@ export async function executeReasoningAgent(
       await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
     }
     await simpleMemory.persist(outText);
-    return toNodeOutput(result, { query: userText, snippets, endpoint });
+    return toNodeOutput(result, outputExtra);
   };
 
   for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {

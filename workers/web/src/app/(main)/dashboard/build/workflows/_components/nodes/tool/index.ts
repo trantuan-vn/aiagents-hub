@@ -18,6 +18,8 @@ function toolLabelKey(kind: ToolKind): string {
       return "tool_get_rag";
     case "get-db-info":
       return "tool_get_db_info";
+    case "check-sql":
+      return "tool_check_sql";
     case "agent":
       return "tool_pick_agent";
     case "workflow":
@@ -42,6 +44,7 @@ function toolCatalogIcon(kind: ToolKind): string {
     case "save-rag":
     case "get-rag":
     case "get-db-info":
+    case "check-sql":
       return "Oracle";
     default:
       return "Wrench";
@@ -93,3 +96,4 @@ export const TOOL_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TOOL_KINDS.filter(
 export const toolSaveRagUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("save-rag");
 export const toolGetRagUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-rag");
 export const toolGetDbInfoUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-db-info");
+export const toolCheckSqlUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("check-sql");

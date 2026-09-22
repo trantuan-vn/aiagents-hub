@@ -103,6 +103,28 @@ export function omitGetRagWhenGrounded<T extends ToolSet>(tools: T, alreadyGroun
   return next;
 }
 
+/** Prefer SQL from the last successful check_sql tool result (not prose). */
+export function validatedSqlFromObservations(
+  observations: Array<{ tool: string; ok: boolean; output?: unknown }>,
+): string {
+  for (let i = observations.length - 1; i >= 0; i--) {
+    const o = observations[i]!;
+    if (!o.ok || !/check[_-]?sql/i.test(o.tool)) continue;
+    try {
+      const parsed =
+        typeof o.output === 'string'
+          ? (JSON.parse(o.output) as { ok?: boolean; sql?: string })
+          : (o.output as { ok?: boolean; sql?: string } | null);
+      if (parsed && parsed.ok === true && typeof parsed.sql === 'string' && parsed.sql.trim()) {
+        return parsed.sql.trim();
+      }
+    } catch {
+      /* observation may be truncated non-JSON */
+    }
+  }
+  return '';
+}
+
 export function buildAskUserTool(): ToolSet {
   return {
     [ASK_USER_TOOL]: tool({

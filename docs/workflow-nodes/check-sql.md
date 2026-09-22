@@ -1,6 +1,6 @@
 # Node: Check SQL (`tool_node:check-sql`)
 
-> **Trạng thái:** Draft  
+> **Trạng thái:** Implemented (pha 4)  
 > **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "check-sql"`  
 > **Gắn vào:** [`reasoning-agent.md`](./reasoning-agent.md) qua handle `tools`
@@ -104,4 +104,5 @@ Test: SELECT hợp lệ → `ok: true`; ORA-00904 → `ok: false` và message ng
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-09-22 | Implemented — executeQuery proxy, guard, agent validate loop |
 | 0.1 | 2026-09-22 | Draft — probe SELECT Oracle, trả lỗi cho Reasoning Agent |

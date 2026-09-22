@@ -1,3 +1,4 @@
+import { checkSqlToolModule } from '../check-sql/module.js';
 import { getDbInfoToolModule } from '../get-db-info/module.js';
 import { getRagToolModule } from '../get-rag/module.js';
 import { saveRagToolModule } from '../save-rag/module.js';
@@ -8,6 +9,7 @@ export const TOOL_MODULES: ToolModule[] = [
   getDbInfoToolModule,
   saveRagToolModule,
   getRagToolModule,
+  checkSqlToolModule,
 ];
 
 export function getToolModule(kind: string): ToolModule | undefined {

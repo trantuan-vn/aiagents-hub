@@ -109,3 +109,22 @@ export async function proxyFetchOracleSqlHistories(
 ): Promise<Record<string, ProxySqlHistoryEntry[]>> {
   return proxyCall(env, { action: 'sqlHistory', config, tableNames, limit });
 }
+
+export type ProxyQueryResult =
+  | {
+      ok: true;
+      columns: string[];
+      rowCount: number;
+      sampleRows: Record<string, unknown>[];
+      elapsedMs: number;
+    }
+  | { ok: false; error: string; oracleCode?: string };
+
+export async function proxyExecuteOracleQuery(
+  env: ProxyEnv,
+  config: OracleConnectConfig,
+  sql: string,
+  maxRows: number,
+): Promise<ProxyQueryResult> {
+  return proxyCall<ProxyQueryResult>(env, { action: 'executeQuery', config, sql, maxRows });
+}
