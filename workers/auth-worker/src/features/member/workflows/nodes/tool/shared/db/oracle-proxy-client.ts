@@ -1,5 +1,5 @@
 import type { OracleConnectConfig } from './connect-config.js';
-import type { DbColumnInfo, DbForeignKey } from './execute.js';
+import type { DbColumnInfo, DbForeignKey } from './types.js';
 
 type ProxyEnv = {
   ORACLE_PROXY_URL?: string;

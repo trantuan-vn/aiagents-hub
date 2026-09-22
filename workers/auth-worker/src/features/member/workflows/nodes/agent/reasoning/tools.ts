@@ -1,16 +1,21 @@
 import { tool, type ToolSet } from 'ai';
 import { z } from 'zod';
 
+import { toolClassForToolName } from '../../tool/shared/registry.js';
 import type { AgentPlan, SafetyLevel } from './types.js';
 import { ASK_USER_TOOL } from './types.js';
 
-export type ToolClass = 'retrieve' | 'persist' | 'http_write' | 'http_read' | 'ask' | 'other';
+export type ToolClass = 'retrieve' | 'persist' | 'validate' | 'http_write' | 'http_read' | 'ask' | 'other';
 
 export function classifyToolName(name: string, description = ''): ToolClass {
+  const fromModule = toolClassForToolName(name);
+  if (fromModule) return fromModule;
+
   const key = `${name} ${description}`.toLowerCase().replace(/-/g, '_');
   if (name === ASK_USER_TOOL || key.includes('ask_user')) return 'ask';
   if (/(get_rag|retrieve_memory|get_db_info|retrieve)/.test(key)) return 'retrieve';
   if (/save_rag|persist|upsert|write memory/.test(key)) return 'persist';
+  if (/check_sql|validate/.test(key)) return 'validate';
   if (/\b(post|put|patch|delete)\b/.test(key) && /http|calls /.test(key)) return 'http_write';
   if (/http|calls /.test(key)) return 'http_read';
   return 'other';
@@ -33,11 +38,18 @@ export function filterToolsForPolicy(
   for (const [name, def] of Object.entries(tools)) {
     const description = String((def as { description?: string }).description ?? '');
     const kind = classifyToolName(name, description);
-    if (kind === 'ask' || kind === 'retrieve' || kind === 'other' || kind === 'http_read') {
+    if (
+      kind === 'ask' ||
+      kind === 'retrieve' ||
+      kind === 'validate' ||
+      kind === 'other' ||
+      kind === 'http_read'
+    ) {
       out[name] = def;
       continue;
     }
-    const allowedByPlan = planned.has(name) && (args.plan?.steps.some((s) => s.tool === name && s.risk !== 'high') ?? false);
+    const allowedByPlan =
+      planned.has(name) && (args.plan?.steps.some((s) => s.tool === name && s.risk !== 'high') ?? false);
     if (args.safetyLevel === 'strict' && !allowedByPlan) continue;
     if (kind === 'persist' || kind === 'http_write') {
       if (planned.size > 0 && !planned.has(name)) continue;
@@ -69,11 +81,13 @@ export function decorateToolDescription(name: string, description: string): stri
       ? 'When to use: before answering factual/SQL questions. When not: chit-chat or already-grounded answers.'
       : kind === 'persist'
         ? 'When to use: only if the user or plan asks to store knowledge. When not: routine Q&A.'
-        : kind === 'http_write'
-          ? 'When to use: only when the plan explicitly requires a write. When not: guessing IDs or destructive actions.'
-          : kind === 'ask'
-            ? 'When to use: required slots are missing and no tool can fill them. When not: you already have enough to answer.'
-            : 'When to use: the plan names this tool. When not: guessing arguments.';
+        : kind === 'validate'
+          ? 'When to use: after writing SQL, to verify it runs. When not: before you have a candidate query.'
+          : kind === 'http_write'
+            ? 'When to use: only when the plan explicitly requires a write. When not: guessing IDs or destructive actions.'
+            : kind === 'ask'
+              ? 'When to use: required slots are missing and no tool can fill them. When not: you already have enough to answer.'
+              : 'When to use: the plan names this tool. When not: guessing arguments.';
   return `${description} ${when}`.trim();
 }
 

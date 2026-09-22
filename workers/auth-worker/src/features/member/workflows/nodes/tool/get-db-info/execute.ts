@@ -6,56 +6,32 @@ import {
 import { toolNodeConfig } from '../shared/rag-context.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import {
+  filterTables,
+  fetchSqlHistory as fetchOracleSqlHistories,
+  introspectTable as introspectOracleTable,
   isOracleConnectionType,
+  listDatabaseTables,
   resolveOracleConnectConfig,
   resolveOracleSchema,
+  type DbColumnInfo,
+  type DbConnection,
+  type DbForeignKey,
+  type GetDbInfoInput,
+  type GetDbInfoResult,
   type OracleConnectConfig,
-} from './connect-config.js';
-import { ragDocumentsFromDbInfo, type RagDocumentItem } from './documents.js';
-import { fetchOracleSqlHistories, introspectOracleTable, introspectOracleTables, listOracleTables } from './oracle.js';
+  type SqlHistoryEntry,
+} from '../shared/db/index.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 
-export type DbColumnInfo = {
-  name: string;
-  type: string;
-  nullable: boolean;
-  default?: string;
-  comment?: string;
-};
+export type {
+  DbColumnInfo,
+  DbForeignKey,
+  GetDbInfoInput,
+  GetDbInfoResult,
+  SqlHistoryEntry,
+} from '../shared/db/index.js';
 
-export type DbForeignKey = {
-  column: string;
-  refTable: string;
-  refColumn: string;
-};
-
-export type SqlHistoryEntry = {
-  sql: string;
-  executedAt?: string;
-  durationMs?: number;
-  rowCount?: number;
-};
-
-export type GetDbInfoInput = {
-  tableName?: string;
-  schemaName?: string;
-  sampleRowLimit?: number;
-  sqlHistoryLimit?: number;
-  includeSqlHistory?: boolean;
-};
-
-export type GetDbInfoResult = {
-  dbId: string;
-  schemaName: string;
-  tableName: string;
-  columns: DbColumnInfo[];
-  primaryKey: string[];
-  foreignKeys: DbForeignKey[];
-  ddl: string;
-  sampleRows: Record<string, unknown>[];
-  sqlHistory: SqlHistoryEntry[];
-  rowCountEstimate?: number;
-};
+export { listDatabaseTables } from '../shared/db/index.js';
 
 export type GetDbInfoExecuteParams = {
   env: Env;
@@ -64,24 +40,6 @@ export type GetDbInfoExecuteParams = {
   triggerContext: Record<string, unknown>;
   input: GetDbInfoInput;
 };
-
-type DbConnection = {
-  type: string;
-  credentialKey?: string;
-  databaseId?: string;
-  user?: string;
-  password?: string;
-  connectString?: string;
-};
-
-async function listD1Tables(db: D1Database): Promise<string[]> {
-  const { results } = await db
-    .prepare(
-      `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%$%' ORDER BY name`,
-    )
-    .all<{ name: string }>();
-  return (results ?? []).map((r) => r.name);
-}
 
 async function introspectD1Table(
   db: D1Database,
@@ -213,56 +171,6 @@ function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnec
     ...(connection ?? {}),
     connection: connection ?? source.connection,
   });
-}
-
-export async function listDatabaseTables(
-  env: Env,
-  connection: DbConnection,
-  schemaName = 'public',
-  tableFilter = '*',
-): Promise<string[]> {
-  const oracleConfig = oracleConfigFrom(connection, connection);
-  if (oracleConfig || isOracleConnectionType(connection.type)) {
-    if (!oracleConfig) {
-      throw new Error(
-        'get_db_info: Oracle user, password, and connectString are required from the previous node',
-      );
-    }
-    const owner = resolveOracleSchema(schemaName, oracleConfig.user);
-    const tables = await listOracleTables(oracleConfig, owner, env);
-    return filterTables(tables, tableFilter);
-  }
-
-  if (connection.type === 'd1') {
-    const db = (env as unknown as Record<string, unknown>).D1DB as D1Database | undefined;
-    if (!db) return [];
-    const tables = await listD1Tables(db);
-    return filterTables(tables, tableFilter);
-  }
-
-  throw new Error(
-    'get_db_info: Oracle user, password, and connectString are required from the previous node (map u / p / c). Will not list the platform database.',
-  );
-}
-
-/** Oracle-generated objects (recycle bin, AQ, MV logs, Text indexes) include `$`. */
-function isSystemGeneratedTable(name: string): boolean {
-  return name.includes('$');
-}
-
-function filterTables(tables: string[], tableFilter: string): string[] {
-  const realTables = tables.filter((t) => !isSystemGeneratedTable(t));
-  const filter = tableFilter.trim();
-  if (!filter || filter === '*') return realTables;
-  if (filter.includes(',')) {
-    const allowed = new Set(filter.split(',').map((s) => s.trim()).filter(Boolean));
-    return realTables.filter((t) => allowed.has(t));
-  }
-  if (filter.includes('*')) {
-    const re = new RegExp(`^${filter.replace(/\*/g, '.*').replace(/\?/g, '.')}$`, 'i');
-    return realTables.filter((t) => re.test(t));
-  }
-  return realTables.filter((t) => t === filter);
 }
 
 export async function executeGetDbInfo(params: GetDbInfoExecuteParams): Promise<GetDbInfoResult> {
@@ -411,170 +319,6 @@ export type TableLoopItem = {
 
 function buildTableLoopItem(tableName: string, schemaName: string): TableLoopItem {
   return { tableName, schemaName };
-}
-
-function truncateSampleRows(info: GetDbInfoResult, sampleLimit: number): GetDbInfoResult {
-  info.sampleRows = info.sampleRows.slice(0, sampleLimit).map((row) => {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(row)) {
-      out[k] = typeof v === 'string' && v.length > 200 ? v.slice(0, 200) + '…' : v;
-    }
-    return out;
-  });
-  return info;
-}
-
-const RAG_SAMPLE_LIMIT = 3;
-
-async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const index = next++;
-      results[index] = await fn(items[index]!);
-    }
-  }
-  const workers = Array.from({ length: Math.min(Math.max(1, concurrency), items.length) }, () => worker());
-  await Promise.all(workers);
-  return results;
-}
-
-/** Introspect one table and emit schema + sqlexample documents for Save RAG. */
-export async function introspectTableToRagDocuments(params: {
-  env: Env;
-  definition: import('../../../domain/domain.js').WorkflowDefinition;
-  agentId: string;
-  triggerContext: Record<string, unknown>;
-  tableName: string;
-  schemaName?: string;
-}): Promise<RagDocumentItem[]> {
-  const limits = asRecord(params.triggerContext.limits);
-  const sampleLimit = Math.min(
-    Number(limits.sampleRowLimit ?? RAG_SAMPLE_LIMIT) || RAG_SAMPLE_LIMIT,
-    RAG_SAMPLE_LIMIT,
-  );
-  const config = getDbInfoConfig(params.definition, params.agentId);
-  const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
-    config,
-    params.triggerContext,
-  );
-  const info = await executeGetDbInfo({
-    env: params.env,
-    definition: params.definition,
-    agentId: params.agentId,
-    triggerContext: { ...params.triggerContext, tableName: params.tableName },
-    input: {
-      tableName: params.tableName,
-      schemaName: params.schemaName,
-      sampleRowLimit: sampleLimit,
-      sqlHistoryLimit,
-      includeSqlHistory,
-    },
-  });
-  return ragDocumentsFromDbInfo(truncateSampleRows(info, sampleLimit));
-}
-
-/** Batch-introspect many tables for RAG (one Oracle session). */
-export async function introspectTablesToRagDocuments(params: {
-  env: Env;
-  definition: import('../../../domain/domain.js').WorkflowDefinition;
-  agentId: string;
-  triggerContext: Record<string, unknown>;
-  tables: Array<{ tableName: string; schemaName?: string }>;
-}): Promise<RagDocumentItem[]> {
-  const tables = params.tables
-    .map((t) => ({
-      tableName: String(t.tableName ?? '').trim(),
-      schemaName: String(t.schemaName ?? ''),
-    }))
-    .filter((t) => t.tableName && !isSystemGeneratedTable(t.tableName));
-  if (!tables.length) return [];
-  if (tables.length === 1) {
-    return introspectTableToRagDocuments({ ...params, ...tables[0]! });
-  }
-
-  const connection = (params.triggerContext.connection ?? {}) as DbConnection;
-  const oracleConfig = oracleConfigFrom(params.triggerContext, connection);
-  const explicitType = String(connection.type ?? params.triggerContext.connectionType ?? '')
-    .trim()
-    .toLowerCase();
-  const connType = explicitType || (oracleConfig ? 'oracle' : '');
-  const dbId = String(params.triggerContext.dbId ?? params.triggerContext.databaseId ?? '');
-  const sampleLimit = RAG_SAMPLE_LIMIT;
-
-  if (oracleConfig || isOracleConnectionType(connType)) {
-    if (!oracleConfig) {
-      throw new Error(
-        'get_db_info: Oracle user, password, and connectString are required from the previous node',
-      );
-    }
-    const schemaName = resolveOracleSchema(tables[0]!.schemaName, oracleConfig.user);
-    const tableNames = tables.map((t) => t.tableName);
-    const introspected = await introspectOracleTables(
-      oracleConfig,
-      schemaName,
-      tableNames,
-      sampleLimit,
-      params.env,
-    );
-    const config = getDbInfoConfig(params.definition, params.agentId);
-    const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
-      config,
-      params.triggerContext,
-    );
-    const historyByTable = includeSqlHistory
-      ? await fetchSqlHistory({
-          oracleConfig,
-          tableNames,
-          limit: sqlHistoryLimit,
-          env: params.env,
-        })
-      : {};
-    const docs: RagDocumentItem[] = [];
-    for (const row of introspected) {
-      if (row.error || !row.columns.length) {
-        console.warn(`[get-db-info] skip table ${row.tableName}: ${row.error || 'no columns'}`);
-        continue;
-      }
-      docs.push(
-        ...ragDocumentsFromDbInfo(
-          truncateSampleRows(
-            {
-              dbId,
-              schemaName,
-              tableName: row.tableName,
-              columns: row.columns,
-              primaryKey: row.primaryKey,
-              foreignKeys: row.foreignKeys,
-              ddl: row.ddl,
-              sampleRows: row.sampleRows,
-              sqlHistory: historyByTable[historyKey(row.tableName)] ?? [],
-              rowCountEstimate: row.rowCountEstimate,
-            },
-            sampleLimit,
-          ),
-        ),
-      );
-    }
-    return docs;
-  }
-
-  if (connType !== 'd1' && explicitType !== 'd1') {
-    throw new Error(
-      `get_db_info: no database connection for ${tables.length} table(s) (need Oracle user/password/connectString from Form / Get DB Info — run those nodes first, or Execute workflow from the form)`,
-    );
-  }
-
-  const nested = await mapPool(tables, 4, (table) =>
-    introspectTableToRagDocuments({
-      ...params,
-      tableName: table.tableName,
-      schemaName: table.schemaName,
-      triggerContext: { ...params.triggerContext, tableName: table.tableName },
-    }),
-  );
-  return nested.flat();
 }
 
 /** Graph-path execute: list tables only — loop items carry connection context for per-table Save RAG. */

@@ -1,9 +1,10 @@
 # Artifact: `sqlexample.md` (SQL examples document)
 
 > **Loại:** Document artifact — **không phải** canvas node  
-> **Sinh bởi:** Agent hoặc `get-db-info/documents.ts` (sau [`getDBInfo`](./getDBInfo.md))  
-> **Lưu bởi:** [`saveRag`](./saveRag.md) → [`vectorize`](./vectorize.md)  
-> **Dùng lại:** [`getRag`](./getRag.md) + Agent (BT3 — Text-to-SQL)
+> **Sinh bởi:** [`saveRag`](./saveRag.md) — history Oracle ghép với logic thông thường do LLM viết cùng lúc với [`schema.md`](./schema.md)  
+> **Lưu bởi:** Save RAG, service embed → [`vectorize`](./vectorize.md)  
+> **Dùng lại:** [`getRag`](./getRag.md) + Reasoning Agent  
+> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)
 
 Mỗi **bảng** × **mỗi execution** tạo **một** `sqlexample.md`. File name logic: `{dbId}.{schemaName}.{tableName}.sqlexample.md`.
 
@@ -13,10 +14,10 @@ Mỗi **bảng** × **mỗi execution** tạo **một** `sqlexample.md`. File na
 
 | Khía cạnh | Mô tả |
 |-----------|-------|
-| **Nội dung** | Ví dụ SQL thực tế + pattern từ lịch sử query |
-| **Nguồn** | `get_db_info.sqlHistory` (10 query) + Agent suy diễn pattern từ `sampleRows` |
+| **Nội dung** | Câu đã chạy trên bảng, rồi các câu SELECT thông thường của bảng đó |
+| **Nguồn** | (1) `ADMIN.DBTOOLS$EXECUTION_HISTORY` lọc theo tên bảng. (2) LLM viết logic hay gặp: tra khóa, lọc ngày, đếm, gom nhóm, join FK |
 | **Vectorize** | `docType: sqlexample` |
-| **Mục tiêu retrieve** | Few-shot SQL cho Agent khi trả lời câu hỏi user |
+| **Mục tiêu retrieve** | Few-shot để Reasoning Agent viết SQL sát câu hỏi user |
 
 ---
 
@@ -77,16 +78,14 @@ SELECT status, COUNT(*) FROM public.orders GROUP BY status;
 
 ---
 
-## 3. Mapping từ get_db_info
+## 3. Hai nguồn
 
-| Nguồn `get_db_info` | Section sqlexample.md |
-|---------------------|------------------------|
-| `sqlHistory[i].sql` | `## Historical queries` |
-| `sqlHistory[i].executedAt` | bullet metadata |
-| `sampleRows` | Gợi ý `## Suggested patterns` |
-| `columns` + `foreignKeys` | JOIN examples trong Suggested |
+| Phần | Nguồn | Ghi vào document |
+|------|--------|------------------|
+| `## Historical queries` | `fetchOracleSqlHistoriesDirect` đọc `ADMIN.DBTOOLS$EXECUTION_HISTORY`. Cột SQL là `STATEMENT` / `SQL_TEXT` / `SQL` / `TEXT`. Lọc `LIKE` tên bảng, `FETCH FIRST sqlHistoryLimit`. | Nguyên văn `sql`, kèm `executedAt` nếu có. Không để LLM viết lại câu này |
+| `## Typical queries` | `typicalQueries` trong JSON của lần LLM | `titleVi` / `titleEn`, `sql` (một `SELECT` hoặc `WITH`), `noteVi` đưa vào text embed |
 
-Agent **normalize** SQL (format, qualify schema) trước khi save.
+History trống → mục Historical ghi “không có”. Typical query vẫn được sinh từ schema. Cả hai trống → không upsert document sqlexample.
 
 ---
 
@@ -137,4 +136,6 @@ Cả hai **bắt buộc** per table trước khi BT3 query hoạt động tốt.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.3 | 2026-09-22 | History từ `ADMIN.DBTOOLS$EXECUTION_HISTORY` + typical queries do LLM |
+| 0.2 | 2026-09-22 | Save RAG sinh ví dụ; embed cùng schema |
 | 0.1 | 2026-06-13 | Draft — sqlexample artifact for BT3 |

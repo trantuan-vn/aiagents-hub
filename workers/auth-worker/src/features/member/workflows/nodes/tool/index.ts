@@ -14,6 +14,10 @@ export type {
   SaveRagResult,
   SaveRagExecuteParams,
 } from './save-rag/execute.js';
+export {
+  introspectTableToRagDocuments,
+  introspectTablesToRagDocuments,
+} from './save-rag/table-docs.js';
 
 export { executeGetRag, executeGetRagPipeline, prefetchLinkedGetRag } from './get-rag/execute.js';
 export type {
@@ -23,7 +27,7 @@ export type {
   GetRagExecuteParams,
 } from './get-rag/execute.js';
 
-export { executeGetDbInfo, executeGetDbInfoPipeline, listDatabaseTables, introspectTableToRagDocuments } from './get-db-info/execute.js';
+export { executeGetDbInfo, executeGetDbInfoPipeline, listDatabaseTables } from './get-db-info/execute.js';
 export type {
   DbColumnInfo,
   DbForeignKey,
@@ -44,6 +48,9 @@ export type { PdfFileInput } from './save-rag/pdf-extract.js';
 
 export { resolveRagResources, resolveRagEmbedModel, findRagToolNodeId, toolNodeConfig } from './shared/rag-context.js';
 export type { RagBilling, RagResourceContext } from './shared/rag-context.js';
+
+export { getToolModule, TOOL_MODULES, toolClassForToolName } from './shared/registry.js';
+export type { ToolModule, WorkflowToolClass, AgentToolBindContext } from './shared/tool-module.js';
 
 export { executeToolNode } from './execute.js';
 

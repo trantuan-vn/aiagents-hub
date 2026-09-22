@@ -1,9 +1,10 @@
 # Artifact: `schema.md` (table schema document)
 
 > **Loại:** Document artifact — **không phải** canvas node  
-> **Sinh bởi:** Agent hoặc `get-db-info/documents.ts` (sau [`getDBInfo`](./getDBInfo.md))  
-> **Lưu bởi:** [`saveRag`](./saveRag.md) → [`vectorize`](./vectorize.md)  
-> **Dùng lại:** [`getRag`](./getRag.md) + Agent (BT3 query — Text-to-SQL)
+> **Sinh bởi:** [`saveRag`](./saveRag.md) sau khi introspect bảng và LLM viết mô tả cột  
+> **Lưu bởi:** Save RAG → [`vectorize`](./vectorize.md)  
+> **Dùng lại:** [`getRag`](./getRag.md) + [`reasoning-agent`](./reasoning-agent.md) để viết SQL  
+> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)
 
 Mỗi **bảng** × **mỗi execution** tạo **một** `schema.md`. File name logic: `{dbId}.{schemaName}.{tableName}.schema.md`.
 
@@ -14,7 +15,7 @@ Mỗi **bảng** × **mỗi execution** tạo **một** `schema.md`. File name l
 | Khía cạnh | Mô tả |
 |-----------|-------|
 | **Nội dung** | Mô tả cấu trúc bảng dạng markdown — human + LLM friendly |
-| **Nguồn** | Agent tổng hợp từ `get_db_info` output |
+| **Nguồn** | Oracle introspect + LLM mô tả cột, cả hai trong Save RAG |
 | **Vectorize** | `docType: schema`, metadata filter khi retrieve |
 | **Mục tiêu retrieve** | Agent hiểu cột, PK/FK, kiểu dữ liệu để **sinh SQL đúng** |
 
@@ -34,16 +35,19 @@ generatedAt: 2026-06-13T10:00:00Z
 # Table: public.orders
 
 ## Summary
-One-line business description of the table (Agent-generated).
+- VI: Một câu mô tả nghiệp vụ bảng.
+- EN: One-line business description of the table.
 
 ## Columns
 
-| Column | Type | Nullable | Default | Description |
-|--------|------|----------|---------|-------------|
-| id | uuid | NO | gen_random_uuid() | Primary key |
-| user_id | uuid | NO | | FK → users.id |
-| total | numeric(12,2) | NO | 0 | Order total |
-| created_at | timestamptz | NO | now() | |
+| Column | Type | Nullable | Default | Description (VI) | Description (EN) |
+|--------|------|----------|---------|----------------|----------------|
+| id | uuid | NO | gen_random_uuid() | Khóa chính đơn hàng | Primary key |
+| user_id | uuid | NO | | Khách đặt hàng. FK → users.id | Ordering customer. FK → users.id |
+| total | numeric(12,2) | NO | 0 | Tổng tiền đơn | Order total |
+| created_at | timestamptz | NO | now() | Thời điểm tạo đơn | Created at |
+
+`aliasesVi` (ví dụ `tổng tiền`, `doanh thu` cho `total`) nằm trong cùng section cột hoặc ngay dưới bảng, để Get RAG khớp câu hỏi tiếng Việt.
 
 ## Primary key
 - `id`
@@ -63,25 +67,16 @@ CREATE TABLE public.orders (
 ```
 
 ## Sample shape (from live data)
-Brief note on value patterns (Agent inference from 10 sample rows).
+Tối đa 3 dòng, chuỗi cắt ngắn. Không suy diễn thêm ngoài giá trị Oracle trả về.
 ```
 
 ---
 
-## 3. Agent prompt (ingest)
+## 3. Ai viết document
 
-Gợi ý system/user instruction trên Agent node BT3 ingest:
+Save RAG gọi LLM một lần mỗi bảng (`save-rag/describe-table.ts`). Model điền summary, mô tả cột, và các câu SELECT thông thường. Phần history của [`sqlexample.md`](./sqlexample.md) lấy nguyên từ `ADMIN.DBTOOLS$EXECUTION_HISTORY`, không do LLM viết. Tên cột, kiểu, PK/FK, DDL lấy từ Oracle, không để LLM bịa.
 
-```
-You receive get_db_info JSON for a single table.
-Produce TWO markdown documents:
-1) schema.md — follow docs/workflow-nodes/schema.md template exactly.
-2) sqlexample.md — follow docs/workflow-nodes/sqlexample.md template.
-
-Call save_rag twice with documentId:
-- {dbId}.{schemaName}.{tableName}.schema
-- {dbId}.{schemaName}.{tableName}.sqlexample
-```
+Không còn Agent ingest viết hai file này.
 
 ---
 
@@ -121,4 +116,5 @@ Agent ưu tiên snippet `docType=schema` trước khi sinh SQL.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.2 | 2026-09-22 | Save RAG sinh document; mỗi cột có mô tả VI + EN |
 | 0.1 | 2026-06-13 | Draft — schema artifact for BT3 |

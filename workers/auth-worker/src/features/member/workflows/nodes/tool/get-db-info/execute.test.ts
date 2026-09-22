@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
-import { ragDocumentsFromDbInfo } from './documents.js';
+import { ragDocumentsFromDbInfo } from '../save-rag/documents.js';
+import {
+  introspectTableToRagDocuments,
+  introspectTablesToRagDocuments,
+} from '../save-rag/table-docs.js';
 import {
   executeGetDbInfo,
   executeGetDbInfoPipeline,
-  introspectTableToRagDocuments,
-  introspectTablesToRagDocuments,
   type GetDbInfoResult,
 } from './execute.js';
 import type { NodeContext } from '../../types.js';
@@ -65,7 +67,7 @@ const info: GetDbInfoResult = {
   rowCountEstimate: 1,
 };
 
-describe('get-db-info documents', () => {
+describe('save-rag documents (schema + sqlexample)', () => {
   it('emits schema + sqlexample RAG items', () => {
     const items = ragDocumentsFromDbInfo(info);
     expect(items).toHaveLength(2);

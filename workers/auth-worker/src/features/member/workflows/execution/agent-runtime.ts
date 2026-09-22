@@ -10,13 +10,8 @@ import {
   matchesToSnippets,
   queryCollection,
 } from '../rag/index.js';
-import {
-  executeGetDbInfo,
-  executeGetRag,
-  executeSaveRag,
-} from '../nodes/tool/index.js';
 import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
-import { resolveConfiguredText } from '../nodes/tool/shared/pipeline.js';
+import { getToolModule } from '../nodes/tool/shared/registry.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -126,7 +121,8 @@ export function agentHasRagToolKind(definition: WorkflowDefinition, agentId: str
   return linked.tools.some((t) => String(t.kind ?? '') === kind);
 }
 
-export function buildRagToolset(
+/** Build AI SDK tools from linked tool_node modules (registry-driven). */
+export function buildLinkedAgentTools(
   ctx: AgentToolContext,
   definition: WorkflowDefinition,
   agentId: string,
@@ -137,90 +133,41 @@ export function buildRagToolset(
 
   for (const t of linked.tools) {
     const kind = String(t.kind ?? '');
+    const mod = getToolModule(kind);
+    if (!mod?.createAgentTool) continue;
+
     const config = (t.config ?? {}) as Record<string, unknown>;
-    const toolName = sanitizeToolName(String(config.toolName ?? kind.replace(/-/g, '_')), kind.replace(/-/g, '_'));
-    const description = String(
-      config.toolDescription ?? config.description ?? `RAG tool: ${kind}`,
+    const toolName = sanitizeToolName(
+      String(config.toolName ?? kind.replace(/-/g, '_')),
+      kind.replace(/-/g, '_'),
+    );
+    const toolDescription = String(
+      config.toolDescription ?? config.description ?? `Tool: ${kind}`,
     );
 
-    if (kind === 'get-rag') {
-      tools[toolName] = tool({
-        description,
-        inputSchema: z.object({
-          query: z.string().describe('Search query'),
-          topK: z.number().optional(),
-          namespace: z.string().optional(),
-          docType: z.string().optional().describe('Filter by docType metadata (schema | sqlexample)'),
-        }),
-        execute: async (input) => {
-          const query =
-            String(input.query ?? '').trim() ||
-            resolveConfiguredText(config.queryField, ctx.triggerContext ?? {}, '');
-          return executeGetRag({
-            env: ctx.env,
-            definition,
-            agentId,
-            input: { ...input, query },
-            embedModel: ctx.embedModel,
-            userDO: ctx.userDO,
-            ownerId: ctx.ownerId,
-            workflowId: ctx.workflowId,
-            billing: ctx.billing,
-            triggerContext: triggerContext as Record<string, unknown>,
-          });
-        },
-      });
-    }
-
-    if (kind === 'save-rag') {
-      tools[toolName] = tool({
-        description,
-        inputSchema: z.object({
-          content: z.string().describe('Text content to embed and store'),
-          documentId: z.string().optional(),
-          source: z.string().optional(),
-          chunks: z
-            .array(z.object({ content: z.string(), index: z.number() }))
-            .optional(),
-          metadata: z.record(z.string()).optional(),
-        }),
-        execute: async (input) =>
-          executeSaveRag({
-            env: ctx.env,
-            definition,
-            agentId,
-            input,
-            userDO: ctx.userDO,
-            ownerId: ctx.ownerId,
-            workflowId: ctx.workflowId,
-            billing: ctx.billing,
-          }),
-      });
-    }
-
-    if (kind === 'get-db-info') {
-      tools[toolName] = tool({
-        description,
-        inputSchema: z.object({
-          tableName: z.string().optional(),
-          schemaName: z.string().optional(),
-          sampleRowLimit: z.number().optional(),
-          sqlHistoryLimit: z.number().optional(),
-        }),
-        execute: async (input) =>
-          executeGetDbInfo({
-            env: ctx.env,
-            definition,
-            agentId,
-            triggerContext,
-            input,
-          }),
-      });
-    }
+    const created = mod.createAgentTool({
+      env: ctx.env,
+      userDO: ctx.userDO,
+      definition,
+      agentId,
+      triggerContext,
+      embedModel: ctx.embedModel,
+      ownerId: ctx.ownerId,
+      workflowId: ctx.workflowId,
+      billing: ctx.billing,
+      toolId: String(t.id ?? ''),
+      toolConfig: config,
+      toolName,
+      toolDescription,
+    });
+    if (created) tools[created.name] = created.tool;
   }
 
   return tools;
 }
+
+/** @deprecated Prefer buildLinkedAgentTools — same implementation. */
+export const buildRagToolset = buildLinkedAgentTools;
 
 /** Retrieve top-K snippets from a Vectorize collection for RAG grounding. */
 export async function retrieveMemory(

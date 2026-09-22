@@ -1,149 +1,99 @@
 # Node: Save RAG (`tool_node:save-rag`)
 
-> **Trạng thái:** Done  
+> **Trạng thái:** Draft  
+> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "save-rag"`  
-> **Liên kết:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-pdf--vectorize) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md)
+> **Liên kết:** [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md)
 
-Tool **ghi knowledge** vào Vectorize: nhận chunk + embedding (hoặc raw text để embed qua Service), upsert vào collection từ Memory node đã nối Agent.
+Tool **ghi knowledge của một bảng**. Input là tên bảng từ Get DB Info / Loop. Nó lấy schema Oracle, nhờ LLM mô tả từng cột, dựng SQL example từ history và logic thông thường, rồi embed hai document vào Vectorize.
 
----
-
-## 1. Tóm tắt
-
-| Thuộc tính | Giá trị |
-|------------|---------|
-| **ID** | `tool_node` (variant `save-rag`) |
-| **Category** | `resource` |
-| **Vai trò** | Tool callable của Agent — persist vectors + metadata |
-| **Loại plugin** | Resource + execute pipeline (data-flow) + Agent tool |
-| **Nối tới Agent** | `tool_node.tools` → `agent.tools` (đứt nét, có thể nhiều tool) |
-| **Phụ thuộc** | [`service.md`](./service.md) (embed), [`vectorize.md`](./vectorize.md) (store) |
+Không nhận PDF, không nhận text tự do, không gọi module Get DB Info.
 
 ---
 
-## 2. Graph representation
+## 1. Một bảng, một lượt
 
-```json
+Loop đưa `{ tableName, schemaName }`. Connection Oracle còn trên INPUT. Đã index `tableName` trong run thì bỏ qua (`INDEXED_TABLES_KEY`).
+
+1. `tableName` từ `tableNameField` (mặc định `{{ $json.tableName }}`). Connection qua `shared/db/connect-config.ts`.
+2. `shared/db/oracle-client.introspectTables` cho đúng bảng đó. Lấy cột, kiểu, nullable, default, comment Oracle, PK, FK, DDL, tối đa 3 sample row. Không list lại catalog.
+3. `shared/db/oracle-client.fetchSqlHistory` — cùng hàm `fetchOracleSqlHistoriesDirect` hiện có. Đọc `ADMIN.DBTOOLS$EXECUTION_HISTORY`, lọc câu có tên bảng (`LIKE` trên text SQL), mới nhất trước, mặc định 10 câu (`sqlHistoryLimit`, trần 50). Bảng history không có hoặc query lỗi → lịch sử rỗng, vẫn chạy bước LLM.
+4. **Một lần LLM chat** mỗi bảng, handle `llm`. Input là schema Oracle, sample đã cắt ngắn, và các câu history (nguyên văn). LLM viết mô tả cột và **phần logic thông thường**. Không nhờ LLM bịa lại câu history. Output JSON:
+
+```ts
 {
-  "id": "tool_save_rag",
-  "type": "tool_node",
-  "position": { "x": 640, "y": 280 },
-  "data": {
-    "label": "Save RAG",
-    "toolKind": "save-rag",
-    "toolName": "save_rag",
-    "toolDescription": "Embed document chunks and upsert into the knowledge base.",
-    "chunkSize": 800,
-    "chunkOverlap": 120,
-    "documentIdField": "{{ $json.body.documentId }}",
-    "contentField": "{{ $json.body.text }}",
-    "sourceField": "{{ $json.body.filename }}",
-    "inputMode": "agent_tool_call"
-  }
-}
-```
-
----
-
-## 3. Handles
-
-| Handle | Type | connectionType | Vị trí |
-|--------|------|----------------|--------|
-| `tools` | source | resource | Trên (diamond) → Agent `tools` |
-
----
-
-## 4. Config panel — Parameters
-
-| Field UI | `node.data` key | Type | Default | Mô tả |
-|----------|-----------------|------|---------|-------|
-| **Label** | `label` | text | `"Save RAG"` | Tên canvas |
-| **Tool kind** | `toolKind` | select | `"save-rag"` | Cố định cho variant này |
-| **Tool name** | `toolName` | text | `"save_rag"` | Tên function AI SDK (snake_case) |
-| **Description** | `toolDescription` | textarea | — | Mô tả cho model khi tool-calling |
-| **Chunk size** | `chunkSize` | number | `800` | Ký tự / token mỗi chunk |
-| **Chunk overlap** | `chunkOverlap` | number | `120` | Overlap giữa chunks |
-| **Document ID field** | `documentIdField` | expression | — | Expression lấy id từ upstream / tool args |
-| **Content field** | `contentField` | expression | — | Text hoặc extracted PDF text |
-| **Source field** | `sourceField` | expression | — | Filename / URL metadata |
-| **Input mode** | `inputMode` | select | `"agent_tool_call"` | `agent_tool_call` \| `pipeline_auto` |
-
-**Input mode:**
-
-| Value | Hành vi |
-|-------|---------|
-| `agent_tool_call` | Agent quyết định gọi tool sau khi xử lý PDF (mặc định — khớp bài toán 1) |
-| `pipeline_auto` | Graph execute `executeSaveRagPipeline` — chunk + embed + upsert, không cần LLM gọi tool |
-
----
-
-## 5. Tool schema (AI SDK)
-
-**Input schema (agent gọi tool):**
-
-```typescript
-{
-  documentId?: string;
-  content: string;           // Full text hoặc chunk
-  source?: string;           // pdf filename
-  chunks?: Array<{           // Optional — agent đã split sẵn
-    content: string;
-    index: number;
+  tableSummaryVi: string;
+  tableSummaryEn: string;
+  columns: Array<{
+    name: string;          // đúng tên cột Oracle
+    descriptionVi: string;
+    descriptionEn: string;
+    aliasesVi: string[];
   }>;
-  metadata?: Record<string, string>;  // BT3: docType, tableName, dbId
+  typicalQueries: Array<{
+    titleVi: string;
+    titleEn: string;
+    sql: string;           // một SELECT / WITH Oracle, qualify schema.table
+    noteVi: string;        // câu hỏi nghiệp vụ thông thường mà câu này trả lời
+  }>;
 }
 ```
 
-**Execute** (`nodes/tool/save-rag/execute.ts`):
+`typicalQueries` là logic hay gặp của một bảng Oracle: tra theo khóa, lọc theo cột ngày, đếm, gom nhóm, join FK nếu có. Không copy history vào mảng này.
 
-1. Resolve `collection`, `namespace` từ Agent/memory (`resolveRagResources`)
-2. Embed endpoint từ service (`resolveRagEmbedService`)
-3. PDF: `extractTextFromPdfFiles` nếu input là files
-4. Split `content` (`chunk.ts`) nếu chưa có `chunks`
-5. `embedTextsWithUsage` → `upsertVectors`
-6. Return `{ ok, saved, documentId, collection }`
-7. BT3: có thể `introspectTablesToRagDocuments` khi input là DB catalog
+5. Dựng hai markdown:
+   - [`schema.md`](./schema.md) — tên, kiểu, PK/FK, DDL lấy từ Oracle; mô tả cột lấy từ LLM. LLM không được bịa cột hay đổi tên.
+   - [`sqlexample.md`](./sqlexample.md) — hai phần: (1) câu lấy nguyên từ `ADMIN.DBTOOLS$EXECUTION_HISTORY`; (2) `typicalQueries`.
+6. Embed **cả hai** bằng service embed trên handle `service`, upsert vào Vectorize trên handle `memory`.
 
-**Output tool:**
+| Document | `documentId` | `docType` |
+|----------|--------------|-----------|
+| Schema | `{dbId}.{schemaName}.{tableName}.schema` | `schema` |
+| SQL example | `{dbId}.{schemaName}.{tableName}.sqlexample` | `sqlexample` |
 
-```json
-{
-  "ok": true,
-  "saved": 12,
-  "documentId": "doc-abc",
-  "collection": "vectorize-default"
-}
-```
+Metadata chung: `tableName`, `schemaName`, `dbId`. Text embed của schema chứa cả tiếng Việt và tiếng Anh.
 
----
+Billing: một charge LLM, rồi charge embed cho các chunk của hai document.
 
-## 6. Vai trò trong bài toán 1 (ingest PDF)
+Thiếu handle `llm` hoặc `service` → fail bảng đó, không ghi Vectorize. LLM thiếu cột hoặc đổi tên cột → giữ cột Oracle, bỏ mô tả cột đó, ghi warning. `typicalQueries` rỗng hoặc câu không phải SELECT → bỏ câu đó. History rỗng và không còn typical query → vẫn lưu schema, bỏ document sqlexample của bảng.
 
-Luồng: **Webhook (PDF) → Agent → Service (embed) → saveRag → Vectorize**
-
-1. Webhook đặt file PDF / extracted text vào `body.files[]` hoặc `body.text`
-2. Agent INPUT hiển thị webhook output ([`agent.md`](./agent.md) §4.1)
-3. Agent prompt hướng dẫn: extract text → gọi `save_rag`
-4. Service node cung cấp embedding model
-5. `save_rag` ghi vào index Vectorize đã khai báo
-
-Chi tiết graph mẫu: [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-pdf--vectorize).
+Sample row trong prompt và trong schema cắt ngắn, tối đa 3 dòng.
 
 ---
 
-## 7. File map
+## 2. Handles
+
+| Handle | Vai trò |
+|--------|---------|
+| `in` / `out` | Data-flow: Loop → Save RAG |
+| `service` | **Embed model**. Vector hóa schema và SQL example |
+| `llm` | **Chat model**. Một lần mỗi bảng. `service_node` nối vào handle này |
+| `memory` | Vectorize, nơi chứa vector |
+
+Không có handle nhận file PDF.
+
+---
+
+## 3. Config
+
+`toolName` `save_rag`, `tableNameField`, `chunkSize` 800, `chunkOverlap` 120, `sqlHistoryLimit` 10.
+
+Bỏ khỏi panel mục tiêu: `contentField`, `documentIdField`, `sourceField`, `inputMode`, prompt PDF. Prompt LLM là hằng trong `save-rag/describe-table.ts`.
+
+---
+
+## 4. File map mục tiêu
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/tool/definition.ts` | `SAVE_RAG_TOOL_DEFINITION` |
-| `workers/auth-worker/.../nodes/tool/save-rag/execute.ts` | Pipeline + tool execute |
-| `workers/auth-worker/.../nodes/tool/save-rag/chunk.ts` | Text chunking |
-| `workers/auth-worker/.../nodes/tool/save-rag/pdf-extract.ts` | PDF → text |
-| `workers/auth-worker/.../nodes/tool/index.ts` | `toolSaveRagPlugin` (`execute: executeToolNode`) |
-| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset` |
-| `workers/web/.../nodes/tool/` | `toolSaveRagUIPlugin` |
+| `save-rag/module.ts` | `ToolModule`, `toolClass: persist`. Pipeline only — không `createAgentTool` nhận text |
+| `save-rag/execute.ts` | Introspect → LLM → hai document → embed. Không import `get-db-info/` |
+| `save-rag/describe-table.ts` | Gọi chat service, parse JSON (mô tả cột + typical queries) |
+| `save-rag/schema-document.ts` | Markdown schema |
+| `save-rag/sql-example-document.ts` | Ghép history Oracle + typical queries |
+| `save-rag/chunk.ts` | Cắt hai markdown trước khi embed |
 
-`TOOL_OVERRIDE_KINDS` = `save-rag`, `get-rag`, `get-db-info`.
+`pdf-extract.ts` không còn trong đường này. Introspect đi qua `shared/db/oracle-client.ts`.
 
 ---
 
@@ -151,4 +101,7 @@ Chi tiết graph mẫu: [`rag-recipes.md`](./rag-recipes.md#bài-toán-1-ingest-
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.2 | 2026-09-11 | Execute + PDF + pipeline live |
+| 0.5 | 2026-09-22 | SQL example = `ADMIN.DBTOOLS$EXECUTION_HISTORY` + logic thông thường do LLM |
+| 0.4 | 2026-09-22 | Chỉ schema DB. LLM ra schema mới + SQL example, embed cả hai. Bỏ PDF/text |
+| 0.3 | 2026-09-22 | Tự introspect, LLM mô tả cột |
+| 0.2 | 2026-09-11 | Pipeline + PDF — không còn là hợp đồng |

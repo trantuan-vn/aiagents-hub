@@ -1,10 +1,11 @@
 # Node: Get RAG (`tool_node:get-rag`)
 
-> **Trạng thái:** Done  
+> **Trạng thái:** Draft — retrieve schema để Reasoning Agent viết SQL  
+> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "get-rag"`  
-> **Liên kết:** [`agent.md`](./agent.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md) · [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--retrieve--generate)
+> **Liên kết:** [`saveRag.md`](./saveRag.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`reasoning-agent.md`](./reasoning-agent.md)
 
-Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retrieve, trả snippets cho Agent đưa vào prompt trước khi gọi chat model.
+Tool **đọc** Vectorize theo câu hỏi của user và trả schema (cột + mô tả VI/EN) cùng SQL example của các bảng liên quan, để Reasoning Agent viết SQL. Nó không introspect Oracle và không chạy SQL.
 
 ---
 
@@ -12,138 +13,65 @@ Tool **đọc knowledge** từ Vectorize: embed query qua Service, top-K retriev
 
 | Thuộc tính | Giá trị |
 |------------|---------|
-| **ID** | `tool_node` (variant `get-rag`) |
-| **Category** | `resource` |
-| **Vai trò** | Tool callable — semantic search trên Vectorize |
-| **Loại plugin** | Resource + execute pipeline + Agent tool |
-| **Nối tới Agent** | `tool_node.tools` → `agent.tools` |
-| **Phụ thuộc** | [`service.md`](./service.md) (embed query), [`vectorize.md`](./vectorize.md) (index) |
+| **ID** | `tool_node:get-rag` |
+| **Vai trò** | Tool `retrieve` của Reasoning Agent, hoặc prefetch trên data-flow trước Agent |
+| **Query** | Câu hỏi user (`query` của tool call, hoặc `queryField` trên INPUT) |
+| **Output** | Các bảng liên quan. Mỗi bảng gồm document schema và document SQL example, đã ghép đủ chunk |
 
 ---
 
-## 2. Graph representation
+## 2. Execute
 
-```json
+1. Resolve collection / namespace / embed model qua `shared/rag-context.ts` (cùng index Save RAG đã ghi).
+2. Embed **nguyên câu hỏi**, không viết lại câu hỏi.
+3. `queryCollection` top-K trên cả `docType=schema` và `docType=sqlexample`.
+4. Gom match theo `groupByField` (mặc định `tableName`). Với mỗi bảng, hydrate đủ chunk của **cả hai** document và ghép theo `chunkIndex`. Schema đứng trước SQL example. Agent cần full cột và vài câu SELECT mẫu, không chỉ đoạn dính từ khóa.
+5. Trả:
+
+```ts
 {
-  "id": "tool_get_rag",
-  "type": "tool_node",
-  "position": { "x": 640, "y": 340 },
-  "data": {
-    "label": "Get RAG",
-    "toolKind": "get-rag",
-    "toolName": "get_rag",
-    "toolDescription": "Search the knowledge base for passages relevant to the user question.",
-    "topK": 5,
-    "scoreThreshold": 0.65,
-    "querySource": "from_tool_args",
-    "includeMetadata": true
-  }
+  snippets: Array<{
+    text: string;       // schema (VI + EN) rồi SQL example của cùng bảng
+    tableName: string;
+    schemaName: string;
+    source: string;
+    score: number;
+  }>;
+  count: number;        // số bảng, không phải số chunk
 }
 ```
 
----
+`topK` là số **bảng** giữ lại sau khi gom, mặc định 12. `scoreThreshold` lọc match trước khi gom.
 
-## 3. Handles
-
-| Handle | Type | connectionType | Vị trí |
-|--------|------|----------------|--------|
-| `tools` | source | resource | Trên (diamond) → Agent `tools` |
+Không gọi Get DB Info, Save RAG, hay Check SQL. Không lọc theo tên bảng hardcode.
 
 ---
 
-## 4. Config panel — Parameters
+## 3. Cách Reasoning Agent dùng
 
-| Field UI | `node.data` key | Type | Default | Mô tả |
-|----------|-----------------|------|---------|-------|
-| **Label** | `label` | text | `"Get RAG"` | Tên canvas |
-| **Tool kind** | `toolKind` | select | `"get-rag"` | Cố định variant |
-| **Tool name** | `toolName` | text | `"get_rag"` | Tên function AI SDK |
-| **Description** | `toolDescription` | textarea | — | Hướng dẫn model khi nào gọi search |
-| **Top K** | `topK` | number | `12` | Số **nhóm liên quan** (bảng/document) cần hydrate đủ schema + data |
-| **Group related docs by** | `groupByField` | text / expression | `"tableName"` | Metadata key Save RAG đã ghi; hoặc expression lấy tên key từ INPUT |
-| **Score threshold** | `scoreThreshold` | number | `0.65` | Lọc match score tối thiểu |
-| **Query source** | `querySource` | select | `"from_tool_args"` | Nguồn câu query |
-| **Include metadata** | `includeMetadata` | toggle | `true` | Trả thêm `source`, `documentId` |
+1. Gọi `get_rag` với câu hỏi user trước khi viết SQL.
+2. Đọc `descriptionVi` / `aliasesVi` để map từ người dùng sang tên cột. Đọc SQL example của cùng bảng như few-shot.
+3. Viết một câu SELECT. Bước kiểm tra thuộc [`check-sql.md`](./check-sql.md), không thuộc tool này.
 
-**Query source:**
-
-| Value | Hành vi |
-|-------|---------|
-| `from_tool_args` | Agent truyền `query` khi gọi tool (mặc định) |
-| `from_agent_input` | Lấy text từ upstream INPUT (câu hỏi webhook) — pipeline auto |
+Pipeline (Webhook → Get RAG → Agent): `querySource: from_agent_input`, question từ `queryField`. Snippet nằm trên INPUT; Agent bỏ tool `get_rag` khỏi loop nếu upstream đã có snippet (giữ hành vi hiện tại).
 
 ---
 
-## 5. Tool schema (AI SDK)
+## 4. Config
 
-**Input schema:**
+Giữ `toolName` `get_rag`, `queryField`, `groupByField`, `topK`, `scoreThreshold`, `querySource`, `includeMetadata`.
 
-```typescript
-{
-  query: string;              // Câu hỏi / từ khóa search
-  topK?: number;              // Override config node
-  namespace?: string;         // Override filter metadata
-}
-```
-
-**Execute** (`nodes/tool/get-rag/execute.ts`):
-
-1. Resolve collection/namespace (`resolveRagResources`)
-2. Embed `query` (`embedTextWithUsage`)
-3. `queryCollection` (Vectorize top-K + metadata filter `docType` / `tableName`)
-4. Map matches → `{ snippets, count }`
-5. SQL RAG: gom theo metadata key user chọn (`groupByField`, mặc định `tableName`) rồi **hydrate đủ document** của mỗi bảng liên quan (schema + data/sqlexample), ghép chunk theo `chunkIndex`.
-
-**Output tool:**
-
-```json
-{
-  "snippets": [
-    { "text": "...", "source": "report-q1.pdf", "score": 0.82 }
-  ],
-  "count": 3
-}
-```
-
-Agent merge snippets vào system/user message rồi gọi chat model từ Service.
+`toolDescription` nói rõ: tìm schema bảng liên quan tới câu hỏi để viết SQL; đừng gọi khi đã có snippet schema trong context.
 
 ---
 
-## 6. So sánh với implicit RAG trong Agent
-
-| Cách | Khi nào | Code hiện tại |
-|------|---------|---------------|
-| **Implicit** | Memory nối Agent, không có getRag tool | `executeAgent` pre-fetch `queryVectorMemory` vào system prompt |
-| **Explicit (getRag)** | Tool hoặc data-flow `tool_node:get-rag` | ✅ `buildRagToolset` + `executeGetRag`; agent bỏ tool khỏi loop nếu đã có upstream get-rag |
-
-Spec khuyến nghị **bài toán 2** dùng **getRag explicit** để model quyết định có search hay không; vẫn **bắt buộc** nối [`vectorize.md`](./vectorize.md) để bind collection.
-
----
-
-## 7. Vai trò trong bài toán 2 (Q&A)
-
-Luồng: **Webhook (câu hỏi) → Agent → getRag (Vectorize) → Service (chat) → trả lời**
-
-1. Webhook body: `{ "question": "..." }`
-2. Agent INPUT = webhook output
-3. Agent gọi `get_rag({ query: question })`
-4. Snippets làm context
-5. Service node chat model sinh câu trả lời grounded
-6. Agent OUTPUT → webhook response / node downstream
-
-Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--retrieve--generate).
-
----
-
-## 8. File map
+## 5. File map mục tiêu
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes/src/nodes/tool/definition.ts` | `GET_RAG_TOOL_DEFINITION` |
-| `workers/auth-worker/.../nodes/tool/get-rag/execute.ts` | Query + snippet mapping |
-| `workers/auth-worker/.../nodes/tool/index.ts` | `toolGetRagPlugin` |
-| `workers/auth-worker/.../execution/agent-runtime.ts` | `buildRagToolset` |
-| `workers/web/.../nodes/tool/` | `toolGetRagUIPlugin` |
+| `get-rag/module.ts` | `ToolModule`, `toolClass: retrieve` |
+| `get-rag/execute.ts` | Embed + query + hydrate |
+| `get-rag/assemble.ts` | Gom theo bảng, ghép schema rồi SQL example |
 
 ---
 
@@ -151,4 +79,6 @@ Chi tiết graph: [`rag-recipes.md`](./rag-recipes.md#bài-toán-2-hỏi-đáp--
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 0.3 | 2026-09-14 | Hydrate related groups from user `groupByField`; stitch schema + data into agent context |
+| 0.5 | 2026-09-22 | Mỗi bảng trả schema + SQL example |
+| 0.4 | 2026-09-22 | Retrieve schema song ngữ cho Reasoning Agent |
+| 0.3 | 2026-09-14 | Hydrate group theo `groupByField` |

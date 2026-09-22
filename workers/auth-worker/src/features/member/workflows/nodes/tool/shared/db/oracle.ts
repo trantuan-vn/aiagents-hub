@@ -1,5 +1,5 @@
 import type { OracleConnectConfig } from './connect-config.js';
-import type { DbColumnInfo, DbForeignKey } from './execute.js';
+import type { DbColumnInfo, DbForeignKey } from './types.js';
 import {
   oracleProxyConfigured,
   proxyFetchOracleSqlHistories,

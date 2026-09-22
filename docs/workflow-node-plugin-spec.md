@@ -299,7 +299,7 @@ return plugin.trigger.handle(request, trigger);
 | Trigger pass-through | `nodes/trigger/execute.ts` |
 | Webhook HTTP ingress | `nodes/webhook/trigger.ts` ← `api/hooks-presentation.ts` |
 | Human review pause | engine loop + `nodes/human-review/` (gmail execute) |
-| RAG tools | `nodes/tool/save-rag/`, `get-rag/`, `get-db-info/` |
+| RAG tools | `nodes/tool/save-rag/`, `get-rag/`, `get-db-info/`, `check-sql/` — ranh giới: [`workflow-nodes/tool-nodes.md`](./workflow-nodes/tool-nodes.md) |
 | Resource nodes | `nodes/service-node/`, `memory-node/` (`skipExecution`) |
 
 ---

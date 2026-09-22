@@ -1,4 +1,4 @@
-import type { GetDbInfoResult } from './execute.js';
+import type { GetDbInfoResult } from '../shared/db/types.js';
 
 export type RagDocumentItem = {
   content: string;

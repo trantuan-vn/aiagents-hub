@@ -12,8 +12,8 @@ import {
 } from '../shared/rag-context.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
-import { introspectTablesToRagDocuments } from '../get-db-info/execute.js';
-import { resolveOracleConnectConfig } from '../get-db-info/connect-config.js';
+import { introspectTablesToRagDocuments } from './table-docs.js';
+import { resolveOracleConnectConfig } from '../shared/db/index.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
 import { chunkText } from './chunk.js';
 

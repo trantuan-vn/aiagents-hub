@@ -68,7 +68,19 @@ Prompt mặc định: `REASONING_AGENT_PROMPT` / `REASONING_AGENT_SYSTEM_PROMPT`
 
 Chat (`workflow-chat.ts`) nhánh cùng controller.
 
-## 5. Anti-patterns
+## 5. Tool SQL
+
+Khi canvas nối Get RAG và Check SQL vào handle `tools`:
+
+1. `get_rag` với câu hỏi user — schema cột (mô tả VI/EN) và SQL example của bảng liên quan ([`getRag.md`](./getRag.md)).
+2. Model viết một SELECT từ snippet đó.
+3. `check_sql` chạy thử trên Oracle ([`check-sql.md`](./check-sql.md)).
+4. `ok: false` → sửa SQL và gọi lại, trong `maxReflectRetries`.
+5. Output `sql` chỉ lấy từ lần `check_sql` trả `ok: true`.
+
+`toolClass: validate` không đi qua cổng `persist`. Get DB Info không nằm trên vòng này: agent không introspect catalog lúc hỏi.
+
+## 6. Anti-patterns
 
 - Không sửa hành vi `tools_agent`
 - Không bịa citation URL

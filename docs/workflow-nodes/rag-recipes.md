@@ -312,6 +312,8 @@ Có thể gộp cả ingest + Q&A vào **một workflow** với 2 webhook path k
 
 ## Bài toán 3: DB schema ingest → Text-to-SQL
 
+> **Target graph:** [`tool-nodes.md`](./tool-nodes.md). Form → Get DB Info (chỉ tên bảng) → Loop → Save RAG (schema Oracle → LLM → schema mới + SQL example → embed). Hỏi: Reasoning Agent + Get RAG + Check SQL. Sơ đồ và JSON phía dưới là recipe cũ — đừng implement theo đó.
+
 **Mục tiêu:** Form trigger kết nối DB → **mỗi bảng = 1 execution** → introspect → Agent sinh `schema.md` + `sqlexample.md` → Vectorize → user hỏi → sinh SQL (như BT2 nhưng output là SQL).
 
 **Specs:** [`trigger.md`](./trigger.md) · [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md)
