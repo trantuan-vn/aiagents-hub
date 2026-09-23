@@ -14,6 +14,7 @@ import {
   refreshOverview,
   updateIncident,
 } from './infrastructure.js';
+import { forceFlushUser, rerunPipeline } from './actions.js';
 
 function errBody(e: PipelineHealthError) {
   return { error: e.message, code: e.code };
@@ -125,8 +126,8 @@ export function createAdminPipelineHealthRoutes() {
 
   app.get('/users/:userId', async (c) => {
     try {
-      requireAdmin(c);
-      return c.json(await probeUser(c.env, c.req.param('userId')));
+      const user = requireAdmin(c);
+      return c.json(await probeUser(c.env, c.req.param('userId'), String(user.identifier ?? 'admin')));
     } catch (e) {
       if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
       const { errorResponse, status } = await handleError(c, e, 'Failed to probe UserDO');
@@ -142,6 +143,39 @@ export function createAdminPipelineHealthRoutes() {
     } catch (e) {
       if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
       const { errorResponse, status } = await handleError(c, e, 'Failed to refresh pipeline health');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/force-flush', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as {
+        userId?: string;
+        table?: string;
+        confirm?: boolean;
+        force?: boolean;
+      };
+      return c.json(await forceFlushUser(c.env, String(user.identifier ?? 'admin'), body));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to force flush');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/rerun-pipeline', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as {
+        table?: string;
+        all?: boolean;
+        confirm?: boolean;
+      };
+      return c.json(await rerunPipeline(c.env, String(user.identifier ?? 'admin'), body));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to re-run pipeline');
       return c.json(errorResponse, status);
     }
   });

@@ -1,5 +1,10 @@
 export const OVERVIEW_CACHE_TTL_SECONDS = 60;
 export const REFRESH_MIN_INTERVAL_MS = 2 * 60 * 1000;
+export const FORCE_FLUSH_MIN_INTERVAL_MS = 5 * 60 * 1000;
+export const RERUN_ALL_MIN_INTERVAL_MS = 10 * 60 * 1000;
+export const RERUN_TABLE_MIN_INTERVAL_MS = 2 * 60 * 1000;
+export const DO_PROBE_WINDOW_MS = 5 * 60 * 1000;
+export const DO_PROBE_MAX_PER_WINDOW = 30;
 export const EXCERPT_MAX_CHARS = 512;
 export const OPEN_INCIDENT_CAP = 500;
 export const HOT_USER_CAP = 200;
@@ -10,7 +15,13 @@ export const INCIDENT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 export const CRON_STALE_MS = 36 * 60 * 60 * 1000;
 export const OVERVIEW_CACHE_KV_KEY = 'pipeline-health-overview';
 export const REFRESH_AT_KV_KEY = 'pipeline-health-refresh-at';
+export const FORCE_FLUSH_KV_PREFIX = 'pipeline-health-force-flush:';
+export const RERUN_KV_PREFIX = 'pipeline-health-rerun:';
+export const PROBE_COUNT_KV_PREFIX = 'pipeline-health-probe:';
+export const ALERTS_SENT_KV_KEY = 'pipeline-health-alerts-sent';
 export const SYSTEM_CONFIG_KV_KEY = 'aiagents-hub-system-config';
+export const INTERNAL_TRIGGER_HEADER = 'X-Hub-Admin-Action';
+export const INTERNAL_TRIGGER_VALUE = 'pipeline-health';
 
 export type PipelineHealthErrorCode =
   | 'token_missing'
@@ -18,8 +29,12 @@ export type PipelineHealthErrorCode =
   | 'rate_limited'
   | 'invalid_status'
   | 'invalid_user_id'
+  | 'invalid_table'
+  | 'confirm_required'
+  | 'binding_missing'
   | 'not_found'
-  | 'do_probe_failed';
+  | 'do_probe_failed'
+  | 'action_failed';
 
 export class PipelineHealthError extends Error {
   readonly code: PipelineHealthErrorCode;

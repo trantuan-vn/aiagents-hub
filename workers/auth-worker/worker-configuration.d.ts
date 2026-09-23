@@ -53,6 +53,7 @@ declare namespace Cloudflare {
 		TWITTER_CLIENT_ID: SecretsStoreSecret;
 		TWITTER_CLIENT_SECRET: SecretsStoreSecret;
 		QUEUE_WORKER: Fetcher /* queue-worker */;
+		D1TOR2_CRON: Fetcher /* d1tor2-cron */;
 		INPUT_QUEUE: Queue;
 		ERROR_QUEUE: Queue;
 		WS_BROADCAST_QUEUE: Queue;

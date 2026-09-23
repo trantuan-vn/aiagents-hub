@@ -324,8 +324,12 @@
 	],
   	"services": [
 		{
-			"binding": "QUEUE_WORKER",        // Tên bạn sẽ dùng trong code: env.QUEUE_WORKER
-			"service": "aiagents-hub-queue-worker"        // Tên chính xác của Worker kia (phải khớp 100%)
+			"binding": "QUEUE_WORKER",
+			"service": "aiagents-hub-queue-worker"
+		},
+		{
+			"binding": "D1TOR2_CRON",
+			"service": "aiagents-hub-d1tor2-cron"
 		}
 	]
 }

@@ -567,7 +567,19 @@
     "link_logs": "Worker errors",
     "link_system_config": "System config",
     "not_finops": "Not a Cloudflare bill / overage screen",
-    "not_worker_logs": "Not the general Worker error inbox"
+    "not_worker_logs": "Not the general Worker error inbox",
+    "actions": "Actions",
+    "action_force_flush": "Force flush UserDO",
+    "action_force_flush_help": "Flush pending sync rows to the input queue. Rate-limited: 1 user / 5 minutes. Audited.",
+    "action_force_flush_confirm": "Force flush this UserDO pending queue to Cloudflare Queues?",
+    "action_rerun": "Re-run d1tor2 pipeline",
+    "action_rerun_help": "Archive D1 → R2 via service binding. All: 1 / 10 min. Per table: 1 / 2 min. Audited.",
+    "action_rerun_all": "All archive tables",
+    "action_rerun_all_confirm": "Re-run ALL d1tor2 archive pipelines now?",
+    "action_rerun_table_confirm": "Re-run this table’s d1tor2 pipeline now?",
+    "action_table_optional": "Optional sync table name",
+    "action_running": "Running…",
+    "action_error": "Action failed"
   },
   "UserEconomicsAdmin": {
     "page_title": "User Economics",

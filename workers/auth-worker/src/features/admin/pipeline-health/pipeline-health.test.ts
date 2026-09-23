@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PIPELINE_ARCHIVE_TABLES,
+  SYNC_TABLE_NAMES,
   classifyPipelineEvent,
   isPipelineTelemetryEvent,
   isValidDoUserId,
@@ -98,5 +100,35 @@ describe('pipeline-health domain', () => {
     const recs = buildPipelineRecommendations(incidents, overview);
     expect(recs.some((r) => r.id === 'pipe.stab.retention_vs_fail')).toBe(true);
     expect(recs.some((r) => r.id === 'pipe.stab.cron_red')).toBe(true);
+  });
+
+  it('phase2 table catalogs include archive + sync', () => {
+    expect(PIPELINE_ARCHIVE_TABLES).toContain('service_usages');
+    expect(SYNC_TABLE_NAMES).toContain('agent_workflows');
+    expect(SYNC_TABLE_NAMES).toContain('orders');
+  });
+});
+
+describe('pipeline-health actions validation', () => {
+  it('forceFlush requires confirm and valid userId', async () => {
+    const { forceFlushUser } = await import('./actions.js');
+    const env = { SYSTEM_CONFIG_KV: undefined, USER_DO: undefined, D1DB: undefined } as unknown as Env;
+    await expect(forceFlushUser(env, 'admin', { userId: 'a'.repeat(64) })).rejects.toMatchObject({
+      code: 'confirm_required',
+    });
+    await expect(forceFlushUser(env, 'admin', { userId: 'bad', confirm: true })).rejects.toMatchObject({
+      code: 'invalid_user_id',
+    });
+  });
+
+  it('rerunPipeline requires confirm and valid archive table', async () => {
+    const { rerunPipeline } = await import('./actions.js');
+    const env = { SYSTEM_CONFIG_KV: undefined, D1DB: undefined } as unknown as Env;
+    await expect(rerunPipeline(env, 'admin', { all: true })).rejects.toMatchObject({
+      code: 'confirm_required',
+    });
+    await expect(rerunPipeline(env, 'admin', { table: 'users', confirm: true })).rejects.toMatchObject({
+      code: 'invalid_table',
+    });
   });
 });

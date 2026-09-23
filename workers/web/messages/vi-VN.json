@@ -567,7 +567,19 @@
     "link_logs": "Lỗi Worker",
     "link_system_config": "Cấu hình hệ thống",
     "not_finops": "Không phải màn hoá đơn / overage Cloudflare",
-    "not_worker_logs": "Không phải hộp lỗi Worker chung"
+    "not_worker_logs": "Không phải hộp lỗi Worker chung",
+    "actions": "Hành động",
+    "action_force_flush": "Force flush UserDO",
+    "action_force_flush_help": "Đẩy pending sync lên Queue. Giới hạn 1 user / 5 phút. Có audit.",
+    "action_force_flush_confirm": "Force flush pending của UserDO này lên Cloudflare Queues?",
+    "action_rerun": "Chạy lại pipeline d1tor2",
+    "action_rerun_help": "Archive D1 → R2 qua service binding. All: 1 / 10 phút. Từng bảng: 1 / 2 phút. Có audit.",
+    "action_rerun_all": "Tất cả bảng archive",
+    "action_rerun_all_confirm": "Chạy lại TẤT CẢ pipeline archive d1tor2 ngay?",
+    "action_rerun_table_confirm": "Chạy lại pipeline d1tor2 cho bảng này ngay?",
+    "action_table_optional": "Tên bảng sync (tuỳ chọn)",
+    "action_running": "Đang chạy…",
+    "action_error": "Hành động thất bại"
   },
   "UserEconomicsAdmin": {
     "page_title": "Kinh tế người dùng",

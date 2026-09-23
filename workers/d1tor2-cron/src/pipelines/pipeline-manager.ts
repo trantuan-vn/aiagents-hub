@@ -702,9 +702,22 @@ export class PipelineManager {
 	 * @param schemaName Tên schema
 	 */
 	async runPipelineByName(schemaName: string): Promise<PipelineResult> {
+		await this.loadD1tor2Config();
 		const config = PIPELINE_CONFIGS.find((c) => c.schemaName === schemaName);
 		if (!config) {
 			throw new Error(`Pipeline config not found for schema: ${schemaName}`);
+		}
+		return this.runPipeline(config);
+	}
+
+	/**
+	 * Chạy một pipeline theo tên bảng D1 (vd service_usages)
+	 */
+	async runPipelineByTable(tableName: string): Promise<PipelineResult> {
+		await this.loadD1tor2Config();
+		const config = PIPELINE_CONFIGS.find((c) => c.tableName === tableName);
+		if (!config) {
+			throw new Error(`Pipeline config not found for table: ${tableName}`);
 		}
 		return this.runPipeline(config);
 	}

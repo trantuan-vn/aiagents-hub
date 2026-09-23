@@ -183,7 +183,8 @@ export async function upsertPipelineIncident(
       .run();
   } else {
     let status = existing.status;
-    if (status === 'resolved' && now - existing.last_seen < TIME_RANGE_MS['1h']) {
+    // Phase 2: reopen resolved when the same fingerprint fires again. Ignored stays ignored.
+    if (status === 'resolved') {
       status = 'new';
     }
     const hourAgo = now - TIME_RANGE_MS['1h'];

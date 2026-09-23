@@ -26,6 +26,8 @@ import {
 } from './domain.js';
 import { pollPipelineIncidents } from './incidents.js';
 import { buildPipelineRecommendations } from './recommendations.js';
+import { dispatchPipelineBurstAlert } from './alerts.js';
+import { assertProbeBudget } from './actions.js';
 import {
   countOpenAndNew1h,
   ensurePipelineTables,
@@ -355,6 +357,11 @@ async function buildOverview(env: Env, range: TimeRangeId, opts?: { force?: bool
       /* ignore */
     }
   }
+  try {
+    await dispatchPipelineBurstAlert(env, dto);
+  } catch {
+    /* alert best-effort */
+  }
   return dto;
 }
 
@@ -469,9 +476,12 @@ export async function getHotUsers(env: Env) {
   return { users: await listHotUsers(env.D1DB, 100) };
 }
 
-export async function probeUser(env: Env, userId: string): Promise<UserDoHealthDto> {
+export async function probeUser(env: Env, userId: string, actor?: string): Promise<UserDoHealthDto> {
   if (!isValidDoUserId(userId)) {
     throw new PipelineHealthError('invalid_user_id', 'userId must be a 64-char Durable Object id', 400);
+  }
+  if (actor) {
+    await assertProbeBudget(env, actor);
   }
   if (!env.USER_DO) {
     throw new PipelineHealthError('do_probe_failed', 'USER_DO binding missing', 503);

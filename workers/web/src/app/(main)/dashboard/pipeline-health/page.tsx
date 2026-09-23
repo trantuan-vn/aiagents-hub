@@ -13,6 +13,7 @@ import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } fr
 
 import { useRequireAdmin } from "../_hooks/use-require-admin";
 import { IncidentsTable } from "./_components/incidents-table";
+import { ActionsPanel } from "./_components/actions-panel";
 import { CronRunsPanel, HotUsersPanel, TablesPanel } from "./_components/panels";
 import { RecommendationList } from "./_components/recommendation-list";
 import { StageStrip } from "./_components/stage-strip";
@@ -254,6 +255,7 @@ export default function PipelineHealthPage() {
               <TabsTrigger value="cron">{t("cron_runs")}</TabsTrigger>
               <TabsTrigger value="hot">{t("hot_users")}</TabsTrigger>
               <TabsTrigger value="probe">{t("do_probe")}</TabsTrigger>
+              <TabsTrigger value="actions">{t("actions")}</TabsTrigger>
             </TabsList>
             <TabsContent value="incidents" className="pt-3">
               <IncidentsTable incidents={incidents} onPatch={patchIncident} />
@@ -288,6 +290,9 @@ export default function PipelineHealthPage() {
                   {JSON.stringify(probeResult, null, 2)}
                 </pre>
               ) : null}
+            </TabsContent>
+            <TabsContent value="actions" className="pt-3">
+              <ActionsPanel defaultUserId={probeId || undefined} onDone={() => void load()} />
             </TabsContent>
           </Tabs>
           <p className="text-muted-foreground text-xs">
