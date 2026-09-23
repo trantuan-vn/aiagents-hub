@@ -579,7 +579,17 @@
     "action_rerun_table_confirm": "Chạy lại pipeline d1tor2 cho bảng này ngay?",
     "action_table_optional": "Tên bảng sync (tuỳ chọn)",
     "action_running": "Đang chạy…",
-    "action_error": "Hành động thất bại"
+    "action_error": "Hành động thất bại",
+    "dlq": "DLQ",
+    "dlq_help": "Chỉ metadata — không lưu body. Replay gửi pointer pullFromDo (tối đa 10 lần/admin/ngày).",
+    "dlq_replay": "Replay",
+    "dlq_replay_confirm": "Replay entry DLQ này qua pullFromDo vào input queue? Có audit và rate-limit.",
+    "dlq_replay_ok": "Đã xếp hàng replay",
+    "no_dlq": "Chưa có entry DLQ đã log",
+    "aux_buckets": "R2 phụ",
+    "aux_ekyc": "Bucket eKYC",
+    "aux_version": "Version backup",
+    "no_aux_buckets": "Chưa có probe bucket phụ"
   },
   "UserEconomicsAdmin": {
     "page_title": "Kinh tế người dùng",

@@ -3,6 +3,8 @@ export const REFRESH_MIN_INTERVAL_MS = 2 * 60 * 1000;
 export const FORCE_FLUSH_MIN_INTERVAL_MS = 5 * 60 * 1000;
 export const RERUN_ALL_MIN_INTERVAL_MS = 10 * 60 * 1000;
 export const RERUN_TABLE_MIN_INTERVAL_MS = 2 * 60 * 1000;
+export const DLQ_REPLAY_MIN_INTERVAL_MS = 30 * 1000;
+export const DLQ_REPLAY_DAILY_CAP = 10;
 export const DO_PROBE_WINDOW_MS = 5 * 60 * 1000;
 export const DO_PROBE_MAX_PER_WINDOW = 30;
 export const EXCERPT_MAX_CHARS = 512;
@@ -13,11 +15,13 @@ export const DO_PROBE_TIMEOUT_MS = 2_000;
 export const POLL_EVENT_LIMIT = 200;
 export const INCIDENT_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 export const CRON_STALE_MS = 36 * 60 * 60 * 1000;
+export const WATERMARK_WINDOW_MS = 6 * 60 * 60 * 1000;
 export const OVERVIEW_CACHE_KV_KEY = 'pipeline-health-overview';
 export const REFRESH_AT_KV_KEY = 'pipeline-health-refresh-at';
 export const FORCE_FLUSH_KV_PREFIX = 'pipeline-health-force-flush:';
 export const RERUN_KV_PREFIX = 'pipeline-health-rerun:';
 export const PROBE_COUNT_KV_PREFIX = 'pipeline-health-probe:';
+export const DLQ_REPLAY_KV_PREFIX = 'pipeline-health-dlq-replay:';
 export const ALERTS_SENT_KV_KEY = 'pipeline-health-alerts-sent';
 export const SYSTEM_CONFIG_KV_KEY = 'aiagents-hub-system-config';
 export const INTERNAL_TRIGGER_HEADER = 'X-Hub-Admin-Action';
@@ -34,7 +38,8 @@ export type PipelineHealthErrorCode =
   | 'binding_missing'
   | 'not_found'
   | 'do_probe_failed'
-  | 'action_failed';
+  | 'action_failed'
+  | 'replay_not_possible';
 
 export class PipelineHealthError extends Error {
   readonly code: PipelineHealthErrorCode;
@@ -130,7 +135,36 @@ export type PipelineLag = {
   dlqPendingApprox: number | null;
   e2eDoToD1Minutes: number | null;
   e2eD1ToR2Hours: number | null;
+  watermarkSampleCount: number | null;
   confidence: 'low' | 'medium' | 'high';
+};
+
+export type DlqEntryStatus = 'logged' | 'replayed' | 'discarded';
+
+export type DlqEntryDto = {
+  id: number;
+  messageId: string;
+  userId: string | null;
+  tableName: string | null;
+  queueId: number | null;
+  pullFromDo: boolean;
+  attempts: number | null;
+  bodyBytes: number | null;
+  status: DlqEntryStatus;
+  receivedAt: string;
+  replayedAt: string | null;
+  replayedBy: string | null;
+  excerpt: string | null;
+  canReplay: boolean;
+};
+
+export type AuxBucketHealth = {
+  id: 'ekyc' | 'version_backup';
+  binding: string;
+  status: 'healthy' | 'watch' | 'unavailable' | 'unknown';
+  summary: string;
+  objectCountHint: number | null;
+  checkedAt: string;
 };
 
 export type PipelineIncident = {
@@ -221,6 +255,8 @@ export type PipelineOverviewDto = {
   retentionDays: number;
   lastCron: CronRunSummary | null;
   sampleSize: number;
+  auxBuckets: AuxBucketHealth[];
+  dlqLoggedApprox: number | null;
   telemetryError?: string;
   queuesError?: string;
 };

@@ -20,7 +20,34 @@ export type PipelineLag = {
   dlqPendingApprox: number | null;
   e2eDoToD1Minutes: number | null;
   e2eD1ToR2Hours: number | null;
+  watermarkSampleCount: number | null;
   confidence: "low" | "medium" | "high";
+};
+
+export type DlqEntryDto = {
+  id: number;
+  messageId: string;
+  userId: string | null;
+  tableName: string | null;
+  queueId: number | null;
+  pullFromDo: boolean;
+  attempts: number | null;
+  bodyBytes: number | null;
+  status: "logged" | "replayed" | "discarded";
+  receivedAt: string;
+  replayedAt: string | null;
+  replayedBy: string | null;
+  excerpt: string | null;
+  canReplay: boolean;
+};
+
+export type AuxBucketHealth = {
+  id: "ekyc" | "version_backup";
+  binding: string;
+  status: "healthy" | "watch" | "unavailable" | "unknown";
+  summary: string;
+  objectCountHint: number | null;
+  checkedAt: string;
 };
 
 export type CronRunSummary = {
@@ -52,6 +79,8 @@ export type PipelineOverviewDto = {
   retentionDays: number;
   lastCron: CronRunSummary | null;
   sampleSize: number;
+  auxBuckets: AuxBucketHealth[];
+  dlqLoggedApprox: number | null;
   telemetryError?: string;
   queuesError?: string;
 };

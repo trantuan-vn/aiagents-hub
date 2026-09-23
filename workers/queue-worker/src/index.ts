@@ -107,6 +107,114 @@ async function upsertHotUser(
   }
 }
 
+/** Persist DLQ metadata only (no PII body) for admin inspect/replay. */
+async function persistDlqEntry(
+  db: D1Database,
+  input: {
+    messageId: string;
+    userId?: string;
+    table?: string;
+    queueId?: number;
+    pullFromDo?: boolean;
+    attempts?: number;
+    bodyBytes?: number;
+    excerpt?: string;
+  },
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS pipeline_dlq_entries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          message_id TEXT NOT NULL,
+          user_id TEXT,
+          table_name TEXT,
+          queue_id INTEGER,
+          pull_from_do INTEGER NOT NULL DEFAULT 0,
+          attempts INTEGER,
+          body_bytes INTEGER,
+          status TEXT NOT NULL DEFAULT 'logged',
+          received_at INTEGER NOT NULL,
+          replayed_at INTEGER,
+          replayed_by TEXT,
+          excerpt TEXT,
+          UNIQUE (message_id, user_id, table_name, queue_id)
+        )`,
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO pipeline_dlq_entries
+          (message_id, user_id, table_name, queue_id, pull_from_do, attempts, body_bytes, status, received_at, excerpt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'logged', ?, ?)
+         ON CONFLICT(message_id, user_id, table_name, queue_id) DO UPDATE SET
+           attempts = COALESCE(excluded.attempts, pipeline_dlq_entries.attempts),
+           received_at = excluded.received_at`,
+      )
+      .bind(
+        input.messageId,
+        input.userId ?? null,
+        input.table ?? null,
+        input.queueId ?? null,
+        input.pullFromDo ? 1 : 0,
+        input.attempts ?? null,
+        input.bodyBytes ?? null,
+        Date.now(),
+        input.excerpt ?? null,
+      )
+      .run();
+  } catch {
+    /* never break DLQ ack path */
+  }
+}
+
+function estimateLagMs(record: Record<string, unknown> | null | undefined): number | null {
+  if (!record || typeof record !== 'object') return null;
+  const candidates = [record.flushedAt, record.createdAt, record.created_at, record.processedAt];
+  for (const c of candidates) {
+    const n = typeof c === 'number' ? c : typeof c === 'string' ? Date.parse(c) : NaN;
+    if (Number.isFinite(n) && n > 0) {
+      const lag = Date.now() - n;
+      if (lag >= 0 && lag < 30 * 24 * 60 * 60 * 1000) return lag;
+    }
+  }
+  return null;
+}
+
+/** Best-effort e2e DO→D1 lag sample for admin pipeline-health watermarks. */
+async function recordWatermark(
+  db: D1Database,
+  table: string,
+  userId: string,
+  records: number,
+  lagMs: number | null,
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS pipeline_watermarks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          captured_at INTEGER NOT NULL,
+          table_name TEXT NOT NULL,
+          user_id TEXT,
+          records INTEGER NOT NULL DEFAULT 0,
+          lag_ms INTEGER,
+          source TEXT NOT NULL DEFAULT 'queue_insert'
+        )`,
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO pipeline_watermarks (captured_at, table_name, user_id, records, lag_ms, source)
+         VALUES (?, ?, ?, ?, ?, 'queue_insert')`,
+      )
+      .bind(Date.now(), table, userId, records, lagMs)
+      .run();
+  } catch {
+    /* never break queue processing */
+  }
+}
+
 /** Đọc cấu hình queue_worker từ KV. Có hiệu lực ngay khi admin thiết lập. */
 async function getQueueWorkerConfig(env: Env): Promise<{
   BATCH_SIZE: number;
@@ -204,6 +312,16 @@ const processChunk = async (
     
     // Batch insert all records into D1 (preserves id from message)
     await database.batchInsertOrUpsertRecords(table, dataArray, userId);
+
+    try {
+      const lags = dataArray
+        .map((r) => estimateLagMs(r as Record<string, unknown>))
+        .filter((n): n is number => n != null);
+      const lagMs = lags.length ? Math.max(...lags) : null;
+      await recordWatermark(env.D1DB, table, userId, dataArray.length, lagMs);
+    } catch {
+      /* ignore */
+    }
 
     // Khi cập nhật sessions: nếu session có isActive = false (hết hiệu lực) thì cập nhật connections liên quan thành hết hiệu lực
     if (table === 'sessions') {
@@ -469,9 +587,21 @@ const processErrorQueue = async (batch: MessageBatch, env: Env): Promise<void> =
 
   for (const message of batch.messages) {
     try {
+      const bodyBytes =
+        typeof message.body === 'string'
+          ? message.body.length
+          : message.body != null
+            ? JSON.stringify(message.body).length
+            : null;
       const parsed = parseMessage(message);
       if (!parsed) {
         log.error('queue.dlq_parse_failed', { messageId: message.id });
+        await persistDlqEntry(env.D1DB, {
+          messageId: message.id,
+          attempts: message.attempts,
+          bodyBytes: bodyBytes ?? undefined,
+          excerpt: 'parse_failed',
+        });
         message.ack();
         continue;
       }
@@ -483,6 +613,16 @@ const processErrorQueue = async (batch: MessageBatch, env: Env): Promise<void> =
           queueId: parsedItem.queueId,
         });
         await upsertHotUser(env.D1DB, parsedItem.userId, 'dlq', parsedItem.table);
+        await persistDlqEntry(env.D1DB, {
+          messageId: message.id,
+          userId: parsedItem.userId,
+          table: parsedItem.table,
+          queueId: parsedItem.queueId,
+          pullFromDo: parsedItem.pullFromDo === true,
+          attempts: message.attempts,
+          bodyBytes: bodyBytes ?? undefined,
+          excerpt: `table=${parsedItem.table} queueId=${parsedItem.queueId ?? 'n/a'} pullFromDo=${parsedItem.pullFromDo ? 1 : 0}`,
+        });
       }
       message.ack();
     } catch (error) {

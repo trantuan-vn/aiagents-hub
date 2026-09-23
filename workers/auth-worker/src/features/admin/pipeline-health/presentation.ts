@@ -3,7 +3,9 @@ import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 import { PipelineHealthError, parseTimeRange } from './domain.js';
 import {
+  getAuxBucketHealth,
   getCronRuns,
+  getDlqInbox,
   getHotUsers,
   getOverview,
   getTables,
@@ -14,7 +16,7 @@ import {
   refreshOverview,
   updateIncident,
 } from './infrastructure.js';
-import { forceFlushUser, rerunPipeline } from './actions.js';
+import { forceFlushUser, replayDlqEntry, rerunPipeline } from './actions.js';
 
 function errBody(e: PipelineHealthError) {
   return { error: e.message, code: e.code };
@@ -176,6 +178,51 @@ export function createAdminPipelineHealthRoutes() {
     } catch (e) {
       if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
       const { errorResponse, status } = await handleError(c, e, 'Failed to re-run pipeline');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/dlq', async (c) => {
+    try {
+      requireAdmin(c);
+      const limit = Number(c.req.query('limit') ?? 50);
+      return c.json(
+        await getDlqInbox(c.env, {
+          status: c.req.query('status') ?? undefined,
+          limit: Number.isFinite(limit) ? limit : 50,
+        }),
+      );
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load DLQ entries');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/replay-dlq', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as { id?: number; confirm?: boolean };
+      return c.json(
+        await replayDlqEntry(c.env, String(user.identifier ?? 'admin'), {
+          id: Number(body.id),
+          confirm: body.confirm,
+        }),
+      );
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to replay DLQ entry');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/aux-buckets', async (c) => {
+    try {
+      requireAdmin(c);
+      return c.json(await getAuxBucketHealth(c.env));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to probe aux R2 buckets');
       return c.json(errorResponse, status);
     }
   });

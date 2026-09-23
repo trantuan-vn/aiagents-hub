@@ -29,18 +29,22 @@ import { buildPipelineRecommendations } from './recommendations.js';
 import { dispatchPipelineBurstAlert } from './alerts.js';
 import { assertProbeBudget } from './actions.js';
 import {
+  countLoggedDlq,
   countOpenAndNew1h,
   ensurePipelineTables,
   getIncident,
+  getWatermarkLagSummary,
   isCronStale,
   latestCronRun,
   listCronRuns,
+  listDlqEntries,
   listHotUsers,
   listIncidents,
   patchIncident,
   saveStageSnapshot,
   writeAudit,
 } from './store.js';
+import { probeAuxBuckets } from './r2-aux.js';
 
 function cacheKey(range: TimeRangeId): string {
   return `${OVERVIEW_CACHE_KV_KEY}:${range}`;
@@ -183,7 +187,20 @@ async function buildOverview(env: Env, range: TimeRangeId, opts?: { force?: bool
       const raw = await env.SYSTEM_CONFIG_KV?.get(cacheKey(range));
       if (raw) {
         const parsed = JSON.parse(raw) as PipelineOverviewDto;
-        if (parsed?.stages?.length === 4) return { ...parsed, stale: true, range };
+        if (parsed?.stages?.length === 4) {
+          return {
+            ...parsed,
+            stale: true,
+            range,
+            auxBuckets: parsed.auxBuckets ?? [],
+            dlqLoggedApprox: parsed.dlqLoggedApprox ?? null,
+            lag: {
+              ...parsed.lag,
+              watermarkSampleCount: parsed.lag?.watermarkSampleCount ?? null,
+              e2eDoToD1Minutes: parsed.lag?.e2eDoToD1Minutes ?? null,
+            },
+          };
+        }
       }
     } catch {
       /* rebuild */
@@ -312,18 +329,30 @@ async function buildOverview(env: Env, range: TimeRangeId, opts?: { force?: bool
     },
   ];
 
+  const lagWm = env.D1DB ? await getWatermarkLagSummary(env.D1DB) : { p50Minutes: null, sampleCount: 0 };
+  const dlqLoggedApprox = env.D1DB ? await countLoggedDlq(env.D1DB) : null;
+  const auxBuckets = await probeAuxBuckets(env);
+
   const lag: PipelineLag = {
     doPendingP50: percentile(pendings, 50),
     doPendingP95: percentile(pendings, 95),
     doFlushedStuckOverMin: null,
     queueDepthApprox: queueApprox.depth,
-    dlqPendingApprox: queueApprox.dlq,
-    e2eDoToD1Minutes: null,
+    dlqPendingApprox: queueApprox.dlq ?? dlqLoggedApprox,
+    e2eDoToD1Minutes: lagWm.p50Minutes,
     e2eD1ToR2Hours:
       lastCron && lastCron.success
         ? Math.round((Date.now() - Date.parse(lastCron.finishedAt)) / 3_600_000)
         : null,
-    confidence: okProbes.length >= 5 && lastCron ? 'medium' : okProbes.length > 0 || lastCron ? 'low' : 'low',
+    watermarkSampleCount: lagWm.sampleCount > 0 ? lagWm.sampleCount : null,
+    confidence:
+      lagWm.sampleCount >= 20 && okProbes.length >= 5 && lastCron
+        ? 'high'
+        : okProbes.length >= 5 && lastCron
+          ? 'medium'
+          : okProbes.length > 0 || lastCron || lagWm.sampleCount > 0
+            ? 'low'
+            : 'low',
   };
 
   const overall = maxStageStatus(stages.map((s) => s.status));
@@ -339,6 +368,8 @@ async function buildOverview(env: Env, range: TimeRangeId, opts?: { force?: bool
     retentionDays,
     lastCron,
     sampleSize: okProbes.length,
+    auxBuckets,
+    dlqLoggedApprox,
     telemetryError,
     queuesError,
   };
@@ -547,4 +578,19 @@ export async function dailyPipelineHealthSync(env: Env): Promise<void> {
   } catch {
     /* scheduled must not throw past other jobs */
   }
+}
+
+export async function getDlqInbox(env: Env, query: { status?: string; limit?: number }) {
+  if (!env.D1DB) return { entries: [], loggedApprox: 0 };
+  const entries = await listDlqEntries(env.D1DB, {
+    status: query.status,
+    limit: query.limit,
+  });
+  const loggedApprox = await countLoggedDlq(env.D1DB);
+  return { entries, loggedApprox };
+}
+
+export async function getAuxBucketHealth(env: Env) {
+  const buckets = await probeAuxBuckets(env);
+  return { buckets };
 }

@@ -80,6 +80,7 @@ describe('pipeline-health domain', () => {
         dlqPendingApprox: 0,
         e2eDoToD1Minutes: null,
         e2eD1ToR2Hours: null,
+        watermarkSampleCount: null,
         confidence: 'low',
       },
       openCount: 0,
@@ -95,6 +96,8 @@ describe('pipeline-health domain', () => {
         failed: 2,
       },
       sampleSize: 0,
+      auxBuckets: [],
+      dlqLoggedApprox: 0,
     };
     const incidents: PipelineIncident[] = [];
     const recs = buildPipelineRecommendations(incidents, overview);
@@ -130,5 +133,28 @@ describe('pipeline-health actions validation', () => {
     await expect(rerunPipeline(env, 'admin', { table: 'users', confirm: true })).rejects.toMatchObject({
       code: 'invalid_table',
     });
+  });
+
+  it('replayDlq requires confirm and rejects missing entry', async () => {
+    const { replayDlqEntry } = await import('./actions.js');
+    const env = {
+      SYSTEM_CONFIG_KV: undefined,
+      INPUT_QUEUE: undefined,
+      D1DB: undefined,
+    } as unknown as Env;
+    await expect(replayDlqEntry(env, 'admin', { id: 1 })).rejects.toMatchObject({
+      code: 'confirm_required',
+    });
+    await expect(replayDlqEntry(env, 'admin', { id: 1, confirm: true })).rejects.toMatchObject({
+      code: 'binding_missing',
+    });
+  });
+});
+
+describe('pipeline-health phase3 helpers', () => {
+  it('exports DLQ replay limits', async () => {
+    const { DLQ_REPLAY_DAILY_CAP, DLQ_REPLAY_MIN_INTERVAL_MS } = await import('./domain.js');
+    expect(DLQ_REPLAY_DAILY_CAP).toBe(10);
+    expect(DLQ_REPLAY_MIN_INTERVAL_MS).toBe(30_000);
   });
 });

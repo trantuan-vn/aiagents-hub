@@ -315,14 +315,45 @@ CREATE TABLE IF NOT EXISTS pipeline_health_audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   at INTEGER NOT NULL,
   actor TEXT NOT NULL,
-  action TEXT NOT NULL,                  -- refresh|force_flush|rerun_pipeline|status_patch
+  action TEXT NOT NULL,                  -- refresh|force_flush|rerun_pipeline|status_patch|dlq_replay
   detail TEXT
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_dlq_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id TEXT NOT NULL,
+  user_id TEXT,
+  table_name TEXT,
+  queue_id INTEGER,
+  pull_from_do INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER,
+  body_bytes INTEGER,
+  status TEXT NOT NULL DEFAULT 'logged', -- logged|replayed|discarded
+  received_at INTEGER NOT NULL,
+  replayed_at INTEGER,
+  replayed_by TEXT,
+  excerpt TEXT,                          -- metadata only, no PII body
+  UNIQUE (message_id, user_id, table_name, queue_id)
+);
+
+CREATE TABLE IF NOT EXISTS pipeline_watermarks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  captured_at INTEGER NOT NULL,
+  table_name TEXT NOT NULL,
+  user_id TEXT,
+  records INTEGER NOT NULL DEFAULT 0,
+  lag_ms INTEGER,                        -- approx DO flush → D1 insert
+  source TEXT NOT NULL DEFAULT 'queue_insert'
 );
 ```
 
 **Ghi `pipeline_cron_runs`:** ưu tiên sửa `d1tor2-cron` sau `runAllPipelines` → insert D1 (cùng `D1DB`). Không phụ thuộc parse log. Nếu PR tách: auth poll chỉ dùng khi cron chưa ship insert.
 
 **Hot users:** queue-worker khi `chunk_failed` / `dlq_entry` / `pull_from_do_failed` → upsert `pipeline_hot_users` (best-effort). Tránh AE bắt buộc.
+
+**DLQ inbox:** queue-worker `processErrorQueue` persist metadata → `pipeline_dlq_entries` rồi ack (vẫn không auto-replay). Admin `GET /dlq` + `POST /actions/replay-dlq` gửi `pullFromDo` pointer.
+
+**Watermark:** sau insert D1 thành công, queue-worker ghi `pipeline_watermarks` từ `flushedAt`/`createdAt` trên record (không migration cột `syncedAt`).
 
 Cap: 500 incidents open; hot_users 200 LRU; cron_runs giữ 90 ngày; snapshots 400 ngày (nhỏ).
 
@@ -507,7 +538,15 @@ type UserDoHealthDto = {
 - `force-flush` qua `USER_DO` stub từ auth (đã bind).
 - Optional: AE dimensions chuẩn hoá `blobs: [table, result]` nếu chưa có — chỉ khi AE còn room (xem usage).
 
-### 7.3 Cấm
+### 7.3 Phase 3
+
+| Worker | Đổi |
+|--------|-----|
+| `queue-worker` | Persist `pipeline_dlq_entries` (metadata) trước ack; ghi `pipeline_watermarks` sau insert OK |
+| `auth-worker` | `GET /dlq`, `POST /actions/replay-dlq` (pullFromDo + confirm + 10/day), `GET /aux-buckets`, overview lag DO→D1 từ watermark |
+| `web` | Tab DLQ + Aux R2 |
+
+### 7.4 Cấm
 
 - Tail Worker warehouse.
 - Logpush raw queue body → R2.
@@ -556,13 +595,11 @@ type UserDoHealthDto = {
 - Reopen incident khi signal lặp  
 - Burst alert in-app (tái dùng kênh usage/logs) khi overall `incident`  
 
-### Phase 3 — sâu hơn
+### Phase 3 — sâu hơn ✅
 
-- DLQ inspect metadata (không full PII body) + replay có kiểm soát  
-- e2e latency watermark chính xác (cột `syncedAt` nếu cần migration)  
-- Health phụ R2 eKYC / version-backup  
-
-Không làm phase 3 trong PR đầu.
+- DLQ inspect metadata (không full PII body) + replay có kiểm soát (`pullFromDo`, confirm + audit + 10/admin/ngày)
+- e2e latency watermark từ queue-worker (`pipeline_watermarks.lag_ms` ← `flushedAt`/`createdAt`) — không cần cột `syncedAt` trên bảng nghiệp vụ
+- Health phụ R2 eKYC / version-backup (`list({limit:1})` qua binding)
 
 ---
 

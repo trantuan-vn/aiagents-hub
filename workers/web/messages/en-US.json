@@ -579,7 +579,17 @@
     "action_rerun_table_confirm": "Re-run this table’s d1tor2 pipeline now?",
     "action_table_optional": "Optional sync table name",
     "action_running": "Running…",
-    "action_error": "Action failed"
+    "action_error": "Action failed",
+    "dlq": "DLQ",
+    "dlq_help": "Metadata only — no message body. Replay sends a pullFromDo pointer (max 10/admin/day).",
+    "dlq_replay": "Replay",
+    "dlq_replay_confirm": "Replay this DLQ entry via pullFromDo into the input queue? Audited and rate-limited.",
+    "dlq_replay_ok": "Replay queued",
+    "no_dlq": "No logged DLQ entries yet",
+    "aux_buckets": "Aux R2",
+    "aux_ekyc": "eKYC bucket",
+    "aux_version": "Version backup",
+    "no_aux_buckets": "No aux bucket probes"
   },
   "UserEconomicsAdmin": {
     "page_title": "User Economics",

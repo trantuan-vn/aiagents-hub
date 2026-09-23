@@ -14,6 +14,7 @@ import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } fr
 import { useRequireAdmin } from "../_hooks/use-require-admin";
 import { IncidentsTable } from "./_components/incidents-table";
 import { ActionsPanel } from "./_components/actions-panel";
+import { AuxBucketsPanel, DlqPanel } from "./_components/dlq-panel";
 import { CronRunsPanel, HotUsersPanel, TablesPanel } from "./_components/panels";
 import { RecommendationList } from "./_components/recommendation-list";
 import { StageStrip } from "./_components/stage-strip";
@@ -21,7 +22,9 @@ import {
   API_BASE_URL,
   statusClass,
   type ApiError,
+  type AuxBucketHealth,
   type CronRunSummary,
+  type DlqEntryDto,
   type HotUserRow,
   type IncidentStatus,
   type PipelineIncident,
@@ -43,6 +46,8 @@ export default function PipelineHealthPage() {
   const [tables, setTables] = useState<TableHealthRow[]>([]);
   const [cronRuns, setCronRuns] = useState<CronRunSummary[]>([]);
   const [hotUsers, setHotUsers] = useState<HotUserRow[]>([]);
+  const [dlqEntries, setDlqEntries] = useState<DlqEntryDto[]>([]);
+  const [auxBuckets, setAuxBuckets] = useState<AuxBucketHealth[]>([]);
   const [probeId, setProbeId] = useState("");
   const [probeResult, setProbeResult] = useState<UserDoHealthDto | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
@@ -57,13 +62,15 @@ export default function PipelineHealthPage() {
     setErrorCode(undefined);
     try {
       const qs = `range=${range}`;
-      const [ovRes, iRes, rRes, tRes, cRes, hRes] = await Promise.all([
+      const [ovRes, iRes, rRes, tRes, cRes, hRes, dRes, aRes] = await Promise.all([
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/overview?${qs}`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/incidents?${qs}`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/recommendations?${qs}`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/tables`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/cron-runs?limit=20`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/hot-users`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/dlq?limit=50`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/aux-buckets`, { credentials: "include" }),
       ]);
       if (!ovRes.ok) {
         const errBody = await parseDashboardApiError(ovRes);
@@ -72,7 +79,9 @@ export default function PipelineHealthPage() {
         setErrorCode(parsed?.code);
         throw new Error(dashboardApiErrorMessage(errBody, t("load_error")));
       }
-      setOverview((await ovRes.json()) as PipelineOverviewDto);
+      const ov = (await ovRes.json()) as PipelineOverviewDto;
+      setOverview(ov);
+      setAuxBuckets(ov.auxBuckets ?? []);
       if (iRes.ok) {
         const body = (await iRes.json()) as { incidents?: PipelineIncident[] };
         setIncidents(body.incidents ?? []);
@@ -92,6 +101,14 @@ export default function PipelineHealthPage() {
       if (hRes.ok) {
         const body = (await hRes.json()) as { users?: HotUserRow[] };
         setHotUsers(body.users ?? []);
+      }
+      if (dRes.ok) {
+        const body = (await dRes.json()) as { entries?: DlqEntryDto[] };
+        setDlqEntries(body.entries ?? []);
+      }
+      if (aRes.ok) {
+        const body = (await aRes.json()) as { buckets?: AuxBucketHealth[] };
+        if (body.buckets?.length) setAuxBuckets(body.buckets);
       }
     } catch (err) {
       setOverview(null);
@@ -240,8 +257,9 @@ export default function PipelineHealthPage() {
             <p className="font-medium">{t("lag")}</p>
             <p className="text-muted-foreground text-xs">
               pending P50/P95: {overview.lag.doPendingP50 ?? "—"} / {overview.lag.doPendingP95 ?? "—"} · queue depth:{" "}
-              {overview.lag.queueDepthApprox ?? "—"} · DLQ: {overview.lag.dlqPendingApprox ?? "—"} · D1→R2 hours:{" "}
-              {overview.lag.e2eD1ToR2Hours ?? "—"} · confidence: {overview.lag.confidence}
+              {overview.lag.queueDepthApprox ?? "—"} · DLQ: {overview.lag.dlqPendingApprox ?? "—"} · DO→D1 min:{" "}
+              {overview.lag.e2eDoToD1Minutes ?? "—"} · D1→R2 hours: {overview.lag.e2eD1ToR2Hours ?? "—"} · wm n=
+              {overview.lag.watermarkSampleCount ?? 0} · confidence: {overview.lag.confidence}
             </p>
             <p className="text-muted-foreground mt-1 text-xs">
               {t("open_incidents")}: {overview.openCount} · {t("new_1h")}: {overview.new1h}
@@ -254,6 +272,8 @@ export default function PipelineHealthPage() {
               <TabsTrigger value="tables">{t("tables")}</TabsTrigger>
               <TabsTrigger value="cron">{t("cron_runs")}</TabsTrigger>
               <TabsTrigger value="hot">{t("hot_users")}</TabsTrigger>
+              <TabsTrigger value="dlq">{t("dlq")}</TabsTrigger>
+              <TabsTrigger value="aux">{t("aux_buckets")}</TabsTrigger>
               <TabsTrigger value="probe">{t("do_probe")}</TabsTrigger>
               <TabsTrigger value="actions">{t("actions")}</TabsTrigger>
             </TabsList>
@@ -271,6 +291,12 @@ export default function PipelineHealthPage() {
             </TabsContent>
             <TabsContent value="hot" className="pt-3">
               <HotUsersPanel users={hotUsers} onProbe={(id) => void runProbe(id)} />
+            </TabsContent>
+            <TabsContent value="dlq" className="pt-3">
+              <DlqPanel entries={dlqEntries} onReplayDone={() => void load()} />
+            </TabsContent>
+            <TabsContent value="aux" className="pt-3">
+              <AuxBucketsPanel buckets={auxBuckets.length ? auxBuckets : (overview.auxBuckets ?? [])} />
             </TabsContent>
             <TabsContent value="probe" className="space-y-3 pt-3">
               <div className="flex flex-wrap gap-2">

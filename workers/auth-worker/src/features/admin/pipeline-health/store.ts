@@ -4,10 +4,13 @@ import {
   INCIDENT_RETENTION_MS,
   OPEN_INCIDENT_CAP,
   TIME_RANGE_MS,
+  WATERMARK_WINDOW_MS,
   clipExcerpt,
   isIncidentStatus,
   isPipelineStage,
   type CronRunSummary,
+  type DlqEntryDto,
+  type DlqEntryStatus,
   type HotUserRow,
   type IncidentStatus,
   type PipelineIncident,
@@ -79,19 +82,48 @@ CREATE TABLE IF NOT EXISTS pipeline_incident_notes (
   note TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_pipeline_inc_notes ON pipeline_incident_notes (fingerprint, at DESC);
+CREATE TABLE IF NOT EXISTS pipeline_dlq_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id TEXT NOT NULL,
+  user_id TEXT,
+  table_name TEXT,
+  queue_id INTEGER,
+  pull_from_do INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER,
+  body_bytes INTEGER,
+  status TEXT NOT NULL DEFAULT 'logged',
+  received_at INTEGER NOT NULL,
+  replayed_at INTEGER,
+  replayed_by TEXT,
+  excerpt TEXT,
+  UNIQUE (message_id, user_id, table_name, queue_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_dlq_received ON pipeline_dlq_entries (received_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pipeline_dlq_status ON pipeline_dlq_entries (status, received_at DESC);
+CREATE TABLE IF NOT EXISTS pipeline_watermarks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  captured_at INTEGER NOT NULL,
+  table_name TEXT NOT NULL,
+  user_id TEXT,
+  records INTEGER NOT NULL DEFAULT 0,
+  lag_ms INTEGER,
+  source TEXT NOT NULL DEFAULT 'queue_insert'
+);
+CREATE INDEX IF NOT EXISTS idx_pipeline_wm_captured ON pipeline_watermarks (captured_at DESC);
 `;
 
-let tablesReady = false;
+const SCHEMA_VERSION = 3;
+let readySchemaVersion = 0;
 
 export async function ensurePipelineTables(db: D1Database): Promise<void> {
-  if (tablesReady) return;
+  if (readySchemaVersion === SCHEMA_VERSION) return;
   const statements = DDL.split(';')
     .map((s) => s.trim())
     .filter(Boolean);
   for (const sql of statements) {
     await db.prepare(sql).run();
   }
-  tablesReady = true;
+  readySchemaVersion = SCHEMA_VERSION;
 }
 
 type IncidentRow = {
@@ -525,6 +557,178 @@ export function isCronStale(lastFinishedAtIso: string | null | undefined, now = 
   const t = Date.parse(lastFinishedAtIso);
   if (!Number.isFinite(t)) return true;
   return now - t > CRON_STALE_MS;
+}
+
+function toDlqStatus(raw: string | null | undefined): DlqEntryStatus {
+  if (raw === 'replayed' || raw === 'discarded') return raw;
+  return 'logged';
+}
+
+function dlqCanReplay(row: {
+  status: string;
+  user_id: string | null;
+  table_name: string | null;
+  queue_id: number | null;
+}): boolean {
+  return (
+    toDlqStatus(row.status) === 'logged' &&
+    !!row.user_id &&
+    !!row.table_name &&
+    row.queue_id != null &&
+    Number.isFinite(row.queue_id)
+  );
+}
+
+export async function listDlqEntries(
+  db: D1Database,
+  opts: { status?: string; limit?: number } = {},
+): Promise<DlqEntryDto[]> {
+  await ensurePipelineTables(db);
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+  const status = opts.status?.trim();
+  const res = status
+    ? await db
+        .prepare(
+          `SELECT id, message_id, user_id, table_name, queue_id, pull_from_do, attempts, body_bytes,
+                  status, received_at, replayed_at, replayed_by, excerpt
+           FROM pipeline_dlq_entries WHERE status = ? ORDER BY received_at DESC LIMIT ?`,
+        )
+        .bind(status, limit)
+        .all<{
+          id: number;
+          message_id: string;
+          user_id: string | null;
+          table_name: string | null;
+          queue_id: number | null;
+          pull_from_do: number;
+          attempts: number | null;
+          body_bytes: number | null;
+          status: string;
+          received_at: number;
+          replayed_at: number | null;
+          replayed_by: string | null;
+          excerpt: string | null;
+        }>()
+    : await db
+        .prepare(
+          `SELECT id, message_id, user_id, table_name, queue_id, pull_from_do, attempts, body_bytes,
+                  status, received_at, replayed_at, replayed_by, excerpt
+           FROM pipeline_dlq_entries ORDER BY received_at DESC LIMIT ?`,
+        )
+        .bind(limit)
+        .all<{
+          id: number;
+          message_id: string;
+          user_id: string | null;
+          table_name: string | null;
+          queue_id: number | null;
+          pull_from_do: number;
+          attempts: number | null;
+          body_bytes: number | null;
+          status: string;
+          received_at: number;
+          replayed_at: number | null;
+          replayed_by: string | null;
+          excerpt: string | null;
+        }>();
+
+  return (res.results ?? []).map((r) => ({
+    id: r.id,
+    messageId: r.message_id,
+    userId: r.user_id,
+    tableName: r.table_name,
+    queueId: r.queue_id,
+    pullFromDo: r.pull_from_do === 1,
+    attempts: r.attempts,
+    bodyBytes: r.body_bytes,
+    status: toDlqStatus(r.status),
+    receivedAt: new Date(r.received_at).toISOString(),
+    replayedAt: r.replayed_at != null ? new Date(r.replayed_at).toISOString() : null,
+    replayedBy: r.replayed_by,
+    excerpt: r.excerpt,
+    canReplay: dlqCanReplay(r),
+  }));
+}
+
+export async function getDlqEntry(db: D1Database, id: number): Promise<DlqEntryDto | null> {
+  await ensurePipelineTables(db);
+  const r = await db
+    .prepare(
+      `SELECT id, message_id, user_id, table_name, queue_id, pull_from_do, attempts, body_bytes,
+              status, received_at, replayed_at, replayed_by, excerpt
+       FROM pipeline_dlq_entries WHERE id = ?`,
+    )
+    .bind(id)
+    .first<{
+      id: number;
+      message_id: string;
+      user_id: string | null;
+      table_name: string | null;
+      queue_id: number | null;
+      pull_from_do: number;
+      attempts: number | null;
+      body_bytes: number | null;
+      status: string;
+      received_at: number;
+      replayed_at: number | null;
+      replayed_by: string | null;
+      excerpt: string | null;
+    }>();
+  if (!r) return null;
+  return {
+    id: r.id,
+    messageId: r.message_id,
+    userId: r.user_id,
+    tableName: r.table_name,
+    queueId: r.queue_id,
+    pullFromDo: r.pull_from_do === 1,
+    attempts: r.attempts,
+    bodyBytes: r.body_bytes,
+    status: toDlqStatus(r.status),
+    receivedAt: new Date(r.received_at).toISOString(),
+    replayedAt: r.replayed_at != null ? new Date(r.replayed_at).toISOString() : null,
+    replayedBy: r.replayed_by,
+    excerpt: r.excerpt,
+    canReplay: dlqCanReplay(r),
+  };
+}
+
+export async function markDlqReplayed(db: D1Database, id: number, actor: string): Promise<void> {
+  await ensurePipelineTables(db);
+  await db
+    .prepare(
+      `UPDATE pipeline_dlq_entries SET status = 'replayed', replayed_at = ?, replayed_by = ? WHERE id = ?`,
+    )
+    .bind(Date.now(), actor, id)
+    .run();
+}
+
+export async function countLoggedDlq(db: D1Database): Promise<number> {
+  await ensurePipelineTables(db);
+  const row = await db
+    .prepare(`SELECT COUNT(*) as c FROM pipeline_dlq_entries WHERE status = 'logged'`)
+    .first<{ c: number }>();
+  return row?.c ?? 0;
+}
+
+export async function getWatermarkLagSummary(
+  db: D1Database,
+  windowMs = WATERMARK_WINDOW_MS,
+): Promise<{ p50Minutes: number | null; sampleCount: number }> {
+  await ensurePipelineTables(db);
+  const since = Date.now() - windowMs;
+  const res = await db
+    .prepare(
+      `SELECT lag_ms FROM pipeline_watermarks
+       WHERE captured_at >= ? AND lag_ms IS NOT NULL
+       ORDER BY lag_ms ASC LIMIT 500`,
+    )
+    .bind(since)
+    .all<{ lag_ms: number }>();
+  const lags = (res.results ?? []).map((r) => r.lag_ms).filter((n) => Number.isFinite(n) && n >= 0);
+  if (lags.length === 0) return { p50Minutes: null, sampleCount: 0 };
+  const mid = lags[Math.floor((lags.length - 1) / 2)]!;
+  return { p50Minutes: Math.round(mid / 60_000), sampleCount: lags.length };
 }
 
 export type { IncidentStatus };

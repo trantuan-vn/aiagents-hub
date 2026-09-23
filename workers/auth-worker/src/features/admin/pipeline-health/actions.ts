@@ -2,6 +2,9 @@ import {
   DO_PROBE_MAX_PER_WINDOW,
   DO_PROBE_TIMEOUT_MS,
   DO_PROBE_WINDOW_MS,
+  DLQ_REPLAY_DAILY_CAP,
+  DLQ_REPLAY_KV_PREFIX,
+  DLQ_REPLAY_MIN_INTERVAL_MS,
   FORCE_FLUSH_KV_PREFIX,
   FORCE_FLUSH_MIN_INTERVAL_MS,
   INTERNAL_TRIGGER_HEADER,
@@ -15,7 +18,7 @@ import {
   SYNC_TABLE_NAMES,
   isValidDoUserId,
 } from './domain.js';
-import { writeAudit } from './store.js';
+import { getDlqEntry, markDlqReplayed, writeAudit } from './store.js';
 
 type D1tor2TriggerStats = {
   totalPipelines: number;
@@ -212,4 +215,111 @@ export async function rerunPipeline(
     );
   }
   return { ok: true, scope: runAll ? 'all' : (table as string), stats };
+}
+
+/**
+ * Controlled DLQ replay: always send a compact pullFromDo pointer (no stored PII body).
+ * Rate-limited per entry + daily cap per admin.
+ */
+export async function replayDlqEntry(
+  env: Env,
+  actor: string,
+  input: { id: number; confirm?: boolean },
+): Promise<{ ok: true; id: number; userId: string; table: string; queueId: number }> {
+  if (input.confirm !== true) {
+    throw new PipelineHealthError('confirm_required', 'confirm: true is required', 400);
+  }
+  if (!env.D1DB) {
+    throw new PipelineHealthError('binding_missing', 'D1DB binding missing', 503);
+  }
+  if (!env.INPUT_QUEUE) {
+    throw new PipelineHealthError('binding_missing', 'INPUT_QUEUE binding missing', 503);
+  }
+  const id = Number(input.id);
+  if (!Number.isFinite(id) || id < 1) {
+    throw new PipelineHealthError('not_found', 'DLQ entry not found', 404);
+  }
+
+  const entry = await getDlqEntry(env.D1DB, id);
+  if (!entry) {
+    throw new PipelineHealthError('not_found', 'DLQ entry not found', 404);
+  }
+  if (!entry.canReplay || !entry.userId || !entry.tableName || entry.queueId == null) {
+    throw new PipelineHealthError(
+      'replay_not_possible',
+      'Entry cannot be replayed (missing user/table/queueId or already replayed)',
+      400,
+    );
+  }
+  if (!(SYNC_TABLE_NAMES as readonly string[]).includes(entry.tableName)) {
+    throw new PipelineHealthError('invalid_table', `Table ${entry.tableName} is not a sync table`, 400);
+  }
+  if (!isValidDoUserId(entry.userId)) {
+    throw new PipelineHealthError('invalid_user_id', 'Stored userId is not a valid Durable Object id', 400);
+  }
+
+  await assertKvCooldown(
+    env,
+    `${DLQ_REPLAY_KV_PREFIX}entry:${id}`,
+    DLQ_REPLAY_MIN_INTERVAL_MS,
+    'This DLQ entry was replayed recently',
+  );
+
+  const dayKey = `${DLQ_REPLAY_KV_PREFIX}day:${actor}:${new Date().toISOString().slice(0, 10)}`;
+  const dayRaw = await env.SYSTEM_CONFIG_KV?.get(dayKey);
+  const dayCount = dayRaw ? Number(dayRaw) : 0;
+  if (Number.isFinite(dayCount) && dayCount >= DLQ_REPLAY_DAILY_CAP) {
+    throw new PipelineHealthError(
+      'rate_limited',
+      `DLQ replay limited to ${DLQ_REPLAY_DAILY_CAP} per admin per day`,
+      429,
+    );
+  }
+
+  const queueId = entry.queueId;
+  const userId = entry.userId;
+  const table = entry.tableName;
+  const payload = [
+    {
+      body: JSON.stringify({
+        table,
+        id: queueId,
+        pullFromDo: true,
+        data: { queueId },
+        batchInfo: {
+          userId,
+          table,
+          batchSize: 1,
+          minId: queueId,
+          maxId: queueId,
+          timestamp: Date.now(),
+          pullFromDo: true,
+          replayFromDlq: id,
+        },
+      }),
+    },
+  ];
+
+  try {
+    await env.INPUT_QUEUE.send(payload);
+  } catch (e) {
+    throw new PipelineHealthError(
+      'action_failed',
+      e instanceof Error ? e.message : 'INPUT_QUEUE.send failed',
+      503,
+    );
+  }
+
+  await markDlqReplayed(env.D1DB, id, actor);
+  await markKvCooldown(env, `${DLQ_REPLAY_KV_PREFIX}entry:${id}`, DLQ_REPLAY_MIN_INTERVAL_MS);
+  await env.SYSTEM_CONFIG_KV?.put(dayKey, String((Number.isFinite(dayCount) ? dayCount : 0) + 1), {
+    expirationTtl: 48 * 60 * 60,
+  });
+  await writeAudit(
+    env.D1DB,
+    actor,
+    'dlq_replay',
+    JSON.stringify({ id, userId, table, queueId, messageId: entry.messageId }),
+  );
+  return { ok: true, id, userId, table, queueId };
 }
