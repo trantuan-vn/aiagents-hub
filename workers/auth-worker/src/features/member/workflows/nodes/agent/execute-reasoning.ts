@@ -18,6 +18,7 @@ import {
   agentHasRagToolKind,
   buildAgentToolset,
   buildRagToolset,
+  codeModeToolName,
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { attachSimpleMemory, isLinkedSimpleMemory } from '../memory-node/simple.js';
@@ -61,11 +62,15 @@ import { parseReflect, reflectHeuristics, REFLECT_PROMPT } from './reasoning/ref
 import { parseLlmSafety, ruleClassify, SAFETY_CLASSIFIER_PROMPT } from './reasoning/safety.js';
 import {
   buildAskUserTool,
+  buildToolLoopGuidance,
+  codeModeSucceeded,
   decorateToolDescription,
   filterToolsForPolicy,
   initialToolChoice,
   maxActSteps,
-  omitGetRagWhenGrounded,
+  omitRetrieveWhenGrounded,
+  partitionToolNames,
+  validatedArtifactFromObservations,
   validatedSqlFromObservations,
 } from './reasoning/tools.js';
 import type {
@@ -84,8 +89,10 @@ import {
   MAX_REFLECT_RETRIES,
   MIN_QUALITY_DELTA,
   draftsEquivalent,
+  resolveEvaluationMode,
   scoreDraft,
   shouldStopImproving,
+  type EvaluationMode,
 } from './reasoning/quality.js';
 import {
   resolveConfiguredChoice,
@@ -93,6 +100,19 @@ import {
   resolveConfiguredNumber,
   resolveConfiguredRaw,
 } from '../tool/shared/pipeline.js';
+import { toolClassForKind } from '../tool/shared/registry.js';
+
+/** Validate tool names from the graph (survives Code Mode collapse). */
+function linkedValidateToolNames(linkedTools: Array<Record<string, unknown>>): string[] {
+  const names: string[] = [];
+  for (const t of linkedTools) {
+    const kind = String(t.kind ?? '');
+    if (toolClassForKind(kind) !== 'validate') continue;
+    const config = (t.config ?? {}) as Record<string, unknown>;
+    names.push(String(config.toolName ?? kind.replace(/-/g, '_')).trim() || kind.replace(/-/g, '_'));
+  }
+  return names;
+}
 
 export type ReasoningLlmCall = (args: {
   purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect';
@@ -220,16 +240,20 @@ function toNodeOutput(
     query: string;
     snippets: string[];
     endpoint: string;
-    validatedSql?: string;
-    hasCheckSql?: boolean;
+    evaluationMode?: EvaluationMode;
+    validatedArtifact?: string;
   },
 ): NodeOutput {
-  const sql = extra.hasCheckSql
-    ? String(extra.validatedSql ?? '').trim()
-    : extractSql(result.text);
+  const mode = extra.evaluationMode ?? 'generic';
+  const validated = String(extra.validatedArtifact ?? '').trim();
+  const fromText = extractSql(result.text);
+  // SQL field: prefer validate-tool artifact in sql mode; otherwise only extract when present in the answer.
+  const sql = mode === 'sql' ? validated || fromText : fromText;
+  const artifact = validated || (mode === 'sql' ? sql : '') || undefined;
   return {
     status: result.status,
     text: result.text,
+    ...(artifact ? { artifact } : {}),
     sql,
     citations: result.citations,
     plan: result.plan,
@@ -347,6 +371,8 @@ export async function executeReasoningAgent(
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
   });
+  const linkedValidateNames = linkedValidateToolNames(linked.tools);
+  const evaluationMode = resolveEvaluationMode(linkedValidateNames);
   let nodeInput = { ...(ctx.nodeInput ?? {}) } as Record<string, unknown>;
   let userText = resolveAgentUserText(data, nodeInput, ctx.input);
 
@@ -495,14 +521,21 @@ export async function executeReasoningAgent(
         }
       : {};
 
-  const baseTools: ToolSet = omitGetRagWhenGrounded(
+  const baseTools: ToolSet = omitRetrieveWhenGrounded(
     { ...httpTools, ...ragTools, ...memoryTool, ...buildAskUserTool() },
     snippets.length > 0,
   );
+  const partitionedPreview = partitionToolNames(Object.keys(baseTools));
   for (const [name, def] of Object.entries(baseTools)) {
     const description = String((def as { description?: string }).description ?? '');
-    (def as { description?: string }).description = decorateToolDescription(name, description);
+    (def as { description?: string }).description = decorateToolDescription(name, description, {
+      retrieve: partitionedPreview.retrieve,
+      validate: partitionedPreview.validate,
+    });
   }
+
+  const codeModeName = codeModeToolName(baseTools);
+  const usingCodeMode = Boolean(codeModeName);
 
   const toolNames = Object.keys(baseTools);
   let frame: TaskFrame = {
@@ -517,7 +550,11 @@ export async function executeReasoningAgent(
     confidence: snippets.length ? 0.7 : 0.4,
   };
 
-  if (options.clarificationMode === 'ask' && !frame.missingSlots.length) {
+  if (
+    !usingCodeMode &&
+    options.clarificationMode === 'ask' &&
+    !frame.missingSlots.length
+  ) {
     const framed = await llm({
       purpose: 'frame',
       system: FRAME_PROMPT,
@@ -543,11 +580,14 @@ export async function executeReasoningAgent(
       status: result.status,
     });
     await simpleMemory.persist(questions.join('\n'));
-    return toNodeOutput(result, { query: userText, snippets, endpoint });
+    return toNodeOutput(result, { query: userText, snippets, endpoint, evaluationMode });
   }
 
   let plan: AgentPlan | undefined;
-  if (shouldPlan({ enablePlanner: options.enablePlanner, toolCount: toolNames.length, userText })) {
+  if (
+    !usingCodeMode &&
+    shouldPlan({ enablePlanner: options.enablePlanner, toolCount: toolNames.length, userText })
+  ) {
     const planned = await llm({
       purpose: 'plan',
       system: PLAN_PROMPT,
@@ -559,20 +599,29 @@ export async function executeReasoningAgent(
 
   const policyTools = filterToolsForPolicy(baseTools, { plan, safetyLevel: options.safetyLevel });
   const policyNames = Object.keys(policyTools);
-  const hasCheckSql = policyNames.some((n) => /check[_-]?sql/i.test(n));
+  const partitioned = partitionToolNames(policyNames);
+  const toolLoopGuidance = buildToolLoopGuidance({
+    usingCodeMode,
+    codeModeName,
+    retrieve: partitioned.retrieve,
+    validate: partitioned.validate.length ? partitioned.validate : linkedValidateNames,
+  });
   const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
   const systemParts = [
-    userSystem,
+    userSystem ||
+      (usingCodeMode
+        ? 'You are a tool-using assistant. Prefer Code Mode when available.'
+        : 'You are a helpful assistant that uses tools when they improve accuracy.'),
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     policyNames.length
       ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
       : `If you lack required details, say so and ask. Do not guess.`,
-    hasCheckSql
-      ? 'SQL loop: draft SELECT → check_sql. On ok: false, call get_rag again (focused on the Oracle error / missing identifiers), rewrite SQL, then check_sql again. Final answer only after check_sql ok: true; otherwise report the last Oracle error and do not claim success.'
-      : '',
+    toolLoopGuidance,
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-    formatRagContext(snippets) ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}` : '',
+    !usingCodeMode && formatRagContext(snippets)
+      ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}`
+      : '',
     options.requireCitations && citationSeed.length
       ? 'Every factual claim must include [n] citations that match the source list.'
       : '',
@@ -584,24 +633,30 @@ export async function executeReasoningAgent(
   let draft = '';
   let lastIssues = '';
   let observations: ToolObservation[] = [];
+  const configuredActSteps = resolveConfiguredNumber(data.maxActSteps, optionScope);
   const stopSteps = maxActSteps(
-    resolveConfiguredNumber(data.maxActSteps, optionScope) ?? DEFAULT_ACT_STEPS,
+    configuredActSteps ?? (usingCodeMode ? 2 : DEFAULT_ACT_STEPS),
   );
   let bestText = '';
   let bestScore = Number.NEGATIVE_INFINITY;
   let bestCitations: AgentCitation[] = [];
   let stagnant = 0;
 
+  const outputExtraBase = () => ({
+    query: userText,
+    snippets,
+    endpoint,
+    evaluationMode,
+    validatedArtifact:
+      evaluationMode === 'sql'
+        ? validatedSqlFromObservations(observations)
+        : validatedArtifactFromObservations(observations),
+  });
+
   const finish = async (text: string, cites: AgentCitation[]) => {
     const outText = groundedTextOrFallback(text, cites);
     const outputSafety = ruleClassify(outText);
-    const outputExtra = {
-      query: userText,
-      snippets,
-      endpoint,
-      hasCheckSql,
-      validatedSql: validatedSqlFromObservations(observations),
-    };
+    const outputExtra = outputExtraBase();
     if (outputSafety.action === 'refuse') {
       return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), outputExtra);
     }
@@ -627,7 +682,7 @@ export async function executeReasoningAgent(
     return toNodeOutput(result, outputExtra);
   };
 
-  for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {
+  for (let attempt = 0; attempt <= (usingCodeMode ? Math.min(1, options.maxReflectRetries) : options.maxReflectRetries); attempt += 1) {
     const act = await llm({
       purpose: 'act',
       system: systemParts.join('\n\n'),
@@ -636,7 +691,9 @@ export async function executeReasoningAgent(
           ? userText
           : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.\nKeep citations as [n].`,
       tools: policyNames.length ? policyTools : undefined,
-      toolChoice: policyNames.length ? initialToolChoice(policyNames, plan, snippets.length > 0) : undefined,
+      toolChoice: policyNames.length
+        ? initialToolChoice(policyNames, plan, snippets.length > 0, codeModeName)
+        : undefined,
       stopSteps,
     });
     observations = [...observations, ...(act.observations ?? [])];
@@ -651,9 +708,28 @@ export async function executeReasoningAgent(
         status: result.status,
       });
       await simpleMemory.persist(act.askedUser.questions.join('\n'));
-      return toNodeOutput(result, { query: userText, snippets, endpoint });
+      return toNodeOutput(result, { query: userText, snippets, endpoint, evaluationMode });
     }
     draft = asText(act.text);
+
+    if (usingCodeMode && codeModeSucceeded(observations)) {
+      const artifact =
+        evaluationMode === 'sql'
+          ? validatedSqlFromObservations(observations)
+          : validatedArtifactFromObservations(observations);
+      if (artifact && !/```/.test(draft)) {
+        draft =
+          evaluationMode === 'sql' && /^(SELECT|WITH)\b/i.test(artifact)
+            ? `\`\`\`sql\n${artifact}\n\`\`\``
+            : artifact;
+      }
+      const citations = buildCitations({
+        snippets,
+        observations,
+        sessionSummary: session.summary,
+      });
+      return finish(draft, citations);
+    }
 
     const citations = buildCitations({
       snippets,
@@ -668,6 +744,7 @@ export async function executeReasoningAgent(
       requireCitations: options.requireCitations,
       userText,
       snippets,
+      mode: evaluationMode,
     });
     const quality = scoreDraft({
       text: draft,
@@ -676,6 +753,7 @@ export async function executeReasoningAgent(
       observations,
       snippets,
       userText,
+      mode: evaluationMode,
     });
     if (quality > bestScore + MIN_QUALITY_DELTA && !draftsEquivalent(draft, bestText)) {
       bestScore = quality;
@@ -698,6 +776,14 @@ export async function executeReasoningAgent(
       return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
     }
 
+    if (usingCodeMode) {
+      // Code Mode already ran the validate loop in-sandbox; one reflect max is enough.
+      lastIssues = heuristic.issues.join(', ') || 'code_mode_incomplete';
+      if (attempt >= 1) {
+        return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
+      }
+    }
+
     const critique = await llm({
       purpose: 'reflect',
       system: REFLECT_PROMPT,
@@ -717,6 +803,7 @@ export async function executeReasoningAgent(
         requireCitations: options.requireCitations,
         userText,
         snippets,
+        mode: evaluationMode,
       });
       const rewrittenScore = scoreDraft({
         text: draft,
@@ -725,6 +812,7 @@ export async function executeReasoningAgent(
         observations,
         snippets,
         userText,
+        mode: evaluationMode,
       });
       if (rewrittenScore > bestScore + MIN_QUALITY_DELTA) {
         bestScore = rewrittenScore;

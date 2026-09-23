@@ -3,8 +3,12 @@
 > **Trạng thái:** Done (v1)  
 > **Family:** [`agent.md`](./agent.md)  
 > **Kind:** `reasoning_agent` — song song `tools_agent`, không thay SQL/tools agent.
+>
+> **Code Mode:** khi link `code` + `get-rag` + `check-sql`, outer chỉ gọi `codemode` (script JS trong sandbox). Xem [`code.md`](./code.md).
 
 Agent có vòng điều khiển: **safety → memory → clarify → plan → act → reflect → cite**.
+
+Toolset **động** theo node nối vào handle `tools` (registry `toolClass`: retrieve / validate / persist / delegate…). Prompt vòng lặp được sinh từ tên tool thực tế — không hardcode chỉ `get_rag` / `check_sql`. Text-to-SQL vẫn là một recipe phổ biến khi link Get RAG + Check SQL (+ optional Code Mode).
 
 ## 1. Tóm tắt
 

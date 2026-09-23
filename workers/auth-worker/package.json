@@ -8,9 +8,10 @@
   },
   "main": "dist/src/index.js",
   "dependencies": {
+    "@ai-sdk/provider": "^3.0.8",
     "@aiagents-hub/oracle-db": "*",
     "@aiagents-hub/workflow-nodes": "*",
-    "@ai-sdk/provider": "^3.0.8",
+    "@cloudflare/codemode": "^0.5.2",
     "@simplewebauthn/server": "^10.0.0",
     "@tsndr/cloudflare-worker-jwt": "^3.1.7",
     "ai": "^6.0.140",

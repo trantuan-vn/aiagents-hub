@@ -32,8 +32,9 @@ Hệ quả của code hiện tại:
 | Save RAG | `save-rag` | Lấy schema một bảng từ Oracle, LLM viết mô tả cột và SQL example, embed cả hai document vào Vectorize | PDF, text tự do, liệt kê mọi bảng, gọi module Get DB Info |
 | Get RAG | `get-rag` | Embed câu hỏi, query Vectorize, trả schema + SQL example cho Reasoning Agent viết SQL | Ghi vector, chạy SQL, introspect Oracle |
 | Check SQL | `check-sql` | Chạy một câu SELECT Oracle, trả thành công hoặc lỗi Oracle | Sinh SQL, retrieve, ghi/sửa dữ liệu |
+| Code Mode | `code` | Outer tool: model viết JS; sandbox gọi get_rag/check_sql | Transform data-flow (`core:code`); eval tùy ý |
 
-Luồng ingest và luồng hỏi tách nhau. Reasoning Agent chỉ có mặt ở luồng hỏi.
+Luồng ingest và luồng hỏi tách nhau. Reasoning Agent chỉ có mặt ở luồng hỏi. Code Mode chỉ trên luồng hỏi.
 
 ```mermaid
 flowchart LR
@@ -106,7 +107,8 @@ type ToolModule = {
 | `get-db-info` | `retrieve` | Có — emit `items[]` cho Loop | Có — trả danh sách bảng |
 | `save-rag` | `persist` | Có — schema + SQL example của một bảng | Không — không nhận text/PDF từ Agent |
 | `get-rag` | `retrieve` | Có — prefetch từ câu hỏi upstream | Có — `query` là câu hỏi user |
-| `check-sql` | `validate` | Không | Có — bắt buộc trên Reasoning Agent |
+| `check-sql` | `validate` | Không | Có — bắt buộc trên Reasoning Agent (hoặc inner của Code Mode) |
+| `code` | `delegate` | Không | Có — Code Mode; cần get-rag + check-sql link kèm |
 
 `toolClass` khai báo trên module. `classifyToolName` không đoán bằng regex.
 

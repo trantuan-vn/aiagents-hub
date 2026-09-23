@@ -3,6 +3,8 @@ import { matchToSnippet, type VectorMatch } from '../../../rag/index.js';
 const MAX_CHUNKS_PER_DOCUMENT = 24;
 const MIN_OVERLAP = 8;
 
+export { MAX_CHUNKS_PER_DOCUMENT };
+
 /** Phase 3: schema before SQL examples for the Reasoning Agent. */
 const DOC_TYPE_ORDER: Record<string, number> = {
   schema: 0,
@@ -169,8 +171,27 @@ export function groupDocumentIds(matches: VectorMatch[]): string[] {
   return [...new Set(matches.map(documentIdOf).filter(Boolean))];
 }
 
-export function chunkIdsForDocument(documentId: string): string[] {
-  return Array.from({ length: MAX_CHUNKS_PER_DOCUMENT }, (_, i) => vectorChunkId(documentId, i));
+/** Prefer metadata.totalChunks when known (e.g. 3); otherwise probe up to MAX. */
+export function totalChunksForDocument(documentId: string, matches: VectorMatch[]): number {
+  let maxKnown = 0;
+  for (const match of matches) {
+    if (documentIdOf(match) !== documentId) continue;
+    const fromMeta = Number(match.metadata?.totalChunks);
+    if (Number.isFinite(fromMeta) && fromMeta > 0) {
+      maxKnown = Math.max(maxKnown, Math.floor(fromMeta));
+    }
+    maxKnown = Math.max(maxKnown, chunkIndex(match) + 1);
+  }
+  if (maxKnown > 0) return Math.min(MAX_CHUNKS_PER_DOCUMENT, maxKnown);
+  return MAX_CHUNKS_PER_DOCUMENT;
+}
+
+export function chunkIdsForDocument(documentId: string, totalChunks?: number): string[] {
+  const n =
+    totalChunks != null && Number.isFinite(totalChunks) && totalChunks > 0
+      ? Math.min(MAX_CHUNKS_PER_DOCUMENT, Math.max(1, Math.floor(totalChunks)))
+      : MAX_CHUNKS_PER_DOCUMENT;
+  return Array.from({ length: n }, (_, i) => vectorChunkId(documentId, i));
 }
 
 export function matchesFromVectorRows(

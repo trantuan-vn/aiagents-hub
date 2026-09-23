@@ -27,6 +27,7 @@ import {
   mergeMatches,
   pickRelatedGroups,
   resolveGroupKey,
+  totalChunksForDocument,
 } from './assemble.js';
 
 /** Both Phase 2 document types must be present per table for Reasoning Agent SQL. */
@@ -90,14 +91,26 @@ export function resolveGroupByField(template: unknown, input: Record<string, unk
   return expr;
 }
 
+/**
+ * When any chunk of a document matches, load every sibling chunk so the agent
+ * sees the full doc (e.g. 1 of 3 → all 3). Uses metadata.totalChunks when set.
+ */
 async function loadDocumentRows(
   env: Env,
   collection: string,
   documentIds: string[],
+  seedMatches: VectorMatch[] = [],
 ): Promise<VectorMatch[]> {
   const index = resolveVectorizeIndex(env, collection);
   if (!index?.getByIds || !documentIds.length) return [];
-  const ids = documentIds.flatMap(chunkIdsForDocument);
+
+  const ids = [
+    ...new Set(
+      documentIds.flatMap((documentId) =>
+        chunkIdsForDocument(documentId, totalChunksForDocument(documentId, seedMatches)),
+      ),
+    ),
+  ];
   try {
     const rows = await index.getByIds(ids);
     return matchesFromVectorRows(rows ?? []);
@@ -157,7 +170,10 @@ async function hydrateRelatedGroups(params: {
         console.warn('[get-rag] related-group filter query failed:', e);
       }
 
-      grouped = mergeMatches(grouped, await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)));
+      grouped = mergeMatches(
+        grouped,
+        await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
+      );
 
       const catalogued = grouped.some(
         (match) => match.metadata?.tableName || match.metadata?.docType || match.metadata?.schemaName,
@@ -180,7 +196,7 @@ async function hydrateRelatedGroups(params: {
         }
         grouped = mergeMatches(
           grouped,
-          await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)),
+          await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
         );
       }
 
@@ -212,7 +228,7 @@ async function hydrateRelatedGroups(params: {
             }
             grouped = mergeMatches(
               grouped,
-              await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped)),
+              await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
             );
           }
         } catch (e) {

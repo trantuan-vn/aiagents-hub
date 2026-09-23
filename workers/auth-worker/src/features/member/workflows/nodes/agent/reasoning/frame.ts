@@ -30,10 +30,8 @@ export function inferMissingSlots(
     return ['referent'];
   }
 
-  const looksLikeDataQuestion =
-    /\b(sql|query|schema|table|how many|doanh thu|select)\b/i.test(text) ||
-    /[?？]$/.test(text);
-  if (looksLikeDataQuestion && !context.hasTools && !context.hasMemorySnippets && text.length < 40) {
+  const looksVagueQuestion = /[?？]$/.test(text) || /\b(how many|what is|cho tôi|liệt kê)\b/i.test(text);
+  if (looksVagueQuestion && !context.hasTools && !context.hasMemorySnippets && text.length < 40) {
     return ['target'];
   }
 

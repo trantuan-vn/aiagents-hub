@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import {
   executeOracleQueryDirect,
+  validateOracleQueryDirect,
   fetchOracleSqlHistoriesDirect,
   introspectOracleTableDirect,
   introspectOracleTablesDirect,
@@ -89,7 +90,7 @@ app.post('/oracle', async (c) => {
       ? `${action} ${body.tableName}`
       : action === 'introspectTables' || action === 'sqlHistory'
         ? `${action} x${tableCount}`
-        : action === 'executeQuery'
+        : action === 'executeQuery' || action === 'validateQuery'
           ? `${action}`
           : action;
   const timeoutMs = resolveActionTimeoutMs();
@@ -158,6 +159,20 @@ app.post('/oracle', async (c) => {
         `[oracle-proxy] OK ${label} ok=${result.ok} (${Date.now() - t0}ms)`,
       );
       // Always HTTP 200 with nested result so ORA-* reaches the agent as ok:false (not a throw).
+      return jsonResponse({ ok: true, result });
+    }
+    if (action === 'validateQuery') {
+      const sql = String(body.sql ?? '').trim();
+      if (!sql) return badRequest('Missing sql');
+      const schemaName = String(body.schemaName ?? '').trim() || undefined;
+      const result = await withTimeout(
+        validateOracleQueryDirect(config, sql, schemaName),
+        timeoutMs,
+        label,
+      );
+      console.log(
+        `[oracle-proxy] OK ${label} ok=${result.ok} (${Date.now() - t0}ms)`,
+      );
       return jsonResponse({ ok: true, result });
     }
     return badRequest(`Unknown action "${action}"`);

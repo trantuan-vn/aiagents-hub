@@ -158,6 +158,10 @@ async function executeSaveRagMany(params: {
   }
   const vectors: VectorizeVectorRecord[] = [];
   const savedByDoc = new Map<string, number>();
+  const totalChunksByDoc = new Map<string, number>();
+  for (const { doc } of owners) {
+    totalChunksByDoc.set(doc.documentId, (totalChunksByDoc.get(doc.documentId) ?? 0) + 1);
+  }
 
   for (let i = 0; i < owners.length; i++) {
     const values = embeddings[i] ?? [];
@@ -173,6 +177,7 @@ async function executeSaveRagMany(params: {
         source: doc.source,
         documentId: doc.documentId,
         chunkIndex: String(chunk.index),
+        totalChunks: String(totalChunksByDoc.get(doc.documentId) ?? 1),
         ...(namespace ? { namespace } : {}),
         ...doc.metadata,
       },

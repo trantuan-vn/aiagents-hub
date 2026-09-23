@@ -544,6 +544,8 @@ export type OracleQueryOk = {
   rowCount: number;
   sampleRows: Record<string, unknown>[];
   elapsedMs: number;
+  /** True when only EXPLAIN PLAN / parse ran — no row fetch. */
+  validatedOnly?: boolean;
 };
 
 export type OracleQueryErr = {
@@ -598,6 +600,42 @@ export async function executeOracleQueryDirect(
         rowCount: sampleRows.length,
         sampleRows,
         elapsedMs: Date.now() - t0,
+      };
+    } catch (err) {
+      return oracleErrorResult(err);
+    }
+  });
+}
+
+/**
+ * Validate SQL without fetching rows: `EXPLAIN PLAN FOR <sql>`.
+ * Optionally `ALTER SESSION SET CURRENT_SCHEMA` so unqualified names resolve.
+ */
+export async function validateOracleQueryDirect(
+  config: OracleConnectConfig,
+  sql: string,
+  schemaName?: string,
+): Promise<OracleQueryResult> {
+  const t0 = Date.now();
+  return withOracleConnection(config, async (connection) => {
+    try {
+      const schema = String(schemaName ?? '').trim().toUpperCase();
+      if (schema && /^[A-Z][A-Z0-9_$#]*$/.test(schema)) {
+        await connection.execute(`ALTER SESSION SET CURRENT_SCHEMA = ${schema}`, {}, {
+          autoCommit: false,
+        });
+      }
+      const trimmed = String(sql ?? '').trim().replace(/;+\s*$/, '');
+      await connection.execute(`EXPLAIN PLAN FOR\n${trimmed}`, {}, {
+        autoCommit: false,
+      });
+      return {
+        ok: true,
+        columns: [],
+        rowCount: 0,
+        sampleRows: [],
+        elapsedMs: Date.now() - t0,
+        validatedOnly: true,
       };
     } catch (err) {
       return oracleErrorResult(err);

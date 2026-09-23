@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@cloudflare/codemode', () => ({
+  DynamicWorkerExecutor: class {
+    constructor(_opts: unknown) {}
+  },
+}));
+vi.mock('@cloudflare/codemode/ai', () => ({
+  createCodeTool: () => ({
+    description: 'mock codemode',
+    execute: async () => ({ result: null, logs: [] }),
+  }),
+}));
+
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 

@@ -3,6 +3,7 @@ import type { OracleQueryResult } from '@aiagents-hub/oracle-db';
 import {
   oracleProxyConfigured,
   proxyExecuteOracleQuery,
+  proxyValidateOracleQuery,
 } from './oracle-proxy-client.js';
 
 export {
@@ -50,6 +51,30 @@ export async function executeReadOnly(params: ExecuteReadOnlyParams): Promise<Or
   try {
     const { executeOracleQueryDirect } = await import('@aiagents-hub/oracle-db');
     return await executeOracleQueryDirect(params.config, params.sql, maxRows);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`check_sql: Oracle connection failed — ${message}`);
+  }
+}
+
+/** Validate SQL via EXPLAIN PLAN — no row fetch. Optional CURRENT_SCHEMA. */
+export async function validateReadOnly(params: {
+  config: OracleConnectConfig;
+  sql: string;
+  schemaName?: string;
+  env?: unknown;
+}): Promise<OracleQueryResult> {
+  if (resolveOraclePath(params.env) === 'proxy') {
+    return proxyValidateOracleQuery(
+      requireProxyEnv(params.env),
+      params.config,
+      params.sql,
+      params.schemaName,
+    );
+  }
+  try {
+    const { validateOracleQueryDirect } = await import('@aiagents-hub/oracle-db');
+    return await validateOracleQueryDirect(params.config, params.sql, params.schemaName);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     throw new Error(`check_sql: Oracle connection failed — ${message}`);

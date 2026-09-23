@@ -5,7 +5,7 @@
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "check-sql"`  
 > **Gắn vào:** [`reasoning-agent.md`](./reasoning-agent.md) qua handle `tools`
 
-Tool **chạy thử** một câu SELECT Oracle. Thành công hoặc lỗi đều trả về Reasoning Agent. Lỗi không kết thúc lượt: Agent sửa SQL và gọi lại, trong trần `maxReflectRetries`.
+Tool **validate** một câu SELECT Oracle qua **EXPLAIN PLAN** (không fetch dòng — nhanh hơn execute). Thành công hoặc lỗi đều trả về Reasoning Agent. Lỗi không kết thúc lượt: Agent sửa SQL và gọi lại, trong trần `maxReflectRetries`.
 
 Không có pipeline execute. Node này không đứng trên data-flow.
 
@@ -19,9 +19,9 @@ Không có pipeline execute. Node này không đứng trên data-flow.
 | **toolName** | `check_sql` |
 | **toolClass** | `validate` — luôn có trong toolset, không bị policy `persist` chặn |
 | **Input tool** | `{ sql: string }` |
-| **Kết nối** | Oracle từ INPUT của Agent (cùng `user` / `password` / `connectString` mà ingest đã dùng), resolve bằng `shared/db/connect-config.ts` |
+| **Kết nối** | `userField` / `passwordField` / `connectStringField` / `schemaNameField` trên panel (expression), fallback INPUT Agent |
 
-`toolDescription`: chạy câu SELECT trên Oracle và trả lỗi parser/thực thi nếu câu sai. Gọi sau khi đã có schema từ `get_rag` và trước khi coi SQL là câu trả lời. Không dùng để lấy full kết quả cho user.
+`toolDescription`: validate SELECT qua EXPLAIN PLAN; `ok: false` kèm lỗi Oracle để agent sửa.
 
 ---
 

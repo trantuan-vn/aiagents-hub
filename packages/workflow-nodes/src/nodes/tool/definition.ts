@@ -8,6 +8,7 @@ import {
   GET_DB_INFO_USER_FIELD,
   GET_DB_INFO_PASSWORD_FIELD,
   GET_DB_INFO_CONNECT_STRING_FIELD,
+  GET_DB_INFO_SCHEMA_FIELD,
 } from "../workflow-presets";
 
 export {
@@ -93,11 +94,52 @@ const GET_RAG_FIELDS = [
 
 const CHECK_SQL_FIELDS = [
   {
+    id: "userField",
+    type: "text" as const,
+    labelKey: "field_user_field",
+    descriptionKey: "field_user_field_desc",
+    defaultValue: GET_DB_INFO_USER_FIELD,
+    placeholderKey: "field_user_field_placeholder",
+    supportsExpression: true,
+    order: 3.1,
+  },
+  {
+    id: "passwordField",
+    type: "text" as const,
+    labelKey: "field_password_field",
+    descriptionKey: "field_password_field_desc",
+    defaultValue: GET_DB_INFO_PASSWORD_FIELD,
+    placeholderKey: "field_password_field_placeholder",
+    supportsExpression: true,
+    order: 3.2,
+  },
+  {
+    id: "connectStringField",
+    type: "text" as const,
+    labelKey: "field_connect_string_field",
+    descriptionKey: "field_connect_string_field_desc",
+    defaultValue: GET_DB_INFO_CONNECT_STRING_FIELD,
+    placeholderKey: "field_connect_string_field_placeholder",
+    supportsExpression: true,
+    order: 3.3,
+  },
+  {
+    id: "schemaNameField",
+    type: "text" as const,
+    labelKey: "field_schema_name_field",
+    descriptionKey: "field_check_sql_schema_desc",
+    defaultValue: GET_DB_INFO_SCHEMA_FIELD,
+    placeholderKey: "field_schema_name_field_placeholder",
+    supportsExpression: true,
+    order: 3.4,
+  },
+  {
     id: "maxRows",
     type: "number" as const,
     labelKey: "field_max_rows",
+    descriptionKey: "field_check_sql_max_rows_desc",
     defaultValue: 5,
-    order: 3.1,
+    order: 3.5,
   },
 ];
 
@@ -136,6 +178,7 @@ const GET_DB_INFO_FIELDS = [
     id: "schemaNameField",
     type: "text" as const,
     labelKey: "field_schema_name_field",
+    defaultValue: GET_DB_INFO_SCHEMA_FIELD,
     placeholderKey: "field_schema_name_field_placeholder",
     supportsExpression: true,
     order: 3.4,
@@ -332,11 +375,45 @@ export const CHECK_SQL_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   defaultData: {
     toolKind: "check-sql",
     toolName: "check_sql",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
+    schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     maxRows: 5,
   },
   sections: [
     defaultInputSection(),
     defaultParametersSection([...RAG_COMMON_FIELDS, ...CHECK_SQL_FIELDS]),
+    defaultOutputSection(false),
+  ],
+});
+
+const CODE_TOOL_FIELDS = [
+  {
+    id: "timeoutMs",
+    type: "number" as const,
+    labelKey: "field_code_timeout_ms",
+    defaultValue: 60000,
+    order: 4,
+  },
+];
+
+export const CODE_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
+  id: "tool_node:code",
+  runtimeType: "tool_node",
+  kind: "code",
+  nameKey: "tool_pick_code",
+  descriptionKey: "tool_pick_code_desc",
+  category: "resource",
+  icon: "Wrench",
+  defaultData: {
+    toolKind: "code",
+    toolName: "codemode",
+    timeoutMs: 60000,
+  },
+  sections: [
+    defaultInputSection(),
+    defaultParametersSection([...RAG_COMMON_FIELDS, ...CODE_TOOL_FIELDS]),
     defaultOutputSection(false),
   ],
 });
@@ -374,7 +451,7 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     userField: GET_DB_INFO_USER_FIELD,
     passwordField: GET_DB_INFO_PASSWORD_FIELD,
     connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
-    schemaNameField: "",
+    schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     tableNameField: "",
     tableFilter: "*",
   },
@@ -382,7 +459,18 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolKind: "check-sql",
     toolName: "check_sql",
     toolDescription:
-      "Run a SELECT on Oracle and return parser/execution errors if wrong. Call after get_rag, before treating SQL as the final answer.",
+      "Validate a SELECT on Oracle via EXPLAIN PLAN (no row fetch). On ok: false, repair SQL from the error.",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
+    schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     maxRows: 5,
+  },
+  code: {
+    toolKind: "code",
+    toolName: "codemode",
+    toolDescription:
+      "Code Mode: the agent writes JavaScript that calls get_rag and check_sql inside a sandbox (requires those tools linked).",
+    timeoutMs: 60000,
   },
 };

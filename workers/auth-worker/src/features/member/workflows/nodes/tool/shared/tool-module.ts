@@ -6,7 +6,7 @@ import type { NodeContext, NodeOutput } from '../../types.js';
 import type { RagBilling } from './rag-context.js';
 
 /** Declared on ToolModule — reasoning policy reads this instead of guessing from the tool name. */
-export type WorkflowToolClass = 'retrieve' | 'persist' | 'validate' | 'other';
+export type WorkflowToolClass = 'retrieve' | 'persist' | 'validate' | 'delegate' | 'other';
 
 export type AgentToolBindContext = {
   env: Env;

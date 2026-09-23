@@ -157,6 +157,7 @@ export type ProxyQueryResult =
       rowCount: number;
       sampleRows: Record<string, unknown>[];
       elapsedMs: number;
+      validatedOnly?: boolean;
     }
   | { ok: false; error: string; oracleCode?: string };
 
@@ -167,4 +168,19 @@ export async function proxyExecuteOracleQuery(
   maxRows: number,
 ): Promise<ProxyQueryResult> {
   return proxyCall<ProxyQueryResult>(env, { action: 'executeQuery', config, sql, maxRows });
+}
+
+/** Parse/EXPLAIN only — no row fetch. Optional schema sets CURRENT_SCHEMA first. */
+export async function proxyValidateOracleQuery(
+  env: ProxyEnv,
+  config: OracleConnectConfig,
+  sql: string,
+  schemaName?: string,
+): Promise<ProxyQueryResult> {
+  return proxyCall<ProxyQueryResult>(env, {
+    action: 'validateQuery',
+    config,
+    sql,
+    ...(schemaName ? { schemaName } : {}),
+  });
 }

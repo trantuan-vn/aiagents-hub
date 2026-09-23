@@ -163,6 +163,11 @@
 	"ai": {
 		"binding": "AI"  
 	},
+	"worker_loaders": [
+		{
+			"binding": "LOADER"
+		}
+	],
 	"vectorize": [
 		{
 			"binding": "VECTORIZE",

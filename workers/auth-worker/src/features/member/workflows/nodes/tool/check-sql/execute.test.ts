@@ -2,10 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { executeCheckSql, guardReadOnlySql } from './execute.js';
 
-const executeReadOnlyMock = vi.hoisted(() => vi.fn());
+const validateReadOnlyMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../shared/db/oracle-client.js', () => ({
-  executeReadOnly: executeReadOnlyMock,
+  validateReadOnly: validateReadOnlyMock,
+  executeReadOnly: vi.fn(),
 }));
 
 describe('guardReadOnlySql', () => {
@@ -27,13 +28,14 @@ describe('guardReadOnlySql', () => {
 });
 
 describe('executeCheckSql', () => {
-  it('returns ok:true for a valid probe result', async () => {
-    executeReadOnlyMock.mockResolvedValueOnce({
+  it('returns ok:true for a valid validate-only result', async () => {
+    validateReadOnlyMock.mockResolvedValueOnce({
       ok: true,
-      columns: ['N'],
-      rowCount: 1,
-      sampleRows: [{ N: 1 }],
+      columns: [],
+      rowCount: 0,
+      sampleRows: [],
       elapsedMs: 12,
+      validatedOnly: true,
     });
     const out = await executeCheckSql({
       env: {} as Env,
@@ -43,14 +45,13 @@ describe('executeCheckSql', () => {
     expect(out.ok).toBe(true);
     if (out.ok) {
       expect(out.sql).toMatch(/^SELECT/i);
-      expect(out.columns).toEqual(['N']);
-      expect(out.sampleRows).toHaveLength(1);
+      expect(out.validatedOnly).toBe(true);
     }
-    expect(executeReadOnlyMock).toHaveBeenCalled();
+    expect(validateReadOnlyMock).toHaveBeenCalled();
   });
 
   it('returns ok:false with ORA code and does not throw', async () => {
-    executeReadOnlyMock.mockResolvedValueOnce({
+    validateReadOnlyMock.mockResolvedValueOnce({
       ok: false,
       error: 'ORA-00904: "NOPE": invalid identifier',
       oracleCode: 'ORA-00904',
@@ -68,13 +69,88 @@ describe('executeCheckSql', () => {
   });
 
   it('never calls Oracle for DELETE', async () => {
-    executeReadOnlyMock.mockClear();
+    validateReadOnlyMock.mockClear();
     const out = await executeCheckSql({
       env: {} as Env,
       sql: 'DELETE FROM ADMIN.ORDERS WHERE 1=1',
       config: { user: 'u', password: 'p', connectString: 'c' },
     });
     expect(out.ok).toBe(false);
-    expect(executeReadOnlyMock).not.toHaveBeenCalled();
+    expect(validateReadOnlyMock).not.toHaveBeenCalled();
+  });
+
+  it('resolves connection and schema from toolConfig expression fields', async () => {
+    validateReadOnlyMock.mockResolvedValueOnce({
+      ok: true,
+      columns: [],
+      rowCount: 0,
+      sampleRows: [],
+      elapsedMs: 1,
+      validatedOnly: true,
+    });
+    const out = await executeCheckSql({
+      env: {} as Env,
+      sql: 'SELECT 1 FROM dual',
+      triggerContext: { u: 'alice', p: 'secret', c: 'db.host/XEPDB1', schemaName: 'ADMIN' },
+      toolConfig: {
+        userField: '{{ $json.u }}',
+        passwordField: '{{ $json.p }}',
+        connectStringField: '{{ $json.c }}',
+        schemaNameField: '{{ $json.schemaName }}',
+      },
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) expect(out.schemaName).toBe('ADMIN');
+    expect(validateReadOnlyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          user: 'alice',
+          password: 'secret',
+          connectString: 'db.host/XEPDB1',
+        }),
+        schemaName: 'ADMIN',
+      }),
+    );
+  });
+
+  it('resolves form shorthand u/p/c/s for SELECT * FROM ADMIN.CHUNG_KHOAN', async () => {
+    validateReadOnlyMock.mockResolvedValueOnce({
+      ok: true,
+      columns: [],
+      rowCount: 0,
+      sampleRows: [],
+      elapsedMs: 8,
+      validatedOnly: true,
+    });
+    const connectString =
+      '(description= (retry_count=20)(retry_delay=3)(address=(protocol=tcps)(port=1522)(host=adb.ap-singapore-1.oraclecloud.com))(connect_data=(service_name=g3d495d60e13477_host10_high.adb.oraclecloud.com))(security=(ssl_server_dn_match=yes)))';
+    const out = await executeCheckSql({
+      env: {} as Env,
+      sql: 'SELECT * FROM ADMIN.CHUNG_KHOAN',
+      triggerContext: {
+        u: 'ADMIN',
+        p: 'secret',
+        c: connectString,
+        s: 'ADMIN',
+      },
+      toolConfig: {},
+    });
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.sql).toBe('SELECT * FROM ADMIN.CHUNG_KHOAN');
+      expect(out.schemaName).toBe('ADMIN');
+      expect(out.validatedOnly).toBe(true);
+    }
+    expect(validateReadOnlyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          user: 'ADMIN',
+          password: 'secret',
+          connectString,
+        }),
+        schemaName: 'ADMIN',
+        sql: 'SELECT * FROM ADMIN.CHUNG_KHOAN',
+      }),
+    );
   });
 });

@@ -11,6 +11,9 @@ export const GET_RAG_GROUP_BY_FIELD = "tableName";
 export const GET_DB_INFO_USER_FIELD = "{{ $json.u || $json.fields.u || $json.user }}";
 export const GET_DB_INFO_PASSWORD_FIELD = "{{ $json.p || $json.fields.p || $json.password }}";
 export const GET_DB_INFO_CONNECT_STRING_FIELD = "{{ $json.c || $json.fields.c || $json.connectString }}";
+/** Form shorthand `s` = schema/owner (same pattern as u/p/c). */
+export const GET_DB_INFO_SCHEMA_FIELD =
+  "{{ $json.s || $json.fields.s || $json.schemaName || $json.schema }}";
 
 export const LOOP_ITEMS_FIELD = "{{ $json.items }}";
 
@@ -36,16 +39,19 @@ export const REASONING_AGENT_DEFAULTS = {
   safetyLevel: "standard",
 } as const;
 
-export const REASONING_AGENT_SYSTEM_PROMPT = `You are a Text-to-SQL assistant.
-- Always call get_rag first with the user question (search schema and sqlexample docs).
-- Use only tables and columns that appear in retrieved snippets. Never invent names.
-- If the question is ambiguous (table, grain, date range, join key missing), ask a clarifying question instead of guessing.
-- After drafting a SELECT, call check_sql to verify it on Oracle. Only treat SQL as final when check_sql returns ok: true.
-- If check_sql returns ok: false: (1) read the Oracle error, (2) call get_rag again with a focused query (missing table/column, join key, or the error text) to enrich schema/SQL examples, (3) rewrite the SELECT, (4) call check_sql again. Repeat within the tool budget; do not claim success without ok: true.
-- Reply with exactly one read-only SQL query in a fenced sql code block. No INSERT/UPDATE/DELETE/DDL.
-- Qualify tables as schema.table. Prefer patterns from retrieved SQL examples.
-- Cite sources as [n] mapped to retrieved snippets.
-- If you cannot get check_sql ok: true, say the statement did not run and include the last Oracle error — never invent a successful result.`;
+export const REASONING_AGENT_SYSTEM_PROMPT = `You are a careful tool-using assistant.
+- Prefer calling linked tools instead of guessing facts those tools can provide.
+- If required details are missing and no tool can fill them, ask a clarifying question.
+- When a validate tool returns ok: false, read the error, gather more context with retrieve tools if needed, repair, and re-validate within the tool budget.
+- Cite sources as [n] when retrieved snippets are available.
+- Never invent successful tool results.`;
+
+/** Used when Code Mode collapses retrieve + validate tools into one sandbox tool. */
+export const REASONING_AGENT_CODE_MODE_SYSTEM_PROMPT = `You are a tool-using assistant with Code Mode.
+- Call the codemode tool once with a JavaScript async arrow function that orchestrates the linked sandbox APIs (retrieve → draft → validate, with repair loops).
+- Do not call retrieve/validate tools directly when Code Mode is available — only via the code you write.
+- If the question is ambiguous, call ask_user instead of guessing.
+- After codemode succeeds, answer from its return value. Never invent a successful result.`;
 
 export const SQL_HTTP_BODY = '{"sql":"{{ $json.sql }}"}';
 

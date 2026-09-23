@@ -12,6 +12,7 @@ import {
 } from '../rag/index.js';
 import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
 import { getToolModule } from '../nodes/tool/shared/registry.js';
+import { createCodeModeOuterTool } from '../nodes/tool/code/create.js';
 import { runHttpRequest } from './node-runtime.js';
 
 /**
@@ -33,6 +34,12 @@ interface AgentToolContext {
   ownerId?: string;
   workflowId?: number;
   billing?: RagBilling;
+}
+
+/** Fold any linked retrieve/validate tool into Code Mode (not only get-rag/check-sql). */
+export function isCodeModeInnerLinkedKind(kind: string): boolean {
+  const cls = getToolModule(kind)?.toolClass;
+  return cls === 'retrieve' || cls === 'validate';
 }
 
 function sanitizeToolName(raw: string, fallback: string): string {
@@ -121,11 +128,93 @@ export function agentHasRagToolKind(definition: WorkflowDefinition, agentId: str
   return linked.tools.some((t) => String(t.kind ?? '') === kind);
 }
 
+function linkedToolName(t: Record<string, unknown>, kind: string): string {
+  const config = (t.config ?? {}) as Record<string, unknown>;
+  return sanitizeToolName(
+    String(config.toolName ?? kind.replace(/-/g, '_')),
+    kind.replace(/-/g, '_'),
+  );
+}
+
+/**
+ * When a `code` tool is linked with get-rag + check-sql, expose only Code Mode
+ * to the outer model; siblings run inside the sandbox via RPC.
+ */
+export function collapseToCodeModeTool(
+  tools: ToolSet,
+  linkedTools: Array<Record<string, unknown>>,
+  ctx: AgentToolContext,
+): ToolSet {
+  const codeNodes = linkedTools.filter((t) => String(t.kind ?? '') === 'code');
+  if (!codeNodes.length) return tools;
+  if (!ctx.env.LOADER) {
+    console.warn('[agent-runtime] Code Mode linked but LOADER binding is missing — keeping individual tools');
+    return tools;
+  }
+
+  const inner: ToolSet = {};
+  const removeNames: string[] = [];
+  const retrieveNames: string[] = [];
+  const validateNames: string[] = [];
+
+  for (const t of linkedTools) {
+    const kind = String(t.kind ?? '');
+    if (!isCodeModeInnerLinkedKind(kind)) continue;
+    const name = linkedToolName(t, kind);
+    const def = tools[name];
+    if (!def) continue;
+    inner[name] = def;
+    removeNames.push(name);
+    const cls = getToolModule(kind)?.toolClass;
+    if (cls === 'retrieve') retrieveNames.push(name);
+    if (cls === 'validate') validateNames.push(name);
+  }
+
+  if (!retrieveNames.length || !validateNames.length || Object.keys(inner).length < 2) {
+    return tools;
+  }
+
+  const codeNode = codeNodes[0]!;
+  const config = (codeNode.config ?? {}) as Record<string, unknown>;
+  const toolName = sanitizeToolName(
+    String(config.toolName ?? 'codemode'),
+    'codemode',
+  );
+  const timeoutMs = Number(config.timeoutMs ?? config.timeout ?? 60_000);
+
+  try {
+    const created = createCodeModeOuterTool({
+      env: ctx.env,
+      innerTools: inner,
+      toolName,
+      description: String(config.toolDescription ?? config.description ?? '').trim() || undefined,
+      timeoutMs,
+      retrieveNames,
+      validateNames,
+    });
+    const out: ToolSet = { ...tools };
+    for (const name of removeNames) delete out[name];
+    out[created.name] = created.tool;
+    return out;
+  } catch (e) {
+    console.warn('[agent-runtime] Code Mode collapse failed:', e);
+    return tools;
+  }
+}
+
+export function codeModeToolName(tools: ToolSet): string | undefined {
+  for (const name of Object.keys(tools)) {
+    if (/^codemode$/i.test(name) || /code_mode/i.test(name)) return name;
+  }
+  return undefined;
+}
+
 /** Build AI SDK tools from linked tool_node modules (registry-driven). */
 export function buildLinkedAgentTools(
   ctx: AgentToolContext,
   definition: WorkflowDefinition,
   agentId: string,
+  options?: { collapseCodeMode?: boolean },
 ): ToolSet {
   const tools: ToolSet = {};
   const linked = resolveAgentResources(definition, agentId);
@@ -133,6 +222,7 @@ export function buildLinkedAgentTools(
 
   for (const t of linked.tools) {
     const kind = String(t.kind ?? '');
+    if (kind === 'code') continue;
     const mod = getToolModule(kind);
     if (!mod?.createAgentTool) continue;
 
@@ -163,7 +253,8 @@ export function buildLinkedAgentTools(
     if (created) tools[created.name] = created.tool;
   }
 
-  return tools;
+  if (options?.collapseCodeMode === false) return tools;
+  return collapseToCodeModeTool(tools, linked.tools, ctx);
 }
 
 /** @deprecated Prefer buildLinkedAgentTools — same implementation. */

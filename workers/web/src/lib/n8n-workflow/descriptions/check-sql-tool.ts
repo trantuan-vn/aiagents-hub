@@ -1,19 +1,56 @@
 import { resourceNode } from "./common";
+import {
+  GET_DB_INFO_USER_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+} from "@aiagents-hub/workflow-nodes";
 
-/** Check SQL — run a SELECT on Oracle and return errors for the agent to fix. */
+/** Check SQL — validate SELECT via EXPLAIN PLAN (no row fetch). */
 export const CHECK_SQL_TOOL_N8N_DESCRIPTION = resourceNode({
   displayName: "Check SQL",
   name: "tool_node_check_sql",
   icon: "fa:check",
   group: ["transform"],
-  description: "Run a SELECT on Oracle and return parser/execution errors if wrong.",
+  description: "Validate a SELECT on Oracle via EXPLAIN PLAN and return errors for the agent to fix.",
   properties: [
+    {
+      displayName: "User field",
+      name: "userField",
+      type: "string",
+      default: GET_DB_INFO_USER_FIELD,
+      placeholder: GET_DB_INFO_USER_FIELD,
+      description: "Drop INPUT fields here. Example: {{ $json.u || $json.fields.u || $json.user }}",
+    },
+    {
+      displayName: "Password field",
+      name: "passwordField",
+      type: "string",
+      default: GET_DB_INFO_PASSWORD_FIELD,
+      placeholder: GET_DB_INFO_PASSWORD_FIELD,
+      description: "Drop INPUT fields here. Example: {{ $json.p || $json.password }}",
+    },
+    {
+      displayName: "Connect string field",
+      name: "connectStringField",
+      type: "string",
+      default: GET_DB_INFO_CONNECT_STRING_FIELD,
+      placeholder: GET_DB_INFO_CONNECT_STRING_FIELD,
+      description: "Drop INPUT fields here. Example: {{ $json.c || $json.connectString }}",
+    },
+    {
+      displayName: "Schema name field",
+      name: "schemaNameField",
+      type: "string",
+      default: "",
+      placeholder: "{{ $json.schemaName || $json.fields.schemaName }}",
+      description: "Oracle schema/owner for CURRENT_SCHEMA before validate. Example: {{ $json.schemaName }}",
+    },
     {
       displayName: "Max sample rows",
       name: "maxRows",
       type: "number",
       default: 5,
-      description: "Max rows returned as a sample when the SELECT succeeds (capped server-side).",
+      description: "Reserved for future execute mode; validate-only does not fetch rows.",
     },
     {
       displayName: "Tool name",
@@ -27,7 +64,7 @@ export const CHECK_SQL_TOOL_N8N_DESCRIPTION = resourceNode({
       type: "string",
       typeOptions: { rows: 3 },
       default:
-        "Run a SELECT on Oracle and return parser/execution errors if wrong. Call after get_rag, before treating SQL as the final answer.",
+        "Validate a SELECT on Oracle via EXPLAIN PLAN (no row fetch). On ok: false, repair SQL from the error.",
     },
     {
       displayName: "Label",

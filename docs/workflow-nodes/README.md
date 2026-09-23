@@ -27,6 +27,7 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Draft** — retrieve schema + SQL example |
 | Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | **Draft** — chỉ liệt kê bảng |
 | Check SQL | [`check-sql.md`](./check-sql.md) | `nodes/tool/check-sql/` | **Draft** — probe SELECT Oracle |
+| Code Mode | [`code.md`](./code.md) | `nodes/tool/code/` | **Done** — createCodeTool + DynamicWorkerExecutor |
 | Human review | — | `nodes/human-review/` | Family + channel factory (gmail execute) |
 | Action in app | — | `nodes/action-in-app/` | Integration actions |
 | Data transform | — | `nodes/data-transformation/` | Family + `transformKind` factory |

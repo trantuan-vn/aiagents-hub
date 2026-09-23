@@ -57,6 +57,7 @@ declare namespace Cloudflare {
 		ERROR_QUEUE: Queue;
 		WS_BROADCAST_QUEUE: Queue;
 		AI: Ai;
+		LOADER: WorkerLoader;
 		IMAGES: ImagesBinding;
         CF_AI_API_TOKEN: SecretsStoreSecret;
 		CLOUDFLARE_USAGE_API_TOKEN: SecretsStoreSecret;

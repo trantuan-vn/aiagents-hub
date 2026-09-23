@@ -14,7 +14,7 @@ const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule", 
 const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>(["filter"]);
-const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info", "check-sql"]);
+const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info", "check-sql", "code"]);
 const BACKEND_MEMORY_KINDS = new Set(["simple", "vectorize"]);
 const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
 

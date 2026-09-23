@@ -1,6 +1,7 @@
 export type { DbColumnInfo, DbForeignKey, OracleConnectConfig, OracleSqlHistoryEntry } from './types.js';
 export {
   executeOracleQueryDirect,
+  validateOracleQueryDirect,
   fetchOracleSqlHistoriesDirect,
   introspectOracleTableDirect,
   introspectOracleTablesDirect,

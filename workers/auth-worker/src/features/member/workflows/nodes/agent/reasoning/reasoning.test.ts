@@ -11,6 +11,7 @@ import {
   COMPLETE_QUALITY_SCORE,
   draftsEquivalent,
   looksLikeSqlTask,
+  resolveEvaluationMode,
   scoreDraft,
   shouldStopImproving,
 } from './quality.js';
@@ -179,7 +180,7 @@ describe('reasoning citations and reflect', () => {
     expect(block).toContain('"id": "1"');
   });
 
-  it('fails reflection when a schema task has no SQL', () => {
+  it('fails reflection when SQL validate mode has no SQL', () => {
     const verdict = reflectHeuristics({
       text: 'Use the orders table [1].',
       citations: [{ id: 1, source: 'memory', snippet: 'CREATE TABLE orders (id text)' }],
@@ -188,9 +189,25 @@ describe('reasoning citations and reflect', () => {
       requireCitations: true,
       userText: 'write a select query',
       snippets: ['CREATE TABLE orders (id text)'],
+      mode: 'sql',
     });
     expect(verdict.pass).toBe(false);
     expect(verdict.issues).toContain('missing_sql');
+  });
+
+  it('does not require SQL for generic Q&A even with schema snippets', () => {
+    const verdict = reflectHeuristics({
+      text: 'Orders have id and total columns [1].',
+      citations: [{ id: 1, source: 'memory', snippet: 'CREATE TABLE orders (id text)' }],
+      observations: [],
+      frame: { goal: 'explain schema', knownFacts: [], missingSlots: [], confidence: 0.8, canUseTools: false },
+      requireCitations: true,
+      userText: 'what columns does orders have?',
+      snippets: ['CREATE TABLE orders (id text, total number)'],
+      mode: 'generic',
+    });
+    expect(verdict.pass).toBe(true);
+    expect(verdict.issues).not.toContain('missing_sql');
   });
 });
 
@@ -202,12 +219,18 @@ describe('session memory keys', () => {
 });
 
 describe('reasoning quality', () => {
-  it('detects SQL tasks from schema snippets without hardcoded table names', () => {
+  it('resolves evaluation mode from linked validate tools only', () => {
+    expect(resolveEvaluationMode(['check_sql'])).toBe('sql');
+    expect(resolveEvaluationMode(['schema_lint'])).toBe('validated');
+    expect(resolveEvaluationMode([])).toBe('generic');
+  });
+
+  it('detects SQL-looking snippets without forcing evaluation mode', () => {
     expect(looksLikeSqlTask('liet ke', ['## schema\nCREATE TABLE t (id int)'])).toBe(true);
     expect(looksLikeSqlTask('hello', ['plain prose'])).toBe(false);
   });
 
-  it('scores SQL drafts higher than citation-only stubs', () => {
+  it('scores SQL drafts higher only in sql evaluation mode', () => {
     const stub = scoreDraft({
       text: 'See the table [1].',
       issues: ['missing_sql'],
@@ -215,6 +238,7 @@ describe('reasoning quality', () => {
       observations: [],
       snippets: ['CREATE TABLE orders (id text)'],
       userText: 'write sql',
+      mode: 'sql',
     });
     const sql = scoreDraft({
       text: '```sql\nSELECT id FROM orders WHERE id IS NOT NULL\n``` [1]',
@@ -223,12 +247,24 @@ describe('reasoning quality', () => {
       observations: [],
       snippets: ['CREATE TABLE orders (id text)'],
       userText: 'write sql',
+      mode: 'sql',
     });
     expect(sql).toBeGreaterThan(stub);
     expect(sql).toBeGreaterThanOrEqual(COMPLETE_QUALITY_SCORE);
+
+    const genericAnswer = scoreDraft({
+      text: 'Orders use id and total [1].',
+      issues: [],
+      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      observations: [],
+      snippets: ['CREATE TABLE orders (id text)'],
+      userText: 'what columns?',
+      mode: 'generic',
+    });
+    expect(genericAnswer).toBeGreaterThan(40);
   });
 
-  it('stops after a non-improving draft once quality is already complete, not on the first complete pass', () => {
+  it('stops after a non-improving draft once pass is stable or quality is complete', () => {
     expect(
       shouldStopImproving({
         pass: true,
@@ -248,10 +284,20 @@ describe('reasoning quality', () => {
         patience: 1,
         isLastAttempt: false,
       }),
+    ).toBe(true);
+    expect(
+      shouldStopImproving({
+        pass: false,
+        score: 40,
+        bestScore: 40,
+        stagnant: 1,
+        patience: 1,
+        isLastAttempt: false,
+      }),
     ).toBe(false);
     expect(
       shouldStopImproving({
-        pass: true,
+        pass: false,
         score: COMPLETE_QUALITY_SCORE,
         bestScore: COMPLETE_QUALITY_SCORE,
         stagnant: 1,

@@ -38,4 +38,4 @@ export function parsePlan(raw: Record<string, unknown> | null): AgentPlan {
 
 export const PLAN_PROMPT = `Create a short JSON plan. Reply with JSON only:
 {"steps":[{"id":"s1","action":"...","tool":"optional_tool_name","successCriterion":"...","risk":"low"}]}
-Use 1-5 steps. Set risk to "high" only for write/delete/persist actions. Prefer retrieve tools before generating facts or SQL.`;
+Use 1-5 steps. Set risk to "high" only for write/delete/persist actions. Prefer retrieve tools before inventing facts; call validate tools before claiming a draft is final.`;

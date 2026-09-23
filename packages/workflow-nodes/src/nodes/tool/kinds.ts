@@ -22,4 +22,5 @@ export const TOOL_OVERRIDE_KINDS = new Set<ToolKind>([
   "get-rag",
   "get-db-info",
   "check-sql",
+  "code",
 ]);
