@@ -4,7 +4,7 @@
 > **Phiên bản:** 1.2  
 > **Ngày:** 2026-09-22  
 > **Phạm vi:** Ghi nhận mỗi lần chạy workflow (`workflow_executions` trên UserDO): snapshot resume, step I/O cho Logs UI, output cuối, progress WS  
-> **Bổ sung, không thay thế:** kiến trúc engine → [`workflow-architecture.md`](./workflow-architecture.md); luồng vận hành → [`workflow-how-it-works.md`](./workflow-how-it-works.md)  
+> **Bổ sung, không thay thế:** kiến trúc engine → [`workflow-architecture.md`](./workflow-architecture.md); luồng vận hành → [`workflow-how-it-works.md`](./workflow-how-it-works.md); an toàn quy mô triệu user → [`scale-safety-million-users-spec.md`](./scale-safety-million-users-spec.md)  
 > **Không thay thế:** Monitor Logs (`service_usages`), Admin Cloudflare Logs ([`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md)), Workers structured logger
 
 **Phase 0 (code):** UTF-8 gate, clip deterministic, ladder + fail-closed; `serializeOutputSummary`; resume thống nhất + `persistOrFailRun`; flags `ioClipped` / `legacyStub` / `persistDegraded`.

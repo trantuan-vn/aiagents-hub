@@ -4,7 +4,7 @@
 > **Phiên bản:** 1.0  
 > **Ngày:** 2026-09-19  
 > **Phạm vi:** Màn admin nội bộ xem inventory + usage hạ tầng Cloudflare của Hub; dự báo khi nào vượt included allotment theo **gói Cloudflare đang gắn trên account**; nếu đã vượt thì overage từng metric; khuyến nghị tối ưu dựa trên usage thật  
-> **Bổ sung, không thay thế:** economics khách hàng → [`business-model-one-credit-spec.md`](./business-model-one-credit-spec.md); van hệ số Credit → admin Contribution; per-user P&L → admin User Economics; nhật ký lỗi Worker → [`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md); sức khoẻ luồng DO→D1→R2 → [`admin-data-pipeline-health-spec.md`](./admin-data-pipeline-health-spec.md)  
+> **Bổ sung, không thay thế:** economics khách hàng → [`business-model-one-credit-spec.md`](./business-model-one-credit-spec.md); van hệ số Credit → admin Contribution; per-user P&L → admin User Economics; nhật ký lỗi Worker → [`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md); sức khoẻ luồng DO→D1→R2 → [`admin-data-pipeline-health-spec.md`](./admin-data-pipeline-health-spec.md); an toàn quy mô triệu user → [`scale-safety-million-users-spec.md`](./scale-safety-million-users-spec.md)  
 > **Không thay thế:** catalog gói khách hàng Hub → [`subscription-packages-spec.md`](./subscription-packages-spec.md)
 
 Nguyên tắc giữ từ spec Credit:

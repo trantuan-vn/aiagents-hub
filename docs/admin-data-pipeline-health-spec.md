@@ -4,7 +4,7 @@
 > **Phiên bản:** 1.1  
 > **Ngày:** 2026-09-23  
 > **Phạm vi:** Màn admin nội bộ theo dõi **sức khoẻ vận hành** Durable Objects (UserDO / UserShardDO / BroadcastServiceDO), D1, R2 lakehouse, và **lỗi / tắc nghẽn** trên luồng đồng bộ `UserDO → Queue → D1 → d1tor2 → R2`  
-> **Bổ sung, không thay thế:** FinOps hạ tầng → [`admin-cloudflare-usage-spec.md`](./admin-cloudflare-usage-spec.md); inbox lỗi Worker → [`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md); system config queue/d1tor2 → `/dashboard/system-config`  
+> **Bổ sung, không thay thế:** FinOps hạ tầng → [`admin-cloudflare-usage-spec.md`](./admin-cloudflare-usage-spec.md); inbox lỗi Worker → [`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md); an toàn quy mô triệu user → [`scale-safety-million-users-spec.md`](./scale-safety-million-users-spec.md); system config queue/d1tor2 → `/dashboard/system-config`  
 > **Không thay thế:** Monitor Logs (`service_usages`); Cloudflare Dashboard; `wrangler tail`
 
 Nguyên tắc giữ từ spec Credit / Cloudflare:
