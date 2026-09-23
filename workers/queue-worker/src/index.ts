@@ -71,6 +71,42 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 
 const KV_KEY = 'aiagents-hub-system-config';
 
+/** Best-effort hot user index for admin pipeline-health (shared D1). */
+async function upsertHotUser(
+  db: D1Database,
+  userId: string,
+  reason: string,
+  lastTable?: string,
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `CREATE TABLE IF NOT EXISTS pipeline_hot_users (
+          user_id TEXT PRIMARY KEY,
+          reason TEXT NOT NULL,
+          pending_approx INTEGER,
+          last_signal_at INTEGER NOT NULL,
+          last_table TEXT
+        )`,
+      )
+      .run();
+    const now = Date.now();
+    await db
+      .prepare(
+        `INSERT INTO pipeline_hot_users (user_id, reason, pending_approx, last_signal_at, last_table)
+         VALUES (?, ?, NULL, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET
+           reason = excluded.reason,
+           last_signal_at = excluded.last_signal_at,
+           last_table = COALESCE(excluded.last_table, pipeline_hot_users.last_table)`,
+      )
+      .bind(userId, reason, now, lastTable ?? null)
+      .run();
+  } catch {
+    /* never break queue processing */
+  }
+}
+
 /** Đọc cấu hình queue_worker từ KV. Có hiệu lực ngay khi admin thiết lập. */
 async function getQueueWorkerConfig(env: Env): Promise<{
   BATCH_SIZE: number;
@@ -202,6 +238,7 @@ const processChunk = async (
     ackAllMessages(chunk);
   } catch (error) {
     log.error('queue.chunk_failed', { userId, table, recordCount: chunk.length, error });
+    await upsertHotUser(env.D1DB, userId, 'chunk_fail', table);
     retryAllMessages(chunk);
   }
 };
@@ -296,6 +333,7 @@ const resolvePulledRecords = async (
         queueId: parsedItem.queueId,
         error,
       });
+      await upsertHotUser(env.D1DB, parsedItem.userId, 'pull_fail', parsedItem.table);
       return { items: [], retry: true };
     }
   }
@@ -444,6 +482,7 @@ const processErrorQueue = async (batch: MessageBatch, env: Env): Promise<void> =
           table: parsedItem.table,
           queueId: parsedItem.queueId,
         });
+        await upsertHotUser(env.D1DB, parsedItem.userId, 'dlq', parsedItem.table);
       }
       message.ack();
     } catch (error) {

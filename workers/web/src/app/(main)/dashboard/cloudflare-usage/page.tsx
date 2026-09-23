@@ -165,6 +165,9 @@ export default function CloudflareUsagePage() {
           <Link href="/dashboard/cloudflare-logs" className="text-primary text-sm underline-offset-4 hover:underline">
             {t("link_logs")}
           </Link>
+          <Link href="/dashboard/pipeline-health" className="text-primary ml-3 text-sm underline-offset-4 hover:underline">
+            Data pipeline health
+          </Link>
         </>
       ) : null}
     </div>

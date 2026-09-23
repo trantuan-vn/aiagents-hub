@@ -6,6 +6,7 @@
  */
 
 import { PipelineManager } from './pipelines/pipeline-manager';
+import { recordPipelineCronRun } from './pipelines/record-cron-run';
 import { createLogger } from './shared/logger';
 
 const log = createLogger('d1tor2-cron');
@@ -37,8 +38,16 @@ export default {
 		// Manual trigger endpoint (for testing)
 		if (pathname === '/trigger' && req.method === 'POST') {
 			try {
+				const startedAt = Date.now();
 				const pipelineManager = await getPipelineManager(env.D1DB, env);
 				const stats = await pipelineManager.runAllPipelines();
+				try {
+					await recordPipelineCronRun(env.D1DB, stats, startedAt, Date.now());
+				} catch (recordErr) {
+					log.error('cron.record_run_failed', {
+						error: recordErr instanceof Error ? recordErr.message : String(recordErr),
+					});
+				}
 				return new Response(JSON.stringify(stats, null, 2), {
 					headers: { 'Content-Type': 'application/json' },
 				});
@@ -70,6 +79,14 @@ export default {
 					pipeline: result.pipelineName,
 					table: result.tableName,
 					error: result.error,
+				});
+			}
+
+			try {
+				await recordPipelineCronRun(env.D1DB, stats, startedAt, Date.now());
+			} catch (recordErr) {
+				log.error('cron.record_run_failed', {
+					error: recordErr instanceof Error ? recordErr.message : String(recordErr),
 				});
 			}
 

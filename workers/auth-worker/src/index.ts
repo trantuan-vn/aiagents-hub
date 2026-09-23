@@ -50,6 +50,8 @@ import { createAdminCloudflareUsageRoutes } from './features/admin/cloudflare-us
 import { createAdminCloudflareLogsRoutes } from './features/admin/cloudflare-logs/presentation';
 import { dailyLogsSync } from './features/admin/cloudflare-logs/infrastructure';
 import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure';
+import { createAdminPipelineHealthRoutes } from './features/admin/pipeline-health/presentation';
+import { dailyPipelineHealthSync } from './features/admin/pipeline-health/infrastructure';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
 import {
   createWorkflowNodeCatalogAdminRoutes,
@@ -128,6 +130,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/billing', createAdminBillingRoutes());
   routes.route('/dashboard/admin/cloudflare', createAdminCloudflareUsageRoutes());
   routes.route('/dashboard/admin/cloudflare-logs', createAdminCloudflareLogsRoutes());
+  routes.route('/dashboard/admin/pipeline-health', createAdminPipelineHealthRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());
@@ -238,6 +241,13 @@ export default {
       await dailyLogsSync(env);
     } catch (err) {
       log.warn('cloudflare.logs_sync_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    try {
+      await dailyPipelineHealthSync(env);
+    } catch (err) {
+      log.warn('pipeline.health_sync_failed', {
         error: err instanceof Error ? err.message : String(err),
       });
     }

@@ -33,6 +33,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     Contribution: t("contribution"),
     "Cloudflare usage": t("cloudflare_usage"),
     "Worker errors": t("cloudflare_logs"),
+    "Data pipeline health": t("pipeline_health"),
     "User Economics": t("user_economics"),
     Commissions: t("commissions"),
     "Ask AI": t("ask_ai"),

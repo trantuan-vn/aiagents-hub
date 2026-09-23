@@ -5,7 +5,7 @@
 > **Ngày:** 2026-09-21  
 > **Phạm vi:** Màn admin nội bộ **đọc** log/trace/exception từ Cloudflare Observability (SSOT 7 ngày), **chỉ persist** chỉ mục lỗi + trạng thái sửa + khuyến nghị ổn định — không phải kho log thứ hai, không phải log usage khách hàng  
 > **v1.1:** cấm sao chép raw Workers Logs / Logpush / Tail-warehouse; Hub chỉ lưu lỗi đã rút gọn để khuyến nghị admin  
-> **Bổ sung, không thay thế:** FinOps hạ tầng → [`admin-cloudflare-usage-spec.md`](./admin-cloudflare-usage-spec.md); economics khách hàng → [`business-model-one-credit-spec.md`](./business-model-one-credit-spec.md)  
+> **Bổ sung, không thay thế:** FinOps hạ tầng → [`admin-cloudflare-usage-spec.md`](./admin-cloudflare-usage-spec.md); sức khoẻ luồng DO→D1→R2 → [`admin-data-pipeline-health-spec.md`](./admin-data-pipeline-health-spec.md); economics khách hàng → [`business-model-one-credit-spec.md`](./business-model-one-credit-spec.md)  
 > **Không thay thế:** Monitor Logs (`service_usages`) → `/dashboard/monitor/logs`; Cloudflare Dashboard Observability; `wrangler tail`
 
 Nguyên tắc giữ từ spec Credit / Cloudflare usage:

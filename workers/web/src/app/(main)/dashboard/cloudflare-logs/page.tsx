@@ -145,6 +145,9 @@ export default function CloudflareLogsPage() {
           <Link href="/dashboard/cloudflare-usage" className="text-primary text-sm underline-offset-4 hover:underline">
             {t("link_usage")}
           </Link>
+          <Link href="/dashboard/pipeline-health" className="text-primary ml-3 text-sm underline-offset-4 hover:underline">
+            Data pipeline health
+          </Link>
         </div>
         <div className="flex flex-wrap gap-2">
           {(["1h", "6h", "24h", "7d"] as const).map((id) => (

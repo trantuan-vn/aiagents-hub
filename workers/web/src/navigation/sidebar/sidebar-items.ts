@@ -10,6 +10,7 @@ import {
   Code,
   Coins,
   CreditCard,
+  Database,
   FileText,
   GitBranch,
   Key,
@@ -113,6 +114,7 @@ export const sidebarItems: NavGroup[] = [
         subItems: [
           { title: "Cloudflare usage", url: "/dashboard/cloudflare-usage", icon: Cloud, adminOnly: true },
           { title: "Worker errors", url: "/dashboard/cloudflare-logs", icon: Bug, adminOnly: true },
+          { title: "Data pipeline health", url: "/dashboard/pipeline-health", icon: Database, adminOnly: true },
           { title: "WebSocket Notify", url: "/dashboard/notify", icon: Send, adminOnly: true },
         ],
       },
