@@ -11,6 +11,11 @@ describe('isScannerProbePath', () => {
     expect(isScannerProbePath('/.env')).toBe(true);
     expect(isScannerProbePath('/.git/config')).toBe(true);
     expect(isScannerProbePath('//phpinfo.php')).toBe(true);
+    // Joomla SP Page Builder exploit scan (apex site /index.php)
+    expect(isScannerProbePath('/index.php')).toBe(true);
+    expect(
+      isScannerProbePath('/index.php?option=com_sppagebuilder&task=asset.uploadCustomIcon'),
+    ).toBe(true);
   });
 
   it('never matches live Hub routes', () => {

@@ -1,3 +1,7 @@
+import { notFound } from "next/navigation";
+
+import { isScannerProbePath } from "@/lib/scanner-paths";
+
 import App from "../app";
 
 import "@/app/globals.css";
@@ -28,6 +32,10 @@ export default async function CatchAll({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { slug } = await params;
+  const path = pathFromSlug(slug);
+  if (isScannerProbePath(path)) {
+    notFound();
+  }
   const query = await searchParams;
-  return <App ssrLocation={`${pathFromSlug(slug)}${queryStringFromSearchParams(query)}`} />;
+  return <App ssrLocation={`${path}${queryStringFromSearchParams(query)}`} />;
 }
