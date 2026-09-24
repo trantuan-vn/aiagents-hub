@@ -1,9 +1,9 @@
 # Spec: An toàn hệ thống ở quy mô triệu user (Scale Safety)
 
-> **Trạng thái:** Draft v1.1 — Phase A + Phase B implemented  
-> **Phiên bản:** 1.2  
+> **Trạng thái:** Draft v1.3 — Phase A + Phase B implemented; **Phase B.1 planned** (chèn giữa B và C)  
+> **Phiên bản:** 1.3  
 > **Ngày:** 2026-09-24  
-> **Phạm vi:** Bảo vệ **ổn định, công bằng, chi phí kiểm soát được** khi nền tảng tăng tới hàng triệu user / hàng chục–trăm triệu sự kiện/ngày trên data-plane `UserDO → Queue → D1 → R2` và control-plane workflow (UserDO-local)  
+> **Phạm vi:** Bảo vệ **ổn định, công bằng, chi phí kiểm soát được** khi nền tảng tăng tới hàng triệu user / hàng chục–trăm triệu sự kiện/ngày trên data-plane `UserDO → Queue → D1 → R2` và control-plane workflow (UserDO-local state)  
 > **Bổ sung, không thay thế:**  
 > - Sức khoẻ luồng → [`admin-data-pipeline-health-spec.md`](./admin-data-pipeline-health-spec.md)  
 > - FinOps Cloudflare → [`admin-cloudflare-usage-spec.md`](./admin-cloudflare-usage-spec.md)  
@@ -52,14 +52,44 @@ queue_ops/ngày ≈ messages × (1 + retries) × ~3 (CF queue accounting)
 
 | Tier | Bảng / store | Scale driver | Store hiện tại | Rủi ro triệu user |
 |------|--------------|--------------|----------------|-------------------|
-| **T1** | `service_usages` | mỗi API/AI call | DO→Q→D1→**R2** | Lag queue, D1 rows_read/storage, cron archive, credit correctness |
-| **T1** | `workflow_executions` | mỗi workflow run | **DO-local** | DO SQLite size, alarm CPU, resume fail nếu clip sai |
+| **T1** | `service_usages` | mỗi API/AI call trong (hoặc ngoài) run | DO→Q→D1→**R2** | Lag queue, D1 rows_read/storage, cron archive, credit correctness |
+| **T1** | `workflow_executions` (**state** / resume) | mỗi workflow run | **DO-local** (đúng) | DO SQLite size, alarm CPU, resume fail nếu clip sai |
+| **T1** | `workflow_executions` (**ledger** / business) | mỗi workflow run (1 dòng tóm tắt) | **thiếu** — chưa DO→Q→D1→R2 | User/admin không đọc run history từ D1; Monitor đang lệch sang usages |
 | **T1** | `pending_messages` | notify / fan-out | DO→Q→D1 | Burst WS + DO write |
 | **T2** | `sessions`, `connections` | login / device / WS | DO→Q→D1 | Tích nếu không expire |
-| **T2** | `commissions`, `workflow_royalties` | gần theo usages | DO→Q→D1 (**chưa R2**) | D1 phình theo usages |
+| **T2** | `commissions`, `workflow_royalties` | gần theo usages | DO→Q→D1→**R2** (Phase B) | D1 phình theo usages |
 | **T2** | `orders`, `payments`, `refunds` | mua credit | DO→Q→D1→R2 | Ít hơn usages nhưng “nặng” tài chính |
 | **T3** | catalog / auth (`users`, `agent_workflows`, `user_*`, …) | O(users) | DO→Q→D1 | Thấp volume; cao PII |
 | **Out** | `workflow_credentials`, memory tables | secrets / agent | DO-local | Không sync; không được leak |
+
+#### Phân tích: `workflow_executions` vs `service_usages` (v1.3)
+
+**Quan hệ cardinality ở triệu user**
+
+```
+1 user × N workflow runs/ngày
+  → 1 dòng workflow_executions / run          (O(runs))
+  → K dòng service_usages / run               (O(runs × steps/API calls))
+```
+
+Envelope §0.1: `workflow runs / ngày` 1M–20M; `service_usages writes / ngày` 10M–100M → **usages ≫ executions**. Hai bảng không thay thế nhau:
+
+| Lớp | Vai trò kinh doanh | Store đúng |
+|-----|-------------------|------------|
+| **Control-plane** | Resume / HITL / step I/O hot (`state`, `pendingNodeId`, …) | **DO-local only** — giữ nguyên non-goal “không sync snapshot” ([`workflow-execution-logging-spec.md`](./workflow-execution-logging-spec.md)) |
+| **Business ledger** | User thấy “chạy bao nhiêu workflow, giá bao nhiêu”; admin fan-out usages/run | **DO→Q→D1→R2** (slim row, **không** `state`) — **Phase B.1** |
+| **Metering** | Từng API/AI call, credit/COGS, royalty atom | **DO→Q→D1→R2** (`service_usages`) — đã có |
+
+**DO-local đã ổn chưa?**
+
+| Khía cạnh | Đánh giá |
+|-----------|----------|
+| Persist + resume + prune theo gói + fairness run (Phase A/B) | **Ổn** cho control-plane |
+| Soft link usages ↔ run (`workflowId` only, **thiếu `executionKey`**) | **Chưa đủ** — không drill-down “run này sinh bao nhiêu usages” |
+| Monitor **Nhật ký** / **Phân tích** đọc D1 `service_usages` | **Sai nguyên tắc kinh doanh** — user cần ledger **run** (số lần chạy + tổng giá), không raw API call log |
+| Sync full `workflow_executions` (kèm `state`) ra Queue/D1 | **Cấm** — phình D1, PII/I/O, phá tách control vs observability |
+
+**Kết luận:** Spec cũ đúng nửa phần (“giữ executions DO-local”) nhưng **thiếu** nửa business (ledger sync + UI + join key). Không “đưa cả bảng state vào pipeline”; đưa **projection ledger** + gắn `executionKey` lên usages.
 
 #### Cleanup: `order_items` / `order_discounts` (không còn dùng)
 
@@ -95,16 +125,17 @@ Rà soát code (2026-09-24): **không còn write/read path ứng dụng.** **Pha
 
 1. Định nghĩa **SLO / error budget** data-plane và control-plane ở envelope triệu user.
 2. Định nghĩa **trần cứng** (per-user, per-table, global) + **load shed** có thứ tự ưu tiên.
-3. Bảo vệ đường **billing-critical** (`service_usages`, orders/payments) trước social/catalog.
-4. Bảo vệ **DO storage** (đặc biệt `workflow_executions`) độc lập với D1/R2.
+3. Bảo vệ đường **billing-critical** (`service_usages`, orders/payments, **execution ledger**) trước social/catalog.
+4. Bảo vệ **DO storage** (đặc biệt `workflow_executions.state`) độc lập với D1/R2.
 5. Kill-switches admin an toàn (pause ingest table, pause flush user, hạ retention) có audit.
 6. Checklist go-live từng mốc (10k / 100k / 1M MAU) gắn màn usage + pipeline-health.
 7. Phase code rõ; không “optimize mọi thứ” trong một PR.
+8. **Product surface đúng lớp:** member Monitor = ledger run; admin = run → usages fan-out; raw API metering không phải nhật ký user mặc định.
 
 ### 1.2 Non-goals
 
 - Không redesign multi-region / multi-D1 shard trong v1 (ghi roadmap §10).
-- Không chuyển `workflow_executions` sang D1 (vẫn DO-local; offload blob theo execution-logging Phase 2).
+- Không sync **`state` / step I/O snapshot** của `workflow_executions` sang Queue/D1/lakehouse (vẫn DO-local; offload blob theo execution-logging Phase 2). **Có** sync **ledger slim** (Phase B.1).
 - Không tự nâng Workers plan / đổi wrangler từ UI.
 - Không FinOps pricing engine (đã có usage spec).
 - Không chatbot LLM để quyết định shed (quyết định rule-based).
@@ -214,6 +245,7 @@ Khi bất kỳ stage ở `incident` hoặc CF projected overage ≥ 80% kỳ:
 | Bảng | Ở 1M MAU | Quyết định safety |
 |------|----------|-------------------|
 | `service_usages`, `orders`, `payments`, `refunds` | Giữ E2E R2 | OK |
+| `workflow_executions` **ledger** (không `state`) | D1 + R2 (Phase B.1) | Bắt buộc trước khi Monitor/admin đọc run history ngoài DO |
 | `commissions`, `workflow_royalties` | D1 + **R2 archive (Phase B)** | OK — cùng retention `D1_RETENTION_DAYS` sau archive |
 | Social stars/comments | Thấp hơn | Shed P2; có thể D1 TTL ngắn hoặc không sync nếu chỉ DO đủ |
 | Catalog | O(users) | Giữ sync; không archive bắt buộc |
@@ -324,6 +356,74 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 
 **Ops sau deploy:** tạo Cloudflare Pipelines streams/sinks cho `commissions` / `workflow_royalties` nếu chưa có (`pnpm --filter @api-services/pipelines create-pipelines` hoặc d1tor2 auto-create path).
 
+### Phase B.1 — Execution ledger + Monitor/Admin đúng lớp (M) — **planned** *(chèn giữa B và C)*
+
+**Vấn đề đã xác nhận**
+
+1. Mỗi run → nhiều `service_usages`; Metering E2E đã có, **ledger run chưa sync** → D1/R2 không có “lịch sử chạy workflow” cross-device / admin.
+2. Monitor member **Nhật ký** (`/dashboard/monitor/logs`) và **Phân tích** (`/dashboard/monitor/analytics`) đọc `service_usages` → **lệch nghiệp vụ** (user chỉ cần số lần chạy workflow + giá/tổng credit).
+3. Thiếu `executionKey` trên `service_usages` → admin không đo fan-out usages/run.
+4. DO-local **state** vẫn đúng; không thay bằng “đổ cả bảng vào pipeline”.
+
+**Mô hình dữ liệu B.1**
+
+```
+UserDO.workflow_executions          ← HOT: state + ledger columns (như hiện tại)
+        │
+        ├─ (không sync) state / pendingNodeId / I/O hot
+        │
+        └─ sync slim → Queue → D1 → R2 lakehouse (v011.workflow_executions)
+             columns: executionKey, workflowId, workflowOwnerId, workflowName,
+                      status, totalCostVnd, totalCreditsCharged, totalCreditsRoyalty,
+                      totalRoyaltyUsd, stepCount, startedAt, finishedAt,
+                      + queue fields (queueId, queueStatus, …)
+             CẤM: state, input, output (blob), error dài nếu > budget (clip hoặc omit)
+
+UserDO.service_usages               ← đã sync
+        + executionKey (optional string)  ← B.1: set khi charge trong context run
+```
+
+Cách triển khai sync (chọn 1, ghi rõ khi code):
+
+| Option | Mô tả | Ưu | Nhược |
+|--------|-------|----|-------|
+| **A (khuyến nghị)** | Cùng bảng DO; `SYNC_TABLE_NAMES` + queue-worker **allowlist columns** (strip `state`/`input`/`output` trước enqueue) | Một SSOT; prune DO vẫn 1 bảng | Cần strip chắc chắn + test không lộ state |
+| **B** | Bảng phụ `workflow_execution_ledgers` mirror slim khi create/update terminal | An toàn schema sync | 2 write; drift risk |
+
+**Write path**
+
+1. `chargeServiceUsage` / workflow billing: truyền + persist `executionKey` vào mọi usage của run.
+2. Create/update execution: khi status terminal (`completed`/`failed`/`cancelled`) **hoặc** định kỳ khi `totalCreditsCharged` đổi — enqueue ledger slim (idempotent theo `executionKey` / `globalId`).
+3. Thêm vào: UserDO `SYNC_TABLE_NAMES` / `QUEUE_TABLE_NAMES`, queue-worker register, d1tor2 `PIPELINE_CONFIGS` + `PIPELINE_ARCHIVE_TABLES`, pipeline-health catalog, `scripts/check-sync-tables.mjs`, Cloudflare stream/sink/pipeline `workflow_executions_*` → bucket `aiagents-hub-lakehouse` namespace `v011`.
+4. Pending caps T1: ledger table vào cùng soft/hard gate như usages (volume thấp hơn usages nhưng vẫn T1 business).
+
+**UI — member (đổi nguồn dữ liệu)**
+
+| Màn | Path hiện tại | Đổi thành |
+|-----|---------------|-----------|
+| **Nhật ký** | D1 `service_usages` list (API call log) | D1 **execution ledger**: mỗi dòng = 1 run — workflow name/id, status, `startedAt`/`finishedAt`, `totalCreditsCharged` (hoặc CR hiển thị), `stepCount`; filter theo workflow / ngày / status. **Không** mặc định list raw usages. |
+| **Phân tích** | Aggregate COUNT/SUM `service_usages` | Aggregate trên **ledger**: runs/ngày, tổng credit theo ngày, phân bố status, top workflows theo spend. Optional secondary: “chi tiết metering” link admin-only hoặc collapse nâng cao — **không** là default. |
+
+Copy/i18n: đổi “Nhật ký Sử dụng Dịch vụ” / “Phân tích API” → ngôn ngữ **chạy workflow / chi phí run** (vi + en).
+
+**UI — admin (màn mới)**
+
+- Route đề xuất: `/dashboard/workflow-execution-usages` (hoặc tab dưới Contribution / User Economics).
+- Input: `executionKey` và/hoặc filter `userId` + `workflowId` + khoảng ngày.
+- Output: 1 execution ledger row + **COUNT / SUM** `service_usages` where `executionKey = ?` (số dòng, tổng `creditsCharged`, error rate, list usages phân trang).
+- Mục tiêu ops: phát hiện run “nổ” (K usages bất thường), audit gap ledger vs usages, hỗ trợ support.
+
+**Thứ tự implement B.1 (không gộp 1 PR khổng lồ)**
+
+1. Schema: `executionKey` trên `service_usages` (+ pipeline JSON schema); backfill **không** bắt buộc (null = pre-B.1).
+2. Charge path gắn `executionKey`; test.
+3. Ledger sync Option A/B + D1 + R2 pipeline create.
+4. Rewire Monitor Nhật ký + Phân tích + i18n.
+5. Admin drill-down screen + API.
+6. Cập nhật cross-link [`workflow-execution-logging-spec.md`](./workflow-execution-logging-spec.md) § non-goals (Monitor không còn = raw usages).
+
+**Acceptance (DoD) B.1** — xem §15.
+
 ### Phase C — Multi-tenant sẵn sàng 1M (L)
 
 - Queue partition / consumer concurrency review (Cloudflare limits).
@@ -361,6 +461,7 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 ### 11.3 Trước 1M MAU
 
 - [ ] Phase B xong
+- [ ] **Phase B.1 xong** (execution ledger E2E + Monitor đúng lớp + admin usages/run)
 - [ ] Execution R2 offload (logging Phase 2) hoặc history Max giữ thấp
 - [ ] Chaos drill §10 Phase C tối thiểu 1 lần
 - [ ] Budget Cloudflare projected ổn định 2 kỳ billing
@@ -376,6 +477,9 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 | `/dashboard/cloudflare-usage` | Envelope $ / included |
 | `/dashboard/cloudflare-logs` | Burst exception |
 | `/dashboard/system-config` | BATCH / retention / flush knobs |
+| `/dashboard/monitor/logs` | (B.1) nhật ký **workflow runs** từ ledger D1 |
+| `/dashboard/monitor/analytics` | (B.1) phân tích spend/runs từ ledger D1 |
+| `/dashboard/workflow-execution-usages` | (B.1) admin: usages fan-out / execution |
 | In-app burst alert (pipeline) | overall incident |
 | (Phase B) alert khi `pending_high` users > N | noisy neighbor |
 
@@ -393,7 +497,7 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 
 ---
 
-## 14. File sẽ đụng khi code (Phase A gợi ý)
+## 14. File sẽ đụng khi code
 
 | Area | File |
 |------|------|
@@ -402,8 +506,12 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 | Hot users | queue-worker + UserDO upsert (đã có pattern) |
 | Session expire | sessions infrastructure / UserDO |
 | Config knobs | `system-config/domain.ts` + KV |
-| CI catalog sync | script so sánh 3 list `SYNC_TABLE_NAMES` |
+| CI catalog sync | `scripts/check-sync-tables.mjs` |
 | Docs | spec này; link từ pipeline-health + usage |
+| **B.1** `executionKey` on usages | `billing/charge.ts`, `ServiceUsageSchema`, `packages/pipelines/schemas/ServiceUsageSchema.json` |
+| **B.1** ledger sync | UserDO SYNC lists, queue-worker, `d1tor2-cron` `PIPELINE_CONFIGS`, strip state nếu Option A |
+| **B.1** Monitor | `member/monitor/logs/*`, `member/monitor/analytics/*`, `workers/web/.../monitor/{logs,analytics}` |
+| **B.1** Admin fan-out | auth-worker admin feature mới + `workers/web/.../dashboard/workflow-execution-usages` |
 
 ---
 
@@ -424,6 +532,15 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 3. CI fail nếu SYNC lists lệch.
 4. Slow-flush hot user có test.
 
+### Phase B.1
+
+1. `service_usages.executionKey` được set trên mọi charge trong workflow run; schema + pipeline JSON cập nhật.
+2. Execution **ledger slim** có mặt trên DO→Queue→D1→R2 (`aiagents-hub-lakehouse` / `v011`); **không** có cột `state` trên D1/R2; CI sync-tables xanh.
+3. Monitor **Nhật ký** list runs (ledger) — không còn default list raw `service_usages`.
+4. Monitor **Phân tích** aggregate theo runs/credit ledger — không còn default COUNT API calls.
+5. Admin màn drill-down: nhập/ lọc `executionKey` → thấy COUNT (+ SUM credits) `service_usages` của run đó.
+6. Unit/integration: charge gắn key; strip state khỏi enqueue (nếu Option A); query admin fan-out.
+
 ### Phase C
 
 1. Chaos drill note trong runbook pipeline-health.
@@ -434,4 +551,4 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 
 ## 16. Tóm tắt một dòng
 
-**An toàn triệu user = trần per-user + shed có thứ tự + DO không phình + billing không mất + D1/R2 retention chỉ khi cron xanh + đo bằng pipeline-health/usage trước khi Cloudflare hard-stop.**
+**An toàn triệu user = trần per-user + shed có thứ tự + DO không phình (state local) + billing/meter + execution ledger không mất trên D1/R2 + Monitor đúng lớp run (không raw usages) + retention chỉ khi cron xanh + đo bằng pipeline-health/usage trước khi Cloudflare hard-stop.**

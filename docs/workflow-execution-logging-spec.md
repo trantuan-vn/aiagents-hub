@@ -5,7 +5,7 @@
 > **Ngày:** 2026-09-22  
 > **Phạm vi:** Ghi nhận mỗi lần chạy workflow (`workflow_executions` trên UserDO): snapshot resume, step I/O cho Logs UI, output cuối, progress WS  
 > **Bổ sung, không thay thế:** kiến trúc engine → [`workflow-architecture.md`](./workflow-architecture.md); luồng vận hành → [`workflow-how-it-works.md`](./workflow-how-it-works.md); an toàn quy mô triệu user → [`scale-safety-million-users-spec.md`](./scale-safety-million-users-spec.md)  
-> **Không thay thế:** Monitor Logs (`service_usages`), Admin Cloudflare Logs ([`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md)), Workers structured logger
+> **Không thay thế:** Monitor Logs member (Phase B.1 scale-safety sẽ **đổi nguồn** từ raw `service_usages` sang execution ledger — xem [`scale-safety-million-users-spec.md`](./scale-safety-million-users-spec.md) §10 B.1); Admin Cloudflare Logs ([`admin-cloudflare-logs-spec.md`](./admin-cloudflare-logs-spec.md)); Workers structured logger
 
 **Phase 0 (code):** UTF-8 gate, clip deterministic, ladder + fail-closed; `serializeOutputSummary`; resume thống nhất + `persistOrFailRun`; flags `ioClipped` / `legacyStub` / `persistDegraded`.
 
@@ -61,8 +61,9 @@ Persist qua `persistResult` → `capJson` / `serializePersistedState`
 ### 0.3 Non-goals (giữ nguyên)
 
 - Không biến `workflow_executions` thành kho stdout/stderr kiểu container.
-- Không sync execution snapshot sang D1 (vẫn DO-local).
-- Không thay Monitor Logs / Cloudflare Observability.
+- Không sync execution **snapshot/`state`** sang D1 (vẫn DO-local). Slim **ledger** (không state) → D1/R2 = scale-safety Phase B.1.
+- Không thay Admin Cloudflare Observability.
+- Monitor member Logs/Analytics: sau B.1 đọc ledger run, không còn đồng nghĩa raw `service_usages`.
 - Không log secret plaintext vào blob observability (xem §5.4).
 
 ---
