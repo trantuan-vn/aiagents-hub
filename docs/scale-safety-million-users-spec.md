@@ -61,7 +61,20 @@ queue_ops/ngày ≈ messages × (1 + retries) × ~3 (CF queue accounting)
 | **T3** | catalog / auth (`users`, `agent_workflows`, `user_*`, …) | O(users) | DO→Q→D1 | Thấp volume; cao PII |
 | **Out** | `workflow_credentials`, memory tables | secrets / agent | DO-local | Không sync; không được leak |
 
-**Không** coi `order_items` / `order_discounts` là path hot (legacy R2-only).
+#### Cleanup: `order_items` / `order_discounts` (không còn dùng)
+
+Rà soát code (2026-09-24): **không còn write/read path ứng dụng**.
+
+| Store | Trạng thái hiện tại | Việc cần làm |
+|-------|---------------------|--------------|
+| **UserDO** | Không có trong `QUEUE_TABLE_NAMES` / `SYNC_TABLE_NAMES`; không `this.table(...)` | Không tạo lại; nếu DO cũ còn SQLite table rác → drop khi migrate/cleanup DO (best-effort) |
+| **D1** (queue-worker) | Không `registerTable` — chỉ còn `orders` (+ discount trên header order) | Không tạo lại; `DROP TABLE IF EXISTS order_items`, `order_discounts` nếu còn trên DB legacy |
+| **R2** (d1tor2) | Vẫn còn trong `PIPELINE_CONFIGS` + `PIPELINE_ARCHIVE_TABLES` (pipeline-health) | **Xóa** khỏi `PIPELINE_CONFIGS`, catalog archive UI/API; lifecycle/delete prefix lakehouse `order_items` / `order_discounts` (namespace hiện tại) nếu đã từng archive |
+| **Domain / web** | Zod `OrderItemSchema` / `OrderItemDiscountSchema` + comment “legacy… D1→R2”; billing UI `OrderDetail.items` | Xóa schema/DTO legacy sau khi gỡ pipeline; order chỉ dùng bảng `orders` (`discountAmount`, `appliedVoucherCode` trên header) |
+
+**Lý do giữ tạm trước đây:** “legacy R2-only”. Thực tế không còn sync DO→D1 và không có consumer product — chỉ tốn cron/catalog noise. **Không** đưa vào T1/T2 hot path; ưu tiên gỡ trong Phase A (cleanup dead tables) trước khi scale archive.
+
+**Acceptance cleanup:** (1) không còn tên 2 bảng trong d1tor2 / pipeline-health archive list / admin actions; (2) D1 không còn table (hoặc DROP đã chạy); (3) create/list order chỉ đụng `orders` / `payments` / `refunds`.
 
 ### 0.3 Chế độ hỏng điển hình ở scale (phải có countermeasure)
 
@@ -299,6 +312,7 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 - UserDO self-report `pending_high` → `pipeline_hot_users`.
 - Alarm prune executions định kỳ + cleanup processed khi vượt N dù không pending.
 - Session/connection expire policy (lazy hoặc cron-lite).
+- **Cleanup dead tables:** gỡ `order_items` / `order_discounts` khỏi d1tor2 `PIPELINE_CONFIGS`, pipeline-health `PIPELINE_ARCHIVE_TABLES` + UI; DROP trên D1 nếu còn; xóa Zod/DTO legacy; lifecycle R2 prefix nếu đã archive (§0.2).
 - Checklist mốc 10k MAU (mục §11).
 - Cross-link spec này từ pipeline-health + usage.
 
