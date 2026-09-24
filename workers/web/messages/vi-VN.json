@@ -2288,16 +2288,16 @@
     }
   },
   "MonitorLogsPage": {
-    "title": "Nhật ký Sử dụng Dịch vụ",
-    "description": "Xem và quản lý nhật ký sử dụng API. Tìm kiếm, lọc và theo dõi từng lượt gọi API.",
+    "title": "Nhật ký chạy workflow",
+    "description": "Xem mỗi lần chạy workflow, trạng thái và tổng Credits đã trừ.",
     "fetch_error": "Không thể tải nhật ký",
     "error": "Lỗi",
     "refresh": "Làm mới",
     "retry": "Thử lại",
-    "empty": "Chưa có nhật ký",
-    "empty_hint": "Nhật ký sử dụng API sẽ hiển thị tại đây khi bạn thực hiện các lượt gọi API qua dịch vụ.",
+    "empty": "Chưa có lần chạy nào",
+    "empty_hint": "Lịch sử chạy sẽ hiện sau khi bạn chạy workflow.",
     "stats": {
-      "total_logs": "Nhật ký",
+      "total_logs": "Trên trang",
       "on_this_page": "trên trang này",
       "services": "Dịch vụ",
       "active_services": "dịch vụ đang hoạt động",
@@ -2305,21 +2305,25 @@
       "live": "Trực tiếp",
       "realtime": "Dữ liệu theo thời gian thực",
       "all_systems_ok": "Hệ thống hoạt động bình thường",
-      "error_rate": "Tỉ lệ lỗi",
-      "error_rate_desc": "{errors} lỗi trên {total} request",
+      "error_rate": "Tỷ lệ thất bại",
+      "error_rate_desc": "{errors} thất bại / {total} lần chạy",
       "error_rate_na": "Chưa có dữ liệu",
       "success_rate": "tỉ lệ thành công",
       "quality_excellent": "Xuất sắc",
       "quality_good": "Tốt",
-      "quality_attention": "Cần chú ý"
+      "quality_attention": "Cần chú ý",
+      "total_runs": "Tổng lần chạy",
+      "in_filter": "theo bộ lọc",
+      "credits": "Credits",
+      "credits_in_filter": "tổng theo bộ lọc"
     },
     "chart": {
-      "title": "Phân bố Request",
-      "description": "Thành công vs lỗi theo giờ (trang hiện tại)"
+      "title": "Phân bố lần chạy",
+      "description": "Hoàn thành vs thất bại theo giờ (trang hiện tại)"
     },
     "filters": {
-      "title": "Tìm kiếm & Lọc",
-      "description": "Tìm theo endpoint, lọc theo dịch vụ hoặc khoảng thời gian",
+      "title": "Lọc",
+      "description": "Lọc theo workflow, trạng thái hoặc khoảng ngày",
       "search_placeholder": "Tìm kiếm endpoint...",
       "service_placeholder": "Chọn dịch vụ",
       "all_services": "Tất cả dịch vụ",
@@ -2328,11 +2332,22 @@
       "date_90_days": "90 ngày",
       "date_custom": "Tùy chỉnh",
       "apply": "Áp dụng",
-      "clear": "Xóa bộ lọc"
+      "clear": "Xóa bộ lọc",
+      "workflow_id": "Workflow ID",
+      "workflow_id_placeholder": "VD: 42",
+      "status": "Trạng thái",
+      "status_all": "Tất cả",
+      "status_running": "running",
+      "status_completed": "completed",
+      "status_failed": "failed",
+      "status_pending_human": "pending_human",
+      "status_cancelled": "cancelled",
+      "date_from": "Từ ngày",
+      "date_to": "Đến ngày"
     },
     "table": {
-      "title": "Lịch sử Sử dụng",
-      "description": "Các lượt gọi API gần đây từ dịch vụ của bạn",
+      "title": "Danh sách lần chạy",
+      "description": "Mỗi dòng = một workflow execution",
       "time": "Thời gian",
       "service": "Dịch vụ",
       "endpoint": "Endpoint",
@@ -2340,7 +2355,13 @@
       "status_success": "Thành công",
       "status_error": "Lỗi",
       "ip": "Địa chỉ IP",
-      "user_agent": "User Agent"
+      "user_agent": "User Agent",
+      "started": "Bắt đầu",
+      "workflow": "Workflow",
+      "credits": "Credits",
+      "steps": "Bước",
+      "execution_key": "executionKey",
+      "page_size": "{size} dòng / trang"
     },
     "pagination": {
       "showing": "Hiển thị {from}–{to}",
@@ -2349,8 +2370,8 @@
     }
   },
   "MonitorAnalyticsPage": {
-    "title": "Phân tích API",
-    "description": "Theo dõi sử dụng API theo thời gian. Xem số lượng request, tỷ lệ thành công và Credit. Đánh giá chất lượng dịch vụ một cách trực quan.",
+    "title": "Phân tích lần chạy",
+    "description": "Theo dõi số lần chạy workflow và Credits theo thời gian.",
     "fetch_error": "Không thể tải dữ liệu phân tích",
     "error": "Lỗi",
     "refresh": "Làm mới",
@@ -2364,31 +2385,31 @@
     },
     "empty_chart": "Không có dữ liệu cho khoảng thời gian này",
     "empty_table": "Không tìm thấy dữ liệu sử dụng",
-    "empty_hint": "Dữ liệu sử dụng API sẽ hiển thị tại đây khi bạn thực hiện request qua dịch vụ.",
+    "empty_hint": "Dữ liệu hiện sau khi có lần chạy workflow.",
     "stats": {
-      "total_requests": "Tổng Requests",
+      "total_requests": "Tổng lần chạy",
       "success_rate": "Tỷ lệ thành công",
       "errors": "Lỗi",
       "peak_day": "Ngày cao điểm",
-      "estimated_cost": "Credit đã dùng",
+      "estimated_cost": "Credits đã dùng",
       "in_period": "trong khoảng thời gian chọn",
       "of_total": "trên tổng",
       "no_errors": "Không có lỗi",
       "no_data": "Không có dữ liệu",
-      "unit_per_request": "Tổng Credit đã trừ",
+      "unit_per_request": "Tổng Credits trừ",
       "quality_excellent": "Xuất sắc",
       "quality_good": "Tốt",
       "quality_attention": "Cần chú ý"
     },
     "chart": {
       "title": "Thành công vs Lỗi",
-      "volume_title": "Khối lượng Request",
-      "volume_description": "Tổng request API mỗi ngày — theo dõi xu hướng sử dụng",
-      "ratio_title": "Tỷ lệ Thành công",
-      "ratio_description": "Phân bố request thành công và lỗi",
+      "volume_title": "Số lần chạy",
+      "volume_description": "Số workflow runs mỗi ngày",
+      "ratio_title": "Tỷ lệ thành công",
+      "ratio_description": "Hoàn thành vs thất bại",
       "success": "Thành công",
       "error": "Lỗi",
-      "description": "Biểu đồ cột xếp chồng: request thành công (xanh) và request lỗi (đỏ) mỗi ngày",
+      "description": "Cột xếp chồng: hoàn thành (xanh) và thất bại (đỏ) theo ngày",
       "requests": "Requests"
     },
     "table": {
@@ -2396,11 +2417,18 @@
       "description": "Chi tiết số request API và Credit theo ngày",
       "date": "Ngày",
       "requests": "Request API",
-      "total_requests": "Tổng số request API",
-      "success_requests": "Số request API thành công",
-      "error_requests": "Số request API lỗi",
+      "total_requests": "Lần chạy",
+      "success_requests": "Hoàn thành",
+      "error_requests": "Thất bại",
       "cost": "Credit",
       "total": "Tổng cộng"
+    },
+    "top_workflows": {
+      "title": "Top workflow theo chi tiêu",
+      "description": "Workflow tốn nhiều Credits nhất trong kỳ",
+      "workflow": "Workflow",
+      "runs": "Lần chạy",
+      "credits": "Credits"
     }
   },
   "VoucherPage": {
@@ -5266,5 +5294,30 @@
         ]
       }
     }
+  },
+  "WorkflowExecutionUsagesAdmin": {
+    "page_title": "Usages theo execution",
+    "page_description": "Admin: xem mỗi workflow_execution sinh ra bao nhiêu dòng service_usages.",
+    "execution_key_label": "executionKey",
+    "execution_key_placeholder": "uuid…",
+    "search": "Tìm",
+    "recent": "Gần đây",
+    "load_error": "Không tải được",
+    "execution_heading": "Execution",
+    "steps": "{count} bước",
+    "usage_count": "Số dòng usages",
+    "usage_credits": "Tổng Credits usages",
+    "usage_errors": "Lỗi",
+    "recent_heading": "Execution gần đây",
+    "col_time": "Thời gian",
+    "col_endpoint": "Endpoint",
+    "col_model": "Model",
+    "col_credits": "Credits",
+    "col_error": "Lỗi",
+    "col_workflow": "Workflow",
+    "col_status": "Trạng thái",
+    "col_key": "executionKey",
+    "yes": "Có",
+    "no": "Không"
   }
 }

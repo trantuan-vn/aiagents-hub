@@ -1,6 +1,6 @@
 # Spec: An toàn hệ thống ở quy mô triệu user (Scale Safety)
 
-> **Trạng thái:** Draft v1.3 — Phase A + Phase B implemented; **Phase B.1 planned** (chèn giữa B và C)  
+> **Trạng thái:** Draft v1.3 — Phase A + Phase B + **Phase B.1 implemented**; Phase C planned  
 > **Phiên bản:** 1.3  
 > **Ngày:** 2026-09-24  
 > **Phạm vi:** Bảo vệ **ổn định, công bằng, chi phí kiểm soát được** khi nền tảng tăng tới hàng triệu user / hàng chục–trăm triệu sự kiện/ngày trên data-plane `UserDO → Queue → D1 → R2` và control-plane workflow (UserDO-local state)  
@@ -54,7 +54,7 @@ queue_ops/ngày ≈ messages × (1 + retries) × ~3 (CF queue accounting)
 |------|--------------|--------------|----------------|-------------------|
 | **T1** | `service_usages` | mỗi API/AI call trong (hoặc ngoài) run | DO→Q→D1→**R2** | Lag queue, D1 rows_read/storage, cron archive, credit correctness |
 | **T1** | `workflow_executions` (**state** / resume) | mỗi workflow run | **DO-local** (đúng) | DO SQLite size, alarm CPU, resume fail nếu clip sai |
-| **T1** | `workflow_executions` (**ledger** / business) | mỗi workflow run (1 dòng tóm tắt) | **thiếu** — chưa DO→Q→D1→R2 | User/admin không đọc run history từ D1; Monitor đang lệch sang usages |
+| **T1** | `workflow_executions` (**ledger** / business) | mỗi workflow run (1 dòng tóm tắt) | DO→Q→D1→**R2** (Phase B.1, strip state) | Monitor/admin đọc run history; fan-out usages qua `executionKey` |
 | **T1** | `pending_messages` | notify / fan-out | DO→Q→D1 | Burst WS + DO write |
 | **T2** | `sessions`, `connections` | login / device / WS | DO→Q→D1 | Tích nếu không expire |
 | **T2** | `commissions`, `workflow_royalties` | gần theo usages | DO→Q→D1→**R2** (Phase B) | D1 phình theo usages |
@@ -356,7 +356,9 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 
 **Ops sau deploy:** tạo Cloudflare Pipelines streams/sinks cho `commissions` / `workflow_royalties` nếu chưa có (`pnpm --filter @api-services/pipelines create-pipelines` hoặc d1tor2 auto-create path).
 
-### Phase B.1 — Execution ledger + Monitor/Admin đúng lớp (M) — **planned** *(chèn giữa B và C)*
+### Phase B.1 — Execution ledger + Monitor/Admin đúng lớp (M) — **implemented** *(chèn giữa B và C)*
+
+**Option A (đã chọn):** cùng bảng DO `workflow_executions` + strip `state`/`input`/`output`/`pendingNodeId` khi flush; **không** đưa vào `QUEUE_TABLE_NAMES` (catalog retention — DO giữ history/resume sau flush).
 
 **Vấn đề đã xác nhận**
 

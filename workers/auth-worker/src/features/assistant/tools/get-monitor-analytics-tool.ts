@@ -1,8 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getBillingEconomicsFromEnv } from '../../admin/service/get-billing-economics';
-import { getServiceUsageAnalytics, type AnalyticsDuration } from '../../member/monitor/analytics/infrastructure';
+import { getExecutionAnalytics, type AnalyticsDuration } from '../../member/monitor/analytics/infrastructure';
 
 const GetMonitorAnalyticsInputSchema = z.object({
   duration: z.enum(['week', 'month', 'quarter', 'year']).default('month'),
@@ -10,7 +9,7 @@ const GetMonitorAnalyticsInputSchema = z.object({
 
 export function getMonitorAnalyticsTool(c: any, bindingName: string, user: any) {
   return tool({
-    description: 'Lay du lieu monitor analytics cua user theo khoang thoi gian.',
+    description: 'Lay phan tich so lan chay workflow va Credits cua user theo khoang thoi gian.',
     inputSchema: GetMonitorAnalyticsInputSchema,
     async *execute(input: z.infer<typeof GetMonitorAnalyticsInputSchema>) {
       yield { state: 'loading' as const };
@@ -22,13 +21,7 @@ export function getMonitorAnalyticsTool(c: any, bindingName: string, user: any) 
         }
 
         const userId = (c.env[bindingName] as DurableObjectNamespace).idFromName(user.identifier).toString();
-        const eco = await getBillingEconomicsFromEnv(c.env);
-        const result = await getServiceUsageAnalytics(
-          db,
-          userId,
-          input.duration as AnalyticsDuration,
-          eco.creditPriceUsd,
-        );
+        const result = await getExecutionAnalytics(db, userId, input.duration as AnalyticsDuration);
 
         yield {
           state: 'ready' as const,

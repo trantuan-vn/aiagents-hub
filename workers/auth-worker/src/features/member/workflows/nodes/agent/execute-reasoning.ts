@@ -202,6 +202,7 @@ async function bill(
       userAgent: ctx.requestMeta?.userAgent,
       ipAddress: ctx.requestMeta?.ipAddress,
       workflowAttribution: ctx.attr,
+      executionKey: ctx.executionKey,
     },
   );
   reportUsageCharge(ctx.onCost, charge);

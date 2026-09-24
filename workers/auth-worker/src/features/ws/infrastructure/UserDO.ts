@@ -48,6 +48,10 @@ import {
   executionHistoryLimitsForPlan,
   selectExecutionIdsToPrune,
 } from '../../member/workflows/execution/execution-retention.js';
+import {
+  executionPatchShouldSyncLedger,
+  slimWorkflowExecutionForQueue,
+} from '../../member/workflows/execution/execution-ledger.js';
 import type { PlanId } from '../../member/workflows/billing/plan.js';
 import { resolvePlanId } from '../../member/workflows/billing/plan.js';
 
@@ -130,6 +134,8 @@ export class UserDO extends DurableObject {
     "agent_workflows",
     "payout_beneficiary",
     "earnings_payouts",
+    // Phase B.1: slim ledger → D1/R2; DO keeps full row (incl. state) — NOT QUEUE_CLEANUP
+    "workflow_executions",
   ];
 
   private readonly TABLE_CONFIGS = {
@@ -220,9 +226,13 @@ export class UserDO extends DurableObject {
         extendWithQueue(AgentWorkflowSchema),
         this.TABLE_CONFIGS.queueTableWithUniqueIndex('id'),
       );
-      // Durable workflow run history. Kept DO-local (not queue-synced) so paused
-      // runs retain their engine state for resume/replay.
-      this.table('workflow_executions', WorkflowExecutionSchema, this.TABLE_CONFIGS.withUniqueIndex('executionKey'));
+      // Phase B.1: DO keeps full row (state for resume); slim ledger syncs via strip-on-flush.
+      // Catalog retention (not QUEUE_CLEANUP) so processed flush does not delete DO history.
+      this.table(
+        'workflow_executions',
+        extendWithQueue(WorkflowExecutionSchema),
+        this.TABLE_CONFIGS.queueTableWithUniqueIndex('executionKey'),
+      );
       // Credential vault. Kept DO-local (never queue-synced) so encrypted secrets
       // never leave the user's Durable Object.
       this.table('workflow_credentials', WorkflowCredentialSchema, this.TABLE_CONFIGS.withUniqueIndex('credentialKey'));
@@ -684,10 +694,7 @@ export class UserDO extends DurableObject {
       const rejected = await this.rejectIfPendingHard(table);
       if (rejected) return rejected;
 
-      const dataWithQueue = this.ensureCatalogQueueStatus(table, {
-        ...data,
-        queueStatus: 'pending' as const,
-      });
+      const dataWithQueue = this.applySyncQueueStatus(table, data, 'update');
       const result = await this.database.dynamicUpdate(table, id, dataWithQueue);
       
       await this.updateTablePendingCount(table);
@@ -719,10 +726,7 @@ export class UserDO extends DurableObject {
       const rejected = await this.rejectIfPendingHard(table);
       if (rejected) return rejected;
 
-      const dataWithQueue = this.ensureCatalogQueueStatus(table, {
-        ...data,
-        queueStatus: 'pending' as const,
-      });
+      const dataWithQueue = this.applySyncQueueStatus(table, data, 'upsert');
       const result = await this.database.dynamicUpsert(table, dataWithQueue, conflictField);
       
       await this.updateTablePendingCount(table);
@@ -840,17 +844,14 @@ export class UserDO extends DurableObject {
       if (!op.data || !(op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert')) {
         return op;
       }
-      // Align with handleDynamicUpdate/handleDynamicUpsert: re-queue sync-table updates for D1 flush.
-      if (this.isSyncTable(op.table) && (op.operation === 'update' || op.operation === 'upsert')) {
-        return {
-          ...op,
-          data: this.ensureCatalogQueueStatus(op.table, {
-            ...op.data,
-            queueStatus: 'pending' as const,
-          }),
-        };
-      }
-      return { ...op, data: this.ensureCatalogQueueStatus(op.table, op.data) };
+      return {
+        ...op,
+        data: this.applySyncQueueStatus(
+          op.table,
+          op.data,
+          op.operation === 'insert' ? 'insert' : 'update',
+        ),
+      };
     });
     const result = await this.database.dynamicMultiTableTransaction(processedOps);
     
@@ -1140,7 +1141,9 @@ export class UserDO extends DurableObject {
     return records.map((record) => ({
       body: JSON.stringify({
         table: tableName,
-        data: record,
+        data: tableName === 'workflow_executions'
+          ? slimWorkflowExecutionForQueue(record as Record<string, unknown>)
+          : record,
         id: record.queueId,
         batchInfo: {
           userId: this.userId,
@@ -1623,6 +1626,41 @@ export class UserDO extends DurableObject {
   // ========== HELPER METHODS ==========
   private isSyncTable(tableName: string): boolean {
     return this.SYNC_TABLE_NAMES.includes(tableName);
+  }
+
+  /**
+   * Catalog sync tables default pending on insert; updates force pending.
+   * Exception — workflow_executions: only re-enqueue when ledger fields change
+   * (avoid flooding Queue on every state/I/O persist tick). Phase B.1.
+   */
+  private applySyncQueueStatus(
+    tableName: string,
+    data: Record<string, unknown>,
+    mode: 'insert' | 'update' | 'upsert',
+  ): Record<string, unknown> {
+    if (!this.isSyncTable(tableName)) return data;
+
+    if (tableName === 'workflow_executions') {
+      if (mode === 'insert') {
+        return this.ensureCatalogQueueStatus(tableName, {
+          ...data,
+          queueStatus: data.queueStatus ?? 'pending',
+        });
+      }
+      if (executionPatchShouldSyncLedger(data)) {
+        return { ...data, queueStatus: 'pending' as const };
+      }
+      const { queueStatus: _drop, ...rest } = data;
+      return rest;
+    }
+
+    if (mode === 'update' || mode === 'upsert') {
+      return this.ensureCatalogQueueStatus(tableName, {
+        ...data,
+        queueStatus: 'pending' as const,
+      });
+    }
+    return this.ensureCatalogQueueStatus(tableName, data);
   }
 
   /** Chỉ bảng QUEUE_TABLE_NAMES mới xoá record khi cleanup (tiết kiệm storage). Bảng danh mục giữ lại. */

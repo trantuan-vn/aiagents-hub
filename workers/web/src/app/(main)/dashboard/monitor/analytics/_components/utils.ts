@@ -13,6 +13,12 @@ export interface AnalyticsData {
   totalRequests: number;
   totalCost: number;
   duration: string;
+  topWorkflows?: Array<{
+    workflowId: number;
+    workflowName: string;
+    runs: number;
+    credits: number;
+  }>;
 }
 
 export function formatDate(dateStr: string, locale?: string): string {
@@ -24,7 +30,7 @@ export function formatDate(dateStr: string, locale?: string): string {
   });
 }
 
-/** Usage charged in Credits (converted from service_usages USD when needed). */
+/** Credits charged on workflow runs (ledger). */
 export function formatUsageCost(amount: number): string {
   if (amount == null || amount === 0) return "—";
   return formatCredits(amount);

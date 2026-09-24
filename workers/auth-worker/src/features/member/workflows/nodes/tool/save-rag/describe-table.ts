@@ -184,6 +184,7 @@ export async function describeTable(
               workflowOwnerId: billing.workflowAttribution.workflowOwnerId,
             }
           : undefined,
+        executionKey: billing.executionKey,
       },
     );
     reportUsageCharge(billing.onCost, charge);

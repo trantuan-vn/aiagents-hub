@@ -13,6 +13,7 @@ import {
   parseEconomicsHours,
   UserEconomicsNotFoundError,
 } from './user-economics';
+import { getExecutionUsagesReport } from './execution-usages';
 
 export function createAdminBillingRoutes() {
   const app = new Hono<{ Bindings: Env }>();
@@ -41,6 +42,35 @@ export function createAdminBillingRoutes() {
         return c.json({ error: e.message }, 404);
       }
       const { errorResponse, status } = await handleError(c, e, 'Failed to load user economics');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/workflow-execution-usages', async (c) => {
+    try {
+      requireAdmin(c);
+      const db = c.env.D1DB;
+      if (!db) throw new Error('D1 database binding not configured');
+      const executionKey = c.req.query('executionKey')?.trim();
+      const userId = c.req.query('userId')?.trim();
+      const workflowIdRaw = c.req.query('workflowId');
+      const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+      const offset = Math.max(parseInt(c.req.query('offset') || '0', 10), 0);
+      const dateFrom = c.req.query('dateFrom');
+      const dateTo = c.req.query('dateTo');
+
+      const data = await getExecutionUsagesReport(db, {
+        executionKey: executionKey || undefined,
+        userId: userId || undefined,
+        workflowId: workflowIdRaw && /^\d+$/.test(workflowIdRaw) ? parseInt(workflowIdRaw, 10) : undefined,
+        limit,
+        offset,
+        dateFrom: dateFrom && !isNaN(parseInt(dateFrom, 10)) ? parseInt(dateFrom, 10) : undefined,
+        dateTo: dateTo && !isNaN(parseInt(dateTo, 10)) ? parseInt(dateTo, 10) : undefined,
+      });
+      return c.json(data);
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load execution usages');
       return c.json(errorResponse, status);
     }
   });

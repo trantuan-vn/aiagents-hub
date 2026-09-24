@@ -1,44 +1,42 @@
-import { Hono } from "hono";
-import { requireAuth } from "../../../auth/authMiddleware";
-import { handleError } from "../../../../shared/utils";
-import { getBillingEconomicsFromEnv } from "../../../admin/service/get-billing-economics";
-import { getServiceUsageAnalytics, type AnalyticsDuration } from "./infrastructure";
+import { Hono } from 'hono';
+import { requireAuth } from '../../../auth/authMiddleware';
+import { handleError } from '../../../../shared/utils';
+import { getExecutionAnalytics, type AnalyticsDuration } from './infrastructure';
 
-const VALID_DURATIONS: AnalyticsDuration[] = ["week", "month", "quarter", "year"];
+const VALID_DURATIONS: AnalyticsDuration[] = ['week', 'month', 'quarter', 'year'];
 
 export function createMonitorAnalyticsRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
 
-  app.get("/", async (c: any) => {
+  app.get('/', async (c: any) => {
     try {
       const user = requireAuth(c);
       const db = c.env.D1DB;
       if (!db) {
-        throw new Error("D1 database binding not configured");
+        throw new Error('D1 database binding not configured');
       }
       const userId = (c.env[bindingName] as DurableObjectNamespace).idFromName(user.identifier).toString();
 
-      const durationParam = (c.req.query("duration") ?? "month").toLowerCase();
+      const durationParam = (c.req.query('duration') ?? 'month').toLowerCase();
       const duration: AnalyticsDuration = VALID_DURATIONS.includes(durationParam as AnalyticsDuration)
         ? (durationParam as AnalyticsDuration)
-        : "month";
+        : 'month';
 
-      const eco = await getBillingEconomicsFromEnv(c.env);
-      const { daily, totalRequests, totalCost } = await getServiceUsageAnalytics(
+      const { daily, totalRequests, totalCost, topWorkflows } = await getExecutionAnalytics(
         db,
         userId,
         duration,
-        eco.creditPriceUsd,
       );
 
       return c.json({
         daily,
         totalRequests,
         totalCost,
+        topWorkflows,
         duration,
       });
     } catch (e) {
-      const { errorResponse, status } = await handleError(c, e, "Failed to get analytics");
+      const { errorResponse, status } = await handleError(c, e, 'Failed to get run analytics');
       return c.json(errorResponse, status);
     }
   });

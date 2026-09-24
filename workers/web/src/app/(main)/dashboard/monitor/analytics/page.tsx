@@ -194,6 +194,39 @@ export default function MonitorAnalyticsPage() {
           />
         </CardContent>
       </Card>
+
+      {data?.topWorkflows && data.topWorkflows.length > 0 ? (
+        <Card className="overflow-hidden border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle>{t("top_workflows.title")}</CardTitle>
+            <CardDescription>{t("top_workflows.description")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-hidden rounded-xl border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="p-3 font-semibold">{t("top_workflows.workflow")}</th>
+                    <th className="p-3 text-right font-semibold">{t("top_workflows.runs")}</th>
+                    <th className="p-3 text-right font-semibold">{t("top_workflows.credits")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.topWorkflows.map((row) => (
+                    <tr key={row.workflowId} className="border-b last:border-0">
+                      <td className="p-3">{row.workflowName}</td>
+                      <td className="p-3 text-right tabular-nums">{row.runs.toLocaleString()}</td>
+                      <td className="p-3 text-right font-mono tabular-nums">
+                        {row.credits.toLocaleString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

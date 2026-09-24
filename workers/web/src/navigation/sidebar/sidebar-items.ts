@@ -1,4 +1,5 @@
 import {
+  Activity,
   Banknote,
   BarChart3,
   Bell,
@@ -92,6 +93,7 @@ export const sidebarItems: NavGroup[] = [
           { title: "Finance", url: "/dashboard/finance", icon: Banknote, adminOnly: true },
           { title: "Contribution", url: "/dashboard/contribution", icon: BarChart3, adminOnly: true },
           { title: "User Economics", url: "/dashboard/user-economics", icon: CircleDollarSign, adminOnly: true },
+          { title: "Execution Usages", url: "/dashboard/workflow-execution-usages", icon: Activity, adminOnly: true },
         ],
       },
       {

@@ -261,6 +261,7 @@ interface NodeContext {
   userDO: DurableObjectStub<UserDO>;
   meta: EngineMeta;
   attr: ReturnType<typeof workflowAttribution>;
+  executionKey: string;
   input?: string;
   requestMeta?: { userAgent?: string; ipAddress?: string };
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
@@ -303,6 +304,7 @@ async function executeNodeLogic(
     userDO: ctx.userDO,
     meta: ctx.meta,
     attr: ctx.attr,
+    executionKey: ctx.executionKey,
     requestMeta: ctx.requestMeta,
     webhookItem: ctx.webhookItem,
     onCost,
@@ -500,6 +502,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     userDO,
     meta,
     attr,
+    executionKey,
     input: persisted.input,
     requestMeta: persisted.requestMeta,
     webhookItem: persisted.webhookItem,
@@ -628,6 +631,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
               userDO,
               meta,
               attr,
+              executionKey,
               requestMeta: persisted.requestMeta,
               webhookItem: persisted.webhookItem,
             };

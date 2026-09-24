@@ -110,10 +110,12 @@ describe('pipeline-health domain', () => {
     expect(PIPELINE_ARCHIVE_TABLES).toContain('orders');
     expect(PIPELINE_ARCHIVE_TABLES).toContain('commissions');
     expect(PIPELINE_ARCHIVE_TABLES).toContain('workflow_royalties');
+    expect(PIPELINE_ARCHIVE_TABLES).toContain('workflow_executions');
     expect(PIPELINE_ARCHIVE_TABLES).not.toContain('order_items');
     expect(PIPELINE_ARCHIVE_TABLES).not.toContain('order_discounts');
     expect(SYNC_TABLE_NAMES).toContain('agent_workflows');
     expect(SYNC_TABLE_NAMES).toContain('orders');
+    expect(SYNC_TABLE_NAMES).toContain('workflow_executions');
   });
 });
 

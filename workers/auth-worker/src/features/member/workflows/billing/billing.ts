@@ -28,6 +28,8 @@ export interface BillAgentUsageOptions {
   userAgent?: string;
   ipAddress?: string;
   workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+  /** Phase B.1: attribute usage row to a workflow run. */
+  executionKey?: string;
 }
 
 /** Workers AI response, AI SDK usage, or empty fallback the pricing extractor can read. */
@@ -302,6 +304,7 @@ export async function billAgentUsage(
       consumerIdentifier,
       usageUsd,
       workflowAttribution: options.workflowAttribution,
+      executionKey: options.executionKey,
       usageData: {
         serviceId: service.id,
         endpoint: options.endpoint,
@@ -321,6 +324,7 @@ export async function billAgentUsage(
     creditsUsage: usage.creditsUsage,
     usageCredits: usage,
     workflowAttribution: options.workflowAttribution,
+    executionKey: options.executionKey,
     usageData: {
       serviceId: service.id,
       endpoint: options.endpoint,
@@ -347,6 +351,7 @@ export async function billEmbeddingUsage(
     userAgent: options.userAgent,
     ipAddress: options.ipAddress,
     workflowAttribution: options.workflowAttribution,
+    executionKey: options.executionKey,
   });
 }
 

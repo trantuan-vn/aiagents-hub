@@ -59,6 +59,8 @@ export async function chargeServiceUsage(params: {
   creditsUsage?: number;
   usageCredits?: Partial<UsageCredits> & { creditsUsage?: number; cogsAiUsd?: number };
   workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+  /** Phase B.1: persist on service_usages for admin fan-out. */
+  executionKey?: string;
 }): Promise<UsageCharge> {
   const eco = await getBillingEconomicsFromEnv(params.env);
   const creditsFromParams = Number(params.creditsUsage ?? params.usageCredits?.creditsUsage ?? 0) || 0;
@@ -120,6 +122,7 @@ export async function chargeServiceUsage(params: {
     usageData.workflowId = params.workflowAttribution.workflowId;
     usageData.workflowOwnerId = params.workflowAttribution.workflowOwnerId;
   }
+  if (params.executionKey) usageData.executionKey = params.executionKey;
   if (creditsRoyalty > 0) usageData.workflowRoyaltyVnd = royaltyUsd;
 
   const operations: Array<{
@@ -187,6 +190,7 @@ async function chargeLegacyUsd(
     usageData: Record<string, unknown>;
     usageUsd?: number;
     workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+    executionKey?: string;
   },
   userRow: Record<string, unknown>,
 ): Promise<UsageCharge> {
@@ -218,6 +222,7 @@ async function chargeLegacyUsd(
     usageData.workflowId = params.workflowAttribution.workflowId;
     usageData.workflowOwnerId = params.workflowAttribution.workflowOwnerId;
   }
+  if (params.executionKey) usageData.executionKey = params.executionKey;
   if (royaltyUsd > 0) usageData.workflowRoyaltyVnd = royaltyUsd;
 
   const operations: Array<{

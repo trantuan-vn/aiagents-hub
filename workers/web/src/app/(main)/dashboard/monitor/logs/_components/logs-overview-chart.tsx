@@ -4,37 +4,31 @@ import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from "recharts";
 
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
-interface ServiceUsageLog {
-  id?: number;
-  serviceId: number;
-  endpoint: string;
-  isError?: boolean | number;
-  created_at?: number;
-  createdAt?: number;
+interface ExecutionLog {
+  status: string;
+  startedAt?: number;
 }
 
 interface LogsOverviewChartProps {
-  logs: ServiceUsageLog[];
+  logs: ExecutionLog[];
   t: (key: string, values?: Record<string, string | number>) => string;
 }
 
 const chartConfig = {
-  success: { label: "Success", color: "#22c55e" },
-  error: { label: "Error", color: "#ef4444" },
+  success: { label: "Completed", color: "#22c55e" },
+  error: { label: "Failed", color: "#ef4444" },
 } satisfies ChartConfig;
 
-function groupLogsByHour(logs: ServiceUsageLog[]): { hour: string; success: number; error: number }[] {
+function groupByHour(logs: ExecutionLog[]): { hour: string; success: number; error: number }[] {
   const buckets: Record<string, { success: number; error: number }> = {};
   for (const log of logs) {
-    const ts = log.created_at ?? log.createdAt;
-    if (!ts) continue;
-    const d = new Date(typeof ts === "number" && ts < 1e12 ? ts * 1000 : ts);
+    if (!log.startedAt) continue;
+    const d = new Date(typeof log.startedAt === "number" && log.startedAt < 1e12 ? log.startedAt * 1000 : log.startedAt);
     const key = d.toISOString().slice(0, 13);
     if (!(key in buckets)) buckets[key] = { success: 0, error: 0 };
     const bucket = buckets[key]!;
-    const isError = log.isError === true || log.isError === 1;
-    if (isError) bucket.error++;
-    else bucket.success++;
+    if (log.status === "failed") bucket.error++;
+    else if (log.status === "completed") bucket.success++;
   }
   return Object.entries(buckets)
     .sort(([a], [b]) => a.localeCompare(b))
@@ -46,12 +40,9 @@ function groupLogsByHour(logs: ServiceUsageLog[]): { hour: string; success: numb
 }
 
 export function LogsOverviewChart({ logs, t }: LogsOverviewChartProps) {
-  const data = groupLogsByHour(logs);
+  const data = groupByHour(logs);
   const hasData = data.some((d) => d.success > 0 || d.error > 0);
-
-  if (!hasData || logs.length === 0) {
-    return null;
-  }
+  if (!hasData || logs.length === 0) return null;
 
   return (
     <div className="bg-card rounded-xl border p-4 shadow-sm">

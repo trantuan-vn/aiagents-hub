@@ -27,6 +27,7 @@ const ADMIN_MANAGEMENT_PREFIXES = [
   "/dashboard/cloudflare-logs",
   "/dashboard/pipeline-health",
   "/dashboard/user-economics",
+  "/dashboard/workflow-execution-usages",
   "/dashboard/policy",
   "/dashboard/user-groups",
   "/dashboard/workflow/services",

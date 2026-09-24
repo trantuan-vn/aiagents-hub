@@ -5,6 +5,7 @@ import {
 	RefundSchema,
 	CommissionSchema,
 	WorkflowRoyaltySchema,
+	WorkflowExecutionLedgerSchema,
 } from '@auth-worker/features/ws/domain.js';
 import { z } from 'zod';
 
@@ -409,7 +410,7 @@ function createExtendedSchema(schema: z.ZodSchema): z.ZodSchema {
 	});
 }
 /**
- * Pipeline configurations — billing T1 + T2 (commissions, workflow_royalties → R2, Phase B)
+ * Pipeline configurations — billing T1 + T2 + B.1 execution ledger
  * (order_items / order_discounts removed — dead tables, scale-safety Phase A)
  * Tham chiếu: workers/queue-worker/src/database/index.ts -> initializeTables()
  */
@@ -459,6 +460,14 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'workflow_royalties',
 		schema: createExtendedSchema(WorkflowRoyaltySchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(WorkflowRoyaltySchema)),
+		namespace: 'v011',
+		r2BucketName: 'aiagents-hub-lakehouse',
+	},
+	{
+		schemaName: 'WorkflowExecutionSchema',
+		tableName: 'workflow_executions',
+		schema: createExtendedSchema(WorkflowExecutionLedgerSchema),
+		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(WorkflowExecutionLedgerSchema)),
 		namespace: 'v011',
 		r2BucketName: 'aiagents-hub-lakehouse',
 	},

@@ -1,20 +1,20 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 
-import { getServiceUsageLogs, type LogsFilters } from '../../member/monitor/logs/infrastructure';
+import { getExecutionLogs, type LogsFilters } from '../../member/monitor/logs/infrastructure';
 
 const GetMonitorLogsInputSchema = z.object({
   limit: z.number().int().min(1).max(200).default(50),
   offset: z.number().int().min(0).default(0),
-  serviceId: z.number().int().positive().optional(),
-  endpoint: z.string().trim().min(1).optional(),
+  workflowId: z.number().int().positive().optional(),
+  status: z.enum(['running', 'completed', 'failed', 'pending_human', 'cancelled']).optional(),
   dateFrom: z.number().int().nonnegative().optional(),
   dateTo: z.number().int().nonnegative().optional(),
 });
 
 export function getMonitorLogsTool(c: any, bindingName: string, user: any) {
   return tool({
-    description: 'Lay danh sach logs monitor cua user theo bo loc va phan trang.',
+    description: 'Lay danh sach lan chay workflow (execution ledger) cua user theo bo loc va phan trang.',
     inputSchema: GetMonitorLogsInputSchema,
     async *execute(input: z.infer<typeof GetMonitorLogsInputSchema>) {
       yield { state: 'loading' as const };
@@ -29,12 +29,12 @@ export function getMonitorLogsTool(c: any, bindingName: string, user: any) {
         const filters: LogsFilters = {
           limit: input.limit,
           offset: input.offset,
-          serviceId: input.serviceId,
-          endpoint: input.endpoint,
+          workflowId: input.workflowId,
+          status: input.status,
           dateFrom: input.dateFrom,
           dateTo: input.dateTo,
         };
-        const result = await getServiceUsageLogs(db, userId, filters);
+        const result = await getExecutionLogs(db, userId, filters);
 
         yield { state: 'ready' as const, ok: true, body: result };
       } catch (error) {

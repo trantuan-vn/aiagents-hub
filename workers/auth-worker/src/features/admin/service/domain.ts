@@ -95,6 +95,8 @@ export const ServiceUsageSchema = z.object({
   /** Shared agent workflow attribution */
   workflowId: z.number().int().optional(),
   workflowOwnerId: z.string().optional(),
+  /** Phase B.1: join usages → workflow_executions ledger (null = pre-B.1 / non-workflow charge). */
+  executionKey: z.string().min(1).max(80).optional(),
   workflowRoyaltyVnd: z.number().min(0).optional(),
   creditsUsage: z.number().min(0).optional(),
   creditsRoyalty: z.number().min(0).optional(),

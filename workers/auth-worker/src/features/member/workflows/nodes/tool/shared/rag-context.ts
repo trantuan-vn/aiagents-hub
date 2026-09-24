@@ -222,6 +222,7 @@ export type RagBilling = {
   consumerIdentifier: string;
   requestMeta?: { userAgent?: string; ipAddress?: string };
   workflowAttribution?: WorkflowAttribution;
+  executionKey?: string;
   onCost?: (usd: number, royaltyUsd?: number) => void;
 };
 
@@ -240,6 +241,7 @@ export function ragBillingFromNodeContext(ctx: NodeContext): RagBilling | undefi
     consumerIdentifier: ctx.user.identifier,
     requestMeta: ctx.requestMeta,
     workflowAttribution: ctx.attr,
+    executionKey: ctx.executionKey,
     onCost: ctx.onCost,
   };
 }
@@ -308,6 +310,7 @@ export async function billRagEmbeddings(
       userAgent: billing.requestMeta?.userAgent,
       ipAddress: billing.requestMeta?.ipAddress,
       workflowAttribution: billing.workflowAttribution,
+      executionKey: billing.executionKey,
     },
   );
   return reportUsageCharge(billing.onCost, charge);

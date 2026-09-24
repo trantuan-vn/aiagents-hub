@@ -29,6 +29,7 @@ import {
 	WorkflowRoyaltySchema,
 	PayoutBeneficiaryRecordSchema,
 	EarningsPayoutSchema,
+	WorkflowExecutionLedgerSchema,
 } from '@auth-worker/features/ws/domain.js';
 
 export interface TableOptions {
@@ -638,6 +639,12 @@ export class D1DatabaseManager {
       'earnings_payouts',
       EarningsPayoutSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('payoutKey'),
+    );
+    // Phase B.1: slim ledger (no state) — unique on executionKey
+    await this.registerTable(
+      'workflow_executions',
+      WorkflowExecutionLedgerSchema,
+      this.TABLE_CONFIGS.queueTableWithUniqueIndex('executionKey'),
     );
 
     // Queue tables (xoá khỏi DO sau cleanup): queue flow

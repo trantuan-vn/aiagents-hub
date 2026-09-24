@@ -124,6 +124,19 @@ export const WorkflowExecutionSchema = z.object({
 });
 
 /**
+ * Slim ledger projection for DO→Queue→D1→R2 (Phase B.1).
+ * Control-plane `state` / I/O stay DO-local; never register this as the DO table schema.
+ */
+export const WorkflowExecutionLedgerSchema = WorkflowExecutionSchema.omit({
+  state: true,
+  input: true,
+  output: true,
+  pendingNodeId: true,
+}).extend({
+  error: z.string().max(500).optional(),
+});
+
+/**
  * Immutable snapshot of a workflow definition, captured on publish or manual
  * save-point. Enables version history + restore in the marketplace.
  */
@@ -185,6 +198,7 @@ export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type WorkflowComment = z.infer<typeof WorkflowCommentSchema>;
 export type WorkflowRoyalty = z.infer<typeof WorkflowRoyaltySchema>;
 export type WorkflowExecution = z.infer<typeof WorkflowExecutionSchema>;
+export type WorkflowExecutionLedger = z.infer<typeof WorkflowExecutionLedgerSchema>;
 export type WorkflowExecutionStatus = z.infer<typeof WorkflowExecutionStatusSchema>;
 export type WorkflowVersion = z.infer<typeof WorkflowVersionSchema>;
 

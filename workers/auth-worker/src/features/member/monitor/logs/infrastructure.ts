@@ -1,121 +1,157 @@
 /**
- * Fetches service_usages from D1 database.
- * Data is synced from UserDO to D1 via queue-worker; D1 holds the consolidated dataset.
+ * Phase B.1 — member Monitor Nhật ký reads execution ledger from D1 (not raw service_usages).
  */
 
 export interface LogsFilters {
   limit?: number;
   offset?: number;
-  serviceId?: number;
-  endpoint?: string;
+  workflowId?: number;
+  status?: string;
   dateFrom?: number;
   dateTo?: number;
 }
 
-export interface ServiceUsageLog {
+export interface ExecutionLogRow {
   id?: number;
   globalId?: number;
-  serviceId: number;
-  endpoint: string;
-  userAgent?: string;
-  ipAddress?: string;
+  executionKey: string;
+  workflowId: number;
+  workflowOwnerId?: string;
+  workflowName?: string;
+  status: string;
+  totalCostVnd?: number;
+  totalCreditsCharged?: number;
+  totalCreditsRoyalty?: number;
+  totalRoyaltyUsd?: number;
+  stepCount?: number;
+  startedAt?: number;
+  finishedAt?: number;
+  error?: string;
   user_id?: string;
-  isError?: boolean | number;
-  /** Chi phí theo giá cố định service hoặc cost AI Gateway */
-  cost?: number;
   created_at?: number;
   updated_at?: number;
 }
 
-export interface ErrorRateStats {
+export interface RunStats {
   total: number;
-  errors: number;
-  errorRatePercent: number;
+  failed: number;
+  completed: number;
+  failRatePercent: number;
+  totalCredits: number;
 }
 
 export interface LogsResult {
-  logs: ServiceUsageLog[];
+  logs: ExecutionLogRow[];
   hasMore: boolean;
-  errorRate?: ErrorRateStats;
+  runStats?: RunStats;
 }
 
-export async function getServiceUsageLogs(
+export async function getExecutionLogs(
   db: D1Database,
   userId: string,
-  filters: LogsFilters
+  filters: LogsFilters,
 ): Promise<LogsResult> {
-  const { limit = 50, offset = 0, serviceId, endpoint, dateFrom, dateTo } = filters;
+  const { limit = 50, offset = 0, workflowId, status, dateFrom, dateTo } = filters;
 
   const conditions: string[] = ['"user_id" = ?'];
   const params: (string | number)[] = [userId];
 
-  if (serviceId != null) {
-    conditions.push('"serviceId" = ?');
-    params.push(serviceId);
+  if (workflowId != null) {
+    conditions.push('"workflowId" = ?');
+    params.push(workflowId);
   }
-  if (endpoint && endpoint.trim()) {
-    conditions.push('"endpoint" LIKE ?');
-    params.push(`%${endpoint.trim()}%`);
+  if (status && status.trim()) {
+    conditions.push('"status" = ?');
+    params.push(status.trim());
   }
   if (dateFrom != null) {
-    conditions.push('"created_at" >= ?');
+    conditions.push('"startedAt" >= ?');
     params.push(dateFrom);
   }
   if (dateTo != null) {
-    conditions.push('"created_at" <= ?');
+    conditions.push('"startedAt" <= ?');
     params.push(dateTo);
   }
 
   const whereClause = conditions.join(' AND ');
-  const sql = `SELECT * FROM service_usages WHERE ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-  params.push(limit + 1, offset);
+  const sql = `SELECT * FROM workflow_executions WHERE ${whereClause} ORDER BY startedAt DESC LIMIT ? OFFSET ?`;
+  const queryParams = [...params, limit + 1, offset];
 
-  const result = await db.prepare(sql).bind(...params).all<ServiceUsageLog>();
-
+  const result = await db.prepare(sql).bind(...queryParams).all<ExecutionLogRow>();
   const rows = result.results ?? [];
   const hasMore = rows.length > limit;
   const logs = rows.slice(0, limit);
+  const runStats = await getRunStats(db, userId, { workflowId, status, dateFrom, dateTo });
 
-  const errorRate = await getErrorRateStats(db, userId, { serviceId, endpoint, dateFrom, dateTo });
-
-  return { logs, hasMore, errorRate };
+  return { logs, hasMore, runStats };
 }
 
-export async function getErrorRateStats(
+export async function getRunStats(
   db: D1Database,
   userId: string,
-  filters: Pick<LogsFilters, 'serviceId' | 'endpoint' | 'dateFrom' | 'dateTo'>
-): Promise<ErrorRateStats> {
+  filters: Pick<LogsFilters, 'workflowId' | 'status' | 'dateFrom' | 'dateTo'>,
+): Promise<RunStats> {
   const conditions: string[] = ['"user_id" = ?'];
   const params: (string | number)[] = [userId];
 
-  if (filters.serviceId != null) {
-    conditions.push('"serviceId" = ?');
-    params.push(filters.serviceId);
+  if (filters.workflowId != null) {
+    conditions.push('"workflowId" = ?');
+    params.push(filters.workflowId);
   }
-  if (filters.endpoint && filters.endpoint.trim()) {
-    conditions.push('"endpoint" LIKE ?');
-    params.push(`%${filters.endpoint.trim()}%`);
+  if (filters.status && filters.status.trim()) {
+    conditions.push('"status" = ?');
+    params.push(filters.status.trim());
   }
   if (filters.dateFrom != null) {
-    conditions.push('"created_at" >= ?');
+    conditions.push('"startedAt" >= ?');
     params.push(filters.dateFrom);
   }
   if (filters.dateTo != null) {
-    conditions.push('"created_at" <= ?');
+    conditions.push('"startedAt" <= ?');
     params.push(filters.dateTo);
   }
 
   const whereClause = conditions.join(' AND ');
-  const sql = `SELECT
-    COUNT(*) as total,
-    SUM(CASE WHEN isError = 1 THEN 1 ELSE 0 END) as errors
-  FROM service_usages WHERE ${whereClause}`;
+  const row = await db
+    .prepare(
+      `SELECT
+        COUNT(*) as total,
+        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+        SUM(COALESCE(totalCreditsCharged, totalCostVnd, 0)) as total_credits
+      FROM workflow_executions WHERE ${whereClause}`,
+    )
+    .bind(...params)
+    .first<{ total: number; failed: number; completed: number; total_credits: number }>();
 
-  const row = await db.prepare(sql).bind(...params).first<{ total: number; errors: number }>();
-  const total = row?.total ?? 0;
-  const errors = row?.errors ?? 0;
-  const errorRatePercent = total > 0 ? Math.round((errors / total) * 100 * 10) / 10 : 0;
+  const total = Number(row?.total ?? 0) || 0;
+  const failed = Number(row?.failed ?? 0) || 0;
+  const completed = Number(row?.completed ?? 0) || 0;
+  const totalCredits = Number(row?.total_credits ?? 0) || 0;
+  return {
+    total,
+    failed,
+    completed,
+    failRatePercent: total > 0 ? Math.round((failed / total) * 1000) / 10 : 0,
+    totalCredits,
+  };
+}
 
-  return { total, errors, errorRatePercent };
+/** @deprecated Use getExecutionLogs — kept for assistant tools during transition. */
+export async function getServiceUsageLogs(
+  db: D1Database,
+  userId: string,
+  filters: LogsFilters & { serviceId?: number; endpoint?: string },
+): Promise<LogsResult> {
+  return getExecutionLogs(db, userId, filters);
+}
+
+/** @deprecated */
+export async function getErrorRateStats(
+  db: D1Database,
+  userId: string,
+  filters: Pick<LogsFilters, 'workflowId' | 'status' | 'dateFrom' | 'dateTo'>,
+): Promise<{ total: number; errors: number; errorRatePercent: number }> {
+  const stats = await getRunStats(db, userId, filters);
+  return { total: stats.total, errors: stats.failed, errorRatePercent: stats.failRatePercent };
 }

@@ -18,6 +18,13 @@ interface LogsStatsCardsProps {
   logsCount: number;
   servicesCount: number;
   errorRate: ErrorRateStats | null;
+  runStats?: {
+    total: number;
+    failed: number;
+    completed: number;
+    failRatePercent: number;
+    totalCredits: number;
+  } | null;
 }
 
 function getQualityLevel(
@@ -39,10 +46,12 @@ function getQualityLevel(
   return { label: t("stats.quality_attention"), color: "text-rose-600", bgClass: "from-rose-500/10 to-rose-600/5" };
 }
 
-export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStatsCardsProps) {
+export function LogsStatsCards({ logsCount, servicesCount: _servicesCount, errorRate, runStats }: LogsStatsCardsProps) {
   const t = useTranslations("MonitorLogsPage");
   const successRate = errorRate ? 100 - errorRate.errorRatePercent : 100;
   const quality = errorRate ? getQualityLevel(errorRate.errorRatePercent, t) : getQualityLevel(0, t);
+  const totalRuns = runStats?.total ?? errorRate?.total ?? logsCount;
+  const totalCredits = runStats?.totalCredits ?? 0;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -63,34 +72,30 @@ export function LogsStatsCards({ logsCount, servicesCount, errorRate }: LogsStat
       <Card className="overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl">
         <div className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-br from-violet-500/5 via-transparent to-purple-500/5" />
         <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{t("stats.services")}</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("stats.total_runs")}</CardTitle>
           <div className="rounded-lg bg-violet-500/10 p-2">
             <Server className="h-5 w-5 text-violet-500" />
           </div>
         </CardHeader>
         <CardContent className="relative">
-          <div className="text-3xl font-bold tracking-tight">{servicesCount.toLocaleString()}</div>
-          <p className="text-muted-foreground mt-1 text-xs">{t("stats.active_services")}</p>
+          <div className="text-3xl font-bold tracking-tight">{totalRuns.toLocaleString()}</div>
+          <p className="text-muted-foreground mt-1 text-xs">{t("stats.in_filter")}</p>
         </CardContent>
       </Card>
 
       <Card className="overflow-hidden border-0 shadow-lg transition-all hover:shadow-xl">
         <div className="pointer-events-none absolute inset-0 h-full w-full bg-gradient-to-br from-emerald-500/5 via-transparent to-teal-500/5" />
         <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{t("stats.status")}</CardTitle>
+          <CardTitle className="text-sm font-medium">{t("stats.credits")}</CardTitle>
           <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            </span>
             <Badge variant="default" className="bg-emerald-600 text-xs font-medium hover:bg-emerald-600">
               {t("stats.live")}
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="relative">
-          <p className="text-muted-foreground text-xs">{t("stats.realtime")}</p>
-          <p className="mt-1 text-sm font-medium text-emerald-600">{t("stats.all_systems_ok")}</p>
+          <div className="text-3xl font-bold tracking-tight">{totalCredits.toLocaleString()}</div>
+          <p className="text-muted-foreground mt-1 text-xs">{t("stats.credits_in_filter")}</p>
         </CardContent>
       </Card>
 

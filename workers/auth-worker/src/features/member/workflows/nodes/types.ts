@@ -40,6 +40,8 @@ export interface NodeContext {
   userDO: DurableObjectStub<UserDO>;
   meta: WorkflowMeta;
   attr?: WorkflowAttribution;
+  /** Phase B.1: current run id for service_usages.executionKey. */
+  executionKey?: string;
   requestMeta?: RequestMeta;
   webhookItem?: BuildWebhookItemParams;
   onCost?: (chargedUsd: number, royaltyUsd?: number) => void;

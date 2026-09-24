@@ -37,6 +37,8 @@ export const T1_PENDING_GATE_TABLES = [
   'orders',
   'payments',
   'refunds',
+  /** Phase B.1: execution ledger (SYNC catalog, not QUEUE cleanup). */
+  'workflow_executions',
 ] as const;
 
 export type T1PendingGateTable = (typeof T1_PENDING_GATE_TABLES)[number];
