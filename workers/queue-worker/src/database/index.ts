@@ -59,8 +59,16 @@ export interface DynamicOperation {
   params: any[];
 }
 
-/** SQLite / D1 default SQLITE_MAX_VARIABLE_NUMBER */
-const SQLITE_MAX_VARIABLES = 999;
+/**
+ * D1 max bound parameters per query is 100 (not SQLite's SQLITE_MAX_VARIABLE_NUMBER=999).
+ * @see https://developers.cloudflare.com/d1/platform/limits/
+ */
+const D1_MAX_BOUND_PARAMETERS = 100;
+
+/** Max rows for a multi-VALUES INSERT given column count, respecting D1 bind limit. */
+export function maxRowsPerD1Statement(columnCount: number): number {
+  return Math.max(1, Math.floor(D1_MAX_BOUND_PARAMETERS / Math.max(columnCount, 1)));
+}
 
 export class DynamicSchemaManager {
   static createInsertOperation(table: string, data: any): DynamicOperation {
@@ -818,10 +826,7 @@ export class D1DatabaseManager {
     const insertFieldCount = [
       ...new Set(filteredArray.flatMap(d => Object.keys(d))),
     ].filter(f => f !== 'globalId').length;
-    const maxRowsPerStatement = Math.max(
-      1,
-      Math.floor(SQLITE_MAX_VARIABLES / Math.max(insertFieldCount, 1)),
-    );
+    const maxRowsPerStatement = maxRowsPerD1Statement(insertFieldCount);
 
     for (let i = 0; i < filteredArray.length; i += maxRowsPerStatement) {
       const chunk = filteredArray.slice(i, i + maxRowsPerStatement);
@@ -831,6 +836,11 @@ export class D1DatabaseManager {
         conflictFields,
       );
       if (operation.params.length === 0) continue;
+      if (operation.params.length > D1_MAX_BOUND_PARAMETERS) {
+        throw new Error(
+          `batchUpsert ${tableName}: ${operation.params.length} binds exceeds D1 limit ${D1_MAX_BOUND_PARAMETERS}`,
+        );
+      }
 
       const result = await this.execD1SQL(operation.sql, operation.params);
       if (!result.success) {
@@ -1229,7 +1239,8 @@ export class D1DatabaseManager {
     try {
       return await this.db.prepare(sql).bind(...params).run();
     } catch (error) {
-      console.error(`Error executing SQL: ${sql}`, error);
+      const preview = sql.length > 240 ? `${sql.slice(0, 240)}…` : sql;
+      console.error(`Error executing SQL (${params.length} binds): ${preview}`, error);
       throw error;
     }
   }
