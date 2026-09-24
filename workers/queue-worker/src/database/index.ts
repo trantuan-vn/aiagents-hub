@@ -607,6 +607,14 @@ export class D1DatabaseManager {
   }
 
   private async initializeTables(): Promise<void> {
+    // Scale-safety Phase A: drop dead legacy line-item tables if present on older D1 DBs.
+    try {
+      await this.db.prepare(`DROP TABLE IF EXISTS order_items`).run();
+      await this.db.prepare(`DROP TABLE IF EXISTS order_discounts`).run();
+    } catch (e) {
+      console.warn('[D1] drop legacy order_items/order_discounts failed:', e);
+    }
+
     // Bảng danh mục (catalog): queue flow + unique index - tương thích với auth worker UserDO
     await this.registerTable('services', ServiceObjectSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('endpoint'));
     await this.registerTable('vouchers', VoucherSchema, this.TABLE_CONFIGS.queueTableWithUniqueIndex('code'));

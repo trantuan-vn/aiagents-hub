@@ -22,9 +22,34 @@ import {
   groupRecordsForQueueFlush,
   isNonRetryableFlushError,
 } from './queue-flush.js';
+import {
+  BACKPRESSURE_REASON,
+  CONNECTION_STALE_MS,
+  MAINTENANCE_MIN_INTERVAL_MS,
+  PENDING_HARD_PER_TABLE,
+  PENDING_HARD_PER_USER,
+  PENDING_HIGH_REPORT_INTERVAL_MS,
+  PENDING_SOFT_PER_TABLE,
+  PENDING_SOFT_PER_USER,
+  PROCESSED_CLEANUP_THRESHOLD,
+  T1_PENDING_GATE_TABLES,
+  backpressureErrorMessage,
+  evaluatePendingCaps,
+  isT1PendingGateTable,
+  shouldCleanupProcessed,
+} from './scale-safety.js';
+import { upsertHotUser } from '../../admin/pipeline-health/store.js';
+import {
+  executionHistoryLimitsForPlan,
+  selectExecutionIdsToPrune,
+} from '../../member/workflows/execution/execution-retention.js';
+import type { PlanId } from '../../member/workflows/billing/plan.js';
+import { resolvePlanId } from '../../member/workflows/billing/plan.js';
 
 const doLog = createLogger('auth-worker', 'user-do');
 const CRON_NEXT_RUN_AT_KEY = 'cron:nextRunAt';
+const PENDING_HIGH_LAST_KEY = 'scale:pendingHighReportedAt';
+const MAINTENANCE_LAST_KEY = 'scale:lastMaintenanceAt';
 
 import { 
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
@@ -275,12 +300,193 @@ export class UserDO extends DurableObject {
     }
   }
 
+  private async getProcessedCount(tableName: string): Promise<number> {
+    try {
+      const countResult = await this.database.execSelectSQL(
+        `SELECT COUNT(*) as count FROM ${tableName} WHERE queueStatus = 'processed'`,
+      );
+      return countResult[0]?.count || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private getUserPendingTotalFromState(): number {
+    let total = 0;
+    for (const state of this.tableStates.values()) {
+      total += state.pendingCount || 0;
+    }
+    return total;
+  }
+
   /** True if any queue table has pending records (in-memory state). Used to decide whether to keep alarm. */
   private hasPendingQueueWork(): boolean {
     for (const state of this.tableStates.values()) {
       if (state.pendingCount > 0) return true;
     }
     return false;
+  }
+
+  /**
+   * Hard pending gate for T1 sync writes (Phase A). Returns 503 JSON response when over hard caps.
+   * Spec: soft → allow + self-report; hard → reject with reason `backpressure`.
+   */
+  private async rejectIfPendingHard(
+    tableName: string,
+    extraPending = 1,
+  ): Promise<Response | null> {
+    if (!isT1PendingGateTable(tableName)) return null;
+    const tablePending = await this.getPendingCount(tableName);
+    const userPending = this.getUserPendingTotalFromState();
+    const decision = evaluatePendingCaps({
+      table: tableName,
+      tablePendingAfter: tablePending + extraPending,
+      userPendingAfter: userPending + extraPending,
+    });
+    if (!decision.ok) {
+      return this.jsonResponse(
+        {
+          success: false,
+          error: backpressureErrorMessage(decision),
+          reason: BACKPRESSURE_REASON,
+          pending: { table: decision.tablePending, user: decision.userPending },
+          caps: {
+            softPerTable: PENDING_SOFT_PER_TABLE,
+            hardPerTable: PENDING_HARD_PER_TABLE,
+            softPerUser: PENDING_SOFT_PER_USER,
+            hardPerUser: PENDING_HARD_PER_USER,
+          },
+        },
+        503,
+      );
+    }
+    return null;
+  }
+
+  private async maybeReportPendingHigh(tableName: string): Promise<void> {
+    const tablePending = this.tableStates.get(tableName)?.pendingCount ?? 0;
+    const userPending = this.getUserPendingTotalFromState();
+    if (tablePending < PENDING_SOFT_PER_TABLE && userPending < PENDING_SOFT_PER_USER) return;
+    const db = this.env.D1DB;
+    if (!db) return;
+    const last = (await this.storage.get<number>(PENDING_HIGH_LAST_KEY)) ?? 0;
+    if (Date.now() - last < PENDING_HIGH_REPORT_INTERVAL_MS) return;
+    try {
+      await upsertHotUser(db, {
+        userId: this.userId,
+        reason: 'pending_high',
+        pendingApprox: userPending,
+        lastTable: tableName,
+      });
+      await this.storage.put(PENDING_HIGH_LAST_KEY, Date.now());
+    } catch (error) {
+      handleErrorWithoutIp(error, `UserDO ${this.userId} pending_high report failed`);
+    }
+  }
+
+  private async hasExcessProcessedRecords(): Promise<boolean> {
+    for (const tableName of this.QUEUE_TABLE_NAMES) {
+      if (shouldCleanupProcessed(await this.getProcessedCount(tableName))) return true;
+    }
+    return false;
+  }
+
+  /** Cleanup processed QUEUE rows when count > N even if pending is empty (Phase A). */
+  private async maybeCleanupExcessProcessed(): Promise<void> {
+    if (!(await this.hasExcessProcessedRecords())) return;
+    await this.cleanupOldProcessedRecords();
+  }
+
+  /** Deactivate expired sessions + delete stale connection rows (lazy / alarm). */
+  private async expireSessionsAndStaleConnections(): Promise<void> {
+    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
+    try {
+      await this.database.execTransaction([
+        {
+          sql: `UPDATE sessions SET isActive = 0, queueStatus = 'pending'
+                WHERE isActive = 1 AND expiresAt < ?`,
+          params: [nowIso],
+        },
+      ]);
+      await this.updateTablePendingCount('sessions');
+    } catch (error) {
+      handleErrorWithoutIp(error, `UserDO ${this.userId} expire sessions failed`);
+    }
+    try {
+      const staleBefore = nowMs - CONNECTION_STALE_MS;
+      await this.database.execTransaction([
+        {
+          sql: `DELETE FROM connections WHERE lastConnected < ?`,
+          params: [staleBefore],
+        },
+      ]);
+      await this.updateTablePendingCount('connections');
+    } catch (error) {
+      handleErrorWithoutIp(error, `UserDO ${this.userId} stale connections cleanup failed`);
+    }
+  }
+
+  /** Periodic prune of terminal workflow_executions using the user's plan limits. */
+  private async maybePruneWorkflowExecutions(): Promise<void> {
+    try {
+      const users = await this.database.execSelectSQL(`SELECT * FROM users LIMIT 1`);
+      const userRow = (users?.[0] ?? {}) as Record<string, unknown>;
+      const planId = resolvePlanId(userRow) as PlanId;
+      const limits = executionHistoryLimitsForPlan(planId);
+      const scanLimit = Math.min(2_000, Math.max(limits.max * 5, 100));
+      const rows = await this.database.execSelectSQL(
+        `SELECT * FROM workflow_executions ORDER BY startedAt DESC LIMIT ?`,
+        [scanLimit],
+      );
+      if (!Array.isArray(rows) || rows.length === 0) return;
+
+      const byWorkflow = new Map<number, typeof rows>();
+      for (const row of rows) {
+        const wfId = Number(row.workflowId ?? row.workflow_id ?? 0);
+        if (!wfId) continue;
+        const list = byWorkflow.get(wfId) ?? [];
+        list.push(row);
+        byWorkflow.set(wfId, list);
+      }
+
+      const deleteIds: number[] = [];
+      for (const [, wfRows] of byWorkflow) {
+        deleteIds.push(
+          ...selectExecutionIdsToPrune(
+            wfRows.map((r) => ({
+              ...r,
+              id: Number(r.id),
+              status: String(r.status),
+              startedAt: Number(r.startedAt ?? r.started_at ?? 0),
+              finishedAt: r.finishedAt ?? r.finished_at,
+            })) as Parameters<typeof selectExecutionIdsToPrune>[0],
+            limits,
+          ),
+        );
+      }
+      for (const id of deleteIds) {
+        try {
+          await this.database.dynamicDelete('workflow_executions', id);
+        } catch (e) {
+          console.warn(`[UserDO ${this.userId}] prune execution ${id} failed:`, e);
+        }
+      }
+    } catch (error) {
+      handleErrorWithoutIp(error, `UserDO ${this.userId} execution prune failed`);
+    }
+  }
+
+  private async runScaleMaintenance(force = false): Promise<void> {
+    const last = (await this.storage.get<number>(MAINTENANCE_LAST_KEY)) ?? 0;
+    if (!force && Date.now() - last < MAINTENANCE_MIN_INTERVAL_MS) {
+      await this.maybeCleanupExcessProcessed();
+      return;
+    }
+    await this.maybeCleanupExcessProcessed();
+    await this.expireSessionsAndStaleConnections();
+    await this.maybePruneWorkflowExecutions();
+    await this.storage.put(MAINTENANCE_LAST_KEY, Date.now());
   }
 
   /** Đọc cấu hình auth_worker từ KV (override) hoặc env vars. Isolate cache 60s. */
@@ -394,10 +600,14 @@ export class UserDO extends DurableObject {
   }
 
   private async handleQueueInsert(tableName: string, data: any): Promise<Response> {
+    const rejected = await this.rejectIfPendingHard(tableName);
+    if (rejected) return rejected;
+
     const dataWithQueue = this.ensureCatalogQueueStatus(tableName, data);
     const result = await this.database.dynamicInsert(tableName, dataWithQueue);
     
     await this.updateTablePendingCount(tableName);
+    this.state.waitUntil(this.maybeReportPendingHigh(tableName));
     
     if (await this.shouldFlushTable(tableName)) {
       this.state.waitUntil(this.flushPendingRecords(tableName));
@@ -415,6 +625,9 @@ export class UserDO extends DurableObject {
     const { table, id, data } = await request.json() as { table: string; id: number; data: any };
     
     if (this.isSyncTable(table)) {
+      const rejected = await this.rejectIfPendingHard(table);
+      if (rejected) return rejected;
+
       const dataWithQueue = this.ensureCatalogQueueStatus(table, {
         ...data,
         queueStatus: 'pending' as const,
@@ -422,6 +635,7 @@ export class UserDO extends DurableObject {
       const result = await this.database.dynamicUpdate(table, id, dataWithQueue);
       
       await this.updateTablePendingCount(table);
+      this.state.waitUntil(this.maybeReportPendingHigh(table));
       
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
@@ -446,6 +660,9 @@ export class UserDO extends DurableObject {
     };
     
     if (this.isSyncTable(table)) {
+      const rejected = await this.rejectIfPendingHard(table);
+      if (rejected) return rejected;
+
       const dataWithQueue = this.ensureCatalogQueueStatus(table, {
         ...data,
         queueStatus: 'pending' as const,
@@ -453,6 +670,7 @@ export class UserDO extends DurableObject {
       const result = await this.database.dynamicUpsert(table, dataWithQueue, conflictField);
       
       await this.updateTablePendingCount(table);
+      this.state.waitUntil(this.maybeReportPendingHigh(table));
       
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
@@ -511,6 +729,9 @@ export class UserDO extends DurableObject {
     const { table, data } = await request.json() as { table: string; data: any[] };
     
     if (this.isSyncTable(table)) {
+      const rejected = await this.rejectIfPendingHard(table, Array.isArray(data) ? data.length : 1);
+      if (rejected) return rejected;
+
       const results = await Promise.all(
         data.map(record => 
           this.database.dynamicInsert(table, this.ensureCatalogQueueStatus(table, record))
@@ -518,6 +739,7 @@ export class UserDO extends DurableObject {
       );
       
       await this.updateTablePendingCount(table);
+      this.state.waitUntil(this.maybeReportPendingHigh(table));
       
       if (await this.shouldFlushTable(table)) {
         this.state.waitUntil(this.flushPendingRecords(table));
@@ -545,6 +767,18 @@ export class UserDO extends DurableObject {
         where?: { field: string; operator: string; value: any };
       }>;
     };
+
+    const pendingAdds = new Map<string, number>();
+    for (const op of operations) {
+      if (!this.isSyncTable(op.table)) continue;
+      if (op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert') {
+        pendingAdds.set(op.table, (pendingAdds.get(op.table) ?? 0) + 1);
+      }
+    }
+    for (const [tableName, extra] of pendingAdds) {
+      const rejected = await this.rejectIfPendingHard(tableName, extra);
+      if (rejected) return rejected;
+    }
     
     const processedOps = operations.map(op => {
       if (!op.data || !(op.operation === 'insert' || op.operation === 'update' || op.operation === 'upsert')) {
@@ -573,6 +807,7 @@ export class UserDO extends DurableObject {
     const flushConfig = updatedTables.size > 0 ? await this.getAuthQueueConfig() : null;
     for (const tableName of updatedTables) {
       await this.updateTablePendingCount(tableName);
+      this.state.waitUntil(this.maybeReportPendingHigh(tableName));
       if (flushConfig && this.tableNeedsFlush(tableName, flushConfig)) {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
@@ -591,6 +826,11 @@ export class UserDO extends DurableObject {
     
     if (!this.isSyncTable(table)) {
       return this.jsonResponse({ error: `Table ${table} not found` }, 400);
+    }
+
+    if (operation === 'insert' || operation === 'update' || operation === 'upsert') {
+      const rejected = await this.rejectIfPendingHard(table);
+      if (rejected) return rejected;
     }
 
     let result: any;
@@ -613,6 +853,7 @@ export class UserDO extends DurableObject {
     }
 
     await this.updateTablePendingCount(table);
+    this.state.waitUntil(this.maybeReportPendingHigh(table));
 
     if (await this.shouldFlushTable(table)) {
       this.state.waitUntil(this.flushPendingRecords(table));
@@ -681,6 +922,7 @@ export class UserDO extends DurableObject {
       }
       
       const result = await this.cleanupProcessedRecords(table, cleanupMethod, upToId);
+      this.state.waitUntil(this.maybeCleanupExcessProcessed());
       
       return this.jsonResponse({
         success: true,
@@ -1080,6 +1322,7 @@ export class UserDO extends DurableObject {
     }
     
     const healthStatus = unhealthyTables > 0 ? 'warning' : 
+                       totalPending >= PENDING_SOFT_PER_USER ? 'degraded' :
                        totalPending > 1000 ? 'degraded' : 'healthy';
     
     return this.jsonResponse({
@@ -1090,6 +1333,16 @@ export class UserDO extends DurableObject {
       pendingTotal: totalPending,
       processedTotal: totalProcessed,
       unhealthyTables,
+      backpressure: totalPending > PENDING_HARD_PER_USER,
+      softExceeded: totalPending >= PENDING_SOFT_PER_USER,
+      caps: {
+        softPerTable: PENDING_SOFT_PER_TABLE,
+        hardPerTable: PENDING_HARD_PER_TABLE,
+        softPerUser: PENDING_SOFT_PER_USER,
+        hardPerUser: PENDING_HARD_PER_USER,
+        processedCleanupThreshold: PROCESSED_CLEANUP_THRESHOLD,
+        t1GateTables: T1_PENDING_GATE_TABLES,
+      },
       userId: this.userId,
       timestamp: Date.now()
     });
@@ -1105,6 +1358,8 @@ export class UserDO extends DurableObject {
       if (hasPending) {
         tasks.push(this.flushAllPendingRecords(), this.cleanupOldProcessedRecords());
       }
+      // Phase A: processed cleanup when count > N even without pending; session/execution prune.
+      tasks.push(this.runScaleMaintenance(!hasPending));
       tasks.push(this.dispatchDueWorkflowCrons());
       tasks.push(this.dispatchWorkflowContinues());
       await Promise.all(tasks);
@@ -1161,8 +1416,9 @@ export class UserDO extends DurableObject {
 
   private async reschedule(): Promise<void> {
     const hasPending = this.hasPendingQueueWork();
+    const excessProcessed = !hasPending && (await this.hasExcessProcessedRecords());
     let queueWake: number | null = null;
-    if (hasPending) {
+    if (hasPending || excessProcessed) {
       const config = await this.getAuthQueueConfig();
       queueWake = Date.now() + config.RETRY_ALARM_INTERVAL;
     }

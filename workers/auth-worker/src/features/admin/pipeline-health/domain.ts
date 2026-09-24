@@ -104,8 +104,6 @@ export const SYNC_TABLE_NAMES = [
 export const PIPELINE_ARCHIVE_TABLES = [
   'service_usages',
   'orders',
-  'order_items',
-  'order_discounts',
   'payments',
   'refunds',
 ] as const;

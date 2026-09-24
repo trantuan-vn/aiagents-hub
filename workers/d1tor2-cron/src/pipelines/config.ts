@@ -1,8 +1,6 @@
 import {
 	OrderSchema,
 	ServiceUsageSchema,
-	OrderItemSchema,
-	OrderItemDiscountSchema,
 	PaymentSchema,
 	RefundSchema,
 } from '@auth-worker/features/ws/domain.js';
@@ -409,7 +407,8 @@ function createExtendedSchema(schema: z.ZodSchema): z.ZodSchema {
 	});
 }
 /**
- * Pipeline configurations - chỉ xử lý các bảng: service_usages, orders, order_items, order_discounts, payments, refunds
+ * Pipeline configurations - service_usages, orders, payments, refunds
+ * (order_items / order_discounts removed — dead tables, scale-safety Phase A)
  * Tham chiếu: workers/queue-worker/src/database/index.ts -> initializeTables()
  */
 export const PIPELINE_CONFIGS: PipelineConfig[] = [
@@ -426,22 +425,6 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'orders',
 		schema: createExtendedSchema(OrderSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderSchema)),
-		namespace: 'v011',
-		r2BucketName: 'aiagents-hub-lakehouse',
-	},
-	{
-		schemaName: 'OrderItemSchema',
-		tableName: 'order_items',
-		schema: createExtendedSchema(OrderItemSchema),
-		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemSchema)),
-		namespace: 'v011',
-		r2BucketName: 'aiagents-hub-lakehouse',
-	},
-	{
-		schemaName: 'OrderItemDiscountSchema',
-		tableName: 'order_discounts',
-		schema: createExtendedSchema(OrderItemDiscountSchema),
-		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(OrderItemDiscountSchema)),
 		namespace: 'v011',
 		r2BucketName: 'aiagents-hub-lakehouse',
 	},

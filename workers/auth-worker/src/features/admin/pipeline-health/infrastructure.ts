@@ -479,21 +479,7 @@ export async function getTables(env: Env): Promise<{ tables: TableHealthRow[]; c
       lastCronError: cron?.error ?? null,
     };
   });
-  // also show archive-only tables not in SYNC (order_items etc.)
-  for (const table of PIPELINE_ARCHIVE_TABLES) {
-    if (SYNC_TABLE_NAMES.includes(table as (typeof SYNC_TABLE_NAMES)[number])) continue;
-    const cron = byTable.get(table);
-    tables.push({
-      table,
-      sync: false,
-      archive: true,
-      cleanup: false,
-      incidentCount: incidents.filter((i) => i.tableName === table).length,
-      lastCronSuccess: cron ? cron.success : null,
-      lastCronAt: cron?.at ?? null,
-      lastCronError: cron?.error ?? null,
-    });
-  }
+  // Archive tables that are also in SYNC appear above; no archive-only leftovers after Phase A.
   return { tables, cachedAt: overview.cachedAt };
 }
 

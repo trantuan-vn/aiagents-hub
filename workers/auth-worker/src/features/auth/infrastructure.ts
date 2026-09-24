@@ -88,7 +88,23 @@ const createSessionRepository = (userDO: DurableObjectStub<UserDO>): ISessionRep
           { field: "isActive", operator: '=', value: 1 }
         ]
       }, 'sessions')    
-    return session[0] || null;
+    const row = session[0] || null;
+    if (!row) return null;
+    // Phase A: lazy expire — deactivate and treat as missing
+    if (row.expiresAt && new Date(row.expiresAt) < new Date()) {
+      try {
+        await executeUtils.executeDynamicAction(
+          userDO,
+          'update',
+          { id: row.id, isActive: false, queueStatus: 'pending' },
+          'sessions',
+        );
+      } catch {
+        /* best-effort */
+      }
+      return null;
+    }
+    return row;
   },
 
   async existsByHashSessionId(sessionId: string): Promise<boolean> {

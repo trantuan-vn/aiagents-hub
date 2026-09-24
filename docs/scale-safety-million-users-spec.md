@@ -1,8 +1,8 @@
 # Spec: An toàn hệ thống ở quy mô triệu user (Scale Safety)
 
-> **Trạng thái:** Draft v1.0 — sẵn sàng chia phase code  
-> **Phiên bản:** 1.0  
-> **Ngày:** 2026-09-23  
+> **Trạng thái:** Draft v1.0 — Phase A implemented (pending caps, `pending_high`, processed cleanup, dead-table cleanup)  
+> **Phiên bản:** 1.1  
+> **Ngày:** 2026-09-24  
 > **Phạm vi:** Bảo vệ **ổn định, công bằng, chi phí kiểm soát được** khi nền tảng tăng tới hàng triệu user / hàng chục–trăm triệu sự kiện/ngày trên data-plane `UserDO → Queue → D1 → R2` và control-plane workflow (UserDO-local)  
 > **Bổ sung, không thay thế:**  
 > - Sức khoẻ luồng → [`admin-data-pipeline-health-spec.md`](./admin-data-pipeline-health-spec.md)  
@@ -63,18 +63,16 @@ queue_ops/ngày ≈ messages × (1 + retries) × ~3 (CF queue accounting)
 
 #### Cleanup: `order_items` / `order_discounts` (không còn dùng)
 
-Rà soát code (2026-09-24): **không còn write/read path ứng dụng**.
+Rà soát code (2026-09-24): **không còn write/read path ứng dụng.** **Phase A đã gỡ** khỏi d1tor2 `PIPELINE_CONFIGS`, pipeline-health archive catalog + UI, Zod/DTO legacy; D1 `DROP TABLE IF EXISTS` khi queue-worker init.
 
-| Store | Trạng thái hiện tại | Việc cần làm |
-|-------|---------------------|--------------|
-| **UserDO** | Không có trong `QUEUE_TABLE_NAMES` / `SYNC_TABLE_NAMES`; không `this.table(...)` | Không tạo lại; nếu DO cũ còn SQLite table rác → drop khi migrate/cleanup DO (best-effort) |
-| **D1** (queue-worker) | Không `registerTable` — chỉ còn `orders` (+ discount trên header order) | Không tạo lại; `DROP TABLE IF EXISTS order_items`, `order_discounts` nếu còn trên DB legacy |
-| **R2** (d1tor2) | Vẫn còn trong `PIPELINE_CONFIGS` + `PIPELINE_ARCHIVE_TABLES` (pipeline-health) | **Xóa** khỏi `PIPELINE_CONFIGS`, catalog archive UI/API; lifecycle/delete prefix lakehouse `order_items` / `order_discounts` (namespace hiện tại) nếu đã từng archive |
-| **Domain / web** | Zod `OrderItemSchema` / `OrderItemDiscountSchema` + comment “legacy… D1→R2”; billing UI `OrderDetail.items` | Xóa schema/DTO legacy sau khi gỡ pipeline; order chỉ dùng bảng `orders` (`discountAmount`, `appliedVoucherCode` trên header) |
+| Store | Trạng thái sau Phase A | Việc còn lại (ops) |
+|-------|------------------------|--------------------|
+| **UserDO** | Không bao giờ có trong SYNC | Nếu DO cũ còn SQLite rác → drop khi migrate/cleanup DO (best-effort) |
+| **D1** | `DROP IF EXISTS` trên init queue-worker | Xác nhận prod không còn table |
+| **R2** | Không còn archive pipeline | Lifecycle/delete prefix lakehouse `order_items` / `order_discounts` (namespace `v011`) nếu đã từng archive |
+| **Domain / web** | Đã xóa `OrderItem*` schemas | Order chỉ dùng bảng `orders` |
 
-**Lý do giữ tạm trước đây:** “legacy R2-only”. Thực tế không còn sync DO→D1 và không có consumer product — chỉ tốn cron/catalog noise. **Không** đưa vào T1/T2 hot path; ưu tiên gỡ trong Phase A (cleanup dead tables) trước khi scale archive.
-
-**Acceptance cleanup:** (1) không còn tên 2 bảng trong d1tor2 / pipeline-health archive list / admin actions; (2) D1 không còn table (hoặc DROP đã chạy); (3) create/list order chỉ đụng `orders` / `payments` / `refunds`.
+**Acceptance cleanup:** (1) không còn tên 2 bảng trong d1tor2 / pipeline-health archive list / admin actions — **done**; (2) D1 DROP trên init — **done**; (3) create/list order chỉ đụng `orders` / `payments` / `refunds` — **done**.
 
 ### 0.3 Chế độ hỏng điển hình ở scale (phải có countermeasure)
 

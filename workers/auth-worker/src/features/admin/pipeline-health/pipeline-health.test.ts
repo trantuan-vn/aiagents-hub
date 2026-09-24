@@ -105,8 +105,11 @@ describe('pipeline-health domain', () => {
     expect(recs.some((r) => r.id === 'pipe.stab.cron_red')).toBe(true);
   });
 
-  it('phase2 table catalogs include archive + sync', () => {
+  it('phase2 table catalogs include archive + sync (no dead order_items)', () => {
     expect(PIPELINE_ARCHIVE_TABLES).toContain('service_usages');
+    expect(PIPELINE_ARCHIVE_TABLES).toContain('orders');
+    expect(PIPELINE_ARCHIVE_TABLES).not.toContain('order_items');
+    expect(PIPELINE_ARCHIVE_TABLES).not.toContain('order_discounts');
     expect(SYNC_TABLE_NAMES).toContain('agent_workflows');
     expect(SYNC_TABLE_NAMES).toContain('orders');
   });

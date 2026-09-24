@@ -59,16 +59,6 @@ export type CreateOrder = {
   paymentMethod?: string;
 };
 
-export const OrderItemSchema = z.object({
-  id: z.number().int(),
-  orderId: z.number().int(),
-  serviceId: z.number().int(),
-  basePrice: z.number().min(0),
-  discountAmount: z.number().min(0).default(0),
-  finalAmount: z.number().min(0),
-  quantity: z.number().min(1),
-});
-
 export const OrderSchema = z.object({
   id: z.number().int(),
   orderCode: z.string(),
@@ -88,10 +78,7 @@ export const OrderSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const OrderDetailSchema = OrderSchema.extend({
-  items: z.array(OrderItemSchema),
-  discounts: z.array(z.any()).optional(),
-});
+export const OrderDetailSchema = OrderSchema;
 
 // Payment Schemas
 export const CreatePaymentSchema = z.object({
@@ -114,7 +101,6 @@ export const PaymentResultSchema = z.object({
 // Types
 export type OrderStatus = z.infer<typeof OrderStatusSchema>;
 export type Order = z.infer<typeof OrderSchema>;
-export type OrderItem = z.infer<typeof OrderItemSchema>;
 export type OrderDetail = z.infer<typeof OrderDetailSchema>;
 export type CreatePayment = z.infer<typeof CreatePaymentSchema>;
 export type PaymentResult = z.infer<typeof PaymentResultSchema>;

@@ -981,6 +981,43 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
       graceWhenExhausted: resolved.workflow.graceWhenExhausted === true || resolved.workflow.graceWhenExhausted === 1,
       workflowId: resolved.workflowId,
     });
+
+    // Phase A: reject new runs when DO queue is over hard pending (noisy neighbor / backpressure).
+    try {
+      const healthRes = await userDO.fetch('https://user.do/queue/health', { method: 'GET' });
+      if (healthRes.ok) {
+        const health = (await healthRes.json()) as {
+          backpressure?: boolean;
+          pendingTotal?: number;
+          caps?: { hardPerUser?: number };
+        };
+        if (health.backpressure === true) {
+          return {
+            ok: false,
+            result: {
+              status: 'failed',
+              executionKey,
+              workflowId: resolved.workflowId,
+              workflowOwnerId: resolved.ownerId,
+              output: {
+                error: 'BACKPRESSURE: queue overloaded — try again shortly',
+                code: 'BACKPRESSURE',
+                reason: 'backpressure',
+                pendingTotal: health.pendingTotal ?? null,
+              },
+              steps: [],
+              totalCostVnd: 0,
+            },
+          };
+        }
+      }
+    } catch (e) {
+      console.warn(
+        '[prepareWorkflowExecution] pending-cap check failed:',
+        e instanceof Error ? e.message : e,
+      );
+    }
+
     const record = await createExecution(userDO, {
       executionKey,
       workflowId: resolved.workflowId,

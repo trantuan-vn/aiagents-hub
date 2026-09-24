@@ -12,8 +12,6 @@ import { API_BASE_URL } from "./types";
 const ARCHIVE_TABLES = [
   "service_usages",
   "orders",
-  "order_items",
-  "order_discounts",
   "payments",
   "refunds",
 ] as const;
