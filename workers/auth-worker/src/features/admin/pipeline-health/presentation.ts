@@ -16,7 +16,8 @@ import {
   refreshOverview,
   updateIncident,
 } from './infrastructure.js';
-import { forceFlushUser, replayDlqEntry, rerunPipeline } from './actions.js';
+import { forceFlushUser, replayDlqEntry, rerunPipeline, clearSyncPauseUser, setSyncPauseTables, setSyncPauseUser } from './actions.js';
+import { getSyncPauseStatus } from '../../ws/infrastructure/sync-pause.js';
 
 function errBody(e: PipelineHealthError) {
   return { error: e.message, code: e.code };
@@ -122,6 +123,58 @@ export function createAdminPipelineHealthRoutes() {
     } catch (e) {
       if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
       const { errorResponse, status } = await handleError(c, e, 'Failed to load hot users');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/sync-pause', async (c) => {
+    try {
+      requireAdmin(c);
+      return c.json(await getSyncPauseStatus(c.env));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load sync pause status');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/pause-tables', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as { tables?: string[]; confirm?: boolean };
+      return c.json(await setSyncPauseTables(c.env, String(user.identifier ?? 'admin'), body));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to set pause tables');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/pause-user', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as {
+        userId?: string;
+        reason?: string;
+        ttlSec?: number;
+        confirm?: boolean;
+      };
+      return c.json(await setSyncPauseUser(c.env, String(user.identifier ?? 'admin'), body));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to pause user sync');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/actions/resume-user', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const body = (await c.req.json().catch(() => ({}))) as { userId?: string; confirm?: boolean };
+      return c.json(await clearSyncPauseUser(c.env, String(user.identifier ?? 'admin'), body));
+    } catch (e) {
+      if (e instanceof PipelineHealthError) return c.json(errBody(e), e.status);
+      const { errorResponse, status } = await handleError(c, e, 'Failed to resume user sync');
       return c.json(errorResponse, status);
     }
   });

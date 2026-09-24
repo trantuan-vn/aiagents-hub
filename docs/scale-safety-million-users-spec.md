@@ -1,7 +1,7 @@
 # Spec: An toàn hệ thống ở quy mô triệu user (Scale Safety)
 
-> **Trạng thái:** Draft v1.0 — Phase A implemented (pending caps, `pending_high`, processed cleanup, dead-table cleanup)  
-> **Phiên bản:** 1.1  
+> **Trạng thái:** Draft v1.1 — Phase A + Phase B implemented  
+> **Phiên bản:** 1.2  
 > **Ngày:** 2026-09-24  
 > **Phạm vi:** Bảo vệ **ổn định, công bằng, chi phí kiểm soát được** khi nền tảng tăng tới hàng triệu user / hàng chục–trăm triệu sự kiện/ngày trên data-plane `UserDO → Queue → D1 → R2` và control-plane workflow (UserDO-local)  
 > **Bổ sung, không thay thế:**  
@@ -214,7 +214,7 @@ Khi bất kỳ stage ở `incident` hoặc CF projected overage ≥ 80% kỳ:
 | Bảng | Ở 1M MAU | Quyết định safety |
 |------|----------|-------------------|
 | `service_usages`, `orders`, `payments`, `refunds` | Giữ E2E R2 | OK |
-| `commissions`, `workflow_royalties` | D1-only hôm nay | **Phase B:** thêm pipeline archive hoặc retention ngắn hơn usages |
+| `commissions`, `workflow_royalties` | D1 + **R2 archive (Phase B)** | OK — cùng retention `D1_RETENTION_DAYS` sau archive |
 | Social stars/comments | Thấp hơn | Shed P2; có thể D1 TTL ngắn hoặc không sync nếu chỉ DO đủ |
 | Catalog | O(users) | Giữ sync; không archive bắt buộc |
 
@@ -314,13 +314,15 @@ v1 UI: có thể bắt đầu bằng KV + system-config fields; pipeline-health 
 - Checklist mốc 10k MAU (mục §11).
 - Cross-link spec này từ pipeline-health + usage.
 
-### Phase B — Backpressure & archive T2 (M)
+### Phase B — Backpressure & archive T2 (M) — **implemented**
 
-- Slow-flush per hot user.
-- KV `sync.pause_tables` / `pause_user` + UI admin read-only status.
-- Archive `commissions` + `workflow_royalties` → R2 **hoặc** retention D1 riêng ngắn hơn.
-- Fairness rate-limit workflow run gắn pending hard.
-- CI: diff `SYNC_TABLE_NAMES` UserDO vs queue-worker vs domain catalogs.
+- Slow-flush per hot user (`SLOW_FLUSH_*` trên UserDO khi soft exceed / `pending_high`).
+- KV `sync.pause_tables` / `sync.pause_user:{id}` + audit; UserDO skip flush (force flush vẫn chạy); UI pipeline-health **read-only** status + admin API pause/resume.
+- Archive `commissions` + `workflow_royalties` → R2 (d1tor2 `PIPELINE_CONFIGS` + `PIPELINE_ARCHIVE_TABLES`) — **đã chọn archive**, không dùng retention riêng.
+- Fairness workflow run: hard → `BACKPRESSURE`; soft → `BACKPRESSURE_SOFT` throttle (`WORKFLOW_SOFT_THROTTLE_MS`).
+- CI: `npm run check:sync-tables` (`scripts/check-sync-tables.mjs`).
+
+**Ops sau deploy:** tạo Cloudflare Pipelines streams/sinks cho `commissions` / `workflow_royalties` nếu chưa có (`pnpm --filter @api-services/pipelines create-pipelines` hoặc d1tor2 auto-create path).
 
 ### Phase C — Multi-tenant sẵn sàng 1M (L)
 

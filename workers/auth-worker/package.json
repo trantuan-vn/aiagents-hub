@@ -88,7 +88,7 @@
   "scripts": {
     "cf-typegen": "wrangler types",
     "check": "tsc && wrangler deploy --dry-run",
-    "test": "vitest run",
+    "test": "vitest run && node ../../scripts/check-sync-tables.mjs",
     "test:watch": "vitest",
     "deploy": "wrangler deploy",
     "dev": "npm run build && wrangler dev",

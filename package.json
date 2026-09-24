@@ -20,6 +20,7 @@
     "deploy:consumer": "wrangler deploy -c workers/consumer-worker/wrangler.jsonc",
     "deploy:web": "npm run deploy --workspace=trading-sto",
     "deploy:all": "npm run deploy:queue && npm run deploy:consumer && npm run deploy:auth && npm run deploy:web",
+    "check:sync-tables": "node scripts/check-sync-tables.mjs",
     "cf": "powershell -ExecutionPolicy Bypass -File scripts/cf.ps1",
     "cf:login": "powershell -ExecutionPolicy Bypass -File scripts/cf.ps1 login"
   },

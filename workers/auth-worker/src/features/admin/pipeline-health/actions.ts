@@ -19,6 +19,11 @@ import {
   isValidDoUserId,
 } from './domain.js';
 import { getDlqEntry, markDlqReplayed, writeAudit } from './store.js';
+import {
+  clearPauseUser,
+  setPauseTables,
+  setPauseUser,
+} from '../../ws/infrastructure/sync-pause.js';
 
 type D1tor2TriggerStats = {
   totalPipelines: number;
@@ -322,4 +327,63 @@ export async function replayDlqEntry(
     JSON.stringify({ id, userId, table, queueId, messageId: entry.messageId }),
   );
   return { ok: true, id, userId, table, queueId };
+}
+
+export async function setSyncPauseTables(
+  env: Env,
+  actor: string,
+  input: { tables?: string[]; confirm?: boolean },
+): Promise<{ ok: true; pauseTables: string[] }> {
+  if (input.confirm !== true) {
+    throw new PipelineHealthError('confirm_required', 'confirm: true is required', 400);
+  }
+  const tables = Array.isArray(input.tables) ? input.tables : [];
+  const pauseTables = await setPauseTables(env, tables, SYNC_TABLE_NAMES);
+  if (env.D1DB) {
+    await writeAudit(env.D1DB, actor, 'sync.pause_tables', JSON.stringify({ pauseTables }));
+  }
+  return { ok: true, pauseTables };
+}
+
+export async function setSyncPauseUser(
+  env: Env,
+  actor: string,
+  input: { userId?: string; reason?: string; ttlSec?: number; confirm?: boolean },
+): Promise<{ ok: true; userId: string; ttlSec: number }> {
+  if (input.confirm !== true) {
+    throw new PipelineHealthError('confirm_required', 'confirm: true is required', 400);
+  }
+  const userId = input.userId?.trim() ?? '';
+  if (!isValidDoUserId(userId)) {
+    throw new PipelineHealthError('invalid_user_id', 'userId must be a 64-char Durable Object id', 400);
+  }
+  const result = await setPauseUser(env, {
+    userId,
+    by: actor,
+    reason: input.reason,
+    ttlSec: input.ttlSec,
+  });
+  if (env.D1DB) {
+    await writeAudit(env.D1DB, actor, 'sync.pause_user', JSON.stringify(result));
+  }
+  return { ok: true, ...result };
+}
+
+export async function clearSyncPauseUser(
+  env: Env,
+  actor: string,
+  input: { userId?: string; confirm?: boolean },
+): Promise<{ ok: true; userId: string }> {
+  if (input.confirm !== true) {
+    throw new PipelineHealthError('confirm_required', 'confirm: true is required', 400);
+  }
+  const userId = input.userId?.trim() ?? '';
+  if (!isValidDoUserId(userId)) {
+    throw new PipelineHealthError('invalid_user_id', 'userId must be a 64-char Durable Object id', 400);
+  }
+  await clearPauseUser(env, userId);
+  if (env.D1DB) {
+    await writeAudit(env.D1DB, actor, 'sync.resume_user', JSON.stringify({ userId }));
+  }
+  return { ok: true, userId };
 }

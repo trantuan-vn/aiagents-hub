@@ -32,12 +32,17 @@ import {
   PENDING_SOFT_PER_TABLE,
   PENDING_SOFT_PER_USER,
   PROCESSED_CLEANUP_THRESHOLD,
+  SLOW_FLUSH_INTERVAL_MULTIPLIER,
   T1_PENDING_GATE_TABLES,
   backpressureErrorMessage,
+  effectiveFlushInterval,
   evaluatePendingCaps,
+  isSlowFlushActive,
   isT1PendingGateTable,
+  nextSlowFlushUntil,
   shouldCleanupProcessed,
 } from './scale-safety.js';
+import { isUserPaused, readPauseTables } from './sync-pause.js';
 import { upsertHotUser } from '../../admin/pipeline-health/store.js';
 import {
   executionHistoryLimitsForPlan,
@@ -50,6 +55,11 @@ const doLog = createLogger('auth-worker', 'user-do');
 const CRON_NEXT_RUN_AT_KEY = 'cron:nextRunAt';
 const PENDING_HIGH_LAST_KEY = 'scale:pendingHighReportedAt';
 const MAINTENANCE_LAST_KEY = 'scale:lastMaintenanceAt';
+const SLOW_FLUSH_UNTIL_KEY = 'scale:slowFlushUntil';
+const WORKFLOW_LAST_RUN_KEY = 'scale:lastWorkflowRunAt';
+/** Short isolate cache for sync.pause_* so flush does not hit KV every call. */
+let syncPauseCache: { at: number; tables: string[]; userPaused: boolean; userId: string } | null = null;
+const SYNC_PAUSE_CACHE_MS = 15_000;
 
 import { 
   ConnectionSchema, PendingMessageSchema, SubscriptionSchema, 
@@ -366,7 +376,17 @@ export class UserDO extends DurableObject {
   private async maybeReportPendingHigh(tableName: string): Promise<void> {
     const tablePending = this.tableStates.get(tableName)?.pendingCount ?? 0;
     const userPending = this.getUserPendingTotalFromState();
-    if (tablePending < PENDING_SOFT_PER_TABLE && userPending < PENDING_SOFT_PER_USER) return;
+    if (tablePending < PENDING_SOFT_PER_TABLE && userPending < PENDING_SOFT_PER_USER) {
+      // Clear slow-flush when back under soft
+      const until = (await this.storage.get<number>(SLOW_FLUSH_UNTIL_KEY)) ?? 0;
+      if (until > 0 && !isSlowFlushActive(until)) {
+        await this.storage.delete(SLOW_FLUSH_UNTIL_KEY);
+      }
+      return;
+    }
+    // Phase B: arm slow-flush whenever soft exceeded
+    await this.storage.put(SLOW_FLUSH_UNTIL_KEY, nextSlowFlushUntil());
+
     const db = this.env.D1DB;
     if (!db) return;
     const last = (await this.storage.get<number>(PENDING_HIGH_LAST_KEY)) ?? 0;
@@ -382,6 +402,40 @@ export class UserDO extends DurableObject {
     } catch (error) {
       handleErrorWithoutIp(error, `UserDO ${this.userId} pending_high report failed`);
     }
+  }
+
+  private async getSlowFlushUntil(): Promise<number> {
+    return (await this.storage.get<number>(SLOW_FLUSH_UNTIL_KEY)) ?? 0;
+  }
+
+  private async resolveFlushInterval(baseMs: number): Promise<number> {
+    const until = await this.getSlowFlushUntil();
+    return effectiveFlushInterval(baseMs, isSlowFlushActive(until), SLOW_FLUSH_INTERVAL_MULTIPLIER);
+  }
+
+  private async getSyncPauseFlags(): Promise<{ tables: string[]; userPaused: boolean }> {
+    const now = Date.now();
+    if (
+      syncPauseCache &&
+      syncPauseCache.userId === this.userId &&
+      now - syncPauseCache.at < SYNC_PAUSE_CACHE_MS
+    ) {
+      return { tables: syncPauseCache.tables, userPaused: syncPauseCache.userPaused };
+    }
+    const [tables, userPaused] = await Promise.all([
+      readPauseTables(this.env),
+      isUserPaused(this.env, this.userId),
+    ]);
+    syncPauseCache = { at: now, tables, userPaused, userId: this.userId };
+    return { tables, userPaused };
+  }
+
+  /** Phase B: skip flush when sync.pause_tables / sync.pause_user (unless force). */
+  private async shouldSkipFlush(tableName: string, force: boolean): Promise<boolean> {
+    if (force) return false;
+    const { tables, userPaused } = await this.getSyncPauseFlags();
+    if (userPaused) return true;
+    return tables.includes(tableName);
   }
 
   private async hasExcessProcessedRecords(): Promise<boolean> {
@@ -517,11 +571,12 @@ export class UserDO extends DurableObject {
     }
   }
 
-  private tableNeedsFlush(tableName: string, config: AuthQueueConfig): boolean {
+  private async tableNeedsFlush(tableName: string, config: AuthQueueConfig): Promise<boolean> {
     const state = this.tableStates.get(tableName);
     if (!state) return false;
     const lastFlushTime = state.lastFlushTime || 0;
-    return state.pendingCount >= config.QUEUE_FLUSH_THRESHOLD || (Date.now() - lastFlushTime) > config.QUEUE_FLUSH_INTERVAL;
+    const interval = await this.resolveFlushInterval(config.QUEUE_FLUSH_INTERVAL);
+    return state.pendingCount >= config.QUEUE_FLUSH_THRESHOLD || (Date.now() - lastFlushTime) > interval;
   }
 
   private async shouldFlushTable(tableName: string, config?: AuthQueueConfig): Promise<boolean> {
@@ -557,6 +612,7 @@ export class UserDO extends DurableObject {
         '/queue/health': () => this.handleQueueHealth(),
         '/queue/cleanup': (req) => this.handleQueueCleanup(req),
         '/queue/table-state-reset': (req) => this.handleTableStateReset(req),
+        '/queue/touch-workflow-run': () => this.handleTouchWorkflowRun(),
         '/debug/id-counters': async () => this.handleDebugIdCounters(),
         '/workflow/collab/get': (req) => this.handleWorkflowCollabGet(req),
         '/workflow/collab/publish': (req) => this.handleWorkflowCollabPublish(req),
@@ -808,7 +864,7 @@ export class UserDO extends DurableObject {
     for (const tableName of updatedTables) {
       await this.updateTablePendingCount(tableName);
       this.state.waitUntil(this.maybeReportPendingHigh(tableName));
-      if (flushConfig && this.tableNeedsFlush(tableName, flushConfig)) {
+      if (flushConfig && (await this.tableNeedsFlush(tableName, flushConfig))) {
         this.state.waitUntil(this.flushPendingRecords(tableName));
       }
     }
@@ -889,7 +945,7 @@ export class UserDO extends DurableObject {
     const results = [];
     const flushConfig = await this.getAuthQueueConfig();
     for (const tableName of this.SYNC_TABLE_NAMES) {
-      if (force || this.tableNeedsFlush(tableName, flushConfig)) {
+      if (force || (await this.tableNeedsFlush(tableName, flushConfig))) {
         await this.flushPendingRecords(tableName, force);
         results.push({
           table: tableName,
@@ -991,6 +1047,11 @@ export class UserDO extends DurableObject {
   private async flushPendingRecords(tableName: string, force: boolean = false): Promise<void> {
     const state = this.tableStates.get(tableName);
     if (!state) return;
+
+    if (await this.shouldSkipFlush(tableName, force)) {
+      doLog.info('do.flush_skipped_pause', { userId: this.userId, table: tableName, force });
+      return;
+    }
 
     const config = await this.getAuthQueueConfig();
     const batchSize = config.QUEUE_BATCH_SIZE;
@@ -1224,7 +1285,7 @@ export class UserDO extends DurableObject {
       stats[tableName] = {
         tableState: state,
         ...this.calculateTableMetrics(statusStats, now, state),
-        shouldFlush: this.tableNeedsFlush(tableName, flushConfig)
+        shouldFlush: await this.tableNeedsFlush(tableName, flushConfig)
       };
     }
 
@@ -1286,6 +1347,12 @@ export class UserDO extends DurableObject {
     };
   }
 
+  private async handleTouchWorkflowRun(): Promise<Response> {
+    const now = Date.now();
+    await this.storage.put(WORKFLOW_LAST_RUN_KEY, now);
+    return this.jsonResponse({ success: true, lastWorkflowRunAt: now });
+  }
+
   private async handleQueueHealth(): Promise<Response> {
     let totalPending = 0;
     let totalProcessed = 0;
@@ -1324,6 +1391,10 @@ export class UserDO extends DurableObject {
     const healthStatus = unhealthyTables > 0 ? 'warning' : 
                        totalPending >= PENDING_SOFT_PER_USER ? 'degraded' :
                        totalPending > 1000 ? 'degraded' : 'healthy';
+
+    const slowFlushUntil = await this.getSlowFlushUntil();
+    const lastWorkflowRunAt = (await this.storage.get<number>(WORKFLOW_LAST_RUN_KEY)) ?? null;
+    const pauseFlags = await this.getSyncPauseFlags();
     
     return this.jsonResponse({
       success: true,
@@ -1335,6 +1406,16 @@ export class UserDO extends DurableObject {
       unhealthyTables,
       backpressure: totalPending > PENDING_HARD_PER_USER,
       softExceeded: totalPending >= PENDING_SOFT_PER_USER,
+      slowFlush: {
+        active: isSlowFlushActive(slowFlushUntil),
+        until: slowFlushUntil || null,
+        multiplier: SLOW_FLUSH_INTERVAL_MULTIPLIER,
+      },
+      syncPause: {
+        userPaused: pauseFlags.userPaused,
+        pausedTables: pauseFlags.tables,
+      },
+      lastWorkflowRunAt,
       caps: {
         softPerTable: PENDING_SOFT_PER_TABLE,
         hardPerTable: PENDING_HARD_PER_TABLE,
@@ -1420,7 +1501,9 @@ export class UserDO extends DurableObject {
     let queueWake: number | null = null;
     if (hasPending || excessProcessed) {
       const config = await this.getAuthQueueConfig();
-      queueWake = Date.now() + config.RETRY_ALARM_INTERVAL;
+      const retryBase = config.RETRY_ALARM_INTERVAL;
+      const interval = await this.resolveFlushInterval(retryBase);
+      queueWake = Date.now() + interval;
     }
     const continueWake = await workflowContinueWakeAt(this.storage);
     const hints = [queueWake, continueWake].filter(
@@ -1486,7 +1569,7 @@ export class UserDO extends DurableObject {
     const tablesToFlush: string[] = [];
     const flushConfig = await this.getAuthQueueConfig();
     for (const tableName of this.SYNC_TABLE_NAMES) {
-      if (this.tableNeedsFlush(tableName, flushConfig)) tablesToFlush.push(tableName);
+      if (await this.tableNeedsFlush(tableName, flushConfig)) tablesToFlush.push(tableName);
     }
     const promises = tablesToFlush.map(tableName => {
         return this.flushPendingRecords(tableName);

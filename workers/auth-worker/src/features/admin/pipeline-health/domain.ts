@@ -100,12 +100,14 @@ export const SYNC_TABLE_NAMES = [
   'earnings_payouts',
 ] as const;
 
-/** Tables archived by d1tor2 PIPELINE_CONFIGS */
+/** Tables archived by d1tor2 PIPELINE_CONFIGS (T1 billing + T2 commissions/royalties) */
 export const PIPELINE_ARCHIVE_TABLES = [
   'service_usages',
   'orders',
   'payments',
   'refunds',
+  'commissions',
+  'workflow_royalties',
 ] as const;
 
 export const PIPELINE_EVENT_PREFIXES = [

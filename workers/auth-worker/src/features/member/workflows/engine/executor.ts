@@ -56,6 +56,7 @@ import {
   executionHistoryLimitsFromEntitlement,
   pruneWorkflowExecutionHistory,
 } from '../execution/execution-retention.js';
+import { evaluateWorkflowRunFairness } from '../../../ws/infrastructure/scale-safety.js';
 import { enqueueWorkflowContinue } from '../execution/workflow-continue.js';
 import { pipelineItems } from '../nodes/tool/shared/pipeline.js';
 
@@ -982,16 +983,24 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
       workflowId: resolved.workflowId,
     });
 
-    // Phase A: reject new runs when DO queue is over hard pending (noisy neighbor / backpressure).
+    // Phase A/B: fairness — hard reject / soft throttle when DO queue overloaded.
     try {
       const healthRes = await userDO.fetch('https://user.do/queue/health', { method: 'GET' });
       if (healthRes.ok) {
         const health = (await healthRes.json()) as {
           backpressure?: boolean;
+          softExceeded?: boolean;
           pendingTotal?: number;
-          caps?: { hardPerUser?: number };
+          lastWorkflowRunAt?: number | null;
+          caps?: { hardPerUser?: number; softPerUser?: number };
         };
-        if (health.backpressure === true) {
+        const decision = evaluateWorkflowRunFairness({
+          pendingTotal: Number(health.pendingTotal ?? 0) || 0,
+          softPerUser: health.caps?.softPerUser,
+          hardPerUser: health.caps?.hardPerUser,
+          lastRunAt: health.lastWorkflowRunAt ?? null,
+        });
+        if (decision.action === 'reject') {
           return {
             ok: false,
             result: {
@@ -1003,6 +1012,26 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
                 error: 'BACKPRESSURE: queue overloaded — try again shortly',
                 code: 'BACKPRESSURE',
                 reason: 'backpressure',
+                pendingTotal: health.pendingTotal ?? null,
+              },
+              steps: [],
+              totalCostVnd: 0,
+            },
+          };
+        }
+        if (decision.action === 'throttle') {
+          return {
+            ok: false,
+            result: {
+              status: 'failed',
+              executionKey,
+              workflowId: resolved.workflowId,
+              workflowOwnerId: resolved.ownerId,
+              output: {
+                error: `BACKPRESSURE_SOFT: slow down — retry in ~${Math.ceil(decision.waitMs / 1000)}s`,
+                code: 'BACKPRESSURE_SOFT',
+                reason: 'backpressure',
+                waitMs: decision.waitMs,
                 pendingTotal: health.pendingTotal ?? null,
               },
               steps: [],
@@ -1026,6 +1055,11 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
       input: typeof input === 'string' ? input.slice(0, 32_000) : undefined,
       state: serializePersistedState(persisted as unknown as Record<string, unknown>),
     });
+    try {
+      await userDO.fetch('https://user.do/queue/touch-workflow-run', { method: 'POST' });
+    } catch {
+      /* best-effort fairness timestamp */
+    }
     try {
       await pruneWorkflowExecutionHistory(
         userDO,

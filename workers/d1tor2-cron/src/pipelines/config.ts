@@ -3,6 +3,8 @@ import {
 	ServiceUsageSchema,
 	PaymentSchema,
 	RefundSchema,
+	CommissionSchema,
+	WorkflowRoyaltySchema,
 } from '@auth-worker/features/ws/domain.js';
 import { z } from 'zod';
 
@@ -407,7 +409,7 @@ function createExtendedSchema(schema: z.ZodSchema): z.ZodSchema {
 	});
 }
 /**
- * Pipeline configurations - service_usages, orders, payments, refunds
+ * Pipeline configurations — billing T1 + T2 (commissions, workflow_royalties → R2, Phase B)
  * (order_items / order_discounts removed — dead tables, scale-safety Phase A)
  * Tham chiếu: workers/queue-worker/src/database/index.ts -> initializeTables()
  */
@@ -441,6 +443,22 @@ export const PIPELINE_CONFIGS: PipelineConfig[] = [
 		tableName: 'refunds',
 		schema: createExtendedSchema(RefundSchema),
 		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(RefundSchema)),
+		namespace: 'v011',
+		r2BucketName: 'aiagents-hub-lakehouse',
+	},
+	{
+		schemaName: 'CommissionSchema',
+		tableName: 'commissions',
+		schema: createExtendedSchema(CommissionSchema),
+		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(CommissionSchema)),
+		namespace: 'v011',
+		r2BucketName: 'aiagents-hub-lakehouse',
+	},
+	{
+		schemaName: 'WorkflowRoyaltySchema',
+		tableName: 'workflow_royalties',
+		schema: createExtendedSchema(WorkflowRoyaltySchema),
+		pipelineSchema: createPipelineSchemaFromZod(createExtendedSchema(WorkflowRoyaltySchema)),
 		namespace: 'v011',
 		r2BucketName: 'aiagents-hub-lakehouse',
 	},

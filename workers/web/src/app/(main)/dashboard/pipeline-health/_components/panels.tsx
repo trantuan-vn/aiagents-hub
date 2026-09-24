@@ -116,3 +116,54 @@ export function HotUsersPanel({
     </div>
   );
 }
+
+/** Phase B: read-only view of sync.pause_tables / sync.pause_user */
+export function SyncPauseStatusPanel({
+  pauseTables,
+  pauseUsers,
+}: {
+  pauseTables: string[];
+  pauseUsers: Array<{ userId: string; reason?: string; by?: string; at?: number }>;
+}) {
+  const idle = !pauseTables.length && !pauseUsers.length;
+  return (
+    <div className="rounded-lg border p-3 text-sm">
+      <div className="mb-2 font-medium">Sync pause (kill-switch)</div>
+      {idle ? (
+        <p className="text-muted-foreground text-sm">No tables or users paused.</p>
+      ) : (
+        <div className="space-y-2">
+          {pauseTables.length ? (
+            <div>
+              <div className="text-muted-foreground mb-1 text-xs">Paused tables</div>
+              <div className="flex flex-wrap gap-1">
+                {pauseTables.map((name) => (
+                  <Badge key={name} variant="destructive">
+                    {name}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          {pauseUsers.length ? (
+            <div>
+              <div className="text-muted-foreground mb-1 text-xs">Paused users</div>
+              <ul className="space-y-1 font-mono text-xs">
+                {pauseUsers.map((u) => (
+                  <li key={u.userId}>
+                    {u.userId.slice(0, 16)}…{u.reason ? ` · ${u.reason}` : ""}
+                    {u.by ? ` · by ${u.by}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      )}
+      <p className="text-muted-foreground mt-2 text-xs">
+        Force flush still works with force=true. API:{" "}
+        <code className="text-[10px]">/pipeline-health/actions/pause-*</code>
+      </p>
+    </div>
+  );
+}

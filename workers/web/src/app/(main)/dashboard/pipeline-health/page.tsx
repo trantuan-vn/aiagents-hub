@@ -15,7 +15,7 @@ import { useRequireAdmin } from "../_hooks/use-require-admin";
 import { IncidentsTable } from "./_components/incidents-table";
 import { ActionsPanel } from "./_components/actions-panel";
 import { AuxBucketsPanel, DlqPanel } from "./_components/dlq-panel";
-import { CronRunsPanel, HotUsersPanel, TablesPanel } from "./_components/panels";
+import { CronRunsPanel, HotUsersPanel, SyncPauseStatusPanel, TablesPanel } from "./_components/panels";
 import { RecommendationList } from "./_components/recommendation-list";
 import { StageStrip } from "./_components/stage-strip";
 import {
@@ -46,6 +46,10 @@ export default function PipelineHealthPage() {
   const [tables, setTables] = useState<TableHealthRow[]>([]);
   const [cronRuns, setCronRuns] = useState<CronRunSummary[]>([]);
   const [hotUsers, setHotUsers] = useState<HotUserRow[]>([]);
+  const [syncPause, setSyncPause] = useState<{
+    pauseTables: string[];
+    pauseUsers: Array<{ userId: string; reason?: string; by?: string; at?: number }>;
+  }>({ pauseTables: [], pauseUsers: [] });
   const [dlqEntries, setDlqEntries] = useState<DlqEntryDto[]>([]);
   const [auxBuckets, setAuxBuckets] = useState<AuxBucketHealth[]>([]);
   const [probeId, setProbeId] = useState("");
@@ -62,7 +66,7 @@ export default function PipelineHealthPage() {
     setErrorCode(undefined);
     try {
       const qs = `range=${range}`;
-      const [ovRes, iRes, rRes, tRes, cRes, hRes, dRes, aRes] = await Promise.all([
+      const [ovRes, iRes, rRes, tRes, cRes, hRes, dRes, aRes, pRes] = await Promise.all([
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/overview?${qs}`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/incidents?${qs}`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/recommendations?${qs}`, { credentials: "include" }),
@@ -71,6 +75,7 @@ export default function PipelineHealthPage() {
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/hot-users`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/dlq?limit=50`, { credentials: "include" }),
         fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/aux-buckets`, { credentials: "include" }),
+        fetch(`${API_BASE_URL}/dashboard/admin/pipeline-health/sync-pause`, { credentials: "include" }),
       ]);
       if (!ovRes.ok) {
         const errBody = await parseDashboardApiError(ovRes);
@@ -109,6 +114,16 @@ export default function PipelineHealthPage() {
       if (aRes.ok) {
         const body = (await aRes.json()) as { buckets?: AuxBucketHealth[] };
         if (body.buckets?.length) setAuxBuckets(body.buckets);
+      }
+      if (pRes.ok) {
+        const body = (await pRes.json()) as {
+          pauseTables?: string[];
+          pauseUsers?: Array<{ userId: string; reason?: string; by?: string; at?: number }>;
+        };
+        setSyncPause({
+          pauseTables: body.pauseTables ?? [],
+          pauseUsers: body.pauseUsers ?? [],
+        });
       }
     } catch (err) {
       setOverview(null);
@@ -317,7 +332,8 @@ export default function PipelineHealthPage() {
                 </pre>
               ) : null}
             </TabsContent>
-            <TabsContent value="actions" className="pt-3">
+            <TabsContent value="actions" className="space-y-4 pt-3">
+              <SyncPauseStatusPanel pauseTables={syncPause.pauseTables} pauseUsers={syncPause.pauseUsers} />
               <ActionsPanel defaultUserId={probeId || undefined} onDone={() => void load()} />
             </TabsContent>
           </Tabs>

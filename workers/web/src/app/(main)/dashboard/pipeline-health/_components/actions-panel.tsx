@@ -14,6 +14,8 @@ const ARCHIVE_TABLES = [
   "orders",
   "payments",
   "refunds",
+  "commissions",
+  "workflow_royalties",
 ] as const;
 
 export function ActionsPanel({
