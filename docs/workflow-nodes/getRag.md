@@ -3,7 +3,7 @@
 > **Trạng thái:** Draft — retrieve schema để Reasoning Agent viết SQL  
 > **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "get-rag"`  
-> **Liên kết:** [`saveRag.md`](./saveRag.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`reasoning-agent.md`](./reasoning-agent.md)
+> **Liên kết:** [`saveRag.md`](./saveRag.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`reasoning-agent.md`](./reasoning-agent.md) · [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md)
 
 Tool **đọc** Vectorize theo câu hỏi của user và trả schema (cột + mô tả VI/EN) cùng SQL example của các bảng liên quan, để Reasoning Agent viết SQL. Nó không introspect Oracle và không chạy SQL.
 
@@ -25,7 +25,7 @@ Tool **đọc** Vectorize theo câu hỏi của user và trả schema (cột + m
 1. Resolve collection / namespace / embed model qua `shared/rag-context.ts` (cùng index Save RAG đã ghi).
 2. Embed **nguyên câu hỏi**, không viết lại câu hỏi.
 3. `queryCollection` top-K trên cả `docType=schema` và `docType=sqlexample`.
-4. Gom match theo `groupByField` (mặc định `tableName`). Với mỗi bảng, hydrate đủ chunk của **cả hai** document và ghép theo `chunkIndex`. Schema đứng trước SQL example. Agent cần full cột và vài câu SELECT mẫu, không chỉ đoạn dính từ khóa.
+4. Gom match theo `groupByField` (mặc định `tableName`). Query chỉ để chọn bảng. Chunk của bảng đã chọn được đọc bằng id hash, ghép đúng lát cắt Save RAG đã ghi. Schema đứng trước SQL example. Thiếu chunk schema thì bỏ bảng, không trả document cụt. Không có sqlexample vẫn trả schema. Hợp đồng đầy đủ: [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) mục 9.
 5. Trả:
 
 ```ts
@@ -61,6 +61,8 @@ Pipeline (Webhook → Get RAG → Agent): `querySource: from_agent_input`, quest
 
 Giữ `toolName` `get_rag`, `queryField`, `groupByField`, `topK`, `scoreThreshold`, `querySource`, `includeMetadata`.
 
+Giá trị để không cắt schema nằm ở [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) mục 9.0: `topK` **12** bảng, `scoreThreshold` **0**, `groupByField` **`tableName`**, `includeMetadata` **true**, `querySource` **`from_agent_input`**. `topK` và `scoreThreshold` chỉ chọn bảng. Chunk của bảng đã chọn được đọc hết.
+
 `toolDescription` nói rõ: tìm schema bảng liên quan tới câu hỏi để viết SQL; đừng gọi khi đã có snippet schema trong context.
 
 ---
@@ -79,6 +81,9 @@ Giữ `toolName` `get_rag`, `queryField`, `groupByField`, `topK`, `scoreThreshol
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.8 | 2026-09-28 | Mặc định mục 9.0: topK 12, scoreThreshold 0, groupBy tableName |
+| 0.7 | 2026-09-28 | Đọc theo mục 9 spec đủ dữ liệu: id hash, nối lát cắt, bỏ bảng khi schema thiếu chunk |
+| 0.6 | 2026-09-28 | Trỏ hợp đồng hydrate đủ chunk: [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) |
 | 0.5 | 2026-09-22 | Mỗi bảng trả schema + SQL example |
 | 0.4 | 2026-09-22 | Retrieve schema song ngữ cho Reasoning Agent |
 | 0.3 | 2026-09-14 | Hydrate group theo `groupByField` |

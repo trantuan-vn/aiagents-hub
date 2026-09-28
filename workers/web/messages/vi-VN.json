@@ -3538,7 +3538,7 @@
     "field_vectorize_scope": "Phạm vi dataset",
     "field_vectorize_scope_desc": "Tự sinh theo từng node Vectorize. Nối cùng node này vào Save RAG và Get RAG để chúng dùng chung dataset.",
     "field_dimensions": "Dimensions",
-    "field_vectorize_dimensions_desc": "Phải khớp service embedding nối vào Get RAG / Save RAG (BGE-base = 768).",
+    "field_vectorize_dimensions_desc": "Phải khớp service embedding nối vào Get RAG / Save RAG (BGE-M3 = 1024).",
     "field_metric": "Metric",
     "field_vectorize_metric_desc": "Metric khoảng cách của index Vectorize dùng chung.",
     "field_vectorize_connected": "Tool đã nối",

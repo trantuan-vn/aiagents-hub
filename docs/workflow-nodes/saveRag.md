@@ -3,7 +3,8 @@
 > **Trạng thái:** Draft  
 > **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "save-rag"`  
-> **Liên kết:** [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md)
+> **Liên kết:** [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md)  
+> **Hợp đồng ghi đủ dữ liệu:** [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) thay mục một lần LLM và cách cắt chunk 800 ký tự khi implement.
 
 Tool **ghi knowledge của một bảng**. Input là tên bảng từ Get DB Info / Loop. Nó lấy schema Oracle, nhờ LLM mô tả từng cột, dựng SQL example từ history và logic thông thường, rồi embed hai document vào Vectorize.
 
@@ -101,6 +102,7 @@ Bỏ khỏi panel mục tiêu: `contentField`, `documentIdField`, `sourceField`,
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 0.6 | 2026-09-28 | Trỏ hợp đồng mới: [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) |
 | 0.5 | 2026-09-22 | SQL example = `ADMIN.DBTOOLS$EXECUTION_HISTORY` + logic thông thường do LLM |
 | 0.4 | 2026-09-22 | Chỉ schema DB. LLM ra schema mới + SQL example, embed cả hai. Bỏ PDF/text |
 | 0.3 | 2026-09-22 | Tự introspect, LLM mô tả cột |

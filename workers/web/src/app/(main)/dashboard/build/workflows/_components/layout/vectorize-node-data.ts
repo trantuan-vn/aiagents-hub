@@ -33,7 +33,7 @@ export function buildVectorizeNodeData(
     memoryKind: "vectorize",
     collection: VECTORIZE_COLLECTION,
     namespace: buildVectorizeNodeScope(workflowId, nodeId),
-    dimensions: 768,
+    dimensions: 1024,
     metric: "cosine",
   };
 }

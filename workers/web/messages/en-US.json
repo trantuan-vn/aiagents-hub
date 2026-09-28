@@ -3538,7 +3538,7 @@
     "field_vectorize_scope": "Dataset scope",
     "field_vectorize_scope_desc": "Auto-generated per Vectorize node. Connect the same node to Save RAG and Get RAG so they share this dataset.",
     "field_dimensions": "Dimensions",
-    "field_vectorize_dimensions_desc": "Must match the embedding service connected to Get RAG / Save RAG (BGE-base = 768).",
+    "field_vectorize_dimensions_desc": "Must match the embedding service connected to Get RAG / Save RAG (BGE-M3 = 1024).",
     "field_metric": "Metric",
     "field_vectorize_metric_desc": "Distance metric of the shared Vectorize index.",
     "field_vectorize_connected": "Connected tools",

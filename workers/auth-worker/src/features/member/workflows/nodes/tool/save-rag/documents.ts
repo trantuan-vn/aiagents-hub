@@ -25,14 +25,34 @@ function yamlHeader(info: GetDbInfoResult, docType: 'schema' | 'sqlexample'): st
   ].join('\n');
 }
 
+function escapeCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+}
+
 function columnDescription(
   col: GetDbInfoResult['columns'][number],
   enrichment: TableEnrichment | undefined,
 ): { vi: string; en: string; aliases: string[] } {
   const found = enrichment?.columns.find((c) => c.name === col.name);
-  const en = found?.descriptionEn || col.comment || '';
-  const vi = found?.descriptionVi || '';
-  return { vi, en, aliases: found?.aliasesVi ?? [] };
+  return {
+    vi: found?.descriptionVi ?? '',
+    en: found?.descriptionEn ?? '',
+    aliases: found?.aliasesVi ?? [],
+  };
+}
+
+function assertEnrichmentComplete(info: GetDbInfoResult, enrichment: TableEnrichment): void {
+  if (!enrichment.tableSummaryVi.trim() || !enrichment.tableSummaryEn.trim()) {
+    throw new Error(`save_rag: table ${info.tableName} summary incomplete`);
+  }
+  for (const col of info.columns) {
+    const found = enrichment.columns.find((item) => item.name === col.name);
+    const vi = found?.descriptionVi.trim() ?? '';
+    const en = found?.descriptionEn.trim() ?? '';
+    if (!vi || !en || vi.length > 2000 || en.length > 2000) {
+      throw new Error(`save_rag: column "${col.name}" enrichment incomplete`);
+    }
+  }
 }
 
 export function buildSchemaDocument(
@@ -53,10 +73,12 @@ ${summaryEn ? `- EN: ${summaryEn}` : ''}
   const columns = info.columns
     .map((c) => {
       const d = columnDescription(c, enrichment);
-      const alias =
-        d.aliases.length > 0 ? ` aliasesVi=[${d.aliases.map((a) => `"${a}"`).join(', ')}]` : '';
-      return `| ${c.name} | ${c.type} | ${c.nullable ? 'YES' : 'NO'} | ${c.default ?? ''} | ${d.vi} | ${d.en}${alias} |`;
+      return `| ${escapeCell(c.name)} | ${escapeCell(c.type)} | ${c.nullable ? 'YES' : 'NO'} | ${escapeCell(c.default ?? '')} | ${escapeCell(d.vi)} | ${escapeCell(d.en)} | ${escapeCell(d.aliases.join(', '))} |`;
     })
+    .join('\n');
+  const comments = info.columns
+    .filter((c) => c.comment?.trim())
+    .map((c) => `- \`${c.name.replace(/`/g, '')}\`: ${escapeCell(c.comment ?? '')}`)
     .join('\n');
   const fks = info.foreignKeys.length
     ? info.foreignKeys.map((fk) => `- \`${fk.column}\` → \`${fk.refTable}(${fk.refColumn})\``).join('\n')
@@ -75,10 +97,10 @@ ${info.ddl}
 
 ## Columns
 
-| Column | Type | Nullable | Default | Description (VI) | Description (EN) |
-|--------|------|----------|---------|------------------|------------------|
-${columns || '| — | — | — | — | — | — |'}
-
+| Column | Type | Nullable | Default | Description (VI) | Description (EN) | Aliases |
+|--------|------|----------|---------|------------------|------------------|---------|
+${columns || '| — | — | — | — | — | — | — |'}
+${comments ? `\n${comments}\n` : ''}
 ## Primary key
 ${info.primaryKey.length ? info.primaryKey.map((k) => `- \`${k}\``).join('\n') : '- none'}
 
@@ -167,13 +189,23 @@ ${renderTypical(typical)}
   };
 }
 
-/** Build schema (+ optional sqlexample) after LLM enrichment. */
-export function ragDocumentsFromEnrichment(
-  info: GetDbInfoResult,
-  enrichment?: TableEnrichment,
-): RagDocumentItem[] {
+function buildDocs(info: GetDbInfoResult, enrichment?: TableEnrichment): RagDocumentItem[] {
   const docs = [buildSchemaDocument(info, enrichment)];
   const sqlDoc = buildSqlExampleDocument(info, enrichment);
   if (sqlDoc) docs.push(sqlDoc);
   return docs;
+}
+
+/** Oracle-only documents. Used by the deprecated introspect helpers. */
+export function ragDocumentsFromTableInfo(info: GetDbInfoResult): RagDocumentItem[] {
+  return buildDocs(info);
+}
+
+/** Schema (+ optional sqlexample) after every column and both summaries are complete. */
+export function ragDocumentsFromEnrichment(
+  info: GetDbInfoResult,
+  enrichment: TableEnrichment,
+): RagDocumentItem[] {
+  assertEnrichmentComplete(info, enrichment);
+  return buildDocs(info, enrichment);
 }

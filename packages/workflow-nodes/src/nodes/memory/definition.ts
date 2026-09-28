@@ -40,7 +40,7 @@ export const VECTORIZE_MEMORY_FIELDS = [
     type: "info" as const,
     labelKey: "field_dimensions",
     descriptionKey: "field_vectorize_dimensions_desc",
-    defaultValue: 768,
+    defaultValue: 1024,
     order: 3,
   },
   {
@@ -234,7 +234,7 @@ export const VECTORIZE_MEMORY_DEFINITION: WorkflowNodeDefinition = createBuiltin
   defaultData: {
     memoryKind: "vectorize",
     collection: "VECTORIZE",
-    dimensions: 768,
+    dimensions: 1024,
     metric: "cosine",
   },
   sections: [defaultParametersSection(VECTORIZE_MEMORY_FIELDS)],

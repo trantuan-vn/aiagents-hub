@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   DEFAULT_EMBED_MODEL,
+  resolveDefaultEmbedModel,
   embedText,
   embedTexts,
   embedTextsWithUsage,
@@ -14,6 +15,13 @@ import { chunkText } from '../nodes/tool/save-rag/chunk.js';
 import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 describe('rag-vector', () => {
+  it('rewrites the legacy English embed model to bge-m3', () => {
+    expect(DEFAULT_EMBED_MODEL).toBe('@cf/baai/bge-m3');
+    expect(resolveDefaultEmbedModel('@cf/baai/bge-base-en-v1.5')).toBe('@cf/baai/bge-m3');
+    expect(resolveDefaultEmbedModel('@cf/baai/bge-large-en-v1.5')).toBe('@cf/baai/bge-large-en-v1.5');
+    expect(resolveDefaultEmbedModel('')).toBe('@cf/baai/bge-m3');
+  });
+
   it('buildMetadataFilter includes namespace and docType', () => {
     expect(buildMetadataFilter({ namespace: 'pdf-ingest', docType: 'schema' })).toEqual({
       namespace: 'pdf-ingest',
@@ -193,6 +201,18 @@ describe('rag-vector', () => {
       topK: 3,
       returnMetadata: 'all',
     });
+  });
+
+  it('does not fall back to the default namespace when the caller set strictNamespace', async () => {
+    const query = vi.fn().mockResolvedValue({ matches: [] });
+    const env = { VECTORIZE: { query, upsert: vi.fn() } } as unknown as Env;
+    const matches = await queryCollection(env, 'VECTORIZE', [0.1, 0.2], {
+      topK: 3,
+      namespace: 'kb',
+      strictNamespace: true,
+    });
+    expect(matches).toEqual([]);
+    expect(query).toHaveBeenCalledTimes(1);
   });
 
   it('upsertVectors calls index upsert', async () => {

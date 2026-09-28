@@ -22,6 +22,7 @@ import {
   type ExecutionStepLog,
 } from "../../_lib/api";
 import { workflowEditorChatStore } from "../editor/workflow-editor-chat-store";
+import { workflowEditorLogsStore } from "../editor/workflow-editor-logs-store";
 import { buildChatApiUrl, resolveChatPath } from "../panels/node-config/chat-url";
 import { isChatTriggerNode } from "../panels/node-config/chat-node-config-panel";
 import { buildFormPublicUrl, resolveFormPath } from "../panels/node-config/form-url";
@@ -232,12 +233,20 @@ export function useWorkflowExecuteEntry({
       // Durable form kick: fields arrive with status=running before slices finish.
       // Keep WS listening for the final broadcast; do not finishRun yet.
       if (isForm && event.status === "running") {
+        if (workflowId && event.executionKey) workflowEditorLogsStore.touchLive(workflowId, event.executionKey);
         toast.message(tRegistry("form_event_received"));
         return;
       }
 
       try {
         const { execution: record } = await getWorkflowExecution(event.executionKey);
+        if (record.status === "running") {
+          if (record.steps?.length) {
+            applyStepOutputs(record.steps, patchNodeDataById);
+            if (workflowId) workflowEditorLogsStore.syncLive(workflowId, record.steps);
+          }
+          return;
+        }
         if (record.steps?.length) {
           applyStepOutputs(record.steps, patchNodeDataById);
           finishRun?.(record.steps);
@@ -248,9 +257,6 @@ export function useWorkflowExecuteEntry({
         else if (record.status === "cancelled") toast.message(tExecute("cancelled"));
         else if (record.status === "failed") {
           toast.error(String(record.error ?? tExecute("failed")));
-        } else if (record.status === "running") {
-          // Still slicing — wait for progress finished / final form broadcast.
-          return;
         } else if (!isChat) {
           toast.success(isForm ? tRegistry("form_event_received") : tRegistry("webhook_event_received"));
         }
@@ -268,7 +274,7 @@ export function useWorkflowExecuteEntry({
         setListeningNodeId(null);
       }
     },
-    [deactivateFormListening, finishRun, listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl],
+    [deactivateFormListening, finishRun, listeningNode, listeningNodeId, patchNodeDataById, tExecute, tRegistry, testUrl, workflowId],
   );
 
   useWebhookListenWs({

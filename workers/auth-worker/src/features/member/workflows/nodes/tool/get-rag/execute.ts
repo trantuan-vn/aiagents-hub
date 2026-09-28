@@ -21,6 +21,7 @@ import {
 import {
   assembleGroupSnippet,
   chunkIdsForDocument,
+  finalizeRetrievedGroup,
   groupDocumentIds,
   inferGroupBy,
   matchesFromVectorRows,
@@ -95,6 +96,8 @@ export function resolveGroupByField(template: unknown, input: Record<string, unk
  * When any chunk of a document matches, load every sibling chunk so the agent
  * sees the full doc (e.g. 1 of 3 → all 3). Uses metadata.totalChunks when set.
  */
+const HYDRATE_PAGE = 100;
+
 async function loadDocumentRows(
   env: Env,
   collection: string,
@@ -106,18 +109,31 @@ async function loadDocumentRows(
 
   const ids = [
     ...new Set(
-      documentIds.flatMap((documentId) =>
-        chunkIdsForDocument(documentId, totalChunksForDocument(documentId, seedMatches)),
-      ),
+      (
+        await Promise.all(
+          documentIds.map((documentId) =>
+            chunkIdsForDocument(documentId, totalChunksForDocument(documentId, seedMatches)),
+          ),
+        )
+      ).flat(),
     ),
   ];
-  try {
-    const rows = await index.getByIds(ids);
-    return matchesFromVectorRows(rows ?? []);
-  } catch (e) {
-    console.warn('[get-rag] getByIds hydrate failed:', e);
-    return [];
+  if (!ids.length) return [];
+
+  const rows: Array<{ id?: string; metadata?: Record<string, string>; score?: number }> = [];
+  for (let i = 0; i < ids.length; i += HYDRATE_PAGE) {
+    const page = ids.slice(i, i + HYDRATE_PAGE);
+    try {
+      rows.push(...((await index.getByIds(page)) ?? []));
+    } catch (e) {
+      try {
+        rows.push(...((await index.getByIds(page)) ?? []));
+      } catch (retryError) {
+        console.warn('[get-rag] hydrate short', retryError ?? e);
+      }
+    }
   }
+  return matchesFromVectorRows(rows);
 }
 
 async function queryTypedForGroup(params: {
@@ -137,6 +153,7 @@ async function queryTypedForGroup(params: {
       namespace: params.namespace,
       docType: params.docType,
       filter,
+      strictNamespace: true,
     });
   } catch (e) {
     console.warn(`[get-rag] typed ${params.docType} query failed:`, e);
@@ -164,6 +181,7 @@ async function hydrateRelatedGroups(params: {
           topK: VECTORIZE_ALL_METADATA_TOPK,
           namespace: params.namespace,
           filter: groupBy ? { [groupBy]: groupValue } : undefined,
+          strictNamespace: true,
         });
         grouped = mergeMatches(grouped, filtered);
       } catch (e) {
@@ -207,6 +225,7 @@ async function hydrateRelatedGroups(params: {
             const named = await queryCollection(params.env, params.collection, namedVector, {
               topK: VECTORIZE_ALL_METADATA_TOPK,
               namespace: params.namespace,
+              strictNamespace: true,
             });
             grouped = mergeMatches(
               grouped,
@@ -241,29 +260,50 @@ async function hydrateRelatedGroups(params: {
 }
 
 /** Query both schema and sqlexample so table selection is not biased to one docType. */
+export function resolveGetRagTopK(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 12;
+  return Math.min(20, Math.floor(n));
+}
+
+export function matchesAboveTableThreshold(
+  matches: VectorMatch[],
+  groupBy: string,
+  threshold: number,
+): VectorMatch[] {
+  if (!(threshold > 0)) return matches;
+  const best = new Map<string, number>();
+  for (const match of matches) {
+    const key = resolveGroupKey(match, groupBy);
+    best.set(key, Math.max(best.get(key) ?? 0, match.score ?? 0));
+  }
+  const keep = new Set(
+    [...best.entries()].filter(([, score]) => score >= threshold).map(([key]) => key),
+  );
+  return matches.filter((match) => keep.has(resolveGroupKey(match, groupBy)));
+}
+
+/** Discovery always asks for the API cap, then groups by table. */
 async function queryBothDocTypes(
   env: Env,
   collection: string,
   vector: number[],
-  opts: { topK: number; namespace?: string; scoreThreshold?: number },
+  opts: { namespace?: string },
 ): Promise<VectorMatch[]> {
-  const broadTopK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(opts.topK * 4, 16));
-  const perTypeTopK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(opts.topK * 2, 8));
   const base = {
     namespace: opts.namespace,
-    scoreThreshold: opts.scoreThreshold,
+    topK: VECTORIZE_ALL_METADATA_TOPK,
+    strictNamespace: true,
   };
   const [broad, schemaMatches, sqlMatches] = await Promise.all([
-    queryCollection(env, collection, vector, { ...base, topK: broadTopK }),
+    queryCollection(env, collection, vector, base),
     queryCollection(env, collection, vector, {
       ...base,
-      topK: perTypeTopK,
       docType: 'schema',
       filter: { docType: 'schema' },
     }),
     queryCollection(env, collection, vector, {
       ...base,
-      topK: perTypeTopK,
       docType: 'sqlexample',
       filter: { docType: 'sqlexample' },
     }),
@@ -287,9 +327,9 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     },
   );
 
-  const topK = input.topK ?? (Number(config.topK ?? 12) || 12);
+  const topK = resolveGetRagTopK(input.topK ?? config.topK);
   const namespace = input.namespace ?? String(config.namespace ?? rag.namespace);
-  const scoreThreshold = config.scoreThreshold != null ? Number(config.scoreThreshold) : undefined;
+  const scoreThreshold = Number(config.scoreThreshold);
   const includeMetadata = config.includeMetadata !== false;
 
   try {
@@ -305,13 +345,11 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
-    const matches = await queryBothDocTypes(env, rag.collection, vector, {
-      topK,
+    const discovered = await queryBothDocTypes(env, rag.collection, vector, {
       namespace: namespace || undefined,
-      scoreThreshold,
     });
-
-    const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {});
+    const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {}) || 'tableName';
+    const matches = matchesAboveTableThreshold(discovered, groupBy, scoreThreshold);
     const hydrated = matches.length
       ? await hydrateRelatedGroups({
           env,
@@ -340,6 +378,8 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
 
     const inferredBy = inferGroupBy(matches, groupBy);
     const snippets = (hydrated.length ? hydrated : [matches])
+      .map((group) => finalizeRetrievedGroup(group))
+      .filter((group): group is VectorMatch[] => group != null && group.length > 0)
       .map((group) => {
         const first = group[0];
         if (!first) return { text: '' };
@@ -450,6 +490,6 @@ export async function prefetchLinkedGetRag(
     return { ragText: snippets.join('\n\n'), snippets, query };
   } catch (e) {
     console.warn('[get-rag] prefetch from Query field failed:', e);
-    return empty;
+    throw e;
   }
 }

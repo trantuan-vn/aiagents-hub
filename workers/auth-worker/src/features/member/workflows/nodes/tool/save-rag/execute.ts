@@ -1,4 +1,4 @@
-import { embedTextsWithUsage, upsertVectors, type VectorizeVectorRecord } from '../../../rag/index.js';
+import { embedTextsWithUsage, upsertVectors, vectorChunkId, type VectorizeVectorRecord } from '../../../rag/index.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import { embeddingUsageOrEstimate, mergeAiUsage, type AiUsage } from '../../../../../admin/service/pricing.js';
 import {
@@ -14,7 +14,7 @@ import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { resolveOracleConnectConfig } from '../shared/db/index.js';
 import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
-import { chunkText } from './chunk.js';
+import { chunkDocument } from './chunk.js';
 import { describeTable } from './describe-table.js';
 import { ragDocumentsFromEnrichment, type RagDocumentItem } from './documents.js';
 import { introspectTablesInfo } from './table-docs.js';
@@ -60,13 +60,6 @@ export type SaveRagExecuteParams = {
 const INDEXED_TABLES_KEY = '__saveRagIndexedTables';
 const VECTORIZE_UPSERT_LIMIT = 1000;
 
-function vectorId(documentId: string, index: number): string {
-  const raw = `${documentId}::chunk-${index}`;
-  if (raw.length <= 64) return raw;
-  const suffix = `::c${index}`;
-  return raw.slice(0, 64 - suffix.length) + suffix;
-}
-
 async function executeSaveRagMany(params: {
   env: Env;
   definition: WorkflowDefinition;
@@ -94,9 +87,6 @@ async function executeSaveRagMany(params: {
       userDO: params.userDO ?? params.billing?.userDO,
     },
   );
-  const chunkSize = Number(config.chunkSize ?? 800) || 800;
-  const chunkOverlap = Number(config.chunkOverlap ?? 120) || 120;
-
   type Pending = {
     documentId: string;
     source: string;
@@ -106,15 +96,23 @@ async function executeSaveRagMany(params: {
 
   const pending: Pending[] = [];
   for (const input of params.docs) {
-    const content = String(input.content ?? '').trim();
+    const content = String(input.content ?? '');
+    if (!content.trim()) continue;
+    const documentId = String(input.documentId ?? crypto.randomUUID());
+    const source = String(input.source ?? input.metadata?.source ?? documentId);
+    const namespace = rag.namespace || input.metadata?.namespace || '';
     const chunks = input.chunks?.length
       ? input.chunks.map((c) => ({ content: c.content, index: c.index }))
-      : chunkText(content, chunkSize, chunkOverlap);
+      : chunkDocument(content, {
+          ...(input.metadata ?? {}),
+          documentId,
+          source,
+          ...(namespace ? { namespace } : {}),
+        });
     if (!chunks.length) continue;
-    const documentId = String(input.documentId ?? crypto.randomUUID());
     pending.push({
       documentId,
-      source: String(input.source ?? input.metadata?.source ?? documentId),
+      source,
       metadata: input.metadata ?? {},
       chunks,
     });
@@ -145,7 +143,10 @@ async function executeSaveRagMany(params: {
     flatTexts,
     embed.model,
   );
-  const billedTexts = flatTexts.filter((text, i) => (embeddings[i] ?? []).length > 0 && text.trim());
+  if (embeddings.some((values) => !values.length)) {
+    throw new Error('save_rag: empty embedding; table was not saved');
+  }
+  const billedTexts = flatTexts.filter((text) => text.trim());
   const usage = embeddingUsageOrEstimate(billedTexts, embedUsage);
   await billRagEmbeddings(embed, params.billing, billedTexts, usage);
   if (rag.dimensions) {
@@ -165,21 +166,20 @@ async function executeSaveRagMany(params: {
 
   for (let i = 0; i < owners.length; i++) {
     const values = embeddings[i] ?? [];
-    if (!values.length) continue;
     const { doc, chunk } = owners[i]!;
     const namespace = rag.namespace || doc.metadata.namespace || '';
     vectors.push({
-      id: vectorId(doc.documentId, chunk.index),
+      id: await vectorChunkId(doc.documentId, chunk.index),
       values,
       metadata: {
         text: chunk.content,
-        content: chunk.content,
         source: doc.source,
         documentId: doc.documentId,
         chunkIndex: String(chunk.index),
         totalChunks: String(totalChunksByDoc.get(doc.documentId) ?? 1),
-        ...(namespace ? { namespace } : {}),
         ...doc.metadata,
+        ...(namespace ? { namespace } : {}),
+        formatVersion: '2',
       },
     });
     savedByDoc.set(doc.documentId, (savedByDoc.get(doc.documentId) ?? 0) + 1);
@@ -330,7 +330,8 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
 
   const results: SaveRagResult[] = [];
   const usages: AiUsage[] = [];
-  const docs: RagDocumentItem[] = [];
+  let llmCalls = 0;
+  let enrichedColumns = 0;
 
   const infos = await introspectTablesInfo({
     env: ctx.c.env,
@@ -344,20 +345,18 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
   });
 
   for (const info of infos) {
-    const enrichment = await describeTable(ctx, info);
-    docs.push(...ragDocumentsFromEnrichment(info, enrichment));
-  }
-
-  if (docs.length) {
+    if (!info.columns.length) {
+      throw new Error(`save_rag: table ${info.tableName} has no columns`);
+    }
+    const described = await describeTable(ctx, info);
+    llmCalls += described.llmCalls;
+    const docs = ragDocumentsFromEnrichment(info, described.enrichment);
     const batch = await saveDocuments(ctx, docs);
     results.push(...batch.results);
     if (batch.usage) usages.push(batch.usage);
+    markIndexedTables(ctx.runContext, [info.tableName]);
+    enrichedColumns += described.enrichment.columns.length;
   }
-
-  markIndexedTables(
-    ctx.runContext,
-    pendingTables.map((item) => String(item.tableName ?? '')),
-  );
 
   const saved = results.reduce((sum, r) => sum + r.saved, 0);
   const usage = mergeAiUsage(...usages);
@@ -368,6 +367,8 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     documentIds: results.map((r) => r.documentId),
     collection: results[0]?.collection,
     tables: infos.map((i) => i.tableName),
+    enrichedColumns,
+    llmCalls,
     ...(usage ? { raw: { usage } } : {}),
   };
 }

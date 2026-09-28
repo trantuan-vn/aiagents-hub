@@ -100,7 +100,7 @@ function saveRagGraph(extraSaveData: Record<string, unknown> = {}): WorkflowDefi
         id: 'svc_embed',
         type: 'service_node',
         position: { x: 0, y: 0 },
-        data: { endpoint: '/api/ai/baai/bge-base-en-v1.5' },
+        data: { endpoint: '/api/ai/baai/bge-m3' },
       },
       {
         id: 'svc_llm',
@@ -131,7 +131,7 @@ describe('executeSaveRagPipeline', () => {
           id: 1,
           endpoint,
           catalogId: 'bge-base',
-          embedModel: '@cf/baai/bge-base-en-v1.5',
+          embedModel: '@cf/baai/bge-m3',
           approvalStatus: 'approved',
         };
       }
@@ -149,7 +149,7 @@ describe('executeSaveRagPipeline', () => {
     billingMock.billAgentUsage.mockResolvedValue(0);
     billingMock.getModelForService.mockImplementation((service: Record<string, unknown>) => {
       const id = String(service.model ?? service.embedModel ?? service.catalogId ?? '');
-      if (id.includes('bge') || id.includes('embed')) return '@cf/baai/bge-base-en-v1.5';
+      if (id.includes('bge') || id.includes('embed')) return '@cf/baai/bge-m3';
       return '@cf/meta/llama-3.1-8b-instruct';
     });
   });
@@ -197,6 +197,15 @@ describe('executeSaveRagPipeline', () => {
     expect(docTypes.has('schema')).toBe(true);
     expect(docTypes.has('sqlexample')).toBe(true);
     expect(vectors.some((v) => v.metadata?.tableName === 'orders')).toBe(true);
+    const schema = vectors.find((v) => v.metadata?.docType === 'schema');
+    expect(schema?.metadata?.text).toContain('Khóa chính');
+    expect(schema?.metadata?.text).toContain('Tổng tiền');
+    expect(schema?.metadata?.formatVersion).toBe('2');
+    expect(schema?.metadata).not.toHaveProperty('content');
+    const saved = upsert.mock.calls[0]?.[0] as Array<{ id: string }>;
+    expect(saved[0]?.id).toMatch(/^[0-9a-f]{64}$/);
+    expect(out.enrichedColumns).toBe(2);
+    expect(out.llmCalls).toBeGreaterThanOrEqual(3);
   });
 
   it('resolves D1 connection from Get DB Info output when loop item is only a table name', async () => {
@@ -312,7 +321,7 @@ describe('executeSaveRagPipeline', () => {
     );
     expect(billingMock.resolveServiceByEndpoint).toHaveBeenCalledWith(
       expect.anything(),
-      '/api/ai/baai/bge-base-en-v1.5',
+      '/api/ai/baai/bge-m3',
     );
     const vectors = upsert.mock.calls[0]?.[0] as Array<{ namespace?: string; metadata?: Record<string, string> }>;
     expect(vectors[0]?.metadata?.namespace).toBe('uuser-1/kb-ns');
@@ -353,8 +362,8 @@ describe('executeSaveRag (embed prepared docs)', () => {
   beforeEach(() => {
     billingMock.resolveServiceByEndpoint.mockResolvedValue({
       id: 9,
-      endpoint: '/api/ai/baai/bge-base-en-v1.5',
-      model: '@cf/baai/bge-base-en-v1.5',
+      endpoint: '/api/ai/baai/bge-m3',
+      model: '@cf/baai/bge-m3',
       catalogId: 'bge-base',
       approvalStatus: 'approved',
       priceInput: 0.067,
@@ -372,7 +381,7 @@ describe('executeSaveRag (embed prepared docs)', () => {
           id: 'save',
           type: 'tool_node',
           position: { x: 0, y: 0 },
-          data: { toolKind: 'save-rag', serviceEndpoint: '/api/ai/baai/bge-base-en-v1.5' },
+          data: { toolKind: 'save-rag', serviceEndpoint: '/api/ai/baai/bge-m3' },
         },
       ],
       edges: [],
@@ -405,6 +414,38 @@ describe('executeSaveRag (embed prepared docs)', () => {
     expect(out.ok).toBe(true);
     expect(billingMock.billEmbeddingUsage).toHaveBeenCalled();
     expect(onCost).toHaveBeenCalledWith(0.000045);
+  });
+
+  it('does not upsert when the embedding vector is empty', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[]] }) },
+      VECTORIZE: { query: vi.fn(), upsert },
+    } as unknown as Env;
+    const definition: WorkflowDefinition = {
+      nodes: [
+        {
+          id: 'save',
+          type: 'tool_node',
+          position: { x: 0, y: 0 },
+          data: { toolKind: 'save-rag', serviceEndpoint: '/api/ai/baai/bge-m3' },
+        },
+      ],
+      edges: [],
+    };
+
+    await expect(
+      executeSaveRag({
+        env,
+        definition,
+        agentId: 'save',
+        input: { content: 'CREATE TABLE orders (id TEXT);', documentId: 'db.public.orders.schema' },
+        userDO: {} as never,
+        ownerId: 'user-1',
+        workflowId: 42,
+      }),
+    ).rejects.toThrow(/empty embedding/);
+    expect(upsert).not.toHaveBeenCalled();
   });
 });
 

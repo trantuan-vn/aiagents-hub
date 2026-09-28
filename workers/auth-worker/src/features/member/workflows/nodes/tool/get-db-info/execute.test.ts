@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
-import { ragDocumentsFromEnrichment } from '../save-rag/documents.js';
+import { ragDocumentsFromTableInfo } from '../save-rag/documents.js';
 import {
   introspectTableToRagDocuments,
   introspectTablesToRagDocuments,
@@ -65,7 +65,7 @@ const info: GetDbInfoResult = {
 
 describe('save-rag documents (schema + sqlexample)', () => {
   it('emits schema document; sqlexample only when history or typical queries exist', () => {
-    const items = ragDocumentsFromEnrichment(info);
+    const items = ragDocumentsFromTableInfo(info);
     expect(items).toHaveLength(1);
     expect(items[0]?.metadata.docType).toBe('schema');
     expect(items[0]?.content).toContain('# Table: public.orders');
@@ -73,7 +73,7 @@ describe('save-rag documents (schema + sqlexample)', () => {
   });
 
   it('renders historical SQL from Oracle execution history', () => {
-    const items = ragDocumentsFromEnrichment({
+    const items = ragDocumentsFromTableInfo({
       ...info,
       sqlHistory: [
         {

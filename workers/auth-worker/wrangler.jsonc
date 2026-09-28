@@ -168,6 +168,7 @@
 			"binding": "LOADER"
 		}
 	],
+	// Index must be 1024 dimensions to match @cf/baai/bge-m3. A 768-dimension index cannot store these vectors.
 	"vectorize": [
 		{
 			"binding": "VECTORIZE",

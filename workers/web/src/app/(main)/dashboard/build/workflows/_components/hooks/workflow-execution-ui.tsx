@@ -78,11 +78,14 @@ export function useWorkflowExecutionProgress({
   workflowId,
   patchNodeDataById,
   onExecutionFinished,
+  onLiveProgress,
 }: {
   workflowId?: number;
   patchNodeDataById?: (nodeId: string, patch: Record<string, unknown>) => void;
   /** Called when a run finishes (fetch steps / toast). */
   onExecutionFinished?: (event: WorkflowExecutionProgressEvent) => void;
+  /** Called on started / node_start / node_done so the editor log can refetch steps. */
+  onLiveProgress?: (event: WorkflowExecutionProgressEvent) => void;
 }): WorkflowExecutionUiValue & { bindListeningNodeId: (nodeId: string | null) => void } {
   const user = useDashboardUser();
   const [running, setRunning] = useState(false);
@@ -94,8 +97,10 @@ export function useWorkflowExecutionProgress({
   const listeningRef = useRef<string | null>(null);
   const patchRef = useRef(patchNodeDataById);
   const finishedRef = useRef(onExecutionFinished);
+  const liveRef = useRef(onLiveProgress);
   patchRef.current = patchNodeDataById;
   finishedRef.current = onExecutionFinished;
+  liveRef.current = onLiveProgress;
   runningRef.current = running;
 
   const bindListeningNodeId = useCallback((nodeId: string | null) => {
@@ -136,6 +141,7 @@ export function useWorkflowExecutionProgress({
         const listening = !!listeningRef.current;
         if (!localRun && !listening) return;
         if (executionKeyRef.current && data.executionKey !== executionKeyRef.current) return;
+        if (data.type !== "finished") liveRef.current?.(data);
 
         if (data.type === "started") {
           executionKeyRef.current = data.executionKey;

@@ -1,5 +1,5 @@
 import { interpolate } from '../../execution/node-runtime.js';
-import { DEFAULT_EMBED_MODEL } from '../../rag/index.js';
+import { DEFAULT_EMBED_MODEL, resolveDefaultEmbedModel } from '../../rag/index.js';
 import type { NodeContext } from '../types.js';
 import { expressionScope, resolveConfiguredNumber, resolveConfiguredText } from '../tool/shared/pipeline.js';
 
@@ -57,7 +57,7 @@ export function resolveEmbedModel(service: Record<string, unknown>): string {
   const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim();
   if (catalog.includes('bge')) return DEFAULT_EMBED_MODEL;
   const model = String(service.embedModel ?? service.embed_model ?? '').trim();
-  return model || DEFAULT_EMBED_MODEL;
+  return resolveDefaultEmbedModel(model || DEFAULT_EMBED_MODEL);
 }
 
 export function resolveAgentUserText(

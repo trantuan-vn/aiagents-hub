@@ -33,7 +33,7 @@ Vectorize là **memory resource node** — khai báo index Vectorize mà Agent v
     "memoryKind": "vectorize",
     "collection": "vectorize-default",
     "namespace": "pdf-ingest",
-    "dimensions": 768,
+    "dimensions": 1024,
     "metric": "cosine"
   }
 }
@@ -70,7 +70,7 @@ Vectorize là **memory resource node** — khai báo index Vectorize mà Agent v
 | **Memory kind** | `memoryKind` | select | `"vectorize"` | Phải là `vectorize` cho spec này |
 | **Collection** | `collection` | text | `"vectorize-default"` | Tên binding Vectorize trên Worker (`env[collection]`) |
 | **Namespace** | `namespace` | text | `""` | Prefix metadata `namespace` — tách nhiều KB trong cùng index |
-| **Dimensions** | `dimensions` | number | `768` | Chiều vector (khớp embedding model) |
+| **Dimensions** | `dimensions` | number | `1024` | Chiều vector của `@cf/baai/bge-m3`. Index phải tạo ở 1024; index 768 chiều không nhận vector này |
 | **Metric** | `metric` | select | `"cosine"` | `cosine` \| `euclidean` \| `dot-product` |
 
 **Alias runtime:** `memoryCollection` = `collection` (Agent `node.data` có thể mirror giá trị này).

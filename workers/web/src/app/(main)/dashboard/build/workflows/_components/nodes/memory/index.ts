@@ -74,7 +74,7 @@ export const memoryVectorizeUIPlugin: WorkflowNodeUIPlugin = {
     memoryKind: "vectorize",
     catalogId: "vectorize",
     collection: "VECTORIZE",
-    dimensions: 768,
+    dimensions: 1024,
     metric: "cosine",
   }),
   match: (node) => isVectorizeMemoryNode(node) && !isSimpleMemoryKind((node.data as { memoryKind?: string })?.memoryKind),

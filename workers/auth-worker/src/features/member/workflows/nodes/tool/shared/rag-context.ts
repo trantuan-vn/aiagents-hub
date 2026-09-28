@@ -13,6 +13,7 @@ import { reportUsageCharge } from '../../../billing/charge.js';
 import { resolveAgentResources } from '../../../engine/graph-helpers.js';
 import {
   DEFAULT_EMBED_MODEL,
+  resolveDefaultEmbedModel,
   VECTORIZE_COLLECTION,
   normalizeVectorizeCollection,
   resolveVectorizeScope,
@@ -319,15 +320,15 @@ export async function billRagEmbeddings(
 export function resolveEmbedModelFromService(service: Record<string, unknown>): string {
   const catalog = String(service.catalogId ?? service.catalog_id ?? '').trim().toLowerCase();
   const explicit = String(service.embedModel ?? service.embed_model ?? '').trim();
-  if (explicit) return explicit;
+  if (explicit) return resolveDefaultEmbedModel(explicit);
 
   const model = getServiceModel(service);
   if (model) {
     const lower = model.toLowerCase();
-    if (lower.includes('bge') || lower.includes('embed')) return model;
+    if (lower.includes('bge') || lower.includes('embed')) return resolveDefaultEmbedModel(model);
   }
   if (catalog.includes('bge') || catalog.includes('embed')) {
-    return model ?? DEFAULT_EMBED_MODEL;
+    return resolveDefaultEmbedModel(model ?? DEFAULT_EMBED_MODEL);
   }
   return DEFAULT_EMBED_MODEL;
 }

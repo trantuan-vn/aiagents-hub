@@ -40,14 +40,14 @@ generatedAt: 2026-06-13T10:00:00Z
 
 ## Columns
 
-| Column | Type | Nullable | Default | Description (VI) | Description (EN) |
-|--------|------|----------|---------|----------------|----------------|
-| id | uuid | NO | gen_random_uuid() | Khóa chính đơn hàng | Primary key |
-| user_id | uuid | NO | | Khách đặt hàng. FK → users.id | Ordering customer. FK → users.id |
-| total | numeric(12,2) | NO | 0 | Tổng tiền đơn | Order total |
-| created_at | timestamptz | NO | now() | Thời điểm tạo đơn | Created at |
+| Column | Type | Nullable | Default | Description (VI) | Description (EN) | Aliases |
+|--------|------|----------|---------|------------------|------------------|---------|
+| id | uuid | NO | gen_random_uuid() | Khóa chính đơn hàng | Primary key | |
+| user_id | uuid | NO | | Khách đặt hàng. FK → users.id | Ordering customer. FK → users.id | khách hàng |
+| total | numeric(12,2) | NO | 0 | Tổng tiền đơn | Order total | tổng tiền, doanh thu |
+| created_at | timestamptz | NO | now() | Thời điểm tạo đơn | Created at | |
 
-`aliasesVi` (ví dụ `tổng tiền`, `doanh thu` cho `total`) nằm trong cùng section cột hoặc ngay dưới bảng, để Get RAG khớp câu hỏi tiếng Việt.
+`aliasesVi` (ví dụ `tổng tiền`, `doanh thu` cho `total`) nằm trong cột Aliases, để Get RAG khớp câu hỏi tiếng Việt.
 
 ## Primary key
 - `id`

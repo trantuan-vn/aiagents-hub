@@ -31,7 +31,7 @@ Service là **resource node** cung cấp AI Hub endpoint (chat + embedding) cho 
   "data": {
     "label": "Embedding Service",
     "endpoint": "/dashboard/assistant/embed",
-    "catalogId": "cf-bge-base-en",
+    "catalogId": "cf-bge-m3",
     "capabilities": ["embed", "chat"]
   }
 }
@@ -90,7 +90,7 @@ serviceEndpoint = data.endpoint ?? data.catalogId ?? data.serviceEndpoint
 | Billing | Qua Agent → `billAgentUsage` |
 | Embed PDF/chunk | ✅ `save-rag` + `rag/rag-vector.ts` (`embedTextsWithUsage`) |
 
-**Embedding trong RAG ingest:** Service có capability `embed` (vd. Workers AI `@cf/baai/bge-base-en-v1.5` hoặc embedding service trên catalog) được Agent / [`saveRag`](./saveRag.md) dùng để vector hóa chunk trước khi ghi Vectorize.
+**Embedding trong RAG ingest:** Service có capability `embed` (Workers AI `@cf/baai/bge-m3`, 1024 chiều) được Agent / [`saveRag`](./saveRag.md) dùng để vector hóa chunk trước khi ghi Vectorize.
 
 **Chat trong RAG Q&A:** Service có capability `chat` được Agent dùng sau khi [`getRag`](./getRag.md) trả context.
 

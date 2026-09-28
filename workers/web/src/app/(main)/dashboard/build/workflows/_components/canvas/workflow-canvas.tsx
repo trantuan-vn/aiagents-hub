@@ -232,6 +232,12 @@ function CanvasInnerWithDrawerUi({
 }) {
   const { open, close } = useWorkflowAddNodeDrawerActions();
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
+  const onLiveProgress = useCallback(
+    (event: WorkflowExecutionProgressEvent) => {
+      if (workflowId) workflowEditorLogsStore.touchLive(workflowId, event.executionKey);
+    },
+    [workflowId],
+  );
   const onExecutionFinished = useCallback(
     async (event: WorkflowExecutionProgressEvent) => {
       try {
@@ -250,6 +256,7 @@ function CanvasInnerWithDrawerUi({
     workflowId,
     patchNodeDataById: readOnly ? undefined : patchNodeDataById,
     onExecutionFinished,
+    onLiveProgress,
   });
   const startRun = useCallback(
     (nodeId: string) => {

@@ -370,9 +370,9 @@ export async function introspectTableToRagDocuments(params: {
   tableName: string;
   schemaName?: string;
 }) {
-  const { ragDocumentsFromEnrichment } = await import('./documents.js');
+  const { ragDocumentsFromTableInfo } = await import('./documents.js');
   const info = await introspectTableInfo(params);
-  return ragDocumentsFromEnrichment(info);
+  return ragDocumentsFromTableInfo(info);
 }
 
 /** @deprecated Prefer introspectTablesInfo + describeTable + ragDocumentsFromEnrichment */
@@ -383,7 +383,7 @@ export async function introspectTablesToRagDocuments(params: {
   triggerContext: Record<string, unknown>;
   tables: Array<{ tableName: string; schemaName?: string }>;
 }) {
-  const { ragDocumentsFromEnrichment } = await import('./documents.js');
+  const { ragDocumentsFromTableInfo } = await import('./documents.js');
   const infos = await introspectTablesInfo(params);
-  return infos.flatMap((info) => ragDocumentsFromEnrichment(info));
+  return infos.flatMap((info) => ragDocumentsFromTableInfo(info));
 }

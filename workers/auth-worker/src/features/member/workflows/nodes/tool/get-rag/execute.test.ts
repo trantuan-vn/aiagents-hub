@@ -2,7 +2,15 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
-import { executeGetRag, executeGetRagPipeline, groupLooksIncomplete, missingSqlRagDocTypes } from './execute.js';
+import {
+  executeGetRag,
+  executeGetRagPipeline,
+  groupLooksIncomplete,
+  matchesAboveTableThreshold,
+  missingSqlRagDocTypes,
+  prefetchLinkedGetRag,
+  resolveGetRagTopK,
+} from './execute.js';
 import { toVectorizeNativeNamespace } from '../../../rag/index.js';
 import { WORKERS_AI_GATEWAY } from '../../../ai/workers-ai.js';
 
@@ -90,8 +98,9 @@ describe('executeGetRag', () => {
     });
     expect(query).toHaveBeenCalledWith(
       [0.5, 0.6],
-      expect.objectContaining({ topK: 16, returnMetadata: 'all', namespace: 'test-ns' }),
+      expect.objectContaining({ topK: 20, returnMetadata: 'all', namespace: 'test-ns' }),
     );
+    expect(query.mock.calls.slice(0, 3).map((call) => call[1]?.topK)).toEqual([20, 20, 20]);
   });
 
   it('embeds the query with the selected service model', async () => {
@@ -151,8 +160,8 @@ describe('executeGetRag', () => {
 
     const service = {
       id: 9,
-      endpoint: '/api/ai/baai/bge-base-en-v1.5',
-      model: '@cf/baai/bge-base-en-v1.5',
+      endpoint: '/api/ai/baai/bge-m3',
+      model: '@cf/baai/bge-m3',
       catalogId: 'bge-base',
       approvalStatus: 'approved',
       priceInput: 0.067,
@@ -166,7 +175,7 @@ describe('executeGetRag', () => {
       ...definition,
       nodes: definition.nodes.map((n) =>
         n.id === 'tool_get'
-          ? { ...n, data: { ...n.data, serviceEndpoint: '/api/ai/baai/bge-base-en-v1.5' } }
+          ? { ...n, data: { ...n.data, serviceEndpoint: '/api/ai/baai/bge-m3' } }
           : n,
       ),
     };
@@ -195,7 +204,7 @@ describe('executeGetRag', () => {
       'user@example.com',
       service,
       expect.objectContaining({
-        endpoint: '/api/ai/baai/bge-base-en-v1.5',
+        endpoint: '/api/ai/baai/bge-m3',
         promptTokens: expect.any(Number),
         workflowAttribution: { workflowId: 19, workflowOwnerId: 'owner-1' },
       }),
@@ -212,8 +221,8 @@ describe('executeGetRag', () => {
 
     const service = {
       id: 9,
-      endpoint: '/api/ai/baai/bge-base-en-v1.5',
-      model: '@cf/baai/bge-base-en-v1.5',
+      endpoint: '/api/ai/baai/bge-m3',
+      model: '@cf/baai/bge-m3',
       approvalStatus: 'approved',
       priceInput: 0.067,
       priceOutput: 0,
@@ -239,7 +248,7 @@ describe('executeGetRag', () => {
 
     expect(billingMock.findApprovedServiceByEndpoint).toHaveBeenCalledWith(
       expect.anything(),
-      '/api/ai/baai/bge-base-en-v1.5',
+      '/api/ai/baai/bge-m3',
     );
     expect(billingMock.billEmbeddingUsage).toHaveBeenCalled();
     expect(onCost).toHaveBeenCalledWith(0.000001);
@@ -898,5 +907,146 @@ describe('related table assembly', () => {
       [0.2, 0.3],
       expect.objectContaining({ filter: { source: 'kb.md' } }),
     );
+  });
+});
+
+describe('Get RAG completeness', () => {
+  it('uses 12 tables when topK is empty and caps at 20', () => {
+    expect(resolveGetRagTopK(undefined)).toBe(12);
+    expect(resolveGetRagTopK(0)).toBe(12);
+    expect(resolveGetRagTopK('nope')).toBe(12);
+    expect(resolveGetRagTopK(100)).toBe(20);
+  });
+
+  it('does not drop a table when scoreThreshold is 0 and drops a table below a positive threshold', () => {
+    const matches = [
+      { score: 0.2, metadata: { tableName: 'ORDERS', text: 'a' } },
+      { score: 0.9, metadata: { tableName: 'INVOICES', text: 'b' } },
+    ];
+    expect(matchesAboveTableThreshold(matches, 'tableName', 0)).toHaveLength(2);
+    expect(matchesAboveTableThreshold(matches, 'tableName', 0.5).map((m) => m.metadata?.tableName)).toEqual([
+      'INVOICES',
+    ]);
+  });
+
+  it('drops a table when a chunk is still missing after one hydrate retry', async () => {
+    const schema = {
+      id: 'seed',
+      score: 0.9,
+      metadata: {
+        formatVersion: '2',
+        docType: 'schema',
+        documentId: 'db.ADMIN.ORDERS.schema',
+        tableName: 'ORDERS',
+        schemaName: 'ADMIN',
+        chunkIndex: '0',
+        totalChunks: '2',
+        text: 'part-0',
+      },
+    };
+    const getByIds = vi.fn().mockResolvedValue([schema]);
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: { query: vi.fn().mockResolvedValue({ matches: [schema] }), getByIds, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const result = await executeGetRag({
+      env,
+      definition,
+      agentId: 'agent_1',
+      input: { query: 'orders' },
+    });
+
+    expect(result.count).toBe(0);
+    expect(result.snippets).toEqual([]);
+    expect(getByIds).toHaveBeenCalled();
+  });
+
+  it('loads 130 chunks in pages of at most 100', async () => {
+    const schema = {
+      id: 'seed',
+      score: 0.9,
+      metadata: {
+        formatVersion: '2',
+        docType: 'schema',
+        documentId: 'db.ADMIN.ORDERS.schema',
+        tableName: 'ORDERS',
+        chunkIndex: '0',
+        totalChunks: '130',
+        text: 'part-0',
+      },
+    };
+    const getByIds = vi.fn().mockImplementation(async (ids: string[]) => {
+      expect(ids.length).toBeLessThanOrEqual(100);
+      return [];
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: { query: vi.fn().mockResolvedValue({ matches: [schema] }), getByIds, upsert: vi.fn() },
+    } as unknown as Env;
+
+    const result = await executeGetRag({
+      env,
+      definition,
+      agentId: 'agent_1',
+      input: { query: 'orders' },
+    });
+
+    expect(result.count).toBe(0);
+    expect(getByIds.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it('returns schema when sqlexample was not saved', async () => {
+    const schema = {
+      id: 'seed',
+      score: 0.9,
+      metadata: {
+        formatVersion: '2',
+        docType: 'schema',
+        documentId: 'db.ADMIN.ORDERS.schema',
+        tableName: 'ORDERS',
+        schemaName: 'ADMIN',
+        chunkIndex: '0',
+        totalChunks: '1',
+        text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);',
+      },
+    };
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
+      VECTORIZE: {
+        query: vi.fn().mockResolvedValue({ matches: [schema] }),
+        getByIds: vi.fn().mockResolvedValue([schema]),
+        upsert: vi.fn(),
+      },
+    } as unknown as Env;
+
+    const result = await executeGetRag({
+      env,
+      definition,
+      agentId: 'agent_1',
+      input: { query: 'orders' },
+    });
+
+    expect(result.count).toBe(1);
+    expect(result.snippets[0]?.text).toContain('CREATE TABLE ADMIN.ORDERS');
+    expect(result.snippets[0]?.text).not.toContain('sqlexample');
+  });
+
+  it('propagates a retrieve error from prefetch instead of returning empty rag text', async () => {
+    const env = {
+      AI: { run: vi.fn().mockRejectedValue(new Error('embed down')) },
+      VECTORIZE: { query: vi.fn(), upsert: vi.fn() },
+    } as unknown as Env;
+    const ctx = {
+      node: definition.nodes[2],
+      nodeInput: {},
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    await expect(prefetchLinkedGetRag(ctx, 'agent_1', 'orders')).rejects.toThrow(/Get RAG retrieve failed/);
   });
 });

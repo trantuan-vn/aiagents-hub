@@ -1,0 +1,2 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm.
+error TS5058: The specified path does not exist: 'tsconfig.json'.

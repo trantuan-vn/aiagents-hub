@@ -10,6 +10,12 @@ function lastStepIndexForNode(steps: ExecutionStepLog[], nodeId: string): number
 export type WorkflowEditorLogsState = {
   workflowId: number | null;
   running: boolean;
+  /** Execution created for the current editor run. Empty until the first progress event. */
+  executionKey: string | null;
+  /** Bumped when a live run should refetch checkpointed steps. */
+  refreshGeneration: number;
+  /** Client time of startRun, used to ignore an older execution still in history. */
+  runStartedAt: number;
   steps: ExecutionStepLog[];
   selectedNodeId: string | null;
   selectedStepIndex: number;
@@ -30,6 +36,9 @@ const PREFS = {
 const INITIAL: WorkflowEditorLogsState = {
   workflowId: null,
   running: false,
+  executionKey: null,
+  refreshGeneration: 0,
+  runStartedAt: 0,
   steps: [],
   selectedNodeId: null,
   selectedStepIndex: -1,
@@ -38,7 +47,14 @@ const INITIAL: WorkflowEditorLogsState = {
 };
 
 let state: WorkflowEditorLogsState = INITIAL;
+let lastLiveTouch = 0;
 const listeners = new Set<() => void>();
+
+function stepsSignature(steps: ExecutionStepLog[]): string {
+  return steps
+    .map((step) => `${step.nodeId}:${step.status}:${step.durationMs ?? ""}:${step.input !== undefined ? 1 : 0}`)
+    .join("|");
+}
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -90,14 +106,56 @@ export const workflowEditorLogsStore = {
   },
 
   startRun: (workflowId: number, nodeId: string) => {
+    lastLiveTouch = 0;
     state = {
       workflowId,
       running: true,
+      executionKey: null,
+      refreshGeneration: state.refreshGeneration,
+      runStartedAt: Date.now(),
       steps: [],
       selectedNodeId: nodeId,
       selectedStepIndex: -1,
       openGeneration: state.openGeneration + 1,
       ...prefsOf(state),
+    };
+    emit();
+  },
+
+  /** Ask the logs panel to refetch steps for the execution that is still running. */
+  touchLive: (workflowId: number, executionKey: string) => {
+    if (!executionKey) return;
+    if (!state.running) return;
+    if (state.workflowId != null && state.workflowId !== workflowId) return;
+    const now = Date.now();
+    const sameKey = state.executionKey === executionKey;
+    if (sameKey && now - lastLiveTouch < 400) return;
+    lastLiveTouch = now;
+    state = {
+      ...state,
+      workflowId,
+      executionKey,
+      refreshGeneration: state.refreshGeneration + 1,
+    };
+    emit();
+  },
+
+  /** Replace steps while the run is still in progress. Ignores a stale snapshot that dropped steps. */
+  syncLive: (workflowId: number, steps: ExecutionStepLog[]) => {
+    if (!state.running) return;
+    if (state.workflowId != null && state.workflowId !== workflowId) return;
+    if (!steps.length || steps.length < state.steps.length) return;
+    if (stepsSignature(state.steps) === stepsSignature(steps)) return;
+    const followingTail = state.selectedStepIndex < 0 || state.selectedStepIndex >= state.steps.length - 1;
+    const selected = followingTail
+      ? { nodeId: steps[steps.length - 1]!.nodeId, index: steps.length - 1 }
+      : pickSelected(steps, state.selectedNodeId, state.selectedStepIndex);
+    state = {
+      ...state,
+      workflowId,
+      steps,
+      selectedNodeId: selected.nodeId,
+      selectedStepIndex: selected.index,
     };
     emit();
   },
@@ -109,6 +167,9 @@ export const workflowEditorLogsStore = {
     state = {
       workflowId,
       running: false,
+      executionKey: state.executionKey,
+      refreshGeneration: state.refreshGeneration,
+      runStartedAt: state.runStartedAt,
       steps: nextSteps,
       selectedNodeId: selected.nodeId,
       selectedStepIndex: selected.index,
@@ -165,6 +226,9 @@ export const workflowEditorLogsStore = {
     state = {
       workflowId,
       running: false,
+      executionKey: state.workflowId === workflowId ? state.executionKey : null,
+      refreshGeneration: state.refreshGeneration,
+      runStartedAt: state.runStartedAt,
       steps,
       selectedNodeId: selected.nodeId,
       selectedStepIndex: selected.index,

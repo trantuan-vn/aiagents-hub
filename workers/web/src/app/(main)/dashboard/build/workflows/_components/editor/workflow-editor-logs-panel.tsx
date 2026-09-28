@@ -16,6 +16,11 @@ import { parseDefinitionJson } from "../panels/workflow-panels/workflow-executio
 
 import { workflowEditorLogsStore } from "./workflow-editor-logs-store";
 
+const LIVE_POLL_MS = 2000;
+const LIVE_FETCH_DELAY_MS = 350;
+/** Ignore a previous execution that started well before this editor run. */
+const LIVE_START_SKEW_MS = 15_000;
+
 let consumedOpenWorkflowId: number | null = null;
 let consumedOpenGeneration = 0;
 
@@ -36,6 +41,28 @@ interface WorkflowEditorLogsPanelProps {
   definitionJson?: string;
   className?: string;
   fill?: boolean;
+}
+
+async function pullLiveSteps(workflowId: number): Promise<void> {
+  const current = workflowEditorLogsStore.getState();
+  if (!current.running || current.workflowId !== workflowId) return;
+
+  let executionKey = current.executionKey;
+  if (!executionKey) {
+    const { executions } = await listWorkflowExecutions(workflowId, 1);
+    const latest = executions[0];
+    if (!latest?.executionKey) return;
+    if (latest.status !== "running" && latest.status !== "pending_human") return;
+    if (latest.startedAt + LIVE_START_SKEW_MS < current.runStartedAt) return;
+    executionKey = latest.executionKey;
+  }
+
+  const { execution } = await getWorkflowExecution(executionKey);
+  const live = workflowEditorLogsStore.getState();
+  if (!live.running || live.workflowId !== workflowId) return;
+  if (live.executionKey && execution.executionKey !== live.executionKey) return;
+  if (!execution.steps?.length) return;
+  workflowEditorLogsStore.syncLive(workflowId, execution.steps);
 }
 
 function graphNodesFromDefinition(definitionJson?: string): Node[] {
@@ -77,6 +104,27 @@ export function WorkflowEditorLogsPanel({
     if (!consumeOpenGeneration(workflowId, logs.openGeneration)) return;
     if (!workflowEditorLogsStore.getState().poppedOut) onOpenChange(true);
   }, [belongsToWorkflow, logs.openGeneration, onOpenChange, workflowId]);
+
+  useEffect(() => {
+    if (!running || !belongsToWorkflow || !workflowId) return;
+    let cancelled = false;
+    const pull = () => {
+      void pullLiveSteps(workflowId).catch(() => {
+        /* keep the steps already on screen */
+      });
+    };
+    const kick = window.setTimeout(() => {
+      if (!cancelled) pull();
+    }, LIVE_FETCH_DELAY_MS);
+    const id = window.setInterval(() => {
+      if (!cancelled) pull();
+    }, LIVE_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(kick);
+      window.clearInterval(id);
+    };
+  }, [belongsToWorkflow, logs.refreshGeneration, running, workflowId]);
 
   useEffect(() => {
     if (!workflowId) return;

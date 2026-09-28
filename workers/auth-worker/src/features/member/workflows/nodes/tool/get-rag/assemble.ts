@@ -1,22 +1,14 @@
-import { matchToSnippet, type VectorMatch } from '../../../rag/index.js';
+import { matchToSnippet, vectorChunkId, type VectorMatch } from '../../../rag/index.js';
 
-const MAX_CHUNKS_PER_DOCUMENT = 24;
 const MIN_OVERLAP = 8;
 
-export { MAX_CHUNKS_PER_DOCUMENT };
+export { vectorChunkId };
 
 /** Phase 3: schema before SQL examples for the Reasoning Agent. */
 const DOC_TYPE_ORDER: Record<string, number> = {
   schema: 0,
   sqlexample: 1,
 };
-
-export function vectorChunkId(documentId: string, index: number): string {
-  const raw = `${documentId}::chunk-${index}`;
-  if (raw.length <= 64) return raw;
-  const suffix = `::c${index}`;
-  return raw.slice(0, 64 - suffix.length) + suffix;
-}
 
 export function metadataValue(match: VectorMatch, key: string): string {
   if (!key) return '';
@@ -59,6 +51,65 @@ export function overlapJoin(left: string, right: string): string {
 export function stitchChunkTexts(chunks: Array<{ index: number; text: string }>): string {
   const sorted = [...chunks].sort((a, b) => a.index - b.index || a.text.localeCompare(b.text));
   return sorted.reduce((acc, chunk, i) => (i === 0 ? chunk.text : overlapJoin(acc, chunk.text)), '');
+}
+
+/** formatVersion 2: exact slices, no inserted newline. */
+export function stitchExact(chunks: Array<{ index: number; text: string }>): string {
+  return [...chunks].sort((a, b) => a.index - b.index).map((chunk) => chunk.text).join('');
+}
+
+function isFormatV2(match: VectorMatch): boolean {
+  return String(match.metadata?.formatVersion ?? '') === '2';
+}
+
+function strictChunkIndex(match: VectorMatch): number | null {
+  const raw = match.metadata?.chunkIndex;
+  if (raw == null || raw === '') return null;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+function documentRowsComplete(rows: VectorMatch[]): boolean {
+  if (!rows.length || !rows.every(isFormatV2)) return false;
+  const totals = new Set(rows.map((row) => String(row.metadata?.totalChunks ?? '')));
+  if (totals.size !== 1) return false;
+  const total = Number([...totals][0]);
+  if (!Number.isInteger(total) || total <= 0 || rows.length !== total) return false;
+  const seen = new Set<number>();
+  for (const row of rows) {
+    const index = strictChunkIndex(row);
+    if (index == null || index >= total || seen.has(index)) return false;
+    seen.add(index);
+  }
+  return seen.size === total;
+}
+
+/**
+ * Version-2 schema must be complete or the table is dropped.
+ * A missing sqlexample does not drop a complete schema.
+ * Groups with no version-2 schema stay as stored (older snippets).
+ */
+export function finalizeRetrievedGroup(matches: VectorMatch[]): VectorMatch[] | null {
+  const v2 = matches.filter(isFormatV2);
+  const schemaIds = [...new Set(v2.filter((match) => docTypeOf(match) === 'schema').map(documentIdOf))];
+  if (!schemaIds.length) return matches;
+
+  const kept: VectorMatch[] = [];
+  let schemaOk = false;
+  for (const id of schemaIds) {
+    const rows = v2.filter((match) => documentIdOf(match) === id);
+    if (!documentRowsComplete(rows)) continue;
+    kept.push(...rows);
+    schemaOk = true;
+  }
+  if (!schemaOk) return null;
+
+  const sqlIds = [...new Set(v2.filter((match) => docTypeOf(match) === 'sqlexample').map(documentIdOf))];
+  for (const id of sqlIds) {
+    const rows = v2.filter((match) => documentIdOf(match) === id);
+    if (documentRowsComplete(rows)) kept.push(...rows);
+  }
+  return kept;
 }
 
 function chunkIndex(match: VectorMatch): number {
@@ -130,9 +181,17 @@ export function assembleGroupSnippet(groupKey: string, matches: VectorMatch[]): 
   }
 
   const docs = [...byDocument.entries()].map(([documentId, chunks]) => {
-    const stitched = stitchChunkTexts(
-      chunks.map((chunk) => ({ index: chunkIndex(chunk), text: matchToSnippet(chunk) })),
-    );
+    const versioned = chunks.every(isFormatV2);
+    const stitched = versioned
+      ? stitchExact(
+          chunks.map((chunk) => ({
+            index: strictChunkIndex(chunk) ?? 0,
+            text: String(chunk.metadata?.text ?? ''),
+          })),
+        )
+      : stitchChunkTexts(
+          chunks.map((chunk) => ({ index: chunkIndex(chunk), text: matchToSnippet(chunk) })),
+        );
     const first = chunks[0];
     return {
       documentId,
@@ -171,27 +230,27 @@ export function groupDocumentIds(matches: VectorMatch[]): string[] {
   return [...new Set(matches.map(documentIdOf).filter(Boolean))];
 }
 
-/** Prefer metadata.totalChunks when known (e.g. 3); otherwise probe up to MAX. */
+/** Version-2 documents only. Missing totalChunks means the document cannot be hydrated. */
 export function totalChunksForDocument(documentId: string, matches: VectorMatch[]): number {
   let maxKnown = 0;
   for (const match of matches) {
-    if (documentIdOf(match) !== documentId) continue;
+    if (documentIdOf(match) !== documentId || !isFormatV2(match)) continue;
     const fromMeta = Number(match.metadata?.totalChunks);
     if (Number.isFinite(fromMeta) && fromMeta > 0) {
       maxKnown = Math.max(maxKnown, Math.floor(fromMeta));
     }
-    maxKnown = Math.max(maxKnown, chunkIndex(match) + 1);
   }
-  if (maxKnown > 0) return Math.min(MAX_CHUNKS_PER_DOCUMENT, maxKnown);
-  return MAX_CHUNKS_PER_DOCUMENT;
+  return maxKnown;
 }
 
-export function chunkIdsForDocument(documentId: string, totalChunks?: number): string[] {
+export async function chunkIdsForDocument(documentId: string, totalChunks?: number): Promise<string[]> {
   const n =
     totalChunks != null && Number.isFinite(totalChunks) && totalChunks > 0
-      ? Math.min(MAX_CHUNKS_PER_DOCUMENT, Math.max(1, Math.floor(totalChunks)))
-      : MAX_CHUNKS_PER_DOCUMENT;
-  return Array.from({ length: n }, (_, i) => vectorChunkId(documentId, i));
+      ? Math.max(0, Math.floor(totalChunks))
+      : 0;
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) ids.push(await vectorChunkId(documentId, i));
+  return ids;
 }
 
 export function matchesFromVectorRows(

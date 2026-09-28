@@ -98,7 +98,7 @@ flowchart TB
       "data": {
         "label": "Embed Service",
         "endpoint": "/dashboard/assistant/embed",
-        "catalogId": "cf-bge-base-en",
+        "catalogId": "cf-bge-m3",
         "capabilities": ["embed"]
       }
     },
@@ -162,7 +162,7 @@ Authorization: Bearer {api_token}
 | 1 | Webhook | Parse body + binary → output `{ body, headers, ... }` |
 | 2 | Agent INPUT | Hiển thị tree webhook output |
 | 3 | Agent | Extract PDF text (model hoặc pre-step Phase 3) |
-| 4 | Service | Embed chunks (`@cf/baai/bge-base-en-v1.5` hoặc catalog) |
+| 4 | Service | Embed chunks (`@cf/baai/bge-m3`) |
 | 5 | save_rag | Upsert vectors + metadata vào `mem_kb.collection` |
 | 6 | Agent OUTPUT | `{ text: "Saved 12 chunks", saved: 12 }` |
 

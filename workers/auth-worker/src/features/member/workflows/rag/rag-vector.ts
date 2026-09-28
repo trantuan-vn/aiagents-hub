@@ -12,7 +12,17 @@ import {
   WORKERS_AI_GATEWAY,
 } from '../ai/workers-ai.js';
 
-export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
+/** Multilingual embeddings. 1024 dimensions — the Vectorize index must be created at 1024. */
+export const DEFAULT_EMBED_MODEL = '@cf/baai/bge-m3';
+export const DEFAULT_EMBED_DIMENSIONS = 1024;
+const LEGACY_ENGLISH_EMBED_MODEL = '@cf/baai/bge-base-en-v1.5';
+
+/** RAG calls use bge-m3. A service still stored as the English base model is rewritten. */
+export function resolveDefaultEmbedModel(modelId: string | undefined): string {
+  const id = String(modelId ?? '').trim();
+  if (!id || id === LEGACY_ENGLISH_EMBED_MODEL) return DEFAULT_EMBED_MODEL;
+  return id;
+}
 
 export type VectorMatch = {
   id?: string;
@@ -42,6 +52,13 @@ export type VectorizeVectorRecord = {
 
 /** `returnMetadata: "all"` drops max topK from 100 to 20. */
 export const VECTORIZE_ALL_METADATA_TOPK = 20;
+
+/** Stable id shared by Save RAG and Get RAG. 64 hex characters. */
+export async function vectorChunkId(documentId: string, index: number): Promise<string> {
+  const payload = new TextEncoder().encode(`${documentId}\n${index}`);
+  const digest = await crypto.subtle.digest('SHA-256', payload);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
 const VECTORIZE_NAMESPACE_MAX_BYTES = 64;
 
 export type QueryCollectionOptions = {
@@ -51,6 +68,11 @@ export type QueryCollectionOptions = {
   scoreThreshold?: number;
   /** Extra metadata equals-filters (e.g. tableName from Save RAG). */
   filter?: Record<string, string>;
+  /**
+   * When set with a namespace, an empty namespaced query stays empty.
+   * Get RAG uses this so another namespace cannot replace the connected scope.
+   */
+  strictNamespace?: boolean;
 };
 
 export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBinding | undefined {
@@ -258,7 +280,7 @@ export async function queryCollection(
   }
 
   // Legacy rows were written to the default namespace with metadata.namespace only.
-  if (!matches.length && nativeNs) {
+  if (!matches.length && nativeNs && !opts.strictNamespace) {
     try {
       const fetched = await queryIndex(index, queryVector, { topK, returnMetadata: 'all' });
       matches = fetched.filter((m) => matchesNamespace(m, opts.namespace));

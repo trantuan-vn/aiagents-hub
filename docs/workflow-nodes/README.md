@@ -24,6 +24,7 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | Tool | — | `nodes/tool/` | Factory; RAG overrides có execute |
 | **Tool nodes** | [`tool-nodes.md`](./tool-nodes.md) | `nodes/tool/shared/` + `ToolModule` | **Draft** — ranh giới tool, registry |
 | Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | **Draft** — schema DB → LLM → schema + SQL example → embed |
+| Save RAG đủ dữ liệu | [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) | `nodes/tool/save-rag/` + `get-rag/` | **Draft** — hợp đồng ghi đủ mô tả cột, không cắt vì `max_tokens` |
 | Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Draft** — retrieve schema + SQL example |
 | Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | **Draft** — chỉ liệt kê bảng |
 | Check SQL | [`check-sql.md`](./check-sql.md) | `nodes/tool/check-sql/` | **Draft** — probe SELECT Oracle |

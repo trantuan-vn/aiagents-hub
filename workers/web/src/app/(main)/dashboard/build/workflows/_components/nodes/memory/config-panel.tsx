@@ -20,8 +20,8 @@ import {
 import { NodeOutputPanel } from "../../panels/node-config/node-output-panel";
 import type { NodeConfigPanelProps } from "../types";
 
-/** Matches the shared `ask-ai-semantic` Vectorize index (BGE-base embeddings). */
-const INDEX_DIMENSIONS = 768;
+/** Matches `@cf/baai/bge-m3`. The bound Vectorize index must be created at 1024 dimensions. */
+const INDEX_DIMENSIONS = 1024;
 const INDEX_METRIC = "cosine";
 
 function ReadOnlyField({

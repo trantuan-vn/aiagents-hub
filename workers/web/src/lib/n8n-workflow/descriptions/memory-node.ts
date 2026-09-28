@@ -23,7 +23,7 @@ export const MEMORY_NODE_N8N_DESCRIPTION = resourceNode({
       displayName: "Dimensions",
       name: "dimensions",
       type: "hidden",
-      default: 768,
+      default: 1024,
     },
     {
       displayName: "Metric",
