@@ -7,7 +7,31 @@ import {
   resolveConfiguredNumber,
   resolveConfiguredRaw,
   resolveConfiguredText,
+  resolveFieldOrLiteral,
 } from './pipeline.js';
+
+describe('resolveFieldOrLiteral', () => {
+  const input = { chatInput: 'show me top customers', u: 'alice' };
+
+  it('evaluates {{ }} expressions', () => {
+    expect(resolveFieldOrLiteral('{{ $json.u }}', input)).toBe('alice');
+  });
+
+  it('resolves a bare INPUT field name', () => {
+    expect(resolveFieldOrLiteral('u', input)).toBe('alice');
+  });
+
+  it('returns hard-coded literals as-is', () => {
+    const dsn = '(description=(address=(protocol=tcps)(port=1522)(host=adb.example.com)))';
+    expect(resolveFieldOrLiteral('ADMIN', input)).toBe('ADMIN');
+    expect(resolveFieldOrLiteral(dsn, input)).toBe(dsn);
+  });
+
+  it('never falls back to the chat message', () => {
+    expect(resolveFieldOrLiteral('{{ $json.c }}', input)).toBe('');
+    expect(resolveFieldOrLiteral('', input)).toBe('');
+  });
+});
 
 describe('resolveConfiguredText', () => {
   it('uses the mapped Query field from a webhook body', () => {

@@ -12,7 +12,7 @@ import {
   type DbConnection,
   type OracleConnectConfig,
 } from '../shared/db/index.js';
-import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
+import { pipelineItems, resolveFieldOrLiteral } from '../shared/pipeline.js';
 
 export type { DbColumnInfo, DbForeignKey, GetDbInfoInput, GetDbInfoResult, SqlHistoryEntry } from '../shared/db/index.js';
 export { listDatabaseTables } from '../shared/db/index.js';
@@ -50,16 +50,15 @@ function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnec
 function mappedFormFields(nodeInput: NodeOutput, data: Record<string, unknown>): Record<string, unknown> {
   const item = pipelineItems(nodeInput)[0] ?? asRecord(nodeInput);
   const mapped: Record<string, unknown> = {};
-  const user = resolvePipelineField(data.userField || GET_DB_INFO_USER_FIELD, item, nodeInput, []);
-  const password = resolvePipelineField(data.passwordField || GET_DB_INFO_PASSWORD_FIELD, item, nodeInput, []);
-  const connectString = resolvePipelineField(
+  const scope = { ...(nodeInput as Record<string, unknown>), ...item };
+  const user = resolveFieldOrLiteral(data.userField || GET_DB_INFO_USER_FIELD, scope);
+  const password = resolveFieldOrLiteral(data.passwordField || GET_DB_INFO_PASSWORD_FIELD, scope);
+  const connectString = resolveFieldOrLiteral(
     data.connectStringField || GET_DB_INFO_CONNECT_STRING_FIELD,
-    item,
-    nodeInput,
-    [],
+    scope,
   );
-  const schemaName = resolvePipelineField(data.schemaNameField, item, nodeInput, []);
-  const tableName = resolvePipelineField(data.tableNameField, item, nodeInput, []);
+  const schemaName = resolveFieldOrLiteral(data.schemaNameField, scope);
+  const tableName = resolveFieldOrLiteral(data.tableNameField, scope);
   if (user) {
     mapped.user = user;
     mapped.u = user;

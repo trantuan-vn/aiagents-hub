@@ -8,7 +8,7 @@ import {
 import type { OracleConnectConfig } from '../shared/db/connect-config.js';
 import { resolveOracleConnectConfig, resolveOracleSchema } from '../shared/db/connect-config.js';
 import { validateReadOnly } from '../shared/db/oracle-client.js';
-import { resolveConfiguredText } from '../shared/pipeline.js';
+import { resolveFieldOrLiteral } from '../shared/pipeline.js';
 
 const FORBIDDEN =
   /\b(INSERT|UPDATE|DELETE|MERGE|DROP|ALTER|TRUNCATE|GRANT|EXECUTE|BEGIN|CALL)\b/i;
@@ -65,25 +65,18 @@ function mappedConnectFromToolConfig(
   triggerContext: Record<string, unknown>,
 ): Record<string, unknown> {
   const mapped: Record<string, unknown> = {};
-  const user = resolveConfiguredText(
-    toolConfig.userField || GET_DB_INFO_USER_FIELD,
-    triggerContext,
-    '',
-  );
-  const password = resolveConfiguredText(
+  const user = resolveFieldOrLiteral(toolConfig.userField || GET_DB_INFO_USER_FIELD, triggerContext);
+  const password = resolveFieldOrLiteral(
     toolConfig.passwordField || GET_DB_INFO_PASSWORD_FIELD,
     triggerContext,
-    '',
   );
-  const connectString = resolveConfiguredText(
+  const connectString = resolveFieldOrLiteral(
     toolConfig.connectStringField || GET_DB_INFO_CONNECT_STRING_FIELD,
     triggerContext,
-    '',
   );
-  const schemaName = resolveConfiguredText(
+  const schemaName = resolveFieldOrLiteral(
     toolConfig.schemaNameField || GET_DB_INFO_SCHEMA_FIELD,
     triggerContext,
-    '',
   );
   if (user) {
     mapped.user = user;

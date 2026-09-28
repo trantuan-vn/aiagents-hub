@@ -111,6 +111,15 @@ export function resolvePipelineField(
   return resolveConfiguredText(template, merged, '', keys);
 }
 
+/** `{{ expr }}`, an INPUT field name, or a hard-coded literal value. Never falls back to chat text. */
+export function resolveFieldOrLiteral(template: unknown, input: Record<string, unknown>): string {
+  const expr = String(template ?? '').trim();
+  if (!expr) return '';
+  const resolved = resolveConfiguredText(expr, input, '', []);
+  if (resolved || expr.includes('{{')) return resolved;
+  return expr;
+}
+
 /** Literal config, or `{{ }}` against INPUT. Empty/missing → undefined so the caller can fallback. */
 export function resolveConfiguredRaw(
   template: unknown,
