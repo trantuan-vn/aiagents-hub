@@ -48,6 +48,16 @@ describe('simple memory session id', () => {
     ).toBe('chat-1');
   });
 
+  it('does not share one default bucket when the chat has no session id', () => {
+    expect(
+      resolveSimpleMemorySessionId({
+        sessionIdSource: 'from_chat_trigger',
+        sessionKey: '{{ $json.sessionId }}',
+        input: { chatInput: 'hi' },
+      }),
+    ).toBe('');
+  });
+
   it('uses the interpolated key when define_below is selected', () => {
     expect(
       resolveSimpleMemorySessionId({

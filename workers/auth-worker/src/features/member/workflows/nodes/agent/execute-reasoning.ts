@@ -56,6 +56,7 @@ import {
   retrieveSemanticMemory,
   saveSessionMemory,
   memoryKey,
+  type Episode,
 } from './reasoning/memory.js';
 import { normalizePlannerMode, parsePlan, shouldPlan, PLAN_PROMPT } from './reasoning/plan.js';
 import { parseReflect, reflectHeuristics, REFLECT_PROMPT } from './reasoning/reflect.js';
@@ -770,13 +771,10 @@ export async function executeReasoningAgent(
     }
   }
 
-  const sessionId =
-    resolveSessionId(nodeInput, String(ctx.runContext.sessionId ?? '')) ||
-    `wf:${ctx.meta.workflowId}`;
-  const session = await loadSessionMemory(
-    ctx.userDO,
-    memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id),
-  );
+  const sessionId = resolveSessionId(nodeInput, String(ctx.runContext.sessionId ?? ''));
+  const session = sessionId
+    ? await loadSessionMemory(ctx.userDO, memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id))
+    : { memoryKey: '', summary: '', episodes: [] as Episode[] };
 
   const memoryCollection = isLinkedSimpleMemory(linked)
     ? ''
@@ -881,23 +879,27 @@ export async function executeReasoningAgent(
       return toNodeOutput(shown, outputExtra);
     }
     if (shown.status === 'needs_clarification') {
+      if (sessionId) {
+        await saveSessionMemory(ctx.userDO, {
+          workflowId: ctx.meta.workflowId,
+          sessionId,
+          agentId: ctx.node.id,
+          summary: `Asked: ${(shown.questions ?? []).join('; ') || shown.text}`.slice(0, 240),
+          status: shown.status,
+        });
+      }
+      await simpleMemory.persist((shown.questions ?? [shown.text]).join('\n'));
+      return toNodeOutput(shown, outputExtra);
+    }
+    if (sessionId) {
       await saveSessionMemory(ctx.userDO, {
         workflowId: ctx.meta.workflowId,
         sessionId,
         agentId: ctx.node.id,
-        summary: `Asked: ${(shown.questions ?? []).join('; ') || shown.text}`.slice(0, 240),
+        summary: shown.text.slice(0, 240),
         status: shown.status,
       });
-      await simpleMemory.persist((shown.questions ?? [shown.text]).join('\n'));
-      return toNodeOutput(shown, outputExtra);
     }
-    await saveSessionMemory(ctx.userDO, {
-      workflowId: ctx.meta.workflowId,
-      sessionId,
-      agentId: ctx.node.id,
-      summary: shown.text.slice(0, 240),
-      status: shown.status,
-    });
     if (memoryCollection) {
       await persistSemanticEpisode(ctx.c.env, memoryCollection, shown.text.slice(0, 400), memoryNamespace);
     }

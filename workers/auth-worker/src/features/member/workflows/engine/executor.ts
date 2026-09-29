@@ -7,6 +7,7 @@ import type { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import {
   createExecution,
   getExecutionByKey,
+  listExecutions,
   updateExecution,
   type ExecutionRow,
 } from '../execution/execution-store.js';
@@ -14,6 +15,7 @@ import { broadcastWorkflowExecutionProgress } from '../execution/execution-progr
 import { nodePluginRegistry } from '../nodes/index.js';
 import type { NodeContext as PluginNodeContext } from '../nodes/types.js';
 import { buildWebhookItemOutput } from '../nodes/webhook/output.js';
+import { shouldPauseChatForClarification } from '../triggers/chat-reply.js';
 import { isWebhookIngressNode } from '../triggers/triggers.js';
 import {
   activeHandlesForNode,
@@ -735,6 +737,13 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.visited.push(nodeId);
       delete engine.runContext._loop;
       delete engine.runContext._loopStates;
+      if (shouldPauseChatForClarification(engine.runContext, engine.outputs[nodeId])) {
+        engine.runContext.awaitingChat = true;
+        engine.runContext.pendingChatNodeId = nodeId;
+        await emitNodeDone(nodeId, 'success', engine.outputs[nodeId]);
+        await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
+        return { status: 'pending_human', output: engine.finalOutput, pendingNodeId: nodeId };
+      }
       await emitNodeDone(nodeId, 'success', engine.outputs[nodeId]);
       scheduleDownstream(definition, node, engine.outputs[nodeId], {
         input: persisted.input ?? '',
@@ -1380,6 +1389,143 @@ async function resolvePersistedForResume(params: {
       loopStates: {},
     },
   };
+}
+
+function readChatRunContext(state: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(state || '{}') as { engine?: { runContext?: Record<string, unknown> } };
+    return parsed.engine?.runContext ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function findPendingChatExecution(
+  userDO: DurableObjectStub<UserDO>,
+  workflowId: number,
+  sessionId: string,
+): Promise<ExecutionRow | null> {
+  const session = sessionId.trim();
+  if (!session) return null;
+  const rows = await listExecutions(userDO, workflowId, 30);
+  for (const row of rows) {
+    if (row.status !== 'pending_human' || !row.pendingNodeId) continue;
+    const ctx = readChatRunContext(String(row.state ?? ''));
+    if (ctx.awaitingChat === true && String(ctx.sessionId ?? '') === session) return row;
+  }
+  return null;
+}
+
+/** Continue the chat execution that asked a question, instead of starting a new run. */
+export async function continueChatExecution(params: {
+  c: any;
+  bindingName: string;
+  user: { identifier: string };
+  runnerDoIdString?: string;
+  executionKey: string;
+  sessionId: string;
+  chatInput: string;
+}): Promise<WorkflowExecutionResult> {
+  const userDO = resolveRunnerDO(params.c, params.bindingName, params.user.identifier, params.runnerDoIdString);
+  const record = await getExecutionByKey(userDO, params.executionKey);
+  if (!record) throw new Error('Execution not found');
+  if (record.status !== 'pending_human') {
+    throw new Error(`Execution is not waiting for chat (status: ${record.status})`);
+  }
+  const pendingNodeId = record.pendingNodeId;
+  if (!pendingNodeId) throw new Error('Execution has no chat node to continue');
+  const persisted = await resolvePersistedForResume({
+    c: params.c,
+    bindingName: params.bindingName,
+    user: params.user,
+    record,
+    rawState: JSON.parse(record.state || '{}') as unknown,
+    pendingNodeId,
+  });
+  const chatInput = params.chatInput;
+  const sessionId = params.sessionId;
+  persisted.input = chatInput;
+  persisted.engine.runContext = {
+    ...persisted.engine.runContext,
+    triggerKind: 'chat',
+    sessionId,
+    chatInput,
+    query: chatInput,
+    input: chatInput,
+    awaitingChat: false,
+    pendingChatNodeId: '',
+  };
+  const outputs = persisted.engine.outputs ?? {};
+  for (const output of Object.values(outputs)) {
+    if (output && output.triggerKind === 'chat') {
+      output.chatInput = chatInput;
+      output.query = chatInput;
+      output.text = chatInput;
+      output.sessionId = sessionId;
+    }
+  }
+  const entryId = persisted.engine.entryNodeId;
+  if (entryId && outputs[entryId]) {
+    Object.assign(outputs[entryId], { chatInput, query: chatInput, text: chatInput, sessionId });
+  }
+  persisted.engine.visited = (persisted.engine.visited ?? []).filter((id) => id !== pendingNodeId);
+  delete persisted.engine.outputs[pendingNodeId];
+  persisted.engine.queue = [
+    pendingNodeId,
+    ...(persisted.engine.queue ?? []).filter((id) => id !== pendingNodeId),
+  ];
+  await updateExecution(userDO, record.id, { status: 'running', pendingNodeId: '' });
+  const result = await runEngine({
+    c: params.c,
+    bindingName: params.bindingName,
+    user: params.user,
+    userDO,
+    persisted,
+    executionKey: params.executionKey,
+  });
+  const persistedResult = await persistOrFailRun(
+    userDO,
+    record.id,
+    persisted,
+    result,
+    params.executionKey,
+    'continueChatExecution',
+  );
+  return {
+    status: persistedResult.status === 'continuing' ? 'running' : persistedResult.status,
+    executionKey: params.executionKey,
+    workflowId: persisted.meta.workflowId,
+    workflowOwnerId: persisted.meta.ownerId,
+    output: persistedResult.output,
+    steps: persisted.engine.steps,
+    totalCostVnd: persisted.engine.totalCostVnd,
+    totalCreditsCharged: persisted.engine.totalCostVnd,
+    totalCreditsRoyalty: persisted.engine.totalRoyaltyUsd ?? 0,
+    totalRoyaltyUsd: persisted.engine.totalRoyaltyUsd ?? 0,
+    pendingNodeId: persistedResult.pendingNodeId,
+  };
+}
+
+export async function executeOrContinueChat(
+  params: ExecuteWorkflowParams & { sessionId: string },
+): Promise<WorkflowExecutionResult> {
+  const sessionId = params.sessionId.trim();
+  if (sessionId) {
+    const userDO = resolveRunnerDO(params.c, params.bindingName, params.user.identifier, params.runnerDoIdString);
+    const pending = await findPendingChatExecution(userDO, params.resolved.workflowId, sessionId);
+    if (pending) {
+      return continueChatExecution({
+        c: params.c,
+        bindingName: params.bindingName,
+        user: params.user,
+        runnerDoIdString: params.runnerDoIdString,
+        executionKey: pending.executionKey,
+        sessionId,
+        chatInput: String(params.input ?? ''),
+      });
+    }
+  }
+  return executeWorkflowGraph(params);
 }
 
 /**

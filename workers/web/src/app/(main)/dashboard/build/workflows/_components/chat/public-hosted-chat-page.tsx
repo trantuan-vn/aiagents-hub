@@ -49,7 +49,17 @@ export function PublicHostedChatPage({
     () => buildChatApiUrl({ workflowId, chatPath, mode, ownerId }),
     [workflowId, chatPath, mode, ownerId],
   );
-  const [sessionId] = useState(newChatSessionId);
+  const [sessionId, setSessionId] = useState(newChatSessionId);
+  const sessionStorageKey = `chat-session:${workflowId}:${chatPath}:${mode}`;
+
+  useEffect(() => {
+    const existing = window.sessionStorage.getItem(sessionStorageKey);
+    if (existing) setSessionId(existing);
+  }, [sessionStorageKey]);
+
+  useEffect(() => {
+    window.sessionStorage.setItem(sessionStorageKey, sessionId);
+  }, [sessionId, sessionStorageKey]);
   const [meta, setMeta] = useState<ChatMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [authChallenge, setAuthChallenge] = useState<ChatAuthChallenge | null>(null);
@@ -195,6 +205,18 @@ export function PublicHostedChatPage({
               <span className="text-muted-foreground ml-auto font-mono text-[11px]">
                 {t("chat_session", { id: sessionShort })}
               </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => {
+                  setSessionId(newChatSessionId());
+                  setMessages(seedChatTriggerMessages(meta?.initialMessages));
+                }}
+              >
+                {t("chat_new")}
+              </Button>
             </div>
             {meta?.subtitle ? <p className="text-muted-foreground text-xs">{meta.subtitle}</p> : null}
           </div>

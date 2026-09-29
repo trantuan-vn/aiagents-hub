@@ -88,10 +88,11 @@ export function resolveSimpleMemorySessionId(args: {
     input: args.fallbackInput ?? '',
   };
   const interpolated = interpolateTemplate(template, scope).trim().slice(0, 80);
+  const fromChat = sessionFromInput(args.input, String(args.runSessionId ?? ''));
   if (source === 'define_below') {
-    return interpolated || 'default';
+    return interpolated || fromChat || 'default';
   }
-  return sessionFromInput(args.input, String(args.runSessionId ?? '')) || interpolated || 'default';
+  return fromChat;
 }
 
 export function isLinkedSimpleMemory(linked: Pick<AgentResourceContext, 'memoryKind'>): boolean {
@@ -191,6 +192,7 @@ export async function attachSimpleMemory(
     runSessionId: ctx.runContext?.sessionId,
     fallbackInput: ctx.input,
   });
+  if (!sessionId) return noop;
   const windowLength = clampContextWindow(linked.memoryContextWindowLength);
   const key = simpleMemoryKey(ctx.meta.workflowId, sessionId, linked.memoryNodeId);
   const history = await loadSimpleMemory(ctx.userDO, key, windowLength);

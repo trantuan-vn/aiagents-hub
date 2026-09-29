@@ -3209,6 +3209,7 @@
     "logs_title": "Logs",
     "chat_panel_title": "Chat",
     "chat_hide": "Hide chat",
+    "chat_new": "New chat",
     "chat_session": "Session: {id}…",
     "chat_input_placeholder": "Type a message, or press 'up' for previous one",
     "chat_send": "Send",

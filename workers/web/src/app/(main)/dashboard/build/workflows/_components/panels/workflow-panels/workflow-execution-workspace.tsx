@@ -29,6 +29,10 @@ async function exportExecution(selected: WorkflowExecutionRecord) {
   await downloadWorkflowExecutionExport(selected.executionKey);
 }
 
+function isChatClarification(output: unknown): boolean {
+  return !!output && typeof output === "object" && (output as { status?: unknown }).status === "needs_clarification";
+}
+
 function ExecutionMetaBar({
   selected,
   stopping,
@@ -189,7 +193,7 @@ function ExecutionAlerts({
 
   return (
     <>
-      {selected.status === "pending_human" ? (
+      {selected.status === "pending_human" && !isChatClarification(selected.output) ? (
         <div className="flex shrink-0 flex-wrap items-end gap-2 border-b bg-amber-500/5 px-4 py-2">
           <Textarea
             value={reviewNote}

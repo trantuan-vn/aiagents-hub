@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { extractChatReply } from './chat-reply.js';
+import { extractChatReply, shouldPauseChatForClarification } from './chat-reply.js';
 
 describe('extractChatReply', () => {
   it('uses the last node text instead of echoing the chat trigger payload', () => {
@@ -133,5 +133,11 @@ describe('extractChatReply', () => {
         },
       }),
     ).toBe('');
+  });
+
+  it('pauses a chat run when the agent still needs an answer', () => {
+    expect(shouldPauseChatForClarification({ triggerKind: 'chat' }, { status: 'needs_clarification' })).toBe(true);
+    expect(shouldPauseChatForClarification({ triggerKind: 'chat' }, { status: 'ok', sql: 'SELECT 1;' })).toBe(false);
+    expect(shouldPauseChatForClarification({ triggerKind: 'manual' }, { status: 'needs_clarification' })).toBe(false);
   });
 });

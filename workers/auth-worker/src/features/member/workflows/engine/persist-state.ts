@@ -275,7 +275,18 @@ function clipSteps(
   });
 }
 
-const RESUME_RUN_CONTEXT_KEYS = ['__saveRagIndexedTables'] as const;
+const RESUME_RUN_CONTEXT_KEYS = [
+  '__saveRagIndexedTables',
+  'triggerKind',
+  'sessionId',
+  'chatInput',
+  'query',
+  'action',
+  'chatUrl',
+  'executionMode',
+  'awaitingChat',
+  'pendingChatNodeId',
+] as const;
 
 function slimLoopItem(item: unknown): unknown {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return item;

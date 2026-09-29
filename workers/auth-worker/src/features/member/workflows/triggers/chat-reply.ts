@@ -154,3 +154,10 @@ export function extractChatReply(result: { output?: unknown; steps?: Array<{ out
   }
   return '';
 }
+
+/** Chat follow-up should resume this run instead of starting another execution. */
+export function shouldPauseChatForClarification(runContext: Record<string, unknown>, output: unknown): boolean {
+  if (runContext.triggerKind !== 'chat') return false;
+  if (!output || typeof output !== 'object' || Array.isArray(output)) return false;
+  return (output as { status?: unknown }).status === 'needs_clarification';
+}

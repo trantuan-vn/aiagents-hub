@@ -3209,6 +3209,7 @@
     "logs_title": "Nhật ký",
     "chat_panel_title": "Chat",
     "chat_hide": "Ẩn chat",
+    "chat_new": "Chat mới",
     "chat_session": "Phiên: {id}…",
     "chat_input_placeholder": "Nhập tin nhắn, hoặc nhấn 'up' để dùng tin trước",
     "chat_send": "Gửi",

@@ -71,6 +71,15 @@ export function WorkflowEditorChatPanel({ workflowId, className }: WorkflowEdito
               variant="ghost"
               size="sm"
               className="ml-auto h-7 px-2 text-xs"
+              onClick={() => workflowEditorChatStore.startNew()}
+            >
+              {t("chat_new")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs"
               onClick={() => workflowEditorChatStore.hide()}
             >
               {t("chat_hide")}

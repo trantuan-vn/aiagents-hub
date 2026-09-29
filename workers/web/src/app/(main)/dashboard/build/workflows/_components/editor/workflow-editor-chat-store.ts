@@ -91,6 +91,17 @@ export const workflowEditorChatStore = {
     emit();
   },
 
+  startNew: () => {
+    if (!state.nodeId) return;
+    state = {
+      ...state,
+      sessionId: newChatSessionId(),
+      messages: seedChatTriggerMessages(state.initialMessages),
+      sending: false,
+    };
+    emit();
+  },
+
   setMessages: (messages: ChatTriggerMessage[]) => {
     if (state.messages === messages) return;
     state = { ...state, messages };

@@ -1,7 +1,7 @@
 import { buildChatTriggerOutput } from '@aiagents-hub/workflow-nodes';
 
 import type { WorkflowDefinition } from '../domain/domain.js';
-import { executeWorkflowGraph } from '../engine/executor.js';
+import { executeOrContinueChat, executeWorkflowGraph } from '../engine/executor.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import {
   bindResolvedToActor,
@@ -278,7 +278,7 @@ export async function runChatTrigger(params: {
   ] as DurableObjectNamespace;
   const actor = params.actor ?? ownerRunActor(params.ownerId);
   const resolved = bindResolvedToActor(params.resolved, actor, binding);
-  return executeWorkflowGraph({
+  return executeOrContinueChat({
     c: { env: params.env } as any,
     bindingName: params.bindingName,
     user: { identifier: actor.identifier },
@@ -289,6 +289,7 @@ export async function runChatTrigger(params: {
     requestMeta: { userAgent: 'trigger:chat' },
     entryNodeIds: [params.node.id],
     runContextOverride: output,
+    sessionId: params.sessionId,
   });
 }
 
