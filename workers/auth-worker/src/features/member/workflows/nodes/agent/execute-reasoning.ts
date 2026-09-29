@@ -63,6 +63,7 @@ import { parseLlmSafety, ruleClassify, SAFETY_CLASSIFIER_PROMPT } from './reason
 import {
   buildAskUserTool,
   buildToolLoopGuidance,
+  CODE_MODE_ACT_GUIDANCE,
   codeModeSucceeded,
   decorateToolDescription,
   filterToolsForPolicy,
@@ -83,6 +84,17 @@ import type {
   ToolObservation,
 } from './reasoning/types.js';
 import { ASK_USER_TOOL, DEFAULT_ACT_STEPS, RETRIEVE_MEMORY_TOOL } from './reasoning/types.js';
+import {
+  ASK_SYNTH_PROMPT,
+  asksFromObservations,
+  clipTrace,
+  mostFrequentAsk,
+  pushAsks,
+  refusalSentence,
+  runnableSqlStatement,
+  sandboxErrorFromOutput,
+} from './reasoning/ask-bag.js';
+import { createLogger } from '../../../../../shared/logger.js';
 import {
   DEFAULT_NO_IMPROVEMENT_LIMIT,
   DEFAULT_REFLECT_RETRIES,
@@ -114,8 +126,24 @@ function linkedValidateToolNames(linkedTools: Array<Record<string, unknown>>): s
   return names;
 }
 
+/** Title shown in the Workers Observability Message column. */
+function codeModeLogTitle(event: string, fields: Record<string, unknown>): string {
+  const attempt = typeof fields.attempt === 'number' && fields.attempt > 0 ? ` #${fields.attempt}` : '';
+  if (event === 'code_mode.step') {
+    const tool = typeof fields.tool === 'string' && fields.tool.trim() ? fields.tool.trim() : 'tool';
+    return `[Code Mode] step${attempt} · ${tool}`;
+  }
+  if (event === 'code_mode.end') {
+    const reason = typeof fields.reason === 'string' && fields.reason.trim() ? fields.reason.trim() : 'done';
+    return `[Code Mode] end · ${reason}`;
+  }
+  const tool = typeof fields.toolChoice === 'string' ? fields.toolChoice.trim() : '';
+  const where = tool && tool !== 'chat' ? tool : fields.mode === 'chat' ? 'chat' : 'code';
+  return `[Code Mode] start${attempt} · ${where}`;
+}
+
 export type ReasoningLlmCall = (args: {
-  purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect';
+  purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect' | 'ask';
   system: string;
   user: string;
   tools?: ToolSet;
@@ -151,6 +179,7 @@ export function readReasoningOptions(
         : DEFAULT_NO_IMPROVEMENT_LIMIT,
     enablePlanner: normalizePlannerMode(planner ?? 'auto'),
     safetyLevel: safety === 'strict' ? 'strict' : 'standard',
+    traceCodeMode: resolveConfiguredFlag(data.traceCodeMode, input, false),
   };
 }
 
@@ -235,6 +264,26 @@ function clarificationResult(questions: string[], why: string, frame: TaskFrame)
   };
 }
 
+function presentForChat(
+  result: ReasoningResult,
+  userText: string,
+  observations: ToolObservation[],
+  evaluationMode: EvaluationMode,
+): ReasoningResult {
+  if (result.status === 'needs_clarification') {
+    const questions = (result.questions ?? []).map((q) => q.trim()).filter(Boolean);
+    if (questions.length === 1) return { ...result, text: questions[0], questions };
+    return result;
+  }
+  if (result.status === 'refused') {
+    return { ...result, text: refusalSentence(userText, result.reason ?? '') };
+  }
+  const validated = evaluationMode === 'sql' ? validatedSqlFromObservations(observations) : '';
+  const runnable = runnableSqlStatement(validated || extractSql(result.text));
+  if (!runnable) return result;
+  return { ...result, text: runnable };
+}
+
 function toNodeOutput(
   result: ReasoningResult,
   extra: {
@@ -243,13 +292,16 @@ function toNodeOutput(
     endpoint: string;
     evaluationMode?: EvaluationMode;
     validatedArtifact?: string;
+    codeModeTrace?: Array<Record<string, unknown>>;
   },
 ): NodeOutput {
   const mode = extra.evaluationMode ?? 'generic';
   const validated = String(extra.validatedArtifact ?? '').trim();
   const fromText = extractSql(result.text);
   // SQL field: prefer validate-tool artifact in sql mode; otherwise only extract when present in the answer.
-  const sql = mode === 'sql' ? validated || fromText : fromText;
+  const rawSql = mode === 'sql' ? validated || fromText : fromText;
+  const runnable = runnableSqlStatement(rawSql);
+  const sql = runnable || rawSql;
   const artifact = validated || (mode === 'sql' ? sql : '') || undefined;
   return {
     status: result.status,
@@ -266,6 +318,7 @@ function toNodeOutput(
     snippets: extra.snippets,
     count: extra.snippets.length,
     endpoint: extra.endpoint,
+    ...(extra.codeModeTrace?.length ? { codeModeTrace: extra.codeModeTrace } : {}),
   };
 }
 
@@ -363,6 +416,192 @@ function createDefaultLlm(args: {
   };
 }
 
+async function synthesizeAsk(args: {
+  llm: ReasoningLlmCall;
+  userText: string;
+  asks: string[];
+  why: string;
+  lastError: string;
+}): Promise<string> {
+  const drafted = await args.llm({
+    purpose: 'ask',
+    system: ASK_SYNTH_PROMPT,
+    user: `User:\n${args.userText}\n\nGaps:\n${args.asks.join('\n')}\n\nWhy: ${args.why}\n\nLast error: ${args.lastError}`,
+    maxTokens: 200,
+  });
+  const parsed = parseJsonObject(drafted.text);
+  const question = String(parsed?.question ?? '').trim();
+  return question || mostFrequentAsk(args.asks);
+}
+
+async function runCodeModeAgent(args: {
+  llm: ReasoningLlmCall;
+  codeModeName: string;
+  tool: ToolSet[string];
+  userText: string;
+  userSystem: string;
+  sessionSummary: string;
+  historyText: string;
+  workflowDescription: string;
+  maxReflectRetries: number;
+  evaluationMode: EvaluationMode;
+  trace: boolean;
+  onTrace?: (event: string, fields: Record<string, unknown>) => void;
+  emit: (result: ReasoningResult, observations: ToolObservation[]) => Promise<NodeOutput>;
+}): Promise<NodeOutput> {
+  const codeTool: ToolSet = { [args.codeModeName]: args.tool };
+  const traceLog = args.trace && args.onTrace ? args.onTrace : null;
+  const system = [
+    args.userSystem,
+    CODE_MODE_ACT_GUIDANCE,
+    args.workflowDescription ? `Workflow: ${args.workflowDescription}` : '',
+    args.sessionSummary ? `Session memory:\n${args.sessionSummary}` : '',
+    args.historyText ? `Previous conversation:\n${args.historyText}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  let observations: ToolObservation[] = [];
+  let asks: string[] = [];
+  let why = '';
+  let lastError = '';
+
+  const actOnce = async (attempt: 1 | 2, priorAsks: string[], priorError: string) => {
+    if (traceLog) {
+      traceLog('code_mode.start', {
+        attempt,
+        guidance: clipTrace(CODE_MODE_ACT_GUIDANCE),
+        tools: args.codeModeName,
+        toolChoice: args.codeModeName,
+        stopSteps: 1,
+      });
+    }
+    const user =
+      attempt === 1
+        ? args.userText
+        : `${args.userText}\n\nPrevious script failed.\nError: ${priorError || '(none)'}\nCall get_rag first with this query:\n${priorAsks.join('\n') || priorError || args.userText}`;
+    return args.llm({
+      purpose: 'act',
+      system,
+      user,
+      tools: codeTool,
+      toolChoice: { type: 'tool', toolName: args.codeModeName },
+      stopSteps: 1,
+    });
+  };
+
+  const logSteps = (attempt: 1 | 2, stepObservations: ToolObservation[], fedToNextStep: boolean) => {
+    if (!traceLog) return;
+    for (const observation of stepObservations) {
+      traceLog('code_mode.step', {
+        attempt,
+        tool: observation.tool,
+        output: clipTrace(String(observation.output ?? '')),
+        fedToNextStep,
+        sandboxLogs: clipTrace(String(observation.output ?? '')),
+      });
+    }
+  };
+
+  const endTrace = (reason: string, askCount: number) => {
+    traceLog?.('code_mode.end', { reason, askCount });
+  };
+
+  const finishOk = async (draft: string, obs: ToolObservation[]) => {
+    const artifact =
+      args.evaluationMode === 'sql'
+        ? validatedSqlFromObservations(obs)
+        : validatedArtifactFromObservations(obs);
+    let text = draft;
+    if (artifact && !/```/.test(text)) {
+      text =
+        args.evaluationMode === 'sql' && /^(SELECT|WITH)\b/i.test(artifact)
+          ? `\`\`\`sql\n${artifact}\n\`\`\``
+          : artifact;
+    }
+    endTrace('artifact', asks.length);
+    return args.emit(
+      {
+        status: 'ok',
+        text,
+        citations: [],
+        confidence: 0.7,
+      },
+      obs,
+    );
+  };
+
+  const first = await actOnce(1, [], '');
+  const firstObs = first.observations ?? [];
+  observations = firstObs;
+  asks = pushAsks(asks, [
+    ...asksFromObservations(firstObs),
+    ...(first.askedUser?.questions ?? []),
+  ]);
+  why = first.askedUser?.why ?? why;
+  lastError = firstObs.map((o) => sandboxErrorFromOutput(o.output)).find(Boolean) ?? '';
+  const firstArtifact = codeModeSucceeded(firstObs);
+
+  if (firstArtifact) {
+    logSteps(1, firstObs, false);
+    return finishOk(asText(first.text), observations);
+  }
+
+  if (args.maxReflectRetries <= 0) {
+    logSteps(1, firstObs, false);
+    if (asks.length) {
+      const question = await synthesizeAsk({
+        llm: args.llm,
+        userText: args.userText,
+        asks,
+        why,
+        lastError,
+      });
+      endTrace('ask_synthesized', asks.length);
+      return args.emit(
+        clarificationResult([question], why, emptyFrame(args.userText.slice(0, 240))),
+        observations,
+      );
+    }
+    endTrace('retries_disabled', 0);
+    return args.emit({ status: 'ok', text: asText(first.text), citations: [], confidence: 0.4 }, observations);
+  }
+
+  logSteps(1, firstObs, true);
+  endTrace('ask_fed_to_rag', asks.length);
+
+  const second = await actOnce(2, asks, lastError);
+  const secondObs = second.observations ?? [];
+  observations = [...observations, ...secondObs];
+  asks = pushAsks(asks, [
+    ...asksFromObservations(secondObs),
+    ...(second.askedUser?.questions ?? []),
+  ]);
+  why = second.askedUser?.why ?? why;
+  lastError = secondObs.map((o) => sandboxErrorFromOutput(o.output)).find(Boolean) ?? lastError;
+  logSteps(2, secondObs, false);
+
+  if (codeModeSucceeded(secondObs)) {
+    return finishOk(asText(second.text), observations);
+  }
+  if (asks.length) {
+    const question = await synthesizeAsk({
+      llm: args.llm,
+      userText: args.userText,
+      asks,
+      why,
+      lastError,
+    });
+    endTrace('ask_synthesized', asks.length);
+    return args.emit(
+      clarificationResult([question], why, emptyFrame(args.userText.slice(0, 240))),
+      observations,
+    );
+  }
+  endTrace('retry_exhausted', 0);
+  return args.emit({ status: 'ok', text: asText(second.text), citations: [], confidence: 0.4 }, observations);
+}
+
 export async function executeReasoningAgent(
   ctx: NodeContext,
   deps?: { llm?: ReasoningLlmCall },
@@ -407,7 +646,9 @@ export async function executeReasoningAgent(
 
   const safetyIn = ruleClassify(userText);
   if (safetyIn.action === 'refuse') {
-    return toNodeOutput(refusedResult(safetyIn.reason, safetyIn.category), {
+    const refused = refusedResult(safetyIn.reason, safetyIn.category);
+    refused.text = refusalSentence(userText, safetyIn.reason);
+    return toNodeOutput(refused, {
       query: userText,
       snippets: [],
       endpoint: String(linked.serviceEndpoint ?? data.serviceEndpoint ?? data.endpoint ?? '').trim(),
@@ -454,7 +695,9 @@ export async function executeReasoningAgent(
     });
     const parsed = parseLlmSafety(classified.text);
     if (parsed.action === 'refuse') {
-      return toNodeOutput(refusedResult(parsed.reason, parsed.category), {
+      const refused = refusedResult(parsed.reason, parsed.category);
+      refused.text = refusalSentence(userText, parsed.reason);
+      return toNodeOutput(refused, {
         query: userText,
         snippets: [],
         endpoint,
@@ -537,8 +780,96 @@ export async function executeReasoningAgent(
 
   const codeModeName = codeModeToolName(baseTools);
   const usingCodeMode = Boolean(codeModeName);
+  const traceRows: Array<Record<string, unknown>> = [];
+  const recordTrace = (event: string, fields: Record<string, unknown>) => {
+    if (!options.traceCodeMode) return;
+    const message = codeModeLogTitle(event, fields);
+    const row = { message, event, ...fields };
+    traceRows.push(row);
+    createLogger('auth-worker', 'reasoning-agent').info(event, row);
+  };
+
+  const emit = async (
+    result: ReasoningResult,
+    observations: ToolObservation[],
+    mode: EvaluationMode = evaluationMode,
+  ): Promise<NodeOutput> => {
+    let shown = presentForChat(result, userText, observations, mode);
+    if (shown.status === 'ok') {
+      const outputSafety = ruleClassify(shown.text);
+      if (outputSafety.action === 'refuse') {
+        shown = presentForChat(refusedResult(outputSafety.reason, outputSafety.category), userText, observations, mode);
+      }
+    }
+    const outputExtra = {
+      query: userText,
+      snippets,
+      endpoint,
+      evaluationMode: mode,
+      validatedArtifact:
+        mode === 'sql'
+          ? validatedSqlFromObservations(observations)
+          : validatedArtifactFromObservations(observations),
+      codeModeTrace: traceRows.slice(),
+    };
+    if (shown.status === 'refused') {
+      return toNodeOutput(shown, outputExtra);
+    }
+    if (shown.status === 'needs_clarification') {
+      await saveSessionMemory(ctx.userDO, {
+        workflowId: ctx.meta.workflowId,
+        sessionId,
+        agentId: ctx.node.id,
+        summary: `Asked: ${(shown.questions ?? []).join('; ') || shown.text}`.slice(0, 240),
+        status: shown.status,
+      });
+      await simpleMemory.persist((shown.questions ?? [shown.text]).join('\n'));
+      return toNodeOutput(shown, outputExtra);
+    }
+    await saveSessionMemory(ctx.userDO, {
+      workflowId: ctx.meta.workflowId,
+      sessionId,
+      agentId: ctx.node.id,
+      summary: shown.text.slice(0, 240),
+      status: shown.status,
+    });
+    if (memoryCollection) {
+      await persistSemanticEpisode(ctx.c.env, memoryCollection, shown.text.slice(0, 400), memoryNamespace);
+    }
+    await simpleMemory.persist(shown.text);
+    return toNodeOutput(shown, outputExtra);
+  };
+
+  if (usingCodeMode && codeModeName) {
+    const codeTool = baseTools[codeModeName];
+    if (codeTool) {
+      return runCodeModeAgent({
+        llm,
+        codeModeName,
+        tool: codeTool,
+        userText,
+        userSystem,
+        sessionSummary: session.summary,
+        historyText: simpleMemory.historyText,
+        workflowDescription: String(ctx.meta.workflowDescription ?? ''),
+        maxReflectRetries: options.maxReflectRetries,
+        evaluationMode,
+        trace: options.traceCodeMode,
+        onTrace: recordTrace,
+        emit: (result, observations) => emit(result, observations, evaluationMode),
+      });
+    }
+  }
 
   const toolNames = Object.keys(baseTools);
+  recordTrace('code_mode.start', {
+    attempt: 0,
+    mode: 'chat',
+    reason: 'not_collapsed',
+    tools: toolNames.join(','),
+    toolChoice: 'chat',
+    stopSteps: 0,
+  });
   let frame: TaskFrame = {
     ...emptyFrame(userText.slice(0, 240)),
     missingSlots: inferMissingSlots(userText, {
@@ -551,11 +882,7 @@ export async function executeReasoningAgent(
     confidence: snippets.length ? 0.7 : 0.4,
   };
 
-  if (
-    !usingCodeMode &&
-    options.clarificationMode === 'ask' &&
-    !frame.missingSlots.length
-  ) {
+  if (options.clarificationMode === 'ask' && !frame.missingSlots.length) {
     const framed = await llm({
       purpose: 'frame',
       system: FRAME_PROMPT,
@@ -573,22 +900,12 @@ export async function executeReasoningAgent(
   if (shouldAskClarification(frame, options.clarificationMode)) {
     const questions = frame.missingSlots.map((slot) => `Please provide: ${slot}`);
     const result = clarificationResult(questions, 'Required details are missing and no tool can fill them.', frame);
-    await saveSessionMemory(ctx.userDO, {
-      workflowId: ctx.meta.workflowId,
-      sessionId,
-      agentId: ctx.node.id,
-      summary: `Asked for ${frame.missingSlots.join(', ')}`,
-      status: result.status,
-    });
-    await simpleMemory.persist(questions.join('\n'));
-    return toNodeOutput(result, { query: userText, snippets, endpoint, evaluationMode });
+    recordTrace('code_mode.end', { reason: 'clarification', askCount: questions.length, mode: 'chat' });
+    return emit(result, []);
   }
 
   let plan: AgentPlan | undefined;
-  if (
-    !usingCodeMode &&
-    shouldPlan({ enablePlanner: options.enablePlanner, toolCount: toolNames.length, userText })
-  ) {
+  if (shouldPlan({ enablePlanner: options.enablePlanner, toolCount: toolNames.length, userText })) {
     const planned = await llm({
       purpose: 'plan',
       system: PLAN_PROMPT,
@@ -601,18 +918,15 @@ export async function executeReasoningAgent(
   const policyTools = filterToolsForPolicy(baseTools, { plan, safetyLevel: options.safetyLevel });
   const policyNames = Object.keys(policyTools);
   const partitioned = partitionToolNames(policyNames);
+  const hasRetrieve = partitioned.retrieve.length > 0;
   const toolLoopGuidance = buildToolLoopGuidance({
-    usingCodeMode,
-    codeModeName,
+    usingCodeMode: false,
     retrieve: partitioned.retrieve,
     validate: partitioned.validate.length ? partitioned.validate : linkedValidateNames,
   });
   const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
   const systemParts = [
-    userSystem ||
-      (usingCodeMode
-        ? 'You are a tool-using assistant. Prefer Code Mode when available.'
-        : 'You are a helpful assistant that uses tools when they improve accuracy.'),
+    userSystem || 'You are a helpful assistant that uses tools when they improve accuracy.',
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     policyNames.length
       ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
@@ -620,7 +934,7 @@ export async function executeReasoningAgent(
     toolLoopGuidance,
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-    !usingCodeMode && formatRagContext(snippets)
+    formatRagContext(snippets)
       ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}`
       : '',
     options.requireCitations && citationSeed.length
@@ -635,102 +949,98 @@ export async function executeReasoningAgent(
   let lastIssues = '';
   let observations: ToolObservation[] = [];
   const configuredActSteps = resolveConfiguredNumber(data.maxActSteps, optionScope);
-  const stopSteps = maxActSteps(
-    configuredActSteps ?? (usingCodeMode ? 2 : DEFAULT_ACT_STEPS),
-  );
+  const stopSteps = maxActSteps(configuredActSteps ?? DEFAULT_ACT_STEPS);
   let bestText = '';
   let bestScore = Number.NEGATIVE_INFINITY;
   let bestCitations: AgentCitation[] = [];
   let stagnant = 0;
-
-  const outputExtraBase = () => ({
-    query: userText,
-    snippets,
-    endpoint,
-    evaluationMode,
-    validatedArtifact:
-      evaluationMode === 'sql'
-        ? validatedSqlFromObservations(observations)
-        : validatedArtifactFromObservations(observations),
-  });
+  let askBag: string[] = [];
+  let askWhy = '';
 
   const finish = async (text: string, cites: AgentCitation[]) => {
-    const outText = groundedTextOrFallback(text, cites);
-    const outputSafety = ruleClassify(outText);
-    const outputExtra = outputExtraBase();
-    if (outputSafety.action === 'refuse') {
-      return toNodeOutput(refusedResult(outputSafety.reason, outputSafety.category), outputExtra);
-    }
-    const result: ReasoningResult = {
-      status: 'ok',
-      text: outText,
-      citations: cites,
-      plan: plan?.steps,
-      confidence: frame.confidence,
-      frame,
-    };
-    await saveSessionMemory(ctx.userDO, {
-      workflowId: ctx.meta.workflowId,
-      sessionId,
-      agentId: ctx.node.id,
-      summary: outText.slice(0, 240),
-      status: result.status,
-    });
-    if (memoryCollection) {
-      await persistSemanticEpisode(ctx.c.env, memoryCollection, outText.slice(0, 400), memoryNamespace);
-    }
-    await simpleMemory.persist(outText);
-    return toNodeOutput(result, outputExtra);
+    return emit(
+      {
+        status: 'ok',
+        text: groundedTextOrFallback(text, cites),
+        citations: cites,
+        plan: plan?.steps,
+        confidence: frame.confidence,
+        frame,
+      },
+      observations,
+    );
   };
 
-  for (let attempt = 0; attempt <= (usingCodeMode ? Math.min(1, options.maxReflectRetries) : options.maxReflectRetries); attempt += 1) {
+  const endChatTrace = (reason: string) => {
+    recordTrace('code_mode.end', { reason, askCount: askBag.length, mode: 'chat' });
+  };
+
+  const clarifyFromAsks = async () => {
+    const question = await synthesizeAsk({
+      llm,
+      userText,
+      asks: askBag,
+      why: askWhy,
+      lastError: lastIssues,
+    });
+    const result = clarificationResult([question], askWhy, frame);
+    result.plan = plan?.steps;
+    result.text = question;
+    result.questions = [question];
+    return emit(result, observations);
+  };
+
+  for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {
+    const retrieveFocus = askBag.length
+      ? `\n\nCall the retrieve tool first with this query:\n${askBag.join('\n')}`
+      : '';
     const act = await llm({
       purpose: 'act',
       system: systemParts.join('\n\n'),
       user:
         attempt === 0
-          ? userText
-          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.\nKeep citations as [n].`,
+          ? `${userText}${retrieveFocus}`
+          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.\nKeep citations as [n].${retrieveFocus}`,
       tools: policyNames.length ? policyTools : undefined,
       toolChoice: policyNames.length
-        ? initialToolChoice(policyNames, plan, snippets.length > 0, codeModeName)
+        ? initialToolChoice(policyNames, plan, snippets.length > 0)
         : undefined,
       stopSteps,
     });
     observations = [...observations, ...(act.observations ?? [])];
-    if (act.askedUser?.questions?.length) {
-      const result = clarificationResult(act.askedUser.questions, act.askedUser.why ?? '', frame);
-      result.plan = plan?.steps;
-      await saveSessionMemory(ctx.userDO, {
-        workflowId: ctx.meta.workflowId,
-        sessionId,
-        agentId: ctx.node.id,
-        summary: `Asked: ${act.askedUser.questions.join('; ')}`,
-        status: result.status,
+    const fresh = act.observations ?? [];
+    if (fresh.length) {
+      for (const observation of fresh) {
+        recordTrace('code_mode.step', {
+          attempt: attempt + 1,
+          mode: 'chat',
+          tool: observation.tool,
+          output: clipTrace(String(observation.output ?? '')),
+          fedToNextStep: true,
+          sandboxLogs: '',
+        });
+      }
+    } else {
+      recordTrace('code_mode.step', {
+        attempt: attempt + 1,
+        mode: 'chat',
+        tool: '(model)',
+        output: clipTrace(asText(act.text)),
+        fedToNextStep: false,
+        sandboxLogs: '',
       });
-      await simpleMemory.persist(act.askedUser.questions.join('\n'));
-      return toNodeOutput(result, { query: userText, snippets, endpoint, evaluationMode });
+    }
+    if (act.askedUser?.questions?.length) {
+      if (!hasRetrieve) {
+        const result = clarificationResult(act.askedUser.questions, act.askedUser.why ?? '', frame);
+        result.plan = plan?.steps;
+        endChatTrace('ask_synthesized');
+        return emit(result, observations);
+      }
+      askBag = pushAsks(askBag, act.askedUser.questions);
+      askWhy = act.askedUser.why ?? askWhy;
     }
     draft = asText(act.text);
-
-    if (usingCodeMode && codeModeSucceeded(observations)) {
-      const artifact =
-        evaluationMode === 'sql'
-          ? validatedSqlFromObservations(observations)
-          : validatedArtifactFromObservations(observations);
-      if (artifact && !/```/.test(draft)) {
-        draft =
-          evaluationMode === 'sql' && /^(SELECT|WITH)\b/i.test(artifact)
-            ? `\`\`\`sql\n${artifact}\n\`\`\``
-            : artifact;
-      }
-      const citations = buildCitations({
-        snippets,
-        observations,
-        sessionSummary: session.summary,
-      });
-      return finish(draft, citations);
-    }
 
     const citations = buildCitations({
       snippets,
@@ -774,15 +1084,12 @@ export async function executeReasoningAgent(
       isLastAttempt: attempt === options.maxReflectRetries,
     });
     if (stop) {
-      return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
-    }
-
-    if (usingCodeMode) {
-      // Code Mode already ran the validate loop in-sandbox; one reflect max is enough.
-      lastIssues = heuristic.issues.join(', ') || 'code_mode_incomplete';
-      if (attempt >= 1) {
-        return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
+      if (!heuristic.pass && askBag.length) {
+        endChatTrace('ask_synthesized');
+        return clarifyFromAsks();
       }
+      endChatTrace('chat');
+      return finish(bestText || draft, bestCitations.length ? bestCitations : citations);
     }
 
     const critique = await llm({
@@ -831,10 +1138,20 @@ export async function executeReasoningAgent(
           isLastAttempt: attempt === options.maxReflectRetries,
         })
       ) {
+        if (!rewrittenHeuristic.pass && askBag.length) {
+          endChatTrace('ask_synthesized');
+          return clarifyFromAsks();
+        }
+        endChatTrace('chat');
         return finish(bestText || draft, bestCitations.length ? bestCitations : rewrittenCitations);
       }
     }
   }
 
+  if (askBag.length) {
+    endChatTrace('ask_synthesized');
+    return clarifyFromAsks();
+  }
+  endChatTrace('chat');
   return finish(bestText || draft, bestCitations);
 }

@@ -250,46 +250,7 @@ export function parseChatMessageRequest(body: Record<string, unknown>): {
   return { sessionId, chatInput, action };
 }
 
-function isChatTriggerEcho(rec: Record<string, unknown>): boolean {
-  if (rec.triggerKind !== 'chat' && rec.action !== 'sendMessage') return false;
-  const userText = typeof rec.chatInput === 'string' ? rec.chatInput : '';
-  const replyFields = [rec.output, rec.message, rec.response, rec.reply, rec.text];
-  return !replyFields.some((value) => typeof value === 'string' && value.trim() && value !== userText);
-}
-
-function textFromUnknown(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value !== 'object') return String(value);
-  const rec = value as Record<string, unknown>;
-  if (isChatTriggerEcho(rec)) return '';
-  const userText = typeof rec.chatInput === 'string' ? rec.chatInput : '';
-  const candidates = [rec.output, rec.text, rec.message, rec.response, rec.reply];
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim() && candidate !== userText) return candidate;
-    if (typeof candidate === 'string' && candidate.trim() && rec.triggerKind !== 'chat') return candidate;
-    if (candidate && typeof candidate === 'object') {
-      const nested = textFromUnknown(candidate);
-      if (nested) return nested;
-    }
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return '';
-  }
-}
-
-export function extractChatReply(result: { output?: unknown; steps?: Array<{ output?: unknown }> }): string {
-  const fromOutput = textFromUnknown(result.output);
-  if (fromOutput) return fromOutput;
-  const steps = result.steps ?? [];
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const text = textFromUnknown(steps[i]?.output);
-    if (text) return text;
-  }
-  return '';
-}
+export { extractChatReply } from './chat-reply.js';
 
 export async function runChatTrigger(params: {
   env: Env;

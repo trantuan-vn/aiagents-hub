@@ -48,6 +48,7 @@ export type ReasoningOptions = {
   noImprovementLimit: number;
   enablePlanner: PlannerMode;
   safetyLevel: SafetyLevel;
+  traceCodeMode: boolean;
 };
 
 export type ReasoningResult = {

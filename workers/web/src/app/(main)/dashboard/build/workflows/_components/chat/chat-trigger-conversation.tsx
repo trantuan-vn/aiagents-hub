@@ -50,6 +50,63 @@ export class ChatAuthRequiredError extends Error {
   }
 }
 
+function looksLikeJsonBlob(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith("{") || trimmed.startsWith("[");
+}
+
+function sqlCandidate(value: unknown): string {
+  if (typeof value !== "string") return "";
+  let text = value.trim().replace(/^```sql\s*/i, "").replace(/```$/g, "").trim();
+  const embedded = text.match(/\b((?:WITH|SELECT)\b[\s\S]{8,20000}?)(?:;|$)/i);
+  if (embedded?.[1] && !/^(?:WITH|SELECT)\b/i.test(text)) text = embedded[1].trim();
+  if (!/^(?:WITH|SELECT)\b/i.test(text)) return "";
+  const parts = text.split(";").map((part) => part.trim()).filter(Boolean);
+  if (parts.length !== 1) return "";
+  return `${parts[0]};`;
+}
+
+export function chatBubbleText(raw: unknown, depth = 0): string {
+  if (depth > 5) return "";
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (looksLikeJsonBlob(trimmed)) {
+      try {
+        const inner = chatBubbleText(JSON.parse(trimmed) as unknown, depth + 1);
+        if (inner) return inner;
+      } catch {
+        return sqlCandidate(trimmed) || trimmed;
+      }
+    }
+    return sqlCandidate(trimmed) || trimmed;
+  }
+  if (raw && typeof raw === "object") {
+    const rec = raw as Record<string, unknown>;
+    const nestedSql = (value: unknown) =>
+      value && typeof value === "object" ? chatBubbleText(value, depth + 1) : sqlCandidate(value);
+    const sql =
+      sqlCandidate(rec.sql) ||
+      sqlCandidate(rec.artifact) ||
+      nestedSql(rec.body) ||
+      nestedSql(rec.data) ||
+      nestedSql(rec.result);
+    if (rec.status === "needs_clarification" || rec.status === "refused") {
+      if (typeof rec.text === "string" && rec.text.trim() && !looksLikeJsonBlob(rec.text)) return rec.text.trim();
+    }
+    if (rec.status === "ok" && sql) return sql;
+    if (typeof rec.text === "string" && rec.text.trim()) {
+      if (looksLikeJsonBlob(rec.text)) {
+        const inner = chatBubbleText(rec.text, depth + 1);
+        if (inner && !looksLikeJsonBlob(inner)) return inner;
+      } else if (!sql) {
+        return rec.text.trim();
+      }
+    }
+    if (sql) return sql;
+  }
+  return "";
+}
+
 export async function postChatTriggerMessage(params: {
   endpointUrl: string;
   sessionId: string;
@@ -74,12 +131,7 @@ export async function postChatTriggerMessage(params: {
     throw new Error(String(data.error ?? `Request failed (${res.status})`));
   }
   const raw = data.output ?? data.text ?? data.message;
-  const output =
-    typeof raw === "string"
-      ? raw
-      : raw != null
-        ? JSON.stringify(raw, null, 2)
-        : "";
+  const output = chatBubbleText(raw);
   return {
     output,
     executionKey: typeof data.executionKey === "string" ? data.executionKey : undefined,

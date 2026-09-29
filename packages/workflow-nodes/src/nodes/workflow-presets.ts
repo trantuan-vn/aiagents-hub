@@ -37,6 +37,7 @@ export const REASONING_AGENT_DEFAULTS = {
   maxTokens: 4096,
   enablePlanner: "auto",
   safetyLevel: "standard",
+  traceCodeMode: false,
 } as const;
 
 export const REASONING_AGENT_SYSTEM_PROMPT = `You are a careful tool-using assistant.

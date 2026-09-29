@@ -303,6 +303,137 @@ describe('executeReasoningAgent', () => {
   });
 });
 
+function codeModeCtx(data: Record<string, unknown>, input: Record<string, unknown> = {}) {
+  const base = ctx(
+    { agentKind: 'reasoning_agent', prompt: 'doanh thu theo tháng', enablePlanner: 'on', ...data },
+    { ragText: 'schema', query: 'doanh thu theo tháng', snippets: ['schema'], ...input },
+  );
+  base.c = { env: { LOADER: {} } } as NodeContext['c'];
+  base.definition = {
+    nodes: [
+      base.node,
+      { id: 'rag', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag', toolName: 'get_rag' } },
+      { id: 'sql', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'check-sql', toolName: 'check_sql' } },
+      { id: 'code', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'code', toolName: 'codemode' } },
+    ],
+    edges: [
+      { id: 'e1', source: 'rag', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+      { id: 'e2', source: 'sql', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+      { id: 'e3', source: 'code', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+    ],
+  };
+  return base;
+}
+
+describe('code mode phase 1', () => {
+  it('returns runnable SQL after one act and does not frame or plan', async () => {
+    const purposes: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      purposes.push(call.purpose);
+      expect(call.stopSteps).toBe(1);
+      expect(call.toolChoice).toEqual({ type: 'tool', toolName: 'codemode' });
+      expect(call.system).toContain('askUser');
+      expect(call.system).not.toContain('Retrieved knowledge');
+      return {
+        text: 'here you go',
+        observations: [
+          {
+            tool: 'codemode',
+            ok: true,
+            output: JSON.stringify({ ok: true, result: { ok: true, sql: 'SELECT id FROM orders' } }),
+          },
+        ],
+      };
+    };
+    const out = await executeReasoningAgent(codeModeCtx({ maxReflectRetries: 2, traceCodeMode: false }), { llm });
+    expect(purposes).toEqual(['act']);
+    expect(out.status).toBe('ok');
+    expect(out.text).toBe('SELECT id FROM orders;');
+    expect(out.sql).toBe('SELECT id FROM orders;');
+  });
+
+  it('feeds askUser into a second get_rag act, then asks once in the user language', async () => {
+    const users: string[] = [];
+    let acts = 0;
+    const llm: ReasoningLlmCall = async (call) => {
+      if (call.purpose === 'ask') {
+        return { text: '{"question":"Bạn muốn doanh thu của tháng nào?"}', observations: [] };
+      }
+      acts += 1;
+      users.push(call.user);
+      return {
+        text: '',
+        observations: [
+          {
+            tool: 'codemode',
+            ok: false,
+            output: JSON.stringify({
+              ok: false,
+              result: { ok: false, error: 'missing month', askUser: ['tháng nào'] },
+            }),
+          },
+        ],
+      };
+    };
+    const out = await executeReasoningAgent(
+      codeModeCtx({ maxReflectRetries: 1, traceCodeMode: false }),
+      { llm },
+    );
+    expect(acts).toBe(2);
+    expect(users[1]).toContain('tháng nào');
+    expect(users[1]).toContain('get_rag');
+    expect(out.status).toBe('needs_clarification');
+    expect(out.questions).toEqual(['Bạn muốn doanh thu của tháng nào?']);
+    expect(out.text).toBe('Bạn muốn doanh thu của tháng nào?');
+    expect(String(out.text)).not.toContain('{');
+  });
+
+  it('synthesizes immediately when retries are disabled and askUser is present', async () => {
+    const purposes: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      purposes.push(call.purpose);
+      if (call.purpose === 'ask') {
+        expect(call.user).toContain('doanh thu theo tháng');
+        return { text: '{"question":"Bạn muốn tháng nào?"}', observations: [] };
+      }
+      return {
+        text: '',
+        observations: [
+          {
+            tool: 'codemode',
+            ok: false,
+            output: JSON.stringify({ result: { ok: false, askUser: ['tháng nào'] } }),
+          },
+        ],
+      };
+    };
+    const out = await executeReasoningAgent(codeModeCtx({ maxReflectRetries: 0 }), { llm });
+    expect(purposes).toEqual(['act', 'ask']);
+    expect(out.text).toBe('Bạn muốn tháng nào?');
+  });
+
+  it('logs code mode steps only when traceCodeMode is on', async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, 'log').mockImplementation((line?: unknown) => {
+      logs.push(String(line ?? ''));
+    });
+    const llm: ReasoningLlmCall = async () => ({
+      text: 'SELECT 1 FROM dual',
+      observations: [{ tool: 'codemode', ok: true, output: JSON.stringify({ ok: true, result: { ok: true, sql: 'SELECT 1 FROM dual' } }) }],
+    });
+    await executeReasoningAgent(codeModeCtx({ traceCodeMode: false }), { llm });
+    expect(logs.some((line) => line.includes('code_mode'))).toBe(false);
+    logs.length = 0;
+    const traced = await executeReasoningAgent(codeModeCtx({ traceCodeMode: true, maxReflectRetries: 0 }), { llm });
+    expect(logs.some((line) => line.includes('[Code Mode] start'))).toBe(true);
+    expect(logs.some((line) => line.includes('[Code Mode] step'))).toBe(true);
+    expect(logs.some((line) => line.includes('[Code Mode] end'))).toBe(true);
+    const rows = traced.codeModeTrace as Array<{ event?: string }>;
+    expect(rows.map((row) => row.event)).toEqual(['code_mode.start', 'code_mode.step', 'code_mode.end']);
+    spy.mockRestore();
+  });
+});
+
 describe('kind routing', () => {
   it('only treats reasoning_agent as the governed kind', () => {
     expect(isReasoningAgentKind({ agentKind: 'tools_agent' })).toBe(false);

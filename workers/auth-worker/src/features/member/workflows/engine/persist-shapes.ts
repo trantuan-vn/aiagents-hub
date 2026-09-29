@@ -44,6 +44,7 @@ export const AGENT_PERSIST_SHAPE: PersistShape = {
     'reason',
     'category',
     'toolNames',
+    'codeModeTrace',
   ],
 };
 

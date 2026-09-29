@@ -3765,6 +3765,7 @@
     "agent_opt_planner_auto": "Auto",
     "agent_opt_planner_on": "Always",
     "agent_opt_planner_off": "Off",
+    "agent_opt_trace_code_mode": "Log Code Mode steps",
     "agent_opt_safety_level": "Safety level",
     "agent_opt_safety_standard": "Standard",
     "agent_opt_safety_strict": "Strict",

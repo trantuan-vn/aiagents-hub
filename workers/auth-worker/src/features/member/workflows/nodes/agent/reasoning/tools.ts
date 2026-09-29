@@ -238,6 +238,13 @@ export function buildToolLoopGuidance(args: {
   return '';
 }
 
+export const CODE_MODE_ACT_GUIDANCE = `Write one JavaScript async arrow function via the codemode tool.
+Inside the script: call the retrieve API first, draft only from those results, then call validate.
+If validate returns ok: false, call retrieve again with the error as the query, rewrite, and validate again (max 3).
+Return { ok: true, ... } only when validate returns ok: true. Never invent identifiers.
+If facts are still missing, call retrieve again with that gap as the query, then return { ok: false, error, askUser: ["..."] }.
+askUser lists what is still missing after that retrieve. It is not a message to the user.`;
+
 export function buildAskUserTool(): ToolSet {
   return {
     [ASK_USER_TOOL]: tool({

@@ -3765,6 +3765,7 @@
     "agent_opt_planner_auto": "Tự động",
     "agent_opt_planner_on": "Luôn bật",
     "agent_opt_planner_off": "Tắt",
+    "agent_opt_trace_code_mode": "Ghi log các bước Code Mode",
     "agent_opt_safety_level": "Mức an toàn",
     "agent_opt_safety_standard": "Tiêu chuẩn",
     "agent_opt_safety_strict": "Nghiêm ngặt",

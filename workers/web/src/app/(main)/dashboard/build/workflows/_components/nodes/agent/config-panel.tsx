@@ -90,6 +90,13 @@ const AGENT_EXTRA_OPTIONS = [
     ],
   },
   {
+    id: "traceCodeMode",
+    labelKey: "agent_opt_trace_code_mode",
+    type: "toggle" as const,
+    defaultValue: false,
+    kinds: ["reasoning_agent"],
+  },
+  {
     id: "safetyLevel",
     labelKey: "agent_opt_safety_level",
     type: "select" as const,
