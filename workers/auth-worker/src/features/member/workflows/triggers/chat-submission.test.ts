@@ -103,6 +103,25 @@ describe('extractChatReply', () => {
     ).toBe(sql);
   });
 
+  it('shows the final node SQL when the agent step text was clipped to an ellipsis', () => {
+    const sql =
+      "SELECT ND.MA_NDT, ND.HO_TEN FROM ADMIN.TAI_KHOAN ND WHERE ND.TRANG_THAI = 'ACTIVE';";
+    expect(
+      extractChatReply({
+        output: {
+          ok: true,
+          echo: true,
+          local: true,
+          method: 'POST',
+          data: { sql },
+          body: { sql },
+          text: JSON.stringify({ ok: true, echo: true, data: { sql } }),
+        },
+        steps: [{ output: { status: 'ok', text: '…', sql: '…' } }],
+      }),
+    ).toBe(sql);
+  });
+
   it('returns empty when the workflow only echoed the chat trigger', () => {
     expect(
       extractChatReply({

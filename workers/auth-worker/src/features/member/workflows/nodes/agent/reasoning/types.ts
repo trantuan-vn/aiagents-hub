@@ -39,6 +39,10 @@ export type ToolObservation = {
   tool: string;
   ok: boolean;
   output: string;
+  /** Tool-call input, including the Code Mode script. */
+  input?: string;
+  /** Sandbox log lines returned with the tool result. */
+  logs?: string;
 };
 
 export type ReasoningOptions = {

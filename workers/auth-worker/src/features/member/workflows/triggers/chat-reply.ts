@@ -5,20 +5,35 @@ function looksLikeJsonBlob(text: string): boolean {
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
+function isPlaceholderReply(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return true;
+  if (trimmed === '...' || trimmed === '…' || trimmed === '..' || trimmed === '.') return true;
+  if (trimmed.length <= 4 && /^[.\u2026]+$/.test(trimmed)) return true;
+  return false;
+}
+
+function looseSqlStatement(text: string): string {
+  let trimmed = text.trim().replace(/^```sql\s*/i, '').replace(/```$/g, '').trim();
+  if (!/^(?:SELECT|WITH)\b/i.test(trimmed) || trimmed.length <= 12 || isPlaceholderReply(trimmed)) return '';
+  if (!/;\s*$/.test(trimmed)) trimmed = `${trimmed};`;
+  return trimmed;
+}
+
 function sqlInString(text: string): string {
   const direct = runnableSqlStatement(text);
   if (direct) return direct;
   const fenced = text.match(/```sql\s*([\s\S]*?)```/i);
   if (fenced?.[1]) {
-    const fromFence = runnableSqlStatement(fenced[1]);
+    const fromFence = runnableSqlStatement(fenced[1]) || looseSqlStatement(fenced[1]);
     if (fromFence) return fromFence;
   }
-  const select = text.match(/\b((?:WITH|SELECT)\b[\s\S]{8,12000}?)(?:;|$)/i);
+  const select = text.match(/\b((?:WITH|SELECT)\b[\s\S]{8,20000}?)(?:;|$)/i);
   if (select?.[1]) {
     const fromBody = runnableSqlStatement(select[1]);
     if (fromBody) return fromBody;
   }
-  return '';
+  return looseSqlStatement(text);
 }
 
 /** Pull one runnable SELECT/WITH from a node output, including HTTP echo `body.sql`. */
@@ -64,8 +79,15 @@ function reasoningReply(value: unknown): string | undefined {
   }
   if (rec.status === 'ok') {
     const sql = findRunnableSql(rec);
-    if (sql) return sql;
-    if (typeof rec.text === 'string' && rec.text.trim() && !looksLikeJsonBlob(rec.text)) return rec.text.trim();
+    if (sql && !isPlaceholderReply(sql)) return sql;
+    if (
+      typeof rec.text === 'string' &&
+      rec.text.trim() &&
+      !looksLikeJsonBlob(rec.text) &&
+      !isPlaceholderReply(rec.text)
+    ) {
+      return rec.text.trim();
+    }
   }
   return '';
 }
@@ -92,22 +114,43 @@ function textFromUnknown(value: unknown): string {
   return '';
 }
 
-export function extractChatReply(result: { output?: unknown; steps?: Array<{ output?: unknown }> }): string {
-  const blobs: unknown[] = [...(result.steps ?? []).map((step) => step?.output), result.output];
-  for (let i = blobs.length - 1; i >= 0; i -= 1) {
-    const reply = reasoningReply(blobs[i]);
-    if (reply) return reply;
+function sqlFromNode(value: unknown): string {
+  if (value && typeof value === 'object' && !Array.isArray(value) && isChatTriggerEcho(value as Record<string, unknown>)) {
+    return '';
   }
-  for (let i = blobs.length - 1; i >= 0; i -= 1) {
-    const sql = findRunnableSql(blobs[i]);
+  const sql = findRunnableSql(value);
+  return sql && !isPlaceholderReply(sql) ? sql : '';
+}
+
+export function extractChatReply(result: { output?: unknown; steps?: Array<{ output?: unknown }> }): string {
+  const stepBlobs = (result.steps ?? []).map((step) => step?.output);
+  const ordered = [...stepBlobs, result.output];
+
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    const reply = reasoningReply(ordered[i]);
+    if (reply && (reply.includes('\n') || !isPlaceholderReply(reply))) {
+      const value = ordered[i];
+      const rec = value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
+      if (rec?.status === 'needs_clarification' || rec?.status === 'refused') return reply;
+    }
+  }
+
+  const finalSql = sqlFromNode(result.output);
+  if (finalSql) return finalSql;
+  for (let i = stepBlobs.length - 1; i >= 0; i -= 1) {
+    const sql = sqlFromNode(stepBlobs[i]);
     if (sql) return sql;
   }
+
+  for (let i = ordered.length - 1; i >= 0; i -= 1) {
+    const reply = reasoningReply(ordered[i]);
+    if (reply && !isPlaceholderReply(reply)) return reply;
+  }
   const fromOutput = textFromUnknown(result.output);
-  if (fromOutput) return fromOutput;
-  const steps = result.steps ?? [];
-  for (let i = steps.length - 1; i >= 0; i -= 1) {
-    const text = textFromUnknown(steps[i]?.output);
-    if (text) return text;
+  if (fromOutput && !isPlaceholderReply(fromOutput)) return fromOutput;
+  for (let i = stepBlobs.length - 1; i >= 0; i -= 1) {
+    const text = textFromUnknown(stepBlobs[i]);
+    if (text && !isPlaceholderReply(text)) return text;
   }
   return '';
 }

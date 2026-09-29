@@ -87,6 +87,7 @@ import { ASK_USER_TOOL, DEFAULT_ACT_STEPS, RETRIEVE_MEMORY_TOOL } from './reason
 import {
   ASK_SYNTH_PROMPT,
   asksFromObservations,
+  asksFromOutput,
   clipTrace,
   mostFrequentAsk,
   pushAsks,
@@ -126,20 +127,63 @@ function linkedValidateToolNames(linkedTools: Array<Record<string, unknown>>): s
   return names;
 }
 
-/** Title shown in the Workers Observability Message column. */
-function codeModeLogTitle(event: string, fields: Record<string, unknown>): string {
+const TRACE_BODY_MAX = 2000;
+
+/** Title plus the step body, so Observability's Message column shows the script, SQL, or error. */
+function codeModeLogMessage(event: string, fields: Record<string, unknown>): string {
   const attempt = typeof fields.attempt === 'number' && fields.attempt > 0 ? ` #${fields.attempt}` : '';
+  let title = `[Code Mode] ${event}`;
   if (event === 'code_mode.step') {
     const tool = typeof fields.tool === 'string' && fields.tool.trim() ? fields.tool.trim() : 'tool';
-    return `[Code Mode] step${attempt} · ${tool}`;
-  }
-  if (event === 'code_mode.end') {
+    title = `[Code Mode] step${attempt} · ${tool}`;
+  } else if (event === 'code_mode.end') {
     const reason = typeof fields.reason === 'string' && fields.reason.trim() ? fields.reason.trim() : 'done';
-    return `[Code Mode] end · ${reason}`;
+    title = `[Code Mode] end · ${reason}`;
+  } else if (event === 'code_mode.start') {
+    const tool = typeof fields.toolChoice === 'string' ? fields.toolChoice.trim() : '';
+    const where = tool && tool !== 'chat' ? tool : fields.mode === 'chat' ? 'chat' : 'code';
+    title = `[Code Mode] start${attempt} · ${where}`;
   }
-  const tool = typeof fields.toolChoice === 'string' ? fields.toolChoice.trim() : '';
-  const where = tool && tool !== 'chat' ? tool : fields.mode === 'chat' ? 'chat' : 'code';
-  return `[Code Mode] start${attempt} · ${where}`;
+  const chunks: string[] = [];
+  for (const key of ['query', 'input', 'output', 'logs', 'detail'] as const) {
+    const value = fields[key];
+    if (typeof value !== 'string' || !value.trim()) continue;
+    chunks.push(`${key}:\n${value.trim()}`);
+  }
+  return chunks.length ? `${title}\n${chunks.join('\n')}` : title;
+}
+
+function readableToolOutput(output: string): string {
+  const text = output.trim();
+  if (!text) return '';
+  let parsed: unknown = text;
+  if (text.startsWith('{') || text.startsWith('[')) {
+    try {
+      parsed = JSON.parse(text) as unknown;
+    } catch {
+      return clipTrace(text, TRACE_BODY_MAX);
+    }
+  }
+  if (!parsed || typeof parsed !== 'object') return clipTrace(text, TRACE_BODY_MAX);
+  const rec = parsed as Record<string, unknown>;
+  const nested =
+    rec.result && typeof rec.result === 'object' ? (rec.result as Record<string, unknown>) : rec;
+  const sql = typeof nested.sql === 'string' ? nested.sql : typeof rec.sql === 'string' ? rec.sql : '';
+  const error = sandboxErrorFromOutput(parsed);
+  const asks = asksFromOutput(parsed);
+  const lines = [
+    sql ? `sql: ${sql}` : '',
+    error ? `error: ${error}` : '',
+    asks.length ? `ask: ${asks.join(' | ')}` : '',
+  ].filter(Boolean);
+  return clipTrace(lines.length ? lines.join('\n') : text, TRACE_BODY_MAX);
+}
+
+function sandboxLogsText(payload: unknown): string {
+  if (!payload || typeof payload !== 'object') return '';
+  const logs = (payload as { logs?: unknown }).logs;
+  if (!Array.isArray(logs) || !logs.length) return '';
+  return logs.map((line) => (typeof line === 'string' ? line : asText(line))).join('\n');
 }
 
 export type ReasoningLlmCall = (args: {
@@ -279,9 +323,13 @@ function presentForChat(
     return { ...result, text: refusalSentence(userText, result.reason ?? '') };
   }
   const validated = evaluationMode === 'sql' ? validatedSqlFromObservations(observations) : '';
-  const runnable = runnableSqlStatement(validated || extractSql(result.text));
-  if (!runnable) return result;
-  return { ...result, text: runnable };
+  const raw = (validated || extractSql(result.text)).trim();
+  const runnable = runnableSqlStatement(raw);
+  const sql =
+    runnable ||
+    (/^(?:SELECT|WITH)\b/i.test(raw) ? (raw.endsWith(';') ? raw : `${raw};`) : '');
+  if (!sql) return result;
+  return { ...result, text: sql };
 }
 
 function toNodeOutput(
@@ -367,17 +415,29 @@ function createDefaultLlm(args: {
       const observations: ToolObservation[] = [];
       let askedUser: { questions: string[]; why?: string } | undefined;
       const steps = (result.steps ?? []) as Array<{
-        toolCalls?: Array<{ toolName?: string }>;
-        toolResults?: Array<{ toolName?: string; result?: unknown }>;
+        toolCalls?: Array<{ toolName?: string; input?: unknown; args?: unknown }>;
+        toolResults?: Array<{
+          toolName?: string;
+          result?: unknown;
+          output?: unknown;
+          input?: unknown;
+          args?: unknown;
+        }>;
       }>;
       for (const step of steps) {
-        for (const tr of step.toolResults ?? []) {
+        const calls = step.toolCalls ?? [];
+        for (const [index, tr] of (step.toolResults ?? []).entries()) {
           const name = String(tr.toolName ?? '');
-          const payload = tr.result;
+          const payload = tr.output !== undefined ? tr.output : tr.result;
+          const call = calls[index];
+          const inputRaw = tr.input ?? tr.args ?? call?.input ?? call?.args;
+          const logs = sandboxLogsText(payload);
           observations.push({
             tool: name,
             ok: !(payload && typeof payload === 'object' && 'ok' in payload && (payload as { ok?: boolean }).ok === false),
             output: truncate(payload),
+            ...(inputRaw == null ? {} : { input: truncate(inputRaw, 4000) }),
+            ...(logs ? { logs: truncate(logs, TRACE_BODY_MAX) } : {}),
           });
           if (name === ASK_USER_TOOL && payload && typeof payload === 'object') {
             const rec = payload as { questions?: string[]; why?: string };
@@ -467,19 +527,19 @@ async function runCodeModeAgent(args: {
   let lastError = '';
 
   const actOnce = async (attempt: 1 | 2, priorAsks: string[], priorError: string) => {
+    const user =
+      attempt === 1
+        ? args.userText
+        : `${args.userText}\n\nPrevious script failed.\nError: ${priorError || '(none)'}\nCall get_rag first with this query:\n${priorAsks.join('\n') || priorError || args.userText}`;
     if (traceLog) {
       traceLog('code_mode.start', {
         attempt,
-        guidance: clipTrace(CODE_MODE_ACT_GUIDANCE),
+        query: clipTrace(user, TRACE_BODY_MAX),
         tools: args.codeModeName,
         toolChoice: args.codeModeName,
         stopSteps: 1,
       });
     }
-    const user =
-      attempt === 1
-        ? args.userText
-        : `${args.userText}\n\nPrevious script failed.\nError: ${priorError || '(none)'}\nCall get_rag first with this query:\n${priorAsks.join('\n') || priorError || args.userText}`;
     return args.llm({
       purpose: 'act',
       system,
@@ -496,15 +556,20 @@ async function runCodeModeAgent(args: {
       traceLog('code_mode.step', {
         attempt,
         tool: observation.tool,
-        output: clipTrace(String(observation.output ?? '')),
+        input: observation.input ? clipTrace(observation.input, TRACE_BODY_MAX) : '',
+        output: readableToolOutput(String(observation.output ?? '')),
+        logs: observation.logs ? clipTrace(observation.logs, TRACE_BODY_MAX) : '',
         fedToNextStep,
-        sandboxLogs: clipTrace(String(observation.output ?? '')),
       });
     }
   };
 
-  const endTrace = (reason: string, askCount: number) => {
-    traceLog?.('code_mode.end', { reason, askCount });
+  const endTrace = (reason: string, askCount: number, detail = '') => {
+    traceLog?.('code_mode.end', {
+      reason,
+      askCount,
+      detail: detail ? clipTrace(detail, TRACE_BODY_MAX) : '',
+    });
   };
 
   const finishOk = async (draft: string, obs: ToolObservation[]) => {
@@ -519,7 +584,7 @@ async function runCodeModeAgent(args: {
           ? `\`\`\`sql\n${artifact}\n\`\`\``
           : artifact;
     }
-    endTrace('artifact', asks.length);
+    endTrace('artifact', asks.length, artifact || text);
     return args.emit(
       {
         status: 'ok',
@@ -557,18 +622,18 @@ async function runCodeModeAgent(args: {
         why,
         lastError,
       });
-      endTrace('ask_synthesized', asks.length);
+      endTrace('ask_synthesized', asks.length, question);
       return args.emit(
         clarificationResult([question], why, emptyFrame(args.userText.slice(0, 240))),
         observations,
       );
     }
-    endTrace('retries_disabled', 0);
+    endTrace('retries_disabled', 0, asText(first.text));
     return args.emit({ status: 'ok', text: asText(first.text), citations: [], confidence: 0.4 }, observations);
   }
 
   logSteps(1, firstObs, true);
-  endTrace('ask_fed_to_rag', asks.length);
+  endTrace('ask_fed_to_rag', asks.length, asks.join('\n') || lastError);
 
   const second = await actOnce(2, asks, lastError);
   const secondObs = second.observations ?? [];
@@ -592,13 +657,13 @@ async function runCodeModeAgent(args: {
       why,
       lastError,
     });
-    endTrace('ask_synthesized', asks.length);
+    endTrace('ask_synthesized', asks.length, question);
     return args.emit(
       clarificationResult([question], why, emptyFrame(args.userText.slice(0, 240))),
       observations,
     );
   }
-  endTrace('retry_exhausted', 0);
+  endTrace('retry_exhausted', 0, asText(second.text) || lastError);
   return args.emit({ status: 'ok', text: asText(second.text), citations: [], confidence: 0.4 }, observations);
 }
 
@@ -783,7 +848,7 @@ export async function executeReasoningAgent(
   const traceRows: Array<Record<string, unknown>> = [];
   const recordTrace = (event: string, fields: Record<string, unknown>) => {
     if (!options.traceCodeMode) return;
-    const message = codeModeLogTitle(event, fields);
+    const message = codeModeLogMessage(event, fields);
     const row = { message, event, ...fields };
     traceRows.push(row);
     createLogger('auth-worker', 'reasoning-agent').info(event, row);
@@ -866,6 +931,7 @@ export async function executeReasoningAgent(
     attempt: 0,
     mode: 'chat',
     reason: 'not_collapsed',
+    query: clipTrace(userText, TRACE_BODY_MAX),
     tools: toolNames.join(','),
     toolChoice: 'chat',
     stopSteps: 0,
@@ -1015,9 +1081,10 @@ export async function executeReasoningAgent(
           attempt: attempt + 1,
           mode: 'chat',
           tool: observation.tool,
-          output: clipTrace(String(observation.output ?? '')),
+          output: readableToolOutput(String(observation.output ?? '')),
+          input: observation.input ? clipTrace(observation.input, TRACE_BODY_MAX) : '',
+          logs: observation.logs ? clipTrace(observation.logs, TRACE_BODY_MAX) : '',
           fedToNextStep: true,
-          sandboxLogs: '',
         });
       }
     } else {
@@ -1025,9 +1092,8 @@ export async function executeReasoningAgent(
         attempt: attempt + 1,
         mode: 'chat',
         tool: '(model)',
-        output: clipTrace(asText(act.text)),
+        output: clipTrace(asText(act.text), TRACE_BODY_MAX),
         fedToNextStep: false,
-        sandboxLogs: '',
       });
     }
     if (act.askedUser?.questions?.length) {

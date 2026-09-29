@@ -427,7 +427,7 @@ describe('code mode phase 1', () => {
     const traced = await executeReasoningAgent(codeModeCtx({ traceCodeMode: true, maxReflectRetries: 0 }), { llm });
     expect(logs.some((line) => line.includes('[Code Mode] start'))).toBe(true);
     expect(logs.some((line) => line.includes('[Code Mode] step'))).toBe(true);
-    expect(logs.some((line) => line.includes('[Code Mode] end'))).toBe(true);
+    expect(logs.some((line) => line.includes('sql: SELECT 1 FROM dual'))).toBe(true);
     const rows = traced.codeModeTrace as Array<{ event?: string }>;
     expect(rows.map((row) => row.event)).toEqual(['code_mode.start', 'code_mode.step', 'code_mode.end']);
     spy.mockRestore();
