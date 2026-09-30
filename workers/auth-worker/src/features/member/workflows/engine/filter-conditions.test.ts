@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyStructuredFilter,
   defaultFilterCondition,
   defaultFilterValue,
   evaluateFilterFromNodeData,
@@ -92,6 +93,26 @@ describe('flow filter branches', () => {
     expect(resolveActiveBranchHandles('filter', data, { ok: false }, { ok: false }).has('out')).toBe(false);
   });
 
+  it('does not reopen a filter that already dropped every row', () => {
+    const data = {
+      flowKind: 'filter',
+      conditions: {
+        combinator: 'and',
+        conditions: [
+          {
+            id: '1',
+            leftValue: '{{ $json.items[0].tableName }}',
+            rightValue: 'RAG',
+            operator: { type: 'string', operation: 'notContains' },
+          },
+        ],
+      },
+    };
+    expect(resolveActiveBranchHandles('filter', data, { filtered: false, items: [] }, { filtered: false }).has('out')).toBe(
+      false,
+    );
+  });
+
   it('reads ignoreCase from options', () => {
     const data = {
       flowKind: 'filter',
@@ -109,5 +130,100 @@ describe('flow filter branches', () => {
       options: { ignoreCase: true },
     };
     expect(evaluateFilterFromNodeData(data, { name: 'Ada' })).toBe(true);
+  });
+});
+
+const KEEP_TABLES = [
+  'CHUNG_KHOAN',
+  'CHUYEN_KHOAN_KHAC',
+  'CHUYEN_KHOAN_THUA_KE',
+  'GIAO_DICH_LUU_KY',
+  'LICH_SU_GIA_CK',
+  'LOAI_CK',
+  'LOAI_GIAO_DICH',
+  'NHA_DAU_TU',
+  'TAI_KHOAN_LUU_KY',
+];
+
+describe('applyStructuredFilter', () => {
+  const input = {
+    schemaName: 'ADMIN',
+    items: [
+      { tableName: 'CHUNG_KHOAN', schemaName: 'ADMIN' },
+      { tableName: 'RAG_ERROR_LOG', schemaName: 'ADMIN' },
+      { tableName: 'NHA_DAU_TU', schemaName: 'ADMIN' },
+      { tableName: 'RAG_SCHEMA_VECTORS', schemaName: 'ADMIN' },
+    ],
+    tables: ['CHUNG_KHOAN', 'RAG_ERROR_LOG', 'NHA_DAU_TU', 'RAG_SCHEMA_VECTORS'],
+    count: 4,
+    tableCount: 4,
+    connection: { type: 'oracle' },
+  };
+
+  it('keeps only whitelist tables referenced through items[0]', () => {
+    const data = {
+      conditions: {
+        combinator: 'and',
+        conditions: [
+          {
+            id: '1',
+            leftValue: `{{ [${KEEP_TABLES.map((name) => `'${name}'`).join(',')}].includes($json.items[0].tableName) }}`,
+            rightValue: '',
+            operator: { type: 'boolean', operation: 'true', singleValue: true },
+          },
+        ],
+      },
+    };
+    const applied = applyStructuredFilter(data, input);
+    expect(applied?.pass).toBe(true);
+    expect(applied?.output.items).toEqual([
+      { tableName: 'CHUNG_KHOAN', schemaName: 'ADMIN' },
+      { tableName: 'NHA_DAU_TU', schemaName: 'ADMIN' },
+    ]);
+    expect(applied?.output.tables).toEqual(['CHUNG_KHOAN', 'NHA_DAU_TU']);
+    expect(applied?.output.count).toBe(2);
+    expect(applied?.output.tableCount).toBe(2);
+    expect(applied?.output.connection).toEqual({ type: 'oracle' });
+  });
+
+  it('drops tables whose name contains RAG', () => {
+    const data = {
+      conditions: {
+        combinator: 'and',
+        conditions: [
+          {
+            id: '1',
+            leftValue: '{{ $json.items[0].tableName }}',
+            rightValue: 'RAG',
+            operator: { type: 'string', operation: 'notContains' },
+          },
+        ],
+      },
+    };
+    const applied = applyStructuredFilter(data, input);
+    expect((applied?.output.items as { tableName: string }[]).map((item) => item.tableName)).toEqual([
+      'CHUNG_KHOAN',
+      'NHA_DAU_TU',
+    ]);
+  });
+
+  it('treats an unsupported arrow expression as not true', () => {
+    const data = {
+      conditions: {
+        combinator: 'and',
+        conditions: [
+          {
+            id: '1',
+            leftValue:
+              "{{ $json.items.some(t => ['CHUNG_KHOAN'].includes(t.tableName)) }}",
+            rightValue: '',
+            operator: { type: 'boolean', operation: 'true', singleValue: true },
+          },
+        ],
+      },
+    };
+    const applied = applyStructuredFilter(data, input);
+    expect(applied?.pass).toBe(false);
+    expect(applied?.output.items).toEqual(input.items);
   });
 });

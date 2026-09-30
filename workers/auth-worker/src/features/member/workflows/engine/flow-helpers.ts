@@ -93,6 +93,10 @@ export function resolveActiveBranchHandles(
   }
 
   if (flowKind === 'filter') {
+    if (typeof nodeInput.filtered === 'boolean') {
+      if (nodeInput.filtered) active.add('out');
+      return active;
+    }
     const structured = evaluateFilterFromNodeData(data, scope);
     const pass = structured ?? evaluateFlowCondition(String(data.condition ?? ''), scope);
     if (pass) active.add('out');

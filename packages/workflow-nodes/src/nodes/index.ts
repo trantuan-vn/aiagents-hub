@@ -121,6 +121,7 @@ export {
   defaultFilterCondition,
   defaultFilterNodeData,
   defaultFilterValue,
+  applyStructuredFilter,
   evaluateFilterFromNodeData,
   evaluateFilterValue,
   parseFilterValue,

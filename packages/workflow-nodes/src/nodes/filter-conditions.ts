@@ -139,7 +139,7 @@ function resolveOperand(raw: unknown, scope: Record<string, unknown>): unknown {
   try {
     return interpolate(raw, { ...scope, $json: scope.$json ?? scope });
   } catch {
-    return raw;
+    return undefined;
   }
 }
 
@@ -308,4 +308,72 @@ export function evaluateFilterFromNodeData(
     ignoreCase: options.ignoreCase === true,
     looseTypeValidation: data.looseTypeValidation === true,
   });
+}
+
+const ITEM_ELEMENT_REF = /\$json\.items\[\d+\]/;
+
+function operandReferencesItemElement(value: unknown): boolean {
+  return typeof value === "string" && ITEM_ELEMENT_REF.test(value);
+}
+
+function rewriteItemOperand(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  return value.replace(/\$json\.items\[\d+\]/g, "$json");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function filterReferencesItemElements(filter: FilterValue): boolean {
+  return filter.conditions.some(
+    (condition) => operandReferencesItemElement(condition.leftValue) || operandReferencesItemElement(condition.rightValue),
+  );
+}
+
+function projectFilteredItems(input: Record<string, unknown>, kept: unknown[]): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...input, items: kept, count: kept.length };
+  if ("tableCount" in input) next.tableCount = kept.length;
+  if (!Array.isArray(input.tables)) return next;
+  const names = kept.map((item) => (isRecord(item) ? item.tableName : undefined));
+  if (names.every((name) => typeof name === "string")) next.tables = names;
+  return next;
+}
+
+/**
+ * Keep rows inside `items` when a condition addresses `$json.items[0].…`.
+ * That path is what the schema tree inserts for one element; it applies to every element.
+ * A whole-object condition still keeps or drops the payload unchanged.
+ */
+export function applyStructuredFilter(
+  data: Record<string, unknown>,
+  input: Record<string, unknown>,
+  scope?: Record<string, unknown>,
+): { output: Record<string, unknown>; pass: boolean } | undefined {
+  const parsed = parseFilterValue(data.conditions);
+  if (!parsed) return undefined;
+  const options = (data.options && typeof data.options === "object" ? data.options : {}) as FilterNodeOptions;
+  const opts = {
+    ignoreCase: options.ignoreCase === true,
+    looseTypeValidation: data.looseTypeValidation === true,
+  };
+  const base = scope ?? input;
+
+  if (Array.isArray(input.items) && filterReferencesItemElements(parsed)) {
+    const rewritten: FilterValue = {
+      ...parsed,
+      conditions: parsed.conditions.map((condition) => ({
+        ...condition,
+        leftValue: rewriteItemOperand(condition.leftValue),
+        rightValue: rewriteItemOperand(condition.rightValue),
+      })),
+    };
+    const kept = input.items.filter((item) => {
+      const record = isRecord(item) ? item : { value: item };
+      return evaluateFilterValue(rewritten, { ...base, ...record, $json: record }, opts);
+    });
+    return { output: projectFilteredItems(input, kept), pass: kept.length > 0 };
+  }
+
+  return { output: input, pass: evaluateFilterValue(parsed, base, opts) };
 }

@@ -1,3 +1,5 @@
+import { applyStructuredFilter } from '@aiagents-hub/workflow-nodes';
+
 import { activeHandlesForNode } from '../../engine/flow-helpers.js';
 import { gatherMainFlowInputs } from '../../engine/graph-helpers.js';
 import {
@@ -39,6 +41,18 @@ export async function executeFlow(ctx: NodeContext): Promise<NodeOutput> {
       activeBranches: [...result.activeHandles],
       _loopState: result.loopState,
     };
+  }
+
+  if (flowKind === 'filter') {
+    const applied = applyStructuredFilter(data, ctx.nodeInput, scope);
+    if (applied) {
+      return {
+        ...applied.output,
+        flowKind: 'filter',
+        activeBranches: applied.pass ? ['out'] : [],
+        filtered: applied.pass,
+      };
+    }
   }
 
   const branches = activeHandlesForNode(ctx.node, ctx.nodeInput, scope);

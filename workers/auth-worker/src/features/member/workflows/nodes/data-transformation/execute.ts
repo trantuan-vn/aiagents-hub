@@ -1,4 +1,4 @@
-import { evaluateFilterFromNodeData } from '@aiagents-hub/workflow-nodes';
+import { applyStructuredFilter, evaluateFilterFromNodeData } from '@aiagents-hub/workflow-nodes';
 
 import type { NodeContext, NodeOutput } from '../types.js';
 
@@ -10,6 +10,10 @@ export async function executeDataTransformation(ctx: NodeContext): Promise<NodeO
       input: ctx.input ?? '',
       variables: ctx.runContext.variables ?? {},
     };
+    const applied = applyStructuredFilter(data, ctx.nodeInput, scope);
+    if (applied) {
+      return { ...applied.output, filtered: applied.pass };
+    }
     const pass = evaluateFilterFromNodeData(data, scope);
     if (pass === false) return { filtered: false };
     return { ...ctx.nodeInput, filtered: pass !== false };
