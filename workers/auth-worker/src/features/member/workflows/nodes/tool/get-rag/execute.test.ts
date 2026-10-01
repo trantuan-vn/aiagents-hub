@@ -5,11 +5,11 @@ import type { NodeContext } from '../../types.js';
 import {
   executeGetRag,
   executeGetRagPipeline,
-  groupLooksIncomplete,
   matchesAboveTableThreshold,
-  missingSqlRagDocTypes,
   prefetchLinkedGetRag,
   resolveGetRagTopK,
+  resolveScoreThreshold,
+  resolveSqlPairTopK,
 } from './execute.js';
 import { toVectorizeNativeNamespace } from '../../../rag/index.js';
 import { WORKERS_AI_GATEWAY } from '../../../ai/workers-ai.js';
@@ -55,13 +55,26 @@ describe('executeGetRag', () => {
     billingMock.ensureWalletBalance.mockReset().mockResolvedValue(undefined);
   });
   it('returns snippets from mocked vectorize', async () => {
-    const query = vi.fn().mockResolvedValue({
-      matches: [
-        {
-          score: 0.91,
-          metadata: { text: 'answer snippet', source: 'doc-1' },
-        },
-      ],
+    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
+      if (opts?.filter?.docType === 'sqlpair') {
+        return {
+          matches: [
+            {
+              score: 0.91,
+              metadata: {
+                text: 'Question: what is RAG?\n\n```sql\nSELECT 1\n```',
+                source: 'doc-1',
+                docType: 'sqlpair',
+                documentId: 'sqlpair.abc',
+                formatVersion: '2',
+                chunkIndex: '0',
+                totalChunks: '1',
+              },
+            },
+          ],
+        };
+      }
+      return { matches: [] };
     });
     const env = {
       AI: {
@@ -87,8 +100,10 @@ describe('executeGetRag', () => {
     });
 
     expect(result.count).toBe(1);
-    expect(result.snippets[0]?.text).toBe('answer snippet');
-    expect(result.snippets[0]?.source).toBe('doc-1');
+    expect(result.snippets[0]?.docType).toBe('sqlpair');
+    expect(result.snippets[0]?.text).toContain('what is RAG?');
+    expect(result.ragText.indexOf('## Câu hỏi và SQL')).toBeLessThan(result.ragText.indexOf('## Schema liên quan'));
+    expect(result.ragText).not.toContain('sqlexample');
     expect(result.raw?.usage).toMatchObject({
       prompt_tokens: 8,
       completion_tokens: 0,
@@ -100,7 +115,11 @@ describe('executeGetRag', () => {
       [0.5, 0.6],
       expect.objectContaining({ topK: 20, returnMetadata: 'all', namespace: 'test-ns' }),
     );
-    expect(query.mock.calls.slice(0, 3).map((call) => call[1]?.topK)).toEqual([20, 20, 20]);
+    const docTypes = query.mock.calls.map((call) => call[1]?.filter?.docType);
+    expect(docTypes.sort()).toEqual(['schema', 'sqlpair']);
+    expect(query.mock.calls.every((call) => call[1]?.topK === 20)).toBe(true);
+    expect(docTypes).not.toContain('sqlexample');
+    expect(query.mock.calls.some((call) => !call[1]?.filter)).toBe(false);
   });
 
   it('embeds the query with the selected service model', async () => {
@@ -369,7 +388,17 @@ describe('executeGetRagPipeline', () => {
       matches: [
         {
           score: 0.88,
-          metadata: { text: 'CREATE TABLE public.orders (id TEXT);', source: 'orders.schema.md' },
+          metadata: {
+            text: '# PUBLIC.ORDERS\n\nĐơn hàng.\nOrders.\n\n| Column | Type | Nullable | Key | Description | Aliases |\n| ID | TEXT | NO | PK | VI: Mã. EN: Id. | |\n',
+            source: 'orders.schema.md',
+            docType: 'schema',
+            documentId: 'db.PUBLIC.ORDERS.schema',
+            tableName: 'ORDERS',
+            schemaName: 'PUBLIC',
+            formatVersion: '2',
+            chunkIndex: '0',
+            totalChunks: '1',
+          },
         },
       ],
     });
@@ -411,7 +440,9 @@ describe('executeGetRagPipeline', () => {
     expect(out.count).toBe(1);
     expect((out.body as { question: string }).question).toBe('total revenue last 30 days');
     expect(String(out.text)).toBe('total revenue last 30 days');
-    expect(String(out.ragText)).toContain('CREATE TABLE public.orders');
+    expect(String(out.ragText)).toContain('## Schema liên quan');
+    expect(String(out.ragText)).toContain('PUBLIC.ORDERS');
+    expect(String(out.ragText)).not.toContain('sqlexample');
   });
 
   it('does not use Simple Memory as the Vectorize dataset for Get RAG', async () => {
@@ -474,7 +505,17 @@ describe('executeGetRagPipeline', () => {
 
   it('queries the same workflow namespace Save RAG used when no memory node is attached', async () => {
     const query = vi.fn().mockResolvedValue({
-      matches: [{ score: 0.8, metadata: { text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);', namespace: 'uu1/wf1' } }],
+      matches: [{
+        score: 0.8,
+        metadata: {
+          text: '# ADMIN.ORDERS\n\nĐơn hàng.\nOrders.\n',
+          namespace: 'uu1/wf1',
+          docType: 'schema',
+          tableName: 'ORDERS',
+          schemaName: 'ADMIN',
+          documentId: 'db.ADMIN.ORDERS.schema',
+        },
+      }],
     });
     const env = {
       AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
@@ -648,92 +689,51 @@ describe('executeGetRagPipeline', () => {
   });
 });
 
-describe('sql rag completeness', () => {
-  it('treats sample-rich schema alone as incomplete until sqlexample is present', () => {
-    const schemaOnly = [
-      {
-        score: 0.9,
-        metadata: {
-          text: '## DDL\nCREATE TABLE ADMIN.ORDERS (ID NUMBER);\n## Sample shape\n```json\n[{ "ID": 1 }]\n```',
-          tableName: 'ORDERS',
-          schemaName: 'ADMIN',
-          docType: 'schema',
-        },
-      },
-    ];
-    expect(groupLooksIncomplete(schemaOnly)).toBe(true);
-    expect(missingSqlRagDocTypes(schemaOnly)).toEqual(['sqlexample']);
-    expect(
-      groupLooksIncomplete([
-        ...schemaOnly,
-        {
-          score: 0.5,
-          metadata: {
-            text: 'SELECT COUNT(*) FROM ADMIN.ORDERS',
-            tableName: 'ORDERS',
-            docType: 'sqlexample',
-          },
-        },
-      ]),
-    ).toBe(false);
-  });
-});
+describe('two-part retrieve', () => {
+  const ordersText = `# SALES.ORDERS
 
-describe('related table assembly', () => {
-  it('hydrates schema and sample data for each related table from metadata', async () => {
+Đơn hàng.
+Orders.
+
+| Column | Type | Nullable | Key | Description | Aliases |
+| ORDER_ID | NUMBER | NO | PK | VI: Mã đơn. EN: Order id. | mã đơn |
+| CUSTOMER_ID | NUMBER | YES | FK → CUSTOMERS.ID | VI: Khách. EN: Customer. | khách |
+| AMOUNT | NUMBER | YES |  | VI: Doanh thu thuần. EN: Net revenue. | doanh thu |
+| NOTE | VARCHAR2 | YES |  | VI: Ghi chú. EN: Note. | ghi chú |
+`;
+
+  function schemaMatch(table: string, text: string, score: number) {
+    return {
+      score,
+      metadata: {
+        docType: 'schema',
+        documentId: `db.SALES.${table}.schema`,
+        tableName: table,
+        schemaName: 'SALES',
+        text,
+      },
+    };
+  }
+
+  it('returns sqlpair snippets before schema and ignores sqlexample', async () => {
     const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.tableName === 'CHUNG_KHOAN') {
+      if (opts?.filter?.docType === 'sqlpair') {
         return {
           matches: [
             {
-              score: 0.7,
+              score: 0.2,
               metadata: {
-                text: '## DDL\n```sql\nCREATE TABLE ADMIN.CHUNG_KHOAN (MA_CK VARCHAR2(20));\n```',
-                tableName: 'CHUNG_KHOAN',
-                schemaName: 'ADMIN',
-                docType: 'schema',
-                documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-                chunkIndex: '0',
-                source: 'ADMIN.CHUNG_KHOAN.schema.md',
+                docType: 'sqlpair',
+                documentId: 'sqlpair.low',
+                text: 'Question: unrelated\n\n```sql\nSELECT 1\n```',
               },
             },
             {
-              score: 0.6,
+              score: 0.88,
               metadata: {
-                text: '## Sample shape (from live data)\n```json\n[{ "MA_CK": "VIC" }]\n```',
-                tableName: 'CHUNG_KHOAN',
-                schemaName: 'ADMIN',
-                docType: 'schema',
-                documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-                chunkIndex: '1',
-              },
-            },
-            {
-              score: 0.5,
-              metadata: {
-                text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
-                tableName: 'CHUNG_KHOAN',
-                schemaName: 'ADMIN',
-                docType: 'sqlexample',
-                documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
-                chunkIndex: '0',
-              },
-            },
-          ],
-        };
-      }
-      if (opts?.filter?.docType === 'sqlexample') {
-        return {
-          matches: [
-            {
-              score: 0.5,
-              metadata: {
-                text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
-                tableName: 'CHUNG_KHOAN',
-                schemaName: 'ADMIN',
-                docType: 'sqlexample',
-                documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
-                chunkIndex: '0',
+                docType: 'sqlpair',
+                documentId: 'sqlpair.revenue',
+                text: 'Question: doanh thu theo tháng\n\n```sql\nSELECT SUM(AMOUNT) FROM SALES.ORDERS\n```',
               },
             },
           ],
@@ -741,16 +741,14 @@ describe('related table assembly', () => {
       }
       return {
         matches: [
+          schemaMatch('ORDERS', ordersText, 0.8),
           {
-            score: 0.99,
+            score: 0.7,
             metadata: {
-              text: '"MA_CK": "VNM", "TEN_CK": "Vinamilk"',
-              tableName: 'CHUNG_KHOAN',
-              schemaName: 'ADMIN',
-              docType: 'schema',
-              documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-              chunkIndex: '1',
-              source: 'ADMIN.CHUNG_KHOAN.schema.md',
+              docType: 'sqlexample',
+              documentId: 'db.SALES.ORDERS.sqlexample',
+              tableName: 'ORDERS',
+              text: 'SELECT * FROM OLD_EXAMPLE',
             },
           },
         ],
@@ -761,12 +759,59 @@ describe('related table assembly', () => {
       VECTORIZE: { query, upsert: vi.fn() },
     } as unknown as Env;
 
+    const result = await executeGetRag({
+      env,
+      definition,
+      agentId: 'agent_1',
+      input: { query: 'doanh thu theo tháng' },
+    });
+
+    expect(result.sqlPairs).toEqual([
+      { question: 'doanh thu theo tháng', sql: 'SELECT SUM(AMOUNT) FROM SALES.ORDERS', score: 0.88 },
+    ]);
+    expect(result.schemas.map((schema) => schema.tableName)).toEqual(['ORDERS']);
+    expect(result.snippets.map((snippet) => snippet.docType)).toEqual(['sqlpair', 'schema']);
+    expect(result.ragText.indexOf('## Câu hỏi và SQL')).toBeLessThan(result.ragText.indexOf('## Schema liên quan'));
+    expect(result.ragText).toContain('AMOUNT');
+    expect(result.ragText).toContain('ORDER_ID');
+    expect(result.ragText).not.toContain('NOTE');
+    expect(result.ragText).not.toContain('OLD_EXAMPLE');
+    expect(result.ragText).not.toContain('sqlexample');
+    const filters = query.mock.calls.map((call) => call[1]?.filter as { docType?: string; tableName?: string });
+    expect(filters.some((filter) => filter?.docType === 'sqlpair')).toBe(true);
+    expect(filters.some((filter) => filter?.docType === 'schema' && !filter.tableName)).toBe(true);
+    expect(filters.some((filter) => filter?.tableName === 'CUSTOMERS')).toBe(true);
+    expect(filters.some((filter) => filter?.docType === 'sqlexample' || !filter?.docType)).toBe(false);
+  });
+
+  it('adds one foreign-key hop without using a topK slot', async () => {
+    const customersText = `# SALES.CUSTOMERS
+
+Khách hàng.
+Customers.
+
+| Column | Type | Nullable | Key | Description | Aliases |
+| ID | NUMBER | NO | PK | VI: Mã khách. EN: Customer id. | |
+| NAME | VARCHAR2 | YES |  | VI: Tên khách. EN: Customer name. | |
+`;
+    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
+      if (opts?.filter?.tableName === 'CUSTOMERS') return { matches: [schemaMatch('CUSTOMERS', customersText, 0.3)] };
+      if (opts?.filter?.docType === 'sqlpair') return { matches: [] };
+      return {
+        matches: [
+          schemaMatch('ORDERS', ordersText, 0.91),
+          schemaMatch('PRODUCTS', '# SALES.PRODUCTS\n\nHàng.\nGoods.\n', 0.4),
+        ],
+      };
+    });
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
+      VECTORIZE: { query, upsert: vi.fn() },
+    } as unknown as Env;
     const wired: WorkflowDefinition = {
       ...definition,
-      nodes: definition.nodes.map((n) =>
-        n.id === 'tool_get'
-          ? { ...n, data: { ...n.data, groupByField: 'tableName', topK: 3 } }
-          : n,
+      nodes: definition.nodes.map((node) =>
+        node.id === 'tool_get' ? { ...node, data: { ...node.data, topK: 1 } } : node,
       ),
     };
 
@@ -774,106 +819,108 @@ describe('related table assembly', () => {
       env,
       definition: wired,
       agentId: 'tool_get',
-      input: { query: 'co phieu Vinamilk' },
+      input: { query: 'doanh thu theo tháng' },
     });
 
-    expect(result.count).toBe(1);
-    expect(result.snippets[0]?.text).toContain('# CHUNG_KHOAN');
-    expect(result.snippets[0]?.text).toContain('CREATE TABLE');
-    expect(result.snippets[0]?.text).toContain('VIC');
-    expect(result.snippets[0]?.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
-    expect(result.snippets[0]?.tableName).toBe('CHUNG_KHOAN');
-    expect(result.snippets[0]?.schemaName).toBe('ADMIN');
+    expect(result.schemas.map((schema) => schema.tableName)).toEqual(['ORDERS', 'CUSTOMERS']);
+    expect(result.ragText).toContain('### SALES.CUSTOMERS');
+    expect(result.ragText).not.toContain('PRODUCTS');
+    expect(result.ragText).toContain('_Không có câu hỏi tương tự._');
   });
 
-  it('still pulls sqlexample when the first hit is only a sample-rich schema chunk', async () => {
+  it('fails retrieve when the embed model dimension does not match the index', async () => {
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+      VECTORIZE: { query: vi.fn().mockResolvedValue({ matches: [] }), upsert: vi.fn() },
+    } as unknown as Env;
+    const wired: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((node) =>
+        node.id === 'mem_kb' ? { ...node, data: { ...node.data, dimensions: 8 } } : node,
+      ),
+    };
+
+    await expect(
+      executeGetRag({
+        env,
+        definition: wired,
+        agentId: 'agent_1',
+        input: { query: 'orders' },
+      }),
+    ).rejects.toThrow(/dimensions/);
+  });
+
+  it('embeds with the embed model selected on the node', async () => {
+    const aiRun = vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] });
+    const env = {
+      AI: { run: aiRun },
+      VECTORIZE: { query: vi.fn().mockResolvedValue({ matches: [] }), upsert: vi.fn() },
+    } as unknown as Env;
+    billingMock.resolveServiceByEndpoint.mockResolvedValue({
+      catalogId: 'bge-m3',
+      endpoint: '/api/ai/baai/bge-m3',
+      model: '@cf/baai/bge-m3',
+      embedModel: '@cf/baai/bge-m3',
+      approvalStatus: 'approved',
+    });
+    const wired: WorkflowDefinition = {
+      ...definition,
+      nodes: definition.nodes.map((node) =>
+        node.id === 'tool_get'
+          ? { ...node, data: { ...node.data, embedModel: '/api/ai/baai/bge-m3' } }
+          : node,
+      ),
+    };
+
+    await executeGetRag({
+      env,
+      definition: wired,
+      agentId: 'tool_get',
+      input: { query: 'doanh thu' },
+      userDO: {} as NodeContext['userDO'],
+    });
+
+    expect(aiRun).toHaveBeenCalledWith(
+      '@cf/baai/bge-m3',
+      { text: 'doanh thu' },
+      { gateway: WORKERS_AI_GATEWAY },
+    );
+  });
+});
+
+describe('group by expression', () => {
+  it('groups schema tables by a mapped metadata key and keeps topK', async () => {
     const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.docType === 'sqlexample' || opts?.filter?.tableName === 'ORDERS') {
-        const rows = [];
-        if (!opts?.filter?.docType || opts.filter.docType === 'schema' || opts.filter.tableName) {
-          rows.push({
-            score: 0.8,
-            metadata: {
-              text: '## DDL\nCREATE TABLE ADMIN.ORDERS (TOTAL NUMBER);\n## Columns\n- TOTAL: Tổng tiền / Total (aliases: doanh thu)',
-              tableName: 'ORDERS',
-              schemaName: 'ADMIN',
-              docType: 'schema',
-              documentId: 'db.ADMIN.ORDERS.schema',
-              chunkIndex: '0',
-            },
-          });
-        }
-        if (!opts?.filter?.docType || opts.filter.docType === 'sqlexample' || opts.filter.tableName) {
-          rows.push({
-            score: 0.6,
-            metadata: {
-              text: 'SELECT SUM(TOTAL) FROM ADMIN.ORDERS',
-              tableName: 'ORDERS',
-              schemaName: 'ADMIN',
-              docType: 'sqlexample',
-              documentId: 'db.ADMIN.ORDERS.sqlexample',
-              chunkIndex: '0',
-            },
-          });
-        }
-        return { matches: rows.filter((r) => !opts?.filter?.docType || r.metadata.docType === opts.filter.docType) };
-      }
+      if (opts?.filter?.docType !== 'schema') return { matches: [] };
       return {
         matches: [
           {
-            score: 0.95,
+            score: 0.91,
             metadata: {
-              text: '## Sample shape\n```json\n[{ "TOTAL": 10 }]\n```',
-              tableName: 'ORDERS',
-              schemaName: 'ADMIN',
               docType: 'schema',
-              documentId: 'db.ADMIN.ORDERS.schema',
-              chunkIndex: '1',
+              tableName: 'ORDERS',
+              schemaName: 'SALES',
+              documentId: 'db.SALES.ORDERS.schema',
+              text: ['# SALES.ORDERS', '', 'Đơn hàng.', 'Orders.', ''].join('\n'),
+            },
+          },
+          {
+            score: 0.5,
+            metadata: {
+              docType: 'schema',
+              tableName: 'PRODUCTS',
+              schemaName: 'SALES',
+              documentId: 'db.SALES.PRODUCTS.schema',
+              text: ['# SALES.PRODUCTS', '', 'Hàng.', 'Goods.', ''].join('\n'),
             },
           },
         ],
       };
     });
     const env = {
-      AI: { run: vi.fn().mockResolvedValue({ data: [[0.4, 0.5]] }) },
-      VECTORIZE: { query, upsert: vi.fn() },
-    } as unknown as Env;
-
-    const wired: WorkflowDefinition = {
-      ...definition,
-      nodes: definition.nodes.map((n) =>
-        n.id === 'tool_get'
-          ? { ...n, data: { ...n.data, groupByField: 'tableName', topK: 3 } }
-          : n,
-      ),
-    };
-
-    const result = await executeGetRag({
-      env,
-      definition: wired,
-      agentId: 'tool_get',
-      input: { query: 'doanh thu tháng này' },
-    });
-
-    expect(result.count).toBe(1);
-    expect(result.snippets[0]?.text).toContain('doanh thu');
-    expect(result.snippets[0]?.text).toContain('## schema');
-    expect(result.snippets[0]?.text).toContain('## sqlexample');
-    expect(result.snippets[0]?.text).toContain('SELECT SUM(TOTAL)');
-    expect(result.snippets[0]?.schemaName).toBe('ADMIN');
-  });
-
-  it('uses a mapped groupByField expression for the metadata key name', async () => {
-    const query = vi.fn().mockResolvedValue({
-      matches: [
-        { score: 0.8, metadata: { text: 'hello kb', source: 'kb.md', documentId: 'kb-1', chunkIndex: '0' } },
-      ],
-    });
-    const env = {
       AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
       VECTORIZE: { query, upsert: vi.fn() },
     } as unknown as Env;
-
     const pipelineDefinition: WorkflowDefinition = {
       nodes: [
         {
@@ -884,38 +931,40 @@ describe('related table assembly', () => {
             toolKind: 'get-rag',
             queryField: '{{ $json.body.question }}',
             groupByField: '{{ $json.groupKey }}',
+            topK: 1,
           },
         },
       ],
       edges: [],
     };
-
     const ctx = {
       node: pipelineDefinition.nodes[0],
-      nodeInput: { body: { question: 'hello' }, groupKey: 'source' },
+      nodeInput: { body: { question: 'orders' }, groupKey: 'tableName' },
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
-
     const out = await executeGetRagPipeline(ctx);
     expect(out.count).toBe(1);
-    expect(String(out.ragText)).toContain('hello kb');
-    expect(query).toHaveBeenCalledWith(
-      [0.2, 0.3],
-      expect.objectContaining({ filter: { source: 'kb.md' } }),
-    );
+    expect(String(out.ragText)).toContain('SALES.ORDERS');
+    expect(String(out.ragText)).not.toContain('PRODUCTS');
+    expect(query.mock.calls.some((call) => call[1]?.filter?.source)).toBe(false);
   });
 });
 
+
 describe('Get RAG completeness', () => {
-  it('uses 12 tables when topK is empty and caps at 20', () => {
-    expect(resolveGetRagTopK(undefined)).toBe(12);
-    expect(resolveGetRagTopK(0)).toBe(12);
-    expect(resolveGetRagTopK('nope')).toBe(12);
+  it('uses 4 schema tables and 5 SQL pairs when those limits are empty', () => {
+    expect(resolveGetRagTopK(undefined)).toBe(4);
+    expect(resolveGetRagTopK(0)).toBe(4);
+    expect(resolveGetRagTopK('nope')).toBe(4);
     expect(resolveGetRagTopK(100)).toBe(20);
+    expect(resolveSqlPairTopK(undefined)).toBe(5);
+    expect(resolveSqlPairTopK(100)).toBe(20);
+    expect(resolveScoreThreshold(undefined)).toBe(0.25);
+    expect(resolveScoreThreshold(0)).toBe(0);
   });
 
   it('does not drop a table when scoreThreshold is 0 and drops a table below a positive threshold', () => {
@@ -1008,7 +1057,7 @@ describe('Get RAG completeness', () => {
         schemaName: 'ADMIN',
         chunkIndex: '0',
         totalChunks: '1',
-        text: 'CREATE TABLE ADMIN.ORDERS (ID NUMBER);',
+        text: '# ADMIN.ORDERS\n\nĐơn hàng.\nOrders.\n\n| Column | Type | Nullable | Key | Description | Aliases |\n| ID | NUMBER | NO | PK | VI: Mã. EN: Id. | |\n',
       },
     };
     const env = {
@@ -1028,8 +1077,11 @@ describe('Get RAG completeness', () => {
     });
 
     expect(result.count).toBe(1);
-    expect(result.snippets[0]?.text).toContain('CREATE TABLE ADMIN.ORDERS');
-    expect(result.snippets[0]?.text).not.toContain('sqlexample');
+    expect(result.snippets[0]?.docType).toBe('schema');
+    expect(result.snippets[0]?.text).toContain('ADMIN.ORDERS');
+    expect(result.snippets[0]?.text).toContain('ID');
+    expect(result.ragText).not.toContain('sqlexample');
+    expect(result.sqlPairs).toEqual([]);
   });
 
   it('propagates a retrieve error from prefetch instead of returning empty rag text', async () => {

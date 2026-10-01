@@ -1,13 +1,13 @@
 import { resourceNode } from "./common";
 import { GET_RAG_QUERY_FIELD } from "@aiagents-hub/workflow-nodes";
 
-/** Get RAG — map the previous node's question into the search query. */
+/** Get RAG — question–SQL pairs first, then related schema. */
 export const GET_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
   displayName: "Get RAG",
   name: "tool_node_get_rag",
   icon: "fa:search",
   group: ["transform"],
-  description: "Search the knowledge base using a field from the previous node.",
+  description: "Return similar question–SQL pairs first, then related table schema.",
   properties: [
     {
       displayName: "Query field",
@@ -19,25 +19,42 @@ export const GET_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
         "Expression for the search query. Drop a second INPUT field to join with ||. You can edit to ??, &&, or a ternary.",
     },
     {
+      displayName: "Embed model",
+      name: "embedModel",
+      type: "string",
+      default: "",
+      description:
+        "Embedding service. Use the same model as Save RAG and Save SQL Pair. A dimension mismatch fails the search instead of returning empty snippets.",
+      typeOptions: { aiHubServiceSelect: true, aiHubServiceCapability: "embed" },
+    },
+    {
       displayName: "Group related docs by",
       name: "groupByField",
       type: "string",
       default: "tableName",
       placeholder: "tableName",
-      description:
-        "Metadata key Save RAG stored (e.g. tableName). Get RAG expands each related value with every stored document type (schema + data). Drop an INPUT field if the key name comes from the previous node.",
+      description: "Metadata key used to group schema documents. Default is tableName.",
     },
     {
       displayName: "Top K",
       name: "topK",
       type: "number",
-      default: 12,
+      default: 4,
+      description: "Max schema tables (default 4).",
+    },
+    {
+      displayName: "SQL pair top K",
+      name: "sqlPairTopK",
+      type: "number",
+      default: 5,
+      description: "Max question–SQL pairs (default 5).",
     },
     {
       displayName: "Score threshold",
       name: "scoreThreshold",
       type: "number",
-      default: 0,
+      default: 0.25,
+      description: "Cosine similarity. Tables and pairs below this are left out (default 0.25).",
     },
     {
       displayName: "Include metadata",
@@ -56,7 +73,8 @@ export const GET_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       name: "toolDescription",
       type: "string",
       typeOptions: { rows: 3 },
-      default: "Search the knowledge base for passages relevant to the user question.",
+      default:
+        "Return similar question–SQL pairs first, then related table schema. Do not call when that two-part context is already in the prompt.",
     },
     {
       displayName: "Label",

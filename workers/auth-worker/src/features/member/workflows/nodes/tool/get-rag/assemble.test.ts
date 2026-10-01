@@ -4,15 +4,20 @@ import { chunkText } from '../save-rag/chunk.js';
 import { vectorChunkId as sharedVectorChunkId } from '../../../rag/index.js';
 import {
   assembleGroupSnippet,
+  assembleTwoPartRag,
   chunkIdsForDocument,
   finalizeRetrievedGroup,
   inferGroupBy,
   overlapJoin,
+  parseSqlPairText,
   pickRelatedGroups,
+  reduceSchemaText,
   resolveGroupKey,
+  selectSchemaColumns,
   stitchChunkTexts,
   stitchExact,
   vectorChunkId,
+  type SchemaColumn,
 } from './assemble.js';
 
 describe('assemble RAG documents', () => {
@@ -45,78 +50,82 @@ describe('assemble RAG documents', () => {
     expect(pickRelatedGroups(matches, 'tableName', 1)).toEqual(['CHUNG_KHOAN']);
   });
 
-  it('assembles schema before sqlexample and keeps schemaName', () => {
-    const snippet = assembleGroupSnippet('CHUNG_KHOAN', [
-      {
-        score: 0.5,
-        metadata: {
-          tableName: 'CHUNG_KHOAN',
-          schemaName: 'ADMIN',
-          docType: 'sqlexample',
-          documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
-          chunkIndex: '0',
-          text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
-        },
-      },
-      {
-        score: 0.7,
-        metadata: {
-          tableName: 'CHUNG_KHOAN',
-          schemaName: 'ADMIN',
-          docType: 'schema',
-          documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-          chunkIndex: '0',
-          text: '## Columns\n- MA_CK: Mã chứng khoán / Ticker (aliases: mã CK)',
-        },
-      },
-    ]);
-    expect(snippet.schemaName).toBe('ADMIN');
-    expect(snippet.tableName).toBe('CHUNG_KHOAN');
-    expect(snippet.text).toContain('# CHUNG_KHOAN');
-    expect(snippet.text.indexOf('## schema')).toBeLessThan(snippet.text.indexOf('## sqlexample'));
-    expect(snippet.text).toContain('aliases: mã CK');
-    expect(snippet.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
+  it('puts every sqlpair snippet before schema and keeps both headings', () => {
+    const rag = assembleTwoPartRag(
+      [{ question: 'doanh thu theo tháng', sql: 'SELECT SUM(AMOUNT) FROM SALES.ORDERS', score: 0.4 }],
+      [{
+        text: '# SALES.ORDERS\n\nĐơn hàng.\nOrders.',
+        tableName: 'ORDERS',
+        schemaName: 'SALES',
+        score: 0.9,
+      }],
+    );
+    expect(rag.ragText.indexOf('## Câu hỏi và SQL')).toBeLessThan(rag.ragText.indexOf('## Schema liên quan'));
+    expect(rag.ragText).toContain('Question: doanh thu theo tháng');
+    expect(rag.ragText).toContain('SELECT SUM(AMOUNT) FROM SALES.ORDERS');
+    expect(rag.ragText).toContain('### SALES.ORDERS');
+    expect(rag.snippets.map((snippet) => snippet.docType)).toEqual(['sqlpair', 'schema']);
+    expect(rag.count).toBe(2);
+    expect(rag.ragText).not.toContain('sqlexample');
   });
 
-  it('assembles schema and sample data for one related table', () => {
-    const snippet = assembleGroupSnippet('CHUNG_KHOAN', [
-      {
-        score: 0.5,
-        metadata: {
-          tableName: 'CHUNG_KHOAN',
-          docType: 'sqlexample',
-          documentId: 'db.ADMIN.CHUNG_KHOAN.sqlexample',
-          chunkIndex: '0',
-          text: 'SELECT * FROM ADMIN.CHUNG_KHOAN LIMIT 50;',
-        },
-      },
-      {
-        score: 0.7,
-        metadata: {
-          tableName: 'CHUNG_KHOAN',
-          docType: 'schema',
-          documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-          chunkIndex: '0',
-          text: '## DDL\nCREATE TABLE ADMIN.CHUNG_KHOAN (MA_CK VARCHAR2(20));',
-        },
-      },
-      {
-        score: 0.8,
-        metadata: {
-          tableName: 'CHUNG_KHOAN',
-          docType: 'schema',
-          documentId: 'db.ADMIN.CHUNG_KHOAN.schema',
-          chunkIndex: '1',
-          text: '## Sample shape (from live data)\n```json\n[{ "MA_CK": "VIC" }]\n```',
-        },
-      },
-    ]);
-    expect(snippet.text).toContain('# CHUNG_KHOAN');
-    expect(snippet.text).toContain('## schema');
-    expect(snippet.text).toContain('CREATE TABLE');
-    expect(snippet.text).toContain('VIC');
-    expect(snippet.text).toContain('## sqlexample');
-    expect(snippet.text).toContain('SELECT * FROM ADMIN.CHUNG_KHOAN');
+  it('says when either part is missing', () => {
+    const rag = assembleTwoPartRag([], []);
+    expect(rag.ragText).toContain('_Không có câu hỏi tương tự._');
+    expect(rag.ragText).toContain('_Không có bảng liên quan. Không bịa tên cột._');
+    expect(rag.count).toBe(0);
+    expect(rag.snippets).toEqual([]);
+  });
+
+  it('drops old document junk and keeps columns the question or SQL mentions', () => {
+    const stored = `# SALES.ORDERS
+
+Doanh thu đơn hàng.
+Order revenue.
+
+## DDL
+\`\`\`sql
+CREATE TABLE SALES.ORDERS (ID NUMBER);
+\`\`\`
+
+| Column | Type | Nullable | Key | Description | Aliases |
+| --- | --- | --- | --- | --- | --- |
+| ORDER_ID | NUMBER | NO | PK | VI: Mã đơn. EN: Order id. | mã đơn |
+| CUSTOMER_ID | NUMBER | YES | FK → CUSTOMERS.ID | VI: Khách hàng. EN: Customer. | khách |
+| AMOUNT | NUMBER | YES |  | VI: Doanh thu thuần. EN: Net revenue. | doanh thu |
+| NOTE | VARCHAR2 | YES |  | VI: Ghi chú. EN: Note. | ghi chú |
+`;
+    const reduced = reduceSchemaText(stored, 'doanh thu theo tháng', ['SELECT AMOUNT FROM SALES.ORDERS']);
+    expect(reduced.text).toContain('# SALES.ORDERS');
+    expect(reduced.text).toContain('Doanh thu đơn hàng.');
+    expect(reduced.text).toContain('AMOUNT');
+    expect(reduced.text).toContain('ORDER_ID');
+    expect(reduced.text).toContain('CUSTOMER_ID');
+    expect(reduced.text).not.toContain('CREATE TABLE');
+    expect(reduced.text).not.toContain('NOTE');
+    expect(reduced.targets).toEqual([{ tableName: 'CUSTOMERS' }]);
+    expect(parseSqlPairText('Question: doanh thu theo tháng\n\n```sql\nSELECT 1\n```')).toEqual({
+      question: 'doanh thu theo tháng',
+      sql: 'SELECT 1',
+    });
+  });
+
+  it('keeps primary keys, foreign keys, and the first 12 columns when nothing matches the question', () => {
+    const columns: SchemaColumn[] = [
+      { name: 'ID', type: 'NUMBER', nullable: 'NO', key: 'PK', description: 'id', aliases: '' },
+      ...Array.from({ length: 12 }, (_, index) => ({
+        name: `C${index}`,
+        type: 'NUMBER',
+        nullable: 'YES',
+        key: '',
+        description: 'other',
+        aliases: '',
+      })),
+      { name: 'PARENT_ID', type: 'NUMBER', nullable: 'YES', key: 'FK → PARENT.ID', description: 'parent', aliases: '' },
+    ];
+    const kept = selectSchemaColumns(columns, 'completely unrelated', []);
+    expect(kept.map((column) => column.name)).toEqual(['ID', ...Array.from({ length: 11 }, (_, index) => `C${index}`), 'PARENT_ID']);
+    expect(kept.some((column) => column.name === 'C11')).toBe(false);
   });
 
   it('uses the same 64-hex id as Save RAG', async () => {

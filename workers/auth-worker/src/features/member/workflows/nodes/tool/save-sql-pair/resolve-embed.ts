@@ -26,9 +26,14 @@ export function serviceLooksLikeEmbed(service: Record<string, unknown>): boolean
 
 export type SqlPairEmbed = ResolvedRagEmbed & { catalogId: string };
 
-function toEmbed(service: Record<string, unknown>, fallbackEndpoint: string, configured: string): SqlPairEmbed {
+function toEmbed(
+  service: Record<string, unknown>,
+  fallbackEndpoint: string,
+  configured: string,
+  label: string,
+): SqlPairEmbed {
   if (!serviceLooksLikeEmbed(service)) {
-    throw new Error('save_sql_pair: selected service is not an embedding model');
+    throw new Error(`${label}: selected service is not an embedding model`);
   }
   const endpoint = String(service.endpoint ?? fallbackEndpoint).trim();
   const catalogId = String(service.catalogId ?? service.catalog_id ?? '').trim() || configured || endpoint;
@@ -49,28 +54,29 @@ function matchesConfigured(service: Record<string, unknown>, value: string): boo
 export async function resolveSqlPairEmbed(
   configured: unknown,
   userDO?: DurableObjectStub<UserDO>,
+  label = 'save_sql_pair',
 ): Promise<SqlPairEmbed> {
-  if (!userDO) throw new Error('save_sql_pair: embed model is required');
+  if (!userDO) throw new Error(`${label}: embed model is required`);
   const value = String(configured ?? '').trim();
   if (!value) {
     const listed = await listApprovedServices(userDO);
     const first = listed.find(serviceLooksLikeEmbed);
-    if (!first) throw new Error('save_sql_pair: no embedding service in the catalog');
-    return toEmbed(first, String(first.endpoint ?? ''), '');
+    if (!first) throw new Error(`${label}: no embedding service in the catalog`);
+    return toEmbed(first, String(first.endpoint ?? ''), '', label);
   }
   if (value.startsWith('/')) {
     const service = await resolveServiceByEndpoint(userDO, value);
-    return toEmbed(service, value, value);
+    return toEmbed(service, value, value, label);
   }
   const byModel = await findApprovedServiceByModel(userDO, value);
-  if (byModel) return toEmbed(byModel, String(byModel.endpoint ?? ''), value);
+  if (byModel) return toEmbed(byModel, String(byModel.endpoint ?? ''), value, label);
   if (value.startsWith('@') || value.includes('/')) {
     const endpoint = modelIdToServiceEndpoint(value);
     const byEndpoint = await findApprovedServiceByEndpoint(userDO, endpoint);
-    if (byEndpoint) return toEmbed(byEndpoint, endpoint, value);
+    if (byEndpoint) return toEmbed(byEndpoint, endpoint, value, label);
   }
   const listed = await listApprovedServices(userDO);
   const match = listed.find((service) => matchesConfigured(service, value) && serviceLooksLikeEmbed(service));
-  if (match) return toEmbed(match, String(match.endpoint ?? ''), value);
-  throw new Error(`save_sql_pair: embed service not found for "${value}"`);
+  if (match) return toEmbed(match, String(match.endpoint ?? ''), value, label);
+  throw new Error(`${label}: embed service not found for "${value}"`);
 }

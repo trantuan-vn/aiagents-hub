@@ -6,7 +6,7 @@ import type { ToolModule } from '../shared/tool-module.js';
 import { executeGetRag, executeGetRagPipeline } from './execute.js';
 
 const GET_RAG_TOOL_DESCRIPTION =
-  'Find related table schema (VI/EN column descriptions) and SQL examples for the user question so you can write SELECT. Do not call when schema snippets are already in context.';
+  'Return similar question–SQL pairs first, then related table schema. Do not call when that two-part context is already in the prompt.';
 
 export const getRagToolModule: ToolModule = {
   kind: 'get-rag',
@@ -18,7 +18,7 @@ export const getRagToolModule: ToolModule = {
       description: bind.toolDescription || GET_RAG_TOOL_DESCRIPTION,
       inputSchema: z.object({
         query: z.string().describe('User question (embed as-is; Vietnamese OK)'),
-        topK: z.number().optional().describe('Max related tables to return'),
+        topK: z.number().optional().describe('Max schema tables to return'),
         namespace: z.string().optional(),
       }),
       execute: async (input) => {

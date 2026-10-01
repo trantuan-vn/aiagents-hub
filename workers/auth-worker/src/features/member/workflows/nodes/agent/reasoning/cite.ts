@@ -45,9 +45,13 @@ export function formatCitationBlock(citations: AgentCitation[]): string {
   return citations.map((c) => `[${c.id}] (${c.source}) ${c.snippet}`).join('\n');
 }
 
-/** Full retrieved docs for the act prompt — do not truncate schema / sample rows. */
-export function formatRagContext(snippets: string[]): string {
-  const parts = snippets.map((text) => text.trim()).filter(Boolean);
+/**
+ * One retrieved context string. A two-part `ragText` is passed through once.
+ * An array of older snippets is still numbered `[n]`.
+ */
+export function formatRagContext(input: string | readonly string[]): string {
+  if (typeof input === 'string') return input.trim();
+  const parts = input.map((text) => text.trim()).filter(Boolean);
   if (!parts.length) return '';
   return parts.map((text, i) => `[${i + 1}]\n${text}`).join('\n\n');
 }

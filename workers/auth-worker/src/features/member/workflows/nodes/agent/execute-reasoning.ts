@@ -993,6 +993,7 @@ export async function executeReasoningAgent(
     validate: partitioned.validate.length ? partitioned.validate : linkedValidateNames,
   });
   const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
+  const ragContext = formatRagContext(String(nodeInput.ragText ?? '').trim() || snippets);
   const systemParts = [
     userSystem || 'You are a helpful assistant that uses tools when they improve accuracy.',
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
@@ -1002,9 +1003,7 @@ export async function executeReasoningAgent(
     toolLoopGuidance,
     session.summary ? `Session memory:\n${session.summary}` : '',
     simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-    formatRagContext(snippets)
-      ? `Retrieved knowledge (cite as [n]):\n${formatRagContext(snippets)}`
-      : '',
+    ragContext ? `Retrieved knowledge (cite as [n]):\n${ragContext}` : '',
     options.requireCitations && citationSeed.length
       ? 'Every factual claim must include [n] citations that match the source list.'
       : '',

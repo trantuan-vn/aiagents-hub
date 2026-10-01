@@ -86,13 +86,16 @@ function documentRowsComplete(rows: VectorMatch[]): boolean {
 
 /**
  * Version-2 schema must be complete or the table is dropped.
- * A missing sqlexample does not drop a complete schema.
- * Groups with no version-2 schema stay as stored (older snippets).
+ * `sqlexample` is never kept. Groups with no version-2 schema stay as stored.
  */
 export function finalizeRetrievedGroup(matches: VectorMatch[]): VectorMatch[] | null {
-  const v2 = matches.filter(isFormatV2);
+  const schemaMatches = matches.filter((match) => {
+    const type = docTypeOf(match);
+    return !type || type === 'schema';
+  });
+  const v2 = schemaMatches.filter(isFormatV2);
   const schemaIds = [...new Set(v2.filter((match) => docTypeOf(match) === 'schema').map(documentIdOf))];
-  if (!schemaIds.length) return matches;
+  if (!schemaIds.length) return schemaMatches.length ? schemaMatches : null;
 
   const kept: VectorMatch[] = [];
   let schemaOk = false;
@@ -103,12 +106,6 @@ export function finalizeRetrievedGroup(matches: VectorMatch[]): VectorMatch[] | 
     schemaOk = true;
   }
   if (!schemaOk) return null;
-
-  const sqlIds = [...new Set(v2.filter((match) => docTypeOf(match) === 'sqlexample').map(documentIdOf))];
-  for (const id of sqlIds) {
-    const rows = v2.filter((match) => documentIdOf(match) === id);
-    if (documentRowsComplete(rows)) kept.push(...rows);
-  }
   return kept;
 }
 
@@ -263,4 +260,314 @@ export function matchesFromVectorRows(
       score: row.score,
       metadata: row.metadata,
     }));
+}
+
+export type SchemaColumn = {
+  name: string;
+  type: string;
+  nullable: string;
+  key: string;
+  description: string;
+  aliases: string;
+};
+
+export type ParsedSchema = {
+  heading: string;
+  schemaName: string;
+  tableName: string;
+  summaryVi: string;
+  summaryEn: string;
+  columns: SchemaColumn[];
+};
+
+export type SqlPairView = { question: string; sql: string; score: number };
+export type SchemaView = { text: string; tableName: string; schemaName: string; score: number };
+export type RagSnippetView = {
+  text: string;
+  docType: 'sqlpair' | 'schema';
+  score: number;
+  tableName?: string;
+  schemaName?: string;
+  source?: string;
+  documentId?: string;
+};
+
+export type TwoPartRag = {
+  sqlPairs: SqlPairView[];
+  schemas: SchemaView[];
+  snippets: RagSnippetView[];
+  count: number;
+  ragText: string;
+};
+
+export type ForeignKeyTarget = { tableName: string; schemaName?: string };
+
+const STOPWORDS = new Set([
+  'a', 'an', 'the', 'of', 'and', 'or', 'to', 'in', 'on', 'for', 'by', 'with', 'from', 'is', 'are', 'was', 'were',
+  'be', 'been', 'being', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'how', 'when', 'where', 'why',
+  'do', 'does', 'did', 'not', 'no', 'yes', 'it', 'its', 'as', 'at', 'into', 'per', 'than', 'then', 'if', 'but',
+  'so', 'we', 'you', 'they', 'their', 'our', 'your',
+  'và', 'của', 'các', 'những', 'cho', 'với', 'trong', 'trên', 'dưới', 'từ', 'đến', 'là', 'có', 'được', 'theo',
+  'về', 'một', 'này', 'đó', 'nào', 'gì', 'khi', 'để', 'hay', 'hoặc', 'cũng', 'đã', 'sẽ', 'rất', 'như', 'ở', 'ra',
+  'vào', 'lại', 'nên', 'thì', 'mà', 'bị', 'bởi', 'cái', 'nhiều', 'bao', 'nhiêu', 'không', 'nhưng', 'vì', 'nếu',
+  'sau', 'trước', 'giữa', 'mỗi', 'tất', 'cả',
+]);
+
+const NO_PAIRS = '_Không có câu hỏi tương tự._';
+const NO_SCHEMA = '_Không có bảng liên quan. Không bịa tên cột._';
+const MAX_FALLBACK_COLUMNS = 12;
+
+/** Stitch every chunk of one document back into the stored markdown. */
+export function stitchedDocumentText(matches: VectorMatch[]): string {
+  if (!matches.length) return '';
+  const versioned = matches.every(isFormatV2);
+  if (versioned) {
+    return stitchExact(
+      matches.map((chunk) => ({
+        index: strictChunkIndex(chunk) ?? 0,
+        text: String(chunk.metadata?.text ?? ''),
+      })),
+    );
+  }
+  return stitchChunkTexts(matches.map((chunk) => ({ index: chunkIndex(chunk), text: matchToSnippet(chunk) })));
+}
+
+export function questionTokens(question: string): string[] {
+  const tokens = question
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}_]+/u)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2 && !STOPWORDS.has(token));
+  return [...new Set(tokens)];
+}
+
+function splitHeading(heading: string): { schemaName: string; tableName: string } {
+  const dot = heading.indexOf('.');
+  if (dot <= 0 || dot === heading.length - 1) return { schemaName: '', tableName: heading };
+  return { schemaName: heading.slice(0, dot).trim(), tableName: heading.slice(dot + 1).trim() };
+}
+
+function splitCells(line: string): string[] {
+  const placeholder = '\u0000';
+  const parts = line
+    .replace(/\\\|/g, placeholder)
+    .split('|')
+    .map((cell) => cell.replaceAll(placeholder, '|').trim());
+  if (parts[0] === '') parts.shift();
+  if (parts[parts.length - 1] === '') parts.pop();
+  return parts;
+}
+
+function isSeparatorRow(cells: string[]): boolean {
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function parseColumnRows(lines: string[]): SchemaColumn[] {
+  const columns: SchemaColumn[] = [];
+  for (const line of lines) {
+    if (!line.trim().startsWith('|')) break;
+    const cells = splitCells(line);
+    if (isSeparatorRow(cells) || cells.length < 6) continue;
+    const [name, type, nullable, key, description, aliases] = cells;
+    if (!name) continue;
+    columns.push({
+      name,
+      type: type ?? '',
+      nullable: nullable ?? '',
+      key: key ?? '',
+      description: description ?? '',
+      aliases: aliases ?? '',
+    });
+  }
+  return columns;
+}
+
+/** Heading, Vietnamese and English summaries, and column rows. Older sections are left out. */
+export function parseSchemaDocument(
+  text: string,
+  fallback?: { schemaName?: string; tableName?: string },
+): ParsedSchema {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  let heading = '';
+  const prose: string[] = [];
+  let tableAt = -1;
+  let fence = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const trimmed = line.trim();
+    if (trimmed.startsWith('```')) {
+      fence = !fence;
+      continue;
+    }
+    if (fence) continue;
+    const headingMatch = /^#\s+(.+?)\s*$/.exec(line);
+    if (!heading && headingMatch) {
+      heading = headingMatch[1]?.trim() ?? '';
+      continue;
+    }
+    if (/^\|\s*Column\s*\|/i.test(trimmed)) {
+      tableAt = i;
+      break;
+    }
+    if (!heading || /^#/.test(trimmed)) continue;
+    if (trimmed) prose.push(trimmed);
+  }
+  const fromHeading = splitHeading(heading);
+  const schemaName = (fallback?.schemaName || fromHeading.schemaName).trim();
+  const tableName = (fallback?.tableName || fromHeading.tableName).trim();
+  const title = schemaName && tableName ? `${schemaName}.${tableName}` : heading || tableName || schemaName;
+  return {
+    heading: title,
+    schemaName,
+    tableName,
+    summaryVi: prose[0] ?? '',
+    summaryEn: prose[1] ?? '',
+    columns: tableAt >= 0 ? parseColumnRows(lines.slice(tableAt + 1)) : [],
+  };
+}
+
+export function foreignKeyTargets(columns: SchemaColumn[]): ForeignKeyTarget[] {
+  const targets: ForeignKeyTarget[] = [];
+  const seen = new Set<string>();
+  for (const column of columns) {
+    const re = /FK\s*→\s*([A-Za-z0-9_$.]+)/gi;
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(column.key))) {
+      const parts = (match[1] ?? '').split('.').filter(Boolean);
+      if (parts.length < 2) continue;
+      parts.pop();
+      const tableName = parts.pop() ?? '';
+      const schemaName = parts.join('.') || undefined;
+      if (!tableName) continue;
+      const id = `${(schemaName ?? '').toUpperCase()}.${tableName.toUpperCase()}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      targets.push({ tableName, schemaName });
+    }
+  }
+  return targets;
+}
+
+function columnMatchesToken(column: SchemaColumn, tokens: string[]): boolean {
+  const haystack = `${column.name} ${column.aliases} ${column.description}`.toLowerCase();
+  return tokens.some((token) => haystack.includes(token));
+}
+
+function isKeyColumn(column: SchemaColumn): boolean {
+  return /\bPK\b/.test(column.key) || /\bFK\b/.test(column.key);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function sqlMentionsColumn(sql: string, name: string): boolean {
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  const re = new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(trimmed)}([^A-Za-z0-9_]|$)`, 'i');
+  return re.test(sql);
+}
+
+/** Keep token matches, keys, and columns named in a retrieved SQL pair. No token hit keeps PK, FK, and the first 12. */
+export function selectSchemaColumns(columns: SchemaColumn[], question: string, sqls: string[]): SchemaColumn[] {
+  const tokens = questionTokens(question);
+  const anyToken = columns.some((column) => columnMatchesToken(column, tokens));
+  if (!anyToken) {
+    return columns.filter((column, index) => index < MAX_FALLBACK_COLUMNS || isKeyColumn(column));
+  }
+  return columns.filter(
+    (column) =>
+      columnMatchesToken(column, tokens) ||
+      isKeyColumn(column) ||
+      sqls.some((sql) => sqlMentionsColumn(sql, column.name)),
+  );
+}
+
+function escapeCell(value: string): string {
+  return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+}
+
+export function renderReducedSchema(parsed: ParsedSchema, columns: SchemaColumn[]): string {
+  const title =
+    parsed.schemaName && parsed.tableName
+      ? `${parsed.schemaName}.${parsed.tableName}`
+      : parsed.heading || parsed.tableName || parsed.schemaName || 'TABLE';
+  const lines = [`# ${title}`];
+  if (parsed.summaryVi) lines.push('', parsed.summaryVi);
+  if (parsed.summaryEn) lines.push(parsed.summaryEn);
+  if (columns.length) {
+    lines.push('', '| Column | Type | Nullable | Key | Description | Aliases |');
+    for (const column of columns) {
+      lines.push(
+        `| ${escapeCell(column.name)} | ${escapeCell(column.type)} | ${escapeCell(column.nullable)} | ${escapeCell(column.key)} | ${escapeCell(column.description)} | ${escapeCell(column.aliases)} |`,
+      );
+    }
+  }
+  return lines.join('\n').trim();
+}
+
+export function reduceSchemaText(
+  text: string,
+  question: string,
+  sqls: string[],
+  meta?: { schemaName?: string; tableName?: string },
+): { text: string; targets: ForeignKeyTarget[]; schemaName: string; tableName: string } {
+  const parsed = parseSchemaDocument(text, meta);
+  const columns = selectSchemaColumns(parsed.columns, question, sqls);
+  return {
+    text: renderReducedSchema(parsed, columns),
+    targets: foreignKeyTargets(parsed.columns),
+    schemaName: parsed.schemaName,
+    tableName: parsed.tableName,
+  };
+}
+
+export function parseSqlPairText(text: string): { question: string; sql: string } | null {
+  const match = /^Question:\s*([\s\S]*?)\n+```sql\s*\n([\s\S]*?)```/i.exec(text.trim());
+  if (!match) return null;
+  const question = match[1]?.trim() ?? '';
+  const sql = match[2]?.trim() ?? '';
+  if (!question || !sql) return null;
+  return { question, sql };
+}
+
+function pairBlock(pair: SqlPairView): string {
+  return `Question: ${pair.question}\n\`\`\`sql\n${pair.sql}\n\`\`\``;
+}
+
+function schemaTitle(schema: SchemaView): string {
+  if (schema.schemaName && schema.tableName) return `${schema.schemaName}.${schema.tableName}`;
+  return schema.tableName || schema.schemaName || 'TABLE';
+}
+
+/** Part 1 is question–SQL, part 2 is schema. Snippets follow that order. */
+export function assembleTwoPartRag(sqlPairs: SqlPairView[], schemas: SchemaView[]): TwoPartRag {
+  const pairSection = sqlPairs.length
+    ? sqlPairs.map((pair, index) => `### ${index + 1}\n${pairBlock(pair)}`).join('\n\n')
+    : NO_PAIRS;
+  const schemaSection = schemas.length
+    ? schemas.map((schema) => `### ${schemaTitle(schema)}\n${schema.text.trim()}`).join('\n\n')
+    : NO_SCHEMA;
+  const ragText = `## Câu hỏi và SQL\n\n${pairSection}\n\n## Schema liên quan\n\n${schemaSection}`;
+  const snippets: RagSnippetView[] = [
+    ...sqlPairs.map((pair) => ({
+      text: pairBlock(pair),
+      docType: 'sqlpair' as const,
+      score: pair.score,
+    })),
+    ...schemas.map((schema) => ({
+      text: schema.text,
+      docType: 'schema' as const,
+      score: schema.score,
+      tableName: schema.tableName || undefined,
+      schemaName: schema.schemaName || undefined,
+    })),
+  ];
+  return {
+    sqlPairs,
+    schemas,
+    snippets,
+    count: sqlPairs.length + schemas.length,
+    ragText,
+  };
 }

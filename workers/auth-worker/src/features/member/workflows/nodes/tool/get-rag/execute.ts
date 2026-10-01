@@ -17,26 +17,39 @@ import {
   findRagToolNodeId,
   toolNodeConfig,
   type RagBilling,
+  type ResolvedRagEmbed,
 } from '../shared/rag-context.js';
+import { resolveSqlPairEmbed } from '../save-sql-pair/resolve-embed.js';
 import {
-  assembleGroupSnippet,
-  chunkIdsForDocument,
+  assembleTwoPartRag,
   finalizeRetrievedGroup,
   groupDocumentIds,
   inferGroupBy,
-  matchesFromVectorRows,
   mergeMatches,
+  chunkIdsForDocument,
+  matchesFromVectorRows,
+  parseSqlPairText,
   pickRelatedGroups,
+  reduceSchemaText,
   resolveGroupKey,
+  stitchedDocumentText,
   totalChunksForDocument,
+  type ForeignKeyTarget,
+  type SchemaView,
+  type SqlPairView,
+  type TwoPartRag,
 } from './assemble.js';
 
-/** Both Phase 2 document types must be present per table for Reasoning Agent SQL. */
-const SQL_RAG_DOC_TYPES = ['schema', 'sqlexample'] as const;
+const DEFAULT_SCHEMA_TOP_K = 4;
+const DEFAULT_SQL_PAIR_TOP_K = 5;
+const DEFAULT_SCORE_THRESHOLD = 0.25;
+const MAX_TOP_K = 20;
+const MAX_FK_HOPS = 4;
 
 export type GetRagInput = {
   query: string;
   topK?: number;
+  sqlPairTopK?: number;
   namespace?: string;
 };
 
@@ -45,14 +58,13 @@ export type GetRagSnippet = {
   source?: string;
   documentId?: string;
   score?: number;
-  docType?: string;
+  docType?: 'sqlpair' | 'schema' | string;
   tableName?: string;
   schemaName?: string;
 };
 
-export type GetRagResult = {
+export type GetRagResult = TwoPartRag & {
   snippets: GetRagSnippet[];
-  count: number;
   raw?: { usage: AiUsage };
 };
 
@@ -70,20 +82,6 @@ export type GetRagExecuteParams = {
   triggerContext?: Record<string, unknown>;
 };
 
-function presentDocTypes(matches: VectorMatch[]): Set<string> {
-  return new Set(matches.map((m) => String(m.metadata?.docType ?? '').trim()).filter(Boolean));
-}
-
-/** Missing schema / sqlexample for this table group. */
-export function missingSqlRagDocTypes(matches: VectorMatch[]): string[] {
-  const present = presentDocTypes(matches);
-  return SQL_RAG_DOC_TYPES.filter((t) => !present.has(t));
-}
-
-export function groupLooksIncomplete(matches: VectorMatch[]): boolean {
-  return missingSqlRagDocTypes(matches).length > 0;
-}
-
 /** Literal metadata key from node config, or an expression that resolves to a key name. */
 export function resolveGroupByField(template: unknown, input: Record<string, unknown>): string {
   const expr = String(template ?? '').trim();
@@ -92,10 +90,45 @@ export function resolveGroupByField(template: unknown, input: Record<string, unk
   return expr;
 }
 
-/**
- * When any chunk of a document matches, load every sibling chunk so the agent
- * sees the full doc (e.g. 1 of 3 → all 3). Uses metadata.totalChunks when set.
- */
+/** Schema tables. Empty or invalid values use 4, capped at 20. */
+export function resolveGetRagTopK(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_SCHEMA_TOP_K;
+  return Math.min(MAX_TOP_K, Math.floor(n));
+}
+
+/** Question–SQL pairs. Empty or invalid values use 5, capped at 20. */
+export function resolveSqlPairTopK(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return DEFAULT_SQL_PAIR_TOP_K;
+  return Math.min(MAX_TOP_K, Math.floor(n));
+}
+
+/** Cosine threshold. Unset values use 0.25. Explicit 0 keeps every hit. */
+export function resolveScoreThreshold(raw: unknown): number {
+  if (raw == null || raw === '') return DEFAULT_SCORE_THRESHOLD;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_SCORE_THRESHOLD;
+  return n;
+}
+
+export function matchesAboveTableThreshold(
+  matches: VectorMatch[],
+  groupBy: string,
+  threshold: number,
+): VectorMatch[] {
+  if (!(threshold > 0)) return matches;
+  const best = new Map<string, number>();
+  for (const match of matches) {
+    const key = resolveGroupKey(match, groupBy);
+    best.set(key, Math.max(best.get(key) ?? 0, match.score ?? 0));
+  }
+  const keep = new Set(
+    [...best.entries()].filter(([, score]) => score >= threshold).map(([key]) => key),
+  );
+  return matches.filter((match) => keep.has(resolveGroupKey(match, groupBy)));
+}
+
 const HYDRATE_PAGE = 100;
 
 async function loadDocumentRows(
@@ -136,179 +169,209 @@ async function loadDocumentRows(
   return matchesFromVectorRows(rows);
 }
 
-async function queryTypedForGroup(params: {
-  env: Env;
-  collection: string;
-  queryVector: number[];
-  namespace?: string;
-  groupBy: string;
-  groupValue: string;
-  docType: string;
-}): Promise<VectorMatch[]> {
-  try {
-    const filter: Record<string, string> = { docType: params.docType };
-    if (params.groupBy) filter[params.groupBy] = params.groupValue;
-    return await queryCollection(params.env, params.collection, params.queryVector, {
-      topK: VECTORIZE_ALL_METADATA_TOPK,
-      namespace: params.namespace,
-      docType: params.docType,
-      filter,
-      strictNamespace: true,
-    });
-  } catch (e) {
-    console.warn(`[get-rag] typed ${params.docType} query failed:`, e);
-    return [];
-  }
+function onlyDocType(matches: VectorMatch[], docType: string): VectorMatch[] {
+  return matches.filter((match) => String(match.metadata?.docType ?? '') === docType);
 }
 
-async function hydrateRelatedGroups(params: {
-  env: Env;
-  collection: string;
-  queryVector: number[];
-  matches: VectorMatch[];
-  namespace?: string;
-  groupBy: string;
-  topK: number;
-  extraEmbed?: (text: string) => Promise<number[]>;
-}): Promise<VectorMatch[][]> {
-  const groupBy = inferGroupBy(params.matches, params.groupBy);
-  const groups = pickRelatedGroups(params.matches, groupBy, params.topK);
-  return Promise.all(
-    groups.map(async (groupValue) => {
-      let grouped = params.matches.filter((match) => resolveGroupKey(match, groupBy) === groupValue);
-      try {
-        const filtered = await queryCollection(params.env, params.collection, params.queryVector, {
-          topK: VECTORIZE_ALL_METADATA_TOPK,
-          namespace: params.namespace,
-          filter: groupBy ? { [groupBy]: groupValue } : undefined,
-          strictNamespace: true,
-        });
-        grouped = mergeMatches(grouped, filtered);
-      } catch (e) {
-        console.warn('[get-rag] related-group filter query failed:', e);
-      }
-
-      grouped = mergeMatches(
-        grouped,
-        await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
-      );
-
-      const catalogued = grouped.some(
-        (match) => match.metadata?.tableName || match.metadata?.docType || match.metadata?.schemaName,
-      );
-
-      if (catalogued && groupLooksIncomplete(grouped)) {
-        for (const docType of missingSqlRagDocTypes(grouped)) {
-          grouped = mergeMatches(
-            grouped,
-            await queryTypedForGroup({
-              env: params.env,
-              collection: params.collection,
-              queryVector: params.queryVector,
-              namespace: params.namespace,
-              groupBy,
-              groupValue,
-              docType,
-            }),
-          );
-        }
-        grouped = mergeMatches(
-          grouped,
-          await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
-        );
-      }
-
-      if (catalogued && groupLooksIncomplete(grouped) && params.extraEmbed) {
-        try {
-          const namedVector = await params.extraEmbed(groupValue);
-          if (namedVector.length) {
-            const named = await queryCollection(params.env, params.collection, namedVector, {
-              topK: VECTORIZE_ALL_METADATA_TOPK,
-              namespace: params.namespace,
-              strictNamespace: true,
-            });
-            grouped = mergeMatches(
-              grouped,
-              named.filter((match) => resolveGroupKey(match, groupBy) === groupValue),
-            );
-            for (const docType of missingSqlRagDocTypes(grouped)) {
-              grouped = mergeMatches(
-                grouped,
-                await queryTypedForGroup({
-                  env: params.env,
-                  collection: params.collection,
-                  queryVector: namedVector,
-                  namespace: params.namespace,
-                  groupBy,
-                  groupValue,
-                  docType,
-                }),
-              );
-            }
-            grouped = mergeMatches(
-              grouped,
-              await loadDocumentRows(params.env, params.collection, groupDocumentIds(grouped), grouped),
-            );
-          }
-        } catch (e) {
-          console.warn('[get-rag] related-group name query failed:', e);
-        }
-      }
-      return grouped;
-    }),
+function documentIdOfMatch(match: VectorMatch): string {
+  return (
+    String(match.metadata?.documentId ?? '').trim() ||
+    String(match.id ?? '').replace(/::c(?:hunk-)?\d+$/i, '')
   );
 }
 
-/** Query both schema and sqlexample so table selection is not biased to one docType. */
-export function resolveGetRagTopK(raw: unknown): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n <= 0) return 12;
-  return Math.min(20, Math.floor(n));
+function bestScore(matches: VectorMatch[]): number {
+  return Math.max(...matches.map((match) => match.score ?? 0), 0);
 }
 
-export function matchesAboveTableThreshold(
-  matches: VectorMatch[],
-  groupBy: string,
-  threshold: number,
-): VectorMatch[] {
-  if (!(threshold > 0)) return matches;
-  const best = new Map<string, number>();
-  for (const match of matches) {
-    const key = resolveGroupKey(match, groupBy);
-    best.set(key, Math.max(best.get(key) ?? 0, match.score ?? 0));
-  }
-  const keep = new Set(
-    [...best.entries()].filter(([, score]) => score >= threshold).map(([key]) => key),
-  );
-  return matches.filter((match) => keep.has(resolveGroupKey(match, groupBy)));
+function metaName(matches: VectorMatch[], key: string): string {
+  return matches.map((match) => String(match.metadata?.[key] ?? '').trim()).find(Boolean) ?? '';
 }
 
-/** Discovery always asks for the API cap, then groups by table. */
-async function queryBothDocTypes(
+type SchemaDraft = {
+  fullText: string;
+  tableName: string;
+  schemaName: string;
+  score: number;
+};
+
+async function queryDocType(
   env: Env,
   collection: string,
   vector: number[],
-  opts: { namespace?: string },
+  namespace: string | undefined,
+  docType: 'sqlpair' | 'schema',
+  extra?: Record<string, string>,
 ): Promise<VectorMatch[]> {
-  const base = {
-    namespace: opts.namespace,
+  return queryCollection(env, collection, vector, {
     topK: VECTORIZE_ALL_METADATA_TOPK,
+    namespace,
+    docType,
+    filter: { docType, ...extra },
     strictNamespace: true,
+  });
+}
+
+async function completeSchema(
+  env: Env,
+  collection: string,
+  seed: VectorMatch[],
+): Promise<VectorMatch[] | null> {
+  if (!seed.length) return null;
+  const loaded = await loadDocumentRows(env, collection, groupDocumentIds(seed), seed);
+  return finalizeRetrievedGroup(mergeMatches(seed, loaded));
+}
+
+function draftFromSchema(matches: VectorMatch[]): SchemaDraft | null {
+  const text = stitchedDocumentText(matches);
+  if (!text.trim()) return null;
+  return {
+    fullText: text,
+    tableName: metaName(matches, 'tableName'),
+    schemaName: metaName(matches, 'schemaName'),
+    score: bestScore(matches),
   };
-  const [broad, schemaMatches, sqlMatches] = await Promise.all([
-    queryCollection(env, collection, vector, base),
-    queryCollection(env, collection, vector, {
-      ...base,
-      docType: 'schema',
-      filter: { docType: 'schema' },
-    }),
-    queryCollection(env, collection, vector, {
-      ...base,
-      docType: 'sqlexample',
-      filter: { docType: 'sqlexample' },
-    }),
-  ]);
-  return mergeMatches(broad, schemaMatches, sqlMatches);
+}
+
+async function selectSqlPairs(params: {
+  env: Env;
+  collection: string;
+  matches: VectorMatch[];
+  topK: number;
+  threshold: number;
+}): Promise<SqlPairView[]> {
+  const byDoc = new Map<string, VectorMatch[]>();
+  for (const match of onlyDocType(params.matches, 'sqlpair')) {
+    const id = documentIdOfMatch(match);
+    if (!id) continue;
+    const list = byDoc.get(id) ?? [];
+    list.push(match);
+    byDoc.set(id, list);
+  }
+
+  const pairs: SqlPairView[] = [];
+  for (const [documentId, chunks] of byDoc) {
+    if (params.threshold > 0 && bestScore(chunks) < params.threshold) continue;
+    const total = totalChunksForDocument(documentId, chunks);
+    let rows = chunks;
+    if (total > chunks.length) {
+      const loaded = await loadDocumentRows(params.env, params.collection, [documentId], chunks);
+      rows = mergeMatches(chunks, loaded);
+    }
+    if (total > 1 && rows.length < total) continue;
+    const parsed = parseSqlPairText(stitchedDocumentText(rows));
+    if (!parsed) continue;
+    pairs.push({ ...parsed, score: bestScore(rows) });
+  }
+  return pairs.sort((a, b) => b.score - a.score).slice(0, params.topK);
+}
+
+async function selectAnchorSchemas(params: {
+  env: Env;
+  collection: string;
+  matches: VectorMatch[];
+  groupBy: string;
+  topK: number;
+}): Promise<SchemaDraft[]> {
+  const keys = pickRelatedGroups(params.matches, params.groupBy, params.topK);
+  const drafts: SchemaDraft[] = [];
+  for (const key of keys) {
+    const grouped = params.matches.filter((match) => resolveGroupKey(match, params.groupBy) === key);
+    const finalized = await completeSchema(params.env, params.collection, grouped);
+    if (!finalized?.length) continue;
+    const draft = draftFromSchema(finalized);
+    if (draft) drafts.push(draft);
+  }
+  return drafts;
+}
+
+function sameTable(left: string, right: string): boolean {
+  return left.trim().toUpperCase() === right.trim().toUpperCase();
+}
+
+async function loadForeignKeyHops(params: {
+  env: Env;
+  collection: string;
+  vector: number[];
+  namespace: string | undefined;
+  anchors: SchemaDraft[];
+  question: string;
+  sqls: string[];
+}): Promise<SchemaDraft[]> {
+  const seen = new Set(params.anchors.map((anchor) => anchor.tableName.toUpperCase()).filter(Boolean));
+  const targets: ForeignKeyTarget[] = [];
+  for (const anchor of params.anchors) {
+    const reduced = reduceSchemaText(anchor.fullText, params.question, params.sqls, {
+      schemaName: anchor.schemaName,
+      tableName: anchor.tableName,
+    });
+    for (const target of reduced.targets) {
+      if (!target.tableName || seen.has(target.tableName.toUpperCase())) continue;
+      seen.add(target.tableName.toUpperCase());
+      targets.push(target);
+      if (targets.length >= MAX_FK_HOPS) break;
+    }
+    if (targets.length >= MAX_FK_HOPS) break;
+  }
+
+  const hops: SchemaDraft[] = [];
+  for (const target of targets) {
+    let found = onlyDocType(
+      await queryDocType(params.env, params.collection, params.vector, params.namespace, 'schema', {
+        tableName: target.tableName,
+      }),
+      'schema',
+    );
+    found = found.filter((match) => sameTable(String(match.metadata?.tableName ?? ''), target.tableName));
+    if (target.schemaName) {
+      const scoped = found.filter((match) =>
+        sameTable(String(match.metadata?.schemaName ?? ''), target.schemaName ?? ''),
+      );
+      if (!scoped.length) continue;
+      found = scoped;
+    }
+    const finalized = await completeSchema(params.env, params.collection, found);
+    if (!finalized?.length) continue;
+    const draft = draftFromSchema(finalized);
+    if (draft) hops.push(draft);
+  }
+  return hops;
+}
+
+function toSchemaView(draft: SchemaDraft, question: string, sqls: string[]): SchemaView {
+  const reduced = reduceSchemaText(draft.fullText, question, sqls, {
+    schemaName: draft.schemaName,
+    tableName: draft.tableName,
+  });
+  return {
+    text: reduced.text,
+    tableName: draft.tableName || reduced.tableName,
+    schemaName: draft.schemaName || reduced.schemaName,
+    score: draft.score,
+  };
+}
+
+async function resolveGetRagEmbed(
+  config: Record<string, unknown>,
+  ragEndpoint: string | undefined,
+  params: GetRagExecuteParams,
+): Promise<ResolvedRagEmbed> {
+  const configured = String(config.embedModel ?? '').trim();
+  if (!configured) {
+    return resolveRagEmbedService(
+      { ...config, serviceEndpoint: ragEndpoint ?? config.serviceEndpoint },
+      {
+        embedModel: params.embedModel,
+        userDO: params.userDO ?? params.billing?.userDO,
+      },
+    );
+  }
+  const resolved = await resolveSqlPairEmbed(
+    configured,
+    params.userDO ?? params.billing?.userDO,
+    'get_rag',
+  );
+  return { model: resolved.model, service: resolved.service, endpoint: resolved.endpoint };
 }
 
 export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRagResult> {
@@ -319,80 +382,82 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     ownerId: params.ownerId,
     workflowId: params.workflowId,
   });
-  const embed = await resolveRagEmbedService(
-    { ...config, serviceEndpoint: rag.serviceEndpoint ?? config.serviceEndpoint },
-    {
-      embedModel: params.embedModel,
-      userDO: params.userDO ?? params.billing?.userDO,
-    },
-  );
+  const embed = await resolveGetRagEmbed(config, rag.serviceEndpoint, params);
 
   const topK = resolveGetRagTopK(input.topK ?? config.topK);
+  const sqlPairTopK = resolveSqlPairTopK(input.sqlPairTopK ?? config.sqlPairTopK);
   const namespace = input.namespace ?? String(config.namespace ?? rag.namespace);
-  const scoreThreshold = Number(config.scoreThreshold);
+  const scoreThreshold = resolveScoreThreshold(config.scoreThreshold);
   const includeMetadata = config.includeMetadata !== false;
+  const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {}) || 'tableName';
 
   try {
     const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, embed.model);
-    if (!vector.length) return { snippets: [], count: 0 };
+    if (!vector.length) {
+      return {
+        sqlPairs: [],
+        schemas: [],
+        snippets: [],
+        count: 0,
+        ragText: '',
+        raw: { usage: embeddingUsageOrEstimate([input.query], embedUsage) },
+      };
+    }
     if (rag.dimensions && vector.length !== rag.dimensions) {
       throw new Error(
         `Get RAG embedding dimensions (${vector.length}) do not match Vectorize index (${rag.dimensions})`,
       );
     }
-    const extraEmbedUsages: AiUsage[] = [];
-    const extraEmbedTexts: string[] = [];
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
-    const discovered = await queryBothDocTypes(env, rag.collection, vector, {
-      namespace: namespace || undefined,
+    const [pairMatches, schemaMatches] = await Promise.all([
+      queryDocType(env, rag.collection, vector, namespace || undefined, 'sqlpair'),
+      queryDocType(env, rag.collection, vector, namespace || undefined, 'schema'),
+    ]);
+    const sqlPairs = await selectSqlPairs({
+      env,
+      collection: rag.collection,
+      matches: pairMatches,
+      topK: sqlPairTopK,
+      threshold: scoreThreshold,
     });
-    const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {}) || 'tableName';
-    const matches = matchesAboveTableThreshold(discovered, groupBy, scoreThreshold);
-    const hydrated = matches.length
-      ? await hydrateRelatedGroups({
+    const schemaAbove = matchesAboveTableThreshold(onlyDocType(schemaMatches, 'schema'), groupBy, scoreThreshold);
+    const anchors = schemaAbove.length
+      ? await selectAnchorSchemas({
           env,
           collection: rag.collection,
-          queryVector: vector,
-          matches,
-          namespace: namespace || undefined,
-          groupBy,
+          matches: schemaAbove,
+          groupBy: inferGroupBy(schemaAbove, groupBy),
           topK,
-          extraEmbed: async (text) => {
-            extraEmbedTexts.push(text);
-            const named = await embedTextWithUsage(env, text, embed.model);
-            if (named.usage) extraEmbedUsages.push(named.usage);
-            return named.vector;
-          },
         })
       : [];
-    if (extraEmbedTexts.length) {
-      await billRagEmbeddings(
-        embed,
-        params.billing,
-        extraEmbedTexts,
-        embeddingUsageOrEstimate(extraEmbedTexts, extraEmbedUsages[0]),
-      );
-    }
-
-    const inferredBy = inferGroupBy(matches, groupBy);
-    const snippets = (hydrated.length ? hydrated : [matches])
-      .map((group) => finalizeRetrievedGroup(group))
-      .filter((group): group is VectorMatch[] => group != null && group.length > 0)
-      .map((group) => {
-        const first = group[0];
-        if (!first) return { text: '' };
-        return assembleGroupSnippet(resolveGroupKey(first, inferredBy), group);
-      })
-      .filter((snippet) => snippet.text.trim())
-      .slice(0, topK)
-      .map((snippet) =>
-        includeMetadata
-          ? snippet
-          : { text: snippet.text, score: snippet.score, tableName: snippet.tableName, schemaName: snippet.schemaName },
-      );
-    return { snippets, count: snippets.length, raw: { usage } };
+    const hops = anchors.length
+      ? await loadForeignKeyHops({
+          env,
+          collection: rag.collection,
+          vector,
+          namespace: namespace || undefined,
+          anchors,
+          question: input.query,
+          sqls: sqlPairs.map((pair) => pair.sql),
+        })
+      : [];
+    const sqls = sqlPairs.map((pair) => pair.sql);
+    const schemas = [...anchors, ...hops].map((draft) => toSchemaView(draft, input.query, sqls));
+    const assembled = assembleTwoPartRag(sqlPairs, schemas);
+    const snippets = assembled.snippets.map((snippet) =>
+      includeMetadata
+        ? snippet
+        : {
+            text: snippet.text,
+            score: snippet.score,
+            docType: snippet.docType,
+            tableName: snippet.tableName,
+            schemaName: snippet.schemaName,
+          },
+    );
+    return { ...assembled, snippets, raw: { usage } };
   } catch (e) {
     const message = String(e instanceof Error ? e.message : e).slice(0, 500);
     throw new Error(`Get RAG retrieve failed: ${message}`);
@@ -415,7 +480,7 @@ function withRagOutput(nodeInput: NodeOutput, rag: Record<string, unknown>): Nod
 export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const query = queryFromInput(ctx);
   if (!query) {
-    return withRagOutput(ctx.nodeInput, { ragText: '', snippets: [], count: 0, query: '' });
+    return withRagOutput(ctx.nodeInput, { ragText: '', snippets: [], sqlPairs: [], schemas: [], count: 0, query: '' });
   }
   const result = await executeGetRag({
     env: ctx.c.env,
@@ -428,15 +493,16 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     billing: ragBillingFromNodeContext(ctx),
     triggerContext: ctx.nodeInput as Record<string, unknown>,
   });
-  const ragText = result.snippets.map((s) => s.text).filter(Boolean).join('\n\n');
   return withRagOutput(ctx.nodeInput, {
-    ragText,
+    ragText: result.ragText,
     snippets: result.snippets,
+    sqlPairs: result.sqlPairs,
+    schemas: result.schemas,
     count: result.count,
     query,
     question: query,
     text: query,
-    ...result,
+    raw: result.raw,
   });
 }
 
@@ -486,8 +552,8 @@ export async function prefetchLinkedGetRag(
       billing: ragBillingFromNodeContext(ctx),
       triggerContext: (ctx.nodeInput ?? {}) as Record<string, unknown>,
     });
-    const snippets = result.snippets.map((s) => s.text).filter(Boolean);
-    return { ragText: snippets.join('\n\n'), snippets, query };
+    const snippets = result.snippets.map((snippet) => snippet.text).filter(Boolean);
+    return { ragText: result.ragText, snippets, query };
   } catch (e) {
     console.warn('[get-rag] prefetch from Query field failed:', e);
     throw e;
