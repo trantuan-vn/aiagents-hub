@@ -55,7 +55,7 @@ Return ONLY one JSON object (no markdown fences):
 { "tableSummaryVi": string, "tableSummaryEn": string }
 Rules:
 - ${JSON_WINS}
-- Do not invent columns.
+- The user message is notes about the table. Do not return those notes, the column list, or schemaName.
 - tableSummaryVi and tableSummaryEn are each one sentence, at most 240 characters, and both must be non-empty.
 - If the instructions above name domain terms, use those terms in both languages.`;
 
@@ -70,6 +70,111 @@ function acceptField(value: unknown): string {
   const text = String(value ?? '').trim();
   if (!text || text.length > COLUMN_DESC_MAX) return '';
   return text;
+}
+
+const SUMMARY_VI_KEYS = ['tableSummaryVi', 'table_summary_vi', 'summaryVi', 'summary_vi'] as const;
+const SUMMARY_EN_KEYS = ['tableSummaryEn', 'table_summary_en', 'summaryEn', 'summary_en'] as const;
+
+/** One sentence stored on the schema document. Longer model text is cut to 240 characters. */
+export function clampSummaryField(value: unknown): string {
+  const text = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  if (text.length <= COLUMN_DESC_MAX) return text;
+  const sliced = text.slice(0, COLUMN_DESC_MAX);
+  const space = sliced.lastIndexOf(' ');
+  if (space >= Math.floor(COLUMN_DESC_MAX * 0.75)) return sliced.slice(0, space).trim();
+  return sliced.trim();
+}
+
+function summaryFromParsed(parsed: Record<string, unknown> | null, keys: readonly string[]): string {
+  if (!parsed) return '';
+  for (const key of keys) {
+    const value = parsed[key];
+    if (typeof value === 'string' && value.trim()) return clampSummaryField(value);
+  }
+  return '';
+}
+
+function summaryFromText(text: string, keys: readonly string[]): string {
+  for (const key of keys) {
+    const re = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`);
+    const match = text.match(re);
+    if (!match?.[1]) continue;
+    let value = match[1];
+    try {
+      value = JSON.parse(`"${match[1]}"`) as string;
+    } catch {
+      /* keep the raw slice */
+    }
+    const clamped = clampSummaryField(value);
+    if (clamped) return clamped;
+  }
+  return '';
+}
+
+function pushText(out: string[], value: unknown): void {
+  if (typeof value === 'string' && value.trim()) out.push(value);
+}
+
+/** Every string Workers AI or an OpenAI-style payload might have used for the completion. */
+export function textsFromAiResponse(response: unknown): string[] {
+  const out: string[] = [];
+  if (typeof response === 'string') {
+    pushText(out, response);
+    return out;
+  }
+  if (!response || typeof response !== 'object') return out;
+  const record = response as Record<string, unknown>;
+  pushText(out, record.response);
+  pushText(out, record.result);
+  if (record.response && typeof record.response === 'object' && !Array.isArray(record.response)) {
+    const parsed = record.response as Record<string, unknown>;
+    pushText(out, parsed.description);
+    if ('tableSummaryVi' in parsed || 'tableSummaryEn' in parsed || 'table_summary_vi' in parsed) {
+      out.push(JSON.stringify(parsed));
+    }
+  }
+  const choices = record.choices;
+  if (!Array.isArray(choices)) return out;
+  for (const choice of choices) {
+    if (!choice || typeof choice !== 'object') continue;
+    const item = choice as Record<string, unknown>;
+    pushText(out, item.text);
+    pushText(out, item.content);
+    const message = item.message;
+    if (!message || typeof message !== 'object' || Array.isArray(message)) continue;
+    const fields = message as Record<string, unknown>;
+    pushText(out, fields.content);
+    pushText(out, fields.reasoning);
+    pushText(out, fields.reasoning_content);
+  }
+  return out;
+}
+
+function looksLikeSchemaDump(text: string): boolean {
+  return text.includes('"schemaName"') && text.includes('"columns"') && !/tableSummary|summaryVi|summary_vi/i.test(text);
+}
+
+/** Prefer a payload that actually has both summaries. A copied schema JSON is not the answer. */
+export function pickSummaryText(aiResponse: unknown, fallback: string): string {
+  const texts = textsFromAiResponse(aiResponse);
+  if (fallback.trim() && !texts.includes(fallback)) texts.unshift(fallback);
+  for (const text of texts) {
+    const summaries = readTableSummaries(text);
+    if (summaries.tableSummaryVi && summaries.tableSummaryEn) return text;
+  }
+  return texts.find((text) => !looksLikeSchemaDump(text)) ?? texts[0] ?? fallback;
+}
+
+/** Accept a too-long sentence by shortening it. Also read snake_case keys and JSON buried in prose. */
+export function readTableSummaries(text: string): { tableSummaryVi: string; tableSummaryEn: string } {
+  const parsed = parseJsonObject(text);
+  return {
+    tableSummaryVi: summaryFromParsed(parsed, SUMMARY_VI_KEYS) || summaryFromText(text, SUMMARY_VI_KEYS),
+    tableSummaryEn: summaryFromParsed(parsed, SUMMARY_EN_KEYS) || summaryFromText(text, SUMMARY_EN_KEYS),
+  };
 }
 
 const EXTRA_REJECT =
@@ -251,10 +356,10 @@ export async function enrichColumnBatches(
 
 function parseEnrichment(raw: unknown, info: GetDbInfoResult): TableEnrichment {
   const text = typeof raw === 'string' ? raw : String(raw ?? '');
-  const parsed = parseJsonObject(text);
+  const summaries = readTableSummaries(text);
   return {
-    tableSummaryVi: acceptField(parsed?.tableSummaryVi),
-    tableSummaryEn: acceptField(parsed?.tableSummaryEn),
+    tableSummaryVi: summaries.tableSummaryVi,
+    tableSummaryEn: summaries.tableSummaryEn,
     columns: matchBatchColumns(salvageColumnRecords(text), info.columns),
   };
 }
@@ -280,18 +385,30 @@ function buildColumnPrompt(info: GetDbInfoResult, take: GetDbInfoResult['columns
   );
 }
 
-function buildSummaryPrompt(info: GetDbInfoResult): string {
-  return JSON.stringify(
-    {
-      schemaName: info.schemaName,
-      tableName: info.tableName,
-      columns: info.columns.map((col) => col.name),
-      primaryKey: info.primaryKey,
-      foreignKeys: info.foreignKeys,
-    },
-    null,
-    2,
-  );
+/** Prose notes, not a JSON document. json_object mode otherwise copies schemaName and columns back. */
+export function buildSummaryPrompt(info: GetDbInfoResult, attempt = 0): string {
+  const table = info.schemaName ? `${info.schemaName}.${info.tableName}` : info.tableName;
+  if (attempt > 0) {
+    return [
+      'The previous reply was rejected because it repeated the table metadata.',
+      `Write one Vietnamese sentence and one English sentence about what ${table} stores.`,
+      `Each sentence must be at most ${COLUMN_DESC_MAX} characters.`,
+      'Return only this JSON object: {"tableSummaryVi":"...","tableSummaryEn":"..."}',
+    ].join('\n');
+  }
+  const foreignKeys = info.foreignKeys
+    .map((item) => `${item.column} -> ${item.refTable}.${item.refColumn}`)
+    .filter((line) => !line.startsWith(' ->'))
+    .join('; ');
+  return [
+    `Describe what Oracle table ${table} stores.`,
+    `Column names: ${info.columns.map((col) => col.name).join(', ')}`,
+    `Primary key: ${info.primaryKey.join(', ') || '(none)'}`,
+    `Foreign keys: ${foreignKeys || '(none)'}`,
+    'Return a new JSON object with only tableSummaryVi and tableSummaryEn.',
+    'Each value is one sentence of at most 240 characters.',
+    'Do not copy the column names back as the JSON.',
+  ].join('\n');
 }
 
 /** Test helper — parse without calling the model. */
@@ -358,7 +475,10 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
     reportUsageCharge(billing.onCost, charge);
   };
 
-  const runDescribe = async (system: string, user: string): Promise<{ text: string; calls: number }> => {
+  const runDescribe = async (
+    system: string,
+    user: string,
+  ): Promise<{ text: string; calls: number; aiResponse: unknown }> => {
     const glm = modelId.toLowerCase().includes('glm');
     const full: Record<string, unknown> = {
       temperature,
@@ -375,14 +495,16 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
       ], maxTokens, extra);
       const text = extractTextFromAiResponse(aiResponse);
       await bill(aiResponse, text);
-      return text;
+      return { text, aiResponse };
     };
     try {
-      return { text: await once(full), calls: 1 };
+      const first = await once(full);
+      return { text: first.text, aiResponse: first.aiResponse, calls: 1 };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       if (!EXTRA_REJECT.test(message)) throw e;
-      return { text: await once(plain), calls: 2 };
+      const second = await once(plain);
+      return { text: second.text, aiResponse: second.aiResponse, calls: 2 };
     }
   };
 
@@ -397,15 +519,26 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
 
   let tableSummaryVi = '';
   let tableSummaryEn = '';
+  let lastSummaryText = '';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await runDescribe(summarySystem, buildSummaryPrompt(info));
-    const parsed = parseJsonObject(result.text);
-    tableSummaryVi = acceptField(parsed?.tableSummaryVi);
-    tableSummaryEn = acceptField(parsed?.tableSummaryEn);
+    const result = await runDescribe(summarySystem, buildSummaryPrompt(info, attempt));
+    lastSummaryText = pickSummaryText(result.aiResponse, result.text);
+    const summaries = readTableSummaries(lastSummaryText);
+    tableSummaryVi = summaries.tableSummaryVi;
+    tableSummaryEn = summaries.tableSummaryEn;
     if (tableSummaryVi && tableSummaryEn) break;
   }
   if (!tableSummaryVi || !tableSummaryEn) {
-    throw new Error(`save_rag: table ${info.tableName} summary incomplete`);
+    const missing = [!tableSummaryVi ? 'tableSummaryVi' : '', !tableSummaryEn ? 'tableSummaryEn' : '']
+      .filter(Boolean)
+      .join(' and ');
+    const preview = lastSummaryText.replace(/\s+/g, ' ').trim().slice(0, 160);
+    const detail = looksLikeSchemaDump(lastSummaryText)
+      ? `missing ${missing}; model repeated the table metadata`
+      : preview
+        ? `missing ${missing}; model said: ${preview}`
+        : `missing ${missing}; model returned empty text`;
+    throw new Error(`save_rag: table ${info.tableName} summary incomplete (${detail})`);
   }
 
   return {

@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest';
 import type { GetDbInfoResult } from '../shared/db/types.js';
 import { chunkDocument, estimateEmbedTokens, EMBED_TOKEN_BUDGET } from './chunk.js';
 import {
+  buildSummaryPrompt,
   COLUMN_SYSTEM,
   composeDescribeSystem,
   describeTable,
   enrichColumnBatches,
   parseTableEnrichmentForTests,
+  pickSummaryText,
+  readTableSummaries,
   resolveDescribeMaxTokens,
   SUMMARY_SYSTEM,
 } from './describe-table.js';
@@ -68,7 +71,7 @@ describe('parseTableEnrichmentForTests', () => {
     expect(enrichment.columns.map((col) => col.name)).toEqual(['ID', 'TOTAL']);
   });
 
-  it('keeps a 240-character sentence and drops 241', () => {
+  it('keeps a 240-character sentence, shortens a longer summary, and drops a 241-character column', () => {
     const enrichment = parseTableEnrichmentForTests(
       JSON.stringify({
         tableSummaryVi: 'a'.repeat(240),
@@ -81,8 +84,66 @@ describe('parseTableEnrichmentForTests', () => {
       info,
     );
     expect(enrichment.tableSummaryVi).toHaveLength(240);
-    expect(enrichment.tableSummaryEn).toBe('');
+    expect(enrichment.tableSummaryEn).toBe('b'.repeat(240));
     expect(enrichment.columns.map((col) => col.name)).toEqual(['TOTAL']);
+  });
+});
+
+describe('readTableSummaries', () => {
+  it('cuts an over-long sentence on a word boundary', () => {
+    const sentence = 'Bảng chứng khoán lưu mã cổ phiếu. ';
+    const got = readTableSummaries(
+      JSON.stringify({
+        tableSummaryVi: sentence.repeat(20),
+        tableSummaryEn: 'Securities master.',
+      }),
+    );
+    expect(got.tableSummaryEn).toBe('Securities master.');
+    expect(got.tableSummaryVi.length).toBeGreaterThan(0);
+    expect(got.tableSummaryVi.length).toBeLessThanOrEqual(240);
+    expect(got.tableSummaryVi.endsWith(' ')).toBe(false);
+    expect(got.tableSummaryVi.endsWith('.')).toBe(true);
+  });
+
+  it('uses the completion when the response field only repeats the schema JSON', () => {
+    const echo = JSON.stringify({
+      schemaName: 'ADMIN',
+      tableName: 'CHUYEN_KHOAN_THUA_KE',
+      columns: ['MA_CHUYEN_KHOAN', 'MA_GD'],
+    });
+    const answer = JSON.stringify({
+      tableSummaryVi: 'Chuyển khoản thừa kế.',
+      tableSummaryEn: 'Inherited securities transfer.',
+    });
+    const picked = pickSummaryText(
+      { response: echo, choices: [{ message: { content: answer } }] },
+      echo,
+    );
+    expect(readTableSummaries(picked)).toEqual({
+      tableSummaryVi: 'Chuyển khoản thừa kế.',
+      tableSummaryEn: 'Inherited securities transfer.',
+    });
+  });
+
+  it('asks for a summary in prose so the model cannot copy a JSON document', () => {
+    const prompt = buildSummaryPrompt(info, 0);
+    expect(prompt.startsWith('{')).toBe(false);
+    expect(prompt).toContain('ADMIN.ORDERS');
+    expect(prompt).toContain('ID, TOTAL');
+    expect(prompt).toContain('tableSummaryVi');
+    expect(prompt).not.toContain('"schemaName"');
+    expect(buildSummaryPrompt(info, 1)).toContain('previous reply was rejected');
+  });
+
+  it('reads snake_case keys and JSON buried after a prose brace', () => {
+    expect(
+      readTableSummaries(
+        'Use {table}. {"table_summary_vi":"Bảng chứng khoán.","table_summary_en":"Securities."}',
+      ),
+    ).toEqual({
+      tableSummaryVi: 'Bảng chứng khoán.',
+      tableSummaryEn: 'Securities.',
+    });
   });
 });
 
