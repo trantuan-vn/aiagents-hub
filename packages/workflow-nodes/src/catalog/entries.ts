@@ -14,7 +14,14 @@ const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule", 
 const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
 const BACKEND_TRANSFORM_KINDS = new Set<string>(["filter"]);
-const BACKEND_TOOL_KINDS = new Set(["save-rag", "get-rag", "get-db-info", "check-sql", "code"]);
+const BACKEND_TOOL_KINDS = new Set([
+  "save-rag",
+  "save-sql-pair",
+  "get-rag",
+  "get-db-info",
+  "check-sql",
+  "code",
+]);
 const BACKEND_MEMORY_KINDS = new Set(["simple", "vectorize"]);
 const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
 
@@ -137,23 +144,27 @@ function toolEntries(): WorkflowCatalogEntrySeed[] {
       nameKey:
         kind === "save-rag"
           ? "tool_kind_save_rag"
-          : kind === "get-rag"
-            ? "tool_kind_get_rag"
-            : kind === "get-db-info"
-              ? "tool_kind_get_db_info"
-              : kind === "check-sql"
-                ? "tool_kind_check_sql"
-                : `tool_kind_${kind}`,
+          : kind === "save-sql-pair"
+            ? "tool_kind_save_sql_pair"
+            : kind === "get-rag"
+              ? "tool_kind_get_rag"
+              : kind === "get-db-info"
+                ? "tool_kind_get_db_info"
+                : kind === "check-sql"
+                  ? "tool_kind_check_sql"
+                  : `tool_kind_${kind}`,
       descKey:
         kind === "save-rag"
           ? "tool_kind_save_rag_desc"
-          : kind === "get-rag"
-            ? "tool_kind_get_rag_desc"
-            : kind === "get-db-info"
-              ? "tool_kind_get_db_info_desc"
-              : kind === "check-sql"
-                ? "tool_kind_check_sql_desc"
-                : `tool_kind_${kind}_desc`,
+          : kind === "save-sql-pair"
+            ? "tool_kind_save_sql_pair_desc"
+            : kind === "get-rag"
+              ? "tool_kind_get_rag_desc"
+              : kind === "get-db-info"
+                ? "tool_kind_get_db_info_desc"
+                : kind === "check-sql"
+                  ? "tool_kind_check_sql_desc"
+                  : `tool_kind_${kind}_desc`,
       hasBackend: BACKEND_TOOL_KINDS.has(kind) || !TOOL_OVERRIDE_KINDS.has(kind),
       hasFrontend: FRONTEND_TOOL_KINDS.has(kind),
       sortOrder: 100 + index,

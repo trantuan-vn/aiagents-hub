@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useRef } from "react";
 import { useTranslations } from "next-intl";
 
 import { Label } from "@/components/ui/label";
@@ -12,16 +13,42 @@ import {
 } from "@/components/ui/select";
 
 import { useApprovedServices } from "../hooks/use-approved-services";
+import type { Service } from "../../../../service/_components/schema";
 
 interface ServiceEndpointSelectProps {
   value: string;
   onChange: (endpoint: string) => void;
   id?: string;
+  capability?: "embed" | "chat";
+  hideHints?: boolean;
 }
 
-export function ServiceEndpointSelect({ value, onChange, id }: ServiceEndpointSelectProps) {
+function isEmbeddingService(service: Service): boolean {
+  const blob = `${service.model ?? ""} ${service.endpoint ?? ""} ${service.name ?? ""}`.toLowerCase();
+  return blob.includes("bge") || blob.includes("embed");
+}
+
+export function ServiceEndpointSelect({
+  value,
+  onChange,
+  id,
+  capability,
+  hideHints,
+}: ServiceEndpointSelectProps) {
   const t = useTranslations("WorkflowEditorPage");
-  const { services, loading } = useApprovedServices();
+  const { services: approved, loading } = useApprovedServices();
+  const services = useMemo(
+    () => (capability === "embed" ? approved.filter(isEmbeddingService) : approved),
+    [approved, capability],
+  );
+  const firstEndpoint = services[0]?.endpoint ?? "";
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  useEffect(() => {
+    if (capability !== "embed" || value || loading || !firstEndpoint) return;
+    onChangeRef.current(firstEndpoint);
+  }, [capability, value, loading, firstEndpoint]);
 
   const placeholder = loading
     ? t("service_select_loading")
@@ -47,8 +74,12 @@ export function ServiceEndpointSelect({ value, onChange, id }: ServiceEndpointSe
           ))}
         </SelectContent>
       </Select>
-      <p className="text-muted-foreground text-xs">{t("agent_model_hint")}</p>
-      <p className="text-muted-foreground text-xs">{t("service_select_hint")}</p>
+      {hideHints ? null : (
+        <>
+          <p className="text-muted-foreground text-xs">{t("agent_model_hint")}</p>
+          <p className="text-muted-foreground text-xs">{t("service_select_hint")}</p>
+        </>
+      )}
     </div>
   );
 }

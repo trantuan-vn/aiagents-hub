@@ -319,11 +319,12 @@ export function WorkflowAddNodePanel({
 
   const filteredBuiltinTools = useMemo(() => {
     return WORKFLOW_AGENT_BUILTIN_TOOLS.filter((item) => {
+      if (fromAgentTools && item.id === "save-sql-pair") return false;
       const name = t(item.nameKey).toLowerCase();
       const desc = t(item.descKey).toLowerCase();
       return !q || name.includes(q) || desc.includes(q) || item.id.includes(q);
     });
-  }, [q, t]);
+  }, [q, t, fromAgentTools]);
 
   const toolsHasResults =
     filteredRecommendedTools.length > 0 ||

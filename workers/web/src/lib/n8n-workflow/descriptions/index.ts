@@ -12,6 +12,7 @@ export { SERVICE_NODE_N8N_DESCRIPTION } from "./service-node";
 export { MEMORY_NODE_N8N_DESCRIPTION } from "./memory-node";
 export { TOOL_NODE_N8N_DESCRIPTION } from "./tool-node";
 export { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./save-rag-tool";
+export { SAVE_SQL_PAIR_TOOL_N8N_DESCRIPTION } from "./save-sql-pair-tool";
 export { GET_RAG_TOOL_N8N_DESCRIPTION } from "./get-rag-tool";
 export { GET_DB_INFO_TOOL_N8N_DESCRIPTION } from "./get-db-info-tool";
 export { CHECK_SQL_TOOL_N8N_DESCRIPTION } from "./check-sql-tool";

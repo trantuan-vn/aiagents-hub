@@ -69,6 +69,8 @@ function N8nPropertyField({
         <ServiceEndpointSelect
           value={typeof value === "string" ? value : ""}
           onChange={(endpoint) => onChange(endpoint)}
+          capability={property.typeOptions?.aiHubServiceCapability}
+          hideHints={property.typeOptions?.aiHubServiceCapability === "embed"}
         />
       </div>
     );

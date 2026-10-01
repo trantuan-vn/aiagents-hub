@@ -18,7 +18,7 @@ Cùng khối đó còn lặp: prefetch ghi vào system, `get_rag` vẫn mở khi
 
 SQL example do LLM bịa lúc ingest không gắn với câu hỏi thật. Few-shot phải là cặp câu hỏi và SQL người dùng đã cho.
 
-Diễn giải schema không có thuật ngữ chuyên ngành thì câu hỏi đời thường và document không cùng lớp từ. Save RAG cần system prompt vai chuyên gia lúc sinh mô tả tiếng Việt và tiếng Anh. Reasoning Agent cần viết lại câu hỏi theo đúng các thuật ngữ đó trước khi Get RAG embed.
+Diễn giải schema không có thuật ngữ chuyên ngành thì câu hỏi đời thường và document không cùng lớp từ. Save RAG cần system prompt vai chuyên gia lúc sinh mô tả tiếng Việt và tiếng Anh. Save SQL Pair dùng cùng kiểu prompt để viết lại câu hỏi trước khi embed, nên vector `sqlpair` nằm cùng lớp từ với schema. Reasoning Agent cần viết lại câu hỏi theo đúng các thuật ngữ đó trước khi Get RAG embed.
 
 ---
 
@@ -27,7 +27,7 @@ Diễn giải schema không có thuật ngữ chuyên ngành thì câu hỏi đ�
 | `docType` | Ai ghi | Embed cái gì | Dùng để |
 |-----------|--------|--------------|---------|
 | `schema` | Save RAG | Markdown schema rút gọn | Biết cột, kiểu, PK/FK |
-| `sqlpair` | Save SQL Pair | **Chỉ câu hỏi** | Few-shot: câu hỏi giống thì lấy SQL kèm theo |
+| `sqlpair` | Save SQL Pair | **Chỉ câu hỏi** (câu đã viết lại khi có system prompt) | Few-shot: câu hỏi giống thì lấy SQL kèm theo |
 
 Cùng collection, cùng namespace, cùng chiều vector. Save RAG, Save SQL Pair và Get RAG dùng **một** embed model. Model lệch nhau thì query không đọc được vector đã ghi.
 
@@ -100,9 +100,9 @@ Diễn giải sinh ra phải dùng đúng các thuật ngữ đó ở cả hai n
 
 ## 4. Node mới: Save SQL Pair (`tool_node:save-sql-pair`)
 
-Tool **ghi một cặp**. Input là một item upstream. Config kéo hai biến: câu hỏi và câu SQL của câu hỏi đó. Embed câu hỏi, upsert vào Vectorize.
+Tool **ghi một cặp**. Input là một item upstream. Config kéo hai biến: câu hỏi và câu SQL của câu hỏi đó. Khi ô System prompt có nội dung, LLM viết lại câu hỏi theo thuật ngữ đó rồi mới embed. Upsert vào Vectorize.
 
-Không gọi LLM. Không introspect Oracle. Không nhận PDF.
+Không introspect Oracle. Không nhận PDF. Không viết SQL. LLM chỉ viết lại câu hỏi.
 
 ### 4.1 Tóm tắt
 
@@ -121,8 +121,11 @@ Không gọi LLM. Không introspect Oracle. Không nhận PDF.
 |--------|---------|
 | `in` / `out` | Data-flow. Một item, một cặp |
 | `memory` | Vectorize, cùng index với Save RAG |
+| `llm` | Service chat. Viết lại câu hỏi khi System prompt khác rỗng |
 
-Không có handle `llm`. Không có handle `service`. Embed model lấy từ combo trên config, không từ service node nối vào.
+Không có handle `service`. Embed model lấy từ combo trên config, không từ service node nối vào. Không có handle `tools`: node không phải tool của agent.
+
+Handle `llm` hiện trên canvas. Bắt buộc khi `describeSystemPrompt` trim khác rỗng. Ô prompt trống thì handle không bắt buộc và runtime không gọi LLM.
 
 ### 4.3 Config panel
 
@@ -132,6 +135,7 @@ Panel Parameters của node này. Hai ô expression dùng cùng cơ chế kéo b
 |----------|-------------|------|---------|-------|
 | **Question** | `questionField` | expression | `{{ $json.question }}` | Kéo biến câu hỏi từ INPUT |
 | **SQL** | `sqlField` | expression | `{{ $json.sql }}` | Kéo biến SQL tương ứng với câu hỏi đó |
+| **System prompt** | `describeSystemPrompt` | textarea | rỗng | Cùng ý với Save RAG mục 3.4: vai chuyên gia và thuật ngữ chuyên ngành. Truyền vào lần LLM viết lại câu hỏi |
 | **Embed model** | `embedModel` | select | model embed đầu tiên trong catalog | Combo. Chỉ service có capability `embed` (cùng nguồn `aiHubServiceSelect`, lọc `embed`) |
 | Tool name | `toolName` | text | `save_sql_pair` | Không hiện như tool của agent |
 | Label | `label` | text | `Save SQL Pair` | Tên trên canvas |
@@ -140,25 +144,38 @@ Combo lưu `catalogId` (hoặc endpoint embed) vào `embedModel`. Runtime resolv
 
 Ô Question và ô SQL trống sau khi resolve expression thì fail item đó, không ghi vector.
 
-### 4.4 Ghi vector
+### 4.4 Viết lại câu hỏi
+
+Chỉ chạy khi `describeSystemPrompt` trim khác rỗng. Cùng cách ghép với Save RAG: vai chuyên ngành đứng trước, quy tắc cố định đứng sau.
+
+1. Chưa nối service chat vào handle `llm`: fail item, không gọi embed, không upsert.
+2. System message = `describeSystemPrompt` rồi quy tắc: chỉ trả câu hỏi đã viết lại, không markdown, không SQL, không giải thích. Một câu hoặc vài mệnh đề, đủ chỉ tiêu, chiều nhóm, điều kiện lọc và kỳ đã có trong câu hỏi hoặc trong SQL. Dùng thuật ngữ của system prompt. Không bịa bảng hoặc cột mà prompt không nói tới.
+3. User message gồm câu hỏi gốc và câu SQL của cặp. SQL để câu viết lại bám đúng logic đã có, không được nằm trong vector.
+4. Output rỗng, dài hơn 2000 ký tự, hoặc bắt đầu bằng `SELECT` / `WITH`: fail item, không upsert.
+5. Ô System prompt trống: bỏ bước, dùng nguyên câu hỏi đã trim. Không gọi LLM.
+
+`documentId` vẫn hash câu hỏi gốc (mục 4.5), nên viết lại khác lời giữa hai lần ghi vẫn đè cùng một vector.
+
+### 4.5 Ghi vector
 
 Với mỗi item:
 
 1. Resolve `questionField` và `sqlField` trên INPUT.
-2. `documentId` = `sqlpair.` + sha256 hex của câu hỏi đã trim (ổn định, ghi lại cùng câu hỏi thì đè).
-3. Text lưu trong chunk:
+2. Viết lại câu hỏi theo mục 4.4. Câu đưa vào embed và vào chunk là câu sau bước này.
+3. `documentId` = `sqlpair.` + sha256 hex của **câu hỏi gốc** đã trim (ổn định, ghi lại cùng câu hỏi thì đè).
+4. Text lưu trong chunk:
 
 ~~~markdown
-Question: {question}
+Question: {câu đã viết lại, hoặc câu gốc nếu bỏ bước 4.4}
 
 ````sql
 {sql}
 ````
 ~~~
 
-4. Vector hóa **chỉ câu hỏi**, không vector hóa cả khối markdown. SQL nằm trong text chunk để Get RAG đọc lại, không kéo vector về phía câu lệnh dài.
-5. Metadata: `docType=sqlpair`, `formatVersion=2`, `embedModel` (catalog id đã chọn). Không nhét SQL vào metadata (trần 10 KiB).
-6. Upsert. Output: `{ ok, saved, documentId, collection }`.
+5. Vector hóa **chỉ câu ở dòng Question**, không vector hóa cả khối markdown. SQL nằm trong text chunk để Get RAG đọc lại, không kéo vector về phía câu lệnh dài.
+6. Metadata: `docType=sqlpair`, `formatVersion=2`, `embedModel` (catalog id đã chọn). Không nhét SQL vào metadata (trần 10 KiB).
+7. Upsert. Output: `{ ok, saved, documentId, collection, llmCalls }`. `llmCalls` là 0 khi bỏ bước viết lại, 1 khi đã gọi chat.
 
 SQL không kiểm tra bằng Check SQL ở node này. Người cấu hình workflow chịu trách nhiệm cặp đưa vào là đúng.
 
@@ -166,14 +183,15 @@ SQL không kiểm tra bằng Check SQL ở node này. Người cấu hình workf
 
 | File | Vai trò |
 |------|---------|
-| `packages/workflow-nodes` `kinds.ts`, `definition.ts` | Kind + field expression + select `embedModel` |
-| `workers/web` catalog, n8n description, i18n | Node trên add-node và panel config |
+| `packages/workflow-nodes` `kinds.ts`, `definition.ts` | Kind + field expression + textarea `describeSystemPrompt` + select `embedModel` |
+| `workers/web` catalog, n8n description, i18n, canvas | Node trên add-node và panel. Handle `llm` khi kind là `save-sql-pair` |
 | `workers/auth-worker/.../tool/save-sql-pair/module.ts` | `ToolModule`, `toolClass: persist`, pipeline only |
-| `save-sql-pair/execute.ts` | Resolve hai field, embed câu hỏi, upsert |
+| `save-sql-pair/rewrite-question.ts` | Ghép system prompt, gọi chat, nhận câu hỏi đã viết lại |
+| `save-sql-pair/execute.ts` | Resolve hai field, viết lại nếu có prompt, embed câu đó, upsert |
 | `shared/registry.ts` | Một dòng trong `TOOL_MODULES` |
 | `shared/rag-context.ts` | `save-sql-pair` nằm trong tập tool RAG (memory + embed) |
 
-Canvas dùng tool node Oracle/RAG sẵn có nếu handle `memory` + `in`/`out` đã vẽ được. Panel config là Parameters generic với expression và select, không cần panel riêng trừ khi combo embed không render được bằng field `select`.
+Canvas vẽ `in` / `out`, `memory`, và `llm`. Panel config là Parameters generic với expression, textarea và select. Combo embed dùng `aiHubServiceSelect` lọc capability `embed`.
 
 ---
 
@@ -275,7 +293,7 @@ Thuật ngữ chuyên ngành nằm trong `systemPrompt` sẵn có của Reasonin
 6. Câu đã viết lại là query embed của prefetch Get RAG (cả `sqlpair` và `schema`). Câu gốc vẫn nằm trong prompt viết SQL, để câu lệnh bám đúng yêu cầu user.
 7. Lần `get_rag` sau lỗi Oracle vẫn dùng identifier trong lỗi, không viết lại lần nữa.
 
-Câu SQL pair nên dùng cùng lớp thuật ngữ. Câu pair viết bằng lời nói thô sẽ khớp kém với câu đã chuẩn hóa.
+Câu trong vector `sqlpair` là câu đã viết lại ở mục 4.4 khi Save SQL Pair có system prompt. Cặp lưu bằng lời nói thô sẽ khớp kém với câu Get RAG embed sau bước này.
 
 ### 6.2 Một lần đưa schema vào prompt
 
@@ -314,7 +332,8 @@ Reflect (`purpose: reflect`) chỉ nhận bản SQL nháp và chuỗi lỗi Orac
 | `execute-reasoning.ts` | Viết lại câu hỏi theo `systemPrompt` trước prefetch. Prefetch một lần, reflect chỉ lỗi, frame bỏ khi đã có RAG, code mode nhận `ragText` |
 | `reasoning/quality.ts` | Bỏ thưởng JOIN/GROUP BY |
 | `reasoning/reflect.ts` | SQL mode không fail vì citation |
-| `packages/workflow-nodes` tool kinds + definitions | Kind mới, xóa `sqlHistoryLimit`, default `topK` / `scoreThreshold`, combo `embedModel`, textarea `describeSystemPrompt` trên Save RAG |
+| `packages/workflow-nodes` tool kinds + definitions | Kind mới, xóa `sqlHistoryLimit`, default `topK` / `scoreThreshold`, combo `embedModel`, textarea `describeSystemPrompt` trên Save RAG và Save SQL Pair |
+| `save-sql-pair/rewrite-question.ts`, `execute.ts` | System prompt khác rỗng thì LLM viết lại câu hỏi trước khi embed. `documentId` hash câu gốc |
 | `workers/web` catalog + n8n description + i18n | Save SQL Pair trên add-node và panel |
 | `shared/registry.ts`, `rag-context.ts` | Đăng ký kind mới |
 
@@ -327,7 +346,7 @@ Test nằm trong folder kind. Save RAG không còn assert document sqlexample. G
 | Pha | Xong khi |
 |-----|----------|
 | **1. Schema only** | Save RAG một document `.schema` rút gọn mỗi bảng, summary và mô tả cột có cả tiếng Việt và tiếng Anh. Panel có system prompt chuyên ngành; thuật ngữ đó có trong text embed. Không gọi history, không gọi LLM typical query. Bảng thiếu mô tả một trong hai ngôn ngữ không được mark indexed |
-| **2. Save SQL Pair** | Node trên catalog. Kéo được question và SQL. Combo embed model. Upsert `docType=sqlpair`, vector của câu hỏi, text chứa đủ SQL |
+| **2. Save SQL Pair** | Node trên catalog. Kéo được question và SQL. Combo embed model. System prompt khác rỗng thì LLM viết lại câu hỏi theo thuật ngữ đó; vector và dòng Question trong chunk là câu đã viết lại, `documentId` hash câu gốc. Prompt trống thì embed nguyên câu hỏi. Upsert `docType=sqlpair`, text chứa đủ SQL |
 | **3. Get RAG hai phần** | `ragText` có heading phần 1 rồi phần 2. Không trả `sqlexample`. `topK` 4, `sqlPairTopK` 5, ngưỡng 0.25, một hop FK |
 | **4. Agent** | Trước prefetch, viết lại câu hỏi theo thuật ngữ trong `systemPrompt` khi prompt có chuyên ngành. Prefetch embed câu đó, không kèm `get_rag` ở act đầu. Reflect không gửi full observation. SQL mode không bắt citation. Code mode thấy `ragText` trước khi viết script |
 

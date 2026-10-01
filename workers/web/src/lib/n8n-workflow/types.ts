@@ -25,6 +25,8 @@ export type N8nNodePropertyOption = {
 export type N8nNodePropertyTypeOptions = {
   rows?: number;
   aiHubServiceSelect?: boolean;
+  /** When set with aiHubServiceSelect, only services of this capability are listed. */
+  aiHubServiceCapability?: "embed" | "chat";
   variant?: "default" | "warning";
   /** When focused and empty, fill the field with the resolved placeholder. */
   autofillPlaceholder?: boolean;

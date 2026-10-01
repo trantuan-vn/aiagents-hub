@@ -32,7 +32,7 @@ export type RagResourceContext = {
   metric?: string;
 };
 
-const RAG_TOOL_KINDS = new Set(['save-rag', 'get-rag']);
+const RAG_TOOL_KINDS = new Set(['save-rag', 'save-sql-pair', 'get-rag']);
 
 function toolKindOf(node: WorkflowDefinition['nodes'][number] | undefined): string {
   return String((node?.data as Record<string, unknown> | undefined)?.toolKind ?? '');

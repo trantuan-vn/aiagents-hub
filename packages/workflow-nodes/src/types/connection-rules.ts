@@ -35,12 +35,20 @@ function isRagToolNode(node: GraphNode): boolean {
   return node.type === "tool_node" && RAG_TOOL_KINDS.has(String(nodeData(node).toolKind ?? ""));
 }
 
+function isSqlPairToolNode(node: GraphNode): boolean {
+  return node.type === "tool_node" && String(nodeData(node).toolKind ?? "") === "save-sql-pair";
+}
+
+function acceptsLlmHandle(node: GraphNode): boolean {
+  return isSaveRagToolNode(node) || isSqlPairToolNode(node);
+}
+
 function isSaveRagToolNode(node: GraphNode): boolean {
   return node.type === "tool_node" && String(nodeData(node).toolKind ?? "") === "save-rag";
 }
 
 function isRagResourceHost(node: GraphNode): boolean {
-  return node.type === "agent" || isRagToolNode(node);
+  return node.type === "agent" || isRagToolNode(node) || isSqlPairToolNode(node);
 }
 
 function isVectorizeMemoryNode(node: GraphNode): boolean {
@@ -84,19 +92,25 @@ export function isValidWorkflowConnection(
     if (!forward && !reversed) return false;
     const host = forward ? targetNode : sourceNode;
     const resource = forward ? sourceNode : targetNode;
-    if (sourceHandle === "memory" && isRagToolNode(host) && !isVectorizeMemoryNode(resource)) {
+    if (isSqlPairToolNode(host) && sourceHandle !== "memory") return false;
+    if (isSqlPairToolNode(resource) && sourceHandle === "tools") return false;
+    if (
+      sourceHandle === "memory" &&
+      (isRagToolNode(host) || isSqlPairToolNode(host)) &&
+      !isVectorizeMemoryNode(resource)
+    ) {
       return false;
     }
     return true;
   }
 
-  // Save RAG LLM handle: service_node (source "service") → save-rag target "llm"
+  // Chat service → LLM handle on Save RAG or Save SQL Pair
   if (
     (sourceHandle === "service" && targetHandle === "llm") ||
     (sourceHandle === "llm" && targetHandle === "service")
   ) {
-    const forward = sourceNode.type === "service_node" && isSaveRagToolNode(targetNode);
-    const reversed = isSaveRagToolNode(sourceNode) && targetNode.type === "service_node";
+    const forward = sourceNode.type === "service_node" && acceptsLlmHandle(targetNode);
+    const reversed = acceptsLlmHandle(sourceNode) && targetNode.type === "service_node";
     return forward || reversed;
   }
 

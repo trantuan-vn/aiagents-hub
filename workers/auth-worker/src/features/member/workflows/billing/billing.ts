@@ -105,6 +105,27 @@ export async function findApprovedServiceByEndpoint(
   return record;
 }
 
+export async function listApprovedServices(
+  userDO: DurableObjectStub<UserDO>,
+): Promise<Record<string, unknown>[]> {
+  const rows = await executeUtils.executeDynamicAction(
+    userDO,
+    'select',
+    {
+      where: [{ field: 'isActive', operator: '=', value: 1 }],
+    },
+    'services',
+  );
+  const list = Array.isArray(rows) ? rows : rows ? [rows] : [];
+  const approved: Record<string, unknown>[] = [];
+  for (const row of list) {
+    if (!row || typeof row !== 'object') continue;
+    const record = row as Record<string, unknown>;
+    if (serviceApprovalStatus(record) === 'approved') approved.push(record);
+  }
+  return approved;
+}
+
 export async function findApprovedServiceByModel(
   userDO: DurableObjectStub<UserDO>,
   modelId: string,

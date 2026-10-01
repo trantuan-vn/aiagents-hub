@@ -49,6 +49,7 @@ export function primaryOutputPaths(
   if (type === "tool_node" && toolKind === "get-rag") return ["query", "ragText"];
   if (type === "tool_node" && toolKind === "get-db-info") return ["items"];
   if (type === "tool_node" && toolKind === "save-rag") return ["ok", "saved"];
+  if (type === "tool_node" && toolKind === "save-sql-pair") return ["ok", "saved", "documentId", "collection"];
   if (type === "flow" && flowKind === "loop_over_items") {
     if (handle === "done") return ["totalBatches", "schemaName", "loopCompleted"];
     return ["tableName"];

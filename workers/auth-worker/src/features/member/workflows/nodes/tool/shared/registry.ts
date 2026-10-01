@@ -3,12 +3,14 @@ import { codeToolModule } from '../code/module.js';
 import { getDbInfoToolModule } from '../get-db-info/module.js';
 import { getRagToolModule } from '../get-rag/module.js';
 import { saveRagToolModule } from '../save-rag/module.js';
+import { saveSqlPairToolModule } from '../save-sql-pair/module.js';
 import type { ToolModule, WorkflowToolClass } from './tool-module.js';
 
 /** Single registry — dispatcher and agent toolset only read this list. */
 export const TOOL_MODULES: ToolModule[] = [
   getDbInfoToolModule,
   saveRagToolModule,
+  saveSqlPairToolModule,
   getRagToolModule,
   checkSqlToolModule,
   codeToolModule,

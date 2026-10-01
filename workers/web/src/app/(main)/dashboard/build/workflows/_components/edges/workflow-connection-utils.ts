@@ -49,8 +49,13 @@ export function isSaveRagToolNode(node: Node | undefined): boolean {
   return String(nodeData(node).toolKind ?? "") === "save-rag";
 }
 
+export function isSqlPairToolNode(node: Node | undefined): boolean {
+  if (!node || node.type !== "tool_node") return false;
+  return String(nodeData(node).toolKind ?? "") === "save-sql-pair";
+}
+
 export function isRagResourceHost(node: Node | undefined): boolean {
-  return node?.type === "agent" || isRagToolNode(node);
+  return node?.type === "agent" || isRagToolNode(node) || isSqlPairToolNode(node);
 }
 
 function isVectorizeMemoryNode(node: Node | undefined): boolean {
@@ -156,17 +161,25 @@ function isValidResourceWorkflowConnection(
   const targetNode = nodes.find((n) => n.id === connection.target);
 
   if (handle === "llm") {
-    const forward = sourceNode?.type === "service_node" && isSaveRagToolNode(targetNode);
-    const reversed = isSaveRagToolNode(sourceNode) && targetNode?.type === "service_node";
+    const acceptsLlm = (node: Node | undefined) => isSaveRagToolNode(node) || isSqlPairToolNode(node);
+    const forward = sourceNode?.type === "service_node" && acceptsLlm(targetNode);
+    const reversed = acceptsLlm(sourceNode) && targetNode?.type === "service_node";
     return Boolean(forward || reversed);
   }
+
+  if (handle === "tools" && isSqlPairToolNode(sourceNode)) return false;
+  if (isSqlPairToolNode(targetNode) && handle !== "memory") return false;
 
   if (!isRagResourceHost(targetNode)) return false;
 
   const expectedSourceHandle = resourceHandleForNodeType(sourceNode?.type);
   if (expectedSourceHandle !== handle) return false;
 
-  if (handle === "memory" && isRagToolNode(targetNode) && !isVectorizeMemoryNode(sourceNode)) {
+  if (
+    handle === "memory" &&
+    (isRagToolNode(targetNode) || isSqlPairToolNode(targetNode)) &&
+    !isVectorizeMemoryNode(sourceNode)
+  ) {
     return false;
   }
 

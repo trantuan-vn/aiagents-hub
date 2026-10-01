@@ -5,6 +5,7 @@ export const TOOL_KINDS = [
   "code",
   "http_request",
   "save-rag",
+  "save-sql-pair",
   "get-rag",
   "get-db-info",
   "check-sql",
@@ -19,6 +20,7 @@ export const TOOL_KIND_FIELD = "toolKind" as const;
 /** Kinds with dedicated override definitions / execute modules. */
 export const TOOL_OVERRIDE_KINDS = new Set<ToolKind>([
   "save-rag",
+  "save-sql-pair",
   "get-rag",
   "get-db-info",
   "check-sql",

@@ -65,6 +65,12 @@ export const SAVE_RAG_PERSIST_SHAPE: PersistShape = {
   logFields: ['documentId'],
 };
 
+export const SAVE_SQL_PAIR_PERSIST_SHAPE: PersistShape = {
+  neverPersist: ['raw', 'embeddings', 'sql'],
+  resumeFields: ['ok', 'saved', 'documentId', 'collection', 'error', 'items', 'llmCalls'],
+  logFields: ['documentId'],
+};
+
 export const GET_RAG_PERSIST_SHAPE: PersistShape = {
   neverPersist: ['raw', 'embeddings'],
   resumeFields: ['ragText', 'count', 'query', 'question', 'text', 'sql', 'ok', 'error'],
@@ -116,6 +122,7 @@ export const PERSIST_SHAPES: Record<string, PersistShape> = {
   agent: AGENT_PERSIST_SHAPE,
   'agent:reasoning_agent': AGENT_PERSIST_SHAPE,
   'tool_node:save-rag': SAVE_RAG_PERSIST_SHAPE,
+  'tool_node:save-sql-pair': SAVE_SQL_PAIR_PERSIST_SHAPE,
   'tool_node:get-rag': GET_RAG_PERSIST_SHAPE,
   'tool_node:get-db-info': GET_DB_INFO_PERSIST_SHAPE,
   'flow:loop_over_items': LOOP_OVER_ITEMS_PERSIST_SHAPE,

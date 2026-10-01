@@ -14,6 +14,8 @@ function toolLabelKey(kind: ToolKind): string {
   switch (kind) {
     case "save-rag":
       return "tool_save_rag";
+    case "save-sql-pair":
+      return "tool_save_sql_pair";
     case "get-rag":
       return "tool_get_rag";
     case "get-db-info":
@@ -42,6 +44,7 @@ function toolDescKey(kind: ToolKind): string {
 function toolCatalogIcon(kind: ToolKind): string {
   switch (kind) {
     case "save-rag":
+    case "save-sql-pair":
     case "get-rag":
     case "get-db-info":
     case "check-sql":
@@ -94,6 +97,7 @@ export const TOOL_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TOOL_KINDS.filter(
 
 /** Override UI plugins for RAG tools (richer defaults). */
 export const toolSaveRagUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("save-rag");
+export const toolSaveSqlPairUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("save-sql-pair");
 export const toolGetRagUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-rag");
 export const toolGetDbInfoUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-db-info");
 export const toolCheckSqlUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("check-sql");

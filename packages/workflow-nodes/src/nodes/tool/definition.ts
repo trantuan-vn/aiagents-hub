@@ -56,6 +56,45 @@ const SAVE_RAG_FIELDS = [
   { id: "chunkOverlap", type: "number" as const, labelKey: "field_chunk_overlap", defaultValue: 120, order: 8 },
 ];
 
+const SAVE_SQL_PAIR_FIELDS = [
+  {
+    id: "questionField",
+    type: "text" as const,
+    labelKey: "field_sql_pair_question",
+    descriptionKey: "field_sql_pair_question_desc",
+    defaultValue: "{{ $json.question }}",
+    placeholderKey: "field_sql_pair_question_placeholder",
+    supportsExpression: true,
+    order: 3.1,
+  },
+  {
+    id: "sqlField",
+    type: "text" as const,
+    labelKey: "field_sql_pair_sql",
+    descriptionKey: "field_sql_pair_sql_desc",
+    defaultValue: "{{ $json.sql }}",
+    placeholderKey: "field_sql_pair_sql_placeholder",
+    supportsExpression: true,
+    order: 3.2,
+  },
+  {
+    id: "describeSystemPrompt",
+    type: "textarea" as const,
+    labelKey: "field_describe_system_prompt",
+    descriptionKey: "field_sql_pair_system_prompt_desc",
+    defaultValue: "",
+    order: 3.25,
+  },
+  {
+    id: "embedModel",
+    type: "select" as const,
+    labelKey: "field_embed_model",
+    descriptionKey: "field_embed_model_desc",
+    defaultValue: "",
+    order: 3.3,
+  },
+];
+
 const GET_RAG_FIELDS = [
   {
     id: "queryField",
@@ -217,6 +256,8 @@ function toolNameKey(kind: ToolKind): string {
   switch (kind) {
     case "save-rag":
       return "tool_save_rag";
+    case "save-sql-pair":
+      return "tool_save_sql_pair";
     case "get-rag":
       return "tool_get_rag";
     case "get-db-info":
@@ -242,6 +283,8 @@ function toolDescKey(kind: ToolKind): string {
   switch (kind) {
     case "save-rag":
       return "tool_save_rag_desc";
+    case "save-sql-pair":
+      return "tool_save_sql_pair_desc";
     case "get-rag":
       return "tool_get_rag_desc";
     case "get-db-info":
@@ -286,7 +329,14 @@ export function createToolKindDefinition(kind: ToolKind): WorkflowNodeDefinition
     nameKey: toolNameKey(kind),
     descriptionKey: toolDescKey(kind),
     category: "resource",
-    icon: kind === "save-rag" || kind === "get-rag" || kind === "get-db-info" || kind === "check-sql" ? "Oracle" : "Wrench",
+    icon:
+      kind === "save-rag" ||
+      kind === "save-sql-pair" ||
+      kind === "get-rag" ||
+      kind === "get-db-info" ||
+      kind === "check-sql"
+        ? "Oracle"
+        : "Wrench",
     defaultData: {
       label: kind.replace(/-/g, " "),
       [TOOL_KIND_FIELD]: kind,
@@ -318,6 +368,39 @@ export const SAVE_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   sections: [
     defaultInputSection(),
     defaultParametersSection([...RAG_COMMON_FIELDS, ...SAVE_RAG_FIELDS]),
+    defaultOutputSection(false),
+  ],
+});
+
+export const SAVE_SQL_PAIR_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
+  id: "tool_node:save-sql-pair",
+  runtimeType: "tool_node",
+  kind: "save-sql-pair",
+  nameKey: "tool_save_sql_pair",
+  descriptionKey: "tool_save_sql_pair_desc",
+  category: "resource",
+  icon: "Oracle",
+  defaultData: {
+    toolKind: "save-sql-pair",
+    toolName: "save_sql_pair",
+    label: "Save SQL Pair",
+    questionField: "{{ $json.question }}",
+    sqlField: "{{ $json.sql }}",
+    describeSystemPrompt: "",
+    embedModel: "",
+  },
+  sections: [
+    defaultInputSection(),
+    defaultParametersSection([
+      {
+        id: "toolName",
+        type: "text" as const,
+        labelKey: "field_tool_name",
+        defaultValue: "save_sql_pair",
+        order: 2,
+      },
+      ...SAVE_SQL_PAIR_FIELDS,
+    ]),
     defaultOutputSection(false),
   ],
 });
@@ -433,6 +516,17 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     describeSystemPrompt: "",
     chunkSize: 800,
     chunkOverlap: 120,
+  },
+  "save-sql-pair": {
+    toolKind: "save-sql-pair",
+    toolName: "save_sql_pair",
+    label: "Save SQL Pair",
+    toolDescription:
+      "Write one question and its SQL into Vectorize. When a system prompt is set, the linked LLM rewrites the question with those domain terms before embedding. The vector is that question; the stored text includes the full SQL.",
+    questionField: "{{ $json.question }}",
+    sqlField: "{{ $json.sql }}",
+    describeSystemPrompt: "",
+    embedModel: "",
   },
   "get-rag": {
     toolKind: "get-rag",

@@ -10,9 +10,12 @@ import {
   GET_DB_INFO_PERSIST_SHAPE,
   GET_RAG_PERSIST_SHAPE,
   SAVE_RAG_PERSIST_SHAPE,
+  SAVE_SQL_PAIR_PERSIST_SHAPE,
 } from '../../engine/persist-shapes.js';
 
 export { executeSaveRag, executeSaveRagPipeline } from './save-rag/execute.js';
+export { executeSaveSqlPairPipeline, sqlPairChunkText, sqlPairDocumentId } from './save-sql-pair/execute.js';
+export type { SaveSqlPairResult } from './save-sql-pair/execute.js';
 export type {
   SaveRagChunkInput,
   SaveRagInput,
@@ -90,6 +93,14 @@ export const toolSaveRagPlugin: WorkflowNodePlugin = {
   kind: 'save-rag',
   execute: executeToolNode,
   ...SAVE_RAG_PERSIST_SHAPE,
+};
+
+export const toolSaveSqlPairPlugin: WorkflowNodePlugin = {
+  id: 'tool_node:save-sql-pair',
+  runtimeType: 'tool_node',
+  kind: 'save-sql-pair',
+  execute: executeToolNode,
+  ...SAVE_SQL_PAIR_PERSIST_SHAPE,
 };
 
 export const toolGetRagPlugin: WorkflowNodePlugin = {

@@ -17,6 +17,7 @@ import { CHECK_SQL_TOOL_N8N_DESCRIPTION } from "./descriptions/check-sql-tool";
 import { GET_DB_INFO_TOOL_N8N_DESCRIPTION } from "./descriptions/get-db-info-tool";
 import { GET_RAG_TOOL_N8N_DESCRIPTION } from "./descriptions/get-rag-tool";
 import { SAVE_RAG_TOOL_N8N_DESCRIPTION } from "./descriptions/save-rag-tool";
+import { SAVE_SQL_PAIR_TOOL_N8N_DESCRIPTION } from "./descriptions/save-sql-pair-tool";
 import { TOOL_NODE_N8N_DESCRIPTION } from "./descriptions/tool-node";
 import { TRIGGER_N8N_DESCRIPTION } from "./descriptions/trigger";
 import { CORE_WEBHOOK_N8N_DESCRIPTION, TRIGGER_WEBHOOK_N8N_DESCRIPTION } from "./descriptions/webhook";
@@ -44,6 +45,7 @@ const BY_KIND: Record<string, N8nNodeTypeDescription> = {
   "core:http_request": HTTP_REQUEST_N8N_DESCRIPTION,
   "core:code": CODE_N8N_DESCRIPTION,
   "tool_node:save-rag": SAVE_RAG_TOOL_N8N_DESCRIPTION,
+  "tool_node:save-sql-pair": SAVE_SQL_PAIR_TOOL_N8N_DESCRIPTION,
   "tool_node:get-rag": GET_RAG_TOOL_N8N_DESCRIPTION,
   "tool_node:get-db-info": GET_DB_INFO_TOOL_N8N_DESCRIPTION,
   "tool_node:check-sql": CHECK_SQL_TOOL_N8N_DESCRIPTION,
