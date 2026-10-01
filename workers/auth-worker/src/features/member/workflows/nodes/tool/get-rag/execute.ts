@@ -512,11 +512,15 @@ export type PrefetchedRag = {
   query: string;
 };
 
-/** When Get RAG is wired as an agent tool, resolve its Query field against the current payload and retrieve. */
+/**
+ * When Get RAG is wired as an agent tool, resolve its Query field against the current payload and retrieve.
+ * `forceQuery` is the rewritten question: it wins over the Query field so embed uses that sentence.
+ */
 export async function prefetchLinkedGetRag(
   ctx: NodeContext,
   agentId: string,
   queryFallback = '',
+  forceQuery = '',
 ): Promise<PrefetchedRag> {
   const empty: PrefetchedRag = { ragText: '', snippets: [], query: '' };
   const existing = String((ctx.nodeInput as Record<string, unknown> | undefined)?.ragText ?? '').trim();
@@ -533,11 +537,13 @@ export async function prefetchLinkedGetRag(
   const config = toolNodeConfig(ctx.definition, agentId, 'get-rag');
   if (!config) return empty;
 
-  const query = resolveConfiguredText(
-    config.queryField,
-    (ctx.nodeInput ?? {}) as Record<string, unknown>,
-    queryFallback,
-  );
+  const query =
+    forceQuery.trim() ||
+    resolveConfiguredText(
+      config.queryField,
+      (ctx.nodeInput ?? {}) as Record<string, unknown>,
+      queryFallback,
+    );
   if (!query) return empty;
 
   try {

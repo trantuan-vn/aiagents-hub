@@ -45,20 +45,30 @@ export function draftsEquivalent(a: string, b: string): boolean {
   return false;
 }
 
-function hasSuccessfulValidation(observations: ToolObservation[]): boolean {
-  return observations.some((o) => {
-    if (!o.ok) return false;
-    try {
-      const parsed =
-        typeof o.output === 'string' ? (JSON.parse(o.output) as { ok?: unknown }) : o.output;
-      if (parsed && typeof parsed === 'object' && 'ok' in (parsed as object)) {
-        return (parsed as { ok?: unknown }).ok === true;
-      }
-    } catch {
-      /* non-JSON success still counts as ok observation */
+function payloadOk(output: unknown, toolOk: boolean): boolean {
+  try {
+    const parsed = typeof output === 'string' ? (JSON.parse(output) as { ok?: unknown }) : output;
+    if (parsed && typeof parsed === 'object' && 'ok' in (parsed as object)) {
+      return (parsed as { ok?: unknown }).ok === true;
     }
-    return true;
-  });
+  } catch {
+    /* truncated non-JSON still follows the observation flag */
+  }
+  return toolOk;
+}
+
+function hasSuccessfulValidation(observations: ToolObservation[]): boolean {
+  return observations.some((o) => o.ok && payloadOk(o.output, true));
+}
+
+/** The latest check_sql result. An earlier success does not outrank a later failure. */
+export function latestSqlCheckOk(observations: ToolObservation[]): boolean {
+  for (let i = observations.length - 1; i >= 0; i--) {
+    const observation = observations[i]!;
+    if (!isSqlValidateToolName(observation.tool)) continue;
+    return observation.ok && payloadOk(observation.output, true);
+  }
+  return false;
 }
 
 export function scoreDraft(args: {
@@ -81,8 +91,8 @@ export function scoreDraft(args: {
 
   if (mode === 'sql') {
     const sql = extractSql(text);
-    score += sql ? 28 : -22;
-    if (sql && /\b(JOIN|WHERE|GROUP BY)\b/i.test(sql)) score += 6;
+    if (sql && latestSqlCheckOk(args.observations)) score += 28;
+    else if (!sql) score -= 22;
   } else if (mode === 'validated') {
     score += hasSuccessfulValidation(args.observations) ? 20 : -12;
     if (text.length > 80) score += 6;

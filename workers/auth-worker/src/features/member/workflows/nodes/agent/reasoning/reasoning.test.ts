@@ -6,6 +6,9 @@ import { shouldPlan, parsePlan, normalizePlannerMode } from './plan.js';
 import { ruleClassify, parseLlmSafety } from './safety.js';
 import { classifyToolName, filterToolsForPolicy, initialToolChoice, omitGetRagWhenGrounded, validatedSqlFromObservations } from './tools.js';
 import { reflectHeuristics } from './reflect.js';
+import { acceptRewrittenQuestion, shouldRewriteForRetrieval } from './rewrite-question.js';
+import { hasGroundedSchema, oracleRetrieveQuery, sqlReflectUser } from './sql-turn.js';
+import { REASONING_AGENT_SYSTEM_PROMPT } from '@aiagents-hub/workflow-nodes';
 import { memoryKey, resolveSessionId } from './memory.js';
 import {
   COMPLETE_QUALITY_SCORE,
@@ -193,6 +196,20 @@ describe('reasoning citations and reflect', () => {
     });
     expect(verdict.pass).toBe(false);
     expect(verdict.issues).toContain('missing_sql');
+    expect(verdict.issues).not.toContain('missing_citations');
+  });
+
+  it('does not fail SQL mode when the statement has no [n] citation', () => {
+    const verdict = reflectHeuristics({
+      text: '```sql\nSELECT id FROM orders\n```',
+      citations: [{ id: 1, source: 'memory', snippet: 'CREATE TABLE orders (id text)' }],
+      observations: [],
+      frame: { goal: 'sql', knownFacts: [], missingSlots: [], confidence: 0.8, canUseTools: false },
+      requireCitations: true,
+      mode: 'sql',
+    });
+    expect(verdict.issues).not.toContain('missing_citations');
+    expect(verdict.pass).toBe(true);
   });
 
   it('does not require SQL for generic Q&A even with schema snippets', () => {
@@ -241,7 +258,7 @@ describe('reasoning quality', () => {
       mode: 'sql',
     });
     const sql = scoreDraft({
-      text: '```sql\nSELECT id FROM orders WHERE id IS NOT NULL\n``` [1]',
+      text: '```sql\nSELECT id FROM orders\n``` [1]',
       issues: [],
       citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
       observations: [],
@@ -249,8 +266,28 @@ describe('reasoning quality', () => {
       userText: 'write sql',
       mode: 'sql',
     });
+    const joined = scoreDraft({
+      text: '```sql\nSELECT id FROM orders JOIN t ON t.id = orders.id GROUP BY id\n``` [1]',
+      issues: [],
+      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      observations: [],
+      snippets: ['CREATE TABLE orders (id text)'],
+      userText: 'write sql',
+      mode: 'sql',
+    });
+    const checked = scoreDraft({
+      text: '```sql\nSELECT id FROM orders\n``` [1]',
+      issues: [],
+      citations: [{ id: 1, source: 'memory', snippet: 'schema' }],
+      observations: [{ tool: 'check_sql', ok: true, output: JSON.stringify({ ok: true, sql: 'SELECT id FROM orders' }) }],
+      snippets: ['CREATE TABLE orders (id text)'],
+      userText: 'write sql',
+      mode: 'sql',
+    });
     expect(sql).toBeGreaterThan(stub);
-    expect(sql).toBeGreaterThanOrEqual(COMPLETE_QUALITY_SCORE);
+    expect(joined).toBe(sql);
+    expect(checked).toBeGreaterThan(sql);
+    expect(checked).toBeGreaterThanOrEqual(COMPLETE_QUALITY_SCORE);
 
     const genericAnswer = scoreDraft({
       text: 'Orders use id and total [1].',
@@ -305,6 +342,24 @@ describe('reasoning quality', () => {
         isLastAttempt: false,
       }),
     ).toBe(true);
+  });
+
+  it('rewrites only when the system prompt adds domain terms', () => {
+    expect(shouldRewriteForRetrieval('')).toBe(false);
+    expect(shouldRewriteForRetrieval(`  ${REASONING_AGENT_SYSTEM_PROMPT}  `)).toBe(false);
+    expect(shouldRewriteForRetrieval('Bạn là chuyên gia kế toán. Dùng doanh thu thuần.')).toBe(true);
+    expect(acceptRewrittenQuestion('doanh thu thuần theo tháng', 'tiền bán')).toBe('doanh thu thuần theo tháng');
+    expect(acceptRewrittenQuestion('SELECT id FROM t', 'tiền bán')).toBe('tiền bán');
+    expect(acceptRewrittenQuestion('', 'tiền bán')).toBe('tiền bán');
+  });
+
+  it('builds the retrieve query from the Oracle identifier, not the user question', () => {
+    expect(oracleRetrieveQuery('ORA-00904: "NET_REVENUE": invalid identifier')).toBe('NET_REVENUE');
+    expect(oracleRetrieveQuery('ORA-00942: table or view "SALES"."ORDERS" does not exist')).toBe('SALES.ORDERS');
+    expect(oracleRetrieveQuery('missing month')).toBe('missing month');
+    expect(hasGroundedSchema('## Schema liên quan', [])).toBe(true);
+    expect(hasGroundedSchema('', ['orders(id, total)'])).toBe(false);
+    expect(sqlReflectUser('```sql\nSELECT 1 FROM dual\n```', 'ORA-00904: "NOPE": invalid identifier')).not.toContain('schema');
   });
 
   it('treats whitespace-normalized SQL as equivalent', () => {

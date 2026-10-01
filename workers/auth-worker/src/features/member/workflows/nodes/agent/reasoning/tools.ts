@@ -142,6 +142,17 @@ export function decorateToolDescription(
   return `${description} ${when}`.trim();
 }
 
+/** Drop every retrieve tool. Used when SQL context is already in the prompt. */
+export function omitRetrieveTools<T extends ToolSet>(tools: T): T {
+  const next = { ...tools } as T;
+  for (const name of Object.keys(next)) {
+    if (classifyToolName(name) === 'retrieve') {
+      delete (next as Record<string, unknown>)[name];
+    }
+  }
+  return next;
+}
+
 /** Drop retrieve tools when upstream already grounded; keep them if any validate tool is linked. */
 export function omitRetrieveWhenGrounded<T extends ToolSet>(tools: T, alreadyGrounded: boolean): T {
   if (!alreadyGrounded) return tools;
@@ -216,9 +227,14 @@ export function buildToolLoopGuidance(args: {
   codeModeName?: string;
   retrieve: string[];
   validate: string[];
+  /** SQL context is already in the prompt, so this turn must not call retrieve. */
+  grounded?: boolean;
 }): string {
   const retrieve = args.retrieve.join(', ');
   const validate = args.validate.join(', ');
+  if (args.grounded && validate) {
+    return `Context is already in the prompt. Draft SQL and call ${validate}. Do not call retrieve on this turn. On ok: false, context is replaced from the Oracle error before the next draft. Only claim success after validation returns ok: true.`;
+  }
   if (args.usingCodeMode && args.codeModeName) {
     const inner =
       retrieve || validate
@@ -244,6 +260,14 @@ If validate returns ok: false, call retrieve again with the error as the query, 
 Return { ok: true, ... } only when validate returns ok: true. Never invent identifiers.
 If facts are still missing, call retrieve again with that gap as the query, then return { ok: false, error, askUser: ["..."] }.
 askUser lists what is still missing after that retrieve. It is not a message to the user.`;
+
+/** Code Mode when prefetch already placed schema and SQL examples in the user message. */
+export const CODE_MODE_GROUNDED_GUIDANCE = `Write one JavaScript async arrow function via the codemode tool.
+The user message already has the question and retrieved context. Write SQL from that context, then call check_sql. Do not call get_rag.
+If check_sql returns ok: false, the next user message gives one short retrieve query (the truncated error). Call get_rag with only that query, then fix the previous SQL and validate again.
+Return { ok: true, sql } only when check_sql returns ok: true. Never invent identifiers.
+If facts are still missing after that retrieve, return { ok: false, error, askUser: ["..."] }.
+askUser lists what is still missing. It is not a message to the user.`;
 
 export function buildAskUserTool(): ToolSet {
   return {

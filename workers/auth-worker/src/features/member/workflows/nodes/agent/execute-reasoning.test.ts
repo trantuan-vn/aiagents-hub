@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { REASONING_AGENT_SYSTEM_PROMPT } from '@aiagents-hub/workflow-nodes';
 
 vi.mock('@cloudflare/codemode', () => ({
   DynamicWorkerExecutor: class {
@@ -11,6 +12,12 @@ vi.mock('@cloudflare/codemode/ai', () => ({
     execute: async () => ({ result: null, logs: [] }),
   }),
 }));
+
+const executeGetRagMock = vi.hoisted(() => vi.fn());
+vi.mock('../tool/get-rag/execute.js', async () => {
+  const actual = await vi.importActual<typeof import('../tool/get-rag/execute.js')>('../tool/get-rag/execute.js');
+  return { ...actual, executeGetRag: executeGetRagMock };
+});
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
@@ -137,7 +144,9 @@ describe('executeReasoningAgent', () => {
   });
 
   it('puts full retrieved schema and sample rows into the act prompt', async () => {
+    const purposes: string[] = [];
     const llm = vi.fn(async ({ purpose, system }) => {
+      purposes.push(purpose);
       if (purpose === 'act') {
         expect(String(system)).toContain('CREATE TABLE ADMIN.CHUNG_KHOAN');
         expect(String(system)).toContain('"MA_CK": "VIC"');
@@ -163,6 +172,7 @@ describe('executeReasoningAgent', () => {
       ),
       { llm },
     );
+    expect(purposes).toEqual(['act']);
     expect(llm).toHaveBeenCalled();
   });
 
@@ -334,6 +344,9 @@ describe('code mode phase 1', () => {
       expect(call.toolChoice).toEqual({ type: 'tool', toolName: 'codemode' });
       expect(call.system).toContain('askUser');
       expect(call.system).not.toContain('Retrieved knowledge');
+      expect(call.user).toContain('doanh thu theo tháng');
+      expect(call.user).toContain('schema');
+      expect(call.user).toContain('Do not call get_rag');
       return {
         text: 'here you go',
         observations: [
@@ -380,8 +393,8 @@ describe('code mode phase 1', () => {
       { llm },
     );
     expect(acts).toBe(2);
-    expect(users[1]).toContain('tháng nào');
-    expect(users[1]).toContain('get_rag');
+    expect(users[1]).toContain('Call get_rag with only this query:\nmissing month');
+    expect(users[1]).toContain('fix the previous SQL');
     expect(out.status).toBe('needs_clarification');
     expect(out.questions).toEqual(['Bạn muốn doanh thu của tháng nào?']);
     expect(out.text).toBe('Bạn muốn doanh thu của tháng nào?');
@@ -431,6 +444,186 @@ describe('code mode phase 1', () => {
     const rows = traced.codeModeTrace as Array<{ event?: string }>;
     expect(rows.map((row) => row.event)).toEqual(['code_mode.start', 'code_mode.step', 'code_mode.end']);
     spy.mockRestore();
+  });
+});
+
+function checkSqlCtx(data: Record<string, unknown>, input: Record<string, unknown> = {}) {
+  const base = ctx(
+    {
+      agentKind: 'reasoning_agent',
+      enablePlanner: 'off',
+      clarificationMode: 'best_effort',
+      maxReflectRetries: 0,
+      ...data,
+    },
+    input,
+  );
+  base.definition = {
+    nodes: [
+      base.node,
+      { id: 'rag', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'get-rag', toolName: 'get_rag' } },
+      { id: 'sql', type: 'tool_node', position: { x: 0, y: 0 }, data: { toolKind: 'check-sql', toolName: 'check_sql' } },
+    ],
+    edges: [
+      { id: 'e1', source: 'rag', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+      { id: 'e2', source: 'sql', target: 'agent_1', sourceHandle: 'tools', targetHandle: 'tools' },
+    ],
+  };
+  return base;
+}
+
+describe('sql generation phase 4', () => {
+  it('rewrites the question from a domain system prompt and keeps the original in the act', async () => {
+    const purposes: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      purposes.push(call.purpose);
+      if (call.purpose === 'rewrite') {
+        expect(call.user).toContain('tiền bán theo tháng');
+        expect(call.user).toContain('doanh thu thuần');
+        expect(call.system).not.toContain('SELECT');
+        return { text: 'doanh thu thuần theo tháng', observations: [] };
+      }
+      if (call.purpose === 'act') {
+        expect(call.user).toContain('tiền bán theo tháng');
+        return { text: '```sql\nSELECT 1 FROM dual\n```', observations: [] };
+      }
+      return { text: '{"pass":true,"issues":[]}', observations: [] };
+    };
+    const out = await executeReasoningAgent(
+      checkSqlCtx(
+        { systemPrompt: 'Bạn là chuyên gia kế toán. Dùng doanh thu thuần.', prompt: 'tiền bán theo tháng' },
+        { query: 'tiền bán theo tháng', ragText: 'schema block' },
+      ),
+      { llm },
+    );
+    expect(purposes[0]).toBe('rewrite');
+    expect(purposes).toContain('act');
+    expect(out.status).toBe('ok');
+  });
+
+  it('skips the rewrite when the system prompt is the Reasoning Agent default', async () => {
+    const purposes: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      purposes.push(call.purpose);
+      return { text: '```sql\nSELECT 1 FROM dual\n```', observations: [] };
+    };
+    await executeReasoningAgent(
+      checkSqlCtx(
+        { systemPrompt: REASONING_AGENT_SYSTEM_PROMPT, prompt: 'doanh thu' },
+        { query: 'doanh thu', ragText: 'schema block' },
+      ),
+      { llm },
+    );
+    expect(purposes).not.toContain('rewrite');
+  });
+
+  it('keeps the original question when the rewrite call fails', async () => {
+    const users: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      if (call.purpose === 'rewrite') throw new Error('llm down');
+      if (call.purpose === 'act') {
+        users.push(call.user);
+        return { text: '```sql\nSELECT 1 FROM dual\n```', observations: [] };
+      }
+      return { text: '{"pass":true,"issues":[]}', observations: [] };
+    };
+    const out = await executeReasoningAgent(
+      checkSqlCtx(
+        { systemPrompt: 'Chuyên gia kế toán. Doanh thu thuần.', prompt: 'tiền bán theo tháng' },
+        { query: 'tiền bán theo tháng', ragText: 'schema block' },
+      ),
+      { llm },
+    );
+    expect(out.status).toBe('ok');
+    expect(users[0]).toContain('tiền bán theo tháng');
+  });
+
+  it('does not call get_rag on the first act and stops when check_sql succeeds', async () => {
+    const purposes: string[] = [];
+    const llm: ReasoningLlmCall = async (call) => {
+      purposes.push(call.purpose);
+      expect(Object.keys(call.tools ?? {})).not.toContain('get_rag');
+      expect(Object.keys(call.tools ?? {})).toContain('check_sql');
+      expect(call.system).toContain('OLD_SCHEMA_BLOCK');
+      expect(call.system).not.toContain('cite as [n]');
+      return {
+        text: '```sql\nSELECT 1 FROM dual\n```',
+        observations: [
+          { tool: 'check_sql', ok: true, output: JSON.stringify({ ok: true, sql: 'SELECT 1 FROM dual' }) },
+        ],
+      };
+    };
+    const out = await executeReasoningAgent(
+      checkSqlCtx(
+        { maxReflectRetries: 4, prompt: 'doanh thu' },
+        { query: 'doanh thu', ragText: 'OLD_SCHEMA_BLOCK', snippets: ['OLD_SCHEMA_BLOCK'] },
+      ),
+      { llm },
+    );
+    expect(purposes).toEqual(['act']);
+    expect(out.sql).toBe('SELECT 1 FROM dual;');
+    expect(executeGetRagMock).not.toHaveBeenCalled();
+  });
+
+  it('replaces rag from the Oracle identifier and reflects only the SQL plus the error', async () => {
+    executeGetRagMock.mockResolvedValue({
+      ragText: 'NEW_SCHEMA_BLOCK',
+      snippets: [{ text: 'NEW_SCHEMA_BLOCK', docType: 'schema' }],
+      sqlPairs: [],
+      schemas: [],
+      count: 1,
+    });
+    const systems: string[] = [];
+    let acts = 0;
+    const llm: ReasoningLlmCall = async (call) => {
+      if (call.purpose === 'reflect') {
+        expect(call.user).toContain('SELECT id FROM orders');
+        expect(call.user).toContain('ORA-00904');
+        expect(call.user).not.toContain('SECRET_OBSERVATION_FIELD');
+        expect(call.user).not.toContain('OLD_SCHEMA_BLOCK');
+        return { text: '{"pass":false,"issues":["bad column"],"rewritten":""}', observations: [] };
+      }
+      acts += 1;
+      systems.push(call.system);
+      if (acts === 1) {
+        expect(Object.keys(call.tools ?? {})).not.toContain('get_rag');
+        return {
+          text: '```sql\nSELECT id FROM orders\n```',
+          observations: [
+            {
+              tool: 'check_sql',
+              ok: false,
+              output: JSON.stringify({
+                ok: false,
+                error: 'ORA-00904: "NET_REVENUE": invalid identifier',
+                sampleRows: ['SECRET_OBSERVATION_FIELD'],
+              }),
+            },
+          ],
+        };
+      }
+      return {
+        text: '```sql\nSELECT net_revenue FROM orders\n```',
+        observations: [
+          { tool: 'check_sql', ok: true, output: JSON.stringify({ ok: true, sql: 'SELECT net_revenue FROM orders' }) },
+        ],
+      };
+    };
+    const out = await executeReasoningAgent(
+      checkSqlCtx(
+        { maxReflectRetries: 1, prompt: 'doanh thu thuần' },
+        { query: 'doanh thu thuần', ragText: 'OLD_SCHEMA_BLOCK', snippets: ['OLD_SCHEMA_BLOCK'] },
+      ),
+      { llm },
+    );
+    expect(systems[0]).toContain('OLD_SCHEMA_BLOCK');
+    expect(systems[1]).toContain('NEW_SCHEMA_BLOCK');
+    expect(systems[1]).not.toContain('OLD_SCHEMA_BLOCK');
+    expect(executeGetRagMock).toHaveBeenCalledWith(
+      expect.objectContaining({ input: expect.objectContaining({ query: 'NET_REVENUE' }) }),
+    );
+    expect(out.sql).toBe('SELECT net_revenue FROM orders;');
+    executeGetRagMock.mockReset();
   });
 });
 

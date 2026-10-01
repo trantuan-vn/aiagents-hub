@@ -46,7 +46,8 @@ export function reflectHeuristics(args: {
     issues.push('unresolved_slots');
   }
 
-  if (claimsNeedCitations(text, args.requireCitations) && args.citations.length > 0) {
+  const requireCitations = args.mode === 'sql' ? false : args.requireCitations;
+  if (claimsNeedCitations(text, requireCitations) && args.citations.length > 0) {
     issues.push('missing_citations');
   }
 
@@ -81,3 +82,7 @@ export function parseReflect(raw: Record<string, unknown> | null, fallback: Refl
 export const REFLECT_PROMPT = `Critique the draft answer. Reply with JSON only:
 {"pass":true,"issues":[],"rewritten":""}
 Fail if claims lack [n] citations when sources were provided, if missing slots remain, if a linked validate tool never returned ok: true when validation was required, or if the answer contradicts tool results. Put a corrected answer in rewritten when pass is false. Set pass true only when the draft is complete and cannot be improved.`;
+
+export const SQL_REFLECT_PROMPT = `Critique the draft SQL against the Oracle error. Reply with JSON only:
+{"pass":true,"issues":[],"rewritten":""}
+Do not require [n] citations. Do not repeat schema. Pass when the statement matches the request and the error is resolved. When pass is false, put a corrected SQL statement in rewritten.`;

@@ -1101,4 +1101,34 @@ describe('Get RAG completeness', () => {
 
     await expect(prefetchLinkedGetRag(ctx, 'agent_1', 'orders')).rejects.toThrow(/Get RAG retrieve failed/);
   });
+
+  it('embeds the forced rewritten question instead of the Query field', async () => {
+    const run = vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] });
+    const env = {
+      AI: { run },
+      VECTORIZE: { query: vi.fn().mockResolvedValue({ matches: [] }), getByIds: vi.fn(), upsert: vi.fn() },
+    } as unknown as Env;
+    const ctx = {
+      node: definition.nodes[2],
+      nodeInput: { query: 'tiền bán theo tháng', chatInput: 'tiền bán theo tháng' },
+      definition: {
+        ...definition,
+        nodes: definition.nodes.map((node) =>
+          node.id === 'tool_get'
+            ? { ...node, data: { ...node.data, queryField: '{{ $json.chatInput }}' } }
+            : node,
+        ),
+      },
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'u1', workflowId: 1 },
+    } as unknown as NodeContext;
+
+    await prefetchLinkedGetRag(ctx, 'agent_1', 'tiền bán theo tháng', 'doanh thu thuần theo tháng');
+
+    const payload = JSON.stringify(run.mock.calls);
+    expect(payload).toContain('doanh thu thuần theo tháng');
+    expect(payload).not.toContain('tiền bán theo tháng');
+  });
 });

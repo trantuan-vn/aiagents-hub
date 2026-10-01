@@ -23,7 +23,7 @@ import {
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { attachSimpleMemory, isLinkedSimpleMemory } from '../memory-node/simple.js';
 import { ragBillingFromNodeContext } from '../tool/shared/rag-context.js';
-import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
+import { executeGetRag, prefetchLinkedGetRag, type PrefetchedRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
 import type { NodeContext, NodeOutput } from '../types.js';
 import {
@@ -59,17 +59,19 @@ import {
   type Episode,
 } from './reasoning/memory.js';
 import { normalizePlannerMode, parsePlan, shouldPlan, PLAN_PROMPT } from './reasoning/plan.js';
-import { parseReflect, reflectHeuristics, REFLECT_PROMPT } from './reasoning/reflect.js';
+import { parseReflect, reflectHeuristics, REFLECT_PROMPT, SQL_REFLECT_PROMPT } from './reasoning/reflect.js';
 import { parseLlmSafety, ruleClassify, SAFETY_CLASSIFIER_PROMPT } from './reasoning/safety.js';
 import {
   buildAskUserTool,
   buildToolLoopGuidance,
   CODE_MODE_ACT_GUIDANCE,
+  CODE_MODE_GROUNDED_GUIDANCE,
   codeModeSucceeded,
   decorateToolDescription,
   filterToolsForPolicy,
   initialToolChoice,
   maxActSteps,
+  omitRetrieveTools,
   omitRetrieveWhenGrounded,
   partitionToolNames,
   validatedArtifactFromObservations,
@@ -103,11 +105,25 @@ import {
   MAX_REFLECT_RETRIES,
   MIN_QUALITY_DELTA,
   draftsEquivalent,
+  isSqlValidateToolName,
+  latestSqlCheckOk,
   resolveEvaluationMode,
   scoreDraft,
   shouldStopImproving,
   type EvaluationMode,
 } from './reasoning/quality.js';
+import {
+  acceptRewrittenQuestion,
+  REWRITE_QUESTION_SYSTEM,
+  rewriteQuestionUser,
+  shouldRewriteForRetrieval,
+} from './reasoning/rewrite-question.js';
+import {
+  hasGroundedSchema,
+  oracleErrorFromObservations,
+  oracleRetrieveQuery,
+  sqlReflectUser,
+} from './reasoning/sql-turn.js';
 import {
   resolveConfiguredChoice,
   resolveConfiguredFlag,
@@ -188,7 +204,7 @@ function sandboxLogsText(payload: unknown): string {
 }
 
 export type ReasoningLlmCall = (args: {
-  purpose: 'safety' | 'frame' | 'plan' | 'act' | 'reflect' | 'ask';
+  purpose: 'safety' | 'rewrite' | 'frame' | 'plan' | 'act' | 'reflect' | 'ask';
   system: string;
   user: string;
   tools?: ToolSet;
@@ -495,11 +511,59 @@ async function synthesizeAsk(args: {
   return question || mostFrequentAsk(args.asks);
 }
 
+async function refreshSqlRag(ctx: NodeContext, agentId: string, query: string): Promise<PrefetchedRag | null> {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+  try {
+    const result = await executeGetRag({
+      env: ctx.c.env,
+      definition: ctx.definition,
+      agentId,
+      input: { query: trimmed },
+      userDO: ctx.userDO,
+      ownerId: ctx.meta.ownerId,
+      workflowId: ctx.meta.workflowId,
+      billing: ragBillingFromNodeContext(ctx),
+      triggerContext: (ctx.nodeInput ?? {}) as Record<string, unknown>,
+    });
+    const snippets = result.snippets.map((snippet) => snippet.text).filter(Boolean);
+    return { ragText: result.ragText, snippets, query: trimmed };
+  } catch (error) {
+    console.warn('[reasoning] get_rag refresh failed:', error);
+    return null;
+  }
+}
+
+function codeModeGroundedUser(original: string, normalized: string, ragText: string): string {
+  return [
+    `Question:\n${original}`,
+    `Normalized question:\n${normalized || original}`,
+    ragText.trim(),
+    'Write SQL from this context, then call check_sql. Do not call get_rag.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function codeModeRepairUser(original: string, error: string): string {
+  const query = oracleRetrieveQuery(error) || clipTrace(error, 240);
+  return [
+    `Question:\n${original}`,
+    'Previous SQL failed.',
+    `Error:\n${error.trim() || '(none)'}`,
+    `Call get_rag with only this query:\n${query || '(none)'}`,
+    'Then fix the previous SQL. Do not send the original question as the retrieve query.',
+  ].join('\n\n');
+}
+
 async function runCodeModeAgent(args: {
   llm: ReasoningLlmCall;
   codeModeName: string;
   tool: ToolSet[string];
   userText: string;
+  originalQuestion: string;
+  normalizedQuestion: string;
+  ragText: string;
   userSystem: string;
   sessionSummary: string;
   historyText: string;
@@ -512,9 +576,10 @@ async function runCodeModeAgent(args: {
 }): Promise<NodeOutput> {
   const codeTool: ToolSet = { [args.codeModeName]: args.tool };
   const traceLog = args.trace && args.onTrace ? args.onTrace : null;
+  const grounded = Boolean(args.ragText.trim());
   const system = [
     args.userSystem,
-    CODE_MODE_ACT_GUIDANCE,
+    grounded ? CODE_MODE_GROUNDED_GUIDANCE : CODE_MODE_ACT_GUIDANCE,
     args.workflowDescription ? `Workflow: ${args.workflowDescription}` : '',
     args.sessionSummary ? `Session memory:\n${args.sessionSummary}` : '',
     args.historyText ? `Previous conversation:\n${args.historyText}` : '',
@@ -528,10 +593,16 @@ async function runCodeModeAgent(args: {
   let lastError = '';
 
   const actOnce = async (attempt: 1 | 2, priorAsks: string[], priorError: string) => {
-    const user =
+    const groundedUser =
       attempt === 1
-        ? args.userText
-        : `${args.userText}\n\nPrevious script failed.\nError: ${priorError || '(none)'}\nCall get_rag first with this query:\n${priorAsks.join('\n') || priorError || args.userText}`;
+        ? codeModeGroundedUser(args.originalQuestion || args.userText, args.normalizedQuestion, args.ragText)
+        : codeModeRepairUser(args.originalQuestion || args.userText, priorError);
+    const user =
+      grounded
+        ? groundedUser
+        : attempt === 1
+          ? args.userText
+          : `${args.userText}\n\nPrevious script failed.\nError: ${priorError || '(none)'}\nCall get_rag first with this query:\n${priorAsks.join('\n') || priorError || args.userText}`;
     if (traceLog) {
       traceLog('code_mode.start', {
         attempt,
@@ -681,32 +752,15 @@ export async function executeReasoningAgent(
   const evaluationMode = resolveEvaluationMode(linkedValidateNames);
   let nodeInput = { ...(ctx.nodeInput ?? {}) } as Record<string, unknown>;
   let userText = resolveAgentUserText(data, nodeInput, ctx.input);
-
-  const prefetched = await prefetchLinkedGetRag({ ...ctx, nodeInput }, ctx.node.id, userText);
-  if (prefetched.ragText) {
-    nodeInput = {
-      ...nodeInput,
-      ragText: prefetched.ragText,
-      snippets: prefetched.snippets,
-      query:
-        typeof nodeInput.query === 'string' && nodeInput.query.trim()
-          ? nodeInput.query
-          : prefetched.query,
-    };
-    userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
-  }
-
-  const optionScope = { ...nodeInput, input: ctx.input ?? '' };
-  const options = readReasoningOptions(data, optionScope);
-
-  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
-  const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
+  const question = userText.trim();
+  let pdfSuffix = '';
 
   const pdfFiles = filesFromWebhookBody(nodeInput.body ?? ctx.nodeInput);
   if (pdfFiles.length) {
     const extracted = await extractTextFromPdfFiles(ctx.c.env, pdfFiles);
     if (extracted.length) {
-      userText = `${userText}\n\nExtracted PDF text:\n${extracted.map((f) => `--- ${f.filename} ---\n${f.text}`).join('\n\n')}`;
+      pdfSuffix = `Extracted PDF text:\n${extracted.map((f) => `--- ${f.filename} ---\n${f.text}`).join('\n\n')}`;
+      userText = `${userText}\n\n${pdfSuffix}`;
     }
   }
 
@@ -728,6 +782,7 @@ export async function executeReasoningAgent(
     throw new Error('Agent node missing serviceEndpoint (connect a service node or pick a service)');
   }
 
+  let optionScope = { ...nodeInput, input: ctx.input ?? '' };
   let service: Record<string, unknown> = { id: 0, endpoint };
   let modelId = '@cf/meta/llama-3.1-8b-instruct';
   if (!deps?.llm) {
@@ -771,6 +826,48 @@ export async function executeReasoningAgent(
     }
   }
 
+  let retrievalQuery = question;
+  if (evaluationMode === 'sql' && shouldRewriteForRetrieval(data.systemPrompt) && question) {
+    try {
+      const rewritten = await llm({
+        purpose: 'rewrite',
+        system: REWRITE_QUESTION_SYSTEM,
+        user: rewriteQuestionUser(question, String(data.systemPrompt ?? '')),
+        maxTokens: 200,
+      });
+      retrievalQuery = acceptRewrittenQuestion(rewritten.text, question);
+    } catch (error) {
+      console.warn('[reasoning] question rewrite failed:', error);
+      retrievalQuery = question;
+    }
+  }
+
+  const prefetched = await prefetchLinkedGetRag(
+    { ...ctx, nodeInput },
+    ctx.node.id,
+    question || userText,
+    retrievalQuery !== question ? retrievalQuery : '',
+  );
+  if (prefetched.ragText) {
+    const priorQuery = typeof nodeInput.query === 'string' ? nodeInput.query.trim() : '';
+    nodeInput = {
+      ...nodeInput,
+      ragText: prefetched.ragText,
+      snippets: prefetched.snippets,
+      query: priorQuery || (evaluationMode === 'sql' ? question : prefetched.query),
+    };
+    if (evaluationMode !== 'sql') {
+      userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
+      if (pdfSuffix && !userText.includes(pdfSuffix)) userText = `${userText}\n\n${pdfSuffix}`;
+    }
+  }
+
+  optionScope = { ...nodeInput, input: ctx.input ?? '' };
+  const options = readReasoningOptions(data, optionScope);
+  const citationsRequired = evaluationMode === 'sql' ? false : options.requireCitations;
+  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
+  const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
+
   const sessionId = resolveSessionId(nodeInput, String(ctx.runContext.sessionId ?? ''));
   const session = sessionId
     ? await loadSessionMemory(ctx.userDO, memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id))
@@ -786,7 +883,7 @@ export async function executeReasoningAgent(
     memoryCollection && !agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag')
       ? await retrieveSemanticMemory(ctx.c.env, memoryCollection, userText, 4, memoryNamespace)
       : [];
-  const snippets = [...new Set([...ragSnippets, ...semantic].map((s) => s.trim()).filter(Boolean))];
+  let snippets = [...new Set([...ragSnippets, ...semantic].map((s) => s.trim()).filter(Boolean))];
 
   const embedModel = resolveEmbedModel(service);
   const billing = ragBillingFromNodeContext(ctx);
@@ -915,6 +1012,9 @@ export async function executeReasoningAgent(
         codeModeName,
         tool: codeTool,
         userText,
+        originalQuestion: question || userText,
+        normalizedQuestion: retrievalQuery || question || userText,
+        ragText: String(nodeInput.ragText ?? '').trim(),
         userSystem,
         sessionSummary: session.summary,
         historyText: simpleMemory.historyText,
@@ -950,7 +1050,8 @@ export async function executeReasoningAgent(
     confidence: snippets.length ? 0.7 : 0.4,
   };
 
-  if (options.clarificationMode === 'ask' && !frame.missingSlots.length) {
+  const ragTextNow = String(nodeInput.ragText ?? '').trim();
+  if (options.clarificationMode === 'ask' && !frame.missingSlots.length && !hasGroundedSchema(ragTextNow, snippets)) {
     const framed = await llm({
       purpose: 'frame',
       system: FRAME_PROMPT,
@@ -987,30 +1088,41 @@ export async function executeReasoningAgent(
   const policyNames = Object.keys(policyTools);
   const partitioned = partitionToolNames(policyNames);
   const hasRetrieve = partitioned.retrieve.length > 0;
-  const toolLoopGuidance = buildToolLoopGuidance({
-    usingCodeMode: false,
-    retrieve: partitioned.retrieve,
-    validate: partitioned.validate.length ? partitioned.validate : linkedValidateNames,
-  });
-  const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
-  const ragContext = formatRagContext(String(nodeInput.ragText ?? '').trim() || snippets);
-  const systemParts = [
-    userSystem || 'You are a helpful assistant that uses tools when they improve accuracy.',
-    ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
-    policyNames.length
-      ? `You can call these tools when helpful: ${policyNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
-      : `If you lack required details, say so and ask. Do not guess.`,
-    toolLoopGuidance,
-    session.summary ? `Session memory:\n${session.summary}` : '',
-    simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-    ragContext ? `Retrieved knowledge (cite as [n]):\n${ragContext}` : '',
-    options.requireCitations && citationSeed.length
-      ? 'Every factual claim must include [n] citations that match the source list.'
-      : '',
-    plan?.steps.length
-      ? `Plan:\n${plan.steps.map((s) => `${s.id}. ${s.action}${s.tool ? ` [${s.tool}]` : ''}`).join('\n')}`
-      : '',
-  ].filter(Boolean);
+  const sqlContextReady = () =>
+    evaluationMode === 'sql' && hasGroundedSchema(String(nodeInput.ragText ?? ''), snippets);
+  const actSystem = (names: string[]) => {
+    const ragContext = formatRagContext(String(nodeInput.ragText ?? '').trim() || snippets);
+    const guidance = buildToolLoopGuidance({
+      usingCodeMode: false,
+      retrieve: partitioned.retrieve,
+      validate: partitioned.validate.length ? partitioned.validate : linkedValidateNames,
+      grounded: sqlContextReady(),
+    });
+    const citationSeed = buildCitations({ snippets, observations: [], sessionSummary: session.summary });
+    return [
+      userSystem || 'You are a helpful assistant that uses tools when they improve accuracy.',
+      ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
+      names.length
+        ? `You can call these tools when helpful: ${names.join(', ')}. Call a tool instead of guessing when it can fetch the answer. Call ${ASK_USER_TOOL} if required details are missing.`
+        : `If you lack required details, say so and ask. Do not guess.`,
+      guidance,
+      session.summary ? `Session memory:\n${session.summary}` : '',
+      simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
+      ragContext
+        ? citationsRequired
+          ? `Retrieved knowledge (cite as [n]):\n${ragContext}`
+          : `Retrieved context:\n${ragContext}`
+        : '',
+      citationsRequired && citationSeed.length
+        ? 'Every factual claim must include [n] citations that match the source list.'
+        : '',
+      plan?.steps.length
+        ? `Plan:\n${plan.steps.map((s) => `${s.id}. ${s.action}${s.tool ? ` [${s.tool}]` : ''}`).join('\n')}`
+        : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+  };
 
   let draft = '';
   let lastIssues = '';
@@ -1028,7 +1140,7 @@ export async function executeReasoningAgent(
     return emit(
       {
         status: 'ok',
-        text: groundedTextOrFallback(text, cites),
+        text: citationsRequired ? groundedTextOrFallback(text, cites) : text,
         citations: cites,
         plan: plan?.steps,
         confidence: frame.confidence,
@@ -1058,19 +1170,23 @@ export async function executeReasoningAgent(
   };
 
   for (let attempt = 0; attempt <= options.maxReflectRetries; attempt += 1) {
-    const retrieveFocus = askBag.length
-      ? `\n\nCall the retrieve tool first with this query:\n${askBag.join('\n')}`
-      : '';
+    const groundedSql = sqlContextReady();
+    const actTools = groundedSql ? omitRetrieveTools(policyTools) : policyTools;
+    const actNames = Object.keys(actTools);
+    const retrieveFocus =
+      !groundedSql && askBag.length
+        ? `\n\nCall the retrieve tool first with this query:\n${askBag.join('\n')}`
+        : '';
     const act = await llm({
       purpose: 'act',
-      system: systemParts.join('\n\n'),
+      system: actSystem(actNames),
       user:
         attempt === 0
           ? `${userText}${retrieveFocus}`
-          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.\nKeep citations as [n].${retrieveFocus}`,
-      tools: policyNames.length ? policyTools : undefined,
-      toolChoice: policyNames.length
-        ? initialToolChoice(policyNames, plan, snippets.length > 0)
+          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.${citationsRequired ? '\nKeep citations as [n].' : ''}${retrieveFocus}`,
+      tools: actNames.length ? actTools : undefined,
+      toolChoice: actNames.length
+        ? initialToolChoice(actNames, plan, snippets.length > 0 || groundedSql)
         : undefined,
       stopSteps,
     });
@@ -1109,6 +1225,28 @@ export async function executeReasoningAgent(
     }
     draft = asText(act.text);
 
+    if (evaluationMode === 'sql' && latestSqlCheckOk(observations)) {
+      const citations = buildCitations({ snippets, observations, sessionSummary: session.summary });
+      bestText = draft || bestText;
+      bestCitations = citations;
+      endChatTrace('chat');
+      return finish(bestText || draft, citations);
+    }
+
+    if (evaluationMode === 'sql' && fresh.some((observation) => isSqlValidateToolName(observation.tool) && !observation.ok)) {
+      const query = oracleRetrieveQuery(oracleErrorFromObservations(fresh));
+      const replaced = await refreshSqlRag(ctx, ctx.node.id, query);
+      if (replaced) {
+        nodeInput = {
+          ...nodeInput,
+          ragText: replaced.ragText,
+          snippets: replaced.snippets,
+          query: replaced.query,
+        };
+        snippets = replaced.snippets;
+      }
+    }
+
     const citations = buildCitations({
       snippets,
       observations,
@@ -1119,7 +1257,7 @@ export async function executeReasoningAgent(
       citations,
       observations,
       frame,
-      requireCitations: options.requireCitations,
+      requireCitations: citationsRequired,
       userText,
       snippets,
       mode: evaluationMode,
@@ -1161,8 +1299,11 @@ export async function executeReasoningAgent(
 
     const critique = await llm({
       purpose: 'reflect',
-      system: REFLECT_PROMPT,
-      user: `Draft:\n${draft}\nSources:\n${formatCitationBlock(citations)}\nTool results:\n${observations.map((o) => `${o.tool}: ${o.output}`).join('\n')}`,
+      system: evaluationMode === 'sql' ? SQL_REFLECT_PROMPT : REFLECT_PROMPT,
+      user:
+        evaluationMode === 'sql'
+          ? sqlReflectUser(draft, oracleErrorFromObservations(observations))
+          : `Draft:\n${draft}\nSources:\n${formatCitationBlock(citations)}\nTool results:\n${observations.map((o) => `${o.tool}: ${o.output}`).join('\n')}`,
       maxTokens: 800,
     });
     const parsed = parseReflect(parseJsonObject(critique.text), heuristic);
@@ -1175,7 +1316,7 @@ export async function executeReasoningAgent(
         citations: rewrittenCitations,
         observations,
         frame,
-        requireCitations: options.requireCitations,
+        requireCitations: citationsRequired,
         userText,
         snippets,
         mode: evaluationMode,
