@@ -192,22 +192,20 @@ type SchemaDraft = {
   fullText: string;
   tableName: string;
   schemaName: string;
+  dbId: string;
   score: number;
 };
 
-async function queryDocType(
+/** One query per retrieve. `docType` splits the rows afterwards, not on the request. */
+async function queryScope(
   env: Env,
   collection: string,
   vector: number[],
   namespace: string | undefined,
-  docType: 'sqlpair' | 'schema',
-  extra?: Record<string, string>,
 ): Promise<VectorMatch[]> {
   return queryCollection(env, collection, vector, {
     topK: VECTORIZE_ALL_METADATA_TOPK,
     namespace,
-    docType,
-    filter: { docType, ...extra },
     strictNamespace: true,
   });
 }
@@ -229,6 +227,7 @@ function draftFromSchema(matches: VectorMatch[]): SchemaDraft | null {
     fullText: text,
     tableName: metaName(matches, 'tableName'),
     schemaName: metaName(matches, 'schemaName'),
+    dbId: metaName(matches, 'dbId'),
     score: bestScore(matches),
   };
 }
@@ -289,17 +288,45 @@ function sameTable(left: string, right: string): boolean {
   return left.trim().toUpperCase() === right.trim().toUpperCase();
 }
 
+/** Save RAG writes this id for every schema document. */
+function schemaDocumentId(dbId: string, schemaName: string, tableName: string): string {
+  return `${dbId || 'db'}.${schemaName}.${tableName}.schema`;
+}
+
+/** An FK target is rarely near the question vector, so fetch its document by id. */
+async function hydrateSchemaDocument(
+  env: Env,
+  collection: string,
+  documentId: string,
+): Promise<VectorMatch[] | null> {
+  const index = resolveVectorizeIndex(env, collection);
+  if (!index?.getByIds) return null;
+  const headIds = await chunkIdsForDocument(documentId, 1);
+  if (!headIds.length) return null;
+  let head: VectorMatch[] = [];
+  try {
+    head = matchesFromVectorRows((await index.getByIds(headIds)) ?? []);
+  } catch (e) {
+    console.warn('[get-rag] foreign key document head failed:', e);
+    return null;
+  }
+  if (!head.length) return null;
+  const rest = await loadDocumentRows(env, collection, [documentId], head);
+  return finalizeRetrievedGroup(mergeMatches(head, rest));
+}
+
+type HopTarget = ForeignKeyTarget & { dbId: string; anchorSchema: string };
+
 async function loadForeignKeyHops(params: {
   env: Env;
   collection: string;
-  vector: number[];
-  namespace: string | undefined;
+  schemaMatches: VectorMatch[];
   anchors: SchemaDraft[];
   question: string;
   sqls: string[];
 }): Promise<SchemaDraft[]> {
   const seen = new Set(params.anchors.map((anchor) => anchor.tableName.toUpperCase()).filter(Boolean));
-  const targets: ForeignKeyTarget[] = [];
+  const targets: HopTarget[] = [];
   for (const anchor of params.anchors) {
     const reduced = reduceSchemaText(anchor.fullText, params.question, params.sqls, {
       schemaName: anchor.schemaName,
@@ -308,7 +335,7 @@ async function loadForeignKeyHops(params: {
     for (const target of reduced.targets) {
       if (!target.tableName || seen.has(target.tableName.toUpperCase())) continue;
       seen.add(target.tableName.toUpperCase());
-      targets.push(target);
+      targets.push({ ...target, dbId: anchor.dbId, anchorSchema: anchor.schemaName });
       if (targets.length >= MAX_FK_HOPS) break;
     }
     if (targets.length >= MAX_FK_HOPS) break;
@@ -316,21 +343,27 @@ async function loadForeignKeyHops(params: {
 
   const hops: SchemaDraft[] = [];
   for (const target of targets) {
-    let found = onlyDocType(
-      await queryDocType(params.env, params.collection, params.vector, params.namespace, 'schema', {
-        tableName: target.tableName,
-      }),
-      'schema',
-    );
-    found = found.filter((match) => sameTable(String(match.metadata?.tableName ?? ''), target.tableName));
-    if (target.schemaName) {
-      const scoped = found.filter((match) =>
-        sameTable(String(match.metadata?.schemaName ?? ''), target.schemaName ?? ''),
+    const schemaName = (target.schemaName || target.anchorSchema || '').trim();
+    let finalized: VectorMatch[] | null = schemaName
+      ? await hydrateSchemaDocument(
+          params.env,
+          params.collection,
+          schemaDocumentId(target.dbId, schemaName, target.tableName),
+        )
+      : null;
+    if (!finalized?.length) {
+      let found = params.schemaMatches.filter((match) =>
+        sameTable(String(match.metadata?.tableName ?? ''), target.tableName),
       );
-      if (!scoped.length) continue;
-      found = scoped;
+      if (schemaName) {
+        const scoped = found.filter((match) =>
+          sameTable(String(match.metadata?.schemaName ?? ''), schemaName),
+        );
+        if (scoped.length) found = scoped;
+      }
+      if (!found.length) continue;
+      finalized = await completeSchema(params.env, params.collection, found);
     }
-    const finalized = await completeSchema(params.env, params.collection, found);
     if (!finalized?.length) continue;
     const draft = draftFromSchema(finalized);
     if (draft) hops.push(draft);
@@ -411,18 +444,16 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
     const usage = embeddingUsageOrEstimate([input.query], embedUsage);
     await billRagEmbeddings(embed, params.billing, [input.query], usage);
 
-    const [pairMatches, schemaMatches] = await Promise.all([
-      queryDocType(env, rag.collection, vector, namespace || undefined, 'sqlpair'),
-      queryDocType(env, rag.collection, vector, namespace || undefined, 'schema'),
-    ]);
+    const scopeMatches = await queryScope(env, rag.collection, vector, namespace || undefined);
     const sqlPairs = await selectSqlPairs({
       env,
       collection: rag.collection,
-      matches: pairMatches,
+      matches: scopeMatches,
       topK: sqlPairTopK,
       threshold: scoreThreshold,
     });
-    const schemaAbove = matchesAboveTableThreshold(onlyDocType(schemaMatches, 'schema'), groupBy, scoreThreshold);
+    const schemaMatches = onlyDocType(scopeMatches, 'schema');
+    const schemaAbove = matchesAboveTableThreshold(schemaMatches, groupBy, scoreThreshold);
     const anchors = schemaAbove.length
       ? await selectAnchorSchemas({
           env,
@@ -436,8 +467,7 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
       ? await loadForeignKeyHops({
           env,
           collection: rag.collection,
-          vector,
-          namespace: namespace || undefined,
+          schemaMatches,
           anchors,
           question: input.query,
           sqls: sqlPairs.map((pair) => pair.sql),

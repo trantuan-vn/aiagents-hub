@@ -212,6 +212,19 @@ export async function toVectorizeNativeNamespace(scope: string): Promise<string>
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Node config stores `wf{id}/n{nodeId}`. Runtime prefixes `u{ownerId}/`, which is
+ * longer than 64 bytes and becomes a different native namespace. Rows written
+ * under the node string are invisible to that hash.
+ */
+export function nodeNamespaceFromScope(scope: string): string {
+  const match = /^u[^/]+\/(.+)$/.exec(scope.trim());
+  const suffix = match?.[1]?.trim() ?? '';
+  if (!suffix) return '';
+  if (new TextEncoder().encode(suffix).byteLength > VECTORIZE_NAMESPACE_MAX_BYTES) return '';
+  return suffix;
+}
+
 function matchesNamespace(match: VectorMatch, namespace?: string): boolean {
   if (!namespace) return true;
   return String(match.metadata?.namespace ?? '') === namespace;
@@ -252,11 +265,13 @@ export async function queryCollection(
   const topK = Math.min(VECTORIZE_ALL_METADATA_TOPK, Math.max(1, opts.topK ?? 5));
   const nativeNs = await toVectorizeNativeNamespace(opts.namespace ?? '');
   const metaFilter = opts.filter && Object.keys(opts.filter).length ? opts.filter : undefined;
-  const base: VectorizeQueryOpts = {
-    topK,
-    returnMetadata: 'all',
-    ...(metaFilter ? { filter: metaFilter } : {}),
-  };
+  /**
+   * Vectorize applies `filter` through a metadata index, and a vector is only in that
+   * index when it was upserted after the index existed. Sending `filter` therefore
+   * returns zero matches here, so every metadata test runs on the returned rows below.
+   * Namespace stays on the request: namespace filtering needs no index.
+   */
+  const base: VectorizeQueryOpts = { topK, returnMetadata: 'all' };
 
   let matches: VectorMatch[] = [];
   try {
@@ -266,17 +281,6 @@ export async function queryCollection(
     });
   } catch (e) {
     console.warn('[rag-vector] namespaced query failed:', e);
-    if (metaFilter) {
-      try {
-        matches = await queryIndex(index, queryVector, {
-          topK,
-          returnMetadata: 'all',
-          ...(nativeNs ? { namespace: nativeNs } : {}),
-        });
-      } catch (retryErr) {
-        console.warn('[rag-vector] query without metadata filter failed:', retryErr);
-      }
-    }
   }
 
   // Legacy rows were written to the default namespace with metadata.namespace only.
@@ -286,6 +290,16 @@ export async function queryCollection(
       matches = fetched.filter((m) => matchesNamespace(m, opts.namespace));
     } catch (e) {
       console.warn('[rag-vector] default-namespace fallback failed:', e);
+    }
+  }
+
+  // Vectors saved under the memory node's own namespace (`wf{id}/n{nodeId}`).
+  const nodeNamespace = nodeNamespaceFromScope(opts.namespace ?? '');
+  if (!matches.length && nodeNamespace && nodeNamespace !== nativeNs) {
+    try {
+      matches = await queryIndex(index, queryVector, { ...base, namespace: nodeNamespace });
+    } catch (e) {
+      console.warn('[rag-vector] node-namespace query failed:', e);
     }
   }
 

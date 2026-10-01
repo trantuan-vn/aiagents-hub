@@ -6,8 +6,13 @@ import { shouldPlan, parsePlan, normalizePlannerMode } from './plan.js';
 import { ruleClassify, parseLlmSafety } from './safety.js';
 import { classifyToolName, filterToolsForPolicy, initialToolChoice, omitGetRagWhenGrounded, validatedSqlFromObservations } from './tools.js';
 import { reflectHeuristics } from './reflect.js';
-import { acceptRewrittenQuestion, shouldRewriteForRetrieval } from './rewrite-question.js';
-import { hasGroundedSchema, oracleRetrieveQuery, sqlReflectUser } from './sql-turn.js';
+import {
+  acceptRewrittenQuestion,
+  bareRetrievalQuestion,
+  rewriteQuestionUser,
+  shouldRewriteForRetrieval,
+} from './rewrite-question.js';
+import { hasGroundedSchema, isUngroundedRagText, oracleRetrieveQuery, sqlReflectUser } from './sql-turn.js';
 import { REASONING_AGENT_SYSTEM_PROMPT } from '@aiagents-hub/workflow-nodes';
 import { memoryKey, resolveSessionId } from './memory.js';
 import {
@@ -353,12 +358,38 @@ describe('reasoning quality', () => {
     expect(acceptRewrittenQuestion('', 'tiền bán')).toBe('tiền bán');
   });
 
+  it('rewrites the bare question and drops a reasoning trace', () => {
+    const wrapped = 'Question: Liệt kê danh sách mã chứng khoán\n\nRetrieved schema and SQL examples:\n';
+    const system = 'You are a Text-to-SQL assistant for Oracle (read-only).\nAlways call get_rag first.';
+    const user = rewriteQuestionUser(wrapped, system);
+    expect(bareRetrievalQuestion(wrapped)).toBe('Liệt kê danh sách mã chứng khoán');
+    expect(user).toContain('Liệt kê danh sách mã chứng khoán');
+    expect(user).not.toContain('Retrieved schema');
+    expect(user.indexOf('Question:')).toBeGreaterThan(user.indexOf('Vocabulary notes'));
+    expect(user.endsWith('Liệt kê danh sách mã chứng khoán')).toBe(true);
+
+    const essay = `The user question is: "Liệt kê danh sách mã chứng khoán".
+
+I need to rewrite this question so it can retrieve schema and SQL examples. The system prompt here doesn't name specific tables.
+
+Something like:`;
+    expect(acceptRewrittenQuestion(essay, wrapped)).toBe('Liệt kê danh sách mã chứng khoán');
+
+    const expanded =
+      'Liệt kê danh sách mã chứng khoán (mã CK, mã cổ phiếu, ticker) từ danh mục chứng khoán, gồm tên chứng khoán, loại chứng khoán, sàn niêm yết, trạng thái.';
+    expect(acceptRewrittenQuestion(`${essay}\n\n${expanded}`, wrapped)).toBe(expanded);
+    expect(acceptRewrittenQuestion(expanded, wrapped)).toBe(expanded);
+  });
+
   it('builds the retrieve query from the Oracle identifier, not the user question', () => {
     expect(oracleRetrieveQuery('ORA-00904: "NET_REVENUE": invalid identifier')).toBe('NET_REVENUE');
     expect(oracleRetrieveQuery('ORA-00942: table or view "SALES"."ORDERS" does not exist')).toBe('SALES.ORDERS');
     expect(oracleRetrieveQuery('missing month')).toBe('missing month');
     expect(hasGroundedSchema('## Schema liên quan', [])).toBe(true);
     expect(hasGroundedSchema('', ['orders(id, total)'])).toBe(false);
+    const emptyRag = '## Schema liên quan\n\n_Không có bảng liên quan. Không bịa tên cột._';
+    expect(isUngroundedRagText(emptyRag)).toBe(true);
+    expect(hasGroundedSchema(emptyRag, [emptyRag])).toBe(false);
     expect(sqlReflectUser('```sql\nSELECT 1 FROM dual\n```', 'ORA-00904: "NOPE": invalid identifier')).not.toContain('schema');
   });
 

@@ -10,6 +10,7 @@ import {
   upsertVectors,
   buildMetadataFilter,
   toVectorizeNativeNamespace,
+  nodeNamespaceFromScope,
 } from './rag-vector.js';
 import { chunkText } from '../nodes/tool/save-rag/chunk.js';
 import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
@@ -116,7 +117,7 @@ describe('rag-vector', () => {
     });
   });
 
-  it('passes extra metadata filters to Vectorize and JS-filters matches', async () => {
+  it('keeps metadata filters off the request and filters the returned rows', async () => {
     const query = vi.fn().mockResolvedValue({
       matches: [
         { score: 0.9, metadata: { text: 'keep', tableName: 'ORDERS' } },
@@ -134,10 +135,12 @@ describe('rag-vector', () => {
     });
     expect(matches).toHaveLength(1);
     expect(matches[0]?.metadata?.text).toBe('keep');
-    expect(query).toHaveBeenCalledWith(
-      [0.1, 0.2],
-      expect.objectContaining({ filter: { tableName: 'ORDERS' }, namespace: 'kb' }),
-    );
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledWith([0.1, 0.2], {
+      topK: 5,
+      returnMetadata: 'all',
+      namespace: 'kb',
+    });
   });
 
   it('caps topK at 20 when returning full metadata', async () => {
@@ -201,6 +204,46 @@ describe('rag-vector', () => {
       topK: 3,
       returnMetadata: 'all',
     });
+  });
+
+  it('reads rows stored on the memory node namespace when the owner-scoped name was hashed', async () => {
+    const query = vi
+      .fn()
+      .mockResolvedValueOnce({ matches: [] })
+      .mockResolvedValueOnce({
+        matches: [
+          {
+            score: 0.67,
+            metadata: { text: '# ADMIN.NHA_DAU_TU', docType: 'schema', tableName: 'NHA_DAU_TU' },
+          },
+        ],
+      });
+    const env = { VECTORIZE: { query, upsert: vi.fn() } } as unknown as Env;
+    const ownerId = 'a'.repeat(64);
+    const nodeNamespace = 'wf26/nmemory_node-1790853401533';
+    const scope = `u${ownerId}/${nodeNamespace}`;
+    const matches = await queryCollection(env, 'VECTORIZE', [0.1, 0.2], {
+      topK: 20,
+      namespace: scope,
+      docType: 'schema',
+      filter: { docType: 'schema' },
+      strictNamespace: true,
+    });
+    expect(nodeNamespaceFromScope(scope)).toBe(nodeNamespace);
+    expect(matches).toHaveLength(1);
+    expect(matches[0]?.metadata?.tableName).toBe('NHA_DAU_TU');
+    const nativeNs = await toVectorizeNativeNamespace(scope);
+    expect(query).toHaveBeenNthCalledWith(
+      1,
+      [0.1, 0.2],
+      expect.objectContaining({ namespace: nativeNs }),
+    );
+    expect(query).toHaveBeenNthCalledWith(
+      2,
+      [0.1, 0.2],
+      expect.objectContaining({ namespace: nodeNamespace, returnMetadata: 'all' }),
+    );
+    expect(query.mock.calls.every((call) => !call[1]?.filter)).toBe(true);
   });
 
   it('does not fall back to the default namespace when the caller set strictNamespace', async () => {

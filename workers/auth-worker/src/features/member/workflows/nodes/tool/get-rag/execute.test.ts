@@ -11,7 +11,7 @@ import {
   resolveScoreThreshold,
   resolveSqlPairTopK,
 } from './execute.js';
-import { toVectorizeNativeNamespace } from '../../../rag/index.js';
+import { toVectorizeNativeNamespace, vectorChunkId } from '../../../rag/index.js';
 import { WORKERS_AI_GATEWAY } from '../../../ai/workers-ai.js';
 
 const billingMock = vi.hoisted(() => ({
@@ -55,26 +55,21 @@ describe('executeGetRag', () => {
     billingMock.ensureWalletBalance.mockReset().mockResolvedValue(undefined);
   });
   it('returns snippets from mocked vectorize', async () => {
-    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.docType === 'sqlpair') {
-        return {
-          matches: [
-            {
-              score: 0.91,
-              metadata: {
-                text: 'Question: what is RAG?\n\n```sql\nSELECT 1\n```',
-                source: 'doc-1',
-                docType: 'sqlpair',
-                documentId: 'sqlpair.abc',
-                formatVersion: '2',
-                chunkIndex: '0',
-                totalChunks: '1',
-              },
-            },
-          ],
-        };
-      }
-      return { matches: [] };
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        {
+          score: 0.91,
+          metadata: {
+            text: 'Question: what is RAG?\n\n```sql\nSELECT 1\n```',
+            source: 'doc-1',
+            docType: 'sqlpair',
+            documentId: 'sqlpair.abc',
+            formatVersion: '2',
+            chunkIndex: '0',
+            totalChunks: '1',
+          },
+        },
+      ],
     });
     const env = {
       AI: {
@@ -115,11 +110,10 @@ describe('executeGetRag', () => {
       [0.5, 0.6],
       expect.objectContaining({ topK: 20, returnMetadata: 'all', namespace: 'test-ns' }),
     );
-    const docTypes = query.mock.calls.map((call) => call[1]?.filter?.docType);
-    expect(docTypes.sort()).toEqual(['schema', 'sqlpair']);
+    // Metadata filtering needs a Vectorize metadata index, so docType is split in JS.
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(query.mock.calls.every((call) => !call[1]?.filter)).toBe(true);
     expect(query.mock.calls.every((call) => call[1]?.topK === 20)).toBe(true);
-    expect(docTypes).not.toContain('sqlexample');
-    expect(query.mock.calls.some((call) => !call[1]?.filter)).toBe(false);
   });
 
   it('embeds the query with the selected service model', async () => {
@@ -716,43 +710,35 @@ Orders.
   }
 
   it('returns sqlpair snippets before schema and ignores sqlexample', async () => {
-    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.docType === 'sqlpair') {
-        return {
-          matches: [
-            {
-              score: 0.2,
-              metadata: {
-                docType: 'sqlpair',
-                documentId: 'sqlpair.low',
-                text: 'Question: unrelated\n\n```sql\nSELECT 1\n```',
-              },
-            },
-            {
-              score: 0.88,
-              metadata: {
-                docType: 'sqlpair',
-                documentId: 'sqlpair.revenue',
-                text: 'Question: doanh thu theo tháng\n\n```sql\nSELECT SUM(AMOUNT) FROM SALES.ORDERS\n```',
-              },
-            },
-          ],
-        };
-      }
-      return {
-        matches: [
-          schemaMatch('ORDERS', ordersText, 0.8),
-          {
-            score: 0.7,
-            metadata: {
-              docType: 'sqlexample',
-              documentId: 'db.SALES.ORDERS.sqlexample',
-              tableName: 'ORDERS',
-              text: 'SELECT * FROM OLD_EXAMPLE',
-            },
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        {
+          score: 0.2,
+          metadata: {
+            docType: 'sqlpair',
+            documentId: 'sqlpair.low',
+            text: 'Question: unrelated\n\n```sql\nSELECT 1\n```',
           },
-        ],
-      };
+        },
+        {
+          score: 0.88,
+          metadata: {
+            docType: 'sqlpair',
+            documentId: 'sqlpair.revenue',
+            text: 'Question: doanh thu theo tháng\n\n```sql\nSELECT SUM(AMOUNT) FROM SALES.ORDERS\n```',
+          },
+        },
+        schemaMatch('ORDERS', ordersText, 0.8),
+        {
+          score: 0.7,
+          metadata: {
+            docType: 'sqlexample',
+            documentId: 'db.SALES.ORDERS.sqlexample',
+            tableName: 'ORDERS',
+            text: 'SELECT * FROM OLD_EXAMPLE',
+          },
+        },
+      ],
     });
     const env = {
       AI: { run: vi.fn().mockResolvedValue({ data: [[0.5, 0.6]] }) },
@@ -777,11 +763,7 @@ Orders.
     expect(result.ragText).not.toContain('NOTE');
     expect(result.ragText).not.toContain('OLD_EXAMPLE');
     expect(result.ragText).not.toContain('sqlexample');
-    const filters = query.mock.calls.map((call) => call[1]?.filter as { docType?: string; tableName?: string });
-    expect(filters.some((filter) => filter?.docType === 'sqlpair')).toBe(true);
-    expect(filters.some((filter) => filter?.docType === 'schema' && !filter.tableName)).toBe(true);
-    expect(filters.some((filter) => filter?.tableName === 'CUSTOMERS')).toBe(true);
-    expect(filters.some((filter) => filter?.docType === 'sqlexample' || !filter?.docType)).toBe(false);
+    expect(query.mock.calls.every((call) => !call[1]?.filter)).toBe(true);
   });
 
   it('adds one foreign-key hop without using a topK slot', async () => {
@@ -794,19 +776,32 @@ Customers.
 | ID | NUMBER | NO | PK | VI: Mã khách. EN: Customer id. | |
 | NAME | VARCHAR2 | YES |  | VI: Tên khách. EN: Customer name. | |
 `;
-    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.tableName === 'CUSTOMERS') return { matches: [schemaMatch('CUSTOMERS', customersText, 0.3)] };
-      if (opts?.filter?.docType === 'sqlpair') return { matches: [] };
-      return {
-        matches: [
-          schemaMatch('ORDERS', ordersText, 0.91),
-          schemaMatch('PRODUCTS', '# SALES.PRODUCTS\n\nHàng.\nGoods.\n', 0.4),
-        ],
-      };
+    // The FK target is far from the question vector, so it is fetched by document id.
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        schemaMatch('ORDERS', ordersText, 0.91),
+        schemaMatch('PRODUCTS', '# SALES.PRODUCTS\n\nHàng.\nGoods.\n', 0.4),
+      ],
     });
+    const customersId = await vectorChunkId('db.SALES.CUSTOMERS.schema', 0);
+    const getByIds = vi.fn().mockImplementation(async (ids: string[]) =>
+      ids.includes(customersId)
+        ? [
+            {
+              id: customersId,
+              metadata: {
+                ...schemaMatch('CUSTOMERS', customersText, 0.3).metadata,
+                formatVersion: '2',
+                chunkIndex: '0',
+                totalChunks: '1',
+              },
+            },
+          ]
+        : [],
+    );
     const env = {
       AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },
-      VECTORIZE: { query, upsert: vi.fn() },
+      VECTORIZE: { query, getByIds, upsert: vi.fn() },
     } as unknown as Env;
     const wired: WorkflowDefinition = {
       ...definition,
@@ -890,32 +885,29 @@ Customers.
 
 describe('group by expression', () => {
   it('groups schema tables by a mapped metadata key and keeps topK', async () => {
-    const query = vi.fn().mockImplementation((_vec: number[], opts: { filter?: Record<string, string> }) => {
-      if (opts?.filter?.docType !== 'schema') return { matches: [] };
-      return {
-        matches: [
-          {
-            score: 0.91,
-            metadata: {
-              docType: 'schema',
-              tableName: 'ORDERS',
-              schemaName: 'SALES',
-              documentId: 'db.SALES.ORDERS.schema',
-              text: ['# SALES.ORDERS', '', 'Đơn hàng.', 'Orders.', ''].join('\n'),
-            },
+    const query = vi.fn().mockResolvedValue({
+      matches: [
+        {
+          score: 0.91,
+          metadata: {
+            docType: 'schema',
+            tableName: 'ORDERS',
+            schemaName: 'SALES',
+            documentId: 'db.SALES.ORDERS.schema',
+            text: ['# SALES.ORDERS', '', 'Đơn hàng.', 'Orders.', ''].join('\n'),
           },
-          {
-            score: 0.5,
-            metadata: {
-              docType: 'schema',
-              tableName: 'PRODUCTS',
-              schemaName: 'SALES',
-              documentId: 'db.SALES.PRODUCTS.schema',
-              text: ['# SALES.PRODUCTS', '', 'Hàng.', 'Goods.', ''].join('\n'),
-            },
+        },
+        {
+          score: 0.5,
+          metadata: {
+            docType: 'schema',
+            tableName: 'PRODUCTS',
+            schemaName: 'SALES',
+            documentId: 'db.SALES.PRODUCTS.schema',
+            text: ['# SALES.PRODUCTS', '', 'Hàng.', 'Goods.', ''].join('\n'),
           },
-        ],
-      };
+        },
+      ],
     });
     const env = {
       AI: { run: vi.fn().mockResolvedValue({ data: [[0.2, 0.3]] }) },

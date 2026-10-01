@@ -3,11 +3,20 @@ import { sandboxErrorFromOutput } from './ask-bag.js';
 import { isSqlValidateToolName } from './quality.js';
 
 const SCHEMA_SNIPPET = /CREATE TABLE|##\s*Schema|\|\s*Column\s*\|/i;
+const EMPTY_SCHEMA_LINE = '_Không có bảng liên quan. Không bịa tên cột._';
+
+/** The assembled "no tables" document. It is not schema. */
+export function isUngroundedRagText(ragText: string): boolean {
+  const text = ragText.trim();
+  if (!text) return true;
+  if (/\|\s*Column\s*\|/i.test(text) || /^#\s+[A-Za-z0-9_$.]+/m.test(text) || /```sql/i.test(text)) return false;
+  return text.includes(EMPTY_SCHEMA_LINE);
+}
 
 /** ragText, or a snippet that still looks like a table document, is enough to skip the frame LLM. */
 export function hasGroundedSchema(ragText: string, snippets: readonly string[]): boolean {
-  if (ragText.trim()) return true;
-  return snippets.some((snippet) => SCHEMA_SNIPPET.test(snippet));
+  if (ragText.trim() && !isUngroundedRagText(ragText)) return true;
+  return snippets.some((snippet) => SCHEMA_SNIPPET.test(snippet) && !isUngroundedRagText(snippet));
 }
 
 function focusLine(error: string): string {

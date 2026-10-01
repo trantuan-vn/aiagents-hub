@@ -31,6 +31,7 @@ import {
   assertTextGenerationModel,
   extractSql,
   interpolateTemplate,
+  isReasoningModel,
   parseJsonObject,
   resolveAgentUserText,
   resolveEmbedModel,
@@ -114,12 +115,14 @@ import {
 } from './reasoning/quality.js';
 import {
   acceptRewrittenQuestion,
+  bareRetrievalQuestion,
   REWRITE_QUESTION_SYSTEM,
   rewriteQuestionUser,
   shouldRewriteForRetrieval,
 } from './reasoning/rewrite-question.js';
 import {
   hasGroundedSchema,
+  isUngroundedRagText,
   oracleErrorFromObservations,
   oracleRetrieveQuery,
   sqlReflectUser,
@@ -209,6 +212,7 @@ export type ReasoningLlmCall = (args: {
   user: string;
   tools?: ToolSet;
   maxTokens?: number;
+  temperature?: number;
   toolChoice?: 'auto' | 'required' | { type: 'tool'; toolName: string };
   stopSteps?: number;
 }) => Promise<{
@@ -400,6 +404,7 @@ function createDefaultLlm(args: {
   const { ctx, modelId, maxTokens, onBill } = args;
   return async (call) => {
     const limit = call.maxTokens ?? Math.min(maxTokens, call.purpose === 'act' ? maxTokens : 512);
+    const temperature = call.temperature ?? args.temperature;
     if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
       const workersAI = createWorkersAI({
         binding: ctx.c.env.AI,
@@ -412,7 +417,7 @@ function createDefaultLlm(args: {
           system: call.system,
           messages: [{ role: 'user', content: call.user }],
           maxOutputTokens: limit,
-          temperature: args.temperature,
+          temperature,
           topP: args.topP,
           frequencyPenalty: args.frequencyPenalty,
           presencePenalty: args.presencePenalty,
@@ -478,7 +483,7 @@ function createDefaultLlm(args: {
       { role: 'user', content: call.user },
     ];
     const aiResponse = await runTextModel(ctx.c.env, modelId, messages, limit, {
-      temperature: args.temperature,
+      temperature,
       top_p: args.topP,
       frequency_penalty: args.frequencyPenalty,
       presence_penalty: args.presencePenalty,
@@ -828,17 +833,19 @@ export async function executeReasoningAgent(
 
   let retrievalQuery = question;
   if (evaluationMode === 'sql' && shouldRewriteForRetrieval(data.systemPrompt) && question) {
+    const source = bareRetrievalQuestion(question) || question;
     try {
       const rewritten = await llm({
         purpose: 'rewrite',
         system: REWRITE_QUESTION_SYSTEM,
         user: rewriteQuestionUser(question, String(data.systemPrompt ?? '')),
-        maxTokens: 200,
+        maxTokens: isReasoningModel(modelId) ? 2048 : 512,
+        temperature: 0,
       });
-      retrievalQuery = acceptRewrittenQuestion(rewritten.text, question);
+      retrievalQuery = acceptRewrittenQuestion(rewritten.text, source);
     } catch (error) {
       console.warn('[reasoning] question rewrite failed:', error);
-      retrievalQuery = question;
+      retrievalQuery = source;
     }
   }
 
@@ -848,18 +855,17 @@ export async function executeReasoningAgent(
     question || userText,
     retrievalQuery !== question ? retrievalQuery : '',
   );
-  if (prefetched.ragText) {
+  if (prefetched.ragText && !isUngroundedRagText(prefetched.ragText)) {
     const priorQuery = typeof nodeInput.query === 'string' ? nodeInput.query.trim() : '';
+    const bare = bareRetrievalQuestion(question) || question;
     nodeInput = {
       ...nodeInput,
       ragText: prefetched.ragText,
       snippets: prefetched.snippets,
-      query: priorQuery || (evaluationMode === 'sql' ? question : prefetched.query),
+      query: priorQuery || (evaluationMode === 'sql' ? bare : prefetched.query),
     };
-    if (evaluationMode !== 'sql') {
-      userText = resolveAgentUserText(data, nodeInput, userText || ctx.input);
-      if (pdfSuffix && !userText.includes(pdfSuffix)) userText = `${userText}\n\n${pdfSuffix}`;
-    }
+    userText = resolveAgentUserText(data, nodeInput, bare);
+    if (pdfSuffix && !userText.includes(pdfSuffix)) userText = `${userText}\n\n${pdfSuffix}`;
   }
 
   optionScope = { ...nodeInput, input: ctx.input ?? '' };
