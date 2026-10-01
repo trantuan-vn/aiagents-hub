@@ -3,7 +3,8 @@
 > **Trạng thái:** Draft — retrieve schema để Reasoning Agent viết SQL  
 > **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "get-rag"`  
-> **Liên kết:** [`saveRag.md`](./saveRag.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`reasoning-agent.md`](./reasoning-agent.md) · [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md)
+> **Liên kết:** [`saveRag.md`](./saveRag.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`reasoning-agent.md`](./reasoning-agent.md) · [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md)  
+> **Thứ tự retrieve mới:** [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) — phần 1 câu hỏi và SQL, phần 2 schema. File này giữ hợp đồng hiện tại cho đến khi spec đó được implement.
 
 Tool **đọc** Vectorize theo câu hỏi của user và trả schema (cột + mô tả VI/EN) cùng SQL example của các bảng liên quan, để Reasoning Agent viết SQL. Nó không introspect Oracle và không chạy SQL.
 

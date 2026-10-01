@@ -53,14 +53,6 @@ const enrichmentJson = JSON.stringify({
     { name: 'id', descriptionVi: 'Khóa chính', descriptionEn: 'Primary key', aliasesVi: ['mã'] },
     { name: 'total', descriptionVi: 'Tổng tiền', descriptionEn: 'Total', aliasesVi: ['doanh thu'] },
   ],
-  typicalQueries: [
-    {
-      titleVi: 'Đếm dòng',
-      titleEn: 'Count rows',
-      sql: 'SELECT COUNT(*) FROM public.orders',
-      noteVi: 'Số lượng đơn',
-    },
-  ],
 });
 
 const billingMock = vi.hoisted(() => ({
@@ -92,7 +84,6 @@ function saveRagGraph(extraSaveData: Record<string, unknown> = {}): WorkflowDefi
           toolKind: 'save-rag',
           tableNameField: '{{ $json.tableName }}',
           chunkSize: 800,
-          sqlHistoryLimit: 10,
           ...extraSaveData,
         },
       },
@@ -154,7 +145,7 @@ describe('executeSaveRagPipeline', () => {
     });
   });
 
-  it('introspects a loop table item then upserts schema and sqlexample docs', async () => {
+  it('introspects a loop table item then upserts one schema document', async () => {
     const db = d1Stub();
     const upsert = vi.fn().mockResolvedValue({ count: 2 });
     const env = {
@@ -173,7 +164,7 @@ describe('executeSaveRagPipeline', () => {
             schemaName: 'public',
             dbId: 'analytics-db',
             connection: { type: 'd1' },
-            limits: { sampleRowLimit: 3, sqlHistoryLimit: 10 },
+            limits: { sampleRowLimit: 3 },
           },
         ],
       },
@@ -189,23 +180,32 @@ describe('executeSaveRagPipeline', () => {
 
     const out = await executeSaveRagPipeline(ctx);
     expect(out.ok).toBe(true);
-    expect(out.saved).toBeGreaterThanOrEqual(2);
+    expect(out.saved).toBeGreaterThanOrEqual(1);
     expect(billingMock.runTextModel).toHaveBeenCalled();
     expect(upsert).toHaveBeenCalled();
     const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
     const docTypes = new Set(vectors.map((v) => v.metadata?.docType));
-    expect(docTypes.has('schema')).toBe(true);
-    expect(docTypes.has('sqlexample')).toBe(true);
+    expect(docTypes).toEqual(new Set(['schema']));
+    expect(vectors.some((v) => String(v.metadata?.documentId).endsWith('.sqlexample'))).toBe(false);
     expect(vectors.some((v) => v.metadata?.tableName === 'orders')).toBe(true);
     const schema = vectors.find((v) => v.metadata?.docType === 'schema');
-    expect(schema?.metadata?.text).toContain('Khóa chính');
-    expect(schema?.metadata?.text).toContain('Tổng tiền');
+    expect(schema?.metadata?.text).toContain('# public.orders');
+    expect(schema?.metadata?.text).toContain('VI: Khóa chính EN: Primary key');
+    expect(schema?.metadata?.text).toContain('VI: Tổng tiền EN: Total');
+    expect(schema?.metadata?.text).toContain('doanh thu');
+    expect(schema?.metadata?.text).not.toContain('CREATE TABLE');
     expect(schema?.metadata?.formatVersion).toBe('2');
     expect(schema?.metadata).not.toHaveProperty('content');
     const saved = upsert.mock.calls[0]?.[0] as Array<{ id: string }>;
     expect(saved[0]?.id).toMatch(/^[0-9a-f]{64}$/);
     expect(out.enrichedColumns).toBe(2);
-    expect(out.llmCalls).toBeGreaterThanOrEqual(3);
+    expect(out.llmCalls).toBe(2);
+    const systems = billingMock.runTextModel.mock.calls.map((call) => {
+      const messages = call[2] as Array<{ role: string; content: string }>;
+      return messages.find((message) => message.role === 'system')?.content ?? '';
+    });
+    expect(systems.some((system) => system.startsWith('You describe Oracle columns'))).toBe(true);
+    expect(systems.some((system) => system.startsWith('You summarize one Oracle table'))).toBe(true);
   });
 
   it('resolves D1 connection from Get DB Info output when loop item is only a table name', async () => {
@@ -223,9 +223,6 @@ describe('executeSaveRagPipeline', () => {
         tableSummaryVi: 't',
         tableSummaryEn: 't',
         columns: [{ name: 'id', descriptionVi: 'k', descriptionEn: 'pk', aliasesVi: [] }],
-        typicalQueries: [
-          { titleVi: 'c', titleEn: 'c', sql: 'SELECT COUNT(*) FROM public.orders', noteVi: 'n' },
-        ],
       }),
     );
 
@@ -355,6 +352,89 @@ describe('executeSaveRagPipeline', () => {
     } as unknown as NodeContext;
 
     await expect(executeSaveRagPipeline(ctx)).rejects.toThrow(/LLM handle/i);
+  });
+
+  it('prepends the domain system prompt and still keeps the JSON rules last', async () => {
+    const db = d1Stub();
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+      D1DB: db,
+    } as unknown as Env;
+    billingMock.runTextModel.mockClear();
+    const definition = saveRagGraph({
+      describeSystemPrompt: 'Bạn là chuyên gia kế toán. Diễn giải bằng doanh thu thuần.',
+    });
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' }],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    await executeSaveRagPipeline(ctx);
+    const systems = billingMock.runTextModel.mock.calls.map((call) => {
+      const messages = call[2] as Array<{ role: string; content: string }>;
+      return messages.find((message) => message.role === 'system')?.content ?? '';
+    });
+    expect(systems.length).toBeGreaterThanOrEqual(2);
+    for (const system of systems) {
+      expect(system.startsWith('Bạn là chuyên gia kế toán.')).toBe(true);
+      expect(system.indexOf('doanh thu thuần')).toBeLessThan(system.indexOf('Return ONLY one JSON object'));
+      expect(system).toContain('at most 240 characters');
+    }
+    const text = (upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>)[0]?.metadata?.text ?? '';
+    expect(text).toContain('Đơn hàng');
+    expect(text).toContain('doanh thu');
+  });
+
+  it('does not upsert or mark indexed when a column is missing one language', async () => {
+    const db = d1Stub();
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+      D1DB: db,
+    } as unknown as Env;
+    billingMock.extractTextFromAiResponse.mockReturnValue(
+      JSON.stringify({
+        tableSummaryVi: 'Đơn hàng',
+        tableSummaryEn: 'Orders',
+        columns: [
+          { name: 'id', descriptionVi: 'Khóa chính', descriptionEn: '', aliasesVi: [] },
+          { name: 'total', descriptionVi: 'Tổng tiền', descriptionEn: 'Total', aliasesVi: [] },
+        ],
+      }),
+    );
+    const definition = saveRagGraph();
+    const runContext: Record<string, unknown> = {};
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' }],
+      },
+      definition,
+      outputs: {},
+      runContext,
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    await expect(executeSaveRagPipeline(ctx)).rejects.toThrow(/column "id" enrichment failed/i);
+    expect(upsert).not.toHaveBeenCalled();
+    expect(runContext.__saveRagIndexedTables).toBeUndefined();
   });
 });
 

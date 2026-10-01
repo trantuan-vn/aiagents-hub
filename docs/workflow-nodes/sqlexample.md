@@ -4,7 +4,8 @@
 > **Sinh bởi:** [`saveRag`](./saveRag.md) — history Oracle ghép với logic thông thường do LLM viết cùng lúc với [`schema.md`](./schema.md)  
 > **Lưu bởi:** Save RAG, service embed → [`vectorize`](./vectorize.md)  
 > **Dùng lại:** [`getRag`](./getRag.md) + Reasoning Agent  
-> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)
+> **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
+> **Thay thế:** [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) bỏ document này. Cặp câu hỏi–SQL do node Save SQL Pair ghi (`docType: sqlpair`).
 
 Mỗi **bảng** × **mỗi execution** tạo **một** `sqlexample.md`. File name logic: `{dbId}.{schemaName}.{tableName}.sqlexample.md`.
 

@@ -26,7 +26,7 @@ export {
   introspectTablesToRagDocuments,
 } from './save-rag/table-docs.js';
 export { parseTableEnrichmentForTests } from './save-rag/describe-table.js';
-export { ragDocumentsFromEnrichment, buildSchemaDocument, buildSqlExampleDocument } from './save-rag/documents.js';
+export { ragDocumentsFromEnrichment, buildSchemaDocument } from './save-rag/documents.js';
 
 export { executeGetRag, executeGetRagPipeline, prefetchLinkedGetRag } from './get-rag/execute.js';
 export type {

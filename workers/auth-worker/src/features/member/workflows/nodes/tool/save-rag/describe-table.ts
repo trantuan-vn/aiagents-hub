@@ -12,7 +12,7 @@ import { resolveServiceOnHandle } from '../../../engine/graph-helpers.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
 import { assertTextGenerationModel, parseJsonObject } from '../../agent/shared.js';
-import type { GetDbInfoResult, SqlHistoryEntry } from '../shared/db/types.js';
+import type { GetDbInfoResult } from '../shared/db/types.js';
 import { ragBillingFromNodeContext } from '../shared/rag-context.js';
 
 export type ColumnEnrichment = {
@@ -22,18 +22,10 @@ export type ColumnEnrichment = {
   aliasesVi: string[];
 };
 
-export type TypicalQuery = {
-  titleVi: string;
-  titleEn: string;
-  sql: string;
-  noteVi: string;
-};
-
 export type TableEnrichment = {
   tableSummaryVi: string;
   tableSummaryEn: string;
   columns: ColumnEnrichment[];
-  typicalQueries: TypicalQuery[];
 };
 
 export type DescribeTableResult = {
@@ -42,27 +34,43 @@ export type DescribeTableResult = {
 };
 
 export const COLUMN_BATCH_START = 12;
-export const COLUMN_DESC_MAX = 2000;
+export const COLUMN_DESC_MAX = 240;
 
-const COLUMN_SYSTEM = `You describe Oracle columns for text-to-SQL retrieval.
+const JSON_WINS =
+  'These JSON rules override any earlier instruction to return markdown, prose, or invented columns.';
+
+export const COLUMN_SYSTEM = `You describe Oracle columns for text-to-SQL retrieval.
 Return ONLY one JSON object (no markdown fences):
 { "columns": [{ "name": string, "descriptionVi": string, "descriptionEn": string, "aliasesVi": string[] }] }
 Rules:
+- ${JSON_WINS}
 - Do not invent columns. name must be one of the columns in this request.
-- descriptionVi and descriptionEn are each at most 2000 characters and must both be non-empty.
-- aliasesVi are Vietnamese user phrases for that column.
+- descriptionVi and descriptionEn are each one sentence, at most 240 characters, and both must be non-empty.
+- If the instructions above name domain terms, use those terms in both languages.
+- aliasesVi are how a user refers to the column: everyday wording and the standard term.
 - Describe only the columns listed in this request.`;
 
-const SUMMARY_SYSTEM = `You summarize one Oracle table for text-to-SQL retrieval.
-Return ONLY one JSON object: { "tableSummaryVi": string, "tableSummaryEn": string }
-Both strings are required and non-empty. Do not invent columns.`;
-
-const TYPICAL_SYSTEM = `You write typical read-only SQL for one Oracle table.
-Return ONLY one JSON object:
-{ "typicalQueries": [{ "titleVi": string, "titleEn": string, "sql": string, "noteVi": string }] }
+export const SUMMARY_SYSTEM = `You summarize one Oracle table for text-to-SQL retrieval.
+Return ONLY one JSON object (no markdown fences):
+{ "tableSummaryVi": string, "tableSummaryEn": string }
 Rules:
-- 2 to 5 ordinary SELECT or WITH statements. Qualify schema.table.
-- Do not copy historical queries from the input. No DML or DDL.`;
+- ${JSON_WINS}
+- Do not invent columns.
+- tableSummaryVi and tableSummaryEn are each one sentence, at most 240 characters, and both must be non-empty.
+- If the instructions above name domain terms, use those terms in both languages.`;
+
+/** Domain role first, then the fixed JSON rules. Blank prompt adds no role. */
+export function composeDescribeSystem(rules: string, describeSystemPrompt: unknown): string {
+  const domain = String(describeSystemPrompt ?? '').trim();
+  if (!domain) return rules;
+  return `${domain}\n\n${rules}`;
+}
+
+function acceptField(value: unknown): string {
+  const text = String(value ?? '').trim();
+  if (!text || text.length > COLUMN_DESC_MAX) return '';
+  return text;
+}
 
 const EXTRA_REJECT =
   /response_format|json_object|chat_template|enable_thinking|unknown parameter|unrecognized/i;
@@ -75,10 +83,6 @@ function truncateSamples(rows: Record<string, unknown>[], limit = 3): Record<str
     }
     return out;
   });
-}
-
-function promptSql(sql: string): string {
-  return sql.length > 2000 ? `${sql.slice(0, 2000)}…` : sql;
 }
 
 export function resolveDescribeMaxTokens(raw: unknown): number {
@@ -189,10 +193,9 @@ export function matchBatchColumns(
 
   const out: ColumnEnrichment[] = [];
   for (const { oracle, raw } of accepted) {
-    const descriptionVi = String(raw.descriptionVi ?? '').trim();
-    const descriptionEn = String(raw.descriptionEn ?? '').trim();
+    const descriptionVi = acceptField(raw.descriptionVi);
+    const descriptionEn = acceptField(raw.descriptionEn);
     if (!descriptionVi || !descriptionEn) continue;
-    if (descriptionVi.length > COLUMN_DESC_MAX || descriptionEn.length > COLUMN_DESC_MAX) continue;
     out.push({
       name: oracle,
       descriptionVi,
@@ -246,43 +249,13 @@ export async function enrichColumnBatches(
   return done;
 }
 
-function isReadOnlySql(sql: string): boolean {
-  const trimmed = sql.trim().replace(/;+\s*$/, '');
-  if (!trimmed || /;/.test(trimmed)) return false;
-  if (!/^(select|with)\b/i.test(trimmed)) return false;
-  if (/\b(insert|update|delete|merge|drop|alter|truncate|grant|execute|begin|call)\b/i.test(trimmed)) {
-    return false;
-  }
-  return true;
-}
-
-function parseTypicalQueries(text: string): TypicalQuery[] {
-  const parsed = parseJsonObject(text);
-  const rawQueries = Array.isArray(parsed?.typicalQueries) ? parsed.typicalQueries : [];
-  const typicalQueries: TypicalQuery[] = [];
-  for (const query of rawQueries) {
-    if (!query || typeof query !== 'object') continue;
-    const rec = query as Record<string, unknown>;
-    const sql = String(rec.sql ?? '').trim();
-    if (!isReadOnlySql(sql)) continue;
-    typicalQueries.push({
-      titleVi: String(rec.titleVi ?? '').trim() || 'Truy vấn',
-      titleEn: String(rec.titleEn ?? '').trim() || 'Query',
-      sql,
-      noteVi: String(rec.noteVi ?? '').trim(),
-    });
-  }
-  return typicalQueries;
-}
-
 function parseEnrichment(raw: unknown, info: GetDbInfoResult): TableEnrichment {
   const text = typeof raw === 'string' ? raw : String(raw ?? '');
   const parsed = parseJsonObject(text);
   return {
-    tableSummaryVi: String(parsed?.tableSummaryVi ?? '').trim(),
-    tableSummaryEn: String(parsed?.tableSummaryEn ?? '').trim(),
+    tableSummaryVi: acceptField(parsed?.tableSummaryVi),
+    tableSummaryEn: acceptField(parsed?.tableSummaryEn),
     columns: matchBatchColumns(salvageColumnRecords(text), info.columns),
-    typicalQueries: parseTypicalQueries(text),
   };
 }
 
@@ -321,21 +294,6 @@ function buildSummaryPrompt(info: GetDbInfoResult): string {
   );
 }
 
-function buildTypicalPrompt(info: GetDbInfoResult, history: SqlHistoryEntry[]): string {
-  return JSON.stringify(
-    {
-      schemaName: info.schemaName,
-      tableName: info.tableName,
-      columns: info.columns.map((col) => col.name),
-      primaryKey: info.primaryKey,
-      foreignKeys: info.foreignKeys,
-      historicalSql: history.slice(0, 10).map((entry) => promptSql(entry.sql)),
-    },
-    null,
-    2,
-  );
-}
-
 /** Test helper — parse without calling the model. */
 export function parseTableEnrichmentForTests(raw: string, info: GetDbInfoResult): TableEnrichment {
   return parseEnrichment(raw, info);
@@ -350,7 +308,7 @@ export function assertLlmServiceLinked(definition: WorkflowDefinition, nodeId: s
   }
 }
 
-/** Column batches, then one summary call, then one typical-query call. */
+/** Column batches, then one summary call. No typical-query call. */
 export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Promise<DescribeTableResult> {
   if (!info.columns.length) {
     throw new Error(`save_rag: table ${info.tableName} has no columns`);
@@ -428,33 +386,30 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
     }
   };
 
+  const domainPrompt = (ctx.node.data as Record<string, unknown> | undefined)?.describeSystemPrompt;
+  const columnSystem = composeDescribeSystem(COLUMN_SYSTEM, domainPrompt);
+  const summarySystem = composeDescribeSystem(SUMMARY_SYSTEM, domainPrompt);
+
   const columns = await enrichColumnBatches(info.columns, async (take) => {
-    const result = await runDescribe(COLUMN_SYSTEM, buildColumnPrompt(info, take));
+    const result = await runDescribe(columnSystem, buildColumnPrompt(info, take));
     return { records: salvageColumnRecords(result.text) };
   });
 
   let tableSummaryVi = '';
   let tableSummaryEn = '';
   for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await runDescribe(SUMMARY_SYSTEM, buildSummaryPrompt(info));
+    const result = await runDescribe(summarySystem, buildSummaryPrompt(info));
     const parsed = parseJsonObject(result.text);
-    tableSummaryVi = String(parsed?.tableSummaryVi ?? '').trim();
-    tableSummaryEn = String(parsed?.tableSummaryEn ?? '').trim();
+    tableSummaryVi = acceptField(parsed?.tableSummaryVi);
+    tableSummaryEn = acceptField(parsed?.tableSummaryEn);
     if (tableSummaryVi && tableSummaryEn) break;
   }
   if (!tableSummaryVi || !tableSummaryEn) {
     throw new Error(`save_rag: table ${info.tableName} summary incomplete`);
   }
 
-  let typicalQueries: TypicalQuery[] = [];
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await runDescribe(TYPICAL_SYSTEM, buildTypicalPrompt(info, info.sqlHistory));
-    typicalQueries = parseTypicalQueries(result.text);
-    if (typicalQueries.length) break;
-  }
-
   return {
-    enrichment: { tableSummaryVi, tableSummaryEn, columns, typicalQueries },
+    enrichment: { tableSummaryVi, tableSummaryEn, columns },
     llmCalls,
   };
 }

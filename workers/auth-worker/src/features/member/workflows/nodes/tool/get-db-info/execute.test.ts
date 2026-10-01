@@ -63,16 +63,19 @@ const info: GetDbInfoResult = {
   rowCountEstimate: 1,
 };
 
-describe('save-rag documents (schema + sqlexample)', () => {
-  it('emits schema document; sqlexample only when history or typical queries exist', () => {
+describe('save-rag documents (schema only)', () => {
+  it('emits one shortened schema document', () => {
     const items = ragDocumentsFromTableInfo(info);
     expect(items).toHaveLength(1);
     expect(items[0]?.metadata.docType).toBe('schema');
-    expect(items[0]?.content).toContain('# Table: public.orders');
-    expect(items[0]?.content).toContain('Description (VI)');
+    expect(items[0]?.documentId).toBe('analytics-db.public.orders.schema');
+    expect(items[0]?.content).toContain('# public.orders');
+    expect(items[0]?.content).toContain('| Column | Type | Nullable | Key | Description | Aliases |');
+    expect(items[0]?.content).toContain('| id | TEXT | NO | PK |');
+    expect(items[0]?.content).not.toContain('CREATE TABLE');
   });
 
-  it('renders historical SQL from Oracle execution history', () => {
+  it('does not render SQL history into the schema document', () => {
     const items = ragDocumentsFromTableInfo({
       ...info,
       sqlHistory: [
@@ -83,10 +86,10 @@ describe('save-rag documents (schema + sqlexample)', () => {
         },
       ],
     });
-    expect(items).toHaveLength(2);
-    expect(items[1]?.content).toContain('### 1. Historical query');
-    expect(items[1]?.content).toContain('SELECT * FROM public.orders WHERE total > 100');
-    expect(items[1]?.content).toContain('Executed: 2026-09-21T10:00:00.000Z');
+    expect(items).toHaveLength(1);
+    expect(items[0]?.metadata.docType).toBe('schema');
+    expect(items[0]?.content).not.toContain('SELECT * FROM public.orders WHERE total > 100');
+    expect(items[0]?.content).not.toContain('Historical');
   });
 });
 
@@ -233,13 +236,13 @@ const oracleConn = {
   connectString: 'dbname_high',
 };
 
-describe('Save RAG SQL history (via table-docs)', () => {
+describe('Save RAG introspect does not fetch SQL history', () => {
   beforeEach(() => {
     directMock.fetchOracleSqlHistoriesDirect.mockClear();
     directMock.introspectOracleTablesDirect.mockClear();
   });
 
-  it('Save RAG uses get-db-info config instead of hard-coded history limit 0', async () => {
+  it('does not call Oracle execution history for one table', async () => {
     const definition: WorkflowDefinition = {
       nodes: [
         {
@@ -266,16 +269,15 @@ describe('Save RAG SQL history (via table-docs)', () => {
       schemaName: 'ADMIN',
     });
 
-    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'ADMIN' }),
-      ['ORDERS'],
-      5,
-    );
-    expect(docs[1]?.content).toContain('SELECT * FROM ADMIN.ORDERS WHERE ROWNUM <= 10');
-    expect(docs[1]?.content).toContain('### 1. Historical query');
+    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
+    expect(docs).toHaveLength(1);
+    expect(docs[0]?.metadata.docType).toBe('schema');
+    expect(docs[0]?.content).toContain('# ADMIN.ORDERS');
+    expect(docs[0]?.content).not.toContain('Historical');
+    expect(docs[0]?.content).not.toContain('SELECT * FROM ADMIN.ORDERS');
   });
 
-  it('batch RAG introspect attaches Oracle SQL history per table', async () => {
+  it('batch introspect writes one schema document per table and skips history', async () => {
     const definition: WorkflowDefinition = {
       nodes: [
         {
@@ -300,12 +302,8 @@ describe('Save RAG SQL history (via table-docs)', () => {
       ],
     });
 
-    expect(directMock.fetchOracleSqlHistoriesDirect).toHaveBeenCalledWith(
-      expect.objectContaining({ user: 'ADMIN' }),
-      ['CHUNG_KHOAN', 'NHA_DAU_TU'],
-      4,
-    );
-    const examples = docs.filter((d) => d.metadata.docType === 'sqlexample');
-    expect(examples).toHaveLength(2);
+    expect(directMock.fetchOracleSqlHistoriesDirect).not.toHaveBeenCalled();
+    expect(docs.map((doc) => doc.metadata.docType)).toEqual(['schema', 'schema']);
+    expect(docs.map((doc) => doc.metadata.tableName).sort()).toEqual(['CHUNG_KHOAN', 'NHA_DAU_TU']);
   });
 });

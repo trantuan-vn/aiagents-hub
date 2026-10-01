@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { GetDbInfoResult } from '../shared/db/types.js';
 import { chunkDocument, estimateEmbedTokens, EMBED_TOKEN_BUDGET } from './chunk.js';
 import {
+  COLUMN_SYSTEM,
+  composeDescribeSystem,
   describeTable,
   enrichColumnBatches,
   parseTableEnrichmentForTests,
   resolveDescribeMaxTokens,
+  SUMMARY_SYSTEM,
 } from './describe-table.js';
 import { ragDocumentsFromEnrichment } from './documents.js';
 
@@ -35,16 +38,11 @@ describe('parseTableEnrichmentForTests', () => {
           { name: 'ID', descriptionVi: 'Khóa', descriptionEn: 'PK', aliasesVi: ['mã'] },
           { name: 'FAKE', descriptionVi: 'x', descriptionEn: 'x', aliasesVi: [] },
         ],
-        typicalQueries: [
-          { titleVi: 'Đếm', titleEn: 'Count', sql: 'SELECT COUNT(*) FROM ADMIN.ORDERS', noteVi: 'n' },
-          { titleVi: 'Bad', titleEn: 'Bad', sql: 'DELETE FROM ADMIN.ORDERS', noteVi: 'n' },
-        ],
       }),
       info,
     );
     expect(enrichment.columns.map((c) => c.name)).toEqual(['ID']);
-    expect(enrichment.typicalQueries).toHaveLength(1);
-    expect(enrichment.typicalQueries[0]?.sql).toMatch(/^SELECT/i);
+    expect(enrichment).not.toHaveProperty('typicalQueries');
   });
 
   it('matches column names case-insensitively and drops unknown names', () => {
@@ -70,17 +68,36 @@ describe('parseTableEnrichmentForTests', () => {
     expect(enrichment.columns.map((col) => col.name)).toEqual(['ID', 'TOTAL']);
   });
 
-  it('treats a description longer than 2000 characters as incomplete', () => {
+  it('keeps a 240-character sentence and drops 241', () => {
     const enrichment = parseTableEnrichmentForTests(
       JSON.stringify({
+        tableSummaryVi: 'a'.repeat(240),
+        tableSummaryEn: 'b'.repeat(241),
         columns: [
-          { name: 'ID', descriptionVi: 'a'.repeat(2001), descriptionEn: 'PK', aliasesVi: [] },
-          { name: 'TOTAL', descriptionVi: 'Tổng', descriptionEn: 'Total', aliasesVi: [] },
+          { name: 'ID', descriptionVi: 'a'.repeat(241), descriptionEn: 'PK', aliasesVi: [] },
+          { name: 'TOTAL', descriptionVi: 'c'.repeat(240), descriptionEn: 'Total', aliasesVi: [] },
         ],
       }),
       info,
     );
+    expect(enrichment.tableSummaryVi).toHaveLength(240);
+    expect(enrichment.tableSummaryEn).toBe('');
     expect(enrichment.columns.map((col) => col.name)).toEqual(['TOTAL']);
+  });
+});
+
+describe('composeDescribeSystem', () => {
+  it('puts the domain prompt before the JSON rules', () => {
+    const system = composeDescribeSystem(COLUMN_SYSTEM, '  Bạn là chuyên gia kế toán. Dùng doanh thu thuần.  ');
+    expect(system.startsWith('Bạn là chuyên gia kế toán. Dùng doanh thu thuần.')).toBe(true);
+    expect(system).toContain('doanh thu thuần');
+    expect(system.indexOf('doanh thu thuần')).toBeLessThan(system.indexOf('Return ONLY one JSON object'));
+    expect(system).toContain('at most 240 characters');
+  });
+
+  it('adds no role when the prompt is blank', () => {
+    expect(composeDescribeSystem(SUMMARY_SYSTEM, '   ')).toBe(SUMMARY_SYSTEM);
+    expect(composeDescribeSystem(COLUMN_SYSTEM, '')).toBe(COLUMN_SYSTEM);
   });
 });
 
@@ -159,22 +176,78 @@ describe('describeTable guards', () => {
 });
 
 describe('schema documents', () => {
-  it('escapes pipes and newlines into one table row and keeps aliases in their own cell', () => {
-    const docs = ragDocumentsFromEnrichment(info, {
-      tableSummaryVi: 'Đơn',
-      tableSummaryEn: 'Orders',
-      columns: [
-        { name: 'ID', descriptionVi: 'Khóa\nchính', descriptionEn: 'PK | key', aliasesVi: ['mã', 'id'] },
-        { name: 'TOTAL', descriptionVi: 'Tổng', descriptionEn: 'Total', aliasesVi: [] },
-      ],
-      typicalQueries: [],
-    });
-    const row = docs[0]?.content.split('\n').find((line) => line.includes('Khóa chính'));
-    expect(row).toBe('| ID | NUMBER | NO |  | Khóa chính | PK \\| key | mã, id |');
-    expect(docs[0]?.content).toContain('| Aliases |');
+  it('writes one shortened schema with PK, FK, and both languages', () => {
+    const docs = ragDocumentsFromEnrichment(
+      {
+        ...info,
+        columns: [
+          { name: 'ID', type: 'NUMBER', nullable: false, comment: 'oracle pk comment' },
+          { name: 'CUSTOMER_ID', type: 'NUMBER', nullable: true },
+        ],
+        primaryKey: ['ID'],
+        foreignKeys: [{ column: 'CUSTOMER_ID', refTable: 'CUSTOMERS', refColumn: 'ID' }],
+      },
+      {
+        tableSummaryVi: 'Đơn hàng.',
+        tableSummaryEn: 'Orders.',
+        columns: [
+          { name: 'ID', descriptionVi: 'Khóa\nchính.', descriptionEn: 'PK | key.', aliasesVi: ['mã', 'id'] },
+          {
+            name: 'CUSTOMER_ID',
+            descriptionVi: 'Khách hàng.',
+            descriptionEn: 'Customer.',
+            aliasesVi: ['doanh thu thuần'],
+          },
+        ],
+      },
+    );
+    expect(docs).toHaveLength(1);
+    expect(docs[0]?.documentId).toBe('db.ADMIN.ORDERS.schema');
+    expect(docs[0]?.metadata.docType).toBe('schema');
+    expect(docs[0]?.content).toBe(`# ADMIN.ORDERS
+
+Đơn hàng.
+Orders.
+
+| Column | Type | Nullable | Key | Description | Aliases |
+| ID | NUMBER | NO | PK | VI: Khóa chính. EN: PK \\| key. | mã, id |
+| CUSTOMER_ID | NUMBER | YES | FK → CUSTOMERS.ID | VI: Khách hàng. EN: Customer. | doanh thu thuần |
+`);
+    expect(docs[0]?.content).not.toContain('CREATE TABLE');
+    expect(docs[0]?.content).not.toContain('oracle pk comment');
+    expect(docs[0]?.content).not.toContain('sqlexample');
+    expect(docs[0]?.content).not.toContain('---');
   });
 
-  it('keeps the first and last column descriptions and the full DDL across schema chunks', () => {
+  it('refuses a table that is missing one language or exceeds 240 characters', () => {
+    const columns = [
+      { name: 'ID', descriptionVi: 'Khóa', descriptionEn: 'PK', aliasesVi: [] as string[] },
+      { name: 'TOTAL', descriptionVi: 'Tổng', descriptionEn: 'Total', aliasesVi: [] as string[] },
+    ];
+    expect(() =>
+      ragDocumentsFromEnrichment(info, {
+        tableSummaryVi: 'Đơn',
+        tableSummaryEn: '',
+        columns,
+      }),
+    ).toThrow('summary incomplete');
+    expect(() =>
+      ragDocumentsFromEnrichment(info, {
+        tableSummaryVi: 'a'.repeat(241),
+        tableSummaryEn: 'Orders',
+        columns,
+      }),
+    ).toThrow('summary incomplete');
+    expect(() =>
+      ragDocumentsFromEnrichment(info, {
+        tableSummaryVi: 'Đơn',
+        tableSummaryEn: 'Orders',
+        columns: [{ name: 'ID', descriptionVi: 'Khóa', descriptionEn: '', aliasesVi: [] }],
+      }),
+    ).toThrow('column "ID" enrichment incomplete');
+  });
+
+  it('keeps the first and last column descriptions across schema chunks', () => {
     const columns = Array.from({ length: 40 }, (_, i) => ({
       name: `C${i}`,
       type: 'VARCHAR2(4000)',
@@ -197,7 +270,6 @@ describe('schema documents', () => {
         descriptionEn: `desc ${col.name}`,
         aliasesVi: [`bí danh ${col.name}`],
       })),
-      typicalQueries: [],
     };
     const content = ragDocumentsFromEnrichment(wide, enrichment)[0]!.content;
     const chunks = chunkDocument(content, { docType: 'schema', tableName: 'ORDERS' });
@@ -206,7 +278,7 @@ describe('schema documents', () => {
     const stored = chunks.map((chunk) => chunk.content).join('\n');
     expect(stored).toContain('mô tả C0');
     expect(stored).toContain('mô tả C39');
-    expect(joined).toContain(ddl);
+    expect(joined).not.toContain(ddl);
     for (const chunk of chunks) {
       expect(estimateEmbedTokens(chunk.content)).toBeLessThanOrEqual(EMBED_TOKEN_BUDGET);
     }

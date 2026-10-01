@@ -4,7 +4,8 @@
 > **Kiến trúc:** [`tool-nodes.md`](./tool-nodes.md)  
 > **Runtime type:** `tool_node` · **Kind:** `toolKind: "save-rag"`  
 > **Liên kết:** [`getDBInfo.md`](./getDBInfo.md) · [`schema.md`](./schema.md) · [`sqlexample.md`](./sqlexample.md) · [`service.md`](./service.md) · [`vectorize.md`](./vectorize.md)  
-> **Hợp đồng ghi đủ dữ liệu:** [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) thay mục một lần LLM và cách cắt chunk 800 ký tự khi implement.
+> **Hợp đồng ghi đủ dữ liệu:** [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) thay mục một lần LLM và cách cắt chunk 800 ký tự khi implement.  
+> **Việc bỏ SQL example:** [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) thay document `sqlexample`, history và typical query. File này giữ mô tả hiện tại cho đến khi spec đó được implement.
 
 Tool **ghi knowledge của một bảng**. Input là tên bảng từ Get DB Info / Loop. Nó lấy schema Oracle, nhờ LLM mô tả từng cột, dựng SQL example từ history và logic thông thường, rồi embed hai document vào Vectorize.
 

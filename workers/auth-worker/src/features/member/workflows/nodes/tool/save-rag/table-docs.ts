@@ -1,6 +1,5 @@
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import {
-  fetchSqlHistory as fetchOracleSqlHistories,
   introspectTable as introspectOracleTable,
   introspectTables as introspectOracleTables,
   isOracleConnectionType,
@@ -10,22 +9,14 @@ import {
   type DbConnection,
   type GetDbInfoResult,
   type OracleConnectConfig,
-  type SqlHistoryEntry,
 } from '../shared/db/index.js';
-import { toolNodeConfig } from '../shared/rag-context.js';
 
 const RAG_SAMPLE_LIMIT = 3;
-const SQL_HISTORY_LIMIT_DEFAULT = 10;
-const SQL_HISTORY_LIMIT_MAX = 50;
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : {};
-}
-
-function historyKey(tableName: string): string {
-  return tableName.trim().toUpperCase();
 }
 
 function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnection): OracleConnectConfig | null {
@@ -34,65 +25,6 @@ function oracleConfigFrom(source: Record<string, unknown>, connection?: DbConnec
     ...(connection ?? {}),
     connection: connection ?? source.connection,
   });
-}
-
-function resolveHistoryConfig(definition: WorkflowDefinition, hostId: string): Record<string, unknown> {
-  const self = definition.nodes.find((n) => n.id === hostId);
-  const selfData = (self?.data ?? {}) as Record<string, unknown>;
-  if (selfData.sqlHistoryLimit != null || selfData.includeSqlHistory != null) return selfData;
-  const linked = toolNodeConfig(definition, hostId, 'get-db-info');
-  if (linked) return linked;
-  const node = definition.nodes.find((n) => {
-    if (n.type !== 'tool_node') return false;
-    return String((n.data as Record<string, unknown> | undefined)?.toolKind ?? '') === 'get-db-info';
-  });
-  return (node?.data ?? {}) as Record<string, unknown>;
-}
-
-function resolveSqlHistorySettings(
-  config: Record<string, unknown>,
-  triggerContext: Record<string, unknown>,
-): { include: boolean; limit: number } {
-  const limits = asRecord(triggerContext.limits);
-  const include = config.includeSqlHistory !== false;
-  const raw = config.sqlHistoryLimit ?? limits.sqlHistoryLimit ?? SQL_HISTORY_LIMIT_DEFAULT;
-  const parsed = Number(raw);
-  const limit = Number.isFinite(parsed)
-    ? Math.min(Math.max(0, Math.floor(parsed)), SQL_HISTORY_LIMIT_MAX)
-    : SQL_HISTORY_LIMIT_DEFAULT;
-  return { include, limit };
-}
-
-async function loadSqlHistory(params: {
-  oracleConfig: OracleConnectConfig | null;
-  tableNames: string[];
-  limit: number;
-  env: Env;
-}): Promise<Record<string, SqlHistoryEntry[]>> {
-  if (!params.oracleConfig || params.limit <= 0 || !params.tableNames.length) return {};
-  try {
-    const rows = await fetchOracleSqlHistories(
-      params.oracleConfig,
-      params.tableNames,
-      params.limit,
-      params.env,
-    );
-    const out: Record<string, SqlHistoryEntry[]> = {};
-    for (const [table, entries] of Object.entries(rows)) {
-      out[historyKey(table)] = (entries ?? [])
-        .map((entry) => ({
-          sql: String(entry.sql ?? ''),
-          ...(entry.executedAt ? { executedAt: String(entry.executedAt) } : {}),
-          ...(entry.durationMs != null ? { durationMs: Number(entry.durationMs) } : {}),
-          ...(entry.rowCount != null ? { rowCount: Number(entry.rowCount) } : {}),
-        }))
-        .filter((entry) => entry.sql.trim());
-    }
-    return out;
-  } catch (err) {
-    console.warn('[save-rag] Oracle SQL history failed:', err);
-    return {};
-  }
 }
 
 function truncateSampleRows(info: GetDbInfoResult, sampleLimit: number): GetDbInfoResult {
@@ -126,8 +58,6 @@ async function introspectOneTable(params: {
   tableName: string;
   schemaName?: string;
   sampleLimit: number;
-  sqlHistoryLimit: number;
-  includeSqlHistory: boolean;
 }): Promise<GetDbInfoResult> {
   const connection = (params.triggerContext.connection ?? {}) as DbConnection;
   const oracleConfig = oracleConfigFrom(params.triggerContext, connection);
@@ -213,22 +143,12 @@ async function introspectOneTable(params: {
     );
   }
 
-  const historyByTable =
-    params.includeSqlHistory && oracleConfig
-      ? await loadSqlHistory({
-          oracleConfig,
-          tableNames: [tableName],
-          limit: params.sqlHistoryLimit,
-          env: params.env,
-        })
-      : {};
-
   return {
     dbId,
     schemaName,
     tableName,
     ...introspection,
-    sqlHistory: historyByTable[historyKey(tableName)] ?? [],
+    sqlHistory: [],
   };
 }
 
@@ -245,24 +165,17 @@ export async function introspectTableInfo(params: {
     Number(limits.sampleRowLimit ?? RAG_SAMPLE_LIMIT) || RAG_SAMPLE_LIMIT,
     RAG_SAMPLE_LIMIT,
   );
-  const config = resolveHistoryConfig(params.definition, params.agentId);
-  const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
-    config,
-    params.triggerContext,
-  );
   const info = await introspectOneTable({
     env: params.env,
     triggerContext: { ...params.triggerContext, tableName: params.tableName },
     tableName: params.tableName,
     schemaName: params.schemaName,
     sampleLimit,
-    sqlHistoryLimit,
-    includeSqlHistory,
   });
   return truncateSampleRows(info, sampleLimit);
 }
 
-/** Batch introspect (+ SQL history). Caller runs LLM then builds documents. */
+/** Batch introspect. Caller runs LLM then builds the schema document. */
 export async function introspectTablesInfo(params: {
   env: Env;
   definition: WorkflowDefinition;
@@ -305,19 +218,6 @@ export async function introspectTablesInfo(params: {
       sampleLimit,
       params.env,
     );
-    const config = resolveHistoryConfig(params.definition, params.agentId);
-    const { include: includeSqlHistory, limit: sqlHistoryLimit } = resolveSqlHistorySettings(
-      config,
-      params.triggerContext,
-    );
-    const historyByTable = includeSqlHistory
-      ? await loadSqlHistory({
-          oracleConfig,
-          tableNames,
-          limit: sqlHistoryLimit,
-          env: params.env,
-        })
-      : {};
     const out: GetDbInfoResult[] = [];
     for (const row of introspected) {
       if (row.error || !row.columns.length) {
@@ -335,7 +235,7 @@ export async function introspectTablesInfo(params: {
             foreignKeys: row.foreignKeys,
             ddl: row.ddl,
             sampleRows: row.sampleRows,
-            sqlHistory: historyByTable[historyKey(row.tableName)] ?? [],
+            sqlHistory: [],
             rowCountEstimate: row.rowCountEstimate,
           },
           sampleLimit,

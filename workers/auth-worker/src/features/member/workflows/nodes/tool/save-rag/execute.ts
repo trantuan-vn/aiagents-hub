@@ -247,7 +247,6 @@ function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>)
     ...asRecord(item.connection),
   };
   const oracle = resolveOracleConnectConfig({ ...merged, connection });
-  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   return {
     ...merged,
     ...item,
@@ -261,7 +260,6 @@ function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>)
     limits: {
       ...asRecord(merged.limits),
       sampleRowLimit: 3,
-      sqlHistoryLimit: data.sqlHistoryLimit ?? asRecord(merged.limits).sqlHistoryLimit ?? 10,
     },
   };
 }
@@ -309,7 +307,7 @@ async function saveDocuments(ctx: NodeContext, docs: RagDocumentItem[]): Promise
   });
 }
 
-/** Graph-path: introspect → LLM describe → schema + sqlexample → embed. */
+/** Graph-path: introspect → LLM describe → one schema document → embed. */
 export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutput> {
   const items = pipelineItems(ctx.nodeInput);
   if (!items.length) {

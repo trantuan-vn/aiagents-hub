@@ -45,10 +45,11 @@ const SAVE_RAG_FIELDS = [
     order: 3.1,
   },
   {
-    id: "sqlHistoryLimit",
-    type: "number" as const,
-    labelKey: "field_sql_history_limit",
-    defaultValue: 10,
+    id: "describeSystemPrompt",
+    type: "textarea" as const,
+    labelKey: "field_describe_system_prompt",
+    descriptionKey: "field_describe_system_prompt_desc",
+    defaultValue: "",
     order: 3.2,
   },
   { id: "chunkSize", type: "number" as const, labelKey: "field_chunk_size", defaultValue: 800, order: 7 },
@@ -426,9 +427,10 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
   "save-rag": {
     toolKind: "save-rag",
     toolName: "save_rag",
-    toolDescription: "Introspect a database table, enrich column descriptions with an LLM, and upsert schema + SQL examples into Vectorize.",
+    toolDescription:
+      "Write one shortened schema document per table into Vectorize. Summaries and column descriptions are one Vietnamese sentence and one English sentence. Does not store SQL examples.",
     tableNameField: "{{ $json.tableName }}",
-    sqlHistoryLimit: 10,
+    describeSystemPrompt: "",
     chunkSize: 800,
     chunkOverlap: 120,
   },

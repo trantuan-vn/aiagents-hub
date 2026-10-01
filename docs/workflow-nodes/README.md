@@ -23,9 +23,9 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | Simple Memory | [`simple-memory.md`](./simple-memory.md) | `nodes/memory/` (`memoryKind: simple`) | **Done** — session chat window |
 | Tool | — | `nodes/tool/` | Factory; RAG overrides có execute |
 | **Tool nodes** | [`tool-nodes.md`](./tool-nodes.md) | `nodes/tool/shared/` + `ToolModule` | **Draft** — ranh giới tool, registry |
-| Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | **Draft** — schema DB → LLM → schema + SQL example → embed |
+| Save RAG | [`saveRag.md`](./saveRag.md) | `nodes/tool/save-rag/` | **Draft** — schema DB → LLM → schema + SQL example → embed. Việc ghi SQL example bị thay bởi [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) |
 | Save RAG đủ dữ liệu | [`save-rag-completeness-spec.md`](./save-rag-completeness-spec.md) | `nodes/tool/save-rag/` + `get-rag/` | **Draft** — hợp đồng ghi đủ mô tả cột, không cắt vì `max_tokens` |
-| Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Draft** — retrieve schema + SQL example |
+| Get RAG | [`getRag.md`](./getRag.md) | `nodes/tool/get-rag/` | **Draft** — retrieve schema + SQL example. Thứ tự hai phần nằm ở [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) |
 | Get DB Info | [`getDBInfo.md`](./getDBInfo.md) | `nodes/tool/get-db-info/` | **Draft** — chỉ liệt kê bảng |
 | Check SQL | [`check-sql.md`](./check-sql.md) | `nodes/tool/check-sql/` | **Draft** — probe SELECT Oracle |
 | Code Mode | [`code.md`](./code.md) | `nodes/tool/code/` | **Done** — createCodeTool + DynamicWorkerExecutor |
@@ -37,7 +37,8 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | **RAG recipes** | [`rag-recipes.md`](./rag-recipes.md) | — | Graph mẫu ingest PDF + Q&A + BT3 |
 | **RAG phases** | [`rag-implementation-phases.md`](./rag-implementation-phases.md) | — | Phases P0–P10 — runtime đã xong; docs giữ lịch sử |
 | schema.md | [`schema.md`](./schema.md) | — | Artifact — table schema |
-| sqlexample.md | [`sqlexample.md`](./sqlexample.md) | — | Artifact — SQL examples |
+| sqlexample.md | [`sqlexample.md`](./sqlexample.md) | — | Artifact — SQL examples. Thay bằng cặp `sqlpair` trong [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) |
+| **Sinh SQL gọn token** | [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) | `save-rag/` + `save-sql-pair/` + `get-rag/` + reasoning | **Draft** — schema only, node cặp câu hỏi–SQL, Get RAG hai phần |
 
 Add-node drawer **vẫn** đọc `workers/web/.../catalogs/*.ts`. UI `NODE_CATALOG` chưa thay catalogs.
 

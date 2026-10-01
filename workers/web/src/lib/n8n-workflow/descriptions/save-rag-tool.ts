@@ -1,13 +1,13 @@
 import { resourceNode } from "./common";
 
-/** Save RAG tool — table ingest only (schema + SQL examples via LLM + embed). */
+/** Save RAG tool — one shortened schema document per table. */
 export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
   displayName: "Save RAG",
   name: "tool_node_save_rag",
   icon: "fa:database",
   group: ["transform"],
   description:
-    "Introspect a database table, enrich column descriptions with an LLM, and upsert schema + SQL examples into Vectorize.",
+    "Write one shortened schema document per table into Vectorize. Does not store SQL examples.",
   properties: [
     {
       displayName: "Table name field",
@@ -18,11 +18,13 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       description: "Drag the current loop item table from INPUT. Example: tableName → {{ $json.tableName }}",
     },
     {
-      displayName: "SQL history limit",
-      name: "sqlHistoryLimit",
-      type: "number",
-      default: 10,
-      description: "Max rows from ADMIN.DBTOOLS$EXECUTION_HISTORY to include for typical-query context.",
+      displayName: "System prompt",
+      name: "describeSystemPrompt",
+      type: "string",
+      typeOptions: { rows: 6 },
+      default: "",
+      description:
+        "Expert role and domain terms. Passed into every LLM call that writes the table summary and column descriptions.",
     },
     {
       displayName: "Tool name",
@@ -36,7 +38,7 @@ export const SAVE_RAG_TOOL_N8N_DESCRIPTION = resourceNode({
       type: "string",
       typeOptions: { rows: 3 },
       default:
-        "Introspect a database table, enrich column descriptions with an LLM, and upsert schema + SQL examples into Vectorize.",
+        "Write one shortened schema document per table into Vectorize. Summaries and column descriptions are one Vietnamese sentence and one English sentence. Does not store SQL examples.",
     },
     {
       displayName: "Chunk size",
