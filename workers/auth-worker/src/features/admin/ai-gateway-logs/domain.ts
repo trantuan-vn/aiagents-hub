@@ -35,6 +35,8 @@ export type GatewayLogRow = {
   step: number | null;
   kind: string | null;
   nodeId: string | null;
+  /** Set only when metadata carries a UUID. Absent on assistant, eKYC, and authoring calls. */
+  executionKey: string | null;
 };
 
 export type GatewayLogDetail = GatewayLogRow & {
@@ -45,6 +47,36 @@ export type GatewayLogDetail = GatewayLogRow & {
   requestTruncated: boolean;
   responseTruncated: boolean;
   metadata: Record<string, string | number | boolean | null>;
+};
+
+export const EXPLORER_RANGES = ['1h', '24h', '7d'] as const;
+export type ExplorerRange = (typeof EXPLORER_RANGES)[number];
+
+export const EXPLORER_RANGE_MS: Record<ExplorerRange, number> = {
+  '1h': 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+};
+
+export type ExplorerGatewayReport = {
+  scope: 'all';
+  accountId: string;
+  gatewayId: string;
+  range: ExplorerRange;
+  since: string;
+  summary: {
+    logCount: number;
+    costUsd: number;
+    tokensIn: number;
+    tokensOut: number;
+    cached: number;
+    errors: number;
+    truncated: boolean;
+  };
+  logs: GatewayLogRow[];
+  page: number;
+  perPage: 24;
+  totalCount: number;
 };
 
 export type ExecutionGatewayLink = 'stamped' | 'unstamped' | 'unavailable';
@@ -89,9 +121,13 @@ export class AiGatewayLogsError extends Error {
   }
 }
 
+export function isExecutionKey(raw: string): boolean {
+  return UUID_RE.test(raw);
+}
+
 export function assertExecutionKey(raw: string): string {
   const key = raw.trim();
-  if (!UUID_RE.test(key)) {
+  if (!isExecutionKey(key)) {
     throw new AiGatewayLogsError('invalid_execution_key', 'executionKey must be a UUID', 400);
   }
   return key;
@@ -109,4 +145,16 @@ export function logStatus(success: boolean, cached: boolean): GatewayLogStatus {
   if (!success) return 'error';
   if (cached) return 'cached';
   return 'success';
+}
+
+/** Minute bucket so a 20s list cache can hit without widening the window by more than a minute. */
+export function explorerSinceMs(range: ExplorerRange, now = Date.now()): number {
+  const bucket = Math.floor(now / 60_000) * 60_000;
+  return bucket - EXPLORER_RANGE_MS[range];
+}
+
+export function assertExplorerRange(raw: string | undefined): ExplorerRange {
+  if (raw == null || raw === '') return '24h';
+  if (raw === '1h' || raw === '24h' || raw === '7d') return raw;
+  throw new AiGatewayLogsError('invalid_range', 'range must be 1h, 24h, or 7d', 400);
 }

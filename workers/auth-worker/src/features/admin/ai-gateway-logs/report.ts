@@ -3,8 +3,10 @@ import {
   AiGatewayLogsError,
   AI_GATEWAY_STAMP_EPOCH_MS,
   assertExecutionKey,
+  assertExplorerRange,
   assertLogId,
   DETAIL_RATE_PER_MINUTE,
+  explorerSinceMs,
   GATEWAY_LIST_CACHE_TTL_SEC,
   GATEWAY_LOG_PAGE_SIZE,
   GATEWAY_SUMMARY_MAX_PAGES,
@@ -12,10 +14,18 @@ import {
   KV_MIN_EXPIRATION_TTL_SEC,
   LIST_RATE_PER_MINUTE,
   type ExecutionGatewayReport,
+  type ExplorerGatewayReport,
+  type ExplorerRange,
   type GatewayLogDetail,
   type GatewayLogRow,
 } from './domain.js';
-import { getGatewayLog, listGatewayLogs, type GatewayListQuery } from './client.js';
+import {
+  getExplorerGatewayLog,
+  getGatewayLog,
+  listExplorerGatewayLogs,
+  listGatewayLogs,
+  type ExplorerListQuery,
+} from './client.js';
 
 type FetchLike = typeof fetch;
 
@@ -25,6 +35,10 @@ export type ExecutionLogFilters = {
   cached?: boolean;
   model?: string;
   search?: string;
+};
+
+export type ExplorerLogFilters = ExecutionLogFilters & {
+  range?: string;
 };
 
 type LedgerRow = {
@@ -107,15 +121,13 @@ function addRow(
 }
 
 async function summarize(
-  env: Env,
-  base: Omit<GatewayListQuery, 'page'>,
-  fetchImpl: FetchLike,
+  listPage: (page: number) => Promise<{ rows: GatewayLogRow[]; totalCount: number }>,
 ): Promise<ReturnType<typeof emptySummary>> {
   const summary = emptySummary();
   let seen = 0;
   let total = 0;
   for (let page = 1; page <= GATEWAY_SUMMARY_MAX_PAGES; page += 1) {
-    const listed = await listGatewayLogs(env, { ...base, page }, fetchImpl);
+    const listed = await listPage(page);
     total = listed.totalCount;
     if (!listed.rows.length) break;
     for (const row of listed.rows) {
@@ -173,7 +185,7 @@ export async function getExecutionGatewayReport(
   const [ledger, listed, summary] = await Promise.all([
     loadLedger(env, executionKey),
     listGatewayLogs(env, { ...queryBase, page }, fetchImpl),
-    summarize(env, queryBase, fetchImpl),
+    summarize((pageNo) => listGatewayLogs(env, { ...queryBase, page: pageNo }, fetchImpl)),
   ]);
 
   const startedAt = ledger?.startedAt ?? null;
@@ -219,6 +231,85 @@ export async function getExecutionGatewayReport(
     }
   }
   return report;
+}
+
+function explorerCacheKey(range: ExplorerRange, filterHash: string, page: number): string {
+  return `ai-gateway-all-logs:${range}:${filterHash}:${page}`;
+}
+
+export async function getExplorerGatewayReport(
+  env: Env,
+  adminId: string,
+  filters: ExplorerLogFilters,
+  fetchImpl: FetchLike = fetch,
+): Promise<ExplorerGatewayReport> {
+  const range = assertExplorerRange(filters.range);
+  await consumeRate(env, adminId, 'list');
+  const page = pageOf(filters.page);
+  const since = new Date(explorerSinceMs(range)).toISOString();
+  const queryBase: Omit<ExplorerListQuery, 'page'> = {
+    since,
+    success: filters.success,
+    cached: filters.cached,
+    model: filters.model?.trim() || undefined,
+    search: filters.search?.trim() || undefined,
+  };
+  const filterHash = await sha16(JSON.stringify({ ...queryBase, page }));
+  const kv = env.SYSTEM_CONFIG_KV;
+  const key = explorerCacheKey(range, filterHash, page);
+  if (kv) {
+    const hit = await kv.get(key);
+    if (hit) {
+      try {
+        const entry = JSON.parse(hit) as { expiresAt?: number; report?: ExplorerGatewayReport };
+        const parsed = entry?.report;
+        const fresh = typeof entry?.expiresAt === 'number' && entry.expiresAt > Date.now();
+        if (fresh && parsed?.scope === 'all' && parsed.range === range && Array.isArray(parsed.logs)) {
+          return parsed;
+        }
+      } catch {
+        /* refetch */
+      }
+    }
+  }
+
+  const [listed, summary] = await Promise.all([
+    listExplorerGatewayLogs(env, { ...queryBase, page }, fetchImpl),
+    summarize((pageNo) => listExplorerGatewayLogs(env, { ...queryBase, page: pageNo }, fetchImpl)),
+  ]);
+  const report: ExplorerGatewayReport = {
+    scope: 'all',
+    accountId: String(env.ACCOUNT_ID ?? ''),
+    gatewayId: AI_GATEWAY_ID,
+    range,
+    since,
+    summary,
+    logs: listed.rows,
+    page,
+    perPage: GATEWAY_LOG_PAGE_SIZE,
+    totalCount: listed.totalCount,
+  };
+
+  if (kv) {
+    const entry = { expiresAt: Date.now() + GATEWAY_LIST_CACHE_TTL_SEC * 1000, report };
+    try {
+      await kv.put(key, JSON.stringify(entry), { expirationTtl: KV_MIN_EXPIRATION_TTL_SEC });
+    } catch {
+      /* cache is best-effort */
+    }
+  }
+  return report;
+}
+
+export async function getExplorerGatewayLogDetail(
+  env: Env,
+  adminId: string,
+  logId: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<GatewayLogDetail> {
+  logId = assertLogId(logId);
+  await consumeRate(env, adminId, 'detail');
+  return getExplorerGatewayLog(env, logId, fetchImpl);
 }
 
 export async function getExecutionGatewayLogDetail(

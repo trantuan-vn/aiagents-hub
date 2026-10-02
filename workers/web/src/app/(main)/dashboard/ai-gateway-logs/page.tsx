@@ -13,9 +13,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { dashboardApiErrorMessage, isStepUpRequired, parseDashboardApiError } from "@/lib/dashboard-api-error";
 
 import { useRequireAdmin } from "../_hooks/use-require-admin";
+import { ExplorerPanel, type ExplorerRange } from "./_components/explorer-panel";
 import { EMPTY_FILTERS, LogFiltersBar, type LogFilters } from "./_components/filters";
 import { formatCostUsd, formatGatewayTime } from "./_components/format";
 import { LogsTable, type GatewayLogRow } from "./_components/logs-table";
@@ -83,6 +85,10 @@ export default function AiGatewayLogsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const executionKey = searchParams.get("executionKey")?.trim() ?? "";
+  const tab = searchParams.get("tab") === "all" ? "all" : "execution";
+  const rangeParam = searchParams.get("range");
+  const explorerRange: ExplorerRange =
+    rangeParam === "1h" || rangeParam === "24h" || rangeParam === "7d" ? rangeParam : "24h";
   const [draftKey, setDraftKey] = useState(executionKey);
   const [filterState, setFilterState] = useState({ key: executionKey, filters: EMPTY_FILTERS });
   if (filterState.key !== executionKey) {
@@ -123,7 +129,7 @@ export default function AiGatewayLogsPage() {
 
   const loadReport = useCallback(
     async (silent: boolean) => {
-      if (!executionKey) return;
+      if (!executionKey || tab !== "execution") return;
       if (!silent) setLoading(true);
       try {
         const response = await fetch(
@@ -155,19 +161,19 @@ export default function AiGatewayLogsPage() {
         if (!silent) setLoading(false);
       }
     },
-    [executionKey, filters, page, t],
+    [executionKey, filters, page, tab, t],
   );
 
   useEffect(() => {
-    if (!isAdmin || !executionKey) return;
+    if (!isAdmin || !executionKey || tab !== "execution") return;
     const handle = window.setTimeout(() => {
       void loadReport(false);
     }, 300);
     return () => window.clearTimeout(handle);
-  }, [isAdmin, executionKey, filters, page, loadReport]);
+  }, [isAdmin, executionKey, tab, filters, page, loadReport]);
 
   useEffect(() => {
-    if (!isAdmin || executionKey) return;
+    if (!isAdmin || executionKey || tab !== "execution") return;
     let cancelled = false;
     void (async () => {
       const response = await fetch(`${API_BASE_URL}/dashboard/admin/billing/workflow-execution-usages`, {
@@ -180,14 +186,14 @@ export default function AiGatewayLogsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isAdmin, executionKey]);
+  }, [isAdmin, executionKey, tab]);
 
   useEffect(() => {
     if (live) liveStarted.current = Date.now();
   }, [live]);
 
   useEffect(() => {
-    if (!live || !executionKey) return;
+    if (!live || !executionKey || tab !== "execution") return;
     const timer = window.setInterval(() => {
       if (Date.now() - liveStarted.current >= LIVE_MAX_MS) {
         setLive(false);
@@ -196,10 +202,10 @@ export default function AiGatewayLogsPage() {
       void loadReport(true);
     }, LIVE_MS);
     return () => window.clearInterval(timer);
-  }, [live, executionKey, loadReport]);
+  }, [live, executionKey, tab, loadReport]);
 
   useEffect(() => {
-    if (!selectedId || !executionKey) {
+    if (!selectedId || !executionKey || tab !== "execution") {
       setDetail(null);
       setDetailError(null);
       return;
@@ -232,7 +238,7 @@ export default function AiGatewayLogsPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, executionKey, t]);
+  }, [selectedId, executionKey, tab, t]);
 
   if (!isAdmin) return null;
 
@@ -244,6 +250,25 @@ export default function AiGatewayLogsPage() {
       return;
     }
     router.replace(`/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(key)}`);
+  };
+
+  const setTab = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === "all") {
+      params.set("tab", "all");
+      if (!params.get("range")) params.set("range", explorerRange);
+    } else {
+      params.delete("tab");
+    }
+    const qs = params.toString();
+    router.replace(qs ? `/dashboard/ai-gateway-logs?${qs}` : "/dashboard/ai-gateway-logs");
+  };
+
+  const setExplorerRange = (next: ExplorerRange) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", "all");
+    params.set("range", next);
+    router.replace(`/dashboard/ai-gateway-logs?${params.toString()}`);
   };
 
   const summary = report?.summary;
@@ -263,10 +288,10 @@ export default function AiGatewayLogsPage() {
             <Sparkles className="size-5" />
             {t("page_title")}
           </h1>
-          <p className="text-muted-foreground max-w-3xl">{t("page_description")}</p>
+          <p className="text-muted-foreground max-w-3xl">{tab === "all" ? t("unscoped") : t("page_description")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {executionKey ? (
+          {tab === "execution" && executionKey ? (
             <Link
               href={`/dashboard/workflow-execution-usages?executionKey=${encodeURIComponent(executionKey)}`}
               className="text-primary text-sm underline-offset-4 hover:underline"
@@ -274,7 +299,7 @@ export default function AiGatewayLogsPage() {
               {t("open_usages")}
             </Link>
           ) : null}
-          {cloudflareUrl ? (
+          {tab === "execution" && cloudflareUrl ? (
             <a
               href={cloudflareUrl}
               target="_blank"
@@ -288,149 +313,186 @@ export default function AiGatewayLogsPage() {
         </div>
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1 space-y-1">
-          <Label htmlFor="execution-key">{t("execution_label")}</Label>
-          <Input
-            id="execution-key"
-            value={draftKey}
-            onChange={(event) => setDraftKey(event.target.value)}
-            placeholder={t("execution_placeholder")}
-          />
-        </div>
-        <Button type="submit">{t("search")}</Button>
-      </form>
+      <Tabs value={tab} onValueChange={setTab}>
+        <TabsList>
+          <TabsTrigger value="execution">{t("tab_execution")}</TabsTrigger>
+          <TabsTrigger value="all">{t("tab_all")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="execution" className="flex flex-col gap-4 pt-2">
+          <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1 space-y-1">
+              <Label htmlFor="execution-key">{t("execution_label")}</Label>
+              <Input
+                id="execution-key"
+                value={draftKey}
+                onChange={(event) => setDraftKey(event.target.value)}
+                placeholder={t("execution_placeholder")}
+              />
+            </div>
+            <Button type="submit">{t("search")}</Button>
+          </form>
 
-      {!executionKey && recent.length > 0 ? (
-        <div className="space-y-2">
-          <h2 className="font-semibold">{t("recent_heading")}</h2>
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("col_time")}</TableHead>
-                  <TableHead>{t("col_workflow")}</TableHead>
-                  <TableHead>{t("col_status")}</TableHead>
-                  <TableHead>{t("execution_label")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recent.map((row) => (
-                  <TableRow
-                    key={row.executionKey}
-                    className="cursor-pointer"
-                    onClick={() =>
-                      router.replace(`/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(row.executionKey)}`)
-                    }
-                  >
-                    <TableCell className="text-xs whitespace-nowrap">{formatGatewayTime(row.startedAt)}</TableCell>
-                    <TableCell className="text-sm">{row.workflowName || `#${row.workflowId}`}</TableCell>
-                    <TableCell className="text-xs capitalize">{row.status}</TableCell>
-                    <TableCell className="font-mono text-xs">{row.executionKey}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      ) : null}
-
-      {executionKey && report ? (
-        <div className="bg-card space-y-3 rounded-lg border p-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs">{report.gatewayId}</span>
-            <span className="text-muted-foreground text-xs">{report.execution?.executionKey ?? executionKey}</span>
-            {report.execution?.workflowName ? <span className="text-sm">{report.execution.workflowName}</span> : null}
-            {report.execution?.status ? (
-              <Badge variant="outline" className="capitalize">
-                {report.execution.status}
-              </Badge>
-            ) : (
-              <Badge variant="outline">{t("unknown_execution")}</Badge>
-            )}
-          </div>
-          <p className="text-muted-foreground text-xs">
-            {formatGatewayTime(report.execution?.startedAt)} – {formatGatewayTime(report.execution?.finishedAt)}
-          </p>
-          {summary ? (
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span>
-                {t("chip_logs", { count: summary.logCount })}
-              </span>
-              <span>{formatCostUsd(summary.costUsd)}</span>
-              <span>{t("usage_in_out", { in: summary.tokensIn, out: summary.tokensOut })}</span>
-              <span>{t("chip_cached", { count: summary.cached })}</span>
-              <span>{t("chip_errors", { count: summary.errors })}</span>
-              {summary.truncated ? <span className="text-muted-foreground">{t("summary_truncated")}</span> : null}
+          {!executionKey && recent.length > 0 ? (
+            <div className="space-y-2">
+              <h2 className="font-semibold">{t("recent_heading")}</h2>
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("col_time")}</TableHead>
+                      <TableHead>{t("col_workflow")}</TableHead>
+                      <TableHead>{t("col_status")}</TableHead>
+                      <TableHead>{t("execution_label")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recent.map((row) => (
+                      <TableRow
+                        key={row.executionKey}
+                        className="cursor-pointer"
+                        onClick={() =>
+                          router.replace(
+                            `/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(row.executionKey)}`,
+                          )
+                        }
+                      >
+                        <TableCell className="text-xs whitespace-nowrap">{formatGatewayTime(row.startedAt)}</TableCell>
+                        <TableCell className="text-sm">{row.workflowName || `#${row.workflowId}`}</TableCell>
+                        <TableCell className="text-xs capitalize">{row.status}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.executionKey}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
           ) : null}
-          <p className="text-muted-foreground text-xs">{t("credit_note")}</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadReport(false)}>
-              <RefreshCw className={`size-3 ${loading ? "animate-spin" : ""}`} />
-              {t("refresh")}
-            </Button>
-            <Label htmlFor="gw-live" className="flex items-center gap-2 text-sm">
-              <Switch id="gw-live" checked={live} onCheckedChange={setLive} />
-              {t("live")}
-            </Label>
-            {report.execution?.status === "running" && !live ? (
-              <button type="button" className="text-primary text-xs underline-offset-4 hover:underline" onClick={() => setLive(true)}>
-                {t("running_hint")}
-              </button>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
 
-      {unavailable ? <p className="text-destructive text-sm">{t("unavailable")}</p> : null}
-      {error && !unavailable ? <p className="text-destructive text-sm">{error.message}</p> : null}
+          {executionKey && report ? (
+            <div className="bg-card space-y-3 rounded-lg border p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs">{report.gatewayId}</span>
+                <span className="text-muted-foreground text-xs">{report.execution?.executionKey ?? executionKey}</span>
+                {report.execution?.workflowName ? (
+                  <span className="text-sm">{report.execution.workflowName}</span>
+                ) : null}
+                {report.execution?.status ? (
+                  <Badge variant="outline" className="capitalize">
+                    {report.execution.status}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline">{t("unknown_execution")}</Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {formatGatewayTime(report.execution?.startedAt)} – {formatGatewayTime(report.execution?.finishedAt)}
+              </p>
+              {summary ? (
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span>{t("chip_logs", { count: summary.logCount })}</span>
+                  <span>{formatCostUsd(summary.costUsd)}</span>
+                  <span>{t("usage_in_out", { in: summary.tokensIn, out: summary.tokensOut })}</span>
+                  <span>{t("chip_cached", { count: summary.cached })}</span>
+                  <span>{t("chip_errors", { count: summary.errors })}</span>
+                  {summary.truncated ? <span className="text-muted-foreground">{t("summary_truncated")}</span> : null}
+                </div>
+              ) : null}
+              <p className="text-muted-foreground text-xs">{t("credit_note")}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() => void loadReport(false)}
+                >
+                  <RefreshCw className={`size-3 ${loading ? "animate-spin" : ""}`} />
+                  {t("refresh")}
+                </Button>
+                <Label htmlFor="gw-live" className="flex items-center gap-2 text-sm">
+                  <Switch id="gw-live" checked={live} onCheckedChange={setLive} />
+                  {t("live")}
+                </Label>
+                {report.execution?.status === "running" && !live ? (
+                  <button
+                    type="button"
+                    className="text-primary text-xs underline-offset-4 hover:underline"
+                    onClick={() => setLive(true)}
+                  >
+                    {t("running_hint")}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
 
-      {executionKey && report && !unavailable ? (
-        <>
-          <LogFiltersBar
-            filters={filters}
-            onChange={(next) => {
-              setFilters(next);
-              setPage(1);
+          {unavailable ? <p className="text-destructive text-sm">{t("unavailable")}</p> : null}
+          {error && !unavailable ? <p className="text-destructive text-sm">{error.message}</p> : null}
+
+          {executionKey && report && !unavailable ? (
+            <>
+              <LogFiltersBar
+                filters={filters}
+                onChange={(next) => {
+                  setFilters(next);
+                  setPage(1);
+                }}
+              />
+              {report.logs.length > 0 ? (
+                <>
+                  <LogsTable
+                    rows={report.logs}
+                    selectedId={selectedId}
+                    onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
+                    detail={detail}
+                    detailLoading={detailLoading}
+                    detailError={detailError}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span>{t("showing", { from, to, total: report.totalCount })}</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setPage((n) => n - 1)}
+                      >
+                        {t("prev")}
+                      </Button>
+                      <span>
+                        {page} / {pageCount}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= pageCount}
+                        onClick={() => setPage((n) => n + 1)}
+                      >
+                        {t("next")}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  {report.link === "unstamped" ? t("unstamped") : t("no_logs")}
+                </p>
+              )}
+            </>
+          ) : null}
+        </TabsContent>
+        <TabsContent value="all" className="pt-2">
+          <ExplorerPanel
+            range={explorerRange}
+            onRange={setExplorerRange}
+            onOpenExecution={(key) => {
+              router.replace(`/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(key)}`);
             }}
           />
-          {report.logs.length > 0 ? (
-            <>
-              <LogsTable
-                rows={report.logs}
-                selectedId={selectedId}
-                onSelect={(id) => setSelectedId((current) => (current === id ? null : id))}
-                detail={detail}
-                detailLoading={detailLoading}
-                detailError={detailError}
-              />
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                <span>{t("showing", { from, to, total: report.totalCount })}</span>
-                <div className="flex items-center gap-2">
-                  <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((n) => n - 1)}>
-                    {t("prev")}
-                  </Button>
-                  <span>
-                    {page} / {pageCount}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= pageCount}
-                    onClick={() => setPage((n) => n + 1)}
-                  >
-                    {t("next")}
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="text-muted-foreground text-sm">{report.link === "unstamped" ? t("unstamped") : t("no_logs")}</p>
-          )}
-        </>
-      ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

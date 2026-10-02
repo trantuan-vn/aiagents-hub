@@ -5397,6 +5397,15 @@
     "unknown_execution": "Không có hồ sơ execution",
     "log_gone": "Log không còn trên gateway.",
     "prev": "Trước",
-    "next": "Sau"
+    "next": "Sau",
+    "tab_execution": "Một execution",
+    "tab_all": "Mọi log gateway",
+    "unscoped": "Không gắn với một execution. Danh sách này là mọi request trên gateway trong khoảng thời gian đã chọn.",
+    "range_1h": "1 giờ",
+    "range_24h": "24 giờ",
+    "range_7d": "7 ngày",
+    "since_label": "Từ {time}",
+    "open_execution": "Mở execution này",
+    "no_logs_range": "Không có log gateway trong khoảng thời gian này."
   }
 }

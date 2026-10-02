@@ -22,6 +22,7 @@ export type GatewayLogRow = {
   step: number | null;
   kind: string | null;
   nodeId: string | null;
+  executionKey?: string | null;
 };
 
 const DOT: Record<GatewayLogRow["status"], string> = {
@@ -37,6 +38,7 @@ export function LogsTable({
   detail,
   detailLoading,
   detailError,
+  onOpenExecution,
 }: {
   rows: GatewayLogRow[];
   selectedId: string | null;
@@ -44,6 +46,7 @@ export function LogsTable({
   detail: GatewayLogDetail | null;
   detailLoading: boolean;
   detailError: string | null;
+  onOpenExecution?: (executionKey: string) => void;
 }) {
   const t = useTranslations("AiGatewayLogsAdmin");
 
@@ -77,7 +80,7 @@ export function LogsTable({
                   className={selected ? "bg-muted/60" : "cursor-pointer"}
                   onClick={() => onSelect(row.id)}
                 >
-                  <TableCell className="whitespace-nowrap font-mono text-xs">
+                  <TableCell className="font-mono text-xs whitespace-nowrap">
                     {formatGatewayTime(row.createdAt)}
                   </TableCell>
                   <TableCell>
@@ -94,8 +97,20 @@ export function LogsTable({
                         {row.step != null && row.step > 0 ? ` · ${t("retry_step", { step: row.step })}` : ""}
                       </div>
                     ) : null}
+                    {onOpenExecution && row.executionKey ? (
+                      <button
+                        type="button"
+                        className="text-primary block max-w-full truncate text-left text-[11px] underline-offset-2 hover:underline"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenExecution(row.executionKey!);
+                        }}
+                      >
+                        {t("open_execution")}
+                      </button>
+                    ) : null}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">{usage(row)}</TableCell>
+                  <TableCell className="text-xs whitespace-nowrap">{usage(row)}</TableCell>
                   <TableCell className="font-mono text-xs">{formatCostUsd(row.costUsd)}</TableCell>
                   <TableCell className="text-xs">{row.durationMs} ms</TableCell>
                   <TableCell className="max-w-[180px] truncate text-xs">{row.userAgent || "—"}</TableCell>

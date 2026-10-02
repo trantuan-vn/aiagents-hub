@@ -6,6 +6,7 @@ import {
   AiGatewayLogsError,
   GATEWAY_HEAD_CHAR_LIMIT,
   GATEWAY_LOG_PAGE_SIZE,
+  isExecutionKey,
   logStatus,
   type GatewayLogDetail,
   type GatewayLogRow,
@@ -16,18 +17,26 @@ const log = createLogger('auth-worker', 'ai-gateway-logs');
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
 export type GatewayListFilter = {
-  key: 'event_id' | 'success' | 'cached' | 'model';
-  operator: 'eq';
+  key: 'event_id' | 'created_at' | 'success' | 'cached' | 'model';
+  operator: 'eq' | 'gt';
   value: string;
 };
 
-export type GatewayListQuery = {
-  executionKey: string;
+type GatewayListFields = {
   page: number;
   success?: boolean;
   cached?: boolean;
   model?: string;
   search?: string;
+};
+
+export type GatewayListQuery = GatewayListFields & {
+  executionKey: string;
+};
+
+/** Phase 2 explorer. Never carries `event_id` — the window is `created_at` gt `since`. */
+export type ExplorerListQuery = GatewayListFields & {
+  since: string;
 };
 
 type FetchLike = typeof fetch;
@@ -73,15 +82,7 @@ function isoFrom(value: unknown): string {
   return new Date(0).toISOString();
 }
 
-/**
- * `filters` must be a JSON string; the API silently ignores the `filters[0][key]`, `filters[key]`
- * and `filters.key` forms and returns every log on the gateway.
- * `event_id` is always the first filter; `search` never replaces it.
- */
-export function buildLogsSearchParams(query: GatewayListQuery): URLSearchParams {
-  const filters: GatewayListFilter[] = [
-    { key: 'event_id', operator: 'eq', value: query.executionKey },
-  ];
+function appendSharedFilters(filters: GatewayListFilter[], query: GatewayListFields): void {
   if (query.success != null) {
     filters.push({ key: 'success', operator: 'eq', value: query.success ? 'true' : 'false' });
   }
@@ -90,7 +91,13 @@ export function buildLogsSearchParams(query: GatewayListQuery): URLSearchParams 
   }
   const model = query.model?.trim();
   if (model) filters.push({ key: 'model', operator: 'eq', value: model.slice(0, 200) });
+}
 
+/**
+ * `filters` must be a JSON string; the API silently ignores the `filters[0][key]`, `filters[key]`
+ * and `filters.key` forms and returns every log on the gateway.
+ */
+function toSearchParams(filters: GatewayListFilter[], query: GatewayListFields): URLSearchParams {
   const params = new URLSearchParams();
   params.set(
     'filters',
@@ -106,6 +113,31 @@ export function buildLogsSearchParams(query: GatewayListQuery): URLSearchParams 
   return params;
 }
 
+/**
+ * Execution list. `event_id` is always the first filter; `search` never replaces it.
+ */
+export function buildLogsSearchParams(query: GatewayListQuery): URLSearchParams {
+  const filters: GatewayListFilter[] = [
+    { key: 'event_id', operator: 'eq', value: query.executionKey },
+  ];
+  appendSharedFilters(filters, query);
+  return toSearchParams(filters, query);
+}
+
+/** Gateway explorer. Time window only — adding `event_id` here would hide logs that are not a run. */
+export function buildExplorerSearchParams(query: ExplorerListQuery): URLSearchParams {
+  const since = query.since.trim();
+  if (!since || !Number.isFinite(Date.parse(since))) {
+    throw new AiGatewayLogsError('invalid_range', 'range must be 1h, 24h, or 7d', 400);
+  }
+  const filters: GatewayListFilter[] = [{ key: 'created_at', operator: 'gt', value: since }];
+  appendSharedFilters(filters, query);
+  if (filters.some((filter) => filter.key === 'event_id')) {
+    throw new AiGatewayLogsError('ai_gateway_error', 'Explorer list must not filter by event id', 500);
+  }
+  return toSearchParams(filters, query);
+}
+
 export function mapGatewayLogRow(raw: unknown): GatewayLogRow | null {
   try {
     const row = asRecord(raw);
@@ -115,6 +147,7 @@ export function mapGatewayLogRow(raw: unknown): GatewayLogRow | null {
     if (typeof row.success !== 'boolean' || typeof row.cached !== 'boolean') return null;
     const meta = parseMetadata(row.metadata);
     const duration = numOrNull(row.duration);
+    const stamped = metaString(meta, 'executionKey');
     return {
       id: row.id,
       createdAt: isoFrom(row.created_at),
@@ -132,6 +165,7 @@ export function mapGatewayLogRow(raw: unknown): GatewayLogRow | null {
       step: numOrNull(row.step),
       kind: metaString(meta, 'kind'),
       nodeId: metaString(meta, 'nodeId'),
+      executionKey: stamped && isExecutionKey(stamped) ? stamped : null,
     };
   } catch {
     return null;
@@ -254,52 +288,87 @@ export type ListedLogs = {
   totalCount: number;
 };
 
+function logsPath(env: Env, params: URLSearchParams): string {
+  return `/accounts/${encodeURIComponent(String(env.ACCOUNT_ID))}/ai-gateway/gateways/${AI_GATEWAY_ID}/logs?${params.toString()}`;
+}
+
+function parseListed(body: unknown): { raw: unknown[]; totalCount: number } {
+  const record = asRecord(body) ?? {};
+  const raw = Array.isArray(record.result) ? record.result : [];
+  const total = numOrNull(asRecord(record.result_info)?.total_count);
+  return { raw, totalCount: total ?? raw.length };
+}
+
 export async function listGatewayLogs(
   env: Env,
   query: GatewayListQuery,
   fetchImpl: FetchLike = fetch,
 ): Promise<ListedLogs> {
-  const body = await cfGet(
-    env,
-    `/accounts/${encodeURIComponent(String(env.ACCOUNT_ID))}/ai-gateway/gateways/${AI_GATEWAY_ID}/logs?${buildLogsSearchParams(query).toString()}`,
-    query.executionKey,
-    'list',
-    fetchImpl,
-  );
-  const record = asRecord(body) ?? {};
-  const result = Array.isArray(record.result) ? record.result : [];
-  const total = numOrNull(asRecord(record.result_info)?.total_count);
-  const matched = result.filter(
-    (raw) => executionKeyFromMetadata(asRecord(raw)?.metadata) === query.executionKey,
+  const body = await cfGet(env, logsPath(env, buildLogsSearchParams(query)), query.executionKey, 'list', fetchImpl);
+  const { raw, totalCount } = parseListed(body);
+  const matched = raw.filter(
+    (item) => executionKeyFromMetadata(asRecord(item)?.metadata) === query.executionKey,
   ).length;
-  if (matched !== result.length) {
+  if (matched !== raw.length) {
     log.warn('gateway.filter_ignored', {
       status: 200,
       executionKey: query.executionKey,
       op: 'list',
-      total,
-      rows: result.length,
+      total: totalCount,
+      rows: raw.length,
       matched,
     });
     throw new AiGatewayLogsError('ai_gateway_filter_ignored', 'AI Gateway ignored the event_id filter', 502);
   }
   return {
-    rows: result.map(mapGatewayLogRow).filter((row): row is GatewayLogRow => row != null),
-    totalCount: total ?? result.length,
+    rows: raw.map(mapGatewayLogRow).filter((row): row is GatewayLogRow => row != null),
+    totalCount,
   };
 }
 
-export async function getGatewayLog(
+export async function listExplorerGatewayLogs(
   env: Env,
-  executionKey: string,
-  logId: string,
+  query: ExplorerListQuery,
   fetchImpl: FetchLike = fetch,
-): Promise<GatewayLogDetail> {
+): Promise<ListedLogs> {
+  const sinceMs = Date.parse(query.since);
+  const body = await cfGet(env, logsPath(env, buildExplorerSearchParams(query)), 'explorer', 'list-all', fetchImpl);
+  const { raw, totalCount } = parseListed(body);
+  const rows: GatewayLogRow[] = [];
+  for (const item of raw) {
+    const record = asRecord(item);
+    const rawCreated = record?.created_at;
+    const created =
+      typeof rawCreated === 'string' || typeof rawCreated === 'number' ? Date.parse(String(rawCreated)) : NaN;
+    if (!Number.isFinite(created)) continue;
+    if (created < sinceMs) {
+      log.warn('gateway.filter_ignored', {
+        status: 200,
+        executionKey: 'explorer',
+        op: 'list-all',
+        total: totalCount,
+        rows: raw.length,
+      });
+      throw new AiGatewayLogsError('ai_gateway_filter_ignored', 'AI Gateway ignored the time filter', 502);
+    }
+    const mapped = mapGatewayLogRow(item);
+    if (mapped) rows.push(mapped);
+  }
+  return { rows, totalCount };
+}
+
+async function readGatewayLog(
+  env: Env,
+  logId: string,
+  scope: string,
+  op: string,
+  fetchImpl: FetchLike,
+): Promise<{ detail: GatewayLogDetail; result: unknown }> {
   const body = await cfGet(
     env,
     `/accounts/${encodeURIComponent(String(env.ACCOUNT_ID))}/ai-gateway/gateways/${AI_GATEWAY_ID}/logs/${encodeURIComponent(logId)}`,
-    executionKey,
-    'detail',
+    scope,
+    op,
     fetchImpl,
   );
   const record = asRecord(body);
@@ -308,9 +377,29 @@ export async function getGatewayLog(
   if (!detail) {
     throw new AiGatewayLogsError('ai_gateway_error', 'AI Gateway request failed', 502);
   }
+  return { detail, result };
+}
+
+export async function getGatewayLog(
+  env: Env,
+  executionKey: string,
+  logId: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<GatewayLogDetail> {
+  const { detail, result } = await readGatewayLog(env, logId, executionKey, 'detail', fetchImpl);
   const owner = executionKeyFromMetadata(asRecord(result)?.metadata);
   if (owner !== executionKey) {
     throw new AiGatewayLogsError('log_not_found', 'Log is not part of this execution', 404);
   }
+  return detail;
+}
+
+/** Any gateway log. Used only by the explorer, which is labeled as not tied to one execution. */
+export async function getExplorerGatewayLog(
+  env: Env,
+  logId: string,
+  fetchImpl: FetchLike = fetch,
+): Promise<GatewayLogDetail> {
+  const { detail } = await readGatewayLog(env, logId, 'explorer', 'detail-all', fetchImpl);
   return detail;
 }

@@ -5397,6 +5397,15 @@
     "unknown_execution": "Unknown execution",
     "log_gone": "This log is no longer on the gateway.",
     "prev": "Previous",
-    "next": "Next"
+    "next": "Next",
+    "tab_execution": "One execution",
+    "tab_all": "All gateway logs",
+    "unscoped": "Not tied to one execution. This list is every request on the gateway in the selected window.",
+    "range_1h": "1 hour",
+    "range_24h": "24 hours",
+    "range_7d": "7 days",
+    "since_label": "Since {time}",
+    "open_execution": "Open this execution",
+    "no_logs_range": "No gateway logs in this window."
   }
 }

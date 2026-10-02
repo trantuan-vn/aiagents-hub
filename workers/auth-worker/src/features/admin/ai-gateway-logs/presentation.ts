@@ -3,7 +3,12 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { requireAdmin } from '../../auth/authMiddleware';
 import { handleError } from '../../../shared/utils';
 import { AiGatewayLogsError, assertExecutionKey, assertLogId } from './domain.js';
-import { getExecutionGatewayLogDetail, getExecutionGatewayReport } from './report.js';
+import {
+  getExecutionGatewayLogDetail,
+  getExecutionGatewayReport,
+  getExplorerGatewayLogDetail,
+  getExplorerGatewayReport,
+} from './report.js';
 
 function parseBool(raw: string | undefined): boolean | undefined {
   if (raw == null || raw === '') return undefined;
@@ -32,6 +37,44 @@ export function createAdminAiGatewayLogsRoutes() {
         return c.json({ error: e.message, code: e.code }, e.status as ContentfulStatusCode);
       }
       const { errorResponse, status } = await handleError(c, e, 'Failed to load AI Gateway log');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/logs/:logId', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const logId = assertLogId(c.req.param('logId'));
+      const detail = await getExplorerGatewayLogDetail(c.env, String(user.identifier ?? 'admin'), logId);
+      return c.json(detail);
+    } catch (e) {
+      if (e instanceof AiGatewayLogsError) {
+        return c.json({ error: e.message, code: e.code }, e.status as ContentfulStatusCode);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load AI Gateway log');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.get('/logs', async (c) => {
+    try {
+      const user = requireAdmin(c);
+      const pageRaw = c.req.query('page');
+      const page = pageRaw ? Number(pageRaw) : 1;
+      const report = await getExplorerGatewayReport(c.env, String(user.identifier ?? 'admin'), {
+        range: c.req.query('range'),
+        page: Number.isFinite(page) ? page : 1,
+        success: parseBool(c.req.query('success')),
+        cached: parseBool(c.req.query('cached')),
+        model: c.req.query('model'),
+        search: c.req.query('search'),
+      });
+      return c.json(report);
+    } catch (e) {
+      if (e instanceof AiGatewayLogsError) {
+        return c.json({ error: e.message, code: e.code }, e.status as ContentfulStatusCode);
+      }
+      const { errorResponse, status } = await handleError(c, e, 'Failed to load AI Gateway logs');
       return c.json(errorResponse, status);
     }
   });
