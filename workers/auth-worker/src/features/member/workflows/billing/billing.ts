@@ -18,7 +18,12 @@ import {
   periodYm,
   type QuotaSnapshot,
 } from './plan.js';
-import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
+import {
+  gatewayForExecution,
+  withAiCapacityRetry,
+  WORKERS_AI_GATEWAY,
+  type AiCallStamp,
+} from '../ai/workers-ai.js';
 
 const DEFAULT_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
@@ -382,15 +387,17 @@ export async function runTextModel(
   messages: Array<{ role: string; content: string }>,
   maxTokens = 1024,
   extra?: Record<string, unknown>,
+  stamp?: AiCallStamp,
 ): Promise<unknown> {
   const id = (modelId || DEFAULT_TEXT_MODEL) as keyof AiModels;
+  const textGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'text' }) : WORKERS_AI_GATEWAY;
 
   const run = () =>
     withAiCapacityRetry(() =>
       env.AI.run(
         id,
         { messages, max_tokens: maxTokens, ...extra },
-        { gateway: WORKERS_AI_GATEWAY },
+        { gateway: textGateway },
       ),
     );
 
@@ -399,7 +406,8 @@ export async function runTextModel(
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (/5016|agree|Prior to using this model/i.test(msg)) {
-      await env.AI.run(id, { prompt: 'agree' });
+      const agreeGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'agree' }) : undefined;
+      await env.AI.run(id, { prompt: 'agree' }, agreeGateway ? { gateway: agreeGateway } : undefined);
       return await run();
     }
     throw e;

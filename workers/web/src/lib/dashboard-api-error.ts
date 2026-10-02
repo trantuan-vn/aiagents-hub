@@ -1,5 +1,6 @@
 export type DashboardApiErrorBody = {
   error?: string;
+  code?: string;
   requiresStrongAuthSetup?: boolean;
   stepUpRequired?: boolean;
   availableMethods?: string[];

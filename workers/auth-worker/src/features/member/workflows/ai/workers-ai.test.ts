@@ -1,10 +1,46 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  gatewayForExecution,
   isAiAccountLimitedError,
   isAiCapacityError,
+  stampFromNode,
   withAiCapacityRetry,
 } from './workers-ai.js';
+
+describe('gatewayForExecution', () => {
+  const key = '11111111-1111-4111-8111-111111111111';
+
+  it('sets eventId to the execution and exactly four metadata keys', () => {
+    const gateway = gatewayForExecution({
+      executionKey: key,
+      workflowId: '42',
+      nodeId: 'node-1',
+      kind: 'text',
+    });
+    expect(gateway.eventId).toBe(key);
+    expect(gateway.id).toBe('unitoken');
+    expect(Object.keys(gateway.metadata).sort()).toEqual(['executionKey', 'kind', 'nodeId', 'workflowId']);
+    expect(gateway.metadata.kind).toBe('text');
+    const agent = gatewayForExecution({ executionKey: key, workflowId: '42', nodeId: 'node-1', kind: 'agent' });
+    expect(agent.metadata.kind).toBe('agent');
+  });
+
+  it('does not put email, authorization, or prompt text in metadata', () => {
+    const gateway = gatewayForExecution(
+      stampFromNode({ executionKey: key, node: { id: 'n' }, meta: { workflowId: 7 } }, 'embed'),
+    );
+    const blob = JSON.stringify(gateway);
+    expect(blob).not.toMatch(/email|authorization|password|prompt/i);
+    expect(gateway.metadata).not.toHaveProperty('owner');
+  });
+
+  it('fails closed when the execution key is missing', () => {
+    expect(() =>
+      gatewayForExecution(stampFromNode({ node: { id: 'n' }, meta: { workflowId: 1 } }, 'text')),
+    ).toThrow(/ai_call_missing_execution_key/);
+  });
+});
 
 describe('Workers AI capacity errors', () => {
   it('detects 3040 capacity errors from message or code', () => {

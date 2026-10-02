@@ -110,6 +110,7 @@ function ctxFor(
     definition,
     outputs: {},
     runContext: {},
+    executionKey: '11111111-1111-4111-8111-111111111111',
     c: { env },
     meta: { ownerId: 'user-1', workflowId: 42 },
     user: { identifier: 'user@example.com' },

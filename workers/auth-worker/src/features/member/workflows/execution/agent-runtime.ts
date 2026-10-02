@@ -34,6 +34,8 @@ interface AgentToolContext {
   ownerId?: string;
   workflowId?: number;
   billing?: RagBilling;
+  /** Set only for a workflow execution. Authoring chat leaves this unset. */
+  aiCall?: { executionKey: string; workflowId: string; nodeId: string };
 }
 
 /** Fold any linked retrieve/validate tool into Code Mode (not only get-rag/check-sql). */
@@ -249,6 +251,7 @@ export function buildLinkedAgentTools(
       toolConfig: config,
       toolName,
       toolDescription,
+      aiCall: ctx.aiCall,
     });
     if (created) tools[created.name] = created.tool;
   }

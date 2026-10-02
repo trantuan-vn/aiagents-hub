@@ -2,7 +2,7 @@ import { generateText, stepCountIs, tool, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 import { z } from 'zod';
 
-import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
+import { gatewayForExecution, stampFromNode, withAiCapacityRetry } from '../../ai/workers-ai.js';
 import {
   asBillingAiResponse,
   billAgentUsage,
@@ -408,7 +408,7 @@ function createDefaultLlm(args: {
     if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
       const workersAI = createWorkersAI({
         binding: ctx.c.env.AI,
-        gateway: WORKERS_AI_GATEWAY,
+        gateway: gatewayForExecution(stampFromNode(ctx, 'agent')),
       });
       let billedSteps = 0;
       const result = await withAiCapacityRetry(async () =>
@@ -487,7 +487,7 @@ function createDefaultLlm(args: {
       top_p: args.topP,
       frequency_penalty: args.frequencyPenalty,
       presence_penalty: args.presencePenalty,
-    });
+    }, stampFromNode(ctx, 'text'));
     const text = asText(extractTextFromAiResponse(aiResponse));
     await onBill?.(aiResponse, text);
     return {
@@ -530,6 +530,7 @@ async function refreshSqlRag(ctx: NodeContext, agentId: string, query: string): 
       workflowId: ctx.meta.workflowId,
       billing: ragBillingFromNodeContext(ctx),
       triggerContext: (ctx.nodeInput ?? {}) as Record<string, unknown>,
+      stamp: stampFromNode(ctx, 'embed'),
     });
     const snippets = result.snippets.map((snippet) => snippet.text).filter(Boolean);
     return { ragText: result.ragText, snippets, query: trimmed };
@@ -887,7 +888,14 @@ export async function executeReasoningAgent(
   const ragSnippets = snippetTexts(nodeInput.snippets);
   const semantic =
     memoryCollection && !agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag')
-      ? await retrieveSemanticMemory(ctx.c.env, memoryCollection, userText, 4, memoryNamespace)
+      ? await retrieveSemanticMemory(
+          ctx.c.env,
+          memoryCollection,
+          userText,
+          4,
+          memoryNamespace,
+          stampFromNode(ctx, 'embed'),
+        )
       : [];
   let snippets = [...new Set([...ragSnippets, ...semantic].map((s) => s.trim()).filter(Boolean))];
 
@@ -903,6 +911,11 @@ export async function executeReasoningAgent(
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
       billing,
+      aiCall: {
+        executionKey: String(ctx.executionKey ?? ''),
+        workflowId: String(ctx.meta.workflowId ?? ''),
+        nodeId: ctx.node.id,
+      },
     },
     ctx.definition,
     ctx.node.id,
@@ -924,6 +937,7 @@ export async function executeReasoningAgent(
                 query,
                 5,
                 memoryNamespace,
+                stampFromNode(ctx, 'embed'),
               );
               return { snippets: found, count: found.length };
             },
@@ -1004,7 +1018,13 @@ export async function executeReasoningAgent(
       });
     }
     if (memoryCollection) {
-      await persistSemanticEpisode(ctx.c.env, memoryCollection, shown.text.slice(0, 400), memoryNamespace);
+      await persistSemanticEpisode(
+        ctx.c.env,
+        memoryCollection,
+        shown.text.slice(0, 400),
+        memoryNamespace,
+        stampFromNode(ctx, 'embed'),
+      );
     }
     await simpleMemory.persist(shown.text);
     return toNodeOutput(shown, outputExtra);

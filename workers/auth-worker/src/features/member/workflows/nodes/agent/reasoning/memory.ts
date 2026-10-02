@@ -6,6 +6,7 @@ import {
   queryCollection,
   upsertVectors,
 } from '../../../rag/index.js';
+import type { AiCallStamp } from '../../../ai/workers-ai.js';
 import { MAX_EPISODES } from './types.js';
 
 export type Episode = {
@@ -147,10 +148,11 @@ export async function retrieveSemanticMemory(
   query: string,
   topK = 5,
   namespace?: string,
+  stamp?: AiCallStamp,
 ): Promise<string[]> {
   if (!query.trim() || !collection.trim()) return [];
   try {
-    const vector = await embedText(env, query);
+    const vector = await embedText(env, query, undefined, stamp);
     if (!vector.length) return [];
     const matches = await queryCollection(env, collection, vector, { topK, namespace });
     return matchesToSnippets(matches);
@@ -165,11 +167,12 @@ export async function persistSemanticEpisode(
   collection: string,
   text: string,
   namespace?: string,
+  stamp?: AiCallStamp,
 ): Promise<void> {
   const content = text.trim();
   if (!content || !collection.trim()) return;
   try {
-    const values = await embedText(env, content);
+    const values = await embedText(env, content, undefined, stamp);
     if (!values.length) return;
     const id = `episode:${Date.now().toString(36)}:${content.slice(0, 12)}`.slice(0, 64);
     await upsertVectors(env, collection, [

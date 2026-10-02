@@ -318,6 +318,9 @@
 		"secret_name": "PAYPAL_CLIENT_SECRET"
 		},
 		{
+		// AI Gateway logs reuse this token. It must include AI Gateway Read
+		// (list + get on gateway unitoken). Do not add a second secret.
+		// AI Gateway Write is not required — Hub never calls patchLog.
 		"binding": "CLOUDFLARE_USAGE_API_TOKEN",
 		"store_id": "8fe9cf5e23574e849953a38dcdafdf8c",
 		"secret_name": "CLOUDFLARE_API_TOKEN"

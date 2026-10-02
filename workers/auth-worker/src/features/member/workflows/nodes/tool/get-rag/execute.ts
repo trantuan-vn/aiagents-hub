@@ -1,4 +1,6 @@
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
+import type { AiCallStamp } from '../../../ai/workers-ai.js';
+import { stampFromNode } from '../../../ai/workers-ai.js';
 import {
   embedTextWithUsage,
   queryCollection,
@@ -80,6 +82,8 @@ export type GetRagExecuteParams = {
   billing?: RagBilling;
   /** Upstream payload — used only to resolve user-mapped Get RAG expressions. */
   triggerContext?: Record<string, unknown>;
+  /** Set on the execution path. Unit tests may omit it. */
+  stamp?: AiCallStamp;
 };
 
 /** Literal metadata key from node config, or an expression that resolves to a key name. */
@@ -425,7 +429,7 @@ export async function executeGetRag(params: GetRagExecuteParams): Promise<GetRag
   const groupBy = resolveGroupByField(config.groupByField, params.triggerContext ?? {}) || 'tableName';
 
   try {
-    const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, embed.model);
+    const { vector, usage: embedUsage } = await embedTextWithUsage(env, input.query, embed.model, params.stamp);
     if (!vector.length) {
       return {
         sqlPairs: [],
@@ -522,6 +526,7 @@ export async function executeGetRagPipeline(ctx: NodeContext): Promise<NodeOutpu
     workflowId: ctx.meta.workflowId,
     billing: ragBillingFromNodeContext(ctx),
     triggerContext: ctx.nodeInput as Record<string, unknown>,
+    stamp: stampFromNode(ctx, 'embed'),
   });
   return withRagOutput(ctx.nodeInput, {
     ragText: result.ragText,
@@ -587,6 +592,7 @@ export async function prefetchLinkedGetRag(
       workflowId: ctx.meta.workflowId,
       billing: ragBillingFromNodeContext(ctx),
       triggerContext: (ctx.nodeInput ?? {}) as Record<string, unknown>,
+      stamp: stampFromNode(ctx, 'embed'),
     });
     const snippets = result.snippets.map((snippet) => snippet.text).filter(Boolean);
     return { ragText: result.ragText, snippets, query };

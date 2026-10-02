@@ -1,9 +1,11 @@
 "use client";
 
-import { type FormEvent, useCallback, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
 
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw, Search, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,7 +59,9 @@ function formatTs(ts?: number): string {
 export default function WorkflowExecutionUsagesPage() {
   const t = useTranslations("WorkflowExecutionUsagesAdmin");
   const isAdmin = useRequireAdmin();
-  const [executionKey, setExecutionKey] = useState("");
+  const searchParams = useSearchParams();
+  const initialKey = searchParams.get("executionKey")?.trim() ?? "";
+  const [executionKey, setExecutionKey] = useState(initialKey);
   const [data, setData] = useState<Report | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +92,10 @@ export default function WorkflowExecutionUsagesPage() {
     },
     [t],
   );
+
+  useEffect(() => {
+    if (isAdmin && initialKey) void fetchReport(initialKey);
+  }, [isAdmin, initialKey, fetchReport]);
 
   if (!isAdmin) return null;
 
@@ -144,6 +152,14 @@ export default function WorkflowExecutionUsagesPage() {
             {formatCredits(Number(data.execution.totalCreditsCharged ?? data.execution.totalCostVnd ?? 0))} ·{" "}
             {t("steps", { count: data.execution.stepCount ?? 0 })}
           </p>
+          {data.execution.executionKey ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(data.execution.executionKey)}`}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                {t("open_gateway_logs")}
+              </Link>
+            </Button>
+          ) : null}
           <div className="flex flex-wrap gap-3 text-sm">
             <span>
               {t("usage_count")}: <strong>{data.usageCount}</strong>

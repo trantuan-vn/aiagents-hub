@@ -1,3 +1,4 @@
+import { stampFromNode } from '../../../ai/workers-ai.js';
 import { embedTextsWithUsage, upsertVectors, vectorChunkId, type VectorizeVectorRecord } from '../../../rag/index.js';
 import { embeddingUsageOrEstimate } from '../../../../../admin/service/pricing.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
@@ -66,7 +67,12 @@ export async function executeSaveSqlPairPipeline(ctx: NodeContext): Promise<Node
   });
   const embed = await resolveSqlPairEmbed(data.embedModel, ctx.userDO ?? ragBillingFromNodeContext(ctx)?.userDO);
   const questions = prepared.map((pair) => pair.question);
-  const { vectors: embeddings, usage: embedUsage } = await embedTextsWithUsage(ctx.c.env, questions, embed.model);
+  const { vectors: embeddings, usage: embedUsage } = await embedTextsWithUsage(
+    ctx.c.env,
+    questions,
+    embed.model,
+    stampFromNode(ctx, 'embed'),
+  );
   if (embeddings.some((values) => !values.length)) {
     throw new Error('save_sql_pair: empty embedding; pair was not saved');
   }

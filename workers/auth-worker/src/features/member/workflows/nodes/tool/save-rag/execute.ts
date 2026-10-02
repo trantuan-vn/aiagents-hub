@@ -1,3 +1,5 @@
+import type { AiCallStamp } from '../../../ai/workers-ai.js';
+import { stampFromNode } from '../../../ai/workers-ai.js';
 import { embedTextsWithUsage, upsertVectors, vectorChunkId, type VectorizeVectorRecord } from '../../../rag/index.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import { embeddingUsageOrEstimate, mergeAiUsage, type AiUsage } from '../../../../../admin/service/pricing.js';
@@ -70,6 +72,7 @@ async function executeSaveRagMany(params: {
   ownerId?: string;
   workflowId?: number;
   billing?: RagBilling;
+  stamp?: AiCallStamp;
 }): Promise<SaveRagManyResult> {
   const toolId = findRagToolNodeId(params.definition, params.agentId, 'save-rag');
   const config =
@@ -142,6 +145,7 @@ async function executeSaveRagMany(params: {
     params.env,
     flatTexts,
     embed.model,
+    params.stamp,
   );
   if (embeddings.some((values) => !values.length)) {
     throw new Error('save_rag: empty embedding; table was not saved');
@@ -304,6 +308,7 @@ async function saveDocuments(ctx: NodeContext, docs: RagDocumentItem[]): Promise
     ownerId: ctx.meta.ownerId,
     workflowId: ctx.meta.workflowId,
     billing: ragBillingFromNodeContext(ctx),
+    stamp: stampFromNode(ctx, 'embed'),
   });
 }
 

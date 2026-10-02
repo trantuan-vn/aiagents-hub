@@ -425,6 +425,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -540,6 +541,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -575,6 +577,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -608,6 +611,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -641,6 +645,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -674,6 +679,7 @@ describe('executeGetRagPipeline', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -935,6 +941,7 @@ describe('group by expression', () => {
       definition: pipelineDefinition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -1087,6 +1094,7 @@ describe('Get RAG completeness', () => {
       definition,
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;
@@ -1113,6 +1121,7 @@ describe('Get RAG completeness', () => {
       },
       outputs: {},
       runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
       c: { env },
       meta: { ownerId: 'u1', workflowId: 1 },
     } as unknown as NodeContext;

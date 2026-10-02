@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { resolveConfiguredText } from '../shared/pipeline.js';
 import type { ToolModule } from '../shared/tool-module.js';
+import type { AiCallStamp } from '../../../ai/workers-ai.js';
 import { executeGetRag, executeGetRagPipeline } from './execute.js';
 
 const GET_RAG_TOOL_DESCRIPTION =
@@ -25,6 +26,14 @@ export const getRagToolModule: ToolModule = {
         const query =
           String(input.query ?? '').trim() ||
           resolveConfiguredText(bind.toolConfig.queryField, bind.triggerContext, '');
+        const stamp: AiCallStamp | undefined = bind.aiCall
+          ? {
+              executionKey: bind.aiCall.executionKey,
+              workflowId: bind.aiCall.workflowId,
+              nodeId: bind.toolId || bind.aiCall.nodeId,
+              kind: 'embed',
+            }
+          : undefined;
         return executeGetRag({
           env: bind.env,
           definition: bind.definition,
@@ -36,6 +45,7 @@ export const getRagToolModule: ToolModule = {
           workflowId: bind.workflowId,
           billing: bind.billing,
           triggerContext: bind.triggerContext,
+          stamp,
         });
       },
     }),

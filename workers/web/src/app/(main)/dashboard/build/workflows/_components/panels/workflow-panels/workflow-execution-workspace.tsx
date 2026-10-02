@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-import { Copy, Download, Play, Square, Wand2 } from "lucide-react";
+import { Copy, Download, Play, Sparkles, Square, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { toast } from "sonner";
+
+import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
 
 import { Button } from "@/components/ui/button";
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -51,6 +54,7 @@ function ExecutionMetaBar({
   onCopiedToEditor?: () => void;
 }) {
   const t = useTranslations("WorkflowEditorPage");
+  const isAdmin = useDashboardUser()?.role === "admin";
   const onCopyToEditor = () => {
     if (!selected.definition || !onApplyDefinition) return;
     onApplyDefinition(JSON.stringify(selected.definition));
@@ -95,6 +99,14 @@ function ExecutionMetaBar({
         })}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        {isAdmin ? (
+          <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+            <Link href={`/dashboard/ai-gateway-logs?executionKey=${encodeURIComponent(selected.executionKey)}`}>
+              <Sparkles className="size-3" />
+              {t("executions_gateway_logs")}
+            </Link>
+          </Button>
+        ) : null}
         {canContinue ? (
           <Button
             size="sm"

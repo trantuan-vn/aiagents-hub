@@ -1,7 +1,7 @@
 import { generateText, stepCountIs } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
-import { withAiCapacityRetry, WORKERS_AI_GATEWAY } from '../../ai/workers-ai.js';
+import { gatewayForExecution, stampFromNode, withAiCapacityRetry } from '../../ai/workers-ai.js';
 
 import {
   asBillingAiResponse,
@@ -118,6 +118,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   }
 
   const billing = ragBillingFromNodeContext(ctx);
+  const textStamp = stampFromNode(ctx, 'text');
   const ragTools = buildRagToolset(
     {
       env: ctx.c.env,
@@ -128,6 +129,11 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       ownerId: ctx.meta.ownerId,
       workflowId: ctx.meta.workflowId,
       billing,
+      aiCall: {
+        executionKey: textStamp.executionKey,
+        workflowId: textStamp.workflowId,
+        nodeId: textStamp.nodeId,
+      },
     },
     ctx.definition,
     ctx.node.id,
@@ -164,7 +170,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     const result = await withAiCapacityRetry(async () => {
       const workersAI = createWorkersAI({
         binding: ctx.c.env.AI,
-        gateway: WORKERS_AI_GATEWAY,
+        gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }),
       });
       return generateText({
         model: workersAI(modelId as never),
@@ -206,7 +212,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     { role: 'user', content: userText },
   ];
 
-  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams);
+  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams, textStamp);
   let text = extractTextFromAiResponse(aiResponse);
   await billOnce(aiResponse, text);
   let sql = extractSql(text);
@@ -226,6 +232,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       ],
       retryTokens,
       modelParams,
+      textStamp,
     );
     const retryText = extractTextFromAiResponse(aiResponse);
     await billOnce(aiResponse, retryText);

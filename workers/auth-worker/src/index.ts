@@ -48,6 +48,7 @@ import { createAdminEarningsPayoutRoutes } from './features/admin/earnings-payou
 import { createAdminBillingRoutes } from './features/admin/billing/presentation';
 import { createAdminCloudflareUsageRoutes } from './features/admin/cloudflare-usage/presentation';
 import { createAdminCloudflareLogsRoutes } from './features/admin/cloudflare-logs/presentation';
+import { createAdminAiGatewayLogsRoutes } from './features/admin/ai-gateway-logs/presentation';
 import { dailyLogsSync } from './features/admin/cloudflare-logs/infrastructure';
 import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure';
 import { createAdminPipelineHealthRoutes } from './features/admin/pipeline-health/presentation';
@@ -130,6 +131,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/billing', createAdminBillingRoutes());
   routes.route('/dashboard/admin/cloudflare', createAdminCloudflareUsageRoutes());
   routes.route('/dashboard/admin/cloudflare-logs', createAdminCloudflareLogsRoutes());
+  routes.route('/dashboard/admin/ai-gateway', createAdminAiGatewayLogsRoutes());
   routes.route('/dashboard/admin/pipeline-health', createAdminPipelineHealthRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   // II. API

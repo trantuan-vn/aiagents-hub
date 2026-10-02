@@ -7,6 +7,7 @@ import {
   resolveServiceByEndpoint,
   runTextModel,
 } from '../../../billing/billing.js';
+import { stampFromNode } from '../../../ai/workers-ai.js';
 import { reportUsageCharge } from '../../../billing/charge.js';
 import { resolveServiceOnHandle } from '../../../engine/graph-helpers.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
@@ -495,7 +496,7 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
       const aiResponse = await runTextModel(ctx.c.env, modelId, [
         { role: 'system', content: system },
         { role: 'user', content: user },
-      ], maxTokens, extra);
+      ], maxTokens, extra, stampFromNode(ctx, 'text'));
       const text = extractTextFromAiResponse(aiResponse);
       await bill(aiResponse, text);
       return { text, aiResponse };

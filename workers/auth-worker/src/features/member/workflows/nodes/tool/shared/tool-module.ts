@@ -22,6 +22,8 @@ export type AgentToolBindContext = {
   toolConfig: Record<string, unknown>;
   toolName: string;
   toolDescription: string;
+  /** Present on an execution. Absent for workflow authoring chat. */
+  aiCall?: { executionKey: string; workflowId: string; nodeId: string };
 };
 
 export type ToolModule = {

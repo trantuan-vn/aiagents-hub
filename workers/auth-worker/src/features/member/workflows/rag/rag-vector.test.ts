@@ -13,7 +13,7 @@ import {
   nodeNamespaceFromScope,
 } from './rag-vector.js';
 import { chunkText } from '../nodes/tool/save-rag/chunk.js';
-import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
+import { gatewayForExecution, WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 
 describe('rag-vector', () => {
   it('rewrites the legacy English embed model to bge-m3', () => {
@@ -45,6 +45,37 @@ describe('rag-vector', () => {
       { text: 'hello world' },
       { gateway: WORKERS_AI_GATEWAY },
     );
+  });
+
+  it('embedText stamps kind embed when an execution stamp is present', async () => {
+    const env = {
+      AI: { run: vi.fn().mockResolvedValue({ data: [[0.1, 0.2]] }) },
+    } as unknown as Env;
+    const stamp = {
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      workflowId: '9',
+      nodeId: 'embed-node',
+      kind: 'text' as const,
+    };
+    await embedText(env, 'hello world', DEFAULT_EMBED_MODEL, stamp);
+    expect(env.AI.run).toHaveBeenCalledWith(
+      DEFAULT_EMBED_MODEL,
+      { text: 'hello world' },
+      { gateway: gatewayForExecution({ ...stamp, kind: 'embed' }) },
+    );
+  });
+
+  it('embedText does not call AI when the stamp has no execution key', async () => {
+    const env = { AI: { run: vi.fn() } } as unknown as Env;
+    await expect(
+      embedText(env, 'hello', DEFAULT_EMBED_MODEL, {
+        executionKey: ' ',
+        workflowId: '1',
+        nodeId: 'n',
+        kind: 'embed',
+      }),
+    ).rejects.toThrow(/ai_call_missing_execution_key/);
+    expect(env.AI.run).not.toHaveBeenCalled();
   });
 
   it('embedTexts batches multiple strings in one AI call', async () => {

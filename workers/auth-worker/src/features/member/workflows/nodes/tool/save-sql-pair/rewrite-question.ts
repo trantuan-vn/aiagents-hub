@@ -11,6 +11,7 @@ import { reportUsageCharge } from '../../../billing/charge.js';
 import { resolveServiceOnHandle } from '../../../engine/graph-helpers.js';
 import { assertTextGenerationModel } from '../../agent/shared.js';
 import type { NodeContext } from '../../types.js';
+import { stampFromNode } from '../../../ai/workers-ai.js';
 import { ragBillingFromNodeContext } from '../shared/rag-context.js';
 
 const REWRITE_RULES = `Rewrite the question for text-to-SQL retrieval.
@@ -91,6 +92,7 @@ export async function rewriteSqlPairQuestion(
     ],
     maxTokens,
     { temperature, max_completion_tokens: maxTokens },
+    stampFromNode(ctx, 'text'),
   );
   const text = extractTextFromAiResponse(aiResponse);
   const billing = ragBillingFromNodeContext(ctx);

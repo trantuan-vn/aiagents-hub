@@ -12,6 +12,53 @@ export const WORKERS_AI_GATEWAY = {
   },
 };
 
+export type AiCallKind = 'text' | 'embed' | 'agent' | 'agree';
+
+/** Join key for admin AI Gateway logs. `eventId` is the execution, not a fifth metadata slot. */
+export type AiCallStamp = {
+  executionKey: string;
+  workflowId: string;
+  nodeId: string;
+  kind: AiCallKind;
+};
+
+const GATEWAY_RETRIES = WORKERS_AI_GATEWAY.retries;
+
+/**
+ * Stamp one execution's Workers AI calls so gateway logs filter by `event_id`.
+ * Metadata is exactly four keys. Do not add owner, email, or prompt text.
+ */
+export function gatewayForExecution(stamp: AiCallStamp) {
+  const executionKey = String(stamp.executionKey ?? '').trim();
+  if (!executionKey) {
+    throw new Error('ai_call_missing_execution_key');
+  }
+  return {
+    id: AI_GATEWAY_ID,
+    retries: GATEWAY_RETRIES,
+    eventId: executionKey,
+    metadata: {
+      executionKey,
+      workflowId: stamp.workflowId == null ? '' : String(stamp.workflowId),
+      nodeId: stamp.nodeId == null ? '' : String(stamp.nodeId),
+      kind: stamp.kind,
+    },
+  };
+}
+
+/** Production node path. Missing executionKey fails closed before `AI.run`. */
+export function stampFromNode(
+  ctx: { executionKey?: string; node?: { id?: string }; meta?: { workflowId?: number } },
+  kind: AiCallKind,
+): AiCallStamp {
+  return {
+    executionKey: String(ctx.executionKey ?? ''),
+    workflowId: ctx.meta?.workflowId == null ? '' : String(ctx.meta.workflowId),
+    nodeId: String(ctx.node?.id ?? ''),
+    kind,
+  };
+}
+
 const CAPACITY_ATTEMPTS = 3;
 
 function aiErrorMessage(err: unknown): string {

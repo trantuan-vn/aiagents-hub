@@ -67,6 +67,7 @@ function ctx(agentKind: string): NodeContext {
     user: { identifier: 'user@example.com' },
     userDO: {} as NodeContext['userDO'],
     meta: { ownerId: 'o', workflowId: 1, isOwnedByUser: true, workflowName: 'wf' },
+    executionKey: '11111111-1111-4111-8111-111111111111',
   };
 }
 

@@ -7,9 +7,11 @@ import {
   type AiUsage,
 } from '../../../admin/service/pricing.js';
 import {
+  gatewayForExecution,
   isAiCapacityError,
   withAiCapacityRetry,
   WORKERS_AI_GATEWAY,
+  type AiCallStamp,
 } from '../ai/workers-ai.js';
 
 /** Multilingual embeddings. 1024 dimensions — the Vectorize index must be created at 1024. */
@@ -83,9 +85,15 @@ export function resolveVectorizeIndex(env: Env, collection: string): VectorizeBi
   return named ?? fallback;
 }
 
-async function runEmbed(env: Env, modelId: string, text: string | string[]): Promise<unknown> {
+async function runEmbed(
+  env: Env,
+  modelId: string,
+  text: string | string[],
+  stamp?: AiCallStamp,
+): Promise<unknown> {
+  const gateway = stamp ? gatewayForExecution({ ...stamp, kind: 'embed' }) : WORKERS_AI_GATEWAY;
   return withAiCapacityRetry(() =>
-    env.AI.run(modelId as keyof AiModels, { text }, { gateway: WORKERS_AI_GATEWAY }),
+    env.AI.run(modelId as keyof AiModels, { text }, { gateway }),
   );
 }
 
@@ -109,8 +117,9 @@ export async function embedText(
   env: Env,
   text: string,
   modelId = DEFAULT_EMBED_MODEL,
+  stamp?: AiCallStamp,
 ): Promise<number[]> {
-  const { vector } = await embedTextWithUsage(env, text, modelId);
+  const { vector } = await embedTextWithUsage(env, text, modelId, stamp);
   return vector;
 }
 
@@ -118,9 +127,10 @@ export async function embedTextWithUsage(
   env: Env,
   text: string,
   modelId = DEFAULT_EMBED_MODEL,
+  stamp?: AiCallStamp,
 ): Promise<{ vector: number[]; usage?: AiUsage }> {
   if (!text.trim() || !env.AI) return { vector: [] };
-  const { vectors, usage } = await embedTextsWithUsage(env, [text], modelId);
+  const { vectors, usage } = await embedTextsWithUsage(env, [text], modelId, stamp);
   return { vector: vectors[0] ?? [], usage };
 }
 
@@ -129,14 +139,16 @@ export async function embedTexts(
   env: Env,
   texts: string[],
   modelId = DEFAULT_EMBED_MODEL,
+  stamp?: AiCallStamp,
 ): Promise<number[][]> {
-  return (await embedTextsWithUsage(env, texts, modelId)).vectors;
+  return (await embedTextsWithUsage(env, texts, modelId, stamp)).vectors;
 }
 
 export async function embedTextsWithUsage(
   env: Env,
   texts: string[],
   modelId = DEFAULT_EMBED_MODEL,
+  stamp?: AiCallStamp,
 ): Promise<EmbedBatchResult> {
   if (!env.AI || !texts.length) return { vectors: texts.map(() => []) };
   const BATCH = 8;
@@ -155,7 +167,7 @@ export async function embedTextsWithUsage(
     const payload = nonempty.length === 1 ? nonempty[0]!.text : nonempty.map((row) => row.text);
     let batchVectors: number[][] | undefined;
     try {
-      const embed = await runEmbed(env, modelId, payload);
+      const embed = await runEmbed(env, modelId, payload, stamp);
       const rows = vectorsFromAiData((embed as { data?: unknown })?.data, nonempty.length);
       if (rows.length === nonempty.length && rows.every((row) => row.length)) {
         batchVectors = rows;
@@ -174,7 +186,7 @@ export async function embedTextsWithUsage(
     } else {
       for (const row of nonempty) {
         try {
-          const embed = await runEmbed(env, modelId, row.text);
+          const embed = await runEmbed(env, modelId, row.text, stamp);
           mapped[row.index] = vectorsFromAiData((embed as { data?: unknown })?.data, 1)[0] ?? [];
           const usage = extractUsageFromAiResponse(embed);
           if (usage) usages.push(usage);
