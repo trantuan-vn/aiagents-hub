@@ -3,13 +3,14 @@ import {
   billAgentUsage,
   ensureWalletBalance,
   extractTextFromAiResponse,
+  finishReasonFromAiResponse,
   getModelForService,
   resolveServiceByEndpoint,
   runTextModel,
 } from '../../../billing/billing.js';
 import { reportUsageCharge } from '../../../billing/charge.js';
 import { resolveServiceOnHandle } from '../../../engine/graph-helpers.js';
-import { assertTextGenerationModel } from '../../agent/shared.js';
+import { assertTextGenerationModel, isReasoningModel } from '../../agent/shared.js';
 import type { NodeContext } from '../../types.js';
 import { stampFromNode } from '../../../ai/workers-ai.js';
 import { ragBillingFromNodeContext } from '../shared/rag-context.js';
@@ -30,20 +31,56 @@ export function composeRewriteSystem(describeSystemPrompt: unknown): string {
   return `${domain}\n\n${REWRITE_RULES}`;
 }
 
-/** Keep a single question. Drop fences, a wrapping quote, and a leading "Question:" label. */
-export function cleanRewrittenQuestion(raw: string): string {
-  let text = String(raw ?? '').trim();
-  text = text.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
+const THINK_BLOCK = /<think>[\s\S]*?<\/think>/gi;
+const ANALYSIS =
+  /\b(I need to|I should|The user wants|The user question|The rules say|Let me|something like)\b/i;
+const THINKING_PARAM_REJECT = /chat_template|enable_thinking|unknown parameter|unrecognized/i;
+
+function stripThink(text: string): string {
+  return text.replace(THINK_BLOCK, ' ').replace(/<\/?think>/gi, ' ').trim();
+}
+
+function unwrap(text: string): string {
+  let next = text.trim();
+  next = next.replace(/^```[a-zA-Z]*\s*/, '').replace(/\s*```$/, '').trim();
   if (
-    (text.startsWith('"') && text.endsWith('"')) ||
-    (text.startsWith("'") && text.endsWith("'")) ||
-    (text.startsWith('“') && text.endsWith('”'))
+    (next.startsWith('"') && next.endsWith('"')) ||
+    (next.startsWith("'") && next.endsWith("'")) ||
+    (next.startsWith('“') && next.endsWith('”'))
   ) {
-    text = text.slice(1, -1).trim();
+    next = next.slice(1, -1).trim();
   }
-  text = text.replace(/^question\s*:\s*/i, '').trim();
-  if (!text || text.length > 2000) return '';
-  if (/^\s*(select|with)\b/i.test(text)) return '';
+  next = next.replace(/^question\s*:\s*/i, '').trim();
+  return next;
+}
+
+function isSql(text: string): boolean {
+  return /^\s*(select|with)\b/i.test(text);
+}
+
+function looksLikeAnalysis(text: string): boolean {
+  return ANALYSIS.test(text);
+}
+
+/** Reasoning traces often contain a finished draft in quotes, then a second draft cut off by the token cap. */
+function lastClosedQuote(text: string): string {
+  const re = /["“]([^"“”]{8,2000})["”]/g;
+  let last = '';
+  for (const match of text.matchAll(re)) {
+    const quote = unwrap(match[1] ?? '');
+    if (!quote || quote.length > 2000 || isSql(quote) || looksLikeAnalysis(quote)) continue;
+    last = quote;
+  }
+  return last;
+}
+
+/** Keep a single question. Drop fences, a wrapping quote, a leading "Question:" label, and chain-of-thought. */
+export function cleanRewrittenQuestion(raw: string): string {
+  const source = String(raw ?? '');
+  const text = unwrap(stripThink(source));
+  if (!text) return '';
+  if (looksLikeAnalysis(text)) return lastClosedQuote(source);
+  if (text.length > 2000 || isSql(text)) return '';
   return text;
 }
 
@@ -81,22 +118,16 @@ export async function rewriteSqlPairQuestion(
     'Save SQL Pair: connect a chat model Service to the "LLM" handle. Pick the embedding model in the "Embed model" field, or clear System prompt to skip the rewrite.',
   );
 
-  const maxTokens = 512;
   const temperature = linked.serviceOptions?.temperature != null ? Number(linked.serviceOptions.temperature) : 0.2;
-  const aiResponse = await runTextModel(
-    ctx.c.env,
-    modelId,
-    [
-      { role: 'system', content: system },
-      { role: 'user', content: `Question:\n${question}\n\nSQL:\n${sql}` },
-    ],
-    maxTokens,
-    { temperature, max_completion_tokens: maxTokens },
-    stampFromNode(ctx, 'text'),
-  );
-  const text = extractTextFromAiResponse(aiResponse);
+  const messages = [
+    { role: 'system', content: system },
+    { role: 'user', content: `Question:\n${question}\n\nSQL:\n${sql}` },
+  ];
   const billing = ragBillingFromNodeContext(ctx);
-  if (billing) {
+  let llmCalls = 0;
+
+  const bill = async (aiResponse: unknown, text: string) => {
+    if (!billing) return;
     const charge = await billAgentUsage(
       billing.env,
       billing.bindingName,
@@ -118,9 +149,42 @@ export async function rewriteSqlPairQuestion(
       },
     );
     reportUsageCharge(billing.onCost, charge);
-  }
+  };
 
-  const rewritten = cleanRewrittenQuestion(text);
+  // GLM puts the answer after a thinking trace. A 512 cap is spent on reasoning_content,
+  // finish_reason becomes "length", and content stays empty.
+  const completeOnce = async (maxTokens: number, disableThinking: boolean) => {
+    const plain = { temperature, max_completion_tokens: maxTokens };
+    const extra: Record<string, unknown> = disableThinking
+      ? { ...plain, chat_template_kwargs: { enable_thinking: false } }
+      : plain;
+    let aiResponse: unknown;
+    try {
+      aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, extra, stampFromNode(ctx, 'text'));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!disableThinking || !THINKING_PARAM_REJECT.test(message)) throw error;
+      aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, plain, stampFromNode(ctx, 'text'));
+    }
+    llmCalls += 1;
+    const text = extractTextFromAiResponse(aiResponse);
+    await bill(aiResponse, text);
+    return { text, finish: finishReasonFromAiResponse(aiResponse) };
+  };
+
+  const disableThinking = modelId.toLowerCase().includes('glm');
+  let maxTokens = isReasoningModel(modelId) ? 2048 : 512;
+  let result = await completeOnce(maxTokens, disableThinking);
+  let rewritten = cleanRewrittenQuestion(result.text);
+  const cutOff =
+    !rewritten &&
+    !isSql(result.text) &&
+    (result.finish === 'length' || looksLikeAnalysis(result.text));
+  if (cutOff && maxTokens < 4096) {
+    maxTokens = 4096;
+    result = await completeOnce(maxTokens, true);
+    rewritten = cleanRewrittenQuestion(result.text);
+  }
   if (!rewritten) throw new Error('save_sql_pair: rewritten question is empty');
-  return { question: rewritten, llmCalls: 1 };
+  return { question: rewritten, llmCalls };
 }

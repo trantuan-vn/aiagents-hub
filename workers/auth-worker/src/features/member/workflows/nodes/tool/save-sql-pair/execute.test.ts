@@ -300,6 +300,49 @@ describe('save sql pair', () => {
       executeSaveSqlPairPipeline(ctxFor(definition, env, { question: 'doanh thu', sql: 'SELECT 1' })),
     ).rejects.toThrow(/rewritten question is empty/);
     expect(upsert).not.toHaveBeenCalled();
+    expect(billingMock.runTextModel).toHaveBeenCalledTimes(1);
+  });
+
+  it('turns GLM thinking off and keeps a finished question from a cut-off reasoning trace', async () => {
+    const quote =
+      'Theo từng đợt thực hiện quyền, cho biết số lượng chốt ban đầu của tài khoản giao dịch lưu ký.';
+    const essay = `The user wants me to rewrite the question. I need to use domain terms.\n\n"${quote}"\n\nLet me write:\n"Theo từng đợt`;
+    billingMock.resolveServiceByEndpoint.mockImplementation(async (_user: unknown, endpoint: string) => {
+      if (String(endpoint).includes('bge') || String(endpoint).includes('embed')) return embedService(String(endpoint));
+      return {
+        id: 2,
+        endpoint,
+        catalogId: 'glm',
+        model: '@cf/zai-org/glm-5.3-flash',
+        approvalStatus: 'approved',
+      };
+    });
+    billingMock.runTextModel.mockResolvedValue({
+      choices: [{ finish_reason: 'length', message: { content: '', reasoning_content: essay } }],
+    });
+    billingMock.extractTextFromAiResponse.mockReturnValue(essay);
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const ai = mockAi();
+    const env = { AI: ai, VECTORIZE: { upsert } } as unknown as Env;
+    const definition = withLlm(pairGraph({ describeSystemPrompt: 'Bạn là chuyên gia dữ liệu chứng khoán Việt Nam.' }));
+
+    const out = await executeSaveSqlPairPipeline(
+      ctxFor(definition, env, { question: 'thông tin quyền', sql: 'SELECT 1' }),
+    );
+
+    expect(out.ok).toBe(true);
+    expect(billingMock.runTextModel).toHaveBeenCalledTimes(1);
+    expect(billingMock.runTextModel.mock.calls[0]?.[3]).toBe(2048);
+    expect(billingMock.runTextModel.mock.calls[0]?.[4]).toMatchObject({
+      max_completion_tokens: 2048,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+    const embedded = ai.run.mock.calls.map((call) => {
+      const input = call[1] as { text: string | string[] };
+      return Array.isArray(input.text) ? input.text.join('\n') : input.text;
+    });
+    expect(embedded.join('\n')).toContain(quote);
+    expect(embedded.join('\n')).not.toContain('The user wants');
   });
 });
 
@@ -309,5 +352,17 @@ describe('cleanRewrittenQuestion', () => {
     expect(cleanRewrittenQuestion('Question: Doanh thu thuần theo tháng')).toBe('Doanh thu thuần theo tháng');
     expect(cleanRewrittenQuestion('"Doanh thu thuần"')).toBe('Doanh thu thuần');
     expect(cleanRewrittenQuestion('SELECT month FROM sales')).toBe('');
+  });
+
+  it('keeps the last finished draft when the reasoning trace is cut off', () => {
+    const quote =
+      'Theo từng đợt thực hiện quyền, cho biết số lượng chốt ban đầu của tài khoản giao dịch lưu ký.';
+    const essay = `${'The user wants me to rewrite. I need to think. '.repeat(80)}\n\n"${quote}"\n\nLet me write:\n"Theo từng đợt`;
+    expect(essay.length).toBeGreaterThan(2000);
+    expect(cleanRewrittenQuestion(essay)).toBe(quote);
+    expect(cleanRewrittenQuestion('The user wants me to rewrite.\n\n"Theo từng đợt thực hiện quyền, mã')).toBe('');
+    expect(cleanRewrittenQuestion('<think>I need to rewrite</think>\nDoanh thu thuần theo tháng')).toBe(
+      'Doanh thu thuần theo tháng',
+    );
   });
 });
