@@ -75,7 +75,10 @@ export async function rewriteSqlPairQuestion(
   await ensureWalletBalance(ctx.userDO, ctx.c.env);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
-  assertTextGenerationModel(modelId);
+  assertTextGenerationModel(
+    modelId,
+    'Save SQL Pair: connect a chat model Service to the "LLM" handle. Pick the embedding model in the "Embed model" field, or clear System prompt to skip the rewrite.',
+  );
 
   const maxTokens = 512;
   const temperature = linked.serviceOptions?.temperature != null ? Number(linked.serviceOptions.temperature) : 0.2;

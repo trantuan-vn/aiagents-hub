@@ -442,7 +442,10 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
   await ensureWalletBalance(ctx.userDO, ctx.c.env);
   const service = await resolveServiceByEndpoint(ctx.userDO, endpoint);
   const modelId = getModelForService(service);
-  assertTextGenerationModel(modelId);
+  assertTextGenerationModel(
+    modelId,
+    'Save RAG: connect a chat model Service to the "LLM" handle; keep the embedding Service on the embed side.',
+  );
 
   const maxTokens = resolveDescribeMaxTokens(linked.serviceOptions?.maxTokens);
   const temperature =

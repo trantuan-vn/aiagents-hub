@@ -44,11 +44,14 @@ export function resolveMaxTokens(
 }
 
 /** Embedding models cannot be used with generateText / chat completions. */
-export function assertTextGenerationModel(modelId: string): void {
+export function assertTextGenerationModel(
+  modelId: string,
+  fix = 'Connect an LLM service to the Agent "Service" handle; keep embedding models for Memory/RAG tools only.',
+): void {
   const id = modelId.toLowerCase();
   if (id.includes('bge') || id.includes('embed')) {
     throw new Error(
-      `Agent requires a text generation model (e.g. @cf/meta/llama-3.1-8b-instruct), but the connected service uses embedding model "${modelId}". Connect an LLM service to the Agent "Service" handle; keep embedding models for Memory/RAG tools only.`,
+      `Agent requires a text generation model (e.g. @cf/meta/llama-3.1-8b-instruct), but the connected service uses embedding model "${modelId}". ${fix}`,
     );
   }
 }
