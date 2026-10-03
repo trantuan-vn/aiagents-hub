@@ -316,6 +316,7 @@ const STOPWORDS = new Set([
 const NO_PAIRS = '_Không có câu hỏi tương tự._';
 const NO_SCHEMA = '_Không có bảng liên quan. Không bịa tên cột._';
 const MAX_FALLBACK_COLUMNS = 12;
+const PROMPT_DESC_MAX = 120;
 
 /** Stitch every chunk of one document back into the stored markdown. */
 export function stitchedDocumentText(matches: VectorMatch[]): string {
@@ -461,14 +462,20 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function sqlMentionsColumn(sql: string, name: string): boolean {
+function mentionsIdentifier(sql: string, name: string): boolean {
   const trimmed = name.trim();
   if (!trimmed) return false;
   const re = new RegExp(`(^|[^A-Za-z0-9_])${escapeRegExp(trimmed)}([^A-Za-z0-9_]|$)`, 'i');
   return re.test(sql);
 }
 
-/** Keep token matches, keys, and columns named in a retrieved SQL pair. No token hit keeps PK, FK, and the first 12. */
+/** A pair only speaks for the table it names, or one pair would keep every same-named column on every table. */
+export function sqlsForTable(sqls: string[], tableName: string): string[] {
+  if (!tableName.trim()) return [];
+  return sqls.filter((sql) => mentionsIdentifier(sql, tableName));
+}
+
+/** Keep token matches, keys, and columns named in `sqls`, the pairs of this table. No token hit keeps PK, FK, and the first 12. */
 export function selectSchemaColumns(columns: SchemaColumn[], question: string, sqls: string[]): SchemaColumn[] {
   const tokens = questionTokens(question);
   const anyToken = columns.some((column) => columnMatchesToken(column, tokens));
@@ -479,12 +486,28 @@ export function selectSchemaColumns(columns: SchemaColumn[], question: string, s
     (column) =>
       columnMatchesToken(column, tokens) ||
       isKeyColumn(column) ||
-      sqls.some((sql) => sqlMentionsColumn(sql, column.name)),
+      sqls.some((sql) => mentionsIdentifier(sql, column.name)),
   );
 }
 
 function escapeCell(value: string): string {
   return value.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+}
+
+/**
+ * Save RAG stores `VI: … EN: …` so both word classes reach the embedding.
+ * Writing SQL needs one language, so the prompt carries the Vietnamese half only.
+ */
+export function promptDescription(description: string): string {
+  const text = description.trim();
+  const vi =
+    /^VI:\s*([\s\S]*?)\s*EN:\s*[\s\S]*$/i.exec(text)?.[1] ?? /^VI:\s*([\s\S]*)$/i.exec(text)?.[1] ?? text;
+  const one = vi.replace(/\s+/g, ' ').trim();
+  if (one.length <= PROMPT_DESC_MAX) return one;
+  const sliced = one.slice(0, PROMPT_DESC_MAX);
+  const space = sliced.lastIndexOf(' ');
+  if (space >= Math.floor(PROMPT_DESC_MAX * 0.75)) return sliced.slice(0, space).trim();
+  return sliced.trim();
 }
 
 export function renderReducedSchema(parsed: ParsedSchema, columns: SchemaColumn[]): string {
@@ -493,13 +516,13 @@ export function renderReducedSchema(parsed: ParsedSchema, columns: SchemaColumn[
       ? `${parsed.schemaName}.${parsed.tableName}`
       : parsed.heading || parsed.tableName || parsed.schemaName || 'TABLE';
   const lines = [`# ${title}`];
-  if (parsed.summaryVi) lines.push('', parsed.summaryVi);
-  if (parsed.summaryEn) lines.push(parsed.summaryEn);
+  const summary = parsed.summaryVi || parsed.summaryEn;
+  if (summary) lines.push('', summary);
   if (columns.length) {
     lines.push('', '| Column | Type | Nullable | Key | Description | Aliases |');
     for (const column of columns) {
       lines.push(
-        `| ${escapeCell(column.name)} | ${escapeCell(column.type)} | ${escapeCell(column.nullable)} | ${escapeCell(column.key)} | ${escapeCell(column.description)} | ${escapeCell(column.aliases)} |`,
+        `| ${escapeCell(column.name)} | ${escapeCell(column.type)} | ${escapeCell(column.nullable)} | ${escapeCell(column.key)} | ${escapeCell(promptDescription(column.description))} | ${escapeCell(column.aliases)} |`,
       );
     }
   }
@@ -513,7 +536,7 @@ export function reduceSchemaText(
   meta?: { schemaName?: string; tableName?: string },
 ): { text: string; targets: ForeignKeyTarget[]; schemaName: string; tableName: string } {
   const parsed = parseSchemaDocument(text, meta);
-  const columns = selectSchemaColumns(parsed.columns, question, sqls);
+  const columns = selectSchemaColumns(parsed.columns, question, sqlsForTable(sqls, parsed.tableName));
   return {
     text: renderReducedSchema(parsed, columns),
     targets: foreignKeyTargets(parsed.columns),

@@ -21,15 +21,27 @@ vi.mock('../tool/get-rag/execute.js', async () => {
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
-import { executeReasoningAgent, readReasoningOptions, type ReasoningLlmCall } from './execute-reasoning.js';
+import { extractTextFromAiResponse, runTextModel } from '../../billing/billing.js';
+import {
+  executeReasoningAgent,
+  raisedOutputTokenLimit,
+  readReasoningOptions,
+  type ReasoningLlmCall,
+} from './execute-reasoning.js';
 import { isReasoningAgentKind } from './shared.js';
 
-vi.mock('../../../billing/billing.js', () => ({
+vi.mock('../../billing/billing.js', () => ({
   ensureWalletBalance: vi.fn().mockResolvedValue(undefined),
   resolveServiceByEndpoint: vi.fn().mockResolvedValue({ model: '@cf/meta/llama-3.1-8b-instruct' }),
   getModelForService: vi.fn().mockReturnValue('@cf/meta/llama-3.1-8b-instruct'),
   runTextModel: vi.fn(),
   extractTextFromAiResponse: vi.fn(),
+  finishReasonFromAiResponse: (response: unknown) => {
+    if (!response || typeof response !== 'object') return '';
+    const choices = (response as { choices?: unknown }).choices;
+    if (!Array.isArray(choices) || !choices[0] || typeof choices[0] !== 'object') return '';
+    return String((choices[0] as { finish_reason?: unknown }).finish_reason ?? '');
+  },
   billAgentUsage: vi.fn().mockResolvedValue(0),
   asBillingAiResponse: (usage: unknown, fallbackText = '') =>
     usage != null && typeof usage === 'object' ? usage : { response: fallbackText },
@@ -146,11 +158,13 @@ describe('executeReasoningAgent', () => {
 
   it('puts full retrieved schema and sample rows into the act prompt', async () => {
     const purposes: string[] = [];
-    const llm = vi.fn(async ({ purpose, system }) => {
+    const llm = vi.fn(async ({ purpose, system, user }) => {
       purposes.push(purpose);
       if (purpose === 'act') {
-        expect(String(system)).toContain('CREATE TABLE ADMIN.CHUNG_KHOAN');
-        expect(String(system)).toContain('"MA_CK": "VIC"');
+        expect(String(user)).toContain('CREATE TABLE ADMIN.CHUNG_KHOAN');
+        expect(String(user)).toContain('"MA_CK": "VIC"');
+        expect(String(system)).not.toContain('CREATE TABLE ADMIN.CHUNG_KHOAN');
+        expect(String(system)).not.toContain('"MA_CK": "VIC"');
         return { text: 'Use ADMIN.CHUNG_KHOAN [1].', observations: [] };
       }
       return { text: '{"pass":true,"issues":[],"missingSlots":[],"canUseTools":false,"confidence":0.9}', observations: [] };
@@ -545,7 +559,8 @@ describe('sql generation phase 4', () => {
       purposes.push(call.purpose);
       expect(Object.keys(call.tools ?? {})).not.toContain('get_rag');
       expect(Object.keys(call.tools ?? {})).toContain('check_sql');
-      expect(call.system).toContain('OLD_SCHEMA_BLOCK');
+      expect(call.user).toContain('OLD_SCHEMA_BLOCK');
+      expect(call.system).not.toContain('OLD_SCHEMA_BLOCK');
       expect(call.system).not.toContain('cite as [n]');
       return {
         text: '```sql\nSELECT 1 FROM dual\n```',
@@ -566,6 +581,27 @@ describe('sql generation phase 4', () => {
     expect(executeGetRagMock).not.toHaveBeenCalled();
   });
 
+  it('keeps retrieved context on the user message once when both prompts reference it', async () => {
+    const llm: ReasoningLlmCall = async (call) => {
+      if (call.purpose !== 'act') return { text: '{"pass":true,"issues":[]}', observations: [] };
+      expect(call.user.split('SCHEMA_ONCE').length - 1).toBe(1);
+      expect(call.system).not.toContain('SCHEMA_ONCE');
+      return { text: '```sql\nSELECT 1 FROM dual\n```', observations: [] };
+    };
+    const out = await executeReasoningAgent(
+      checkSqlCtx(
+        {
+          maxReflectRetries: 0,
+          prompt: 'Question: {{ $json.query }}\n\nRetrieved schema and SQL examples:\n{{ $json.ragText }}',
+          systemPrompt: 'You are a SQL assistant.\n{{ $json.ragText }}',
+        },
+        { query: 'doanh thu', ragText: 'SCHEMA_ONCE', snippets: ['SCHEMA_ONCE'] },
+      ),
+      { llm },
+    );
+    expect(out.status).toBe('ok');
+  });
+
   it('replaces rag from the Oracle identifier and reflects only the SQL plus the error', async () => {
     executeGetRagMock.mockResolvedValue({
       ragText: 'NEW_SCHEMA_BLOCK',
@@ -574,7 +610,7 @@ describe('sql generation phase 4', () => {
       schemas: [],
       count: 1,
     });
-    const systems: string[] = [];
+    const users: string[] = [];
     let acts = 0;
     const llm: ReasoningLlmCall = async (call) => {
       if (call.purpose === 'reflect') {
@@ -585,7 +621,9 @@ describe('sql generation phase 4', () => {
         return { text: '{"pass":false,"issues":["bad column"],"rewritten":""}', observations: [] };
       }
       acts += 1;
-      systems.push(call.system);
+      users.push(call.user);
+      expect(call.system).not.toContain('OLD_SCHEMA_BLOCK');
+      expect(call.system).not.toContain('NEW_SCHEMA_BLOCK');
       if (acts === 1) {
         expect(Object.keys(call.tools ?? {})).not.toContain('get_rag');
         return {
@@ -617,14 +655,67 @@ describe('sql generation phase 4', () => {
       ),
       { llm },
     );
-    expect(systems[0]).toContain('OLD_SCHEMA_BLOCK');
-    expect(systems[1]).toContain('NEW_SCHEMA_BLOCK');
-    expect(systems[1]).not.toContain('OLD_SCHEMA_BLOCK');
+    expect(users[0]).toContain('OLD_SCHEMA_BLOCK');
+    expect(users[0]).not.toContain('NEW_SCHEMA_BLOCK');
+    expect(users[1]).toContain('NEW_SCHEMA_BLOCK');
+    expect(users[1]).not.toContain('OLD_SCHEMA_BLOCK');
     expect(executeGetRagMock).toHaveBeenCalledWith(
       expect.objectContaining({ input: expect.objectContaining({ query: 'NET_REVENUE' }) }),
     );
     expect(out.sql).toBe('SELECT net_revenue FROM orders;');
     executeGetRagMock.mockReset();
+  });
+});
+
+describe('max token limit', () => {
+  it('raises a cut-off budget once, up to the cap', () => {
+    expect(raisedOutputTokenLimit(512)).toBe(8192);
+    expect(raisedOutputTokenLimit(4096)).toBe(8192);
+    expect(raisedOutputTokenLimit(8192)).toBe(16384);
+    expect(raisedOutputTokenLimit(32768)).toBe(32768);
+  });
+
+  it('retries the act at the higher limit when the model stops for length', async () => {
+    const run = vi.mocked(runTextModel);
+    const extract = vi.mocked(extractTextFromAiResponse);
+    run.mockReset();
+    extract.mockReset();
+    run
+      .mockResolvedValueOnce({
+        choices: [{ finish_reason: 'length', message: { content: 'SELECT' } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ finish_reason: 'stop', message: { content: 'SELECT 1 FROM dual' } }],
+      });
+    extract.mockImplementation((response: unknown) => {
+      const choice = (response as { choices?: Array<{ message?: { content?: string } }> })?.choices?.[0];
+      return choice?.message?.content ?? '';
+    });
+    try {
+      const out = await executeReasoningAgent(
+        ctx(
+          {
+            agentKind: 'reasoning_agent',
+            prompt: 'doanh thu',
+            serviceEndpoint: 'https://llm.example/v1',
+            maxTokens: 1024,
+            enablePlanner: 'off',
+            clarificationMode: 'best_effort',
+            maxReflectRetries: 0,
+            requireCitations: false,
+          },
+          { query: 'doanh thu' },
+        ),
+      );
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[0]?.[3]).toBe(1024);
+      expect(run.mock.calls[1]?.[3]).toBe(8192);
+      expect(out.status).toBe('ok');
+      expect(String(out.text)).toContain('SELECT 1 FROM dual');
+    } finally {
+      run.mockReset();
+      extract.mockReset();
+    }
   });
 });
 

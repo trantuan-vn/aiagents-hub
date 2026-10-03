@@ -11,9 +11,11 @@ import {
   overlapJoin,
   parseSqlPairText,
   pickRelatedGroups,
+  promptDescription,
   reduceSchemaText,
   resolveGroupKey,
   selectSchemaColumns,
+  sqlsForTable,
   stitchChunkTexts,
   stitchExact,
   vectorChunkId,
@@ -108,6 +110,38 @@ CREATE TABLE SALES.ORDERS (ID NUMBER);
       question: 'doanh thu theo tháng',
       sql: 'SELECT 1',
     });
+  });
+
+  it('ignores a pair that names another table and prints the Vietnamese description only', () => {
+    const stored = `# SALES.CUSTOMERS
+
+Khách hàng.
+Customers.
+
+| Column | Type | Nullable | Key | Description | Aliases |
+| ID | NUMBER | NO | PK | VI: Mã khách. EN: Customer id. | |
+| DOANH_THU | NUMBER | YES |  | VI: Doanh thu luỹ kế. EN: Revenue. | |
+| AMOUNT | NUMBER | YES |  | VI: Hạn mức. EN: Credit limit. | |
+| NOTE | VARCHAR2 | YES |  | VI: Ghi chú. EN: Note. | |
+`;
+    const reduced = reduceSchemaText(stored, 'doanh thu theo tháng', [
+      'SELECT SUM(AMOUNT), NOTE FROM SALES.ORDERS',
+    ]);
+    expect(reduced.text).toContain('| ID |');
+    expect(reduced.text).toContain('DOANH_THU');
+    expect(reduced.text).not.toContain('AMOUNT');
+    expect(reduced.text).not.toContain('NOTE');
+    expect(reduced.text).toContain('Mã khách.');
+    expect(reduced.text).not.toContain('EN:');
+    expect(reduced.text).not.toContain('Customer id.');
+    expect(sqlsForTable(['SELECT 1 FROM SALES.ORDERS'], 'ORDERS')).toHaveLength(1);
+    expect(sqlsForTable(['SELECT 1 FROM SALES.ORDER_LINES'], 'ORDERS')).toHaveLength(0);
+  });
+
+  it('cuts a long stored description down to one prompt sentence', () => {
+    expect(promptDescription('VI: Ngắn. EN: Short.')).toBe('Ngắn.');
+    expect(promptDescription('plain text')).toBe('plain text');
+    expect(promptDescription(`VI: ${'a '.repeat(200)}EN: x`).length).toBeLessThanOrEqual(120);
   });
 
   it('keeps primary keys, foreign keys, and the first 12 columns when nothing matches the question', () => {

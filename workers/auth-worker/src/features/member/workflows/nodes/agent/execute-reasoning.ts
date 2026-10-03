@@ -9,6 +9,7 @@ import {
   billGenerateTextCalls,
   ensureWalletBalance,
   extractTextFromAiResponse,
+  finishReasonFromAiResponse,
   getModelForService,
   resolveServiceByEndpoint,
   runTextModel,
@@ -391,6 +392,16 @@ function toNodeOutput(
   };
 }
 
+const OUTPUT_TOKEN_FLOOR = 8192;
+const OUTPUT_TOKEN_CAP = 32768;
+
+/** Next output budget after finish_reason length. Stays put once the cap is reached. */
+export function raisedOutputTokenLimit(current: number): number {
+  if (!Number.isFinite(current) || current <= 0) return OUTPUT_TOKEN_FLOOR;
+  if (current >= OUTPUT_TOKEN_CAP) return current;
+  return Math.min(OUTPUT_TOKEN_CAP, Math.max(current * 2, OUTPUT_TOKEN_FLOOR));
+}
+
 function createDefaultLlm(args: {
   ctx: NodeContext;
   modelId: string;
@@ -405,96 +416,109 @@ function createDefaultLlm(args: {
   return async (call) => {
     const limit = call.maxTokens ?? Math.min(maxTokens, call.purpose === 'act' ? maxTokens : 512);
     const temperature = call.temperature ?? args.temperature;
-    if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
-      const workersAI = createWorkersAI({
-        binding: ctx.c.env.AI,
-        gateway: gatewayForExecution(stampFromNode(ctx, 'agent')),
-      });
-      let billedSteps = 0;
-      const result = await withAiCapacityRetry(async () =>
-        generateText({
-          model: workersAI(modelId as never),
-          system: call.system,
-          messages: [{ role: 'user', content: call.user }],
-          maxOutputTokens: limit,
-          temperature,
-          topP: args.topP,
-          frequencyPenalty: args.frequencyPenalty,
-          presencePenalty: args.presencePenalty,
-          tools: call.tools,
-          toolChoice: call.toolChoice,
-          stopWhen: stepCountIs(call.stopSteps ?? DEFAULT_ACT_STEPS),
-          onStepFinish: async (step) => {
-            billedSteps += 1;
-            const usage = (step as { usage?: unknown }).usage;
-            await onBill?.(usage, asText((step as { text?: unknown }).text));
-          },
-        }),
-      );
-      await billGenerateTextCalls(async (usage, text) => {
-        await onBill?.(usage, text);
-      }, result, billedSteps);
-      const observations: ToolObservation[] = [];
-      let askedUser: { questions: string[]; why?: string } | undefined;
-      const steps = (result.steps ?? []) as Array<{
-        toolCalls?: Array<{ toolName?: string; input?: unknown; args?: unknown }>;
-        toolResults?: Array<{
-          toolName?: string;
-          result?: unknown;
-          output?: unknown;
-          input?: unknown;
-          args?: unknown;
+    const complete = async (outputLimit: number) => {
+      if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
+        const workersAI = createWorkersAI({
+          binding: ctx.c.env.AI,
+          gateway: gatewayForExecution(stampFromNode(ctx, 'agent')),
+        });
+        let billedSteps = 0;
+        const result = await withAiCapacityRetry(async () =>
+          generateText({
+            model: workersAI(modelId as never),
+            system: call.system,
+            messages: [{ role: 'user', content: call.user }],
+            maxOutputTokens: outputLimit,
+            temperature,
+            topP: args.topP,
+            frequencyPenalty: args.frequencyPenalty,
+            presencePenalty: args.presencePenalty,
+            tools: call.tools,
+            toolChoice: call.toolChoice,
+            stopWhen: stepCountIs(call.stopSteps ?? DEFAULT_ACT_STEPS),
+            onStepFinish: async (step) => {
+              billedSteps += 1;
+              const usage = (step as { usage?: unknown }).usage;
+              await onBill?.(usage, asText((step as { text?: unknown }).text));
+            },
+          }),
+        );
+        await billGenerateTextCalls(async (usage, text) => {
+          await onBill?.(usage, text);
+        }, result, billedSteps);
+        const observations: ToolObservation[] = [];
+        let askedUser: { questions: string[]; why?: string } | undefined;
+        const steps = (result.steps ?? []) as Array<{
+          finishReason?: string;
+          toolCalls?: Array<{ toolName?: string; input?: unknown; args?: unknown }>;
+          toolResults?: Array<{
+            toolName?: string;
+            result?: unknown;
+            output?: unknown;
+            input?: unknown;
+            args?: unknown;
+          }>;
         }>;
-      }>;
-      for (const step of steps) {
-        const calls = step.toolCalls ?? [];
-        for (const [index, tr] of (step.toolResults ?? []).entries()) {
-          const name = String(tr.toolName ?? '');
-          const payload = tr.output !== undefined ? tr.output : tr.result;
-          const call = calls[index];
-          const inputRaw = tr.input ?? tr.args ?? call?.input ?? call?.args;
-          const logs = sandboxLogsText(payload);
-          observations.push({
-            tool: name,
-            ok: !(payload && typeof payload === 'object' && 'ok' in payload && (payload as { ok?: boolean }).ok === false),
-            output: truncate(payload),
-            ...(inputRaw == null ? {} : { input: truncate(inputRaw, 4000) }),
-            ...(logs ? { logs: truncate(logs, TRACE_BODY_MAX) } : {}),
-          });
-          if (name === ASK_USER_TOOL && payload && typeof payload === 'object') {
-            const rec = payload as { questions?: string[]; why?: string };
-            askedUser = {
-              questions: Array.isArray(rec.questions) ? rec.questions.map(String) : [],
-              why: rec.why,
-            };
+        for (const step of steps) {
+          const calls = step.toolCalls ?? [];
+          for (const [index, tr] of (step.toolResults ?? []).entries()) {
+            const name = String(tr.toolName ?? '');
+            const payload = tr.output !== undefined ? tr.output : tr.result;
+            const toolCall = calls[index];
+            const inputRaw = tr.input ?? tr.args ?? toolCall?.input ?? toolCall?.args;
+            const logs = sandboxLogsText(payload);
+            observations.push({
+              tool: name,
+              ok: !(payload && typeof payload === 'object' && 'ok' in payload && (payload as { ok?: boolean }).ok === false),
+              output: truncate(payload),
+              ...(inputRaw == null ? {} : { input: truncate(inputRaw, 4000) }),
+              ...(logs ? { logs: truncate(logs, TRACE_BODY_MAX) } : {}),
+            });
+            if (name === ASK_USER_TOOL && payload && typeof payload === 'object') {
+              const rec = payload as { questions?: string[]; why?: string };
+              askedUser = {
+                questions: Array.isArray(rec.questions) ? rec.questions.map(String) : [],
+                why: rec.why,
+              };
+            }
           }
         }
+        const finish = result.finishReason || steps[steps.length - 1]?.finishReason || '';
+        return {
+          text: asText(result.text),
+          usage: result.totalUsage ?? result.usage,
+          observations,
+          askedUser,
+          cutOff: finish === 'length',
+        };
       }
-      return {
-        text: asText(result.text),
-        usage: result.totalUsage ?? result.usage,
-        observations,
-        askedUser,
-      };
-    }
 
-    const messages = [
-      ...(call.system ? [{ role: 'system', content: call.system }] : []),
-      { role: 'user', content: call.user },
-    ];
-    const aiResponse = await runTextModel(ctx.c.env, modelId, messages, limit, {
-      temperature,
-      top_p: args.topP,
-      frequency_penalty: args.frequencyPenalty,
-      presence_penalty: args.presencePenalty,
-    }, stampFromNode(ctx, 'text'));
-    const text = asText(extractTextFromAiResponse(aiResponse));
-    await onBill?.(aiResponse, text);
-    return {
-      text,
-      usage: aiResponse,
-      observations: [],
+      const messages = [
+        ...(call.system ? [{ role: 'system', content: call.system }] : []),
+        { role: 'user', content: call.user },
+      ];
+      const aiResponse = await runTextModel(ctx.c.env, modelId, messages, outputLimit, {
+        temperature,
+        top_p: args.topP,
+        frequency_penalty: args.frequencyPenalty,
+        presence_penalty: args.presencePenalty,
+      }, stampFromNode(ctx, 'text'));
+      const text = asText(extractTextFromAiResponse(aiResponse));
+      await onBill?.(aiResponse, text);
+      return {
+        text,
+        usage: aiResponse,
+        observations: [] as ToolObservation[],
+        cutOff: finishReasonFromAiResponse(aiResponse) === 'length',
+      };
     };
+
+    const first = await complete(limit);
+    if (!first.cutOff) return first;
+    const raised = raisedOutputTokenLimit(limit);
+    if (raised <= limit) return first;
+    console.warn(`[reasoning] ${call.purpose} hit max_tokens ${limit}; retrying at ${raised}`);
+    return complete(raised);
   };
 }
 
@@ -540,11 +564,30 @@ async function refreshSqlRag(ctx: NodeContext, agentId: string, query: string): 
   }
 }
 
+/** Retrieved schema belongs on the user message only. System stays instructions. */
+function withRetrievedContext(body: string, ragContext: string, citationsRequired: boolean): string {
+  const context = ragContext.trim();
+  if (!context || body.includes(context)) return body;
+  const block = citationsRequired
+    ? `Retrieved knowledge (cite as [n]):\n${context}`
+    : `Retrieved context:\n${context}`;
+  return body.trim() ? `${body}\n\n${block}` : block;
+}
+
+function systemPromptScope(nodeInput: Record<string, unknown>, input: string): Record<string, unknown> {
+  const source = { ...nodeInput, ragText: '', snippets: [] };
+  return { ...source, $json: source, json: source, input };
+}
+
 function codeModeGroundedUser(original: string, normalized: string, ragText: string): string {
+  const context = ragText.trim();
+  const question = bareRetrievalQuestion(original) || original;
+  const normalizedQuestion = bareRetrievalQuestion(normalized) || normalized || question;
+  const alreadyPresent = Boolean(context) && (question.includes(context) || normalizedQuestion.includes(context));
   return [
-    `Question:\n${original}`,
-    `Normalized question:\n${normalized || original}`,
-    ragText.trim(),
+    `Question:\n${question}`,
+    `Normalized question:\n${normalizedQuestion}`,
+    alreadyPresent ? '' : context,
     'Write SQL from this context, then call check_sql. Do not call get_rag.',
   ]
     .filter(Boolean)
@@ -872,8 +915,10 @@ export async function executeReasoningAgent(
   optionScope = { ...nodeInput, input: ctx.input ?? '' };
   const options = readReasoningOptions(data, optionScope);
   const citationsRequired = evaluationMode === 'sql' ? false : options.requireCitations;
-  const agentScope = { ...nodeInput, $json: nodeInput, json: nodeInput, input: ctx.input ?? '' };
-  const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), agentScope);
+  const userSystem = interpolateTemplate(
+    String(data.systemPrompt ?? ''),
+    systemPromptScope(nodeInput, String(ctx.input ?? '')),
+  );
 
   const sessionId = resolveSessionId(nodeInput, String(ctx.runContext.sessionId ?? ''));
   const session = sessionId
@@ -1117,7 +1162,6 @@ export async function executeReasoningAgent(
   const sqlContextReady = () =>
     evaluationMode === 'sql' && hasGroundedSchema(String(nodeInput.ragText ?? ''), snippets);
   const actSystem = (names: string[]) => {
-    const ragContext = formatRagContext(String(nodeInput.ragText ?? '').trim() || snippets);
     const guidance = buildToolLoopGuidance({
       usingCodeMode: false,
       retrieve: partitioned.retrieve,
@@ -1134,11 +1178,6 @@ export async function executeReasoningAgent(
       guidance,
       session.summary ? `Session memory:\n${session.summary}` : '',
       simpleMemory.historyText ? `Previous conversation:\n${simpleMemory.historyText}` : '',
-      ragContext
-        ? citationsRequired
-          ? `Retrieved knowledge (cite as [n]):\n${ragContext}`
-          : `Retrieved context:\n${ragContext}`
-        : '',
       citationsRequired && citationSeed.length
         ? 'Every factual claim must include [n] citations that match the source list.'
         : '',
@@ -1203,13 +1242,15 @@ export async function executeReasoningAgent(
       !groundedSql && askBag.length
         ? `\n\nCall the retrieve tool first with this query:\n${askBag.join('\n')}`
         : '';
+    const ragContext = formatRagContext(String(nodeInput.ragText ?? '').trim() || snippets);
+    const groundedUser = withRetrievedContext(userText, ragContext, citationsRequired);
     const act = await llm({
       purpose: 'act',
       system: actSystem(actNames),
       user:
         attempt === 0
-          ? `${userText}${retrieveFocus}`
-          : `${userText}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.${citationsRequired ? '\nKeep citations as [n].' : ''}${retrieveFocus}`,
+          ? `${groundedUser}${retrieveFocus}`
+          : `${groundedUser}\n\nRevise the previous draft:\n${draft}\nIssues: ${lastIssues}\nImprove the answer. Stop if you cannot do better than the draft.${citationsRequired ? '\nKeep citations as [n].' : ''}${retrieveFocus}`,
       tools: actNames.length ? actTools : undefined,
       toolChoice: actNames.length
         ? initialToolChoice(actNames, plan, snippets.length > 0 || groundedSql)
@@ -1270,6 +1311,8 @@ export async function executeReasoningAgent(
           query: replaced.query,
         };
         snippets = replaced.snippets;
+        const nextUser = resolveAgentUserText(data, nodeInput, question);
+        userText = pdfSuffix && !nextUser.includes(pdfSuffix) ? `${nextUser}\n\n${pdfSuffix}` : nextUser;
       }
     }
 

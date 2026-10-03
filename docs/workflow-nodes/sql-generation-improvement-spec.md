@@ -297,7 +297,7 @@ Câu trong vector `sqlpair` là câu đã viết lại ở mục 4.4 khi Save SQ
 
 ### 6.2 Một lần đưa schema vào prompt
 
-Prefetch Get RAG ghi `ragText` (hai phần ở mục 5.3) vào system **một lần**. Query của prefetch là câu đã chuẩn hóa khi bước 6.1 có chạy. Đã có `ragText` thì act đầu không gọi `get_rag`.
+Prefetch Get RAG ghi `ragText` (hai phần ở mục 5.3) vào **user message** một lần. Không gắn lại khối đó vào system prompt, kể cả khi system prompt có `{{ $json.ragText }}`. Query của prefetch là câu đã chuẩn hóa khi bước 6.1 có chạy. Đã có `ragText` thì act đầu không gọi `get_rag`.
 
 `check_sql` trả `ok: false`: gọi `get_rag` với query là identifier hoặc bảng còn thiếu trong lỗi Oracle, không nhét nguyên câu hỏi cũ cộng stack lỗi. Kết quả **thay** khối `ragText` của lượt đó, không nối thêm vào cuối.
 
