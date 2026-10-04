@@ -73,8 +73,8 @@ function flush() {
   sqlite
     .prepare(
       `INSERT INTO agent_workflows (id, user_id, name, description, tags, status, isShared, isEnterprise,
-         enterpriseId, enterpriseAcceptance, acceptedRoyaltyPercent, updated_at)
-       VALUES (?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?, 1)`,
+         enterpriseId, enterpriseAcceptance, acceptedRoyaltyPercent, updated_at, definition)
+       VALUES (?, ?, ?, ?, '[]', ?, ?, ?, ?, ?, ?, 1, ?)`,
     )
     .run(
       WF,
@@ -87,6 +87,7 @@ function flush() {
       (wf.enterpriseId as string | null) ?? null,
       String(wf.enterpriseAcceptance ?? 'none'),
       (wf.acceptedRoyaltyPercent as number | null) ?? null,
+      String(wf.definition ?? ''),
     );
 }
 
@@ -109,7 +110,7 @@ beforeEach(() => {
   sqlite = enterpriseSqlite();
   sqlite.exec(`CREATE TABLE users (user_id TEXT, identifier TEXT)`);
   sqlite.exec(`CREATE TABLE agent_workflows (id INTEGER, user_id TEXT, name TEXT, description TEXT, tags TEXT, status TEXT,
-    isShared INTEGER, isEnterprise INTEGER, enterpriseId TEXT, enterpriseAcceptance TEXT, acceptedRoyaltyPercent REAL, updated_at INTEGER)`);
+    isShared INTEGER, isEnterprise INTEGER, enterpriseId TEXT, enterpriseAcceptance TEXT, acceptedRoyaltyPercent REAL, updated_at INTEGER, definition TEXT)`);
   for (const [identifier, id] of Object.entries(IDS)) sqlite.prepare(`INSERT INTO users VALUES (?, ?)`).run(id, identifier);
   addOrg('org-1', FUTURE);
   addOrg('org-2', FUTURE);
@@ -130,6 +131,7 @@ beforeEach(() => {
     id: WF,
     name: 'Payroll',
     description: 'Monthly payroll',
+    definition: JSON.stringify({ nodes: [{ id: 'n1', type: 'trigger', data: { triggerKind: 'chat', enterpriseTriggerKey: 'chat' } }], edges: [] }),
     status: 'published',
     isShared: true,
     isEnterprise: true,

@@ -75,6 +75,7 @@ import {
   ownerWithdrawFlag,
 } from '../../../enterprise/workflow-flag';
 import { ownerSetEnterpriseProposal } from '../../../enterprise/workflow-proposal';
+import { assignEnterpriseTriggerKeys } from '../../../enterprise/trigger-keys';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
@@ -356,6 +357,7 @@ export function createWorkflowRoutes(bindingName: string) {
         'insert',
         {
           ...body,
+          definition: assignEnterpriseTriggerKeys(null, body.definition),
           tags: body.tags ?? '[]',
         },
         'agent_workflows',
@@ -907,6 +909,9 @@ export function createWorkflowRoutes(bindingName: string) {
         where: { field: 'id', operator: '=', value: id },
       }, 'agent_workflows');
       const existing = Array.isArray(rows) ? rows[0] : rows;
+      if (typeof body.definition === 'string') {
+        body.definition = assignEnterpriseTriggerKeys((existing as { definition?: unknown })?.definition, body.definition);
+      }
       const updated = await executeUtils.executeDynamicAction(
         userDO,
         'update',
@@ -1045,10 +1050,17 @@ export function createWorkflowRoutes(bindingName: string) {
       if (!version || version.workflowId !== id) {
         return c.json({ error: 'Version not found' }, 404);
       }
+      const currentRows = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'id', operator: '=', value: id },
+      }, 'agent_workflows');
+      const current = Array.isArray(currentRows) ? currentRows[0] : currentRows;
       const updated = await executeUtils.executeDynamicAction(
         userDO,
         'update',
-        { id, definition: version.definition },
+        {
+          id,
+          definition: assignEnterpriseTriggerKeys((current as { definition?: unknown })?.definition, version.definition),
+        },
         'agent_workflows',
       );
       return c.json({ workflow: updated, restoredVersion: version.version });

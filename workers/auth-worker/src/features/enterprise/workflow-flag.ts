@@ -2,6 +2,7 @@ import type { UserDO } from '../ws/infrastructure/UserDO';
 import { executeUtils } from '../../shared/utils';
 import { EnterpriseError } from './domain';
 import { d1, insertEvent } from './store';
+import { assignEnterpriseTriggerKeys } from './trigger-keys';
 
 export type FlagRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -223,8 +224,11 @@ async function approvePendingRequest(env: Env, actorId: string, req: FlagRequest
     .run();
   if (claimed.meta.changes === 0) throw new EnterpriseError('ENTERPRISE_FLAG_REQUEST_NOT_PENDING', 409);
   try {
-    await requireOwnerWorkflow(env, req.workflow_owner_id, req.workflow_id);
+    const wf = await requireOwnerWorkflow(env, req.workflow_owner_id, req.workflow_id);
+    const definition = String(wf.definition ?? '{"nodes":[],"edges":[]}');
+    const keyed = assignEnterpriseTriggerKeys(definition, definition);
     await writeOwnerWorkflow(env, req.workflow_owner_id, req.workflow_id, {
+      ...(keyed !== definition ? { definition: keyed } : {}),
       isEnterprise: true,
       enterpriseId: null,
       enterpriseAcceptance: 'none',

@@ -62,7 +62,7 @@ export type SeatExclusion = 'self_paid' | 'admin_granted';
 export class EnterpriseError extends Error {
   constructor(
     public readonly code: string,
-    public readonly status: 400 | 403 | 404 | 409,
+    public readonly status: 400 | 402 | 403 | 404 | 409,
     message?: string,
   ) {
     super(message ?? code);
@@ -97,6 +97,27 @@ export const SeatCheckoutSchema = z.object({ userId: UserIdSchema });
 export const RejectFlagRequestSchema = z.object({ reason: z.string().trim().min(1).max(1000) });
 
 export const SetWorkflowFlagSchema = z.object({ isEnterprise: z.boolean(), force: z.boolean().optional() });
+
+const TriggerKeySchema = z.string().uuid();
+
+export const PutGrantsSchema = z.object({
+  granteeUserId: UserIdSchema,
+  triggerKeys: z.array(TriggerKeySchema).max(100),
+  monthlyCreditCap: z.number().min(0).max(1_000_000).nullable().optional(),
+});
+
+export const IssueCredentialSchema = z.object({
+  triggerKey: TriggerKeySchema,
+  granteeUserId: UserIdSchema.optional(),
+});
+
+export const EnterpriseExecuteSchema = z.object({
+  triggerKey: TriggerKeySchema,
+  input: z.string().max(100_000).optional(),
+  fields: z.record(z.unknown()).optional(),
+  sessionId: z.string().max(200).optional(),
+  chatInput: z.string().max(100_000).optional(),
+});
 
 export const PENDING_INVOICE_TTL_MS = 24 * 60 * 60 * 1000;
 const SEAT_GRACE_MS = ENTERPRISE_SEAT_GRACE_DAYS * 24 * 60 * 60 * 1000;

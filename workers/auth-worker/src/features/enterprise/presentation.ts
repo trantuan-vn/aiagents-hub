@@ -17,6 +17,9 @@ import {
   CheckoutSchema,
   CreateEnterpriseSchema,
   EnterpriseError,
+  EnterpriseExecuteSchema,
+  IssueCredentialSchema,
+  PutGrantsSchema,
   PatchEnterpriseSchema,
   RejectFlagRequestSchema,
   SeatCheckoutSchema,
@@ -30,6 +33,7 @@ import {
   adminSetWorkflowFlag,
 } from './workflow-flag';
 import { businessDecideProposal, enterpriseCatalog } from './workflow-proposal';
+import { businessIssueCredential, businessListGrants, businessPutGrants, credentialHook, sessionExecute } from './triggers';
 
 type Guard = (c: any) => { identifier: string };
 
@@ -161,6 +165,47 @@ export function createEnterpriseWorkflowRoutes() {
 
   app.get('/', member(async (c, user) => c.json(await enterpriseCatalog(c.env, user.identifier)), 'Failed to load organization workflows'));
 
+  const target = (c: any) => {
+    const workflowId = parseInt(c.req.param('workflowId'), 10);
+    if (isNaN(workflowId)) throw new Error('Invalid workflow id');
+    return { ownerId: c.req.param('ownerId') as string, workflowId };
+  };
+
+  app.get(
+    '/:ownerId/:workflowId/grants',
+    member(async (c, user) => {
+      const { ownerId, workflowId } = target(c);
+      return c.json(await businessListGrants(c.env, user.identifier, ownerId, workflowId));
+    }, 'Failed to load grants'),
+  );
+
+  app.put(
+    '/:ownerId/:workflowId/grants',
+    member(async (c, user) => {
+      const { ownerId, workflowId } = target(c);
+      const body = PutGrantsSchema.parse(await c.req.json());
+      return c.json(await businessPutGrants(c.env, user.identifier, ownerId, workflowId, body));
+    }, 'Failed to save grants'),
+  );
+
+  app.post(
+    '/:ownerId/:workflowId/credentials',
+    member(async (c, user) => {
+      const { ownerId, workflowId } = target(c);
+      const body = IssueCredentialSchema.parse(await c.req.json());
+      return c.json(await businessIssueCredential(c.env, user.identifier, ownerId, workflowId, body), 201);
+    }, 'Failed to issue credential'),
+  );
+
+  app.post(
+    '/:ownerId/:workflowId/execute',
+    member(async (c, user) => {
+      const { ownerId, workflowId } = target(c);
+      const body = EnterpriseExecuteSchema.parse(await c.req.json());
+      return c.json(await sessionExecute(c.env, user.identifier, ownerId, workflowId, body));
+    }, 'Failed to run organization workflow'),
+  );
+
   for (const decision of ['accept', 'reject', 'release'] as const) {
     app.post(
       `/:ownerId/:workflowId/${decision}`,
@@ -173,6 +218,16 @@ export function createEnterpriseWorkflowRoutes() {
     );
   }
 
+  return app;
+}
+
+/** Mounted at `/hooks/enterprise`, ahead of the workflow hook router. No session: the token is the credential. */
+export function createEnterpriseHookRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+  app.post(
+    '/:token',
+    route(() => ({ identifier: '' }), async (c) => c.json(await credentialHook(c.env, c.req.param('token'), c.req.raw)), 'Failed to run organization trigger'),
+  );
   return app;
 }
 

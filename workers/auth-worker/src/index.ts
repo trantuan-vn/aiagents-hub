@@ -58,6 +58,7 @@ import {
   createAdminEnterpriseFlagRequestRoutes,
   createAdminEnterpriseRoutes,
   createAdminWorkflowEnterpriseRoutes,
+  createEnterpriseHookRoutes,
   createEnterpriseMemberRoutes,
   createEnterpriseWorkflowRoutes,
 } from './features/enterprise/presentation';
@@ -157,6 +158,7 @@ function createRoutes(bindingName: string) {
   routes.route('/api/ws', createApiWebSocketRoutes(bindingName));
 
   // III. PUBLIC WEBHOOKS (workflow webhooks: Bearer API token + X-Client-ID)
+  routes.route('/hooks/enterprise', createEnterpriseHookRoutes());
   routes.route('/hooks', createWorkflowHookRoutes(bindingName));
   routes.route('/', createFormHookRoutes(bindingName));
   routes.route('/', createChatHookRoutes(bindingName));

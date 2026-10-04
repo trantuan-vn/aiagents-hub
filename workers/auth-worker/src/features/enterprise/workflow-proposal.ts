@@ -17,6 +17,7 @@ import {
   requireOwnerWorkflow,
   writeOwnerWorkflow,
 } from './workflow-flag';
+import { listEnterpriseTriggers } from './trigger-keys';
 
 type Acceptance = 'none' | 'pending' | 'accepted';
 
@@ -160,9 +161,15 @@ type CatalogRow = {
   tags: string | null;
   acceptedRoyaltyPercent: number | null;
   owner_identifier: string | null;
+  definition?: string | null;
+  granted_keys?: string | null;
 };
 
-function catalogView(r: CatalogRow) {
+/** `granted` limits the card to those keys (Pro); undefined shows every key on the graph (Business). */
+function catalogView(r: CatalogRow, granted?: Set<string>) {
+  const triggers = listEnterpriseTriggers(r.definition)
+    .filter((t) => !granted || granted.has(t.triggerKey))
+    .map(({ triggerKey, kind, label }) => ({ triggerKey, kind, label }));
   return {
     id: r.id,
     ownerId: r.user_id,
@@ -171,11 +178,12 @@ function catalogView(r: CatalogRow) {
     description: r.description,
     tags: r.tags ?? '[]',
     royaltyPercent: r.acceptedRoyaltyPercent,
+    triggers,
   };
 }
 
 const CATALOG_COLUMNS = `w.id, w.user_id, w.name, w.description, w.tags, w."acceptedRoyaltyPercent" AS acceptedRoyaltyPercent,
-       u.identifier AS owner_identifier`;
+       w.definition, u.identifier AS owner_identifier`;
 
 /**
  * `GET /dashboard/build/workflows/enterprise`. One D1 query over the agent_workflows projection, never
@@ -183,7 +191,8 @@ const CATALOG_COLUMNS = `w.id, w.user_id, w.name, w.description, w.tags, w."acce
  * proposals; Pro sees accepted workflows it holds at least one grant on.
  */
 export async function enterpriseCatalog(env: Env, identifier: string, now = new Date()) {
-  const empty = { workflows: [] as ReturnType<typeof catalogView>[], proposals: [] as ReturnType<typeof catalogView>[] };
+  type Card = ReturnType<typeof catalogView>;
+  const empty: { workflows: Card[]; proposals: Card[] } = { workflows: [], proposals: [] };
   const db = d1(env);
   const member = await getMembership(db, identifier);
   if (!member) return empty;
@@ -198,18 +207,23 @@ export async function enterpriseCatalog(env: Env, identifier: string, now = new 
   if (member.seat_role === 'pro') {
     const { results } = await db
       .prepare(
-        `SELECT ${CATALOG_COLUMNS}
+        `SELECT ${CATALOG_COLUMNS}, g.granted_keys
            FROM agent_workflows w
+           JOIN (SELECT workflow_owner_id, workflow_id, group_concat(trigger_key) AS granted_keys
+                   FROM enterprise_trigger_grants
+                  WHERE enterprise_id = ? AND grantee_user_id = ?
+                  GROUP BY workflow_owner_id, workflow_id) g
+             ON g.workflow_owner_id = w.user_id AND g.workflow_id = w.id
            LEFT JOIN users u ON u.user_id = w.user_id
           WHERE ${acceptedWhere}
-            AND EXISTS (SELECT 1 FROM enterprise_trigger_grants g
-                         WHERE g.workflow_owner_id = w.user_id AND g.workflow_id = w.id
-                           AND g.enterprise_id = ? AND g.grantee_user_id = ?)
           ORDER BY w.name`,
       )
-      .bind(org.id, org.id, identifier)
+      .bind(org.id, identifier, org.id)
       .all<CatalogRow>();
-    return { workflows: (results ?? []).map(catalogView), proposals: [] };
+    const workflows = (results ?? [])
+      .map((r) => catalogView(r, new Set(String(r.granted_keys ?? '').split(',').filter(Boolean))))
+      .filter((w) => w.triggers.length > 0);
+    return { workflows, proposals: [] };
   }
 
   const [accepted, pending] = await db.batch<CatalogRow>([
@@ -228,7 +242,7 @@ export async function enterpriseCatalog(env: Env, identifier: string, now = new 
       .bind(org.id),
   ]);
   return {
-    workflows: (accepted.results ?? []).map(catalogView),
-    proposals: (pending.results ?? []).map(catalogView),
+    workflows: (accepted.results ?? []).map((r) => catalogView(r)),
+    proposals: (pending.results ?? []).map((r) => catalogView(r)),
   };
 }
