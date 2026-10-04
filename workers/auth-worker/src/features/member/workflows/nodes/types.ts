@@ -20,6 +20,8 @@ export interface WorkflowAttribution {
   workflowId: number;
   workflowOwnerId: string;
   workflowName?: string;
+  /** Frozen royalty of an accepted enterprise workflow; unset means the platform rate. */
+  royaltyPercent?: number;
 }
 
 export interface RequestMeta {

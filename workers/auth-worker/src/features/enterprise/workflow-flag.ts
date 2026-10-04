@@ -22,6 +22,13 @@ export function isEnterpriseWorkflow(wf: Record<string, unknown> | null | undefi
   return v === true || v === 1 || v === '1';
 }
 
+/** Royalty % the organization accepted (§3.2). Admin edits to the platform rate do not reach it. */
+export function frozenEnterpriseRoyaltyPercent(wf: Record<string, unknown> | null | undefined): number | undefined {
+  if (!isEnterpriseWorkflow(wf) || wf?.enterpriseAcceptance !== 'accepted') return undefined;
+  const pct = Number(wf.acceptedRoyaltyPercent);
+  return wf.acceptedRoyaltyPercent != null && Number.isFinite(pct) ? pct : undefined;
+}
+
 /** `ownerId` is the owner's UserDO id string, the same value as `agent_workflows.user_id` on D1. */
 export function ownerDo(env: Env, ownerId: string): DurableObjectStub<UserDO> {
   if (!/^[0-9a-f]{64}$/i.test(ownerId)) throw new Error('Workflow not found');
@@ -47,14 +54,21 @@ export async function loadOwnerWorkflow(
   return wf ? (wf as Record<string, unknown>) : null;
 }
 
-async function requireOwnerWorkflow(env: Env, ownerId: string, workflowId: number): Promise<Record<string, unknown>> {
+export async function requireOwnerWorkflow(env: Env, ownerId: string, workflowId: number): Promise<Record<string, unknown>> {
   const wf = await loadOwnerWorkflow(env, ownerId, workflowId);
   if (!wf) throw new EnterpriseError('ENTERPRISE_WORKFLOW_NOT_FOUND', 404);
   return wf;
 }
 
-async function writeOwnerWorkflow(env: Env, ownerId: string, workflowId: number, patch: Record<string, unknown>) {
+export async function writeOwnerWorkflow(env: Env, ownerId: string, workflowId: number, patch: Record<string, unknown>) {
   await executeUtils.executeDynamicAction(ownerDo(env, ownerId), 'update', { id: workflowId, ...patch }, 'agent_workflows');
+}
+
+export async function deleteWorkflowGrants(db: D1Database, ownerId: string, workflowId: number): Promise<void> {
+  await db.batch([
+    db.prepare(`DELETE FROM enterprise_trigger_grants WHERE workflow_owner_id = ? AND workflow_id = ?`).bind(ownerId, workflowId),
+    db.prepare(`DELETE FROM enterprise_trigger_credentials WHERE workflow_owner_id = ? AND workflow_id = ?`).bind(ownerId, workflowId),
+  ]);
 }
 
 /**
@@ -273,10 +287,7 @@ export async function adminSetWorkflowFlag(
     acceptedRoyaltyPercent: null,
     ...(acceptance === 'accepted' ? { isShared: false } : {}),
   });
-  await db.batch([
-    db.prepare(`DELETE FROM enterprise_trigger_grants WHERE workflow_owner_id = ? AND workflow_id = ?`).bind(ownerId, workflowId),
-    db.prepare(`DELETE FROM enterprise_trigger_credentials WHERE workflow_owner_id = ? AND workflow_id = ?`).bind(ownerId, workflowId),
-  ]);
+  await deleteWorkflowGrants(db, ownerId, workflowId);
   const enterpriseId = wf.enterpriseId ? String(wf.enterpriseId) : '';
   if (enterpriseId) {
     await insertEvent(db, {

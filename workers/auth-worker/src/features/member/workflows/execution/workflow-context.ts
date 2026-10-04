@@ -2,7 +2,7 @@ import { getIdFromName, executeUtils } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { WorkflowDefinitionSchema } from '../domain/domain.js';
-import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
+import { frozenEnterpriseRoyaltyPercent, isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
 
 export interface ResolvedWorkflow {
   workflow: Record<string, unknown>;
@@ -94,9 +94,11 @@ export async function resolveWorkflow(
 
 export function workflowAttribution(resolved: ResolvedWorkflow) {
   if (resolved.isOwnedByUser) return undefined;
+  const royaltyPercent = frozenEnterpriseRoyaltyPercent(resolved.workflow);
   return {
     workflowId: resolved.workflowId,
     workflowOwnerId: resolved.ownerId,
+    ...(royaltyPercent !== undefined ? { royaltyPercent } : {}),
   };
 }
 

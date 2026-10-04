@@ -58,7 +58,7 @@ export async function chargeServiceUsage(params: {
   usageUsd?: number;
   creditsUsage?: number;
   usageCredits?: Partial<UsageCredits> & { creditsUsage?: number; cogsAiUsd?: number };
-  workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+  workflowAttribution?: { workflowId: number; workflowOwnerId: string; royaltyPercent?: number };
   /** Phase B.1: persist on service_usages for admin fan-out. */
   executionKey?: string;
 }): Promise<UsageCharge> {
@@ -82,6 +82,7 @@ export async function chargeServiceUsage(params: {
     const royalty = await resolveWorkflowRoyalty(params.env, params.bindingName, {
       workflowId: params.workflowAttribution.workflowId,
       workflowOwnerId: params.workflowAttribution.workflowOwnerId,
+      royaltyPercent: params.workflowAttribution.royaltyPercent,
       consumerIdentifier: params.consumerIdentifier,
       baseCostUsd: revenueUsd,
     });
@@ -153,6 +154,7 @@ export async function chargeServiceUsage(params: {
     await recordWorkflowRoyalty(params.env, params.bindingName, {
       workflowId: params.workflowAttribution.workflowId,
       workflowOwnerId: params.workflowAttribution.workflowOwnerId,
+      royaltyPercent: params.workflowAttribution.royaltyPercent,
       consumerIdentifier: params.consumerIdentifier,
       baseCostUsd: revenueUsd,
     });
@@ -189,7 +191,7 @@ async function chargeLegacyUsd(
     consumerIdentifier: string;
     usageData: Record<string, unknown>;
     usageUsd?: number;
-    workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+    workflowAttribution?: { workflowId: number; workflowOwnerId: string; royaltyPercent?: number };
     executionKey?: string;
   },
   userRow: Record<string, unknown>,
@@ -200,6 +202,7 @@ async function chargeLegacyUsd(
     const royalty = await resolveWorkflowRoyalty(params.env, params.bindingName, {
       workflowId: params.workflowAttribution.workflowId,
       workflowOwnerId: params.workflowAttribution.workflowOwnerId,
+      royaltyPercent: params.workflowAttribution.royaltyPercent,
       consumerIdentifier: params.consumerIdentifier,
       baseCostUsd: usageUsd,
     });
@@ -253,6 +256,7 @@ async function chargeLegacyUsd(
     await recordWorkflowRoyalty(params.env, params.bindingName, {
       workflowId: params.workflowAttribution.workflowId,
       workflowOwnerId: params.workflowAttribution.workflowOwnerId,
+      royaltyPercent: params.workflowAttribution.royaltyPercent,
       consumerIdentifier: params.consumerIdentifier,
       baseCostUsd: usageUsd,
     });

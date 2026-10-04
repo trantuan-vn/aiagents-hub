@@ -59,6 +59,7 @@ import {
   createAdminEnterpriseRoutes,
   createAdminWorkflowEnterpriseRoutes,
   createEnterpriseMemberRoutes,
+  createEnterpriseWorkflowRoutes,
 } from './features/enterprise/presentation';
 import { sweepEnterprises } from './features/enterprise/billing';
 import {
@@ -116,6 +117,7 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/assistant', createAssistantRoutes(bindingName));
   // Static /node-catalog must be registered before /:id on the workflows router.
   routes.route('/dashboard/build/workflows/node-catalog', createWorkflowNodeCatalogMemberRoutes(bindingName));
+  routes.route('/dashboard/build/workflows/enterprise', createEnterpriseWorkflowRoutes());
   routes.route('/dashboard/build/workflows', createWorkflowRoutes(bindingName));
   routes.route('/dashboard/vnpay', createPaymentRoutes(bindingName));
   routes.route('/dashboard/paypal', createPaypalRoutes(bindingName));

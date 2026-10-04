@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { DatabaseSync } from 'node:sqlite';
+import type { DatabaseSync } from 'node:sqlite';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const doRows = new Map<string, Record<string, unknown>>();
@@ -36,39 +35,7 @@ import {
   ownerRequestFlag,
   ownerWithdrawFlag,
 } from './workflow-flag';
-
-const MIGRATIONS = ['019_enterprise.sql', '021_enterprise_flag_request_one_pending.sql'].map((f) =>
-  readFileSync(new URL(`../../../../queue-worker/migrations/${f}`, import.meta.url), 'utf8'),
-);
-
-function fakeD1(sqlite: DatabaseSync): D1Database {
-  const statement = (sql: string, params: unknown[] = []) => ({
-    sql,
-    params,
-    bind: (...next: unknown[]) => statement(sql, next),
-    run: async () => {
-      const r = sqlite.prepare(sql).run(...(params as any[]));
-      return { meta: { changes: Number(r.changes) } };
-    },
-    first: async () => sqlite.prepare(sql).get(...(params as any[])) ?? null,
-    all: async () => ({ results: sqlite.prepare(sql).all(...(params as any[])) }),
-  });
-  return {
-    prepare: (sql: string) => statement(sql),
-    batch: async (stmts: any[]) => {
-      sqlite.exec('BEGIN');
-      try {
-        const out = [];
-        for (const s of stmts) out.push(await s.run());
-        sqlite.exec('COMMIT');
-        return out;
-      } catch (err) {
-        sqlite.exec('ROLLBACK');
-        throw err;
-      }
-    },
-  } as unknown as D1Database;
-}
+import { enterpriseSqlite, fakeD1 } from './test-d1';
 
 const ALICE = 'alice@example.com';
 const ALICE_ID = 'a'.repeat(64);
@@ -79,8 +46,7 @@ let env: Env;
 
 beforeEach(() => {
   doRows.clear();
-  sqlite = new DatabaseSync(':memory:');
-  for (const m of MIGRATIONS) sqlite.exec(m);
+  sqlite = enterpriseSqlite();
   sqlite.exec(`CREATE TABLE users (user_id TEXT, identifier TEXT)`);
   sqlite.prepare(`INSERT INTO users VALUES (?, ?)`).run(ALICE_ID, ALICE);
   env = {

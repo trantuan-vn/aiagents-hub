@@ -74,9 +74,11 @@ import {
   ownerRequestFlag,
   ownerWithdrawFlag,
 } from '../../../enterprise/workflow-flag';
+import { ownerSetEnterpriseProposal } from '../../../enterprise/workflow-proposal';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
+const EnterpriseProposalSchema = z.string().trim().min(1).max(64).nullable();
 
 function hasAdminOnlyWorkflowField(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object') return false;
@@ -874,7 +876,17 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(id)) throw new Error('Invalid workflow id');
       const raw = await c.req.json();
       if (hasAdminOnlyWorkflowField(raw)) return c.json(ENTERPRISE_FLAG_FORBIDDEN, 403);
-      const body = UpdateWorkflowSchema.parse(raw);
+      const { enterpriseId, ...rest } = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+      const body = UpdateWorkflowSchema.parse(rest);
+      if (enterpriseId !== undefined) {
+        const proposed = await ownerSetEnterpriseProposal(
+          c.env,
+          user.identifier,
+          id,
+          EnterpriseProposalSchema.parse(enterpriseId),
+        );
+        if (Object.keys(body).length === 0) return c.json({ workflow: proposed });
+      }
       const userDO = getUserDO(c, user.identifier);
       const { quota } = await loadUserAndSyncPlan(userDO, c.env);
       if (!quota.entitlement.canShareWorkflows) {

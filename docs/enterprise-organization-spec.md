@@ -264,7 +264,7 @@ User Business của đúng tổ chức:
 
 | Việc | Hệ quả |
 |------|--------|
-| Chấp nhận | `enterpriseAcceptance = accepted` và đóng băng `acceptedRoyaltyPercent` bằng `WORKFLOW_ROYALTY_PERCENT` tại lúc bấm. Workflow vào khối tổ chức của Business. Pro vẫn chưa thấy cho đến khi có grant |
+| Chấp nhận | `enterpriseAcceptance = accepted` và đóng băng `acceptedRoyaltyPercent` bằng mức đã ghi trên đề nghị (`WORKFLOW_ROYALTY_PERCENT` lúc owner gửi). Workflow vào khối tổ chức của Business. Pro vẫn chưa thấy cho đến khi có grant |
 | Từ chối đề nghị `pending` | Xóa `enterpriseId`, acceptance về `none`, xóa grant |
 | Nhả workflow đã `accepted` | Như từ chối, cộng xóa credential. Owner giữ graph và cờ enterprise, có thể đề nghị tổ chức khác |
 
@@ -274,7 +274,7 @@ User Business của đúng tổ chức:
 
 Catalog công khai (`GET /shared` và tab workflow công khai) luôn loại `isEnterprise = 1`. Thiếu hàng trả 404, không 403.
 
-Khối **Tổ chức** trên màn cộng đồng đọc `GET /dashboard/workflows/enterprise`, không trộn vào response `/shared`.
+Khối **Tổ chức** trên màn cộng đồng đọc `GET /dashboard/build/workflows/enterprise`, không trộn vào response `/shared`.
 
 Hiện trong khối đó khi:
 
@@ -397,14 +397,14 @@ Mọi đổi ghế, đổi acceptance, ghi grant, và `force` ghi `enterprise_ev
 
 | Method | Path | Việc |
 |--------|------|------|
-| GET | `/dashboard/workflows/enterprise` | Khối Tổ chức. Business: workflow `accepted` + hàng đề nghị `pending`. Pro: chỉ workflow `accepted` mình có grant. `triggers` đã cắt. Không đủ điều kiện → `{ workflows: [], proposals: [] }`. Tên, mô tả và danh sách `triggerKey` của mỗi workflow đọc bản chiếu D1 — một query, không đọc UserDO của từng owner. Cắt theo grant bằng join `enterprise_trigger_grants`. UserDO của owner chỉ đọc lúc execute |
-| POST | `/dashboard/workflows/enterprise/:ownerId/:workflowId/accept` | Business chấp nhận đề nghị `pending` |
-| POST | `/dashboard/workflows/enterprise/:ownerId/:workflowId/reject` | Business từ chối `pending` |
-| POST | `/dashboard/workflows/enterprise/:ownerId/:workflowId/release` | Business nhả workflow `accepted`. Xóa grant và credential |
-| PUT | `/dashboard/workflows/enterprise/:ownerId/:workflowId/grants` | Business. Body `{ granteeUserId, triggerKeys: string[], monthlyCreditCap?: number \| null }`. Không nhận `*`. Mảng rỗng = xóa grant và credential của user này. Response gồm token bản rõ **một lần** cho từng key mới |
-| GET | `/dashboard/workflows/enterprise/:ownerId/:workflowId/grants` | Business. Pro của tổ chức, key đang có trên graph, grant hiện có. Không trả token bản rõ |
-| POST | `/dashboard/workflows/enterprise/:ownerId/:workflowId/credentials` | Business tạo token cho chính mình trên một `triggerKey` của workflow `accepted`, để hệ thống bên ngoài gọi |
-| POST | `/dashboard/workflows/enterprise/:ownerId/:workflowId/execute` | Session. Body có `triggerKey`. Business của tổ chức, hoặc Pro có grant key đó |
+| GET | `/dashboard/build/workflows/enterprise` | Khối Tổ chức. Business: workflow `accepted` + hàng đề nghị `pending`. Pro: chỉ workflow `accepted` mình có grant. `triggers` đã cắt. Không đủ điều kiện → `{ workflows: [], proposals: [] }`. Tên, mô tả và danh sách `triggerKey` của mỗi workflow đọc bản chiếu D1 — một query, không đọc UserDO của từng owner. Cắt theo grant bằng join `enterprise_trigger_grants`. UserDO của owner chỉ đọc lúc execute |
+| POST | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/accept` | Business chấp nhận đề nghị `pending` |
+| POST | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/reject` | Business từ chối `pending` |
+| POST | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/release` | Business nhả workflow `accepted`. Xóa grant và credential |
+| PUT | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/grants` | Business. Body `{ granteeUserId, triggerKeys: string[], monthlyCreditCap?: number \| null }`. Không nhận `*`. Mảng rỗng = xóa grant và credential của user này. Response gồm token bản rõ **một lần** cho từng key mới |
+| GET | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/grants` | Business. Pro của tổ chức, key đang có trên graph, grant hiện có. Không trả token bản rõ |
+| POST | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/credentials` | Business tạo token cho chính mình trên một `triggerKey` của workflow `accepted`, để hệ thống bên ngoài gọi |
+| POST | `/dashboard/build/workflows/enterprise/:ownerId/:workflowId/execute` | Session. Body có `triggerKey`. Business của tổ chức, hoặc Pro có grant key đó |
 | POST | `/hooks/enterprise/:token` | Credential. Chạy đúng một `triggerKey`. URL công khai cũ của workflow enterprise trả 404 |
 
 ### 4.2b Kỳ thanh toán của tổ chức
@@ -641,6 +641,6 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 1. D1 cho bảng tổ chức ở `workers/queue-worker/migrations/019_enterprise.sql` (không đưa vào `SYNC_TABLE_NAMES`, không đưa vào `d1tor2`). Cột workflow ở `020_agent_workflows_enterprise.sql` và trong `AgentWorkflowSchema` (UserDO tự thêm cột qua `ensureSchemaColumns`). `planSource = 'enterprise'` giữ plan đến `planCurrentPeriodEnd` + 7 ngày.
 2. Hóa đơn một kỳ, `periodEnd` khóa lúc `paid`, áp từng UserDO, idempotent theo `applied_user_ids`. Order và payment trên DO của người trả. Code ở `workers/auth-worker/src/features/enterprise/`. Hóa đơn tạo một `orders` ghi chú `enterprise:<invoiceId>` và người trả thanh toán order đó qua PayPal hoặc Casso như order thường (`checkoutPath` = `/dashboard/control/billing?payOrder=…`). Cổng thanh toán từ chối order mà `order_id`, người trả hoặc số tiền không khớp hóa đơn. Cron `7 * * * *` hết hạn hóa đơn treo, chạy nốt lần áp ghế bị rớt, và settle hóa đơn có `payments` `COMPLETED`. Xóa tổ chức còn thành viên → 409 `ENTERPRISE_HAS_MEMBERS`.
 3. Hàng chờ xin bật cờ, canvas admin đọc DO, hook/form/execute đọc DO. List D1 lọc `isEnterprise = 0` khi bản chiếu đã có cờ. Code ở `features/enterprise/workflow-flag.ts`. Owner gọi `GET`/`POST`/`DELETE /dashboard/build/workflows/:id/enterprise-flag-request`; `GET` trả yêu cầu mới nhất kèm `reason`. D1 `021_enterprise_flag_request_one_pending.sql` giữ một yêu cầu `pending` mỗi workflow. Cửa công khai (execute/chat shared, chi tiết, comment, star, form/chat production, webhook, kênh, cron) đọc DO và trả 404; cron của owner bỏ qua workflow enterprise không retry. Lần chạy test trên canvas vẫn mở.
-4. Đề nghị, chấp nhận, từ chối, nhả. Khối Tổ chức tách khỏi list `/shared`.
+4. Đề nghị, chấp nhận, từ chối, nhả. Khối Tổ chức tách khỏi list `/shared`. Code ở `features/enterprise/workflow-proposal.ts`. Owner gửi `{ enterpriseId }` qua `PUT /dashboard/build/workflows/:id`; mức royalty lúc gửi được ghi sẵn vào `acceptedRoyaltyPercent` để Business thấy và chấp nhận đúng mức đó. Route Business mount ở `/dashboard/build/workflows/enterprise` trước router workflow. Chấp nhận cần tổ chức `active` và ghế Business đang hiệu lực; từ chối và nhả vẫn làm được khi tổ chức `suspended`. Royalty khi chạy đi qua `workflowAttribution.royaltyPercent`. Danh sách trigger trên card để phase 5.
 5. `enterpriseTriggerKey` trên node. Grant theo key đã có lúc lưu, credential một lần, `POST /hooks/enterprise/:token`, trần Credit, tắt cron owner.
 6. Trang tĩnh và i18n.

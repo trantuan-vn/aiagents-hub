@@ -467,12 +467,7 @@ export async function describeTable(ctx: NodeContext, info: GetDbInfoResult): Pr
         aiResponse: asBillingAiResponse(aiResponse, text),
         userAgent: billing.requestMeta?.userAgent,
         ipAddress: billing.requestMeta?.ipAddress,
-        workflowAttribution: billing.workflowAttribution
-          ? {
-              workflowId: billing.workflowAttribution.workflowId,
-              workflowOwnerId: billing.workflowAttribution.workflowOwnerId,
-            }
-          : undefined,
+        workflowAttribution: billing.workflowAttribution,
         executionKey: billing.executionKey,
       },
     );

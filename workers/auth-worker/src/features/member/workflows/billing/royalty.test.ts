@@ -51,4 +51,15 @@ describe('resolveWorkflowRoyalty', () => {
       consumerDoId,
     });
   });
+
+  it('uses the royalty frozen on an accepted enterprise workflow instead of the platform rate', async () => {
+    const resolved = await resolveWorkflowRoyalty(env, 'USER_DO', {
+      workflowId: 7,
+      workflowOwnerId: ownerId,
+      consumerIdentifier: consumerDoId,
+      baseCostUsd: 1,
+      royaltyPercent: 12,
+    });
+    expect(resolved).toMatchObject({ royaltyAmountUsd: 0.12, royaltyPercent: 12 });
+  });
 });

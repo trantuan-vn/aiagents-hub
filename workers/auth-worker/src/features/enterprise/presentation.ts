@@ -29,6 +29,7 @@ import {
   adminRejectFlagRequest,
   adminSetWorkflowFlag,
 } from './workflow-flag';
+import { businessDecideProposal, enterpriseCatalog } from './workflow-proposal';
 
 type Guard = (c: any) => { identifier: string };
 
@@ -148,6 +149,29 @@ export function createAdminWorkflowEnterpriseRoutes() {
       return c.json({ success: true });
     }, 'Failed to set enterprise flag'),
   );
+
+  return app;
+}
+
+/** Mounted at `/dashboard/build/workflows/enterprise`, ahead of the workflow router's `/:id`. */
+export function createEnterpriseWorkflowRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+  const member = (fn: (c: any, user: { identifier: string }) => Promise<Response>, fallback: string) =>
+    route(requireAuth, fn, fallback);
+
+  app.get('/', member(async (c, user) => c.json(await enterpriseCatalog(c.env, user.identifier)), 'Failed to load organization workflows'));
+
+  for (const decision of ['accept', 'reject', 'release'] as const) {
+    app.post(
+      `/:ownerId/:workflowId/${decision}`,
+      member(async (c, user) => {
+        const workflowId = parseInt(c.req.param('workflowId'), 10);
+        if (isNaN(workflowId)) throw new Error('Invalid workflow id');
+        await businessDecideProposal(c.env, user.identifier, c.req.param('ownerId'), workflowId, decision);
+        return c.json({ success: true });
+      }, `Failed to ${decision} workflow`),
+    );
+  }
 
   return app;
 }

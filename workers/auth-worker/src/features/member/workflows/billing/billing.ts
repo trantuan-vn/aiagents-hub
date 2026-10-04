@@ -32,7 +32,7 @@ export interface BillAgentUsageOptions {
   aiResponse: unknown;
   userAgent?: string;
   ipAddress?: string;
-  workflowAttribution?: { workflowId: number; workflowOwnerId: string };
+  workflowAttribution?: { workflowId: number; workflowOwnerId: string; royaltyPercent?: number };
   /** Phase B.1: attribute usage row to a workflow run. */
   executionKey?: string;
 }

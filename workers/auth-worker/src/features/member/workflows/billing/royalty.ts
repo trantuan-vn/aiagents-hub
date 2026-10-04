@@ -10,6 +10,8 @@ export interface WorkflowRoyaltyContext {
   consumerIdentifier: string;
   baseCostUsd: number;
   serviceUsageGlobalId?: number;
+  /** Frozen % of an accepted enterprise workflow; unset uses the platform rate. */
+  royaltyPercent?: number;
 }
 
 export type ResolvedWorkflowRoyalty = {
@@ -30,7 +32,7 @@ export function computeWorkflowRoyaltyUsd(baseCostUsd: number, royaltyPercent: n
 export async function resolveWorkflowRoyalty(
   env: Env,
   bindingName: string,
-  ctx: Pick<WorkflowRoyaltyContext, 'workflowId' | 'workflowOwnerId' | 'consumerIdentifier' | 'baseCostUsd'>,
+  ctx: Pick<WorkflowRoyaltyContext, 'workflowId' | 'workflowOwnerId' | 'consumerIdentifier' | 'baseCostUsd' | 'royaltyPercent'>,
 ): Promise<ResolvedWorkflowRoyalty | null> {
   const { workflowId, workflowOwnerId, consumerIdentifier, baseCostUsd } = ctx;
   if (!baseCostUsd || baseCostUsd <= 0) return null;
@@ -38,7 +40,7 @@ export async function resolveWorkflowRoyalty(
   const binding = env[bindingName as keyof Env] as DurableObjectNamespace;
   const consumerDoId = runnerDoIdFromIdentifier(binding, consumerIdentifier);
   if (consumerDoId === workflowOwnerId) return null;
-  const royaltyPercent = await getWorkflowRoyaltyPercentFromEnv(env);
+  const royaltyPercent = ctx.royaltyPercent ?? (await getWorkflowRoyaltyPercentFromEnv(env));
   return {
     royaltyAmountUsd: computeWorkflowRoyaltyUsd(baseCostUsd, royaltyPercent),
     royaltyPercent,
