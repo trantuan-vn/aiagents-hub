@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS enterprise_flag_requests (
   workflow_owner_id TEXT NOT NULL,
   workflow_id INTEGER NOT NULL,
   note TEXT,
-  status TEXT NOT NULL,        -- 'pending' | 'approved' | 'rejected' | 'withdrawn'
+  status TEXT NOT NULL,        -- 'pending' | 'approved' | 'rejected' | 'cancelled'
   reason TEXT,
   actor_id TEXT,
   created_at TEXT NOT NULL,

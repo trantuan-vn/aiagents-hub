@@ -29,6 +29,7 @@ import {
   syncFormTriggersForWorkflow,
 } from '../triggers/triggers.js';
 import { actorForPublicTrigger } from '../execution/workflow-runner.js';
+import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
 
 type FormMode = 'test' | 'production';
 
@@ -83,6 +84,7 @@ async function resolveFormContext(
   }
 
   if (mode === 'production') {
+    if (isEnterpriseWorkflow(resolved.workflow)) return { error: 'Form not found', status: 404 as const };
     const status = String(resolved.workflow.status ?? 'draft');
     if (status !== 'published') {
       return { error: 'Workflow is not published', status: 403 as const };

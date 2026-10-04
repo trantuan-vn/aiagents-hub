@@ -67,6 +67,13 @@ import { parseWorkflowDefinition, resolveWorkflow } from '../execution/workflow-
 import { touchUserCronAlarm } from '../triggers/cron-alarm.js';
 import { createWorkflowChatStreamResponse } from '../collab/workflow-chat.js';
 import { createWorkflowNodeCatalogMemberRoutes } from '../../../admin/workflow-node-catalog/presentation';
+import {
+  assertPublicSharedOnOwnerDo,
+  beforeOwnerDeletesWorkflow,
+  ownerLatestFlagRequest,
+  ownerRequestFlag,
+  ownerWithdrawFlag,
+} from '../../../enterprise/workflow-flag';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
@@ -1036,11 +1043,45 @@ export function createWorkflowRoutes(bindingName: string) {
     }, 'Failed to restore workflow version'),
   );
 
+  // --- Enterprise flag request (owner asks, admin flips the flag) ---
+  app.get(
+    '/:id/enterprise-flag-request',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      return c.json({ request: await ownerLatestFlagRequest(c.env, user.identifier, id) });
+    }, 'Failed to get enterprise flag request'),
+  );
+
+  app.post(
+    '/:id/enterprise-flag-request',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      const { note } = z
+        .object({ note: z.string().trim().max(1000).optional() })
+        .parse(await c.req.json().catch(() => ({})));
+      const request = await ownerRequestFlag(c.env, user.identifier, id, note || undefined);
+      return c.json({ request }, 201);
+    }, 'Failed to request enterprise flag'),
+  );
+
+  app.delete(
+    '/:id/enterprise-flag-request',
+    createRouteHandler(async (c: any, user: any) => {
+      const id = parseInt(c.req.param('id'), 10);
+      if (isNaN(id)) throw new Error('Invalid workflow id');
+      await ownerWithdrawFlag(c.env, user.identifier, id);
+      return c.json({ success: true });
+    }, 'Failed to withdraw enterprise flag request'),
+  );
+
   app.delete(
     '/:id',
     createRouteHandler(async (c: any, user: any) => {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
+      await beforeOwnerDeletesWorkflow(c.env, user.identifier, id);
       const userDO = getUserDO(c, user.identifier);
       await executeUtils.executeDynamicAction(
         userDO,
@@ -1083,9 +1124,10 @@ export function createWorkflowRoutes(bindingName: string) {
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
       const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted
-        FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`;
+        FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);
+      await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const userDO = getUserDO(c, user.identifier);
       const { quota } = await loadUserAndSyncPlan(userDO, c.env);
       const minPlanId = result.minPlanId ?? 'free';
@@ -1112,6 +1154,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
+      await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
       const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
       const { comments, hasMore } = await getWorkflowCommentsFromD1(
@@ -1138,6 +1181,7 @@ export function createWorkflowRoutes(bindingName: string) {
           authorDisplayName: z.string().max(200).optional(),
         })
         .parse(await c.req.json());
+      await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const userDO = getUserDO(c, user.identifier);
       const created = await executeUtils.executeDynamicAction(
         userDO,
@@ -1194,6 +1238,7 @@ export function createWorkflowRoutes(bindingName: string) {
         workflowOwnerId: true,
         workflowId: true,
       }).parse(await c.req.json());
+      await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const workflowKey = `${ownerId}:${workflowId}`;
       const userDO = getUserDO(c, user.identifier);
       const existing = await executeUtils.executeDynamicAction(userDO, 'select', {

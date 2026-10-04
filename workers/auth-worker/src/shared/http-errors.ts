@@ -89,6 +89,10 @@ const OPERATIONAL_MESSAGE_PREFIXES = [
   'Entry node not found',
   'Get RAG',
   'Unknown node type:',
+  'ENTERPRISE_',
+  'INVOICE_',
+  'ALREADY_PREPAID',
+  'USER_NOT_FOUND',
 ] as const;
 
 /** Missing config, bindings, or internal invariant — always log as error. */
@@ -184,12 +188,21 @@ export function logHandlerFailure(
   }
 }
 
+/** `EnterpriseError` carries its own HTTP status; matched by name so this module does not import features. */
+function codedErrorStatus(e: unknown): ContentfulStatusCode | null {
+  if (!(e instanceof Error) || e.name !== 'EnterpriseError') return null;
+  const status = (e as Error & { status?: unknown }).status;
+  return typeof status === 'number' ? (status as ContentfulStatusCode) : null;
+}
+
 export function resolveHttpStatus(
   message: string,
   isSafe: boolean,
   e?: unknown,
 ): ContentfulStatusCode {
   if (e instanceof ZodError) return 400;
+  const coded = codedErrorStatus(e);
+  if (coded) return coded;
   if (!isSafe) {
     if (isOperationalMessage(message)) return resolveOperationalHttpStatus(message);
     return 500;

@@ -210,7 +210,7 @@ Người tạo có thể là admin hoặc user thường. Cờ không suy từ �
 
 Người tạo không gửi `isEnterprise`. Họ gửi một yêu cầu. Admin chỉ nhìn và bật cờ những workflow có yêu cầu đang mở. Không có màn admin duyệt mọi workflow riêng của user.
 
-Owner `POST /dashboard/workflows/:id/enterprise-flag-request` với `{ note?: string }`.
+Owner `POST /dashboard/build/workflows/:id/enterprise-flag-request` với `{ note?: string }`.
 
 - Chỉ owner. Workflow chưa `isEnterprise`.
 - Một workflow chỉ một yêu cầu `pending`. Gửi lần nữa khi đang `pending` → 409.
@@ -440,7 +440,7 @@ Khoản tiền tạo `orders` và `payments` trên UserDO của người trả, 
 
 Webhook subscription cá nhân không ghi đè user `planSource = enterprise`. Checkout gói lẻ của user đó trả 403 `ENTERPRISE_PLAN_MANAGED`.
 
-Owner đề nghị tổ chức qua `PUT /workflows/:id` với `enterpriseId`. Gửi kèm `isEnterprise` → 403. Xin bật cờ qua `POST /dashboard/workflows/:id/enterprise-flag-request`. Rút yêu cầu đang `pending`: `DELETE` cùng path.
+Owner đề nghị tổ chức qua `PUT /workflows/:id` với `enterpriseId`. Gửi kèm `isEnterprise` → 403. Xin bật cờ qua `POST /dashboard/build/workflows/:id/enterprise-flag-request`. Rút yêu cầu đang `pending`: `DELETE` cùng path.
 
 ### 4.3 Lưu trữ
 
@@ -640,7 +640,7 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 
 1. D1 cho bảng tổ chức ở `workers/queue-worker/migrations/019_enterprise.sql` (không đưa vào `SYNC_TABLE_NAMES`, không đưa vào `d1tor2`). Cột workflow ở `020_agent_workflows_enterprise.sql` và trong `AgentWorkflowSchema` (UserDO tự thêm cột qua `ensureSchemaColumns`). `planSource = 'enterprise'` giữ plan đến `planCurrentPeriodEnd` + 7 ngày.
 2. Hóa đơn một kỳ, `periodEnd` khóa lúc `paid`, áp từng UserDO, idempotent theo `applied_user_ids`. Order và payment trên DO của người trả. Code ở `workers/auth-worker/src/features/enterprise/`. Hóa đơn tạo một `orders` ghi chú `enterprise:<invoiceId>` và người trả thanh toán order đó qua PayPal hoặc Casso như order thường (`checkoutPath` = `/dashboard/control/billing?payOrder=…`). Cổng thanh toán từ chối order mà `order_id`, người trả hoặc số tiền không khớp hóa đơn. Cron `7 * * * *` hết hạn hóa đơn treo, chạy nốt lần áp ghế bị rớt, và settle hóa đơn có `payments` `COMPLETED`. Xóa tổ chức còn thành viên → 409 `ENTERPRISE_HAS_MEMBERS`.
-3. Hàng chờ xin bật cờ, canvas admin đọc DO, hook/form/execute đọc DO. List D1 lọc `isEnterprise = 0` khi bản chiếu đã có cờ.
+3. Hàng chờ xin bật cờ, canvas admin đọc DO, hook/form/execute đọc DO. List D1 lọc `isEnterprise = 0` khi bản chiếu đã có cờ. Code ở `features/enterprise/workflow-flag.ts`. Owner gọi `GET`/`POST`/`DELETE /dashboard/build/workflows/:id/enterprise-flag-request`; `GET` trả yêu cầu mới nhất kèm `reason`. D1 `021_enterprise_flag_request_one_pending.sql` giữ một yêu cầu `pending` mỗi workflow. Cửa công khai (execute/chat shared, chi tiết, comment, star, form/chat production, webhook, kênh, cron) đọc DO và trả 404; cron của owner bỏ qua workflow enterprise không retry. Lần chạy test trên canvas vẫn mở.
 4. Đề nghị, chấp nhận, từ chối, nhả. Khối Tổ chức tách khỏi list `/shared`.
 5. `enterpriseTriggerKey` trên node. Grant theo key đã có lúc lưu, credential một lần, `POST /hooks/enterprise/:token`, trần Credit, tắt cron owner.
 6. Trang tĩnh và i18n.

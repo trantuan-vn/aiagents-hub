@@ -54,7 +54,12 @@ import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure
 import { createAdminPipelineHealthRoutes } from './features/admin/pipeline-health/presentation';
 import { dailyPipelineHealthSync } from './features/admin/pipeline-health/infrastructure';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
-import { createAdminEnterpriseRoutes, createEnterpriseMemberRoutes } from './features/enterprise/presentation';
+import {
+  createAdminEnterpriseFlagRequestRoutes,
+  createAdminEnterpriseRoutes,
+  createAdminWorkflowEnterpriseRoutes,
+  createEnterpriseMemberRoutes,
+} from './features/enterprise/presentation';
 import { sweepEnterprises } from './features/enterprise/billing';
 import {
   createWorkflowNodeCatalogAdminRoutes,
@@ -137,6 +142,8 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/pipeline-health', createAdminPipelineHealthRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
   routes.route('/dashboard/admin/enterprises', createAdminEnterpriseRoutes());
+  routes.route('/dashboard/admin/enterprise-flag-requests', createAdminEnterpriseFlagRequestRoutes());
+  routes.route('/dashboard/admin/workflows', createAdminWorkflowEnterpriseRoutes());
   routes.route('/dashboard/enterprises', createEnterpriseMemberRoutes());
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());

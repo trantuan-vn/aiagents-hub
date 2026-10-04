@@ -2,6 +2,7 @@ import { getIdFromName, executeUtils } from '../../../../shared/utils.js';
 import { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { WorkflowDefinitionSchema } from '../domain/domain.js';
+import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
 
 export interface ResolvedWorkflow {
   workflow: Record<string, unknown>;
@@ -42,7 +43,7 @@ export async function resolveWorkflow(
     const row = await db
       .prepare(
         `SELECT id, user_id, name, description, tags, definition, isShared, status
-         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 LIMIT 1`,
+         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`,
       )
       .bind(ownerIdParam, workflowId)
       .first<Record<string, unknown>>();
@@ -58,6 +59,10 @@ export async function resolveWorkflow(
     );
     const wf = Array.isArray(rows) ? rows[0] : rows;
     if (!wf) throw new Error('Workflow not found');
+    // The D1 projection lags the owner's UserDO; the flag and sharing are authoritative there.
+    const sharedOnDo = wf.isShared === true || wf.isShared === 1;
+    if (!sharedOnDo || isEnterpriseWorkflow(wf)) throw new Error('Shared workflow not found');
+    if (wf.status !== 'published') throw new Error('Workflow is not published');
 
     return {
       workflow: wf,

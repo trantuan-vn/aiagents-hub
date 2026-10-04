@@ -66,7 +66,7 @@ export async function listSharedWorkflowsFromD1(
   filters: SharedWorkflowFilters,
 ): Promise<{ workflows: SharedWorkflowRow[]; hasMore: boolean }> {
   const { limit = 50, offset = 0, starCount, search, excludeOwnerId } = filters;
-  const conditions: string[] = ['w."isShared" = 1', 'w."status" = ?'];
+  const conditions: string[] = ['w."isShared" = 1', 'COALESCE(w."isEnterprise", 0) = 0', 'w."status" = ?'];
   const params: (string | number)[] = ['published'];
 
   if (excludeOwnerId) {
@@ -157,7 +157,7 @@ export async function getPublishedSharedWorkflow(
   workflowId: number,
 ): Promise<{ id: number; user_id: string } | null> {
   const sql = `SELECT id, user_id FROM agent_workflows
-    WHERE user_id = ? AND id = ? AND "isShared" = 1 AND status = 'published' LIMIT 1`;
+    WHERE user_id = ? AND id = ? AND "isShared" = 1 AND COALESCE("isEnterprise", 0) = 0 AND status = 'published' LIMIT 1`;
   return (await db.prepare(sql).bind(ownerId, workflowId).first<{ id: number; user_id: string }>()) ?? null;
 }
 
@@ -166,7 +166,7 @@ export async function findUniquePublishedSharedWorkflowOwner(
   workflowId: number,
 ): Promise<string | null> {
   const sql = `SELECT user_id FROM agent_workflows
-    WHERE id = ? AND "isShared" = 1 AND status = 'published' LIMIT 2`;
+    WHERE id = ? AND "isShared" = 1 AND COALESCE("isEnterprise", 0) = 0 AND status = 'published' LIMIT 2`;
   const result = await db.prepare(sql).bind(workflowId).all<{ user_id?: string }>();
   const rows = result.results ?? [];
   if (rows.length !== 1) return null;

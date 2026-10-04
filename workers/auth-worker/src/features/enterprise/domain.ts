@@ -66,6 +66,7 @@ export class EnterpriseError extends Error {
     message?: string,
   ) {
     super(message ?? code);
+    this.name = 'EnterpriseError';
   }
 }
 
@@ -92,6 +93,10 @@ export const AddMemberSchema = z.object({
 
 export const CheckoutSchema = z.object({ interval: PlanIntervalSchema });
 export const SeatCheckoutSchema = z.object({ userId: UserIdSchema });
+
+export const RejectFlagRequestSchema = z.object({ reason: z.string().trim().min(1).max(1000) });
+
+export const SetWorkflowFlagSchema = z.object({ isEnterprise: z.boolean(), force: z.boolean().optional() });
 
 export const PENDING_INVOICE_TTL_MS = 24 * 60 * 60 * 1000;
 const SEAT_GRACE_MS = ENTERPRISE_SEAT_GRACE_DAYS * 24 * 60 * 60 * 1000;

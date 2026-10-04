@@ -16,6 +16,7 @@ import {
 } from '../infrastructure/infrastructure.js';
 import { listFormSubmissionNodes } from './form-submission.js';
 import { listChatTriggerNodes } from './chat-submission.js';
+import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
 
 /** Channel types align with OpenClaw multi-channel support (Telegram/Slack/Discord). */
 export type TriggerType = 'cron' | 'webhook' | 'form' | 'chat' | 'telegram' | 'slack' | 'discord';
@@ -1141,6 +1142,7 @@ export async function consumeWorkflowCronRun(
     return;
   }
   const resolved = await resolveOwnedWorkflow(env, 'USER_DO', trigger.ownerId, trigger.workflowId);
+  if (isEnterpriseWorkflow(resolved.workflow)) return;
   if (isOrphanCronTrigger(trigger, resolved.definition)) {
     await deleteTrigger(db, trigger.ownerId, trigger.triggerId);
     return;
@@ -1173,6 +1175,7 @@ export async function runTrigger(
   actor?: WorkflowRunActor,
 ) {
   const resolvedOwned = await resolveOwnedWorkflow(env, bindingName, trigger.ownerId, trigger.workflowId);
+  if (isEnterpriseWorkflow(resolvedOwned.workflow)) throw new Error('Workflow not found for trigger');
   const binding = (env as unknown as Record<string, unknown>)[bindingName] as DurableObjectNamespace;
   const runActor = actor ?? ownerRunActor(trigger.ownerId);
   const resolved = bindResolvedToActor(resolvedOwned, runActor, binding);

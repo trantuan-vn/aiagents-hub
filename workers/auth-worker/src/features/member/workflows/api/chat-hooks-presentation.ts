@@ -32,6 +32,7 @@ import {
   actorForPublicTrigger,
   progressDoIdForActor,
 } from '../execution/workflow-runner.js';
+import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
 
 type ChatMode = 'test' | 'production';
 
@@ -168,6 +169,7 @@ async function resolveChatContext(
   }
 
   if (mode === 'production') {
+    if (isEnterpriseWorkflow(resolved.workflow)) return { error: 'Chat not found', status: 404 as const };
     const status = String(resolved.workflow.status ?? 'draft');
     if (status !== 'published') {
       return { error: 'Workflow is not published', status: 403 as const };

@@ -64,10 +64,10 @@ export const AgentWorkflowSchema = z.object({
   /** Only admin sets this (enterprise-organization-spec §3.1). Hidden from the public catalog when true. */
   isEnterprise: z.boolean().default(false),
   /** Organization the owner proposed. Null until proposed. */
-  enterpriseId: z.string().max(64).optional(),
+  enterpriseId: z.string().max(64).nullish(),
   enterpriseAcceptance: z.enum(['none', 'pending', 'accepted']).default('none'),
   /** Royalty % frozen when the Business user accepts. Null until accepted. */
-  acceptedRoyaltyPercent: z.number().min(0).max(100).optional(),
+  acceptedRoyaltyPercent: z.number().min(0).max(100).nullish(),
 });
 
 /** Fields the owner may never write through member routes. */

@@ -18,8 +18,17 @@ import {
   CreateEnterpriseSchema,
   EnterpriseError,
   PatchEnterpriseSchema,
+  RejectFlagRequestSchema,
   SeatCheckoutSchema,
+  SetWorkflowFlagSchema,
 } from './domain';
+import {
+  adminApproveFlagRequest,
+  adminGetFlagRequest,
+  adminListFlagRequests,
+  adminRejectFlagRequest,
+  adminSetWorkflowFlag,
+} from './workflow-flag';
 
 type Guard = (c: any) => { identifier: string };
 
@@ -90,6 +99,54 @@ export function createAdminEnterpriseRoutes() {
       await adminRemoveMember(c.env, user.identifier, c.req.param('id'), decodeURIComponent(c.req.param('userId')));
       return c.json({ success: true });
     }, 'Failed to remove member'),
+  );
+
+  return app;
+}
+
+/** Mounted at `/dashboard/admin/enterprise-flag-requests`. */
+export function createAdminEnterpriseFlagRequestRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+  const admin = (fn: (c: any, user: { identifier: string }) => Promise<Response>, fallback: string) =>
+    route(requireAdmin, fn, fallback);
+
+  app.get('/', admin(async (c) => c.json({ requests: await adminListFlagRequests(c.env) }), 'Failed to list flag requests'));
+
+  app.get('/:id', admin(async (c) => c.json(await adminGetFlagRequest(c.env, c.req.param('id'))), 'Failed to load flag request'));
+
+  app.post(
+    '/:id/approve',
+    admin(async (c, user) => {
+      await adminApproveFlagRequest(c.env, user.identifier, c.req.param('id'));
+      return c.json({ success: true });
+    }, 'Failed to approve flag request'),
+  );
+
+  app.post(
+    '/:id/reject',
+    admin(async (c, user) => {
+      const { reason } = RejectFlagRequestSchema.parse(await c.req.json());
+      await adminRejectFlagRequest(c.env, user.identifier, c.req.param('id'), reason);
+      return c.json({ success: true });
+    }, 'Failed to reject flag request'),
+  );
+
+  return app;
+}
+
+/** Mounted at `/dashboard/admin/workflows`. */
+export function createAdminWorkflowEnterpriseRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+
+  app.put(
+    '/:ownerId/:workflowId/enterprise',
+    route(requireAdmin, async (c, user) => {
+      const workflowId = parseInt(c.req.param('workflowId'), 10);
+      if (isNaN(workflowId)) throw new Error('Invalid workflow id');
+      const body = SetWorkflowFlagSchema.parse(await c.req.json());
+      await adminSetWorkflowFlag(c.env, user.identifier, c.req.param('ownerId'), workflowId, body);
+      return c.json({ success: true });
+    }, 'Failed to set enterprise flag'),
   );
 
   return app;
