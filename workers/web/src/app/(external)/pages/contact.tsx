@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -43,7 +43,11 @@ const Contact = () => {
   const t = useTranslations("ContactPage");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [topic, setTopic] = useState<(typeof TOPIC_KEYS)[number]>("general");
+  const [searchParams] = useSearchParams();
+  const [topic, setTopic] = useState<(typeof TOPIC_KEYS)[number]>(() => {
+    const wanted = searchParams.get("topic");
+    return TOPIC_KEYS.find((key) => key === wanted) ?? "general";
+  });
   const [message, setMessage] = useState("");
 
   const copyEmail = useCallback(async () => {

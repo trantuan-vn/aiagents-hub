@@ -886,7 +886,7 @@
     "basic": "Pro",
     "basic_desc": "For teams running real agents",
     "enterprise": "Enterprise",
-    "enterprise_desc": "SLA, SSO, and custom quotas — contact us, not a fifth card",
+    "enterprise_desc": "An organization plan: one Business user pays one period for every seat",
     "per_month": "/month",
     "custom_price": "Custom",
     "most_popular": "Most Popular",
@@ -902,7 +902,7 @@
     "interval_n": "{n} months",
     "paypal_hint": "Choose Casso or PayPal on the next screen. PayPal Subscribe auto-renews: PayPal charges PayPal balance first, then a linked bank if your country allows it, then a card.",
     "pay_order": "Pay this period with Casso or PayPal",
-    "enterprise_footer": "Need SLA / SSO / a company invoice? Contact us",
+    "enterprise_footer": "SLA, SSO, or a company invoice? That is a separate contract — contact us",
     "checkout_cancelled": "Checkout was not completed — pick a plan again when you are ready.",
     "checkout_error": "Could not start checkout. Try again.",
     "get_started": "Get Started",
@@ -947,7 +947,8 @@
       "sla_guarantee": "SLA guarantee",
       "on_premise_option": "On-premise option",
       "custom_integrations": "Custom integrations"
-    }
+    },
+    "enterprise_link": "Enterprise for organizations"
   },
   "PackagesPage": {
     "badge": "Subscription + Credits",
@@ -986,8 +987,8 @@
         "body": "Pay for agent runs. See the estimate before it runs. Hit a limit? Top up — no surprise bill at month end."
       },
       "enterprise": {
-        "title": "Contract",
-        "body": "Need SLA, SSO, or a company invoice? Contact us — not a fifth card on the pricing page."
+        "title": "Organization",
+        "body": "Enterprise is an organization, not a fifth price. A Business user pays one period for every seat on the roster, inside the dashboard."
       }
     },
     "packages": {
@@ -1011,6 +1012,22 @@
           "3": "Custom quotas"
         }
       }
+    },
+    "enterprise": {
+      "kicker": "Enterprise",
+      "title": "For",
+      "title_gradient": "organizations",
+      "body": "We set up the organization and its roster with you. A Business user then pays one amount per period for every Pro and Business seat. There is no fixed list price and no checkout on this page.",
+      "items": [
+        "One payment covers the whole roster until the same period end.",
+        "1, 3, 6, or 12-month periods with the same discounts as individual plans.",
+        "The Business user pays in the dashboard with Casso or PayPal. Members never pay for their own plan.",
+        "Miss the next period and seats keep working for 7 more days.",
+        "The minimum number of Pro seats is set in your contract.",
+        "Private workflows accepted by your organization, never listed in the public catalog. Each person gets their own trigger credentials."
+      ],
+      "cta_contact": "Talk to us about an organization",
+      "cta_docs": "How Enterprise works"
     }
   },
   "AboutPage": {
@@ -1073,7 +1090,7 @@
     "cta": {
       "title": "Start with a",
       "title_gradient": "free workspace",
-      "subtitle": "Start Free with no card. Starter, Pro, and Business unlock extra Credits. SLA / SSO is a contract — contact us.",
+      "subtitle": "Start Free with no card. Starter, Pro, and Business unlock extra Credits. Enterprise is an organization plan, not a fifth price — contact us.",
       "get_started": "Get started",
       "view_packages": "View pricing",
       "view_docs": "Read the docs"
@@ -1123,7 +1140,7 @@
       },
       "contact": {
         "title": "Contact",
-        "description": "Partnerships, billing, and Enterprise conversations."
+        "description": "Partnerships, billing, and Enterprise organizations."
       },
       "blog": {
         "title": "Blog",
@@ -1152,7 +1169,7 @@
       },
       "sharing": {
         "title": "Share & royalties",
-        "description": "Publish a workflow. Others run it in Credits; you earn a royalty without extra COGS for the Hub."
+        "description": "Publish a workflow. Others run it in Credits; you earn a royalty without extra COGS for the Hub. Organization workflows are not in the public catalog — members see them in a separate block once their organization accepts them."
       },
       "triggers": {
         "title": "Triggers",
@@ -1317,7 +1334,7 @@
       "general": "General",
       "billing": "Billing & Credits",
       "technical": "Workflows / agents",
-      "enterprise": "Enterprise / SLA",
+      "enterprise": "Enterprise / organization",
       "partnership": "Partnership",
       "other": "Other"
     },
@@ -1367,7 +1384,7 @@
       },
       "change_plan": {
         "question": "How do I change my plan?",
-        "answer": "Open /packages to pick Free, Starter, Pro, or Business. Paid plans check out on PayPal (Visa, Mastercard, or PayPal wallet) and auto-renew. Enterprise SLA / SSO is a contract — use Contact, not a fifth card."
+        "answer": "Open /packages to pick Free, Starter, Pro, or Business. Paid plans check out on PayPal (Visa, Mastercard, or PayPal wallet) and auto-renew. Enterprise is an organization plan, not a fifth card, and its workflows are not in the public catalog. To set up an organization, use Contact."
       },
       "free_trial": {
         "question": "Is there a free plan?",
@@ -1397,7 +1414,7 @@
       "welcome": "Hello — I can help with workflows, Credits, and plans. What are you trying to ship?",
       "recommend": "Start in Dashboard > Workflows: add a trigger (chat, webhook, or cron), an agent node, and optional RAG or tools. Run once and watch the Credit estimate. Need a specific job (support, RAG Q&A, HTTP automation)?",
       "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each UTC month. Starter, Pro, and Business can buy more (wallet cap applies). Buying Credits does not upgrade your plan.",
-      "upgrade": "Change plans at /packages. PayPal Subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet. Cancel at Dashboard > Billing > Cancel plan — you keep the plan until the period you already paid for ends. Need SLA / SSO? Use Contact.",
+      "upgrade": "Change plans at /packages. PayPal Subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet. Cancel at Dashboard > Billing > Cancel plan — you keep the plan until the period you already paid for ends. Want an organization plan? Use Contact.",
       "how_credits": "A run costs Credits based on model class (tiny / mid / frontier) and tokens used. You get an estimate first; the wallet is charged after. Sharing someone else's workflow may add a royalty in Credits.",
       "calls": "Credits meter AI usage. Check Dashboard > Billing for your balance and included pool.",
       "rate_limit": "Plans include infrastructure quotas (to prevent abuse). AI usage is Credits, not request/second product SKUs. If a run is blocked, check quota and Credit balance.",
@@ -1438,7 +1455,7 @@
       "services": {
         "title": "The services",
         "paragraphs": [
-          "We provide an AI agent platform: a workflow builder, runtime for agents and tools, Credit metering, documentation, observability, and account tooling. We sell platform access (Subscription), metered consumption (Credits), and optional Enterprise guarantees (SLA, dedicated capacity, custom terms). We do not sell third-party model tokens or infrastructure line items as standalone products.",
+          "We provide an AI agent platform: a workflow builder, runtime for agents and tools, Credit metering, documentation, observability, and account tooling. We sell platform access (Subscription), metered consumption (Credits), Enterprise organization plans, and, under a separate contract, guarantees such as SLA, dedicated capacity, or custom terms. We do not sell third-party model tokens or infrastructure line items as standalone products.",
           "Specific capabilities, quotas, regions, uptime targets, and support levels depend on your plan and product documentation. We may modify, deprecate, or replace features where reasonably necessary for security, compliance, or operations, in line with the change and notice practices described below."
         ]
       },
@@ -1485,6 +1502,7 @@
         "title": "Fees, Credits, and billing",
         "paragraphs": [
           "Paid Subscriptions, Credit purchases, and taxes (where applicable) are described at checkout, in your dashboard, or in an order form. Self-serve plans (Starter, Pro, Business) are billed through PayPal Subscriptions using a Visa/Mastercard or PayPal wallet on PayPal's checkout. Subscriptions auto-renew at the interval you choose (1, 3, 6, or 12 months) until you cancel. Cancelling stops the next PayPal charge; you keep paid entitlements until the current period end, then return to Free. Credits are prepaid service units: they are not refundable as cash except where mandatory law requires otherwise, they are not transferable except as we expressly allow (for example royalty earnings on a separate ledger), and purchased Credits expire according to product rules (typically twelve months from credit).",
+          "An Enterprise organization period is one payment, made by a Business seat holder, for every seat on that invoice until its period end. We do not charge members individually for the period, and removing a seat mid-period is not refunded.",
           "Included Credits granted with a Subscription expire at the end of each UTC calendar month and do not roll over, including when you prepay 3, 6, or 12 months. Buying Credits (Casso, PayPal Orders, or other wallets we offer) does not upgrade your plan. We may enforce a maximum Credit balance. Model coefficients (how many Credits a run costs) may change with notice as described in product documentation; we do not pass through provider invoices as line items.",
           "Failure to pay may result in suspension or termination of access. You are responsible for providing valid payment details and for any fees charged by payment providers (for example VNPay, Casso, or PayPal). We do not store full card numbers (PAN); PayPal is the payment processor for subscriptions."
         ]
@@ -4765,13 +4783,13 @@
       "badge_1": "One Platform · One Credit · Unlimited Models",
       "badge_2": "Dashboard: aiagents-hub.vn",
       "layers_title": "How the product is sold",
-      "layers_body": "Three layers, and only three. The workspace plan unlocks the builder. Credits pay for agent runs. Enterprise is a contract for SLA, SSO, and invoices — not a fifth pricing card.",
+      "layers_body": "Three layers, and only three. The workspace plan unlocks the builder. Credits pay for agent runs. Enterprise is an organization: a Business user pays one period for every seat — not a fifth pricing card.",
       "layer_plan_title": "Workspace plan",
       "layer_plan_desc": "Free, Starter, Pro, or Business. You buy the right to build, share, and run — not a model catalog.",
       "layer_credit_title": "Credits",
       "layer_credit_desc": "One unit for every model. See an estimate before the run; the wallet is charged after.",
       "layer_ent_title": "Enterprise",
-      "layer_ent_desc": "SLA, SSO, company invoices, custom quotas, optional BYOK. Contact us — we do not list it as a card.",
+      "layer_ent_desc": "Organizations: one payment per period for every seat, private workflows, per-person trigger credentials. Set up with us — no list price.",
       "paths_title": "Choose a path",
       "path_start_title": "Start in the canvas",
       "path_start_desc": "Create a workspace, draw a small graph, run once, and read the Credit estimate.",
@@ -4832,7 +4850,7 @@
       "principle_title": "The principle",
       "principle_body": "You pay for the value of work the agent finishes, not for the infrastructure bill we receive. Faster or deeper models change Credits per run — they do not rewrite your plan price.",
       "slogan": "One Platform, One Credit, Unlimited Models",
-      "slogan_body": "The plan is the right to use the workspace. Credits are the meter for AI usage. Enterprise is a guarantee (SLA, SSO, invoices) — not a cheaper token SKU.",
+      "slogan_body": "The plan is the right to use the workspace. Credits are the meter for AI usage. Enterprise is an organization plan built on Pro and Business seats — not a cheaper token SKU.",
       "layers_title": "Three layers",
       "layers_body": "When you grow, you do not get a surprise token invoice. You pay more because you run more work.",
       "col_layer": "Layer",
@@ -4850,13 +4868,13 @@
           "USD per million tokens"
         ],
         [
-          "Enterprise contract",
-          "SLA, SSO, audit, custom quotas, optional BYOK",
-          "A fifth card on Pricing"
+          "Enterprise organization",
+          "Pro and Business seats paid together per period, private workflows, per-person trigger credentials",
+          "A fifth card on Pricing or a shared Credit wallet"
         ]
       ],
       "see_title": "What you see",
-      "see_body": "Free, Starter, and Pro see Credits, estimates, and plan quotas. Business (and Enterprise contracts) can also see the model family — Llama, GPT, Claude — still billed in Credits.",
+      "see_body": "Free, Starter, and Pro see Credits, estimates, and plan quotas. Business (including Business seats in an organization) can also see the model family — Llama, GPT, Claude — still billed in Credits.",
       "see_items": [
         "How many Credits remain, and which lots expire soon.",
         "About how many Credits a run will cost, before it runs.",
@@ -5210,25 +5228,59 @@
     },
     "enterprise": {
       "title": "Enterprise",
-      "description": "SLA, SSO, invoices, and optional BYOK — a contract, not a fifth pricing card.",
-      "toc_what": "What a contract buys",
-      "toc_not": "What it is not",
+      "description": "An organization plan: one Business user pays one period for every seat, and the organization runs its own private workflows.",
+      "toc_what": "What an organization is",
+      "toc_billing": "One payment per period",
+      "toc_workflows": "Organization workflows",
+      "toc_access": "Triggers and credentials",
+      "toc_not": "Outside this plan",
       "toc_contact": "Talk to us",
-      "what_title": "What a contract buys",
-      "what_body": "Self-serve stops at Business. If you need guarantees the public catalog cannot promise, we write a contract.",
+      "what_title": "What an organization is",
+      "what_body": "Enterprise is not a fifth plan. We create the organization and its roster with you. Every member holds a Pro or Business seat, and one person belongs to at most one organization.",
       "what_items": [
+        "Business seats accept the organization's workflows and pay for the period.",
+        "Pro seats run the workflows and triggers a Business user grants them.",
+        "The minimum number of Pro seats is set in your contract. Members do not invite or remove people — we update the roster on request.",
+        "Each member keeps their own Credit wallet. Seats are not Credits, and there is no shared organization wallet."
+      ],
+      "billing_title": "One payment per period",
+      "billing_body": "A Business user pays one amount for every billable seat on the roster. The period is 1, 3, 6, or 12 months with the same discounts as individual plans, and each seat is priced at the current Pro or Business list price.",
+      "billing_items": [
+        "Payment happens in the dashboard with Casso or PayPal. There is no checkout on the pricing page and no auto-renewal.",
+        "Once paid, every seat on that invoice runs until the same period end. Renewing applies the next period to the whole roster.",
+        "Members never pay for their own plan while the organization covers them.",
+        "If the next period is not paid, seats keep working for 7 more days. After that the organization is suspended and members return to Free.",
+        "Removing a seat mid-period is not refunded."
+      ],
+      "workflows_title": "Organization workflows",
+      "workflows_body": "A creator asks us to mark a workflow for Enterprise, then proposes it to one organization. It enters the organization's catalog only after a Business user accepts it.",
+      "workflows_items": [
+        "Enterprise workflows are never listed in the public community catalog, and their public links stop working.",
+        "The proposal shows the royalty rate up front. That rate stays fixed while the organization keeps the workflow.",
+        "Whoever runs the workflow pays in Credits from their own wallet, plus the accepted royalty to the creator.",
+        "The organization can release the workflow at any time. The creator cannot delete it while the organization holds it."
+      ],
+      "access_title": "Triggers and credentials",
+      "access_body": "Business users see every accepted workflow and every trigger. Pro users only see the triggers they were granted.",
+      "access_items": [
+        "Grants are per trigger. A trigger added later is not part of an older grant.",
+        "Each person gets their own credential for each trigger, shown once. Issuing a new one revokes the old one.",
+        "A Business user can set a monthly Credit cap for each Pro user on a workflow.",
+        "Suspending the organization stops every trigger immediately."
+      ],
+      "not_title": "Outside this plan",
+      "not_callout": "Not a cheaper Business",
+      "not_body": "Enterprise does not replace the self-serve plans and is not a wholesale token SKU. Individual plans stay on",
+      "not_items_intro": "These are not part of the organization plan. They need a separate contract:",
+      "not_items": [
         "Uptime SLA and a named support path.",
         "SSO, audit logs, and company invoices.",
-        "Custom quotas and committed Credit volume.",
-        "Optional BYOK: you pay the model provider; we still charge a platform fee. Usage on Hub-hosted models still spends Credits."
+        "Dedicated capacity or custom infrastructure quotas.",
+        "BYOK (bring your own model key)."
       ],
-      "not_title": "What it is not",
-      "not_callout": "Not a cheaper Business",
-      "not_body": "Enterprise does not replace the $99.90 Business card and is not a wholesale token SKU. The four self-serve plans stay on",
-      "byok_body": "BYOK is not available on Free, Starter, Pro, or self-serve Business. It exists so large teams are not forced through our model catalog — not so the Hub becomes a pass-through gateway.",
       "contact_title": "Talk to us",
-      "contact_body": "Tell us the SLA, identity, and invoice constraints. We route Enterprise topics to the right owners.",
-      "contact_cta": "Contact sales"
+      "contact_body": "Tell us how many Pro and Business seats you need and which workflows you want to run. We set up the organization, then your Business user pays in the dashboard.",
+      "contact_cta": "Contact us about Enterprise"
     }
   },
   "BlogPage": {

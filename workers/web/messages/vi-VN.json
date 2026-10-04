@@ -886,7 +886,7 @@
     "basic": "Pro",
     "basic_desc": "Cho đội ngũ chạy agent thật",
     "enterprise": "Enterprise",
-    "enterprise_desc": "SLA, SSO và quota tùy chỉnh — liên hệ, không phải card thứ năm",
+    "enterprise_desc": "Gói tổ chức: một user Business trả một kỳ cho mọi ghế",
     "per_month": "/tháng",
     "custom_price": "Theo hợp đồng",
     "most_popular": "Phổ biến nhất",
@@ -902,7 +902,7 @@
     "interval_n": "{n} tháng",
     "paypal_hint": "Màn hình tiếp theo chọn Casso hoặc PayPal. PayPal Subscribe tự gia hạn: trừ số dư PayPal trước, rồi tài khoản ngân hàng liên kết (nếu quốc gia cho phép), rồi thẻ.",
     "pay_order": "Trả kỳ này bằng Casso hoặc PayPal",
-    "enterprise_footer": "Cần SLA / SSO / hóa đơn công ty? Liên hệ",
+    "enterprise_footer": "Cần SLA, SSO hay hóa đơn công ty? Đó là hợp đồng riêng — liên hệ",
     "checkout_cancelled": "Chưa thanh toán — chọn lại gói khi sẵn sàng.",
     "checkout_error": "Không bắt đầu được thanh toán. Thử lại.",
     "get_started": "Bắt đầu",
@@ -947,7 +947,8 @@
       "sla_guarantee": "Đảm bảo SLA",
       "on_premise_option": "Tùy chọn tại chỗ",
       "custom_integrations": "Tích hợp tùy chỉnh"
-    }
+    },
+    "enterprise_link": "Enterprise cho tổ chức"
   },
   "PackagesPage": {
     "badge": "Subscription + Credit",
@@ -986,8 +987,8 @@
         "body": "Trả cho lần chạy agent. Ước lượng hiện trước khi chạy. Hết thì nạp thêm — không hóa đơn bất ngờ cuối tháng."
       },
       "enterprise": {
-        "title": "Hợp đồng",
-        "body": "Cần SLA, SSO hay hóa đơn công ty? Liên hệ — không phải card thứ năm trên trang giá."
+        "title": "Tổ chức",
+        "body": "Enterprise là tổ chức, không phải mức giá thứ năm. User Business trả một kỳ cho mọi ghế trong danh sách, ngay trong dashboard."
       }
     },
     "packages": {
@@ -1011,6 +1012,22 @@
           "3": "Quota tùy chỉnh"
         }
       }
+    },
+    "enterprise": {
+      "kicker": "Enterprise",
+      "title": "Cho",
+      "title_gradient": "tổ chức",
+      "body": "Chúng tôi lập tổ chức và danh sách thành viên cùng bạn. Sau đó user Business trả một khoản mỗi kỳ cho mọi ghế Pro và Business. Không có giá niêm yết cố định và không thanh toán trên trang này.",
+      "items": [
+        "Một lần trả bao cả danh sách đến cùng một ngày hết kỳ.",
+        "Kỳ 1, 3, 6 hoặc 12 tháng, cùng mức chiết khấu như gói lẻ.",
+        "User Business trả trong dashboard bằng Casso hoặc PayPal. Thành viên không tự trả gói.",
+        "Chưa trả kỳ mới thì ghế vẫn chạy thêm 7 ngày.",
+        "Số ghế Pro tối thiểu ghi trong hợp đồng.",
+        "Workflow riêng do tổ chức chấp nhận, không nằm trong catalog công khai. Mỗi người có credential trigger riêng."
+      ],
+      "cta_contact": "Liên hệ để lập tổ chức",
+      "cta_docs": "Enterprise hoạt động thế nào"
     }
   },
   "AboutPage": {
@@ -1073,7 +1090,7 @@
     "cta": {
       "title": "Bắt đầu với",
       "title_gradient": "workspace miễn phí",
-      "subtitle": "Bắt đầu Free không cần thẻ. Starter, Pro và Business mở mua thêm Credit. SLA / SSO là hợp đồng — liên hệ chúng tôi.",
+      "subtitle": "Bắt đầu Free không cần thẻ. Starter, Pro và Business mở mua thêm Credit. Enterprise là gói tổ chức, không phải mức giá thứ năm — liên hệ chúng tôi.",
       "get_started": "Bắt đầu",
       "view_packages": "Xem giá",
       "view_docs": "Đọc tài liệu"
@@ -1123,7 +1140,7 @@
       },
       "contact": {
         "title": "Liên hệ",
-        "description": "Hợp tác, thanh toán và Enterprise."
+        "description": "Hợp tác, thanh toán và tổ chức Enterprise."
       },
       "blog": {
         "title": "Blog",
@@ -1152,7 +1169,7 @@
       },
       "sharing": {
         "title": "Chia sẻ & royalty",
-        "description": "Xuất bản workflow. Người khác chạy bằng Credit; bạn nhận royalty."
+        "description": "Xuất bản workflow. Người khác chạy bằng Credit; bạn nhận royalty. Workflow của tổ chức không nằm trong catalog công khai — thành viên thấy chúng ở khối riêng sau khi tổ chức chấp nhận."
       },
       "triggers": {
         "title": "Trigger",
@@ -1317,7 +1334,7 @@
       "general": "Chung",
       "billing": "Thanh toán & Credit",
       "technical": "Workflow / agent",
-      "enterprise": "Enterprise / SLA",
+      "enterprise": "Enterprise / tổ chức",
       "partnership": "Hợp tác",
       "other": "Khác"
     },
@@ -1367,7 +1384,7 @@
       },
       "change_plan": {
         "question": "Làm sao đổi gói?",
-        "answer": "Mở /packages để chọn Free, Starter, Pro hoặc Business. Gói trả phí thanh toán trên PayPal (Visa, Mastercard hoặc ví PayPal) và tự gia hạn. Enterprise SLA / SSO là hợp đồng — dùng Liên hệ, không phải card thứ năm."
+        "answer": "Mở /packages để chọn Free, Starter, Pro hoặc Business. Gói trả phí thanh toán trên PayPal (Visa, Mastercard hoặc ví PayPal) và tự gia hạn. Enterprise là gói tổ chức, không phải card thứ năm, và workflow của nó không nằm trong catalog công khai. Muốn lập tổ chức thì dùng Liên hệ."
       },
       "free_trial": {
         "question": "Có gói miễn phí không?",
@@ -1397,7 +1414,7 @@
       "welcome": "Xin chào — tôi giúp về workflow, Credit và gói. Bạn đang muốn đưa gì vào việc?",
       "recommend": "Bắt đầu ở Dashboard > Workflows: thêm trigger (chat, webhook hoặc cron), node agent, và RAG/tool nếu cần. Chạy một lần và xem ước lượng Credit. Bạn đang làm việc cụ thể nào (hỗ trợ, RAG Q&A, tự động HTTP)?",
       "credits": "Credit là đồng hồ duy nhất cho mức dùng AI/agent. Credit tặng theo gói và hết hạn mỗi tháng UTC. Starter, Pro và Business mua thêm được (có trần ví). Nạp Credit không nâng gói.",
-      "upgrade": "Đổi gói tại /packages. PayPal Subscriptions tự gia hạn bằng Visa, Mastercard hoặc ví PayPal. Hủy tại Dashboard > Thanh toán > Hủy gói — bạn giữ gói đến hết kỳ đã trả. Cần SLA / SSO? Dùng Liên hệ.",
+      "upgrade": "Đổi gói tại /packages. PayPal Subscriptions tự gia hạn bằng Visa, Mastercard hoặc ví PayPal. Hủy tại Dashboard > Thanh toán > Hủy gói — bạn giữ gói đến hết kỳ đã trả. Muốn gói tổ chức? Dùng Liên hệ.",
       "how_credits": "Mỗi lần chạy trừ Credit theo lớp model (tiny / mid / frontier) và token đã dùng. Có ước lượng trước; ví trừ sau. Chạy workflow người khác có thể thêm royalty bằng Credit.",
       "calls": "Credit đo mức dùng AI. Xem Dashboard > Thanh toán để biết số dư và Credit tặng.",
       "rate_limit": "Gói có quota hạ tầng (chống lạm dụng). Mức dùng AI là Credit, không phải SKU request/giây. Nếu lần chạy bị chặn, kiểm tra quota và số dư Credit.",
@@ -1438,7 +1455,7 @@
       "services": {
         "title": "Dịch vụ",
         "paragraphs": [
-          "Chúng tôi cung cấp nền tảng agent AI: workflow builder, runtime cho agent và tool, đo Credit, tài liệu, quan sát và công cụ tài khoản. Chúng tôi bán quyền dùng nền tảng (Subscription), mức tiêu thụ đo được (Credit) và đảm bảo Enterprise tùy chọn (SLA, dung lượng riêng, điều khoản tùy chỉnh). Chúng tôi không bán token model bên thứ ba hay dòng hạ tầng như sản phẩm độc lập.",
+          "Chúng tôi cung cấp nền tảng agent AI: workflow builder, runtime cho agent và tool, đo Credit, tài liệu, quan sát và công cụ tài khoản. Chúng tôi bán quyền dùng nền tảng (Subscription), mức tiêu thụ đo được (Credit), gói tổ chức Enterprise, và theo hợp đồng riêng, các đảm bảo như SLA, dung lượng riêng hay điều khoản tùy chỉnh. Chúng tôi không bán token model bên thứ ba hay dòng hạ tầng như sản phẩm độc lập.",
           "Khả năng cụ thể, quota, khu vực, mục tiêu uptime và mức hỗ trợ phụ thuộc gói và tài liệu sản phẩm. Chúng tôi có thể sửa, ngừng hoặc thay tính năng khi cần cho bảo mật, tuân thủ hoặc vận hành, theo thực hành thông báo dưới đây."
         ]
       },
@@ -1485,6 +1502,7 @@
         "title": "Phí, Credit và thanh toán",
         "paragraphs": [
           "Subscription trả phí, mua Credit và thuế (nếu có) được mô tả lúc thanh toán, trên dashboard hoặc trên đơn hàng. Gói tự phục vụ (Starter, Pro, Business) thu qua PayPal Subscriptions bằng Visa/Mastercard hoặc ví PayPal trên trang PayPal. Gói tự gia hạn theo chu kỳ bạn chọn (1, 3, 6 hoặc 12 tháng) đến khi bạn hủy. Hủy sẽ không thu kỳ PayPal tiếp theo; bạn giữ quyền đến hết kỳ hiện tại rồi về Free. Credit là đơn vị dịch vụ trả trước: không hoàn thành tiền mặt trừ khi luật bắt buộc, không chuyển nhượng trừ khi chúng tôi cho phép rõ (ví dụ earnings royalty trên sổ riêng), và Credit đã mua hết hạn theo quy tắc sản phẩm (thường mười hai tháng kể từ khi credited).",
+          "Kỳ của tổ chức Enterprise là một khoản do người giữ ghế Business trả cho mọi ghế trong hóa đơn đó, đến ngày hết kỳ của hóa đơn. Chúng tôi không thu riêng từng thành viên cho kỳ đó, và gỡ ghế giữa kỳ không được hoàn tiền.",
           "Credit tặng theo Subscription hết hạn cuối mỗi tháng lịch UTC và không chuyển kỳ, kể cả khi bạn trả trước 3, 6 hoặc 12 tháng. Nạp Credit (Casso, PayPal Orders hoặc ví khác chúng tôi cung cấp) không nâng gói. Chúng tôi có thể áp trần số dư Credit. Hệ số model (một lần chạy tốn bao nhiêu Credit) có thể đổi kèm thông báo theo tài liệu sản phẩm; chúng tôi không chuyển hóa đơn nhà cung cấp thành dòng riêng.",
           "Không thanh toán có thể dẫn tới tạm ngưng hoặc chấm dứt truy cập. Bạn chịu trách nhiệm cung cấp thông tin thanh toán hợp lệ và mọi phí cổng (ví dụ VNPay, Casso hoặc PayPal). Chúng tôi không lưu số thẻ đầy đủ (PAN); PayPal là bộ xử lý thanh toán cho subscription."
         ]
@@ -4765,13 +4783,13 @@
       "badge_1": "Một nền tảng · Một Credit · Không giới hạn model",
       "badge_2": "Dashboard: aiagents-hub.vn",
       "layers_title": "Sản phẩm được bán thế nào",
-      "layers_body": "Ba lớp, chỉ ba lớp. Gói workspace mở khóa builder. Credit trả cho lần chạy agent. Enterprise là hợp đồng SLA, SSO, hóa đơn — không phải card giá thứ năm.",
+      "layers_body": "Ba lớp, chỉ ba lớp. Gói workspace mở khóa builder. Credit trả cho lần chạy agent. Enterprise là tổ chức: user Business trả một kỳ cho mọi ghế — không phải card giá thứ năm.",
       "layer_plan_title": "Gói workspace",
       "layer_plan_desc": "Free, Starter, Pro hoặc Business. Bạn mua quyền xây, chia sẻ và chạy — không mua catalog model.",
       "layer_credit_title": "Credit",
       "layer_credit_desc": "Một đơn vị cho mọi model. Xem ước lượng trước khi chạy; ví trừ sau khi việc xong.",
       "layer_ent_title": "Enterprise",
-      "layer_ent_desc": "SLA, SSO, hóa đơn công ty, quota tùy chỉnh, BYOK tùy chọn. Liên hệ — chúng tôi không để card riêng.",
+      "layer_ent_desc": "Tổ chức: một khoản mỗi kỳ cho mọi ghế, workflow riêng, credential trigger từng người. Lập cùng chúng tôi — không có giá niêm yết.",
       "paths_title": "Chọn lối vào",
       "path_start_title": "Bắt đầu trên canvas",
       "path_start_desc": "Tạo workspace, vẽ graph nhỏ, chạy một lần và đọc ước lượng Credit.",
@@ -4832,7 +4850,7 @@
       "principle_title": "Nguyên tắc",
       "principle_body": "Bạn trả theo giá trị việc agent làm xong, không theo hóa đơn hạ tầng chúng tôi nhận. Model nhanh hay sâu đổi Credit mỗi lần chạy — không đổi giá gói.",
       "slogan": "One Platform, One Credit, Unlimited Models",
-      "slogan_body": "Gói là quyền dùng workspace. Credit là đồng hồ đo mức dùng AI. Enterprise là đảm bảo (SLA, SSO, hóa đơn) — không phải SKU token rẻ hơn.",
+      "slogan_body": "Gói là quyền dùng workspace. Credit là đồng hồ đo mức dùng AI. Enterprise là gói tổ chức dựng trên ghế Pro và Business — không phải SKU token rẻ hơn.",
       "layers_title": "Ba lớp",
       "layers_body": "Khi bạn lớn lên, không có hóa đơn token bất ngờ. Bạn trả nhiều hơn vì chạy nhiều việc hơn.",
       "col_layer": "Lớp",
@@ -4850,13 +4868,13 @@
           "USD trên mỗi triệu token"
         ],
         [
-          "Hợp đồng Enterprise",
-          "SLA, SSO, audit, quota tùy chỉnh, BYOK tùy chọn",
-          "Card thứ năm trên trang giá"
+          "Tổ chức Enterprise",
+          "Ghế Pro và Business trả chung theo kỳ, workflow riêng, credential trigger từng người",
+          "Card thứ năm trên trang giá hay ví Credit chung"
         ]
       ],
       "see_title": "Bạn thấy gì",
-      "see_body": "Free, Starter và Pro thấy Credit, ước lượng và quota gói. Business (và hợp đồng Enterprise) còn thấy họ model — Llama, GPT, Claude — vẫn trừ Credit.",
+      "see_body": "Free, Starter và Pro thấy Credit, ước lượng và quota gói. Business (kể cả ghế Business trong tổ chức) còn thấy họ model — Llama, GPT, Claude — vẫn trừ Credit.",
       "see_items": [
         "Còn bao nhiêu Credit, lot nào sắp hết hạn.",
         "Một lần chạy tốn khoảng bao nhiêu Credit, trước khi chạy.",
@@ -5210,25 +5228,59 @@
     },
     "enterprise": {
       "title": "Enterprise",
-      "description": "SLA, SSO, hóa đơn và BYOK tùy chọn — hợp đồng, không phải card giá thứ năm.",
-      "toc_what": "Hợp đồng mua gì",
-      "toc_not": "Không phải gì",
+      "description": "Gói tổ chức: một user Business trả một kỳ cho mọi ghế, và tổ chức chạy workflow riêng của mình.",
+      "toc_what": "Tổ chức là gì",
+      "toc_billing": "Một khoản mỗi kỳ",
+      "toc_workflows": "Workflow của tổ chức",
+      "toc_access": "Trigger và credential",
+      "toc_not": "Ngoài phạm vi gói này",
       "toc_contact": "Liên hệ",
-      "what_title": "Hợp đồng mua gì",
-      "what_body": "Self-serve dừng ở Business. Nếu bạn cần đảm bảo catalog công khai không hứa được, chúng tôi viết hợp đồng.",
+      "what_title": "Tổ chức là gì",
+      "what_body": "Enterprise không phải gói thứ năm. Chúng tôi lập tổ chức và danh sách thành viên cùng bạn. Mỗi thành viên giữ một ghế Pro hoặc Business, và một người thuộc tối đa một tổ chức.",
       "what_items": [
+        "Ghế Business chấp nhận workflow cho tổ chức và trả tiền kỳ.",
+        "Ghế Pro chạy các workflow và trigger mà user Business cấp.",
+        "Số ghế Pro tối thiểu ghi trong hợp đồng. Thành viên không tự mời hay gỡ người — chúng tôi cập nhật danh sách theo yêu cầu.",
+        "Mỗi thành viên giữ ví Credit riêng. Ghế không phải Credit, và không có ví chung của tổ chức."
+      ],
+      "billing_title": "Một khoản mỗi kỳ",
+      "billing_body": "User Business trả một khoản cho mọi ghế tính tiền trong danh sách. Kỳ là 1, 3, 6 hoặc 12 tháng với cùng chiết khấu như gói lẻ, và mỗi ghế tính theo giá niêm yết Pro hoặc Business hiện tại.",
+      "billing_items": [
+        "Thanh toán trong dashboard bằng Casso hoặc PayPal. Không thanh toán trên trang giá và không tự gia hạn.",
+        "Trả xong, mọi ghế trong hóa đơn đó chạy đến cùng một ngày hết kỳ. Gia hạn thì kỳ sau áp cho cả danh sách.",
+        "Thành viên không tự trả gói khi đang được tổ chức bao.",
+        "Chưa trả kỳ sau thì ghế vẫn chạy thêm 7 ngày. Sau đó tổ chức bị tạm ngưng và thành viên về Free.",
+        "Gỡ ghế giữa kỳ không được hoàn tiền."
+      ],
+      "workflows_title": "Workflow của tổ chức",
+      "workflows_body": "Người tạo xin chúng tôi bật cờ Enterprise cho workflow, rồi đề nghị nó cho một tổ chức. Workflow chỉ vào catalog của tổ chức sau khi user Business chấp nhận.",
+      "workflows_items": [
+        "Workflow Enterprise không bao giờ nằm trong catalog cộng đồng công khai, và link công khai của nó ngừng chạy.",
+        "Đề nghị hiện sẵn mức royalty. Mức đó giữ nguyên chừng nào tổ chức còn giữ workflow.",
+        "Ai chạy workflow thì trả Credit từ ví của mình, cộng royalty đã chấp nhận cho người tạo.",
+        "Tổ chức nhả workflow lúc nào cũng được. Người tạo không xóa được workflow khi tổ chức đang giữ."
+      ],
+      "access_title": "Trigger và credential",
+      "access_body": "User Business thấy mọi workflow đã chấp nhận và mọi trigger. User Pro chỉ thấy các trigger được cấp.",
+      "access_items": [
+        "Cấp quyền theo từng trigger. Trigger thêm sau không nằm trong lần cấp cũ.",
+        "Mỗi người có credential riêng cho từng trigger, chỉ hiện một lần. Cấp lại thì credential cũ hết hiệu lực.",
+        "User Business đặt được trần Credit hàng tháng cho từng user Pro trên một workflow.",
+        "Tổ chức bị tạm ngưng thì mọi trigger dừng ngay."
+      ],
+      "not_title": "Ngoài phạm vi gói này",
+      "not_callout": "Không phải Business rẻ hơn",
+      "not_body": "Enterprise không thay các gói self-serve và không phải SKU token sỉ. Gói lẻ vẫn ở",
+      "not_items_intro": "Các mục sau không nằm trong gói tổ chức. Cần hợp đồng riêng:",
+      "not_items": [
         "SLA uptime và đường hỗ trợ có tên.",
         "SSO, audit log và hóa đơn công ty.",
-        "Quota tùy chỉnh và Credit cam kết.",
-        "BYOK tùy chọn: bạn trả nhà cung cấp model; chúng tôi vẫn thu phí nền tảng. Mức dùng model Hub host vẫn trừ Credit."
+        "Dung lượng riêng hoặc quota hạ tầng tùy chỉnh.",
+        "BYOK (dùng key model của bạn)."
       ],
-      "not_title": "Không phải gì",
-      "not_callout": "Không phải Business rẻ hơn",
-      "not_body": "Enterprise không thay card Business $99.90 và không phải SKU token sỉ. Bốn gói self-serve vẫn ở",
-      "byok_body": "BYOK không mở cho Free, Starter, Pro hay Business self-serve. Nó tồn tại để đội lớn không bị ép qua catalog model của chúng tôi — không để Hub thành gateway pass-through.",
       "contact_title": "Liên hệ",
-      "contact_body": "Nói SLA, định danh và ràng buộc hóa đơn. Chúng tôi chuyển chủ đề Enterprise đến đúng người.",
-      "contact_cta": "Liên hệ sales"
+      "contact_body": "Cho chúng tôi biết bạn cần bao nhiêu ghế Pro và Business, và muốn chạy workflow nào. Chúng tôi lập tổ chức, sau đó user Business của bạn trả trong dashboard.",
+      "contact_cta": "Liên hệ về Enterprise"
     }
   },
   "BlogPage": {

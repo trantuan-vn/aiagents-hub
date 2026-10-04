@@ -300,16 +300,19 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
       </div>
       <p className="text-muted-foreground mt-6 text-center text-sm">{t("paypal_hint")}</p>
       {!compact ? (
-        <p className="mt-4 text-center text-sm">
-          <Link to="/contact" className="text-primary underline-offset-4 hover:underline">
+        <p className="mt-4 text-center text-xs">
+          <Link to="/contact?topic=enterprise" className="text-muted-foreground underline-offset-4 hover:underline">
             {t("enterprise_footer")}
           </Link>
         </p>
       ) : (
-        <div className="mt-10 text-center">
+        <div className="mt-10 flex flex-col items-center gap-2 text-center">
           <Button variant="ghost" asChild>
             <Link to="/packages">{t("compare_plans")}</Link>
           </Button>
+          <Link to="/packages#enterprise" className="text-primary text-sm underline-offset-4 hover:underline">
+            {t("enterprise_link")}
+          </Link>
         </div>
       )}
     </div>
