@@ -598,7 +598,7 @@ Mọi API ở mục 4 phải có màn hình gọi được. Không ai phải g�
 | User Business | Tab **Tổ chức** ở `/dashboard/build/workflows`; khối **Tổ chức** ở `/dashboard/control/billing` | Chấp nhận / từ chối / nhả workflow. Phân quyền trigger cho Pro, cấp credential. Chạy workflow. Trả kỳ, thêm ghế |
 | User Pro | Tab **Tổ chức** ở `/dashboard/build/workflows` | Chạy đúng các trigger được cấp |
 
-Thêm `{ title: "Enterprises", url: "/dashboard/enterprises", adminOnly: true }` vào nhóm "Members & Revenue" trong `navigation/sidebar/sidebar-items.ts` và key dịch trong `sidebar-translations.ts`. Trang admin gọi `useRequireAdmin()`.
+Thêm `{ title: "Enterprises", url: "/dashboard/enterprises", adminOnly: true }` vào nhóm "Members & Revenue" trong `navigation/sidebar/sidebar-items.ts` và key dịch trong `sidebar-translations.ts`. Trang admin gọi `useRequireAdmin()` và nằm trong `ADMIN_MANAGEMENT_PREFIXES` (`sensitive-step-up.ts`) để hiện step-up như các màn admin khác.
 
 ### 5A.2 Admin — `/dashboard/enterprises`
 

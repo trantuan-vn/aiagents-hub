@@ -31,6 +31,7 @@ const ADMIN_MANAGEMENT_PREFIXES = [
   "/dashboard/workflow-execution-usages",
   "/dashboard/policy",
   "/dashboard/user-groups",
+  "/dashboard/enterprises",
   "/dashboard/workflow/services",
   "/dashboard/workflow-nodes",
 ] as const;
