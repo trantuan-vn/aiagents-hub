@@ -282,6 +282,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
           onOpenChange={setSettingsOpen}
           descriptionInputRef={resolvedDescRef}
           {...editSettings}
+          workflowId={workflowId}
         />
       ) : null}
 

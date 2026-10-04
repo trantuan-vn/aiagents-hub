@@ -31,6 +31,7 @@ import {
   type CreditLotView,
 } from "./_components/billing-api";
 import { BillingStatsCards } from "./_components/billing-stats-cards";
+import { EnterpriseBillingBlock } from "./_components/enterprise-billing-block";
 import { BillingPlanCard, type BillingPlanId } from "./_components/billing-plan-card";
 import { OrderHistoryTab, getPresetDateRange } from "./_components/order-history-tab";
 import { OrderList } from "./_components/order-list";
@@ -380,6 +381,8 @@ export default function BillingPage() {
           <WalletTopUpDialog onCreate={handleCreateOrder} open={topUpOpen} onOpenChange={handleTopUpOpenChange} />
         ) : null}
       </div>
+
+      <EnterpriseBillingBlock />
 
       <BillingPlanCard
         planId={planId}

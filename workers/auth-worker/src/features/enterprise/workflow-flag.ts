@@ -186,6 +186,32 @@ export async function adminListFlagRequests(env: Env) {
   );
 }
 
+/** Flagged workflows from the D1 projection, which may lag the owners' UserDOs. */
+export async function adminListEnterpriseWorkflows(env: Env) {
+  const { results } = await d1(env)
+    .prepare(
+      `SELECT w.user_id, w.id, w.name, w.status, w."isShared" AS isShared, w."enterpriseId" AS enterpriseId,
+              w."enterpriseAcceptance" AS enterpriseAcceptance, u.identifier AS owner_identifier, e.name AS enterprise_name
+         FROM agent_workflows w
+         LEFT JOIN users u ON u.user_id = w.user_id
+         LEFT JOIN enterprises e ON e.id = w."enterpriseId"
+        WHERE COALESCE(w."isEnterprise", 0) = 1
+        ORDER BY w.updated_at DESC LIMIT 500`,
+    )
+    .all<Record<string, unknown>>();
+  return (results ?? []).map((r) => ({
+    ownerId: String(r.user_id),
+    ownerIdentifier: r.owner_identifier == null ? null : String(r.owner_identifier),
+    workflowId: Number(r.id),
+    name: String(r.name ?? ''),
+    status: String(r.status ?? 'draft'),
+    isShared: Number(r.isShared) === 1,
+    enterpriseId: r.enterpriseId == null ? null : String(r.enterpriseId),
+    enterpriseName: r.enterprise_name == null ? null : String(r.enterprise_name),
+    enterpriseAcceptance: String(r.enterpriseAcceptance ?? 'none'),
+  }));
+}
+
 async function requireFlagRequest(env: Env, id: string): Promise<FlagRequestRow> {
   const row = await d1(env).prepare(`SELECT * FROM enterprise_flag_requests WHERE id = ?`).bind(id).first<FlagRequestRow>();
   if (!row) throw new EnterpriseError('ENTERPRISE_FLAG_REQUEST_NOT_FOUND', 404);

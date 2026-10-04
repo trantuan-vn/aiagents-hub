@@ -33,7 +33,7 @@ vi.mock('../member/workflows/billing/get-royalty-percent', () => ({
   getWorkflowRoyaltyPercentFromEnv: vi.fn(async () => platformRoyalty.percent),
 }));
 
-import { frozenEnterpriseRoyaltyPercent } from './workflow-flag';
+import { adminListEnterpriseWorkflows, frozenEnterpriseRoyaltyPercent } from './workflow-flag';
 import { businessDecideProposal, enterpriseCatalog, ownerSetEnterpriseProposal } from './workflow-proposal';
 import { enterpriseSqlite, fakeD1 } from './test-d1';
 
@@ -239,14 +239,29 @@ describe('organization block', () => {
     await ownerSetEnterpriseProposal(env, OWNER, WF, 'org-1');
     await businessDecideProposal(env, BIZ, OWNER_ID, WF, 'accept');
     flush();
-    expect(await enterpriseCatalog(env, PRO)).toEqual({ workflows: [], proposals: [] });
+    const ungranted = await enterpriseCatalog(env, PRO);
+    expect(ungranted).toMatchObject({ workflows: [], proposals: [] });
+    expect(ungranted.enterprise).toMatchObject({ seatRole: 'pro', status: 'active', seatActive: true });
+    expect(ungranted.enterprise).not.toHaveProperty('id');
     addGrant(PRO);
     expect((await enterpriseCatalog(env, PRO)).workflows).toHaveLength(1);
-    expect(await enterpriseCatalog(env, OUTSIDER)).toEqual({ workflows: [], proposals: [] });
+    expect(await enterpriseCatalog(env, OUTSIDER)).toEqual({ enterprise: null, workflows: [], proposals: [] });
 
     sqlite.exec(`UPDATE enterprises SET admin_hold = 1 WHERE id = 'org-1'`);
-    expect(await enterpriseCatalog(env, PRO)).toEqual({ workflows: [], proposals: [] });
-    expect(await enterpriseCatalog(env, BIZ)).toEqual({ workflows: [], proposals: [] });
+    expect(await enterpriseCatalog(env, PRO)).toMatchObject({ workflows: [], proposals: [] });
+    const held = await enterpriseCatalog(env, BIZ);
+    expect(held).toMatchObject({ workflows: [], proposals: [] });
+    expect(held.enterprise).toMatchObject({ id: 'org-1', seatRole: 'business', status: 'suspended' });
+  });
+
+  it('admin list shows flagged workflows with their organization and acceptance', async () => {
+    flush();
+    expect(await adminListEnterpriseWorkflows(env)).toMatchObject([{ workflowId: WF, enterpriseId: null, enterpriseAcceptance: 'none' }]);
+    await ownerSetEnterpriseProposal(env, OWNER, WF, 'org-1');
+    flush();
+    expect(await adminListEnterpriseWorkflows(env)).toMatchObject([
+      { ownerId: OWNER_ID, ownerIdentifier: OWNER, workflowId: WF, enterpriseId: 'org-1', enterpriseName: 'org-1', enterpriseAcceptance: 'pending' },
+    ]);
   });
 
   it('hides accepted workflows the owner unshared', async () => {

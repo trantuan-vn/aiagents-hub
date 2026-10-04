@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEnterpriseErrorMessage } from "@/lib/enterprise-api";
 import { formatUsd } from "@/lib/utils";
 
 import { deleteWorkflow, listMyWorkflows, type AgentWorkflow } from "../../_lib/api";
@@ -20,6 +21,7 @@ import { WorkflowCronBadge } from "./workflow-cron-badge";
 
 export function MyWorkflowsTab() {
   const t = useTranslations("WorkflowsPage");
+  const errorMessage = useEnterpriseErrorMessage();
   const [items, setItems] = useState<AgentWorkflow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,8 +47,8 @@ export function MyWorkflowsTab() {
       await deleteWorkflow(id);
       toast.success(t("deleted"));
       void load();
-    } catch {
-      toast.error(t("load_error"));
+    } catch (err) {
+      toast.error(errorMessage(err));
     }
   };
 

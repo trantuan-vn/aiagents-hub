@@ -59,6 +59,7 @@ export function getTranslateTitle(t: (key: string) => string): (title: string) =
     "Commission Policy": t("commission_policy"),
     "API Service": t("api_service"),
     "Discount Vouchers": t("discount_vouchers"),
+    Enterprises: t("enterprises"),
     "Version Updates": t("version_updates"),
     "WebSocket Notify": t("websocket_notify"),
   };

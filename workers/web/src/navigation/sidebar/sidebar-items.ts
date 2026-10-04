@@ -3,6 +3,7 @@ import {
   Banknote,
   BarChart3,
   Bell,
+  Building2,
   Bot,
   Bug,
   Sparkles,
@@ -107,6 +108,7 @@ export const sidebarItems: NavGroup[] = [
           { title: "Earnings Payouts", url: "/dashboard/earnings-payouts", icon: Wallet, adminOnly: true },
           { title: "Commission Policy", url: "/dashboard/commission-policy", icon: Banknote, adminOnly: true },
           { title: "Discount Vouchers", url: "/dashboard/voucher", icon: Ticket, adminOnly: true },
+          { title: "Enterprises", url: "/dashboard/enterprises", icon: Building2, adminOnly: true },
         ],
       },
       {

@@ -3,7 +3,7 @@
 > **Trạng thái:** Draft v0.4 — dòng DO → D1 → R2 khớp pipeline đang chạy  
 > **Phiên bản:** 0.4  
 > **Ngày:** 2026-10-04  
-> **Phạm vi:** Tổ chức Enterprise do admin tạo, ghế Business + Pro có gia hạn, workflow phải được tổ chức chấp nhận, phân quyền trigger bền, credential riêng từng user, trang tĩnh  
+> **Phạm vi:** Tổ chức Enterprise do admin tạo, ghế Business + Pro có gia hạn, workflow phải được tổ chức chấp nhận, phân quyền trigger bền, credential riêng từng user, trang tĩnh, dashboard cho admin / người tạo / Business / Pro  
 
 > **v0.4:** cờ và plan chỉ ghi trên UserDO; D1 là bản chiếu qua queue; hook đọc DO; hóa đơn áp từng DO có idempotency; sổ tiền đi `orders` / `payments` / `workflow_royalties` để tới R2. Grant và credential ở D1, không vào queue và không bị archive  
 > **Bổ sung, không thay thế:** giá 4 gói và PayPal → [`subscription-packages-spec.md`](./subscription-packages-spec.md); Credit → [`business-model-one-credit-spec.md`](./business-model-one-credit-spec.md); graph chạy thế nào → [`workflow-how-it-works.md`](./workflow-how-it-works.md)
@@ -585,6 +585,126 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 
 ---
 
+## 5A. Dashboard
+
+Mọi API ở mục 4 phải có màn hình gọi được. Không ai phải gọi API bằng tay. Dashboard nằm ở `workers/web/src/app/(main)/dashboard`, gọi auth-worker bằng session (`credentials: "include"`) như các màn khác.
+
+### 5A.1 Bốn vai và chỗ họ làm việc
+
+| Vai | Màn | Việc |
+|-----|-----|------|
+| Platform admin | `/dashboard/enterprises` (mới, `adminOnly`) | Tạo và sửa tổ chức, thêm/gỡ thành viên, hold, xóa. Duyệt yêu cầu bật cờ. Tắt cờ |
+| Người tạo workflow | Sheet **Cài đặt** trong editor workflow | Xin bật cờ, rút yêu cầu, xem lý do từ chối. Đề nghị một tổ chức, rút đề nghị |
+| User Business | Tab **Tổ chức** ở `/dashboard/build/workflows`; khối **Tổ chức** ở `/dashboard/control/billing` | Chấp nhận / từ chối / nhả workflow. Phân quyền trigger cho Pro, cấp credential. Chạy workflow. Trả kỳ, thêm ghế |
+| User Pro | Tab **Tổ chức** ở `/dashboard/build/workflows` | Chạy đúng các trigger được cấp |
+
+Thêm `{ title: "Enterprises", url: "/dashboard/enterprises", adminOnly: true }` vào nhóm "Members & Revenue" trong `navigation/sidebar/sidebar-items.ts` và key dịch trong `sidebar-translations.ts`. Trang admin gọi `useRequireAdmin()`.
+
+### 5A.2 Admin — `/dashboard/enterprises`
+
+Ba tab.
+
+**Tổ chức.** Bảng đọc `GET /dashboard/admin/enterprises`: tên, badge `status` (thêm badge “Hold” khi `adminHold`), `periodEnd`, `seatGraceUntil` nếu có, ghế `billableBusiness`/`billablePro` so với `1 + minProSeats`, ghế `activeBusiness`/`activePro`, số workflow `pending`/`accepted`. Nút **Tạo tổ chức** mở dialog `{ name, minProSeats, note }`.
+
+Bấm một dòng mở sheet chi tiết (`GET /dashboard/admin/enterprises/:id`):
+
+- Sửa `name`, `minProSeats`, `note` → `PATCH`. Công tắc **Hold** → `PATCH { adminHold }`, có hộp xác nhận vì catalog và trigger dừng ngay.
+- Mã tổ chức (`id`) có nút copy. Đây là mã người tạo workflow nhập khi đề nghị.
+- Thành viên: email, `seatRole`, ngày thêm, nút gỡ (xác nhận; ghi rõ plan về Free nếu `planSource = enterprise`, không hoàn tiền). Ô thêm: email + chọn `business`/`pro` → `POST …/members`.
+- Hóa đơn: 50 hóa đơn gần nhất (`kind`, `status`, số tiền, người trả, `periodEnd`, ngày trả). Chỉ xem.
+- Workflow của tổ chức: lọc từ tab **Workflow enterprise** theo `enterpriseId`.
+- Nút **Xóa tổ chức** → `DELETE`. Lỗi 409 hiện đúng lý do (còn thành viên / còn workflow).
+
+**Yêu cầu bật cờ.** Danh sách `GET /dashboard/admin/enterprise-flag-requests`: email owner, tên workflow, `status`, `isShared`, `note`, thời điểm. Bấm **Xem** mở dialog đọc `GET …/:id`: tên, mô tả, tag, note, và canvas chỉ xem vẽ `definition` bằng `WorkflowExecutionGraph` (truyền `steps = []`). Không có nút sửa hay chạy. Hai nút:
+
+- **Duyệt** → `POST …/approve`.
+- **Từ chối** → nhập `reason` bắt buộc → `POST …/reject`.
+
+**Workflow enterprise.** Danh sách workflow đang có cờ, đọc API mới `GET /dashboard/admin/workflows/enterprise` (mục 5A.7): owner, tên, tổ chức, acceptance. Nút **Tắt cờ** → `PUT …/:ownerId/:workflowId/enterprise { isEnterprise: false }`. Gặp 409 `ENTERPRISE_ACCEPTED` thì hỏi lại “Tổ chức đang dùng workflow này. Tắt cưỡng bức sẽ xóa grant, credential và tắt chia sẻ” rồi gửi `force: true`.
+
+### 5A.3 Người tạo — sheet Cài đặt của editor
+
+Thêm khối **Enterprise** vào `workflow-editor-settings-sheet.tsx`, nhận thêm `workflowId`. Khối tự tải `GET /dashboard/build/workflows/:id` và `GET …/:id/enterprise-flag-request`, không đi qua vòng lưu của editor. Mọi thao tác xong thì tải lại khối.
+
+| Trạng thái | Hiện | Thao tác |
+|------------|------|----------|
+| Chưa có cờ, chưa từng xin hoặc đã rút | Giải thích workflow enterprise không vào catalog công khai, URL công khai sẽ tắt | Ô `note` + **Xin bật cờ** → `POST` |
+| Chưa có cờ, yêu cầu `pending` | “Đang chờ admin duyệt”, ngày gửi | **Rút yêu cầu** → `DELETE` |
+| Chưa có cờ, yêu cầu `rejected` | Lý do từ chối | Gửi yêu cầu mới |
+| Có cờ, `enterpriseAcceptance = none` | Ô mã tổ chức | **Gửi đề nghị** → `PUT /:id { enterpriseId }` |
+| Có cờ, `pending` | Mã tổ chức, mức royalty đã ghi `acceptedRoyaltyPercent` | **Rút đề nghị** → `PUT /:id { enterpriseId: null }` |
+| Có cờ, `accepted` | Mã tổ chức, royalty đã đóng băng. “Chỉ tổ chức hoặc admin gỡ được” | Không |
+
+Khi có cờ mà workflow chưa `isShared` hoặc chưa `published`, khối nhắc: “Bật Chia sẻ để tổ chức chạy được workflow này. Workflow vẫn không hiện ở catalog công khai.” Nút xóa workflow ở danh sách “Của tôi” hiện lỗi `ENTERPRISE_ACCEPTED` bằng câu dễ hiểu.
+
+### 5A.4 Business và Pro — tab Tổ chức
+
+`/dashboard/build/workflows` thêm tab **Tổ chức** cạnh “Của tôi” và “Chia sẻ”. Tab đọc `GET /dashboard/build/workflows/enterprise`.
+
+- `enterprise = null` (không là thành viên): tab vẫn hiện, nội dung là một đoạn giải thích và link `/docs/enterprise`.
+- Đầu tab: tên tổ chức, vai của người xem, `status`. Business thấy thêm mã tổ chức có nút copy (để gửi cho người tạo workflow).
+- Trong 7 ngày gia hạn: banner vàng “Kỳ đã hết ngày …, còn đến … để thanh toán”, Business có link sang Billing. `suspended`: banner đỏ, danh sách trống.
+
+**Đề nghị chờ chấp nhận** (chỉ Business): mỗi hàng có tên, email người tạo, mô tả, số trigger, câu “Mỗi lần người khác chạy, người chạy trả thêm X% usage cho người tạo”. Nút **Chấp nhận** / **Từ chối** (`POST …/accept` / `…/reject`).
+
+**Card workflow.** Tên, email người tạo, mô tả, tag, royalty %. Mỗi trigger trong `triggers` là một nút theo `kind`:
+
+| `kind` | Nút | Dialog chạy |
+|--------|-----|-------------|
+| `chat` | Mở chat | Khung chat. Giữ `sessionId` trong dialog; mỗi tin gửi `{ triggerKey, chatInput, sessionId }` |
+| `form` | Điền form | Form dựng từ `fields` của trigger (mục 5A.7); gửi `{ triggerKey, fields }` |
+| `webhook` | Gọi webhook | Ô JSON body; gửi `{ triggerKey, fields }` khi JSON là object, ngược lại `{ triggerKey, input }` |
+| `schedule` | Chạy ngay | Ô input tùy chọn; gửi `{ triggerKey, input }` |
+
+Tất cả gọi `POST …/:ownerId/:workflowId/execute`. Dialog hiện `status`, `executionKey` và `output`. Lỗi 402 `ENTERPRISE_CREDIT_CAP` hiện “Đã chạm trần Credit tháng do Business đặt”.
+
+Business có thêm trên card:
+
+- **Phân quyền** mở sheet mục 5A.5.
+- **Credential của tôi**: chọn một trigger → `POST …/credentials { triggerKey }` → dialog token mục 5A.6.
+- **Nhả workflow** → xác nhận → `POST …/release`.
+
+Pro chỉ thấy nút trigger của mình. Pro không thấy đề nghị, không thấy nút phân quyền hay nhả.
+
+### 5A.5 Sheet phân quyền
+
+Đọc `GET …/grants`. Bảng: mỗi hàng một user Pro (`proMembers`), mỗi cột một trigger (`triggers`, hiện `label` và `kind`), thêm cột **Tất cả**, cột **Trần Credit/tháng** (để trống = không trần) và nút **Lưu** từng hàng.
+
+- **Tất cả** tick mọi trigger đang có trong bảng lúc bấm. Không lưu wildcard; gửi danh sách key cụ thể.
+- **Lưu** → `PUT …/grants { granteeUserId, triggerKeys, monthlyCreditCap }`. Bỏ hết ô thì hỏi xác nhận “Thu hồi hết quyền và credential của user này”.
+- Response có `credentials` thì mở dialog token mục 5A.6 với cả danh sách.
+- Ô đã cấp có biểu tượng credential (`hasCredential`) và menu **Cấp lại credential** → `POST …/credentials { triggerKey, granteeUserId }`.
+- Không có Pro nào: hiện “Tổ chức chưa có user Pro. Liên hệ admin để thêm ghế.”
+
+### 5A.6 Dialog token
+
+Mỗi token hiện cùng URL `https://api.aiagents-hub.vn/hooks/enterprise/<token>`, nút copy, và ví dụ `curl -X POST -H 'Content-Type: application/json' -d '{…}' <url>`. Dòng cảnh báo: “Token chỉ hiện một lần. Đóng dialog là không xem lại được; cấp lại sẽ vô hiệu token cũ.” Token không lưu vào state ngoài dialog, không ghi log, không đưa lên URL.
+
+### 5A.7 Billing của tổ chức — `/dashboard/control/billing`
+
+Thêm khối **Tổ chức** ở đầu trang. Khối gọi `GET /dashboard/enterprises/mine/billing`; 403 hoặc 404 thì không hiện gì (người xem không phải Business của tổ chức).
+
+- Tên, `status`, `periodEnd`, `planInterval`, banner gia hạn như 5A.4.
+- Bảng ghế: email, `seatRole`, nhãn “Đang tự trả” (`excluded = self_paid`) hoặc “Admin tặng” (`admin_granted`), plan hiện tại và hạn.
+- `billableBusiness`/`billablePro` so ngưỡng. `thresholdMet = false` thì nút thanh toán tắt và ghi thiếu bao nhiêu ghế.
+- Chọn kỳ 1/3/6/12, hiện `quotes[interval]` và % chiết khấu. **Thanh toán kỳ** → `POST …/checkout { interval }` → chuyển tới `checkoutPath` (trang này với `?payOrder=…`, dùng luồng Casso/PayPal có sẵn).
+- Có `pendingInvoice`: hiện số tiền, ngày tạo, nút **Thanh toán tiếp** (mở `?payOrder=<orderId>`) và **Hủy** (`POST …/checkout/:invoiceId/cancel`). Nút tạo hóa đơn mới tắt.
+- Ghế chưa được kỳ hiện tại bao (không bị loại, `planSource` khác `enterprise` hoặc `planCurrentPeriodEnd` sớm hơn `periodEnd`) có nút **Thêm vào kỳ** → `POST …/seats { userId }` → `checkoutPath`.
+
+### 5A.8 Bổ sung backend cho dashboard
+
+| Việc | Chi tiết |
+|------|----------|
+| `GET /dashboard/build/workflows/enterprise` thêm `enterprise` | `{ id, name, status, seatRole, periodEnd, seatGraceUntil } \| null`. Trả cho mọi thành viên, kể cả khi tổ chức không `active` (lúc đó `workflows` và `proposals` rỗng). `id` chỉ trả khi `seatRole = business` |
+| Trigger `form` trong catalog thêm `fields` | `[{ fieldName, label, fieldType, required, options? }]` lấy từ `formElements` của node. Không trả phần nào khác của definition |
+| `GET /dashboard/admin/workflows/enterprise` | Admin. Đọc bản chiếu D1: `isEnterprise = 1`, kèm `ownerId`, email owner, `workflowId`, tên, `enterpriseId`, tên tổ chức, `enterpriseAcceptance`. Bản D1 có thể trễ; nút tắt cờ vẫn đọc DO như mục 3.1 |
+
+### 5A.9 Mã lỗi và i18n
+
+Client đọc `code` trong body lỗi và tra `Enterprise.errors.<CODE>`; không có key thì hiện `code`. Mọi chuỗi mới nằm trong `en-US.json` và `vi-VN.json` dưới `EnterpriseAdminPage`, `EnterpriseWorkflowsTab`, `EnterpriseBilling`, `WorkflowEnterpriseSection` và `Enterprise.errors`. Hai file có cùng bộ key.
+
+---
+
 ## 6. Việc không làm trong v0.4
 
 - Không `planId = enterprise`. Ghế tổ chức ghi `planId` là `pro` hoặc `business` và `planSource = enterprise`. Không parse nhầm hàng legacy `enterprise` (spec gói đã map sang `business` khi đọc).
@@ -634,6 +754,17 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 - [ ] `/docs/enterprise` mô tả đúng v0.4, CTA liên hệ.
 - [ ] Copy en và vi khớp.
 
+**Dashboard**
+
+- [ ] Admin tạo tổ chức, thêm 1 Business + n Pro, bật/gỡ hold, gỡ thành viên, xóa tổ chức trống — hoàn toàn trên `/dashboard/enterprises`.
+- [ ] Owner xin bật cờ từ sheet Cài đặt. Admin thấy yêu cầu, mở canvas chỉ xem, duyệt hoặc từ chối kèm lý do; owner thấy kết quả và lý do.
+- [ ] Owner nhập mã tổ chức và gửi đề nghị. Business thấy hàng chờ kèm % royalty, chấp nhận; workflow hiện ở tab Tổ chức.
+- [ ] Business tick trigger cho một Pro và lưu; token hiện một lần kèm URL. Pro mở tab Tổ chức chỉ thấy đúng các nút đó và chạy được chat, form, webhook, schedule.
+- [ ] Business trả kỳ từ khối Tổ chức ở Billing, hủy hóa đơn treo, thêm ghế giữa kỳ.
+- [ ] Admin tắt cờ; với workflow `accepted` phải xác nhận cưỡng bức.
+- [ ] Người không thuộc tổ chức không thấy khối Billing tổ chức; tab Tổ chức chỉ có đoạn giải thích.
+- [ ] Mọi lỗi enterprise hiện câu dịch theo `code`.
+
 ---
 
 ## 8. Phase code gợi ý
@@ -644,3 +775,4 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 4. Đề nghị, chấp nhận, từ chối, nhả. Khối Tổ chức tách khỏi list `/shared`. Code ở `features/enterprise/workflow-proposal.ts`. Owner gửi `{ enterpriseId }` qua `PUT /dashboard/build/workflows/:id`; mức royalty lúc gửi được ghi sẵn vào `acceptedRoyaltyPercent` để Business thấy và chấp nhận đúng mức đó. Route Business mount ở `/dashboard/build/workflows/enterprise` trước router workflow. Chấp nhận cần tổ chức `active` và ghế Business đang hiệu lực; từ chối và nhả vẫn làm được khi tổ chức `suspended`. Royalty khi chạy đi qua `workflowAttribution.royaltyPercent`. Danh sách trigger trên card để phase 5.
 5. `enterpriseTriggerKey` trên node. Grant theo key đã có lúc lưu, credential một lần, `POST /hooks/enterprise/:token`, trần Credit, tắt cron owner. Code ở `features/enterprise/trigger-keys.ts` và `triggers.ts`. Server gán key khi tạo, `PUT`, khôi phục version và lúc admin duyệt cờ; key giữ theo node id nên canvas lưu bản cũ không làm đổi key, node sao chép nhận key mới. Node có key: webhook (trigger/core), chat, form (không gồm form database), schedule. Token dạng `ent_…`, lưu SHA-256; `POST …/credentials` với `granteeUserId` của Pro là cấp lại. Execute trong app và hook token chạy graph trên UserDO của owner với người gọi là actor, bỏ `minPlanId`. Trần tháng so `SUM(creditsCharged)` trên `service_usages` D1 từ đầu tháng UTC, kiểm trước khi chạy. Cron owner đã tắt từ phase 3.
 6. Trang tĩnh và i18n. `/packages` có khối `#enterprise` dưới 4 card (không giá, CTA `/contact?topic=enterprise` và `/docs/enterprise`), dòng SLA/SSO là link phụ. Trang chủ thêm link tới `/packages#enterprise`. `/docs/enterprise` viết lại theo các mục tổ chức, một khoản mỗi kỳ, workflow của tổ chức, trigger và credential, ngoài phạm vi gói. `/contact` điền sẵn topic từ `?topic=`. Copy en/vi sửa ở `PackagesPage.layers.enterprise`, `PackagesPage.enterprise`, `Docs.enterprise.*`, `Docs.hub`, `Docs.platform`, About CTA, Support FAQ, Terms (dịch vụ và phí), Community.
+7. Dashboard theo mục 5A: trang admin `/dashboard/enterprises` (tổ chức, yêu cầu bật cờ, workflow enterprise), khối Enterprise trong sheet Cài đặt của editor, tab Tổ chức ở `/dashboard/build/workflows` (đề nghị, card, chạy trigger, phân quyền, token), khối Tổ chức ở Billing. Backend bổ sung theo 5A.8. Deploy auth-worker trước web. Client chung ở `web/src/lib/enterprise-api.ts` (phần admin ở `enterprise-admin-api.ts`), component dùng chung ở `web/src/components/enterprise/` (badge, xác nhận, dialog token, banner gia hạn). Trang admin ở `dashboard/enterprises/`; tab Tổ chức ở `build/workflows/_components/enterprise/`; khối editor là `workflow-enterprise-section.tsx`, chỉ hiện khi workflow đã có id; khối Billing là `control/billing/_components/enterprise-billing-*.tsx`. Thanh toán kỳ và thêm ghế tải lại cả trang tới `checkoutPath` để danh sách order có order mới trước khi mở dialog thanh toán. Lỗi xóa workflow ở “Của tôi” đi qua `Enterprise.errors`.

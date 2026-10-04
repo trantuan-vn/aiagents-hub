@@ -62,3 +62,34 @@ describe('assignEnterpriseTriggerKeys', () => {
     expect(assignEnterpriseTriggerKeys(null, 'not json')).toBe('not json');
   });
 });
+
+describe('listEnterpriseTriggers', () => {
+  it('describes form inputs without hidden fields and nothing for other kinds', () => {
+    const out = assignEnterpriseTriggerKeys(
+      null,
+      def([
+        chat('c1'),
+        {
+          id: 'f1',
+          type: 'trigger',
+          data: {
+            triggerKind: 'form',
+            formCredentialKey: 'secret-key',
+            formElements: [
+              { id: 'e1', label: 'Email', fieldType: 'email', fieldName: 'email', requiredField: true },
+              { id: 'e2', label: 'Plan', fieldType: 'dropdown', fieldName: 'plan', fieldOptions: 'pro\n business \n' },
+              { id: 'e3', label: 'Ref', fieldType: 'hidden', fieldName: 'ref' },
+            ],
+          },
+        },
+      ]),
+    );
+    const [chatTrigger, form] = listEnterpriseTriggers(out);
+    expect(chatTrigger).not.toHaveProperty('fields');
+    expect(form.fields).toEqual([
+      { fieldName: 'email', label: 'Email', fieldType: 'email', required: true },
+      { fieldName: 'plan', label: 'Plan', fieldType: 'dropdown', required: false, options: ['pro', 'business'] },
+    ]);
+    expect(JSON.stringify(form)).not.toContain('secret-key');
+  });
+});

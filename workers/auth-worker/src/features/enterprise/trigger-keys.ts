@@ -5,11 +5,21 @@
 
 export type EnterpriseTriggerKind = 'webhook' | 'chat' | 'form' | 'schedule';
 
+/** Form inputs the in-app run dialog renders. Nothing else from the definition leaves the server. */
+export type EnterpriseFormField = {
+  fieldName: string;
+  label: string;
+  fieldType: string;
+  required: boolean;
+  options?: string[];
+};
+
 export type EnterpriseTrigger = {
   triggerKey: string;
   nodeId: string;
   kind: EnterpriseTriggerKind;
   label: string;
+  fields?: EnterpriseFormField[];
 };
 
 type RawNode = { id?: unknown; type?: unknown; data?: Record<string, unknown> | null };
@@ -90,7 +100,33 @@ export function listEnterpriseTriggers(definition: unknown): EnterpriseTrigger[]
     if (!kind || !key || typeof node.id !== 'string') continue;
     const data = node.data ?? {};
     const label = String(data.label ?? data.title ?? data.name ?? kind);
-    out.push({ triggerKey: key, nodeId: node.id, kind, label });
+    out.push({ triggerKey: key, nodeId: node.id, kind, label, ...(kind === 'form' ? { fields: formFields(data.formElements) } : {}) });
   }
   return out;
+}
+
+function formFields(raw: unknown): EnterpriseFormField[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((el): el is Record<string, unknown> => !!el && typeof el === 'object')
+    .filter((el) => el.fieldType !== 'hidden')
+    .map((el) => {
+      const fieldName = String(el.fieldName || el.id || '');
+      const fieldType = String(el.fieldType || 'text');
+      const options =
+        fieldType === 'dropdown'
+          ? String(el.fieldOptions ?? '')
+              .split('\n')
+              .map((line) => line.trim())
+              .filter(Boolean)
+          : undefined;
+      return {
+        fieldName,
+        label: String(el.label || fieldName || 'Field'),
+        fieldType,
+        required: el.requiredField === true,
+        ...(options ? { options } : {}),
+      };
+    })
+    .filter((f) => f.fieldName.length > 0);
 }

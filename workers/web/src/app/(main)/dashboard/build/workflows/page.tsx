@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { EnterpriseWorkflowsTab } from "./_components/enterprise/enterprise-workflows-tab";
 import { MyWorkflowsTab } from "./_components/list/my-workflows-tab";
 import { SharedWorkflowsTab } from "./_components/list/shared-workflows-tab";
 
@@ -38,12 +39,16 @@ export default function WorkflowsPage() {
         <TabsList>
           <TabsTrigger value="mine">{t("tab_mine")}</TabsTrigger>
           <TabsTrigger value="shared">{t("tab_shared")}</TabsTrigger>
+          <TabsTrigger value="enterprise">{t("tab_enterprise")}</TabsTrigger>
         </TabsList>
         <TabsContent value="mine" className="mt-4">
           <MyWorkflowsTab />
         </TabsContent>
         <TabsContent value="shared" className="mt-4">
           <SharedWorkflowsTab />
+        </TabsContent>
+        <TabsContent value="enterprise" className="mt-4">
+          <EnterpriseWorkflowsTab />
         </TabsContent>
       </Tabs>
     </div>

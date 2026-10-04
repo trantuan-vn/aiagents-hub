@@ -14,6 +14,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
+import { WorkflowEnterpriseSection } from "./workflow-enterprise-section";
+
 export interface WorkflowEditorSettingsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +37,7 @@ export interface WorkflowEditorSettingsSheetProps {
   starLabel: string;
   onStarLabelChange: (s: string) => void;
   descriptionInputRef?: React.RefObject<HTMLTextAreaElement>;
+  workflowId?: number;
 }
 
 export function WorkflowEditorSettingsSheet({
@@ -58,6 +61,7 @@ export function WorkflowEditorSettingsSheet({
   starLabel,
   onStarLabelChange,
   descriptionInputRef,
+  workflowId,
 }: WorkflowEditorSettingsSheetProps) {
   const t = useTranslations("WorkflowsPage");
   const te = useTranslations("WorkflowEditorPage");
@@ -140,6 +144,7 @@ export function WorkflowEditorSettingsSheet({
             <Label>{t("star_label")}</Label>
             <Input value={starLabel} onChange={(e) => onStarLabelChange(e.target.value)} />
           </div>
+          {open && workflowId && workflowId > 0 ? <WorkflowEnterpriseSection workflowId={workflowId} /> : null}
         </div>
       </SheetContent>
     </Sheet>

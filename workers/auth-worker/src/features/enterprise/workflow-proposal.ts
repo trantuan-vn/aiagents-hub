@@ -169,7 +169,7 @@ type CatalogRow = {
 function catalogView(r: CatalogRow, granted?: Set<string>) {
   const triggers = listEnterpriseTriggers(r.definition)
     .filter((t) => !granted || granted.has(t.triggerKey))
-    .map(({ triggerKey, kind, label }) => ({ triggerKey, kind, label }));
+    .map(({ triggerKey, kind, label, fields }) => ({ triggerKey, kind, label, ...(fields ? { fields } : {}) }));
   return {
     id: r.id,
     ownerId: r.user_id,
@@ -192,14 +192,23 @@ const CATALOG_COLUMNS = `w.id, w.user_id, w.name, w.description, w.tags, w."acce
  */
 export async function enterpriseCatalog(env: Env, identifier: string, now = new Date()) {
   type Card = ReturnType<typeof catalogView>;
-  const empty: { workflows: Card[]; proposals: Card[] } = { workflows: [], proposals: [] };
   const db = d1(env);
   const member = await getMembership(db, identifier);
-  if (!member) return empty;
+  if (!member) return { enterprise: null, workflows: [] as Card[], proposals: [] as Card[] };
   const org = await refreshEnterpriseState(db, await requireEnterprise(db, member.enterprise_id), now);
-  if (org.status !== 'active') return empty;
   const caller = await loadUserRow(userDoFor(env, identifier));
-  if (!isActiveSeat(caller, member.seat_role, now)) return empty;
+  const seatActive = isActiveSeat(caller, member.seat_role, now);
+  const enterprise = {
+    ...(member.seat_role === 'business' ? { id: org.id } : {}),
+    name: org.name,
+    status: org.status,
+    seatRole: member.seat_role,
+    seatActive,
+    periodEnd: org.period_end,
+    seatGraceUntil: org.seat_grace_until,
+  };
+  const empty = { enterprise, workflows: [] as Card[], proposals: [] as Card[] };
+  if (org.status !== 'active' || !seatActive) return empty;
 
   const acceptedWhere = `COALESCE(w."isEnterprise", 0) = 1 AND w."isShared" = 1 AND w.status = 'published'
      AND w."enterpriseAcceptance" = 'accepted' AND w."enterpriseId" = ?`;
@@ -223,7 +232,7 @@ export async function enterpriseCatalog(env: Env, identifier: string, now = new 
     const workflows = (results ?? [])
       .map((r) => catalogView(r, new Set(String(r.granted_keys ?? '').split(',').filter(Boolean))))
       .filter((w) => w.triggers.length > 0);
-    return { workflows, proposals: [] };
+    return { enterprise, workflows, proposals: [] as Card[] };
   }
 
   const [accepted, pending] = await db.batch<CatalogRow>([
@@ -242,6 +251,7 @@ export async function enterpriseCatalog(env: Env, identifier: string, now = new 
       .bind(org.id),
   ]);
   return {
+    enterprise,
     workflows: (accepted.results ?? []).map((r) => catalogView(r)),
     proposals: (pending.results ?? []).map((r) => catalogView(r)),
   };

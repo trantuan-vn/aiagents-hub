@@ -28,6 +28,7 @@ import {
 import {
   adminApproveFlagRequest,
   adminGetFlagRequest,
+  adminListEnterpriseWorkflows,
   adminListFlagRequests,
   adminRejectFlagRequest,
   adminSetWorkflowFlag,
@@ -142,6 +143,11 @@ export function createAdminEnterpriseFlagRequestRoutes() {
 /** Mounted at `/dashboard/admin/workflows`. */
 export function createAdminWorkflowEnterpriseRoutes() {
   const app = new Hono<{ Bindings: Env }>();
+
+  app.get(
+    '/enterprise',
+    route(requireAdmin, async (c) => c.json({ workflows: await adminListEnterpriseWorkflows(c.env) }), 'Failed to list enterprise workflows'),
+  );
 
   app.put(
     '/:ownerId/:workflowId/enterprise',
