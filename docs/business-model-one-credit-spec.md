@@ -5,6 +5,7 @@
 > **Ngày:** 2026-09-18  
 > **Phạm vi:** Billing, wallet, service pricing, workflow charge, marketing packages, admin economics  
 > **Gói / PayPal Subscriptions / hủy / grace / minPlan:** → [`subscription-packages-spec.md`](./subscription-packages-spec.md)  
+> **Tổ chức Enterprise (ghế + workflow riêng, không phải giá thứ năm):** → [`enterprise-organization-spec.md`](./enterprise-organization-spec.md)  
 > **Không thay thế:** luồng workflow → [`workflow-how-it-works.md`](./workflow-how-it-works.md); plugin → [`workflow-node-plugin-spec.md`](./workflow-node-plugin-spec.md)
 
 **v0.3:** catalog self-serve **Free / Starter ($4.90) / Pro ($19.90) / Business ($99.90)** — không còn placeholder $49 / Free–Pro–Enterprise trên `/packages`. Enterprise = lớp hợp đồng (SLA/SSO/BYOK), không phải card giá. Chi tiết entitlement, PayPal Subscriptions, chiết khấu nhiều tháng → spec gói.

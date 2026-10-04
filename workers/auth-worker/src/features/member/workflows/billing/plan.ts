@@ -182,9 +182,19 @@ function planStatusOf(user: Record<string, unknown>): string {
   return String(user.planStatus ?? user.plan_status ?? '').toLowerCase();
 }
 
-function paidPeriodStillOpen(user: Record<string, unknown>, now: Date): boolean {
+function paidPeriodStillOpen(user: Record<string, unknown>, now: Date, graceMs = 0): boolean {
   const end = Date.parse(String(user.planCurrentPeriodEnd ?? user.plan_current_period_end ?? ''));
-  return Number.isFinite(end) && end > now.getTime();
+  return Number.isFinite(end) && end + graceMs > now.getTime();
+}
+
+/** Organization seats keep their plan this long after `periodEnd` (enterprise-organization-spec §2.4). */
+export const ENTERPRISE_SEAT_GRACE_DAYS = 7;
+const ENTERPRISE_SEAT_GRACE_MS = ENTERPRISE_SEAT_GRACE_DAYS * 24 * 60 * 60 * 1000;
+
+function enterpriseSeatOpen(user: Record<string, unknown>, now: Date): boolean {
+  const status = planStatusOf(user);
+  if (status === 'suspended' || status === 'canceled') return false;
+  return paidPeriodStillOpen(user, now, ENTERPRISE_SEAT_GRACE_MS);
 }
 
 /**
@@ -203,6 +213,10 @@ export function resolvePlanId(user: Record<string, unknown>, now = new Date()): 
   }
   if (source === 'order') {
     if (!paidPeriodStillOpen(user, now)) return 'free';
+    return parsePlanId(user.planId ?? user.plan_id);
+  }
+  if (source === 'enterprise') {
+    if (!enterpriseSeatOpen(user, now)) return 'free';
     return parsePlanId(user.planId ?? user.plan_id);
   }
   return 'free';
@@ -549,6 +563,7 @@ export function syncPlanPeriod(
   if (
     planId === 'free' &&
     (planSourceOf(user) === 'order' ||
+      planSourceOf(user) === 'enterprise' ||
       (planSourceOf(user) === 'paypal' && planStatusOf(user) === 'canceled' && !paidPeriodStillOpen(user, now)))
   ) {
     patch.planSource = 'free';

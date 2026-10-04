@@ -196,7 +196,7 @@ export const UserSchema = BaseUserSchema.extend({
     if (s === 'enterprise') return 'business';
     return s;
   }, z.enum(['free', 'starter', 'pro', 'business']).optional()),
-  planSource: z.enum(['free', 'paypal', 'admin', 'order']).optional(),
+  planSource: z.enum(['free', 'paypal', 'admin', 'order', 'enterprise']).optional(),
   paypalSubscriptionId: z.string().max(64).optional(),
   paypalPayerId: z.string().max(64).optional(),
   paypalPlanId: z.string().max(64).optional(),

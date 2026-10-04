@@ -271,6 +271,25 @@ describe('plan entitlements', () => {
     expect(incrementDailyWorkflowRuns({ workflowRunsToday: 2, workflowRunsOn: '2026-09-16' }, new Date('2026-09-16T02:00:00.000Z')).workflowRunsToday).toBe(3);
   });
 
+  it('keeps an enterprise seat through periodEnd plus 7 days of grace', () => {
+    const seat = { planId: 'pro', planSource: 'enterprise', planStatus: 'active', planCurrentPeriodEnd: '2026-10-01T00:00:00.000Z' };
+    expect(resolvePlanId(seat, new Date('2026-09-30T00:00:00.000Z'))).toBe('pro');
+    expect(resolvePlanId(seat, new Date('2026-10-07T23:00:00.000Z'))).toBe('pro');
+    expect(resolvePlanId(seat, new Date('2026-10-08T01:00:00.000Z'))).toBe('free');
+    expect(resolvePlanId({ ...seat, planStatus: 'suspended' }, new Date('2026-09-30T00:00:00.000Z'))).toBe('free');
+    expect(resolvePlanId({ ...seat, planCurrentPeriodEnd: undefined }, new Date('2026-09-30T00:00:00.000Z'))).toBe('free');
+  });
+
+  it('drops a lapsed enterprise seat to free on sync', () => {
+    const patch = syncPlanPeriod(
+      { planId: 'business', planSource: 'enterprise', planStatus: 'active', planCurrentPeriodEnd: '2026-09-01T00:00:00.000Z' },
+      eco,
+      new Date('2026-09-20T00:00:00.000Z'),
+    );
+    expect(patch.planId).toBe('free');
+    expect(patch.planSource).toBe('free');
+  });
+
   it('clamps creator minPlanId to owner plan', () => {
     expect(clampMinPlanId('business', 'starter')).toBe('starter');
     expect(clampMinPlanId('free', 'pro')).toBe('free');

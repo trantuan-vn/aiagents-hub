@@ -5,7 +5,8 @@ import { requireAuth } from '../../../auth/authMiddleware';
 import { handleError, getIdFromName, executeUtils } from '../../../../shared/utils';
 import { UserDO } from '../../../ws/infrastructure/UserDO';
 import {
-  AgentWorkflowSchema,
+  ADMIN_ONLY_WORKFLOW_FIELDS,
+  MemberWorkflowWriteSchema,
   WorkflowCommentSchema,
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
@@ -67,8 +68,15 @@ import { touchUserCronAlarm } from '../triggers/cron-alarm.js';
 import { createWorkflowChatStreamResponse } from '../collab/workflow-chat.js';
 import { createWorkflowNodeCatalogMemberRoutes } from '../../../admin/workflow-node-catalog/presentation';
 
-const CreateWorkflowSchema = AgentWorkflowSchema;
-const UpdateWorkflowSchema = AgentWorkflowSchema.partial();
+const CreateWorkflowSchema = MemberWorkflowWriteSchema;
+const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
+
+function hasAdminOnlyWorkflowField(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  return ADMIN_ONLY_WORKFLOW_FIELDS.some((key) => key in raw);
+}
+
+const ENTERPRISE_FLAG_FORBIDDEN = { error: 'ENTERPRISE_FLAG_FORBIDDEN', code: 'ENTERPRISE_FLAG_FORBIDDEN' } as const;
 
 const ExecuteBodySchema = z.object({
   input: z.string().optional(),
@@ -330,7 +338,9 @@ export function createWorkflowRoutes(bindingName: string) {
   app.post(
     '/',
     createRouteHandler(async (c: any, user: any) => {
-      const body = CreateWorkflowSchema.parse(await c.req.json());
+      const raw = await c.req.json();
+      if (hasAdminOnlyWorkflowField(raw)) return c.json(ENTERPRISE_FLAG_FORBIDDEN, 403);
+      const body = CreateWorkflowSchema.parse(raw);
       const userDO = getUserDO(c, user.identifier);
       const created = await executeUtils.executeDynamicAction(
         userDO,
@@ -855,7 +865,9 @@ export function createWorkflowRoutes(bindingName: string) {
     createRouteHandler(async (c: any, user: any) => {
       const id = parseInt(c.req.param('id'), 10);
       if (isNaN(id)) throw new Error('Invalid workflow id');
-      const body = UpdateWorkflowSchema.parse(await c.req.json());
+      const raw = await c.req.json();
+      if (hasAdminOnlyWorkflowField(raw)) return c.json(ENTERPRISE_FLAG_FORBIDDEN, 403);
+      const body = UpdateWorkflowSchema.parse(raw);
       const userDO = getUserDO(c, user.identifier);
       const { quota } = await loadUserAndSyncPlan(userDO, c.env);
       if (!quota.entitlement.canShareWorkflows) {

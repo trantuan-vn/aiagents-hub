@@ -61,6 +61,24 @@ export const AgentWorkflowSchema = z.object({
   usageCount: z.number().int().min(0).default(0),
   totalEarningsUsd: z.number().min(0).default(0),
   status: z.enum(['draft', 'published']).default('draft'),
+  /** Only admin sets this (enterprise-organization-spec §3.1). Hidden from the public catalog when true. */
+  isEnterprise: z.boolean().default(false),
+  /** Organization the owner proposed. Null until proposed. */
+  enterpriseId: z.string().max(64).optional(),
+  enterpriseAcceptance: z.enum(['none', 'pending', 'accepted']).default('none'),
+  /** Royalty % frozen when the Business user accepts. Null until accepted. */
+  acceptedRoyaltyPercent: z.number().min(0).max(100).optional(),
+});
+
+/** Fields the owner may never write through member routes. */
+export const ADMIN_ONLY_WORKFLOW_FIELDS = ['isEnterprise', 'enterpriseAcceptance', 'acceptedRoyaltyPercent'] as const;
+
+/** Body for member create/update. Enterprise fields are written only by admin and organization routes. */
+export const MemberWorkflowWriteSchema = AgentWorkflowSchema.omit({
+  isEnterprise: true,
+  enterpriseId: true,
+  enterpriseAcceptance: true,
+  acceptedRoyaltyPercent: true,
 });
 
 /** Personal star/label when browsing shared workflows (per consumer). */

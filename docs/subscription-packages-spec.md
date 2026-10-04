@@ -13,7 +13,7 @@ Nguyên tắc giữ từ spec Credit:
 
 - **Subscription** = quyền nền tảng (lãi bền). Giá gói ổn định; không nhảy vì catalog Cloudflare.
 - **Credit** = van COGS. Credit tặng **hết tháng UTC là hết**, không cộng dồn — kể cả khi user trả trước 3/6/12 tháng.
-- **Enterprise hợp đồng** = SLA / SSO / BYOK / quota custom — **không** là gói thứ 5 trên `/packages`.
+- **Enterprise hợp đồng** = SLA / SSO / BYOK / quota custom — không phải giá checkout thứ năm. Tổ chức, ghế Business + Pro, và workflow riêng: [`enterprise-organization-spec.md`](./enterprise-organization-spec.md).
 
 Coding bám spec này. **Không** hard-code giá / included credits rải rác trên UI. Marketing đọc `GET /public/plans`.
 
