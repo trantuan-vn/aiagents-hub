@@ -1,10 +1,13 @@
 import { Hono } from 'hono';
 import { createOrderApplicationService } from './application';
-import { parseCreateOrderRequest, UpdateOrderStatusSchema, ORDER_DEFAULT_PAGE, ORDER_DEFAULT_LIMIT } from './domain';
+import { isReservedOrderNote, parseCreateOrderRequest, UpdateOrderStatusSchema, ORDER_DEFAULT_PAGE, ORDER_DEFAULT_LIMIT } from './domain';
 import { getOrderHistoryFromD1, type OrderHistoryFilters } from './order-history-infrastructure';
 import { getMemberBillingParamsFromEnv } from '../../admin/system-config/get-usd-vnd-rate';
 import { requireAuth } from '../../auth/authMiddleware';
-import { handleError } from '../../../shared/utils';
+import { getIdFromName, handleError } from '../../../shared/utils';
+import type { UserDO } from '../../ws/infrastructure/UserDO';
+import { ENTERPRISE_PLAN_MANAGED, isEnterpriseManaged } from '../../enterprise/domain';
+import { loadUserRow } from '../../enterprise/store';
 
 export function createOrderRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
@@ -36,6 +39,10 @@ export function createOrderRoutes(bindingName: string) {
     const body = await c.req.json();
     const { minTopUpVnd } = await getMemberBillingParamsFromEnv(c.env, bindingName);
     const request = parseCreateOrderRequest(body, minTopUpVnd);
+    if (request.planId) {
+      const userDO = getIdFromName(c, user.identifier, bindingName) as DurableObjectStub<UserDO>;
+      if (isEnterpriseManaged(await loadUserRow(userDO))) return c.json(ENTERPRISE_PLAN_MANAGED, 403);
+    }
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.createOrder(user, request);
     return c.json(result);
@@ -102,6 +109,9 @@ export function createOrderRoutes(bindingName: string) {
     }
     const body = await c.req.json();
     const request = UpdateOrderStatusSchema.parse(body);
+    if (request.status !== 'CANCELLED' || isReservedOrderNote(request.notes)) {
+      return c.json({ error: 'Only cancellation is allowed', code: 'ORDER_STATUS_FORBIDDEN' }, 403);
+    }
     const orderApp = createOrderApplicationService(c, bindingName);
     const result = await orderApp.updateOrderStatus(user.identifier, orderId, request);
     return c.json(result);

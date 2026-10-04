@@ -1,0 +1,134 @@
+import { Hono } from 'hono';
+
+import { handleError } from '../../shared/utils';
+import { requireAdmin, requireAuth } from '../auth/authMiddleware';
+import {
+  adminAddMember,
+  adminCreateEnterprise,
+  adminDeleteEnterprise,
+  adminGetEnterprise,
+  adminListEnterprises,
+  adminPatchEnterprise,
+  adminRemoveMember,
+} from './admin';
+import { billingSnapshot, cancelInvoice, checkoutPeriod, checkoutSeat } from './billing';
+import {
+  AddMemberSchema,
+  CheckoutSchema,
+  CreateEnterpriseSchema,
+  EnterpriseError,
+  PatchEnterpriseSchema,
+  SeatCheckoutSchema,
+} from './domain';
+
+type Guard = (c: any) => { identifier: string };
+
+function route(guard: Guard, fn: (c: any, user: { identifier: string }) => Promise<Response>, fallback: string) {
+  return async (c: any) => {
+    try {
+      return await fn(c, guard(c));
+    } catch (e) {
+      if (e instanceof EnterpriseError) return c.json({ error: e.code, code: e.code }, e.status);
+      const { errorResponse, status } = await handleError(c, e, fallback);
+      return c.json(errorResponse, status);
+    }
+  };
+}
+
+function checkoutResponse(created: { invoiceId: string; orderId: number; amountUsd: number }) {
+  return {
+    ...created,
+    checkoutPath: `/dashboard/control/billing?payOrder=${created.orderId}`,
+  };
+}
+
+/** Mounted at `/dashboard/admin/enterprises`. */
+export function createAdminEnterpriseRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+  const admin = (fn: (c: any, user: { identifier: string }) => Promise<Response>, fallback: string) =>
+    route(requireAdmin, fn, fallback);
+
+  app.get('/', admin(async (c) => c.json({ enterprises: await adminListEnterprises(c.env) }), 'Failed to list enterprises'));
+
+  app.post(
+    '/',
+    admin(async (c, user) => {
+      const body = CreateEnterpriseSchema.parse(await c.req.json());
+      return c.json({ enterprise: await adminCreateEnterprise(c.env, user.identifier, body) }, 201);
+    }, 'Failed to create enterprise'),
+  );
+
+  app.get('/:id', admin(async (c) => c.json(await adminGetEnterprise(c.env, c.req.param('id'))), 'Failed to load enterprise'));
+
+  app.patch(
+    '/:id',
+    admin(async (c, user) => {
+      const body = PatchEnterpriseSchema.parse(await c.req.json());
+      return c.json({ enterprise: await adminPatchEnterprise(c.env, user.identifier, c.req.param('id'), body) });
+    }, 'Failed to update enterprise'),
+  );
+
+  app.delete(
+    '/:id',
+    admin(async (c, user) => {
+      await adminDeleteEnterprise(c.env, user.identifier, c.req.param('id'));
+      return c.json({ success: true });
+    }, 'Failed to delete enterprise'),
+  );
+
+  app.post(
+    '/:id/members',
+    admin(async (c, user) => {
+      const body = AddMemberSchema.parse(await c.req.json());
+      return c.json({ member: await adminAddMember(c.env, user.identifier, c.req.param('id'), body) }, 201);
+    }, 'Failed to add member'),
+  );
+
+  app.delete(
+    '/:id/members/:userId',
+    admin(async (c, user) => {
+      await adminRemoveMember(c.env, user.identifier, c.req.param('id'), decodeURIComponent(c.req.param('userId')));
+      return c.json({ success: true });
+    }, 'Failed to remove member'),
+  );
+
+  return app;
+}
+
+/** Mounted at `/dashboard/enterprises`. Business seats pay the organization's period here. */
+export function createEnterpriseMemberRoutes() {
+  const app = new Hono<{ Bindings: Env }>();
+  const member = (fn: (c: any, user: { identifier: string }) => Promise<Response>, fallback: string) =>
+    route(requireAuth, fn, fallback);
+
+  app.get(
+    '/mine/billing',
+    member(async (c, user) => c.json(await billingSnapshot(c.env, user.identifier)), 'Failed to load enterprise billing'),
+  );
+
+  app.post(
+    '/mine/billing/checkout',
+    member(async (c, user) => {
+      const body = CheckoutSchema.parse(await c.req.json());
+      return c.json(checkoutResponse(await checkoutPeriod(c.env, user.identifier, body.interval)), 201);
+    }, 'Failed to create enterprise invoice'),
+  );
+
+  app.post(
+    '/mine/billing/checkout/:invoiceId/cancel',
+    member(async (c, user) => {
+      await cancelInvoice(c.env, user.identifier, c.req.param('invoiceId'));
+      return c.json({ success: true });
+    }, 'Failed to cancel enterprise invoice'),
+  );
+
+  app.post(
+    '/mine/billing/seats',
+    member(async (c, user) => {
+      const body = SeatCheckoutSchema.parse(await c.req.json());
+      return c.json(checkoutResponse(await checkoutSeat(c.env, user.identifier, body.userId)), 201);
+    }, 'Failed to create seat invoice'),
+  );
+
+  return app;
+}

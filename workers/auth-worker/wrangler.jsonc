@@ -72,7 +72,7 @@
 	},
 	// Daily contribution van at 00:20 ICT (17:20 UTC). Admin can also POST /dashboard/admin/billing/contribution/scan.
 	"triggers": {
-		"crons": ["20 17 * * *"]
+		"crons": ["20 17 * * *", "7 * * * *"]
 	},
 	"images": {
 		"binding": "IMAGES" // i.e. available in your Worker on env.IMAGES

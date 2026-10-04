@@ -27,6 +27,8 @@ import { getOrderPayableVnd, getOrderWalletCreditUsd, getOrderWalletCreditVnd, g
 import { applyWalletCreditDebit, applyWalletCreditTopUp, resolveCreditBalance } from '../workflows/billing/credit-wallet';
 import { appendCassoIpnLog } from './casso-ipn-log';
 import { paidPlanGrantPatch, parsePlanOrderIntent } from '../billing/plan-order';
+import { parseEnterpriseInvoiceId } from '../../enterprise/domain';
+import { assertOrderSettlesInvoice, captureEnterpriseInvoice } from '../../enterprise/billing';
 
 export type VNPayWalletOptions = { env: Env; bindingName: string };
 
@@ -114,6 +116,26 @@ export function createVNPayService(
       const dbUser = userRows[0];
       if (!dbUser?.id || !orderRow) {
         throw new Error(PAYMENT_ERROR_MESSAGES.ORDER_NOT_FOUND);
+      }
+      const enterpriseInvoiceId = parseEnterpriseInvoiceId(orderRow);
+      if (enterpriseInvoiceId) {
+        const env = walletOptions?.env;
+        if (!env) throw new Error(PAYMENT_ERROR_MESSAGES.INVALID_REQUEST);
+        await assertOrderSettlesInvoice(env, enterpriseInvoiceId, orderRow, dbUser.identifier);
+        operations.push({
+          table: 'orders',
+          operation: 'update',
+          id: orderId,
+          data: { status: ORDER_STATUS.COMPLETED, queueStatus: 'pending' },
+        });
+        await executeUtils.executeDynamicAction(userDO, 'multi-table', { operations });
+        try {
+          await captureEnterpriseInvoice(env, enterpriseInvoiceId);
+        } catch (err) {
+          // Payment is recorded; the hourly enterprise sweep settles the invoice from the completed payment.
+          console.error('[Payment] enterprise capture deferred', { paymentId, orderId, enterpriseInvoiceId, err });
+        }
+        return;
       }
       const planIntent = parsePlanOrderIntent(orderRow);
       if (planIntent) {

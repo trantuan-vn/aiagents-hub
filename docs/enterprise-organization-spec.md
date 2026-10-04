@@ -639,7 +639,7 @@ Card Enterprise không có giá `$` cố định và không có `checkout=` trê
 ## 8. Phase code gợi ý
 
 1. D1 cho bảng tổ chức ở `workers/queue-worker/migrations/019_enterprise.sql` (không đưa vào `SYNC_TABLE_NAMES`, không đưa vào `d1tor2`). Cột workflow ở `020_agent_workflows_enterprise.sql` và trong `AgentWorkflowSchema` (UserDO tự thêm cột qua `ensureSchemaColumns`). `planSource = 'enterprise'` giữ plan đến `planCurrentPeriodEnd` + 7 ngày.
-2. Hóa đơn một kỳ, `periodEnd` khóa lúc `paid`, áp từng UserDO, idempotent theo `applied_user_ids`. Order và payment trên DO của người trả.
+2. Hóa đơn một kỳ, `periodEnd` khóa lúc `paid`, áp từng UserDO, idempotent theo `applied_user_ids`. Order và payment trên DO của người trả. Code ở `workers/auth-worker/src/features/enterprise/`. Hóa đơn tạo một `orders` ghi chú `enterprise:<invoiceId>` và người trả thanh toán order đó qua PayPal hoặc Casso như order thường (`checkoutPath` = `/dashboard/control/billing?payOrder=…`). Cổng thanh toán từ chối order mà `order_id`, người trả hoặc số tiền không khớp hóa đơn. Cron `7 * * * *` hết hạn hóa đơn treo, chạy nốt lần áp ghế bị rớt, và settle hóa đơn có `payments` `COMPLETED`. Xóa tổ chức còn thành viên → 409 `ENTERPRISE_HAS_MEMBERS`.
 3. Hàng chờ xin bật cờ, canvas admin đọc DO, hook/form/execute đọc DO. List D1 lọc `isEnterprise = 0` khi bản chiếu đã có cờ.
 4. Đề nghị, chấp nhận, từ chối, nhả. Khối Tổ chức tách khỏi list `/shared`.
 5. `enterpriseTriggerKey` trên node. Grant theo key đã có lúc lưu, credential một lần, `POST /hooks/enterprise/:token`, trần Credit, tắt cron owner.

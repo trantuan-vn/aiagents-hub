@@ -54,6 +54,8 @@ import { dailyUsageSync } from './features/admin/cloudflare-usage/infrastructure
 import { createAdminPipelineHealthRoutes } from './features/admin/pipeline-health/presentation';
 import { dailyPipelineHealthSync } from './features/admin/pipeline-health/infrastructure';
 import { createPayoutBeneficiaryRoutes } from './features/member/payout/presentation';
+import { createAdminEnterpriseRoutes, createEnterpriseMemberRoutes } from './features/enterprise/presentation';
+import { sweepEnterprises } from './features/enterprise/billing';
 import {
   createWorkflowNodeCatalogAdminRoutes,
   createWorkflowNodeCatalogMemberRoutes,
@@ -134,6 +136,8 @@ function createRoutes(bindingName: string) {
   routes.route('/dashboard/admin/ai-gateway', createAdminAiGatewayLogsRoutes());
   routes.route('/dashboard/admin/pipeline-health', createAdminPipelineHealthRoutes());
   routes.route('/dashboard/payout', createPayoutBeneficiaryRoutes(bindingName));
+  routes.route('/dashboard/admin/enterprises', createAdminEnterpriseRoutes());
+  routes.route('/dashboard/enterprises', createEnterpriseMemberRoutes());
   // II. API
   routes.use('/api/*', createTokenRateLimitMiddleware());
   routes.use('/api/*', createTokenValidationMiddleware(bindingName));
@@ -152,6 +156,8 @@ function createRoutes(bindingName: string) {
 }
 
 const routeApp = createRoutes("USER_DO");
+/** Must match the hourly entry in wrangler.jsonc `triggers.crons`. */
+const ENTERPRISE_SWEEP_CRON = '7 * * * *';
 const log = createLogger('auth-worker');
 
 // Warmup BroadcastServiceDO once per isolate so its tables are created on deploy.
@@ -202,8 +208,19 @@ export default {
     await warmupBroadcastServiceDO(env);
     return routeApp.fetch(request, env, ctx);
   },
+  // Hourly cron (`ENTERPRISE_SWEEP_CRON`): enterprise invoices and organization status only.
   // Daily cron (`20 17 * * *` = 00:20 ICT): contribution scan, PayPal pending cancels, marketing rollup, expired credit lots.
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
+    if (controller.cron === ENTERPRISE_SWEEP_CRON) {
+      try {
+        await sweepEnterprises(env);
+      } catch (err) {
+        log.warn('enterprise.sweep_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return;
+    }
     try {
       await scanContributionAndPropose(env);
     } catch (err) {

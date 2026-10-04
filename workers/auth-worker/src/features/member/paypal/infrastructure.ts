@@ -17,6 +17,8 @@ import {
 } from './domain';
 import { getPaypalApiBase, getPaypalCredentials, PAYPAL_ERROR_MESSAGES } from './config';
 import { paidPlanGrantPatch, parsePlanOrderIntent } from '../billing/plan-order';
+import { parseEnterpriseInvoiceId } from '../../enterprise/domain';
+import { assertOrderSettlesInvoice, captureEnterpriseInvoice } from '../../enterprise/billing';
 
 const payLog = createLogger('auth-worker', 'paypal');
 
@@ -98,12 +100,34 @@ export function createPaypalService(
     }
   };
 
+  const assertEnterpriseOrderOwnsInvoice = async (order: OrderRow, identifier: string): Promise<void> => {
+    const invoiceId = parseEnterpriseInvoiceId(order);
+    if (invoiceId) await assertOrderSettlesInvoice(options.env, invoiceId, order, identifier);
+  };
+
   /** Credit the USD wallet exactly like the VNPay/Casso completion path (single multi-table tx). */
   const creditWalletForOrder = async (order: OrderRow, captureId: string): Promise<number> => {
     const userRows = await executeUtils.executeDynamicAction(userDO, 'select', {}, 'users');
     const dbUser = userRows[0];
     if (!dbUser?.id) {
       throw new Error(PAYPAL_ERROR_MESSAGES.ORDER_NOT_FOUND);
+    }
+
+    const enterpriseInvoiceId = parseEnterpriseInvoiceId(order);
+    if (enterpriseInvoiceId) {
+      await executeUtils.executeDynamicAction(
+        userDO,
+        'update',
+        { id: order.id, status: ORDER_STATUS.COMPLETED, queueStatus: 'pending' },
+        'orders',
+      );
+      try {
+        await captureEnterpriseInvoice(options.env, enterpriseInvoiceId);
+      } catch (err) {
+        // Payment is recorded; the hourly enterprise sweep settles the invoice from the completed payment.
+        payLog.error('paypal.enterprise_capture_deferred', { orderId: order.id, enterpriseInvoiceId, captureId, err });
+      }
+      return 0;
     }
 
     const planIntent = parsePlanOrderIntent(order);
@@ -168,6 +192,7 @@ export function createPaypalService(
   ): Promise<CreatePaypalOrderResult> => {
     const order = await loadOrder(request.orderId);
     assertPayableUsdOrder(order);
+    await assertEnterpriseOrderOwnsInvoice(order, identifier);
 
     const chargeUsd = getOrderChargeUsd(order);
     const accessToken = await getAccessToken();
@@ -245,6 +270,7 @@ export function createPaypalService(
   ): Promise<CapturePaypalOrderResult> => {
     const order = await loadOrder(request.orderId);
     assertPayableUsdOrder(order);
+    await assertEnterpriseOrderOwnsInvoice(order, identifier);
 
     const accessToken = await getAccessToken();
     const res = await fetch(

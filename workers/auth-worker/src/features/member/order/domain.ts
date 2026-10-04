@@ -37,8 +37,16 @@ export const CreateOrderSchema = z.object({
 
 const MIN_TOP_UP_USD = 1;
 
+/** Order notes the server writes to grant a plan or settle an enterprise invoice on payment. */
+const RESERVED_ORDER_NOTE = /^\s*(plan|enterprise):/i;
+
+export function isReservedOrderNote(notes: unknown): boolean {
+  return RESERVED_ORDER_NOTE.test(String(notes ?? ''));
+}
+
 export function parseCreateOrderRequest(body: unknown, minTopUpVnd: number): CreateOrder {
-  const parsed = CreateOrderSchema.parse(body);
+  const raw = CreateOrderSchema.parse(body);
+  const parsed = isReservedOrderNote(raw.notes) ? { ...raw, notes: undefined } : raw;
   const currency = (parsed.currency ?? 'USD').toUpperCase();
   if (parsed.planId) {
     const interval = parsed.interval === 3 || parsed.interval === 6 || parsed.interval === 12 ? parsed.interval : 1;

@@ -15,6 +15,7 @@ import { isPaypalBillingEnabled } from '../workflows/billing/catalog';
 import { completePlanOrdersCoveredByPaypalSubscribe } from '../billing/settle-subscribe-orders';
 import { getPaypalApiBase, getPaypalCredentials, PAYPAL_ERROR_MESSAGES } from './config';
 import { loadPaypalPlanMap, mapPaypalPlanIdWithMap, planIdFromMap, resolvePaypalWebhookId } from './catalog-bootstrap';
+import { isEnterpriseManaged } from '../../enterprise/domain';
 
 const log = createLogger('auth-worker', 'paypal-sub');
 
@@ -317,10 +318,18 @@ export async function applyPaypalSubscriptionToUser(params: {
   );
   const row = await loadUserRow(params.userDO);
   const status = mapPaypalStatus(params.sub.status);
-  const patch: Record<string, unknown> = {
+  const paypalIds = {
     paypalSubscriptionId: params.sub.id ?? row.paypalSubscriptionId,
     paypalPayerId: params.sub.subscriber?.payer_id ?? row.paypalPayerId,
     paypalPlanId: params.sub.plan_id ?? row.paypalPlanId,
+  };
+  if (isEnterpriseManaged(row)) {
+    log.warn('paypal.sub.enterprise_managed_skip', { subId: params.sub.id, status });
+    await saveUserPatch(params.userDO, row, paypalIds);
+    return;
+  }
+  const patch: Record<string, unknown> = {
+    ...paypalIds,
     ...subscriptionEntitlementPatch({
       mapped,
       status,

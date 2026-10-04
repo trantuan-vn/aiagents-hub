@@ -25,6 +25,9 @@ import {
   syncPaypalSubscription,
 } from '../paypal/subscriptions';
 
+import { ENTERPRISE_PLAN_MANAGED, isEnterpriseManaged } from '../../enterprise/domain';
+import { loadUserRow } from '../../enterprise/store';
+
 const log = createLogger('auth-worker', 'billing-sub');
 
 export function createPublicPlanRoutes() {
@@ -82,6 +85,9 @@ export function createBillingSubscriptionRoutes(bindingName: string) {
     '/checkout',
     handler(async (c, user) => {
       const body = CheckoutSubscriptionSchema.parse(await c.req.json());
+      if (isEnterpriseManaged(await loadUserRow(userDOOf(c, user.identifier)))) {
+        return c.json(ENTERPRISE_PLAN_MANAGED, 403);
+      }
       const locale = String(c.req.header('accept-language') ?? '').toLowerCase().startsWith('vi') ? 'vi' : 'en';
       const env = c.env as unknown as Record<string, unknown> & { PAYPAL_BILLING_ENABLED?: string };
       const billingEnabled = isPaypalBillingEnabled(env);
