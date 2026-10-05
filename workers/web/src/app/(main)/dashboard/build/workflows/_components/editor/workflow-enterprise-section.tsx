@@ -66,7 +66,7 @@ export function WorkflowEnterpriseSection({ workflowId }: { workflowId: number }
   };
 
   if (!loaded) {
-    return <div className="text-muted-foreground rounded-lg border p-3 text-xs">{t("loading")}</div>;
+    return <div className="text-muted-foreground rounded-xl border p-4 text-xs">{t("loading")}</div>;
   }
   if (!workflow) return null;
 
@@ -74,7 +74,7 @@ export function WorkflowEnterpriseSection({ workflowId }: { workflowId: number }
   const live = truthy(workflow.isShared) && workflow.status === "published";
 
   return (
-    <div className="space-y-3 rounded-lg border p-3">
+    <div className="space-y-3 rounded-xl border p-4">
       <div className="flex items-center justify-between gap-2">
         <Label className="flex items-center gap-2">
           <Building2 className="h-4 w-4" />
