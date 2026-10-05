@@ -33,7 +33,7 @@ import {
   adminRejectFlagRequest,
   adminSetWorkflowFlag,
 } from './workflow-flag';
-import { businessDecideProposal, enterpriseCatalog } from './workflow-proposal';
+import { businessDecideProposal, enterpriseCatalog, listProposalEnterprises } from './workflow-proposal';
 import { businessIssueCredential, businessListGrants, businessPutGrants, credentialHook, sessionExecute } from './triggers';
 
 type Guard = (c: any) => { identifier: string };
@@ -170,6 +170,11 @@ export function createEnterpriseWorkflowRoutes() {
     route(requireAuth, fn, fallback);
 
   app.get('/', member(async (c, user) => c.json(await enterpriseCatalog(c.env, user.identifier)), 'Failed to load organization workflows'));
+
+  app.get(
+    '/targets',
+    member(async (c) => c.json({ enterprises: await listProposalEnterprises(c.env) }), 'Failed to list enterprises'),
+  );
 
   const target = (c: any) => {
     const workflowId = parseInt(c.req.param('workflowId'), 10);

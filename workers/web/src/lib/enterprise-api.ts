@@ -101,7 +101,10 @@ export type OwnerWorkflowEnterprise = {
   acceptedRoyaltyPercent?: number | null;
 };
 
+export type ProposalEnterprise = { id: string; name: string };
+
 export const ownerEnterprise = {
+  targets: () => call<{ enterprises: ProposalEnterprise[] }>("/dashboard/build/workflows/enterprise/targets"),
   workflow: (id: number) => call<{ workflow: OwnerWorkflowEnterprise }>(`/dashboard/build/workflows/${id}`),
   latestRequest: (id: number) =>
     call<{ request: FlagRequest | null }>(`/dashboard/build/workflows/${id}/enterprise-flag-request`),

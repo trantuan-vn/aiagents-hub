@@ -34,7 +34,7 @@ vi.mock('../member/workflows/billing/get-royalty-percent', () => ({
 }));
 
 import { adminListEnterpriseWorkflows, frozenEnterpriseRoyaltyPercent } from './workflow-flag';
-import { businessDecideProposal, enterpriseCatalog, ownerSetEnterpriseProposal } from './workflow-proposal';
+import { businessDecideProposal, enterpriseCatalog, listProposalEnterprises, ownerSetEnterpriseProposal } from './workflow-proposal';
 import { enterpriseSqlite, fakeD1 } from './test-d1';
 
 const NOW = new Date('2026-10-04T00:00:00.000Z');
@@ -143,6 +143,17 @@ describe('owner proposal', () => {
   it('needs the enterprise flag', async () => {
     workflow().isEnterprise = false;
     await expect(ownerSetEnterpriseProposal(env, OWNER, WF, 'org-1')).rejects.toMatchObject({ code: 'ENTERPRISE_FLAG_REQUIRED', status: 403 });
+  });
+
+  it('lists organizations that can receive a proposal, by name', async () => {
+    addOrg('org-3', FUTURE);
+    sqlite.prepare(`UPDATE enterprises SET name = 'Zeta' WHERE id = 'org-3'`).run();
+    sqlite.prepare(`UPDATE enterprises SET name = 'Alpha' WHERE id = 'org-1'`).run();
+    sqlite.exec(`UPDATE enterprises SET admin_hold = 1 WHERE id = 'org-2'`);
+    await expect(listProposalEnterprises(env, NOW)).resolves.toEqual([
+      { id: 'org-1', name: 'Alpha' },
+      { id: 'org-3', name: 'Zeta' },
+    ]);
   });
 
   it('needs an existing, active organization', async () => {

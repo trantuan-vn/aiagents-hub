@@ -9,7 +9,6 @@ import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -18,7 +17,9 @@ import {
   useEnterpriseErrorMessage,
   type FlagRequest,
   type OwnerWorkflowEnterprise,
+  type ProposalEnterprise,
 } from "@/lib/enterprise-api";
+import { cn } from "@/lib/utils";
 
 type Act = (fn: () => Promise<unknown>, success: string) => Promise<void>;
 
@@ -156,13 +157,35 @@ function FlagRequestPanel({
 
 function ProposalPanel({ workflow, busy, act }: { workflow: OwnerWorkflowEnterprise; busy: boolean; act: Act }) {
   const t = useTranslations("WorkflowEnterpriseSection");
+  const errorMessage = useEnterpriseErrorMessage();
   const [enterpriseId, setEnterpriseId] = useState("");
+  const [enterprises, setEnterprises] = useState<ProposalEnterprise[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const acceptance = workflow.enterpriseAcceptance ?? "none";
   const royalty = workflow.acceptedRoyaltyPercent;
-  const orgId = workflow.enterpriseId ?? "—";
+  const orgId = workflow.enterpriseId ?? "";
+  const orgName = enterprises?.find((org) => org.id === orgId)?.name ?? (orgId || "—");
+
+  useEffect(() => {
+    let cancelled = false;
+    ownerEnterprise
+      .targets()
+      .then((result) => {
+        if (!cancelled) setEnterprises(result.enterprises);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadFailed(true);
+        setEnterprises([]);
+        toast.error(errorMessage(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [errorMessage, workflow.id]);
 
   const propose = async () => {
-    await act(() => ownerEnterprise.propose(workflow.id, enterpriseId.trim()), t("proposed"));
+    await act(() => ownerEnterprise.propose(workflow.id, enterpriseId), t("proposed"));
     setEnterpriseId("");
   };
 
@@ -171,19 +194,42 @@ function ProposalPanel({ workflow, busy, act }: { workflow: OwnerWorkflowEnterpr
       {acceptance === "none" ? (
         <div className="space-y-2">
           <p className="text-muted-foreground text-xs">{t("propose_hint")}</p>
-          <Input
-            value={enterpriseId}
-            onChange={(e) => setEnterpriseId(e.target.value)}
-            placeholder={t("organization_id_placeholder")}
-          />
-          <Button size="sm" disabled={busy || !enterpriseId.trim()} onClick={() => void propose()}>
+          {enterprises === null ? (
+            <p className="text-muted-foreground text-xs">{t("loading_enterprises")}</p>
+          ) : loadFailed ? (
+            <p className="text-muted-foreground text-xs">{t("enterprises_unavailable")}</p>
+          ) : enterprises.length === 0 ? (
+            <p className="text-muted-foreground text-xs">{t("no_enterprises")}</p>
+          ) : (
+            <div role="radiogroup" aria-label={t("propose_hint")} className="max-h-48 space-y-1 overflow-y-auto">
+              {enterprises.map((org) => {
+                const selected = enterpriseId === org.id;
+                return (
+                  <button
+                    key={org.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    className={cn(
+                      "hover:bg-muted/60 flex w-full items-center rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                      selected && "border-primary bg-primary/5",
+                    )}
+                    onClick={() => setEnterpriseId(org.id)}
+                  >
+                    <span className="font-medium">{org.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <Button size="sm" disabled={busy || !enterpriseId} onClick={() => void propose()}>
             {t("propose")}
           </Button>
         </div>
       ) : null}
       {acceptance === "pending" ? (
         <div className="space-y-2">
-          <p className="text-sm">{t("proposal_pending", { id: orgId })}</p>
+          <p className="text-sm">{t("proposal_pending", { name: orgName })}</p>
           {royalty == null ? null : (
             <p className="text-muted-foreground text-xs">{t("royalty_offered", { percent: royalty })}</p>
           )}
@@ -199,7 +245,7 @@ function ProposalPanel({ workflow, busy, act }: { workflow: OwnerWorkflowEnterpr
       ) : null}
       {acceptance === "accepted" ? (
         <div className="space-y-1">
-          <p className="text-sm">{t("accepted", { id: orgId })}</p>
+          <p className="text-sm">{t("accepted", { name: orgName })}</p>
           {royalty == null ? null : (
             <p className="text-muted-foreground text-xs">{t("royalty_frozen", { percent: royalty })}</p>
           )}

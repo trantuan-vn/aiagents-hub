@@ -204,7 +204,7 @@ Mỗi node trigger trên definition có `data.enterpriseTriggerKey`: UUID sinh *
 | `isShared` + `published` | Hiện catalog công khai, ai đủ `minPlanId` cũng chạy | Không vào catalog công khai. Khối riêng trên màn cộng đồng, chỉ sau khi `accepted` |
 | Số tổ chức | 0 | Đúng 1. Đề nghị tổ chức khác thì xóa grant cũ và đưa acceptance về `pending` |
 
-Người tạo có thể là admin hoặc user thường. Cờ không suy từ “ai tạo”. Không có API liệt kê mọi tổ chức cho người tạo. Admin đưa `enterpriseId` cho người sẽ gửi đề nghị, sau khi đã chấp nhận yêu cầu bật cờ.
+Người tạo có thể là admin hoặc user thường. Cờ không suy từ “ai tạo”. Sau khi cờ được bật, người tạo chọn tổ chức từ `GET /dashboard/build/workflows/enterprise/targets`: chỉ `id` và `name` của tổ chức đang `active` (kể cả trong 7 ngày gia hạn ghế). `pending`, `suspended` và `adminHold` không có trong danh sách. Gửi đề nghị vẫn kiểm tra lại trạng thái.
 
 ### 3.0 Xin admin bật cờ
 
@@ -631,7 +631,7 @@ Thêm khối **Enterprise** vào `workflow-editor-settings-sheet.tsx`, nhận th
 | Chưa có cờ, chưa từng xin hoặc đã rút | Giải thích workflow enterprise không vào catalog công khai, URL công khai sẽ tắt | Ô `note` + **Xin bật cờ** → `POST` |
 | Chưa có cờ, yêu cầu `pending` | “Đang chờ admin duyệt”, ngày gửi | **Rút yêu cầu** → `DELETE` |
 | Chưa có cờ, yêu cầu `rejected` | Lý do từ chối | Gửi yêu cầu mới |
-| Có cờ, `enterpriseAcceptance = none` | Ô mã tổ chức | **Gửi đề nghị** → `PUT /:id { enterpriseId }` |
+| Có cờ, `enterpriseAcceptance = none` | Danh sách doanh nghiệp đang `active` | **Gửi đề nghị** → `PUT /:id { enterpriseId }` |
 | Có cờ, `pending` | Mã tổ chức, mức royalty đã ghi `acceptedRoyaltyPercent` | **Rút đề nghị** → `PUT /:id { enterpriseId: null }` |
 | Có cờ, `accepted` | Mã tổ chức, royalty đã đóng băng. “Chỉ tổ chức hoặc admin gỡ được” | Không |
 
@@ -758,7 +758,7 @@ Client đọc `code` trong body lỗi và tra `Enterprise.errors.<CODE>`; không
 
 - [ ] Admin tạo tổ chức, thêm 1 Business + n Pro, bật/gỡ hold, gỡ thành viên, xóa tổ chức trống — hoàn toàn trên `/dashboard/enterprises`.
 - [ ] Owner xin bật cờ từ sheet Cài đặt. Admin thấy yêu cầu, mở canvas chỉ xem, duyệt hoặc từ chối kèm lý do; owner thấy kết quả và lý do.
-- [ ] Owner nhập mã tổ chức và gửi đề nghị. Business thấy hàng chờ kèm % royalty, chấp nhận; workflow hiện ở tab Tổ chức.
+- [ ] Owner chọn doanh nghiệp đang hoạt động và gửi đề nghị. Business thấy hàng chờ kèm % royalty, chấp nhận; workflow hiện ở tab Tổ chức.
 - [ ] Business tick trigger cho một Pro và lưu; token hiện một lần kèm URL. Pro mở tab Tổ chức chỉ thấy đúng các nút đó và chạy được chat, form, webhook, schedule.
 - [ ] Business trả kỳ từ khối Tổ chức ở Billing, hủy hóa đơn treo, thêm ghế giữa kỳ.
 - [ ] Admin tắt cờ; với workflow `accepted` phải xác nhận cưỡng bức.

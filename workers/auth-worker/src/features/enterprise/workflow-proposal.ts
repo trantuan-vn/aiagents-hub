@@ -1,10 +1,11 @@
 import { getWorkflowRoyaltyPercentFromEnv } from '../member/workflows/billing/get-royalty-percent';
-import { EnterpriseError, isActiveSeat, type EnterpriseRow, type MemberRow } from './domain';
+import { deriveEnterpriseState, EnterpriseError, isActiveSeat, type EnterpriseRow, type MemberRow } from './domain';
 import {
   d1,
   getEnterprise,
   getMembership,
   insertEvent,
+  listEnterprises,
   loadUserRow,
   refreshEnterpriseState,
   requireEnterprise,
@@ -30,6 +31,18 @@ function acceptanceOf(wf: Record<string, unknown>): Acceptance {
 
 function enterpriseIdOf(wf: Record<string, unknown>): string | null {
   return wf.enterpriseId ? String(wf.enterpriseId) : null;
+}
+
+/** Active organizations an owner can propose to. Id and name only; notes and billing stay on the admin API. */
+export async function listProposalEnterprises(
+  env: Env,
+  now = new Date(),
+): Promise<Array<{ id: string; name: string }>> {
+  const orgs = await listEnterprises(d1(env));
+  return orgs
+    .filter((org) => deriveEnterpriseState(org, now).status === 'active')
+    .map((org) => ({ id: org.id, name: org.name }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
 }
 
 // --- Owner (§3.2) --------------------------------------------------------
