@@ -31,6 +31,9 @@ function webhookQuotaResponse(c: any, result: { status: string; executionKey: st
   if (code === 'PLAN_FEATURE') {
     return c.json({ code: 'PLAN_FEATURE', checkoutPath: '/packages', output: result.output }, 403);
   }
+  if (code === 'TRIGGER_NOT_PUBLIC') {
+    return c.json({ code: 'TRIGGER_NOT_PUBLIC', triggerKind: output.triggerKind, output: result.output }, 403);
+  }
   if (code === 'PAYMENT_REQUIRED' || err.includes('PAYMENT_REQUIRED') || err.includes('quota exceeded')) {
     c.header('Retry-After', String(secondsUntilUtcMidnight()));
     return c.json(

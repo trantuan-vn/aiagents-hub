@@ -13,6 +13,7 @@ import { workflowEditorLogsStore } from "../editor/workflow-editor-logs-store";
 import { useWorkflowCanvasState } from "../hooks/use-workflow-canvas-state";
 import { useWorkflowExecuteEntry } from "../hooks/use-workflow-execute-entry";
 import { useWorkflowExecutionProgress, WorkflowExecutionUiProvider } from "../hooks/workflow-execution-ui";
+import type { PublicTriggerKind } from "../../_lib/public-trigger-kinds";
 import { WorkflowCanvasExecutePanel } from "./workflow-canvas-execute-panel";
 import { WorkflowCanvasWebhookListeningPanel } from "./workflow-canvas-webhook-listening-panel";
 import { WorkflowCanvasEmptyState } from "./workflow-canvas-empty-state";
@@ -60,6 +61,7 @@ interface WorkflowCanvasProps {
   serviceEndpoint?: string;
   workflowId?: number;
   ownerId?: string;
+  publicTriggerKinds?: PublicTriggerKind[] | null;
   className?: string;
 }
 
@@ -81,6 +83,7 @@ function CanvasInner({
   serviceEndpoint,
   workflowId,
   ownerId,
+  publicTriggerKinds,
   className,
 }: WorkflowCanvasProps) {
   const themeMode = usePreferencesStore((s) => s.themeMode);
@@ -162,6 +165,7 @@ function CanvasInner({
       readOnly={readOnly}
       workflowId={workflowId}
       ownerId={ownerId}
+      publicTriggerKinds={publicTriggerKinds}
       tidyLayout={tidyLayout}
       onTidyWithFitReady={onTidyWithFitReady}
       createConnectedNode={createConnectedNode}
@@ -190,6 +194,7 @@ function CanvasInnerWithDrawerUi({
   readOnly,
   workflowId,
   ownerId,
+  publicTriggerKinds,
   tidyLayout,
   onTidyWithFitReady,
   createConnectedNode,
@@ -214,6 +219,7 @@ function CanvasInnerWithDrawerUi({
   readOnly?: boolean;
   workflowId?: number;
   ownerId?: string;
+  publicTriggerKinds?: PublicTriggerKind[] | null;
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   createConnectedNode: ReturnType<typeof useWorkflowCanvasState>["createConnectedNode"];
@@ -401,6 +407,7 @@ function CanvasInnerWithDrawerUi({
         tidyLayout={tidyLayout}
         onTidyWithFitReady={onTidyWithFitReady}
         workflowId={workflowId}
+        publicTriggerKinds={publicTriggerKinds}
         running={running}
         webhookListening={webhookListening}
         chatListening={chatListening}
@@ -441,6 +448,7 @@ const CanvasSurface = memo(function CanvasSurface({
   tidyLayout,
   onTidyWithFitReady,
   workflowId,
+  publicTriggerKinds,
   running,
   webhookListening,
   chatListening,
@@ -460,6 +468,7 @@ const CanvasSurface = memo(function CanvasSurface({
   tidyLayout: () => void;
   onTidyWithFitReady: (fn: (() => void) | undefined) => void;
   workflowId?: number;
+  publicTriggerKinds?: PublicTriggerKind[] | null;
   running?: boolean;
   webhookListening?: boolean;
   chatListening?: boolean;
@@ -568,6 +577,7 @@ const CanvasSurface = memo(function CanvasSurface({
           <WorkflowCanvasExecutePanel
             nodes={nodes}
             edges={edges}
+            publicTriggerKinds={publicTriggerKinds}
             running={running}
             webhookListening={webhookListening && !chatListening}
             chatListening={chatListening}

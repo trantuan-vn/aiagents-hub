@@ -30,6 +30,7 @@ import {
 } from '../triggers/triggers.js';
 import { actorForPublicTrigger } from '../execution/workflow-runner.js';
 import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
+import { isPublicTriggerAllowed } from '../domain/public-trigger-kinds.js';
 
 type FormMode = 'test' | 'production';
 
@@ -209,6 +210,13 @@ async function handleFormRequest(
     const loginUrl = buildHubLoginRedirectUrl(frontend, actionUrl);
     if (c.req.method === 'GET') return c.redirect(loginUrl, 302);
     return c.json({ error: 'Authentication required', auth: 'hub_users', loginUrl }, 401);
+  }
+
+  if (!gated.resolved.isOwnedByUser && !isPublicTriggerAllowed(gated.resolved.workflow.publicTriggerKinds, 'form')) {
+    if (c.req.method === 'GET') {
+      return c.html(renderFormInactiveHtml('This form is not available to community users.'), 403);
+    }
+    return c.json({ error: 'Form is not available to community users', code: 'TRIGGER_NOT_PUBLIC', triggerKind: 'form' }, 403);
   }
 
   if (c.req.method === 'GET') {

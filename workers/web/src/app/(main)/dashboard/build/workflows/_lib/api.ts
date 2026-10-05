@@ -31,6 +31,8 @@ export interface AgentWorkflow {
   isShared?: boolean;
   minPlanId?: "free" | "starter" | "pro" | "business";
   graceWhenExhausted?: boolean;
+  /** JSON array of trigger kinds community users may start. Null allows all. */
+  publicTriggerKinds?: string | null;
   starCount?: number;
   starLabel?: string;
   communityStarAvg?: number;

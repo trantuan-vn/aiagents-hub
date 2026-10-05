@@ -11,6 +11,12 @@ import {
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
+import {
+  isPublicTriggerAllowed,
+  normalizePublicTriggerKinds,
+  resolveRunTriggerKinds,
+  type PublicTriggerKind,
+} from '../domain/public-trigger-kinds.js';
 import { cancelWorkflowExecution, continueFromCheckpointWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
 import { executionPersistFlags } from '../engine/persist-state.js';
 import { loadUserAndSyncPlan } from '../billing/billing.js';
@@ -87,6 +93,14 @@ function hasAdminOnlyWorkflowField(raw: unknown): boolean {
 }
 
 const ENTERPRISE_FLAG_FORBIDDEN = { error: 'ENTERPRISE_FLAG_FORBIDDEN', code: 'ENTERPRISE_FLAG_FORBIDDEN' } as const;
+
+function triggerNotPublicBody(triggerKind: PublicTriggerKind) {
+  return {
+    error: `Trigger ${triggerKind} is not available to community users`,
+    code: 'TRIGGER_NOT_PUBLIC',
+    triggerKind,
+  };
+}
 
 const ExecuteBodySchema = z.object({
   input: z.string().optional(),
@@ -234,6 +248,24 @@ export function createWorkflowRoutes(bindingName: string) {
     );
 
     const formTriggerNode = findFormDatabaseTriggerNode(resolved.definition);
+    if (!resolved.isOwnedByUser) {
+      const entryNodeId = body.entryNodeId ?? formTriggerNode?.id;
+      const blocked = resolveRunTriggerKinds({
+        definition: resolved.definition,
+        entryNodeIds: entryNodeId ? [entryNodeId] : undefined,
+      }).find((kind) => !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, kind));
+      if (blocked) {
+        return {
+          status: 'failed' as const,
+          executionKey: crypto.randomUUID(),
+          workflowId,
+          workflowOwnerId: resolved.ownerId,
+          output: triggerNotPublicBody(blocked),
+          steps: [],
+          totalCostVnd: 0,
+        };
+      }
+    }
     if (
       formTriggerNode &&
       (!body.entryNodeId || body.entryNodeId === formTriggerNode.id)
@@ -302,6 +334,9 @@ export function createWorkflowRoutes(bindingName: string) {
       workflowId,
       ownerIdParam,
     );
+    if (!resolved.isOwnedByUser && !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, 'chat')) {
+      return c.json(triggerNotPublicBody('chat'), 403);
+    }
     return createWorkflowChatStreamResponse(
       c,
       bindingName,
@@ -351,6 +386,9 @@ export function createWorkflowRoutes(bindingName: string) {
       const raw = await c.req.json();
       if (hasAdminOnlyWorkflowField(raw)) return c.json(ENTERPRISE_FLAG_FORBIDDEN, 403);
       const body = CreateWorkflowSchema.parse(raw);
+      if (body.publicTriggerKinds !== undefined) {
+        body.publicTriggerKinds = normalizePublicTriggerKinds(body.publicTriggerKinds);
+      }
       const userDO = getUserDO(c, user.identifier);
       const created = await executeUtils.executeDynamicAction(
         userDO,
@@ -905,6 +943,9 @@ export function createWorkflowRoutes(bindingName: string) {
       if (body.graceWhenExhausted === true && !quota.entitlement.canGraceWhenExhausted) {
         body.graceWhenExhausted = false;
       }
+      if (body.publicTriggerKinds !== undefined) {
+        body.publicTriggerKinds = normalizePublicTriggerKinds(body.publicTriggerKinds);
+      }
       const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
         where: { field: 'id', operator: '=', value: id },
       }, 'agent_workflows');
@@ -1147,7 +1188,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted
+      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);

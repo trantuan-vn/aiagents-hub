@@ -49,6 +49,20 @@ describe('summarizeWorkflowListTriggers', () => {
     });
   });
 
+  it('hides trigger kinds the owner kept private', () => {
+    const definition = JSON.stringify({
+      nodes: [
+        { id: 'chat-1', type: 'trigger', data: { triggerKind: 'chat' } },
+        { id: 'form-1', type: 'trigger', data: { triggerKind: 'form' } },
+        { id: 'wh-1', type: 'core', data: { coreKind: 'webhook' } },
+      ],
+    });
+    const summary = summarizeWorkflowListTriggers(definition, '["form"]');
+    expect(summary.chat).toBeNull();
+    expect(summary.forms).toHaveLength(1);
+    expect(summary.webhooks).toEqual([]);
+  });
+
   it('marks webhook-mode chat as not hosted', () => {
     const definition = JSON.stringify({
       nodes: [

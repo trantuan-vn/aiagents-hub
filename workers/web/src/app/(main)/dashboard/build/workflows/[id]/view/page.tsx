@@ -13,6 +13,7 @@ import { StarDisplay } from "../../_components/list/star-display";
 import { WorkflowEditor } from "../../_components/editor/workflow-editor";
 import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
 import { getSharedWorkflow, type AgentWorkflow } from "../../_lib/api";
+import { parsePublicTriggerKinds, type PublicTriggerKind } from "../../_lib/public-trigger-kinds";
 interface ViewWorkflowState {
   name: string;
   description: string;
@@ -21,11 +22,13 @@ interface ViewWorkflowState {
   communityStarAvg: number;
   communityStarCount: number;
   usageCount: number;
+  publicTriggerKinds: PublicTriggerKind[] | null;
 }
 
 function buildViewStateFromWorkflow(workflow: AgentWorkflow): ViewWorkflowState {
   const def = workflow.definition || '{"nodes":[],"edges":[]}';
   return {
+    publicTriggerKinds: parsePublicTriggerKinds(workflow.publicTriggerKinds),
     name: workflow.name,
     description: workflow.description ?? "",
     definition: def,
@@ -44,6 +47,7 @@ const EMPTY_VIEW_STATE: ViewWorkflowState = {
   communityStarAvg: 0,
   communityStarCount: 0,
   usageCount: 0,
+  publicTriggerKinds: null,
 };
 
 export default function ViewSharedWorkflowPage() {
@@ -115,6 +119,7 @@ export default function ViewSharedWorkflowPage() {
           workflowId={id}
           ownerId={ownerId}
           definitionJson={view.definition}
+          publicTriggerKinds={view.publicTriggerKinds}
           readOnly
         />
       </WorkflowEditorShell>

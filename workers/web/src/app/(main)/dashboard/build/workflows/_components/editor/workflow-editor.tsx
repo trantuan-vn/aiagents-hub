@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 
+import type { PublicTriggerKind } from "../../_lib/public-trigger-kinds";
 import { WorkflowCanvas } from "../canvas/workflow-canvas";
 import { normalizeWorkflowEdge } from "../edges/workflow-edge-utils";
 import { normalizeWorkflowNodes, type WorkflowDefinition } from "../layout/workflow-definition";
@@ -14,6 +15,8 @@ interface WorkflowEditorProps {
   serviceEndpoint?: string;
   workflowId?: number;
   ownerId?: string;
+  /** Community view: entry points the owner opened to other users. Null shows all. */
+  publicTriggerKinds?: PublicTriggerKind[] | null;
   className?: string;
 }
 
@@ -36,6 +39,7 @@ export function WorkflowEditor({
   serviceEndpoint = "",
   workflowId,
   ownerId,
+  publicTriggerKinds,
   className,
 }: WorkflowEditorProps) {
   const definition = useMemo(() => parseDef(definitionJson), [definitionJson]);
@@ -57,6 +61,7 @@ export function WorkflowEditor({
       serviceEndpoint={serviceEndpoint}
       workflowId={workflowId}
       ownerId={ownerId}
+      publicTriggerKinds={publicTriggerKinds}
     />
   );
 }

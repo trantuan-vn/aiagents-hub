@@ -33,6 +33,7 @@ import {
   progressDoIdForActor,
 } from '../execution/workflow-runner.js';
 import { isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
+import { isPublicTriggerAllowed } from '../domain/public-trigger-kinds.js';
 
 type ChatMode = 'test' | 'production';
 
@@ -318,6 +319,13 @@ async function handleChatRequest(
       frontend,
       headers,
     });
+  }
+
+  if (!gated.resolved.isOwnedByUser && !isPublicTriggerAllowed(gated.resolved.workflow.publicTriggerKinds, 'chat')) {
+    if (c.req.method === 'GET' && !json) {
+      return c.html(renderChatInactiveHtml('This chat is not available to community users.'), 403);
+    }
+    return c.json({ error: 'Chat is not available to community users', code: 'TRIGGER_NOT_PUBLIC', triggerKind: 'chat' }, 403, headers);
   }
 
   const hosted = String(data?.chatMode ?? 'hostedChat') !== 'webhook';

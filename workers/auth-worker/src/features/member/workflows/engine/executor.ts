@@ -54,6 +54,7 @@ import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cance
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
+import { isPublicTriggerAllowed, resolveRunTriggerKinds } from '../domain/public-trigger-kinds.js';
 import {
   executionHistoryLimitsFromEntitlement,
   pruneWorkflowExecutionHistory,
@@ -955,6 +956,32 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
           totalCostVnd: 0,
         },
       };
+    }
+    if (!resolved.isOwnedByUser) {
+      const blockedKind = resolveRunTriggerKinds({
+        definition,
+        entryNodeIds: params.entryNodeIds,
+        triggerKind: params.triggerKind,
+        isWebhook: Boolean(params.webhookItem),
+      }).find((kind) => !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, kind));
+      if (blockedKind) {
+        return {
+          ok: false,
+          result: {
+            status: 'failed',
+            executionKey,
+            workflowId: resolved.workflowId,
+            workflowOwnerId: resolved.ownerId,
+            output: {
+              error: `Trigger ${blockedKind} is not available to community users`,
+              code: 'TRIGGER_NOT_PUBLIC',
+              triggerKind: blockedKind,
+            },
+            steps: [],
+            totalCostVnd: 0,
+          },
+        };
+      }
     }
     const triggerKind = params.triggerKind ?? (params.webhookItem ? 'webhook' : 'manual');
     if (resolved.isOwnedByUser) {

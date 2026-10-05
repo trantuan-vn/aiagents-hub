@@ -55,6 +55,8 @@ export const AgentWorkflowSchema = z.object({
   isShared: z.boolean().default(false),
   minPlanId: z.enum(['free', 'starter', 'pro', 'business']).default('free'),
   graceWhenExhausted: z.boolean().default(false),
+  /** JSON array of trigger kinds community users may start, e.g. `["chat","form"]`. Null allows all. */
+  publicTriggerKinds: z.string().max(200).nullish(),
   /** Owner labels workflow type (1–5 stars). */
   starCount: z.number().int().min(0).max(5).default(0),
   starLabel: z.string().max(100).optional(),

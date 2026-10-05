@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+import { PUBLIC_TRIGGER_KINDS, type PublicTriggerKind } from "../../_lib/public-trigger-kinds";
 import { WORKFLOW_TRIGGER_CATALOG, type WorkflowTriggerKindId } from "../catalogs/workflow-trigger-catalog";
 import { workflowEditorChatStore } from "../editor/workflow-editor-chat-store";
 import { useWorkflowExecutionUi } from "../hooks/workflow-execution-ui";
@@ -42,10 +43,16 @@ const TRIGGER_ICON_COLORS: Partial<Record<WorkflowTriggerKindId | "manual", stri
 interface WorkflowCanvasExecutePanelProps {
   nodes: Node[];
   edges: Edge[];
+  /** Community view: only these entry kinds are offered. Null offers all. */
+  publicTriggerKinds?: PublicTriggerKind[] | null;
   running?: boolean;
   webhookListening?: boolean;
   chatListening?: boolean;
   onExecuteTriggerNode: (nodeId: string) => void;
+}
+
+function asPublicTriggerKind(kind: WorkflowTriggerKindId | "manual"): PublicTriggerKind {
+  return (PUBLIC_TRIGGER_KINDS as readonly string[]).includes(kind) ? (kind as PublicTriggerKind) : "manual";
 }
 
 function nodeLabelFromNodes(nodes: Node[], nodeId: string | null | undefined): string {
@@ -74,6 +81,7 @@ function formatEntryLabel(
 export function WorkflowCanvasExecutePanel({
   nodes,
   edges,
+  publicTriggerKinds,
   running = false,
   webhookListening = false,
   chatListening = false,
@@ -86,7 +94,11 @@ export function WorkflowCanvasExecutePanel({
     workflowEditorChatStore.getState,
   );
   const execution = useWorkflowExecutionUi();
-  const entryPoints = useMemo(() => getWorkflowTriggerEntryPoints(nodes, edges), [nodes, edges]);
+  const entryPoints = useMemo(() => {
+    const points = getWorkflowTriggerEntryPoints(nodes, edges);
+    if (!publicTriggerKinds) return points;
+    return points.filter((point) => publicTriggerKinds.includes(asPublicTriggerKind(point.kind)));
+  }, [nodes, edges, publicTriggerKinds]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(
     () => pickDefaultEntryPoint(entryPoints)?.nodeId ?? null,
   );
@@ -100,10 +112,7 @@ export function WorkflowCanvasExecutePanel({
 
   const selected = entryPoints.find((point) => point.nodeId === selectedNodeId) ?? pickDefaultEntryPoint(entryPoints);
 
-  const triggerCatalogById = useMemo(
-    () => new Map(WORKFLOW_TRIGGER_CATALOG.map((item) => [item.id, item])),
-    [],
-  );
+  const triggerCatalogById = useMemo(() => new Map(WORKFLOW_TRIGGER_CATALOG.map((item) => [item.id, item])), []);
 
   if (!selected || entryPoints.length === 0) return null;
 
@@ -115,8 +124,7 @@ export function WorkflowCanvasExecutePanel({
     return <Icon className={cn("size-4 shrink-0", TRIGGER_ICON_COLORS[kind] ?? "text-muted-foreground")} aria-hidden />;
   };
 
-  const triggerLabel =
-    nodeLabelFromNodes(nodes, execution?.entryNodeId) || formatEntryLabel(selected, entryPoints, t);
+  const triggerLabel = nodeLabelFromNodes(nodes, execution?.entryNodeId) || formatEntryLabel(selected, entryPoints, t);
   const currentLabel = nodeLabelFromNodes(nodes, execution?.currentNodeId);
   const fromLabel =
     running && currentLabel && execution?.currentNodeId !== execution?.entryNodeId
@@ -127,11 +135,12 @@ export function WorkflowCanvasExecutePanel({
           ? t("webhook_execute_listening")
           : formatEntryLabel(selected, entryPoints, t);
 
-  const mainTitle = webhookListening && !running
-    ? t("webhook_stop_listening_short")
-    : running
-      ? t("execute_running")
-      : t("execute_workflow");
+  const mainTitle =
+    webhookListening && !running
+      ? t("webhook_stop_listening_short")
+      : running
+        ? t("execute_running")
+        : t("execute_workflow");
 
   const mainButton = (
     <button
@@ -141,8 +150,8 @@ export function WorkflowCanvasExecutePanel({
       onPointerDown={(event) => event.stopPropagation()}
       className={cn(
         webhookListening ? "bg-[#eb5262] hover:bg-[#d94558]" : "bg-[#ff6d00] hover:bg-[#f57c00]",
-        "disabled:opacity-80 flex h-10 items-center gap-2.5 px-4 text-left text-white transition-colors",
-        hasMultipleTriggers ? "rounded-l-full pl-4 pr-3" : "rounded-full px-5",
+        "flex h-10 items-center gap-2.5 px-4 text-left text-white transition-colors disabled:opacity-80",
+        hasMultipleTriggers ? "rounded-l-full pr-3 pl-4" : "rounded-full px-5",
       )}
     >
       {running ? (
@@ -160,63 +169,63 @@ export function WorkflowCanvasExecutePanel({
   return (
     <Panel position="bottom-center" className="nodrag nopan !m-4 !p-0">
       <div className="nodrag nopan flex items-center gap-2">
-      <div
-        className="inline-flex overflow-hidden rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
-        role="group"
-        aria-label={t("execute_workflow")}
-      >
-        {hasMultipleTriggers ? (
-          <>
-            {mainButton}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  disabled={running}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  className="bg-[#e65100] hover:bg-[#d84315] disabled:opacity-80 border-[#bf360c]/40 flex h-10 w-9 shrink-0 items-center justify-center border-l text-white transition-colors"
-                  aria-label={t("execute_workflow_choose_trigger")}
-                >
-                  <ChevronDown className="size-3.5" aria-hidden />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="center" sideOffset={10} className="min-w-[14rem] p-1">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-[11px] font-medium tracking-wide uppercase">
-                    {t("execute_trigger_group")}
-                  </DropdownMenuLabel>
-                  {entryPoints.map((point) => {
-                    const isSelected = point.nodeId === selected.nodeId;
-                    return (
-                      <DropdownMenuItem
-                        key={point.nodeId}
-                        className="gap-2.5 rounded-md py-2 pr-2 pl-2.5"
-                        onSelect={() => setSelectedNodeId(point.nodeId)}
-                      >
-                        {renderEntryIcon(point.kind)}
-                        <span className="flex-1 text-sm">{formatEntryLabel(point, entryPoints, t)}</span>
-                        {isSelected ? <Check className="text-muted-foreground size-4 shrink-0" aria-hidden /> : null}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        ) : (
-          mainButton
-        )}
-      </div>
-      {chatListening && chat.open ? (
-        <button
-          type="button"
-          onClick={() => workflowEditorChatStore.hide()}
-          onPointerDown={(event) => event.stopPropagation()}
-          className="bg-[#ff6d00] hover:bg-[#f57c00] flex h-10 items-center rounded-full px-4 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+        <div
+          className="inline-flex overflow-hidden rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.22)]"
+          role="group"
+          aria-label={t("execute_workflow")}
         >
-          {t("chat_hide")}
-        </button>
-      ) : null}
+          {hasMultipleTriggers ? (
+            <>
+              {mainButton}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    disabled={running}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className="flex h-10 w-9 shrink-0 items-center justify-center border-l border-[#bf360c]/40 bg-[#e65100] text-white transition-colors hover:bg-[#d84315] disabled:opacity-80"
+                    aria-label={t("execute_workflow_choose_trigger")}
+                  >
+                    <ChevronDown className="size-3.5" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent side="top" align="center" sideOffset={10} className="min-w-[14rem] p-1">
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="text-muted-foreground px-2 py-1.5 text-[11px] font-medium tracking-wide uppercase">
+                      {t("execute_trigger_group")}
+                    </DropdownMenuLabel>
+                    {entryPoints.map((point) => {
+                      const isSelected = point.nodeId === selected.nodeId;
+                      return (
+                        <DropdownMenuItem
+                          key={point.nodeId}
+                          className="gap-2.5 rounded-md py-2 pr-2 pl-2.5"
+                          onSelect={() => setSelectedNodeId(point.nodeId)}
+                        >
+                          {renderEntryIcon(point.kind)}
+                          <span className="flex-1 text-sm">{formatEntryLabel(point, entryPoints, t)}</span>
+                          {isSelected ? <Check className="text-muted-foreground size-4 shrink-0" aria-hidden /> : null}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            mainButton
+          )}
+        </div>
+        {chatListening && chat.open ? (
+          <button
+            type="button"
+            onClick={() => workflowEditorChatStore.hide()}
+            onPointerDown={(event) => event.stopPropagation()}
+            className="flex h-10 items-center rounded-full bg-[#ff6d00] px-4 text-[13px] font-semibold text-white shadow-[0_4px_14px_rgba(0,0,0,0.22)] hover:bg-[#f57c00]"
+          >
+            {t("chat_hide")}
+          </button>
+        ) : null}
       </div>
     </Panel>
   );

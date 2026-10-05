@@ -1,3 +1,5 @@
+import { isPublicTriggerAllowed } from '../domain/public-trigger-kinds.js';
+
 type WorkflowListNode = {
   id?: string;
   type?: string;
@@ -59,8 +61,20 @@ function isWebhookTriggerNode(node: WorkflowListNode): boolean {
   return data.coreKind === 'webhook' || data.triggerKind === 'webhook' || node.type === 'webhook';
 }
 
-/** Compact trigger metadata for community list cards — no full graph. */
-export function summarizeWorkflowListTriggers(definition: unknown): SharedWorkflowTriggerSummary {
+/** Compact trigger metadata for community list cards — no full graph. Hides kinds the owner kept private. */
+export function summarizeWorkflowListTriggers(
+  definition: unknown,
+  publicTriggerKinds?: unknown,
+): SharedWorkflowTriggerSummary {
+  const summary = summarizeAllTriggers(definition);
+  return {
+    chat: isPublicTriggerAllowed(publicTriggerKinds, 'chat') ? summary.chat : null,
+    forms: isPublicTriggerAllowed(publicTriggerKinds, 'form') ? summary.forms : [],
+    webhooks: isPublicTriggerAllowed(publicTriggerKinds, 'webhook') ? summary.webhooks : [],
+  };
+}
+
+function summarizeAllTriggers(definition: unknown): SharedWorkflowTriggerSummary {
   const nodes = parseNodes(definition).filter((node) => typeof node.id === 'string' && node.id);
 
   const chats = nodes.filter(isChatNode).map((node) => {
