@@ -29,6 +29,14 @@ export function isReasoningModel(modelId: string): boolean {
   );
 }
 
+/**
+ * GLM-5.3 thinking stays on. Workers AI defaults `reasoning_effort` to `max`,
+ * and the aliases `none` / `minimal` also map to `max`.
+ */
+export function usesForcedReasoning(modelId: string): boolean {
+  return modelId.toLowerCase().includes('glm-5.3');
+}
+
 export function resolveMaxTokens(
   agentData: Record<string, unknown>,
   serviceOptions?: Record<string, unknown>,

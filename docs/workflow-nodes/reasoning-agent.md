@@ -35,7 +35,9 @@ Mẫu "execution-guided repair": vòng lặp là code deterministic, model chỉ
 3. **Generate** — một lệnh LLM: system = prompt người dùng + quy tắc SQL (`SQL_RULES`), user = câu hỏi + schema truy xuất. Model trả **đúng một** `SELECT`/`WITH` trong fence ```` ```sql ````, hoặc `ASK: <câu hỏi>` khi thiếu dữ liệu không suy được.
 4. **Execute** — host chạy Check SQL (Oracle `EXPLAIN PLAN`, [`check-sql.md`](./check-sql.md)).
 5. **Repair** — nếu lỗi: lượt sau gửi lại SQL cũ + lỗi Oracle nguyên văn. Với `ORA-00904` / `ORA-00942` (identifier/table không tồn tại) host gọi Get RAG với query lấy từ lỗi (`oracleRetrieveQuery`), **gộp** vào schema đã có rồi mới gọi model.
-6. **Dừng** — `ok: true` → `status: "ok"`, `validated: true`. Hết `maxReflectRetries` lượt sửa → `ask`: một câu hỏi ngắn bằng ngôn ngữ user (LLM purpose `ask`); `best_effort`: trả SQL cuối với `validated: false`, `reason` = lỗi cuối.
+6. **Dừng** — `ok: true` → `status: "ok"`, `validated: true`. Hết `maxReflectRetries` lượt sửa → `ask`: một câu hỏi ngắn bằng ngôn ngữ user (LLM purpose `ask`); `best_effort`: trả SQL cuối với `validated: false`, `reason` = lỗi cuối. Hết **45 giây** kể từ đầu pipeline (rewrite + các lượt generate) thì không gọi thêm lượt SQL; `ask` trả câu hỏi mặc định, `best_effort` vẫn trả SQL nháp nếu đã có.
+
+`@cf/zai-org/glm-5.3-flash` không tắt được thinking. Workers AI mặc định `reasoning_effort: max` (`none` cũng map thành `max`), nên khi thiếu schema model viết lòng vòng vào `reasoning_content`, `content` trống, `finish_reason` = `length`. Host gửi `reasoning_effort: low` và `max_completion_tokens`. Câu trả lời chỉ lấy từ `content`. Nếu `content` trống, gọi lại **một lần** cùng hạn token với lệnh quyết định (`sql` hoặc `ASK:`), không nâng `max_tokens` — nâng hạn chỉ làm trace suy luận dài thêm. Model khác vẫn nâng hạn một lần khi bị cắt giữa câu SQL.
 
 Lỗi cấu hình validator (`Missing Oracle credentials…`) ném lỗi ngay, không lặp, không hỏi lại.
 

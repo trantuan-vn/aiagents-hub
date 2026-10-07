@@ -97,6 +97,7 @@ import {
   resolveAgentUserText,
   resolveEmbedModel,
   resolveMaxTokens,
+  usesForcedReasoning,
 } from './shared.js';
 
 /**
@@ -234,12 +235,28 @@ function createTrace(enabled: boolean): Trace {
 
 const OUTPUT_TOKEN_FLOOR = 8192;
 const OUTPUT_TOKEN_CAP = 32768;
+/** Host stops further SQL attempts after this. An in-flight Workers AI call cannot be cancelled. */
+const SQL_REASONING_BUDGET_MS = 45_000;
+const SQL_DECISION_NUDGE =
+  'Decide now. If the context already answers the question, reply with exactly one ```sql fenced query and nothing else. If the instructions say to ask when a required fact is missing, reply with exactly one line ASK: <question>. Do not continue analyzing.';
 
 /** Next output budget after finish_reason length. Stays put once the cap is reached. */
 export function raisedOutputTokenLimit(current: number): number {
   if (!Number.isFinite(current) || current <= 0) return OUTPUT_TOKEN_FLOOR;
   if (current >= OUTPUT_TOKEN_CAP) return current;
   return Math.min(OUTPUT_TOKEN_CAP, Math.max(current * 2, OUTPUT_TOKEN_FLOOR));
+}
+
+/** Answer text only. GLM-5.3 puts the loop in `reasoning_content` and leaves `content` empty. */
+function answerContent(response: unknown): string {
+  if (!response || typeof response !== 'object') return '';
+  const choices = (response as { choices?: unknown }).choices;
+  const choice = Array.isArray(choices) ? choices[0] : null;
+  if (!choice || typeof choice !== 'object') return '';
+  const message = (choice as { message?: unknown }).message;
+  if (!message || typeof message !== 'object') return '';
+  const content = (message as { content?: unknown }).content;
+  return typeof content === 'string' ? content : '';
 }
 
 function createDefaultLlm(args: {
@@ -251,9 +268,10 @@ function createDefaultLlm(args: {
 }): ReasoningLlmCall {
   const { ctx, modelId, maxTokens, params, onBill } = args;
   const temperature = params.temperature as number | undefined;
+  const forcedReasoning = usesForcedReasoning(modelId);
   return async (call) => {
     const limit = call.maxTokens ?? maxTokens;
-    const complete = async (outputLimit: number) => {
+    const complete = async (outputLimit: number, userText = call.user) => {
       if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
         const workersAI = createWorkersAI({
           binding: ctx.c.env.AI,
@@ -264,7 +282,7 @@ function createDefaultLlm(args: {
           generateText({
             model: workersAI(modelId as never),
             system: call.system,
-            messages: [{ role: 'user', content: call.user }],
+            messages: [{ role: 'user', content: userText }],
             maxOutputTokens: outputLimit,
             temperature: call.temperature ?? temperature,
             topP: params.top_p as number | undefined,
@@ -319,17 +337,21 @@ function createDefaultLlm(args: {
 
       const messages = [
         ...(call.system ? [{ role: 'system', content: call.system }] : []),
-        { role: 'user', content: call.user },
+        { role: 'user', content: userText },
       ];
       const aiResponse = await runTextModel(
         ctx.c.env,
         modelId,
         messages,
         outputLimit,
-        { ...params, ...(call.temperature != null ? { temperature: call.temperature } : {}) },
+        {
+          ...params,
+          ...(call.temperature != null ? { temperature: call.temperature } : {}),
+          ...(forcedReasoning ? { reasoning_effort: 'low', max_completion_tokens: outputLimit } : {}),
+        },
         stampFromNode(ctx, 'text'),
       );
-      const text = asText(extractTextFromAiResponse(aiResponse));
+      const text = forcedReasoning ? answerContent(aiResponse) : asText(extractTextFromAiResponse(aiResponse));
       await onBill(aiResponse, text);
       return {
         text,
@@ -340,7 +362,15 @@ function createDefaultLlm(args: {
     };
 
     const first = await complete(limit);
-    if (!first.cutOff) return first;
+    // Empty content means the token budget was spent on reasoning_content. A larger
+    // cap only lengthens that trace. Ask once for the SQL or ASK line at the same limit.
+    if (forcedReasoning && !first.text.trim() && (call.purpose === 'sql' || call.purpose === 'rewrite')) {
+      console.warn(
+        `[reasoning] ${call.purpose} on ${modelId} returned no answer; requesting a decision without raising max_tokens`,
+      );
+      return complete(limit, `${call.user}\n\n${SQL_DECISION_NUDGE}`);
+    }
+    if (!first.cutOff || (forcedReasoning && !first.text.trim())) return first;
     const raised = raisedOutputTokenLimit(limit);
     if (raised <= limit) return first;
     console.warn(`[reasoning] ${call.purpose} hit max_tokens ${limit}; retrying at ${raised}`);
@@ -435,6 +465,8 @@ type Shared = {
 async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutput> {
   const { ctx, data, llm, options, trace } = s;
   const bare = bareRetrievalQuestion(s.question) || s.question;
+  const startedAt = Date.now();
+  const reasoningBudgetExceeded = () => Date.now() - startedAt >= SQL_REASONING_BUDGET_MS;
 
   // 1. Retrieval query: optional rewrite that adds domain vocabulary from the system prompt.
   let retrievalQuery = bare;
@@ -481,8 +513,15 @@ async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutpu
   // 3. Generate → execute → repair.
   let lastSql = '';
   let lastError = '';
+  let stoppedForTime = false;
+  let usedAttempts = 0;
   const attempts = options.maxRepairs + 1;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (reasoningBudgetExceeded()) {
+      stoppedForTime = true;
+      break;
+    }
+    usedAttempts = attempt;
     const scoped = { ...s.nodeInput, ragText, snippets, query: bare };
     let body = resolveAgentUserText(data, scoped, bare);
     if (s.pdfSuffix && !body.includes(s.pdfSuffix)) body = `${body}\n\n${s.pdfSuffix}`;
@@ -537,6 +576,13 @@ async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutpu
   }
 
   // 4. Out of repairs. best_effort still asks when there is no draft to hand back.
+  if (stoppedForTime && (options.clarificationMode === 'ask' || !lastSql)) {
+    trace.push('sql.end', { reason: 'time_budget', attempts: usedAttempts });
+    return s.emit(
+      clarification(defaultClarifyingQuestion(bare), lastError || 'Reasoning time budget reached before a SQL decision.'),
+      snippets,
+    );
+  }
   if (options.clarificationMode === 'ask' || !lastSql) {
     let question = '';
     try {

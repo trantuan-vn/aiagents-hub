@@ -57,6 +57,7 @@ export function isValidatorConfigError(error: string): boolean {
 const SQL_RULES = `Text-to-SQL rules:
 - Write exactly one read-only Oracle query (SELECT or WITH) that answers the question.
 - Use only tables and columns that appear in the retrieved context. Never invent identifiers.
+- Decide in one pass. Stop once the retrieved schema is enough to answer, or clearly is not.
 - Reply with the query inside one \`\`\`sql fenced block and nothing else. No explanation.`;
 
 const ASK_RULE = `- If the context has no table that can answer the question, or a required detail (period, entity, metric) is missing and cannot be inferred, do not write SQL. Reply with exactly one line instead: ASK: <one short question in the user's language>`;

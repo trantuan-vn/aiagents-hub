@@ -43,7 +43,7 @@ vi.mock('../../billing/billing.js', () => ({
 
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext } from '../../types.js';
-import { extractTextFromAiResponse, runTextModel } from '../../billing/billing.js';
+import { extractTextFromAiResponse, getModelForService, runTextModel } from '../../billing/billing.js';
 import type { CheckSqlResult } from '../tool/check-sql/execute.js';
 import {
   executeReasoningAgent,
@@ -411,6 +411,32 @@ describe('max token limit', () => {
     expect(raisedOutputTokenLimit(32768)).toBe(32768);
   });
 
+  it('stops further SQL attempts once the reasoning budget is spent', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    const purposes: string[] = [];
+    try {
+      const out = await executeReasoningAgent(
+        sqlCtx(
+          { prompt: 'x', maxReflectRetries: 5, clarificationMode: 'ask' },
+          { query: 'x', ragText: '# T\n\n## schema\nT' },
+        ),
+        {
+          llm: async () => {
+            purposes.push('sql');
+            vi.setSystemTime(Date.now() + 50_000);
+            return { text: 'still comparing columns', observations: [] };
+          },
+        },
+      );
+      expect(purposes).toEqual(['sql']);
+      expect(out.status).toBe('needs_clarification');
+      expect(out.text).toContain('clarify');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('retries the SQL call at the higher limit when the model stops for length', async () => {
     const run = vi.mocked(runTextModel);
     const extract = vi.mocked(extractTextFromAiResponse);
@@ -438,6 +464,41 @@ describe('max token limit', () => {
     } finally {
       run.mockReset();
       extract.mockReset();
+    }
+  });
+
+  it('does not raise the token cap when GLM-5.3 spends it on reasoning_content', async () => {
+    const run = vi.mocked(runTextModel);
+    const model = vi.mocked(getModelForService);
+    run.mockReset();
+    model.mockReturnValue('@cf/zai-org/glm-5.3-flash');
+    const essay = 'The schema might be missing a period. '.repeat(80);
+    run
+      .mockResolvedValueOnce({
+        choices: [{ finish_reason: 'length', message: { content: '', reasoning_content: essay } }],
+      })
+      .mockResolvedValueOnce({
+        choices: [{ finish_reason: 'stop', message: { content: '```sql\nSELECT 1 FROM dual\n```' } }],
+      });
+    try {
+      const out = await executeReasoningAgent(
+        sqlCtx(
+          { prompt: 'doanh thu', serviceEndpoint: 'https://llm.example/v1', maxTokens: 1024 },
+          { query: 'doanh thu', ragText: '# T\n\n## schema\nT' },
+        ),
+        { checkSql: async (sql) => ok(sql) },
+      );
+      expect(run).toHaveBeenCalledTimes(2);
+      expect(run.mock.calls[0]?.[3]).toBe(1024);
+      expect(run.mock.calls[1]?.[3]).toBe(1024);
+      expect(run.mock.calls[0]?.[4]).toMatchObject({ reasoning_effort: 'low', max_completion_tokens: 1024 });
+      const secondUser = (run.mock.calls[1]?.[2] as Array<{ content?: string }> | undefined)?.[1]?.content ?? '';
+      expect(secondUser).toContain('Decide now');
+      expect(out.sql).toBe('SELECT 1 FROM dual;');
+      expect(out.validated).toBe(true);
+    } finally {
+      model.mockReturnValue('@cf/meta/llama-3.1-8b-instruct');
+      run.mockReset();
     }
   });
 });
