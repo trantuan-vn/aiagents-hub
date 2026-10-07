@@ -64,30 +64,11 @@ const AGENT_EXTRA_OPTIONS = [
     kinds: ["reasoning_agent"],
   },
   {
-    id: "noImprovementLimit",
-    labelKey: "agent_opt_no_improvement_limit",
-    type: "number" as const,
-    defaultValue: REASONING_AGENT_DEFAULTS.noImprovementLimit,
-    kinds: ["reasoning_agent"],
-  },
-  {
     id: "maxActSteps",
     labelKey: "agent_opt_max_act_steps",
     type: "number" as const,
     defaultValue: REASONING_AGENT_DEFAULTS.maxActSteps,
     kinds: ["reasoning_agent"],
-  },
-  {
-    id: "enablePlanner",
-    labelKey: "agent_opt_enable_planner",
-    type: "select" as const,
-    defaultValue: "auto",
-    kinds: ["reasoning_agent"],
-    options: [
-      { value: "auto", labelKey: "agent_opt_planner_auto" },
-      { value: "on", labelKey: "agent_opt_planner_on" },
-      { value: "off", labelKey: "agent_opt_planner_off" },
-    ],
   },
   {
     id: "traceCodeMode",

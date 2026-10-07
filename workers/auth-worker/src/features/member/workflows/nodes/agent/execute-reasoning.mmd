@@ -1,83 +1,67 @@
 flowchart TD
   start([executeReasoningAgent]) --> prep
 
-  subgraph inputPhase ["1. Input"]
-    prep["resolveAgentResources<br/>linkedValidateToolNames to evaluationMode<br/>resolveAgentUserText"]
-    prep --> prefetch[prefetchLinkedGetRag]
-    prefetch --> ragGate{"ragText?"}
-    ragGate -->|yes| mergeRag["Merge ragText, snippets, query<br/>re-resolve userText"]
-    ragGate -->|no| opts["readReasoningOptions<br/>interpolate systemPrompt"]
-    mergeRag --> opts
-    opts --> pdfGate{"PDF files?"}
-    pdfGate -->|yes| pdf["extractTextFromPdfFiles<br/>append extracted text to userText"]
-    pdfGate -->|no| safetyIn["ruleClassify userText"]
-    pdf --> safetyIn
+  subgraph prepare ["1. Prepare"]
+    prep["resolveAgentResources<br/>readReasoningOptions (maxReflectRetries = repair rounds)<br/>resolveAgentUserText + PDF text"]
+    prep --> screenIn{"ruleClassify input"}
+    screenIn -->|refuse| refusedIn([status refused, no LLM])
+    screenIn -->|ok / review| epGate{"injected llm or endpoint?"}
+    epGate -->|neither| missingEp([throw missing serviceEndpoint])
+    epGate -->|yes| model["ensureWalletBalance<br/>resolveServiceByEndpoint<br/>createDefaultLlm (bills per call)"]
+    model --> reviewGate{"input flagged review?"}
+    reviewGate -->|yes| safetyLlm["LLM purpose safety"]
+    safetyLlm -->|refuse| refusedReview([status refused])
+    safetyLlm -->|allow| memory
+    reviewGate -->|no| memory["loadSessionMemory<br/>attachSimpleMemory<br/>interpolate systemPrompt (ragText blanked)"]
+    memory --> emptyGate{"empty question and ask mode?"}
+    emptyGate -->|yes| emptyAsk([needs_clarification])
+    emptyGate -->|no| branch{"linked Check SQL tool?"}
   end
 
-  safetyIn --> refuseIn{"action refuse?"}
-  refuseIn -->|yes| refusedEarly([status refused])
-  refuseIn -->|no| epGate{"injected llm or endpoint?"}
-  epGate -->|neither| missingEp([throw missing serviceEndpoint])
-  epGate -->|endpoint only| wallet["ensureWalletBalance<br/>resolveServiceByEndpoint<br/>assertTextGenerationModel"]
-  epGate -->|injected llm| bindLlm["llm = deps.llm or createDefaultLlm"]
-  wallet --> bindLlm
-  bindLlm --> reviewGate{"safety action review?"}
-  reviewGate -->|yes| safetyLlm["LLM purpose safety<br/>parseLlmSafety"]
-  safetyLlm --> refuseLlm{"parsed refuse?"}
-  refuseLlm -->|yes| refusedReview([status refused])
+  branch -->|yes| rewrite
+  branch -->|no| chatPrefetch
 
-  subgraph contextPhase ["2. Memory and tools"]
-    memory["loadSessionMemory<br/>attachSimpleMemory<br/>clear collection when simple memory is linked"]
-    memory --> semGate{"memoryCollection and no get-rag tool?"}
-    semGate -->|yes| semantic["retrieveSemanticMemory top 4"]
-    semGate -->|no| snippets["Dedupe RAG snippets and semantic hits"]
-    semantic --> snippets
-    snippets --> toolset["HTTP + RAG + optional memory tool + ask_user<br/>omit retrieve when snippets exist<br/>decorate descriptions and detect code mode"]
+  subgraph sqlPipeline ["2a. Text-to-SQL: generate → execute → repair"]
+    rewrite{"system prompt has domain vocabulary?"}
+    rewrite -->|yes| rewriteLlm["LLM purpose rewrite<br/>(retrieval query only)"]
+    rewrite -->|no| retrieve
+    rewriteLlm --> retrieve["prefetchLinkedGetRag<br/>(host does schema linking)"]
+    retrieve --> gen["LLM purpose sql<br/>system = user prompt + SQL rules<br/>user = question + retrieved schema<br/>(+ previous SQL + Oracle error on repair)"]
+    gen --> parse{"parseSqlReply"}
+    parse -->|"ASK: … (ask mode)"| askOut([needs_clarification])
+    parse -->|no SQL| more
+    parse -->|SQL| check["executeCheckSql (EXPLAIN PLAN)"]
+    check -->|ok| okSql([status ok<br/>validated true, columns, rowCount, attempts])
+    check -->|missing credentials| cfgErr([throw config error])
+    check -->|Oracle error| refreshGate{"ORA-00904 / 00942 and repairs left?"}
+    refreshGate -->|yes| refresh["get_rag(oracleRetrieveQuery(error))<br/>mergeSchemaContext"]
+    refresh --> more
+    refreshGate -->|no| more{"repairs left?"}
+    more -->|yes| gen
+    more -->|no| exhausted{"ask mode or no draft?"}
+    exhausted -->|yes| askLlm["LLM purpose ask<br/>one question in user language"]
+    askLlm --> exhaustedAsk([needs_clarification])
+    exhausted -->|no| bestEffort([status ok<br/>validated false, reason = last error])
   end
 
-  refuseLlm -->|no| memory
-  reviewGate -->|no| memory
-
-  toolset --> frameInit["TaskFrame from heuristics<br/>inferMissingSlots"]
-  frameInit --> frameGate{"not code mode<br/>and clarificationMode is ask<br/>and no missing slots?"}
-  frameGate -->|yes| frameLlm["LLM purpose frame<br/>parseTaskFrame"]
-  frameGate -->|no| askGate{"shouldAskClarification?"}
-  frameLlm --> askGate
-  askGate -->|yes| clarifyOut["saveSessionMemory<br/>simpleMemory.persist"]
-  clarifyOut --> clarifyExit([status needs_clarification])
-  askGate -->|no| planGate{"not code mode and shouldPlan?<br/>off never, on always<br/>auto when tools at least 2 or text at least 200"}
-  planGate -->|yes| planLlm["LLM purpose plan<br/>parsePlan"]
-  planGate -->|no| policy["filterToolsForPolicy<br/>build system prompt"]
-  planLlm --> policy
-
-  subgraph actPhase ["3. Act, reflect, finish"]
-    loopStart["attempt = 0 to cap<br/>cap = code mode ? min of 1 and maxReflectRetries : maxReflectRetries"]
-    loopStart --> act["LLM purpose act<br/>pass tools when policy tools exist"]
-    act --> asked{"askedUser questions?"}
-    asked -->|yes| askedSave["saveSessionMemory<br/>simpleMemory.persist"]
-    askedSave --> askedExit([status needs_clarification])
-    asked -->|no| observe["Append observations and set draft"]
-    observe --> codeOk{"code mode succeeded?"}
-    codeOk -->|yes| wrapArtifact["Wrap validated artifact into draft when needed"]
-    codeOk -->|no| score["reflectHeuristics and scoreDraft<br/>keep bestText or increment stagnant"]
-    score --> stop1{"shouldStopImproving?"}
-    stop1 -->|no| codeCap{"code mode and attempt at least 1?"}
-    codeCap -->|no| reflect["LLM purpose reflect<br/>parseReflect"]
-    reflect --> rewritten{"rewritten draft?"}
-    rewritten -->|yes| rescore["Rescore rewritten draft"]
-    rescore --> stop2{"shouldStopImproving?"}
-    stop2 -->|no| more{"attempt less than cap?"}
-    rewritten -->|no| more
-    more -->|yes| act
-    wrapArtifact --> finishIn["groundedTextOrFallback<br/>ruleClassify output"]
-    stop1 -->|yes| finishIn
-    codeCap -->|yes| finishIn
-    stop2 -->|yes| finishIn
-    more -->|no| finishIn
-    finishIn --> outRefuse{"output refuse?"}
-    outRefuse -->|yes| refusedOut([status refused])
-    outRefuse -->|no| persist["saveSessionMemory<br/>persistSemanticEpisode when memoryCollection is set<br/>simpleMemory.persist"]
-    persist --> okExit([status ok])
+  subgraph toolChat ["2b. Generic tool chat"]
+    chatPrefetch["prefetchLinkedGetRag<br/>retrieveSemanticMemory when no get-rag"]
+    chatPrefetch --> toolset["HTTP + linked tools (no Code Mode)<br/>+ retrieve_memory + ask_user (ask mode)<br/>filterToolsForSafety"]
+    toolset --> act["LLM purpose act<br/>generateText with tools, stopWhen stepCountIs(maxActSteps)"]
+    act --> askedGate{"ask_user called?"}
+    askedGate -->|yes| chatAsk([needs_clarification])
+    askedGate -->|no| cite["buildCitations<br/>groundedTextOrFallback when citations required"]
+    cite --> okChat([status ok])
   end
 
-  policy --> loopStart
+  okSql --> emit
+  bestEffort --> emit
+  askOut --> emit
+  exhaustedAsk --> emit
+  chatAsk --> emit
+  okChat --> emit
+  emptyAsk --> emit
+
+  subgraph finish ["3. Emit"]
+    emit["ruleClassify output (ok only)<br/>saveSessionMemory + simpleMemory.persist (not for refused)<br/>toNodeOutput (+ trace when traceCodeMode)"]
+  end

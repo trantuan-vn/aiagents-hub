@@ -1,11 +1,6 @@
 import { executeUtils } from '../../../../../../shared/utils.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
-import {
-  embedText,
-  matchesToSnippets,
-  queryCollection,
-  upsertVectors,
-} from '../../../rag/index.js';
+import { embedText, matchesToSnippets, queryCollection } from '../../../rag/index.js';
 import type { AiCallStamp } from '../../../ai/workers-ai.js';
 import { MAX_EPISODES } from './types.js';
 
@@ -159,31 +154,5 @@ export async function retrieveSemanticMemory(
   } catch (e) {
     console.warn('[reasoning-agent] semantic retrieve failed:', e);
     return [];
-  }
-}
-
-export async function persistSemanticEpisode(
-  env: Env,
-  collection: string,
-  text: string,
-  namespace?: string,
-  stamp?: AiCallStamp,
-): Promise<void> {
-  const content = text.trim();
-  if (!content || !collection.trim()) return;
-  try {
-    const values = await embedText(env, content, undefined, stamp);
-    if (!values.length) return;
-    const id = `episode:${Date.now().toString(36)}:${content.slice(0, 12)}`.slice(0, 64);
-    await upsertVectors(env, collection, [
-      {
-        id,
-        values,
-        namespace,
-        metadata: { text: content.slice(0, 800), source: 'session', docType: 'episode' },
-      },
-    ]);
-  } catch (e) {
-    console.warn('[reasoning-agent] persist semantic episode failed:', e);
   }
 }

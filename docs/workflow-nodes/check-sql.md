@@ -68,16 +68,16 @@ Thất bại (ORA-xxxxx, bảng/cột không tồn tại, kiểu sai): **không 
 
 ## 4. Vòng với Reasoning Agent
 
-Khi agent có cả `get_rag` và `check_sql`:
+Khi agent có cả `get_rag` và `check_sql`, **host** (không phải model) chạy vòng này ([`reasoning-agent.md`](./reasoning-agent.md) §2):
 
-1. `get_rag(question)` lấy schema.
-2. Model viết một SELECT.
-3. `check_sql({ sql })`.
-4. `ok: true` → đưa SQL đó vào output `sql`, kết thúc nhánh SQL.
-5. `ok: false` → gọi lại `get_rag` (query tập trung lỗi Oracle / identifier thiếu), viết lại SQL, gọi `check_sql` lần nữa. Dừng khi hết `maxReflectRetries` hoặc không cải thiện (`noImprovementLimit`).
-6. Hết lượt mà chưa `ok` → output `sql` rỗng, `text` nói câu chưa chạy được và kèm lỗi Oracle cuối. Không bịa là đã chạy thành công.
+1. Host gọi `get_rag(question)` lấy schema.
+2. Model viết một SELECT (không gọi tool).
+3. Host gọi `executeCheckSql(sql)`.
+4. `ok: true` → output `sql`, `validated: true`, kèm `columns` / `rowCount`.
+5. `ok: false` → nếu lỗi là identifier/table thiếu (`ORA-00904` / `ORA-00942`) host gọi lại `get_rag` với query lấy từ lỗi và gộp schema; rồi gửi model SQL cũ + lỗi Oracle để sửa. Tối đa `maxReflectRetries` lượt sửa.
+6. Hết lượt mà chưa `ok` → `ask`: `needs_clarification` với một câu hỏi; `best_effort`: trả SQL cuối với `validated: false` và `reason` = lỗi Oracle cuối. Không bịa là đã chạy thành công.
 
-`extractSql` chỉ nhận SQL từ lần `check_sql` thành công gần nhất, không lấy SQL trong prose chưa được kiểm.
+Thiếu credentials Oracle → ném lỗi ngay, không lặp.
 
 `tools_agent` không đổi. Kind reasoning mới đọc tool class `validate`.
 

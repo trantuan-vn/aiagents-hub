@@ -1,6 +1,8 @@
 # Spec: Reasoning Agent — đường chạy code mode và chat
 
-> **Trạng thái:** Draft — hợp đồng implement, chưa code  
+> **Đã thay thế (2026-10-06):** reasoning agent không còn chạy Code Mode hay vòng act/reflect. Đường chạy hiện tại (host điều khiển generate → execute → repair) mô tả trong [`reasoning-agent.md`](./reasoning-agent.md). Giữ file này làm lịch sử thiết kế.
+>
+> **Trạng thái:** Superseded  
 > **Phiên bản:** 0.3  
 > **Ngày:** 2026-09-29  
 > **0.3:** Màn chat không hiện JSON của node. Kết quả tốt thì bubble là một câu SQL dán vào là chạy. Chưa đủ thì một câu hỏi đúng ngôn ngữ user.  

@@ -1,10 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  classifyToolName,
-  codeModeSucceeded,
-  validatedSqlFromObservations,
-} from '../../agent/reasoning/tools.js';
+import { classifyToolName } from '../../agent/reasoning/tools.js';
 
 vi.mock('@cloudflare/codemode', () => ({
   DynamicWorkerExecutor: class {
@@ -30,29 +26,6 @@ import { createCodeModeOuterTool } from './create.js';
 describe('Code Mode helpers', () => {
   it('classifies codemode as delegate', () => {
     expect(classifyToolName('codemode')).toBe('delegate');
-  });
-
-  it('extracts sql from codemode observation payload', () => {
-    const sql = validatedSqlFromObservations([
-      {
-        tool: 'codemode',
-        ok: true,
-        output: JSON.stringify({
-          ok: true,
-          result: { ok: true, sql: 'SELECT id FROM orders' },
-        }),
-      },
-    ]);
-    expect(sql).toBe('SELECT id FROM orders');
-    expect(
-      codeModeSucceeded([
-        {
-          tool: 'codemode',
-          ok: true,
-          output: { ok: true, result: { ok: true, sql: 'SELECT 1 FROM dual' } },
-        },
-      ]),
-    ).toBe(true);
   });
 
   it('collapse keeps tools when LOADER is missing', () => {

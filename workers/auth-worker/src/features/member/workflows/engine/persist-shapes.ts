@@ -34,17 +34,19 @@ export const GLOBAL_NEVER_PERSIST: readonly string[] = [
 
 export const AGENT_PERSIST_SHAPE: PersistShape = {
   neverPersist: ['raw'],
-  resumeFields: ['text', 'sql', 'query', 'count', 'endpoint', 'status', 'error', 'ok'],
+  resumeFields: ['text', 'sql', 'validated', 'query', 'count', 'endpoint', 'status', 'error', 'ok'],
   logFields: [
     'snippets',
     'citations',
-    'plan',
     'questions',
     'confidence',
     'reason',
     'category',
+    'columns',
+    'rowCount',
+    'attempts',
     'toolNames',
-    'codeModeTrace',
+    'trace',
   ],
 };
 
