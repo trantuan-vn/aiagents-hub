@@ -58,7 +58,7 @@ function newSessionId(): string {
 export function EnterpriseRunDialog({ target, onClose }: { target: RunTarget | null; onClose: () => void }) {
   return (
     <Dialog open={!!target} onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] min-w-0 grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-2xl *:min-w-0 *:max-w-full">
         {target ? (
           <RunBody key={`${target.ownerId}:${target.workflowId}:${target.trigger.triggerKey}`} target={target} />
         ) : null}
@@ -93,11 +93,13 @@ function RunBody({ target }: { target: RunTarget }) {
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
-          {trigger.label}
-          <Badge variant="outline">{t(`kind_${trigger.kind}`)}</Badge>
+        <DialogTitle className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 wrap-anywhere">{trigger.label}</span>
+          <Badge variant="outline" className="shrink-0">
+            {t(`kind_${trigger.kind}`)}
+          </Badge>
         </DialogTitle>
-        <DialogDescription>{target.workflowName}</DialogDescription>
+        <DialogDescription className="wrap-anywhere">{target.workflowName}</DialogDescription>
       </DialogHeader>
 
       {trigger.kind === "chat" ? (
@@ -108,7 +110,7 @@ function RunBody({ target }: { target: RunTarget }) {
 
       {error ? (
         <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="wrap-anywhere break-all">{error}</AlertDescription>
         </Alert>
       ) : null}
 
@@ -134,16 +136,16 @@ function ChatPanel({ trigger, busy, run }: { trigger: EnterpriseTrigger; busy: b
   };
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="space-y-3">
-      <div className="bg-muted/40 max-h-80 min-h-32 space-y-2 overflow-y-auto rounded-lg border p-3">
+    <form onSubmit={(e) => void onSubmit(e)} className="min-w-0 space-y-3">
+      <div className="bg-muted/40 max-h-80 min-h-32 min-w-0 space-y-2 overflow-x-hidden overflow-y-auto rounded-lg border p-3">
         {messages.length === 0 ? <p className="text-muted-foreground text-sm">{t("chat_empty")}</p> : null}
         {messages.map((m, i) => (
-          <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+          <div key={i} className={m.role === "user" ? "flex min-w-0 justify-end" : "flex min-w-0 justify-start"}>
             <div
               className={
                 m.role === "user"
-                  ? "bg-primary text-primary-foreground max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap"
-                  : "bg-background max-w-[85%] rounded-lg border px-3 py-2 text-sm whitespace-pre-wrap"
+                  ? "bg-primary text-primary-foreground max-w-[85%] min-w-0 rounded-lg px-3 py-2 text-sm wrap-anywhere whitespace-pre-wrap"
+                  : "bg-background max-w-[85%] min-w-0 rounded-lg border px-3 py-2 text-sm wrap-anywhere whitespace-pre-wrap"
               }
             >
               {m.text}
@@ -152,8 +154,9 @@ function ChatPanel({ trigger, busy, run }: { trigger: EnterpriseTrigger; busy: b
         ))}
         {busy ? <Loader2 className="text-muted-foreground h-4 w-4 animate-spin" /> : null}
       </div>
-      <div className="flex gap-2">
+      <div className="flex min-w-0 gap-2">
         <Input
+          className="min-w-0"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={t("chat_placeholder")}
@@ -200,7 +203,7 @@ function InputPanel({
   };
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+    <form onSubmit={(e) => void onSubmit(e)} className="min-w-0 max-w-full space-y-4">
       {trigger.kind === "form" ? (
         <EnterpriseFormFields fields={trigger.fields ?? []} values={fields} onChange={setFields} />
       ) : null}
@@ -211,7 +214,7 @@ function InputPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={6}
-            className="font-mono text-xs"
+            className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs wrap-anywhere"
             placeholder='{"message":"hello"}'
           />
         </div>
@@ -219,7 +222,12 @@ function InputPanel({
       {trigger.kind === "schedule" ? (
         <div className="space-y-2">
           <Label>{t("schedule_input")}</Label>
-          <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={3}
+            className="field-sizing-fixed min-w-0 max-w-full wrap-anywhere"
+          />
         </div>
       ) : null}
       <Button type="submit" disabled={busy}>
@@ -233,17 +241,17 @@ function InputPanel({
 function RunResult({ result, showOutput }: { result: EnterpriseRunResult; showOutput: boolean }) {
   const t = useTranslations("EnterpriseWorkflowsTab");
   return (
-    <div className="space-y-2 rounded-lg border p-3 text-xs">
-      <div className="flex flex-wrap gap-x-4 gap-y-1">
+    <div className="min-w-0 max-w-full space-y-2 overflow-hidden rounded-lg border p-3 text-xs">
+      <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1">
         <span>
           {t("run_status")}: <span className="font-medium">{result.status}</span>
         </span>
-        <span className="text-muted-foreground">
-          {t("run_execution_key")}: <code>{result.executionKey}</code>
+        <span className="text-muted-foreground min-w-0">
+          {t("run_execution_key")}: <code className="break-all">{result.executionKey}</code>
         </span>
       </div>
       {showOutput ? (
-        <pre className="bg-muted max-h-64 overflow-auto rounded p-2 whitespace-pre-wrap">
+        <pre className="bg-muted max-h-64 max-w-full min-w-0 overflow-auto rounded p-2 break-all whitespace-pre-wrap">
           {outputText(result.output) || t("run_no_output")}
         </pre>
       ) : null}

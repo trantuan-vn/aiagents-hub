@@ -27,7 +27,7 @@ export function EnterpriseFormFields({
   if (fields.length === 0) return <p className="text-muted-foreground text-sm">{t("form_no_fields")}</p>;
 
   return (
-    <div className="space-y-3">
+    <div className="min-w-0 max-w-full space-y-3">
       {fields.map((f) => (
         <FieldRow
           key={f.fieldName}
@@ -52,7 +52,7 @@ function FieldRow({
   const id = `ef-${field.fieldName}`;
   const type = field.fieldType.toLowerCase();
   const label = (
-    <Label htmlFor={id}>
+    <Label htmlFor={id} className="min-w-0 wrap-anywhere">
       {field.label || field.fieldName}
       {field.required ? <span className="text-destructive"> *</span> : null}
     </Label>
@@ -60,14 +60,14 @@ function FieldRow({
 
   if (type === "checkbox") {
     return (
-      <div className="flex items-center gap-2">
-        <Checkbox id={id} checked={value === true} onCheckedChange={(v) => onChange(v === true)} />
+      <div className="flex min-w-0 items-center gap-2">
+        <Checkbox id={id} className="shrink-0" checked={value === true} onCheckedChange={(v) => onChange(v === true)} />
         {label}
       </div>
     );
   }
   return (
-    <div className="space-y-1.5">
+    <div className="min-w-0 space-y-1.5">
       {label}
       <FieldInput id={id} field={field} type={type} value={value} onChange={onChange} />
     </div>
@@ -93,12 +93,12 @@ function FieldInput({
   if (type === "dropdown" && field.options?.length) {
     return (
       <Select value={text} onValueChange={onChange}>
-        <SelectTrigger id={id}>
+        <SelectTrigger id={id} className="w-full min-w-0 max-w-full">
           <SelectValue placeholder={t("form_select")} />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-w-[var(--radix-select-trigger-width)]">
           {field.options.map((o) => (
-            <SelectItem key={o} value={o}>
+            <SelectItem key={o} value={o} className="wrap-anywhere whitespace-normal">
               {o}
             </SelectItem>
           ))}
@@ -108,7 +108,14 @@ function FieldInput({
   }
   if (type === "textarea") {
     return (
-      <Textarea id={id} required={field.required} value={text} onChange={(e) => onChange(e.target.value)} rows={3} />
+      <Textarea
+        id={id}
+        required={field.required}
+        value={text}
+        onChange={(e) => onChange(e.target.value)}
+        rows={3}
+        className="field-sizing-fixed min-w-0 max-w-full wrap-anywhere"
+      />
     );
   }
   const inputType = INPUT_TYPES.has(type) ? type : "text";
@@ -120,6 +127,7 @@ function FieldInput({
       required={field.required}
       value={text}
       onChange={(e) => onChange(parse(e.target.value))}
+      className="min-w-0 max-w-full"
     />
   );
 }
