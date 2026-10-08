@@ -26,6 +26,7 @@ import {
 	AgentWorkflowSchema,
 	WorkflowUserStarSchema,
 	WorkflowCommentSchema,
+	WorkflowCommentReactionSchema,
 	WorkflowRoyaltySchema,
 	PayoutBeneficiaryRecordSchema,
 	EarningsPayoutSchema,
@@ -641,6 +642,11 @@ export class D1DatabaseManager {
       'workflow_user_stars',
       WorkflowUserStarSchema,
       this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
+    );
+    await this.registerTable(
+      'workflow_comment_reactions',
+      WorkflowCommentReactionSchema,
+      this.TABLE_CONFIGS.queueTableWithUniqueIndex('reactionKey'),
     );
     await this.registerTable('payout_beneficiary', PayoutBeneficiaryRecordSchema, this.TABLE_CONFIGS.queueTable());
     await this.registerTable(

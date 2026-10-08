@@ -98,6 +98,8 @@ export const WorkflowUserStarSchema = z.object({
   label: z.string().max(100).optional(),
 });
 
+export const COMMENT_EMOJIS = ['like', 'love', 'haha', 'wow', 'sad'] as const;
+
 /** Comment on a shared workflow (stored in commenter's DO, synced to D1). */
 export const WorkflowCommentSchema = z.object({
   workflowOwnerId: z.string(),
@@ -105,6 +107,23 @@ export const WorkflowCommentSchema = z.object({
   content: z.string().min(1).max(2000),
   rating: z.number().int().min(1).max(5).optional(),
   authorDisplayName: z.string().max(200).optional(),
+  /** Stable id so replies work before D1 assigns globalId. */
+  commentKey: z.string().min(8).max(80).optional(),
+  /** Root comment this row replies to. Replies stay one level deep. */
+  parentCommentKey: z.string().max(80).optional(),
+  /** Author of the specific comment being answered, when that comment is itself a reply. */
+  replyToName: z.string().max(80).optional(),
+});
+
+/** One viewer's reaction on a comment. `reactionKey` is unique per user. */
+export const WorkflowCommentReactionSchema = z.object({
+  reactionKey: z.string().min(1).max(200),
+  workflowOwnerId: z.string(),
+  workflowId: z.number().int(),
+  commentKey: z.string().min(1).max(80),
+  emoji: z.enum(COMMENT_EMOJIS),
+  /** False hides a reaction the viewer turned off before the queue flush. */
+  active: z.boolean().optional(),
 });
 
 /** Status of a single durable workflow execution. */

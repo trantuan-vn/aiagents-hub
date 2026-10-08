@@ -42,7 +42,7 @@ interface CleanupResult {
 /** Bảng cần xoá khi cleanup (tiết kiệm storage) */
 const QUEUE_TABLE_NAMES = [
   "service_usages", "orders", "payments", "refunds", "commissions",
-  "workflow_royalties", "workflow_user_stars", "workflow_comments",
+  "workflow_royalties", "workflow_user_stars", "workflow_comments", "workflow_comment_reactions",
 ];
 
 const SYNC_TABLE_NAMES = [

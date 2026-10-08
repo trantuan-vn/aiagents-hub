@@ -508,8 +508,26 @@ export function getSharedWorkflow(ownerId: string, workflowId: number) {
   return apiFetch<{ workflow: AgentWorkflow }>(`/dashboard/build/workflows/shared/${ownerId}/${workflowId}`);
 }
 
+export interface WorkflowComment {
+  id: string;
+  parentId: string | null;
+  replyToName: string | null;
+  content: string;
+  authorName: string;
+  createdAt: number | null;
+  reactions: CommentReaction[];
+}
+
+export type CommentEmoji = "like" | "love" | "haha" | "wow" | "sad";
+
+export interface CommentReaction {
+  emoji: CommentEmoji;
+  count: number;
+  mine: boolean;
+}
+
 export function listComments(ownerId: string, workflowId: number) {
-  return apiFetch<{ comments: Record<string, unknown>[]; hasMore: boolean }>(
+  return apiFetch<{ comments: WorkflowComment[]; hasMore: boolean }>(
     `/dashboard/build/workflows/shared/${ownerId}/${workflowId}/comments`,
   );
 }
@@ -517,12 +535,23 @@ export function listComments(ownerId: string, workflowId: number) {
 export function postComment(
   ownerId: string,
   workflowId: number,
-  body: { content: string; rating?: number; authorDisplayName?: string },
+  body: { content: string; commentKey?: string; parentCommentKey?: string; replyToName?: string },
 ) {
   return apiFetch<{ comment: unknown }>(`/dashboard/build/workflows/shared/${ownerId}/${workflowId}/comments`, {
     method: "POST",
     body: JSON.stringify(body),
   });
+}
+
+export function setCommentReaction(
+  ownerId: string,
+  workflowId: number,
+  body: { commentKey: string; emoji: CommentEmoji | null },
+) {
+  return apiFetch<{ reaction: unknown }>(
+    `/dashboard/build/workflows/shared/${ownerId}/${workflowId}/comments/reaction`,
+    { method: "PUT", body: JSON.stringify(body) },
+  );
 }
 
 export function getWorkflowStar(ownerId: string, workflowId: number) {

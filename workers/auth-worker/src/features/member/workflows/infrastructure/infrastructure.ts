@@ -1,4 +1,5 @@
 import { triggerKindsJsonForRunner } from '../domain/share-grants.js';
+import { commentPublicId, isCommentEmoji, toPublicWorkflowComment, type CommentEmoji, type CommentReactionCount, type PublicWorkflowComment } from './comment-author.js';
 import {
   summarizeWorkflowListTriggers,
   type SharedWorkflowTriggerSummary,
@@ -171,13 +172,87 @@ export async function getWorkflowUserStarFromD1(
   return row ?? null;
 }
 
+async function authorIdentifiersByUserId(
+  db: D1Database,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = [...new Set(userIds)].filter(Boolean).slice(0, 100);
+  if (!unique.length) return map;
+  try {
+    const placeholders = unique.map(() => "?").join(",");
+    const result = await db
+      .prepare(`SELECT user_id, identifier FROM users WHERE user_id IN (${placeholders})`)
+      .bind(...unique)
+      .all<{ user_id?: string; identifier?: string }>();
+    for (const row of result.results ?? []) {
+      const id = String(row.user_id ?? "");
+      const identifier = String(row.identifier ?? "");
+      if (id && identifier && !map.has(id)) map.set(id, identifier);
+    }
+  } catch (err) {
+    console.error("[workflows] comment author lookup failed", err);
+  }
+  return map;
+}
+
+async function commentReactionsFromD1(
+  db: D1Database,
+  workflowOwnerId: string,
+  workflowId: number,
+  viewerUserId?: string,
+): Promise<Map<string, CommentReactionCount[]>> {
+  const grouped = new Map<string, CommentReactionCount[]>();
+  try {
+    const totals = await db
+      .prepare(
+        `SELECT "commentKey" AS commentKey, emoji, COUNT(*) AS total
+         FROM workflow_comment_reactions
+         WHERE "workflowOwnerId" = ? AND "workflowId" = ? AND COALESCE("active", 1) != 0
+         GROUP BY "commentKey", emoji`,
+      )
+      .bind(workflowOwnerId, workflowId)
+      .all<{ commentKey?: string; emoji?: string; total?: number }>();
+    const mineRows = viewerUserId
+      ? await db
+          .prepare(
+            `SELECT "commentKey" AS commentKey, emoji
+             FROM workflow_comment_reactions
+             WHERE user_id = ? AND "workflowOwnerId" = ? AND "workflowId" = ? AND COALESCE("active", 1) != 0`,
+          )
+          .bind(viewerUserId, workflowOwnerId, workflowId)
+          .all<{ commentKey?: string; emoji?: string }>()
+      : { results: [] as { commentKey?: string; emoji?: string }[] };
+    const mineByComment = new Map<string, CommentEmoji>();
+    for (const row of mineRows.results ?? []) {
+      const key = String(row.commentKey ?? "");
+      if (key && isCommentEmoji(row.emoji)) mineByComment.set(key, row.emoji);
+    }
+    for (const row of totals.results ?? []) {
+      const key = String(row.commentKey ?? "");
+      if (!key || !isCommentEmoji(row.emoji)) continue;
+      const list = grouped.get(key) ?? [];
+      list.push({
+        emoji: row.emoji,
+        count: Number(row.total ?? 0) || 0,
+        mine: mineByComment.get(key) === row.emoji,
+      });
+      grouped.set(key, list.filter((reaction) => reaction.count > 0));
+    }
+  } catch (err) {
+    console.error("[workflows] comment reaction lookup failed", err);
+  }
+  return grouped;
+}
+
 export async function getWorkflowCommentsFromD1(
   db: D1Database,
   workflowOwnerId: string,
   workflowId: number,
   limit = 50,
   offset = 0,
-): Promise<{ comments: Record<string, unknown>[]; hasMore: boolean }> {
+  viewerUserId?: string,
+): Promise<{ comments: PublicWorkflowComment[]; hasMore: boolean }> {
   const sql = `SELECT * FROM workflow_comments
     WHERE "workflowOwnerId" = ? AND "workflowId" = ?
     ORDER BY created_at DESC LIMIT ? OFFSET ?`;
@@ -187,7 +262,23 @@ export async function getWorkflowCommentsFromD1(
     .all();
   const rows = (result.results ?? []) as Record<string, unknown>[];
   const hasMore = rows.length > limit;
-  return { comments: rows.slice(0, limit), hasMore };
+  const page = rows.slice(0, limit);
+  const authors = await authorIdentifiersByUserId(
+    db,
+    page.map((row) => String(row.user_id ?? "")),
+  );
+  const reactionSets = await commentReactionsFromD1(db, workflowOwnerId, workflowId, viewerUserId);
+  return {
+    comments: page.map((row) => {
+      const withAuthor = {
+        ...row,
+        authorIdentifier: authors.get(String(row.user_id ?? "")),
+      };
+      const id = commentPublicId(withAuthor);
+      return toPublicWorkflowComment(withAuthor, reactionSets.get(id) ?? []);
+    }),
+    hasMore,
+  };
 }
 
 export async function getPublishedSharedWorkflow(

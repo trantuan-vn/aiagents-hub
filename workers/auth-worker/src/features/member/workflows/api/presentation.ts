@@ -6,8 +6,8 @@ import { handleError, getIdFromName, executeUtils } from '../../../../shared/uti
 import { UserDO } from '../../../ws/infrastructure/UserDO';
 import {
   ADMIN_ONLY_WORKFLOW_FIELDS,
+  COMMENT_EMOJIS,
   MemberWorkflowWriteSchema,
-  WorkflowCommentSchema,
   WorkflowUserStarSchema,
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
@@ -64,6 +64,7 @@ import {
   buildExecutionObservability,
   computeExecutionStats,
 } from '../execution/execution-observability.js';
+import { applyViewerReactions, isCommentEmoji, publicAuthorLabel } from '../infrastructure/comment-author.js';
 import {
   getWorkflowCommentsFromD1,
   getWorkflowCommunityStarStats,
@@ -96,6 +97,33 @@ const EnterpriseProposalSchema = z.string().trim().min(1).max(64).nullable();
 function hasAdminOnlyWorkflowField(raw: unknown): boolean {
   if (!raw || typeof raw !== 'object') return false;
   return ADMIN_ONLY_WORKFLOW_FIELDS.some((key) => key in raw);
+}
+
+const COMMENT_KEY = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COMMENT_PARENT_KEY = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\d+)$/i;
+
+function overlayViewerReactions(comments: any[], rows: any[], workflowId: number) {
+  const byComment = new Map<string, string | null>();
+  for (const row of rows) {
+    if (Number(row?.workflowId) !== workflowId) continue;
+    const key = String(row?.commentKey ?? '').trim();
+    if (!key) continue;
+    const active = row.active !== false && row.active !== 0 && row.active !== '0';
+    byComment.set(key, active && isCommentEmoji(row.emoji) ? row.emoji : null);
+  }
+  return comments.map((comment) => {
+    if (!byComment.has(comment.id)) return comment;
+    const d1Mine = comment.reactions?.find((reaction: { mine?: boolean; emoji?: string }) => reaction.mine)?.emoji ?? null;
+    const viewerMine = byComment.get(comment.id) ?? null;
+    return {
+      ...comment,
+      reactions: applyViewerReactions(
+        comment.reactions ?? [],
+        isCommentEmoji(d1Mine) ? d1Mine : null,
+        isCommentEmoji(viewerMine) ? viewerMine : null,
+      ),
+    };
+  });
 }
 
 const ENTERPRISE_FLAG_FORBIDDEN = { error: 'ENTERPRISE_FLAG_FORBIDDEN', code: 'ENTERPRISE_FLAG_FORBIDDEN' } as const;
@@ -438,7 +466,6 @@ export function createWorkflowRoutes(bindingName: string) {
       const { workflows, hasMore } = await listSharedWorkflowsFromD1(db, {
         limit,
         offset,
-        excludeOwnerId: getUserId(c, user.identifier),
         viewerIdentifier: user.identifier,
         search: search || undefined,
         starCount: starCount ? parseInt(starCount, 10) : undefined,
@@ -1245,7 +1272,7 @@ export function createWorkflowRoutes(bindingName: string) {
 
   app.get(
     '/shared/:ownerId/:workflowId/comments',
-    createRouteHandler(async (c: any, _user: any) => {
+    createRouteHandler(async (c: any, user: any) => {
       const workflowId = parseInt(c.req.param('workflowId'), 10);
       const ownerId = c.req.param('ownerId');
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
@@ -1254,14 +1281,25 @@ export function createWorkflowRoutes(bindingName: string) {
       await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const limit = Math.min(100, parseInt(c.req.query('limit') || '50', 10));
       const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
+      const viewerUserId = getUserId(c, user.identifier);
       const { comments, hasMore } = await getWorkflowCommentsFromD1(
         db,
         ownerId,
         workflowId,
         limit,
         offset,
+        viewerUserId,
       );
-      return c.json({ comments, hasMore });
+      let viewerRows: any[] = [];
+      try {
+        const pending = await executeUtils.executeDynamicAction(getUserDO(c, user.identifier), 'select', {
+          where: { field: 'workflowOwnerId', operator: '=', value: ownerId },
+        }, 'workflow_comment_reactions');
+        viewerRows = Array.isArray(pending) ? pending : [];
+      } catch {
+        viewerRows = [];
+      }
+      return c.json({ comments: overlayViewerReactions(comments, viewerRows, workflowId), hasMore });
     }, 'Failed to list comments'),
   );
 
@@ -1271,28 +1309,85 @@ export function createWorkflowRoutes(bindingName: string) {
       const workflowId = parseInt(c.req.param('workflowId'), 10);
       const ownerId = c.req.param('ownerId');
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
-      const body = WorkflowCommentSchema.omit({ workflowOwnerId: true, workflowId: true })
-        .extend({
-          content: z.string().min(1).max(2000),
-          rating: z.number().int().min(1).max(5).optional(),
-          authorDisplayName: z.string().max(200).optional(),
-        })
-        .parse(await c.req.json());
+      const body = z.object({
+        content: z.string().min(1).max(2000),
+        rating: z.number().int().min(1).max(5).optional(),
+        commentKey: z.string().regex(COMMENT_KEY).optional(),
+        parentCommentKey: z.string().regex(COMMENT_PARENT_KEY).optional(),
+        replyToName: z.string().max(80).optional(),
+      }).parse(await c.req.json());
       await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const userDO = getUserDO(c, user.identifier);
+      const authorDisplayName = publicAuthorLabel(user.identifier);
+      const commentKey = body.commentKey ?? crypto.randomUUID();
+      const parentCommentKey = body.parentCommentKey && body.parentCommentKey !== commentKey
+        ? body.parentCommentKey
+        : undefined;
+      const replyToName = parentCommentKey ? publicAuthorLabel(body.replyToName) : '';
       const created = await executeUtils.executeDynamicAction(
         userDO,
         'insert',
         {
           workflowOwnerId: ownerId,
           workflowId,
-          ...body,
+          content: body.content,
+          ...(body.rating ? { rating: body.rating } : {}),
+          commentKey,
+          ...(parentCommentKey ? { parentCommentKey } : {}),
+          ...(replyToName ? { replyToName } : {}),
+          ...(authorDisplayName ? { authorDisplayName } : {}),
           queueStatus: 'pending',
         },
         'workflow_comments',
       );
       return c.json({ comment: created }, 201);
     }, 'Failed to post comment'),
+  );
+
+  app.put(
+    '/shared/:ownerId/:workflowId/comments/reaction',
+    createRouteHandler(async (c: any, user: any) => {
+      const workflowId = parseInt(c.req.param('workflowId'), 10);
+      const ownerId = c.req.param('ownerId');
+      if (isNaN(workflowId)) throw new Error('Invalid workflow id');
+      const body = z.object({
+        commentKey: z.string().regex(COMMENT_PARENT_KEY),
+        emoji: z.enum(COMMENT_EMOJIS).nullable(),
+      }).parse(await c.req.json());
+      await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
+      const userDO = getUserDO(c, user.identifier);
+      const reactionKey = `${ownerId}:${workflowId}:${body.commentKey}`;
+      const existing = await executeUtils.executeDynamicAction(userDO, 'select', {
+        where: { field: 'reactionKey', operator: '=', value: reactionKey },
+      }, 'workflow_comment_reactions');
+      const row = Array.isArray(existing) ? existing[0] : null;
+      const payload = {
+        reactionKey,
+        workflowOwnerId: ownerId,
+        workflowId,
+        commentKey: body.commentKey,
+        emoji: body.emoji ?? row?.emoji ?? 'like',
+        active: Boolean(body.emoji),
+        queueStatus: 'pending',
+      };
+      if (row) {
+        const updated = await executeUtils.executeDynamicAction(
+          userDO,
+          'update',
+          { id: row.id, ...payload },
+          'workflow_comment_reactions',
+        );
+        return c.json({ reaction: updated });
+      }
+      if (!body.emoji) return c.json({ reaction: null });
+      const created = await executeUtils.executeDynamicAction(
+        userDO,
+        'insert',
+        payload,
+        'workflow_comment_reactions',
+      );
+      return c.json({ reaction: created });
+    }, 'Failed to save reaction'),
   );
 
   app.get(

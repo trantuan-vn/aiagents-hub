@@ -74,7 +74,7 @@ import {
   PaymentSchema, RefundSchema, BroadcastValidator, VersionInfoSchema,
   UserMfaSchema, PasskeyCredentialSchema, BackupCodeSchema, UserEkycSchema, UserDidSchema,
   CommissionPolicyObjectSchema, CommissionSchema,
-  AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowRoyaltySchema,
+  AgentWorkflowSchema, WorkflowUserStarSchema, WorkflowCommentSchema, WorkflowCommentReactionSchema, WorkflowRoyaltySchema,
   WorkflowExecutionSchema, WorkflowCredentialSchema, WorkflowVersionSchema,
   AgentSessionMemorySchema,
   SimpleMemorySchema,
@@ -119,7 +119,7 @@ export class UserDO extends DurableObject {
   private readonly QUEUE_TABLE_NAMES = [
     "service_usages", "orders",
     "payments", "refunds", "commissions", "workflow_royalties",
-    "workflow_user_stars", "workflow_comments",
+    "workflow_user_stars", "workflow_comments", "workflow_comment_reactions",
   ];
 
   /** Bảng danh mục: xử lý giống queue nhưng KHÔNG xoá khi cleanup (giữ lại record) */
@@ -209,6 +209,11 @@ export class UserDO extends DurableObject {
         'workflow_user_stars',
         extendWithQueue(WorkflowUserStarSchema),
         this.TABLE_CONFIGS.queueTableWithUniqueIndex('workflowKey'),
+      );
+      this.table(
+        'workflow_comment_reactions',
+        extendWithQueue(WorkflowCommentReactionSchema),
+        this.TABLE_CONFIGS.queueTableWithUniqueIndex('reactionKey'),
       );
       
       // Bảng danh mục (userScoped, không unique index)

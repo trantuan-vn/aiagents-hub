@@ -76,6 +76,7 @@ export const QUEUE_CLEANUP_TABLES = [
   'workflow_royalties',
   'workflow_user_stars',
   'workflow_comments',
+  'workflow_comment_reactions',
 ] as const;
 
 export const SYNC_TABLE_NAMES = [
