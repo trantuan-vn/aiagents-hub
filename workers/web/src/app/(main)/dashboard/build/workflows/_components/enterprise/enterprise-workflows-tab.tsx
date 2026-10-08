@@ -96,7 +96,13 @@ function OrganizationView({
   const issueOwnCredential = async (card: CatalogCard, trigger: EnterpriseTrigger) => {
     try {
       const res = await memberEnterprise.issueCredential(card.ownerId, card.id, { triggerKey: trigger.triggerKey });
-      setTokens([{ token: res.token, label: trigger.label }]);
+      setTokens([
+        {
+          token: res.token,
+          label: trigger.label,
+          ...(trigger.kind === "webhook" ? { bodyJson: JSON.stringify(trigger.bodyExample ?? {}) } : {}),
+        },
+      ]);
     } catch (err) {
       toast.error(errorMessage(err));
     }

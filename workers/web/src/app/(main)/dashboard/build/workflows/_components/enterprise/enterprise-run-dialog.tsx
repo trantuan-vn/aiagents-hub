@@ -21,6 +21,7 @@ import {
 } from "@/lib/enterprise-api";
 
 import { EnterpriseFormFields } from "./enterprise-form-fields";
+import { EnterpriseWebhookGuide } from "./enterprise-webhook-guide";
 
 export type RunTarget = { ownerId: string; workflowId: number; workflowName: string; trigger: EnterpriseTrigger };
 
@@ -58,7 +59,7 @@ function newSessionId(): string {
 export function EnterpriseRunDialog({ target, onClose }: { target: RunTarget | null; onClose: () => void }) {
   return (
     <Dialog open={!!target} onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent className="max-h-[85vh] min-w-0 grid-cols-1 overflow-x-hidden overflow-y-auto sm:max-w-2xl *:min-w-0 *:max-w-full">
+      <DialogContent className="max-h-[85vh] min-w-0 grid-cols-1 overflow-x-hidden overflow-y-auto *:max-w-full *:min-w-0 sm:max-w-2xl">
         {target ? (
           <RunBody key={`${target.ownerId}:${target.workflowId}:${target.trigger.triggerKey}`} target={target} />
         ) : null}
@@ -105,7 +106,14 @@ function RunBody({ target }: { target: RunTarget }) {
       {trigger.kind === "chat" ? (
         <ChatPanel trigger={trigger} busy={busy} run={run} />
       ) : (
-        <InputPanel trigger={trigger} busy={busy} run={run} onInvalid={setError} />
+        <InputPanel
+          trigger={trigger}
+          ownerId={target.ownerId}
+          workflowId={target.workflowId}
+          busy={busy}
+          run={run}
+          onInvalid={setError}
+        />
       )}
 
       {error ? (
@@ -172,17 +180,22 @@ function ChatPanel({ trigger, busy, run }: { trigger: EnterpriseTrigger; busy: b
 
 function InputPanel({
   trigger,
+  ownerId,
+  workflowId,
   busy,
   run,
   onInvalid,
 }: {
   trigger: EnterpriseTrigger;
+  ownerId: string;
+  workflowId: number;
   busy: boolean;
   run: Run;
   onInvalid: (message: string) => void;
 }) {
   const t = useTranslations("EnterpriseWorkflowsTab");
-  const [text, setText] = useState("");
+  const sampleBody = JSON.stringify(trigger.bodyExample ?? {}, null, 2);
+  const [text, setText] = useState(trigger.kind === "webhook" ? sampleBody : "");
   const [fields, setFields] = useState<Record<string, unknown>>({});
 
   const onSubmit = async (e: FormEvent) => {
@@ -203,21 +216,30 @@ function InputPanel({
   };
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="min-w-0 max-w-full space-y-4">
+    <form onSubmit={(e) => void onSubmit(e)} className="max-w-full min-w-0 space-y-4">
       {trigger.kind === "form" ? (
         <EnterpriseFormFields fields={trigger.fields ?? []} values={fields} onChange={setFields} />
       ) : null}
       {trigger.kind === "webhook" ? (
-        <div className="space-y-2">
-          <Label>{t("webhook_body")}</Label>
-          <Textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={6}
-            className="field-sizing-fixed min-w-0 max-w-full font-mono text-xs wrap-anywhere"
-            placeholder='{"message":"hello"}'
+        <>
+          <EnterpriseWebhookGuide
+            body={text}
+            bodyExample={trigger.bodyExample}
+            workflowId={workflowId}
+            ownerId={ownerId}
+            webhookPath={trigger.webhookPath}
           />
-        </div>
+          <div className="space-y-2">
+            <Label>{t("webhook_body")}</Label>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={6}
+              className="field-sizing-fixed max-w-full min-w-0 font-mono text-xs wrap-anywhere"
+              placeholder="{}"
+            />
+          </div>
+        </>
       ) : null}
       {trigger.kind === "schedule" ? (
         <div className="space-y-2">
@@ -226,7 +248,7 @@ function InputPanel({
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={3}
-            className="field-sizing-fixed min-w-0 max-w-full wrap-anywhere"
+            className="field-sizing-fixed max-w-full min-w-0 wrap-anywhere"
           />
         </div>
       ) : null}
@@ -241,7 +263,7 @@ function InputPanel({
 function RunResult({ result, showOutput }: { result: EnterpriseRunResult; showOutput: boolean }) {
   const t = useTranslations("EnterpriseWorkflowsTab");
   return (
-    <div className="min-w-0 max-w-full space-y-2 overflow-hidden rounded-lg border p-3 text-xs">
+    <div className="max-w-full min-w-0 space-y-2 overflow-hidden rounded-lg border p-3 text-xs">
       <div className="flex min-w-0 flex-wrap gap-x-4 gap-y-1">
         <span>
           {t("run_status")}: <span className="font-medium">{result.status}</span>

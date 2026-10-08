@@ -86,7 +86,17 @@ function GrantsBody({ target, onTokens }: { target: GrantsTarget; onTokens: (tok
   if (!view) return <p className="text-muted-foreground p-4 text-sm">{t("loading")}</p>;
   if (view.proMembers.length === 0) return <p className="text-muted-foreground p-4 text-sm">{t("grants_no_pro")}</p>;
 
-  const labelOf = (key: string) => view.triggers.find((tr) => tr.triggerKey === key)?.label ?? key;
+  const triggerOf = (key: string) => view.triggers.find((tr) => tr.triggerKey === key);
+  const labelOf = (key: string) => triggerOf(key)?.label ?? key;
+  const issued = (token: string, key: string, grantee: string): IssuedToken => {
+    const trigger = triggerOf(key);
+    return {
+      token,
+      label: trigger?.label ?? key,
+      grantee,
+      ...(trigger?.kind === "webhook" ? { bodyJson: JSON.stringify(trigger.bodyExample ?? {}) } : {}),
+    };
+  };
   const hasCredential = (user: string, key: string) =>
     view.grants.some((g) => g.granteeUserId === user && g.triggerKey === key && g.hasCredential);
   const isSaved = (user: string, key: string) =>
@@ -124,7 +134,7 @@ function GrantsBody({ target, onTokens }: { target: GrantsTarget; onTokens: (tok
       });
       toast.success(row.keys.size ? t("grants_saved") : t("grants_revoked"));
       if (res.credentials.length) {
-        onTokens(res.credentials.map((c) => ({ token: c.token, label: labelOf(c.triggerKey), grantee: user })));
+        onTokens(res.credentials.map((c) => issued(c.token, c.triggerKey, user)));
       }
       await load();
     } catch (err) {
@@ -140,7 +150,7 @@ function GrantsBody({ target, onTokens }: { target: GrantsTarget; onTokens: (tok
         triggerKey: key,
         granteeUserId: user,
       });
-      onTokens([{ token: res.token, label: labelOf(res.triggerKey), grantee: user }]);
+      onTokens([issued(res.token, res.triggerKey, user)]);
       await load();
     } catch (err) {
       toast.error(errorMessage(err));

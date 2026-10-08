@@ -14,7 +14,10 @@ import {
   runTrigger,
 } from '../triggers/triggers.js';
 import { validateWebhookApiToken } from '../triggers/webhook-auth.js';
-import { consumerRunActor } from '../execution/workflow-runner.js';
+import { consumerRunActor, isDurableObjectId } from '../execution/workflow-runner.js';
+import { EnterpriseError } from '../../../enterprise/domain.js';
+import { runEnterpriseWebhookCall } from '../../../enterprise/triggers.js';
+import { isEnterpriseWorkflow, loadOwnerWorkflow } from '../../../enterprise/workflow-flag.js';
 
 function secondsUntilUtcMidnight(now = new Date()): number {
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
@@ -126,6 +129,20 @@ export function createWorkflowHookRoutes(bindingName: string) {
 
       const callerId = String(clientId);
       const auth = await validateWebhookApiToken(c, bindingName, callerId);
+      const ownerHint = c.req.query('owner_id') ?? undefined;
+      if (ownerHint && isDurableObjectId(ownerHint)) {
+        const wf = await loadOwnerWorkflow(c.env, ownerHint, workflowId);
+        if (wf && isEnterpriseWorkflow(wf)) {
+          if (!auth.identifier) return c.json({ error: 'Missing X-Client-ID header' }, 401);
+          try {
+            const result = await runEnterpriseWebhookCall(c.env, auth.identifier, ownerHint, workflowId, webhookPath, c.req.raw);
+            return webhookQuotaResponse(c, result);
+          } catch (err) {
+            if (err instanceof EnterpriseError) return c.json({ error: err.code, code: err.code }, err.status);
+            throw err;
+          }
+        }
+      }
       const resolvedTrigger = await resolveWebhookTriggerForCaller({
         env: c.env,
         bindingName,

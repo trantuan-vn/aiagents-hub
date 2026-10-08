@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { enterpriseHookUrl } from "@/lib/enterprise-api";
 
-export type IssuedToken = { token: string; label: string; grantee?: string };
+export type IssuedToken = { token: string; label: string; grantee?: string; bodyJson?: string };
 
 /** Plaintext tokens exist only in this dialog's props; closing it drops them. */
 export function TokenDialog({ tokens, onClose }: { tokens: IssuedToken[]; onClose: () => void }) {
@@ -47,7 +47,8 @@ export function TokenDialog({ tokens, onClose }: { tokens: IssuedToken[]; onClos
         <div className="space-y-4">
           {tokens.map((item) => {
             const url = enterpriseHookUrl(item.token);
-            const curl = `curl -X POST -H 'Content-Type: application/json' -d '{"message":"hello"}' ${url}`;
+            const payload = item.bodyJson ?? '{"message":"hello"}';
+            const curl = `curl -X POST -H 'Content-Type: application/json' -d '${payload.replaceAll("'", `'\\''`)}' ${url}`;
             return (
               <div key={item.token} className="space-y-2 rounded-lg border p-3">
                 <p className="text-sm font-medium">

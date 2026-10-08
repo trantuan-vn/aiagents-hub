@@ -71,6 +71,10 @@ export type EnterpriseTrigger = {
   label: string;
   nodeId?: string;
   fields?: EnterpriseFormField[];
+  /** Webhook path segment for `POST /hooks/workflows/:workflowId/:webhookPath`. */
+  webhookPath?: string;
+  /** Webhook POST body shaped like the fields the next node reads from `$json.body`. */
+  bodyExample?: Record<string, unknown>;
 };
 
 // --- Flag requests ---------------------------------------------------------------

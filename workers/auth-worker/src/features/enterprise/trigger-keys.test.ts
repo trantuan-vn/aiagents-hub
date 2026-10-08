@@ -92,4 +92,91 @@ describe('listEnterpriseTriggers', () => {
     ]);
     expect(JSON.stringify(form)).not.toContain('secret-key');
   });
+
+  it('builds a webhook body from variables the next node reads', () => {
+    const out = assignEnterpriseTriggerKeys(
+      null,
+      JSON.stringify({
+        nodes: [
+          { id: 'w1', type: 'core', data: { coreKind: 'webhook', label: 'Hook', enterpriseTriggerKey: 'k-w' } },
+          {
+            id: 'a1',
+            type: 'agent',
+            data: { prompt: 'Q: {{ $json.body.question }} for {{ $json.body.order.id }} sku {{ $json.body.items[0].sku }}' },
+          },
+          { id: 'later', type: 'agent', data: { prompt: '{{ $json.body.ignored }}' } },
+          { id: 'tool', type: 'tool_node', data: { queryField: '{{ $json.body.secret }}' } },
+        ],
+        edges: [
+          { id: 'e1', source: 'w1', target: 'a1', sourceHandle: 'out', targetHandle: 'in' },
+          { id: 'e2', source: 'a1', target: 'later', sourceHandle: 'out', targetHandle: 'in' },
+          { id: 'e3', source: 'w1', target: 'tool', sourceHandle: 'tools', targetHandle: 'tools' },
+        ],
+      }),
+    );
+    const hook = listEnterpriseTriggers(out).find((t) => t.kind === 'webhook');
+    expect(hook?.webhookPath).toBe('w1');
+    expect(hook?.bodyExample).toEqual({
+      question: '',
+      order: { id: '' },
+      items: [{ sku: '' }],
+    });
+    expect(hook?.bodyExample).not.toHaveProperty('ignored');
+    expect(hook?.bodyExample).not.toHaveProperty('secret');
+  });
+
+  it('uses question when the next node reads chatInput and drops method calls', () => {
+    const out = assignEnterpriseTriggerKeys(
+      null,
+      JSON.stringify({
+        nodes: [
+          { id: 'w1', type: 'trigger', data: { triggerKind: 'webhook', enterpriseTriggerKey: 'k-w' } },
+          { id: 'a1', type: 'agent', data: { prompt: '{{ $json.chatInput }} {{ $json.body.name.toLowerCase() }}' } },
+        ],
+        edges: [{ id: 'e1', source: 'w1', target: 'a1' }],
+      }),
+    );
+    expect(listEnterpriseTriggers(out).find((t) => t.kind === 'webhook')?.bodyExample).toEqual({
+      name: '',
+      question: '',
+    });
+  });
+
+  it('uses body fields from an or-chain and ignores $json.query', () => {
+    const out = assignEnterpriseTriggerKeys(
+      null,
+      JSON.stringify({
+        nodes: [
+          { id: 'w1', type: 'trigger', data: { triggerKind: 'webhook', enterpriseTriggerKey: 'k-w' } },
+          {
+            id: 'a1',
+            type: 'agent',
+            data: {
+              prompt:
+                '{{ $json.chatInput || $json.body.question || $json.body.message || $json.query || $json.question }}',
+            },
+          },
+        ],
+        edges: [{ id: 'e1', source: 'w1', target: 'a1' }],
+      }),
+    );
+    expect(listEnterpriseTriggers(out).find((t) => t.kind === 'webhook')?.bodyExample).toEqual({
+      question: '',
+      message: '',
+    });
+  });
+
+  it('does not add question when a chatInput alias is already in the body', () => {
+    const out = assignEnterpriseTriggerKeys(
+      null,
+      JSON.stringify({
+        nodes: [
+          { id: 'w1', type: 'trigger', data: { triggerKind: 'webhook', enterpriseTriggerKey: 'k-w' } },
+          { id: 'a1', type: 'agent', data: { prompt: '{{ $json.body.message }} {{ $json.chatInput }}' } },
+        ],
+        edges: [{ id: 'e1', source: 'w1', target: 'a1' }],
+      }),
+    );
+    expect(listEnterpriseTriggers(out).find((t) => t.kind === 'webhook')?.bodyExample).toEqual({ message: '' });
+  });
 });

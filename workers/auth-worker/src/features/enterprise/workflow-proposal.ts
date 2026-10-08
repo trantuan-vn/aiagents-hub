@@ -182,7 +182,14 @@ type CatalogRow = {
 function catalogView(r: CatalogRow, granted?: Set<string>) {
   const triggers = listEnterpriseTriggers(r.definition)
     .filter((t) => !granted || granted.has(t.triggerKey))
-    .map(({ triggerKey, kind, label, fields }) => ({ triggerKey, kind, label, ...(fields ? { fields } : {}) }));
+    .map(({ triggerKey, kind, label, fields, bodyExample, webhookPath }) => ({
+      triggerKey,
+      kind,
+      label,
+      ...(fields ? { fields } : {}),
+      ...(bodyExample ? { bodyExample } : {}),
+      ...(webhookPath ? { webhookPath } : {}),
+    }));
   return {
     id: r.id,
     ownerId: r.user_id,

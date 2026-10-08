@@ -382,6 +382,43 @@ export async function sessionExecute(
   return runEnterpriseTrigger(env, identifier, auth, body);
 }
 
+/**
+ * `POST /hooks/workflows/:workflowId/:path?owner_id=`. Auth is the caller's API token
+ * (`Authorization: Bearer` + `X-Client-ID`), same as a community webhook. The grant still decides
+ * whether this member may run the trigger.
+ */
+export async function runEnterpriseWebhookCall(
+  env: Env,
+  identifier: string,
+  ownerId: string,
+  workflowId: number,
+  webhookPath: string | undefined,
+  request: Request,
+) {
+  const wf = await loadOwnerWorkflow(env, ownerId, workflowId);
+  if (!wf || !isEnterpriseWorkflow(wf)) throw new EnterpriseError('ENTERPRISE_WORKFLOW_NOT_FOUND', 404);
+  const triggers = listEnterpriseTriggers(wf.definition).filter((t) => t.kind === 'webhook');
+  const path = webhookPath?.trim().replace(/^\/+/, '');
+  const trigger = path
+    ? triggers.find((t) => t.webhookPath === path || t.nodeId === path)
+    : triggers.length === 1
+      ? triggers[0]
+      : undefined;
+  if (!trigger) throw new EnterpriseError('ENTERPRISE_TRIGGER_NOT_FOUND', 404);
+
+  const auth = await authorizeEnterpriseRun(env, identifier, ownerId, workflowId, trigger.triggerKey);
+  const { input, itemParams } = await parseWebhookRequest(request, { input: null }, { executionMode: 'production' });
+  const body = itemParams.body;
+  const record = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : undefined;
+  return runEnterpriseTrigger(env, identifier, auth, {
+    input,
+    fields: record,
+    sessionId: typeof record?.sessionId === 'string' ? record.sessionId : undefined,
+    chatInput: resolveWebhookQuestion(body) || input,
+    webhook: itemParams,
+  });
+}
+
 /** `POST /hooks/enterprise/:token`. The token stands for one user and one key; a bad or revoked token is 404. */
 export async function credentialHook(env: Env, token: string, request: Request) {
   if (!/^ent_[A-Za-z0-9_-]{20,100}$/.test(token)) throw new EnterpriseError('ENTERPRISE_CREDENTIAL_NOT_FOUND', 404);
