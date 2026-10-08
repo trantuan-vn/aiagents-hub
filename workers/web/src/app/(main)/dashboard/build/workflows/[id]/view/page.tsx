@@ -98,7 +98,7 @@ export default function ViewSharedWorkflowPage() {
         </Badge>
       ) : null}
       <span className="text-muted-foreground text-xs">
-        {t("usage_count")}: {view.usageCount}
+        {t("usage_count", { count: view.usageCount })}
       </span>
     </>
   );

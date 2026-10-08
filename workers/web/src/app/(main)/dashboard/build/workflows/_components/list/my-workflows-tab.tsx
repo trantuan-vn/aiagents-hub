@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEnterpriseErrorMessage } from "@/lib/enterprise-api";
-import { formatUsd } from "@/lib/utils";
+import { formatCredits } from "@/lib/utils";
 
 import { deleteWorkflow, listMyWorkflows, type AgentWorkflow } from "../../_lib/api";
 
@@ -77,11 +77,9 @@ export function MyWorkflowsTab() {
             <div className="text-muted-foreground flex flex-wrap gap-3 text-xs">
               <StarDisplay count={wf.starCount} />
               {wf.isShared ? <Badge variant="outline">{t("share_toggle")}</Badge> : null}
+              <span>{t("usage_count", { count: wf.usageCount ?? 0 })}</span>
               <span>
-                {t("usage_count")}: {wf.usageCount ?? 0}
-              </span>
-              <span>
-                {t("earnings")}: {formatUsd(wf.totalEarningsUsd ?? 0)}
+                {t("earnings")}: {formatCredits(wf.totalEarningsCr ?? 0)}
               </span>
             </div>
             <div className="flex flex-wrap gap-2">

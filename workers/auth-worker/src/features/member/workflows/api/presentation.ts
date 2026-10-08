@@ -72,6 +72,7 @@ import {
   listSharedWorkflowsFromD1,
   listWorkflowRoyalties,
 } from '../infrastructure/infrastructure';
+import { usdToCredits } from '../../../admin/service/credit.js';
 import { getBillingEconomicsFromEnv } from '../../../admin/service/get-billing-economics.js';
 import { getWorkflowEarningsMonthlySummary } from '../billing/earnings-monthly.js';
 import { parseWorkflowDefinition, resolveWorkflow } from '../execution/workflow-context.js';
@@ -370,13 +371,18 @@ export function createWorkflowRoutes(bindingName: string) {
         orderBy: { field: 'updated_at', direction: 'DESC' },
       }, 'agent_workflows');
       const workflows = Array.isArray(rows) ? rows : [];
+      const eco = await getBillingEconomicsFromEnv(c.env);
+      const priced = workflows.map((wf: Record<string, unknown>) => {
+        const usd = Number(wf.totalEarningsUsd ?? wf.total_earnings_usd ?? 0) || 0;
+        return { ...wf, totalEarningsCr: usdToCredits(usd, eco.creditPriceUsd) };
+      });
       const db = c.env.D1DB;
-      if (!db) return c.json({ workflows });
+      if (!db) return c.json({ workflows: priced });
       try {
         const ownerId = getUserId(c, user.identifier);
         const crons = summarizeEnabledCrons(await listTriggers(db, ownerId));
         return c.json({
-          workflows: workflows.map((wf: { id?: number }) => {
+          workflows: priced.map((wf: { id?: number }) => {
             const cron = typeof wf.id === 'number' ? crons.get(wf.id) : undefined;
             if (!cron) return { ...wf, hasActiveCron: false };
             return {
@@ -390,7 +396,7 @@ export function createWorkflowRoutes(bindingName: string) {
         });
       } catch (e) {
         console.error('[workflows] cron summary failed:', e);
-        return c.json({ workflows });
+        return c.json({ workflows: priced });
       }
     }, 'Failed to list workflows'),
   );
@@ -1206,7 +1212,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds, shareGrants
+      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds, shareGrants
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);

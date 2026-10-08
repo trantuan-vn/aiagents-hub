@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { formatUsd } from "@/lib/utils";
 
 import type { AgentWorkflow } from "../../_lib/api";
 import { sharedWorkflowViewHref } from "../../_lib/shared-workflow-utils";
@@ -66,12 +65,7 @@ export function SharedWorkflowCard({
             <span>{t("rater_count", { count: raterCount })}</span>
           </div>
           {wf.starLabel ? <Badge variant="secondary">{wf.starLabel}</Badge> : null}
-          <span>
-            {t("usage_count")}: {wf.usageCount ?? 0}
-          </span>
-          <span>
-            {t("earnings")}: {formatUsd(wf.totalEarningsUsd ?? 0)}
-          </span>
+          <span>{t("usage_count", { count: wf.usageCount ?? 0 })}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-xs">{t("your_rating")}:</span>

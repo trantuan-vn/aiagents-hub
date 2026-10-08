@@ -41,6 +41,8 @@ export interface AgentWorkflow {
   communityStarCount?: number;
   usageCount?: number;
   totalEarningsUsd?: number;
+  /** Royalty earned by the owner, in Credits. Present only on the owner's own list. */
+  totalEarningsCr?: number;
   status?: "draft" | "published";
   user_id?: string;
   /** True when this workflow has at least one enabled D1 cron trigger. */

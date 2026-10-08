@@ -117,7 +117,7 @@ export async function listSharedWorkflowsFromD1(
 
   const whereClause = conditions.join(' AND ');
   const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.definition, w.isShared, w.starCount, w.starLabel,
-      w.usageCount, w.totalEarningsUsd, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted, w.publicTriggerKinds, w.shareGrants,
+      w.usageCount, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted, w.publicTriggerKinds, w.shareGrants,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
       COALESCE(star_stats.rater_count, 0) AS communityStarCount
     FROM agent_workflows w
