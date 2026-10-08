@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hướng dẫn lọc cặp "Yêu cầu số liệu – SQL" từ ứng dụng Oracle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F7F9; --paper:#FFFFFF; --ink:#16222D; --muted:#566574; --line:#DCE3E9;
+  --accent:#0B6E8F; --accent-soft:#E2F1F6; --warn:#9A5B00; --warn-soft:#FFF3DC;
+  --ok:#17794A; --ok-soft:#E3F4EA; --code-bg:#14202B; --code-ink:#E6EDF3; --code-dim:#7F93A5;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F171E; --paper:#16212A; --ink:#E6EDF3; --muted:#9AAAB8; --line:#26343F;
+    --accent:#4FB6D6; --accent-soft:#16303B; --warn:#F0B35A; --warn-soft:#2E2412;
+    --ok:#5BC993; --ok-soft:#13291E; --code-bg:#0B1218;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
+.layout{display:grid;grid-template-columns:270px minmax(0,1fr);max-width:1180px;margin:0 auto;gap:48px;padding:0 24px}
+aside{position:sticky;top:0;align-self:start;height:100vh;overflow:auto;padding:40px 0}
+aside .brand{font-weight:700;font-size:15px;line-height:1.4;margin-bottom:6px}
+aside .sub{color:var(--muted);font-size:13px;margin-bottom:24px}
+aside nav a{display:block;padding:6px 12px;margin-left:-12px;border-left:2px solid transparent;color:var(--muted);text-decoration:none;font-size:14px;line-height:1.45}
+aside nav a:hover{color:var(--ink)}
+aside nav a.active{color:var(--accent);border-left-color:var(--accent);font-weight:600}
+aside nav .grp{margin:18px 0 4px;font-size:12px;color:var(--muted);font-weight:600}
+main{padding:56px 0 96px;min-width:0}
+header.hero{margin-bottom:48px}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.2;margin:0 0 16px;font-weight:700;letter-spacing:-.01em}
+.lead{font-size:18px;color:var(--muted);max-width:62ch;margin:0}
+.flow{display:flex;flex-wrap:wrap;gap:8px;margin:28px 0 0;padding:0;list-style:none;counter-reset:f}
+.flow li{counter-increment:f;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px}
+.flow li::before{content:counter(f)". ";color:var(--accent);font-weight:600}
+section{margin-top:56px}
+h2{font-size:26px;line-height:1.3;margin:0 0 16px;letter-spacing:-.005em}
+h3{font-size:18px;margin:28px 0 8px}
+p{margin:0 0 14px;max-width:72ch}
+ul,ol{padding-left:22px;margin:0 0 16px;max-width:72ch}
+li{margin-bottom:6px}
+code{font:500 .88em var(--mono);background:var(--accent-soft);color:var(--accent);padding:2px 6px;border-radius:4px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:24px}
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;max-width:76ch}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+.callout b{display:block;margin-bottom:2px}
+.callout p:last-child{margin:0}
+/* steps */
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;margin-top:40px}
+.step .num{width:44px;height:44px;border-radius:50%;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700}
+.step h3{margin:6px 0 10px;font-size:20px}
+.step .tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;margin-left:8px;vertical-align:middle;background:var(--warn-soft);color:var(--warn)}
+.step .tag.must{background:var(--ok-soft);color:var(--ok)}
+.done{display:inline-flex;align-items:center;gap:8px;margin-top:6px;font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
+.done input{width:18px;height:18px;accent-color:var(--ok)}
+.step:has(.done input:checked) .num{background:var(--ok)}
+.step:has(.done input:checked) h3{color:var(--muted)}
+/* code */
+.code{position:relative;margin:12px 0 18px;border-radius:10px;background:var(--code-bg);overflow:hidden;max-width:100%}
+.code .bar{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 6px 16px;border-bottom:1px solid rgba(255,255,255,.08);color:var(--code-dim);font:500 12px var(--sans)}
+.code button{font:500 12px var(--sans);color:var(--code-ink);background:rgba(255,255,255,.08);border:0;border-radius:6px;padding:5px 12px;cursor:pointer}
+.code button:hover{background:rgba(255,255,255,.16)}
+.code button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.code pre{margin:0;padding:16px;overflow-x:auto;color:var(--code-ink);font:400 13.5px/1.65 var(--mono);tab-size:2}
+.c{color:var(--code-dim)} .k{color:#7FD1EA} .s{color:#A8D8A0}
+/* tables */
+.tw{overflow-x:auto;margin:14px 0 20px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--accent-soft);font-weight:600}
+tr:last-child td{border-bottom:0}
+.req{margin:0 0 20px;padding:0;list-style:none}
+.req li{padding-left:28px;position:relative}
+.req li::before{content:"✓";position:absolute;left:0;color:var(--ok);font-weight:700}
+footer{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:0}
+  aside{position:static;height:auto;padding:28px 0 0}
+  main{padding-top:24px}
+}
+@media (max-width:520px){.step{grid-template-columns:1fr}.step .num{width:36px;height:36px}}
+@media print{
+  aside,.code button,.done{display:none}
+  .layout{display:block;max-width:none}
+  body{background:#fff;color:#000;font-size:11pt}
+  .code{background:#f3f3f3;color:#000}.code pre{color:#000}
+  section,.step,.callout,.tw{break-inside:avoid}
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside>
+  <div class="brand">Lọc cặp “Yêu cầu số liệu – SQL”</div>
+  <div class="sub">Hướng dẫn cho môi trường Oracle, không cần sửa code ứng dụng</div>
+  <nav id="toc">
+    <a href="#tong-quan">Tổng quan</a>
+    <a href="#chuan-bi">Điều kiện &amp; chuẩn bị</a>
+    <div class="grp">Các bước thực hiện</div>
+    <a href="#b1">1. Lập phiếu ghi chép</a>
+    <a href="#b2">2. Xác định session</a>
+    <a href="#b3">3. Làm sạch bộ nhớ SQL</a>
+    <a href="#b4">4. Chốt mốc bắt đầu</a>
+    <a href="#b5">5. Bấm một chức năng</a>
+    <a href="#b6">6. Chốt mốc kết thúc</a>
+    <a href="#b7">7. Liệt kê SQL phát sinh</a>
+    <a href="#b8">8. Chọn SQL trả số liệu</a>
+    <a href="#b9">9. Lấy giá trị tham số</a>
+    <a href="#b10">10. Kiểm chứng</a>
+    <a href="#b11">11. Lưu thành cặp</a>
+    <div class="grp">Bổ sung</div>
+    <a href="#trace">Cách bắt bằng Trace</a>
+    <a href="#loi">Lỗi thường gặp</a>
+    <a href="#don-dep">Dọn dẹp</a>
+  </nav>
+</aside>
+
+<main>
+<header class="hero">
+  <h1>Hướng dẫn lọc một cặp “Tên yêu cầu số liệu – SQL” từ ứng dụng</h1>
+  <p class="lead">Bấm đúng một chức năng, báo cáo hoặc tra cứu trên ứng dụng, bắt lại các câu SQL mà Oracle vừa chạy, rồi chọn ra câu SQL trả số liệu để lưu thành một cặp có định danh.</p>
+  <ol class="flow">
+    <li>Làm sạch bộ nhớ SQL</li>
+    <li>Bấm một chức năng</li>
+    <li>Xem SQL phát sinh</li>
+    <li>Chọn SQL trả số liệu</li>
+    <li>Lấy tham số và kiểm chứng</li>
+    <li>Lưu thành cặp</li>
+  </ol>
+</header>
+
+<section id="tong-quan">
+  <h2>Tổng quan</h2>
+  <p>Mỗi lần người dùng bấm một chức năng, ứng dụng gửi một hoặc nhiều câu SQL tới Oracle. Oracle lưu các câu này trong bộ nhớ chia sẻ (<code>V$SQL</code>) kèm thời điểm chạy và số dòng trả về. Nếu chỉ có một người thao tác trong một khoảng thời gian ngắn, ta có thể lọc theo thời gian để biết chính xác chức năng đó đã sinh ra những SQL nào.</p>
+  <div class="callout warn">
+    <b>Chỉ thực hiện trên môi trường test</b>
+    <p>Hướng dẫn này có lệnh làm sạch bộ nhớ SQL và bật trace, có thể ảnh hưởng hiệu năng nếu chạy trên môi trường đang vận hành.</p>
+  </div>
+</section>
+
+<section id="chuan-bi">
+  <h2>Điều kiện và chuẩn bị</h2>
+  <ul class="req">
+    <li>Môi trường <strong>test</strong>, chỉ <strong>một người</strong> thao tác ứng dụng trong suốt thời gian lấy.</li>
+    <li>Tài khoản DBA, hoặc tài khoản được đọc <code>V$SESSION</code>, <code>V$SQL</code>, <code>V$SQL_BIND_CAPTURE</code>, <code>V$PROCESS</code>.</li>
+    <li>Biết user Oracle mà ứng dụng dùng để kết nối. Trong tài liệu này dùng ví dụ <code>APP_USER</code>; hãy thay bằng user thực tế.</li>
+    <li>Công cụ chạy SQL: SQL Developer, Toad hoặc SQL*Plus.</li>
+  </ul>
+</section>
+
+<!-- STEP 1 -->
+<div class="step" id="b1"><div class="num">1</div><div>
+  <h3>Lập phiếu ghi chép <span class="tag must">Làm trước</span></h3>
+  <p>Ghi lại thông tin sau để về sau đối chiếu được kết quả.</p>
+  <div class="tw"><table>
+    <tr><th>Mục cần ghi</th><th>Ví dụ</th></tr>
+    <tr><td>Tên chức năng trên màn hình</td><td>Báo cáo &gt; Doanh thu tháng</td></tr>
+    <tr><td>Giá trị nhập trên màn hình</td><td>Tháng 09/2026, chi nhánh Hà Nội</td></tr>
+    <tr><td>Kết quả hiển thị</td><td>Tổng doanh thu = 1.250.000.000</td></tr>
+  </table></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 2 -->
+<div class="step" id="b2"><div class="num">2</div><div>
+  <h3>Xác định session của ứng dụng</h3>
+  <p>Cho ứng dụng đăng nhập và để ở trạng thái chờ, chưa bấm gì. Sau đó chạy:</p>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT sid, serial#, username, program, machine, osuser, status
+FROM   v$session
+WHERE  username = 'APP_USER'
+ORDER  BY logon_time DESC;</pre></div>
+  <p>Nếu ứng dụng dùng connection pool, bạn sẽ thấy nhiều session. Cứ ghi lại tất cả; Bước 3 và 7 không phụ thuộc vào một session cụ thể.</p>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 3 -->
+<div class="step" id="b3"><div class="num">3</div><div>
+  <h3>Làm sạch bộ nhớ SQL <span class="tag">Chỉ trên test</span></h3>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>ALTER SYSTEM FLUSH SHARED_POOL;</pre></div>
+  <p>Bước này giúp mọi SQL xuất hiện sau đó chắc chắn đến từ thao tác của bạn, và Oracle ghi nhận lại giá trị tham số ở lần chạy đầu tiên của mỗi SQL.</p>
+  <div class="callout"><p>Nếu không được phép chạy lệnh này, bỏ qua bước 3 và dựa vào mốc thời gian ở Bước 4 và 6.</p></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 4 -->
+<div class="step" id="b4"><div class="num">4</div><div>
+  <h3>Chốt mốc thời gian bắt đầu</h3>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT TO_CHAR(SYSDATE,'YYYY-MM-DD HH24:MI:SS') AS t0 FROM dual;</pre></div>
+  <p>Ghi lại giá trị <code>t0</code>.</p>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 5 -->
+<div class="step" id="b5"><div class="num">5</div><div>
+  <h3>Bấm đúng MỘT chức năng <span class="tag must">Quan trọng</span></h3>
+  <ul>
+    <li>Mở chức năng, nhập tham số, bấm <strong>Xem / Tra cứu / Xuất</strong> đúng một lần.</li>
+    <li>Chờ kết quả hiển thị đầy đủ, rồi <strong>dừng mọi thao tác</strong> trên ứng dụng.</li>
+    <li>Chụp màn hình kết quả để đối chiếu ở Bước 10.</li>
+  </ul>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 6 -->
+<div class="step" id="b6"><div class="num">6</div><div>
+  <h3>Chốt mốc thời gian kết thúc</h3>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT TO_CHAR(SYSDATE,'YYYY-MM-DD HH24:MI:SS') AS t1 FROM dual;</pre></div>
+  <p>Ghi lại giá trị <code>t1</code>.</p>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 7 -->
+<div class="step" id="b7"><div class="num">7</div><div>
+  <h3>Liệt kê SQL phát sinh</h3>
+  <p>Khi chạy, công cụ sẽ hỏi giá trị <code>t0</code> và <code>t1</code>; nhập đúng định dạng <code>YYYY-MM-DD HH24:MI:SS</code>.</p>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT sql_id, child_number, executions, rows_processed,
+       ROUND(elapsed_time/1000000,2) AS elapsed_sec,
+       module, action,
+       SUBSTR(sql_text,1,150) AS sql_preview,
+       last_active_time
+FROM   v$sql
+WHERE  parsing_schema_name = 'APP_USER'
+  AND  last_active_time BETWEEN TO_DATE('&amp;t0','YYYY-MM-DD HH24:MI:SS')
+                            AND TO_DATE('&amp;t1','YYYY-MM-DD HH24:MI:SS')
+  AND  UPPER(sql_text) NOT LIKE '%V$%'
+  AND  UPPER(sql_text) NOT LIKE '%FROM DUAL%'
+  AND  UPPER(sql_text) NOT LIKE '%SYS_CONTEXT%'
+  AND  UPPER(sql_text) NOT LIKE '%DBMS_%'
+ORDER  BY last_active_time, elapsed_time DESC;</pre></div>
+  <div class="callout"><p>Nếu ứng dụng parse SQL dưới schema khác user đăng nhập (dùng proxy hoặc synonym), hãy đổi <code>parsing_schema_name</code> cho phù hợp, hoặc bỏ điều kiện này và lọc thêm bằng <code>module</code> hoặc <code>program</code>.</p></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 8 -->
+<div class="step" id="b8"><div class="num">8</div><div>
+  <h3>Chọn SQL “trả số liệu”</h3>
+  <p>Một lần bấm thường sinh từ 3 đến 20 SQL. Giữ lại câu SQL thoả các điều kiện sau:</p>
+  <ul class="req">
+    <li>Bắt đầu bằng <code>SELECT</code> hoặc <code>WITH</code>.</li>
+    <li>Truy vấn <strong>bảng nghiệp vụ</strong> (doanh thu, đơn hàng, khách hàng...), không phải bảng cấu hình, phân quyền, menu hay log.</li>
+    <li><code>rows_processed</code> lớn hơn 0 và hợp lý: báo cáo tổng hợp thì ít dòng, danh sách chi tiết thì nhiều dòng.</li>
+    <li>Thường là SQL có <code>elapsed_sec</code> lớn nhất, và chứa các cột giống tiêu đề cột trên báo cáo.</li>
+  </ul>
+  <p>Lấy toàn văn SQL đã chọn:</p>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT sql_fulltext
+FROM   v$sql
+WHERE  sql_id = '&amp;sql_id' AND ROWNUM = 1;</pre></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 9 -->
+<div class="step" id="b9"><div class="num">9</div><div>
+  <h3>Lấy giá trị tham số (bind)</h3>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT name, position, datatype_string, value_string, last_captured
+FROM   v$sql_bind_capture
+WHERE  sql_id = '&amp;sql_id'
+ORDER  BY child_number, position;</pre></div>
+  <div class="callout warn"><b>Cột value_string trống hoặc không đủ?</b><p>Oracle chỉ lấy mẫu giá trị bind theo chu kỳ. Khi đó hãy dùng cách bắt bằng trace ở phần <a href="#trace">Cách bắt bằng Trace</a> bên dưới.</p></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 10 -->
+<div class="step" id="b10"><div class="num">10</div><div>
+  <h3>Kiểm chứng kết quả <span class="tag must">Bắt buộc</span></h3>
+  <p>Chạy lại SQL trong SQL Developer hoặc Toad, thay <code>:1</code>, <code>:2</code>... bằng giá trị bind vừa lấy, rồi <strong>so sánh với màn hình đã chụp ở Bước 5</strong>.</p>
+  <div class="callout ok"><p>Chỉ khi số liệu khớp mới coi đó là đúng cặp.</p></div>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<!-- STEP 11 -->
+<div class="step" id="b11"><div class="num">11</div><div>
+  <h3>Lưu thành cặp thông tin</h3>
+  <div class="tw"><table>
+    <tr><th>Trường</th><th>Nội dung ví dụ</th></tr>
+    <tr><td>Mã yêu cầu</td><td><code>RPT_DOANHTHU_THANG</code></td></tr>
+    <tr><td>Tên yêu cầu số liệu</td><td>Doanh thu theo tháng, theo chi nhánh</td></tr>
+    <tr><td>Đường dẫn chức năng</td><td>Báo cáo &gt; Doanh thu &gt; Theo tháng</td></tr>
+    <tr><td>SQL</td><td>Dán SQL đã chọn; đổi giá trị cố định thành <code>:thang</code>, <code>:chi_nhanh</code></td></tr>
+    <tr><td>Tham số</td><td><code>:1 = thang (VARCHAR2, '202609')</code><br><code>:2 = chi_nhanh (NUMBER, 10)</code></td></tr>
+    <tr><td>Kết quả đối chiếu</td><td>1.250.000.000</td></tr>
+    <tr><td>Ngày lấy / Người lấy</td><td>...</td></tr>
+  </table></div>
+  <p>Nếu một chức năng cần nhiều SQL mới ra số liệu, lưu thành <strong>một yêu cầu gồm nhiều SQL có thứ tự</strong> (1, 2, 3...).</p>
+  <label class="done"><input type="checkbox"> Đã hoàn thành bước này</label>
+</div></div>
+
+<section id="trace">
+  <h2>Cách bắt bằng Trace (khi cần chắc chắn về giá trị bind)</h2>
+  <p>Dùng thay cho các Bước 3 đến 7, hoặc chạy song song để bổ sung giá trị tham số.</p>
+
+  <h3>a. Bật trace trước khi bấm</h3>
+  <div class="code"><div class="bar"><span>PL/SQL</span><button type="button">Sao chép</button></div><pre>BEGIN
+  FOR s IN (SELECT sid, serial# FROM v$session WHERE username = 'APP_USER') LOOP
+    DBMS_MONITOR.SESSION_TRACE_ENABLE(s.sid, s.serial#, waits =&gt; TRUE, binds =&gt; TRUE);
+  END LOOP;
+END;
+/</pre></div>
+
+  <h3>b. Bấm đúng một chức năng</h3>
+  <p>Thực hiện như Bước 5.</p>
+
+  <h3>c. Tắt trace</h3>
+  <div class="code"><div class="bar"><span>PL/SQL</span><button type="button">Sao chép</button></div><pre>BEGIN
+  FOR s IN (SELECT sid, serial# FROM v$session WHERE username = 'APP_USER') LOOP
+    DBMS_MONITOR.SESSION_TRACE_DISABLE(s.sid, s.serial#);
+  END LOOP;
+END;
+/</pre></div>
+
+  <h3>d. Tìm file trace của session vừa chạy</h3>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT s.sid, p.tracefile
+FROM   v$session s JOIN v$process p ON p.addr = s.paddr
+WHERE  s.username = 'APP_USER';</pre></div>
+
+  <h3>e. Đọc file trace</h3>
+  <ul>
+    <li>Nhờ DBA lấy file từ server, mở bằng trình soạn thảo văn bản. Tìm <code>PARSING IN CURSOR</code> (là câu SQL) và <code>BINDS #</code> (là giá trị tham số, dạng <code>value=...</code>).</li>
+    <li>Hoặc đọc trực tiếp bằng SQL (Oracle 12c trở lên), không cần vào server:</li>
+  </ul>
+  <div class="code"><div class="bar"><span>SQL</span><button type="button">Sao chép</button></div><pre>SELECT payload
+FROM   v$diag_trace_file_contents
+WHERE  trace_filename = '&amp;ten_file_trace'
+ORDER  BY line_number;</pre></div>
+  <div class="callout warn"><b>Lưu ý về tkprof</b><p><code>tkprof</code> chỉ tổng hợp SQL và <strong>không hiển thị giá trị bind</strong>. Muốn thấy bind phải đọc file trace gốc.</p></div>
+</section>
+
+<section id="loi">
+  <h2>Lỗi thường gặp</h2>
+  <div class="tw"><table>
+    <tr><th style="width:34%">Hiện tượng</th><th>Cách xử lý</th></tr>
+    <tr><td>Không thấy SQL nào</td><td>Kiểm tra <code>parsing_schema_name</code>; mở rộng khoảng t0 đến t1 thêm vài giây.</td></tr>
+    <tr><td>Quá nhiều SQL lẫn lộn</td><td>Có người khác đang dùng ứng dụng hoặc có job nền. Làm lại khi chỉ có một người thao tác.</td></tr>
+    <tr><td>SQL chứa giá trị cố định (như <code>'202609'</code>) thay vì <code>:1</code></td><td>Ứng dụng nối chuỗi. Tự thay giá trị thành bind khi lưu; dùng <code>FORCE_MATCHING_SIGNATURE</code> trong <code>V$SQL</code> để gộp các biến thể.</td></tr>
+    <tr><td>Chức năng chạy nhiều SQL mới ra số liệu</td><td>Lưu thành một yêu cầu gồm nhiều SQL có thứ tự.</td></tr>
+    <tr><td>Kết quả không khớp màn hình</td><td>Chọn nhầm SQL hoặc thiếu bind. Thử SQL khác trong danh sách ở Bước 7.</td></tr>
+  </table></div>
+</section>
+
+<section id="don-dep">
+  <h2>Dọn dẹp sau khi hoàn tất</h2>
+  <ul class="req">
+    <li>Đảm bảo trace đã được tắt (bước c ở phần Trace).</li>
+    <li>Xoá file trace nếu chứa dữ liệu nhạy cảm.</li>
+    <li>Lưu phiếu ghi chép cùng cặp thông tin đã lấy.</li>
+  </ul>
+</section>
+
+<footer>Tài liệu hướng dẫn nội bộ. Ví dụ dùng user <code>APP_USER</code>; thay bằng thông tin thực tế của môi trường.</footer>
+</main>
+</div>
+
+<script>
+document.querySelectorAll('.code button').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    var text=btn.closest('.code').querySelector('pre').innerText;
+    var ok=function(){btn.textContent='Đã sao chép';setTimeout(function(){btn.textContent='Sao chép'},1500)};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(ok,fallback)}else{fallback()}
+    function fallback(){var t=document.createElement('textarea');t.value=text;document.body.appendChild(t);t.select();try{document.execCommand('copy');ok()}catch(e){}document.body.removeChild(t)}
+  });
+});
+var links=[].slice.call(document.querySelectorAll('#toc a'));
+var map={};links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a});
+if('IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(e.isIntersecting){links.forEach(function(a){a.classList.remove('active')});if(map[e.target.id])map[e.target.id].classList.add('active')}
+    });
+  },{rootMargin:'0px 0px -70% 0px'});
+  Object.keys(map).forEach(function(id){var el=document.getElementById(id);if(el)io.observe(el)});
+}
+</script>
+</body>
+</html>
