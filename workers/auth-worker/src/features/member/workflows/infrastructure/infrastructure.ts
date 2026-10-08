@@ -1,3 +1,4 @@
+import { triggerKindsJsonForRunner } from '../domain/share-grants.js';
 import {
   summarizeWorkflowListTriggers,
   type SharedWorkflowTriggerSummary,
@@ -9,6 +10,8 @@ export interface SharedWorkflowFilters {
   starCount?: number;
   search?: string;
   excludeOwnerId?: string;
+  /** Login email of the viewer. User-only grants are listed only for that account. */
+  viewerIdentifier?: string;
 }
 
 export interface SharedWorkflowRow {
@@ -27,6 +30,7 @@ export interface SharedWorkflowRow {
   minPlanId?: string;
   graceWhenExhausted?: boolean | number;
   publicTriggerKinds?: string | null;
+  shareGrants?: string | null;
   status?: string;
   created_at?: number;
   /** Average 1–5 from community ratings (workflow_user_stars). */
@@ -41,6 +45,28 @@ export interface WorkflowCommunityStarStats {
   communityStarAvg: number;
   communityStarCount: number;
 }
+
+/**
+ * Legacy rows (NULL share list) stay in the catalog. A saved list is visible when an
+ * "all" row grants a trigger, or a "users" row lists this viewer's login email.
+ */
+const SHARE_GRANT_VISIBILITY_SQL = `(
+  w."shareGrants" IS NULL
+  OR TRIM(COALESCE(w."shareGrants", '')) = ''
+  OR EXISTS (
+    SELECT 1 FROM json_each(CASE WHEN json_valid(w."shareGrants") THEN w."shareGrants" ELSE '[]' END) AS grant
+    WHERE json_extract(grant.value, '$.audience') = 'all'
+      AND IFNULL(json_array_length(json_extract(grant.value, '$.triggerKinds')), 0) > 0
+  )
+  OR EXISTS (
+    SELECT 1
+    FROM json_each(CASE WHEN json_valid(w."shareGrants") THEN w."shareGrants" ELSE '[]' END) AS grant,
+         json_each(json_extract(grant.value, '$.emails')) AS email
+    WHERE json_extract(grant.value, '$.audience') = 'users'
+      AND lower(email.value) = ?
+      AND IFNULL(json_array_length(json_extract(grant.value, '$.triggerKinds')), 0) > 0
+  )
+)`;
 
 /** Aggregate community star ratings for one shared workflow. */
 export async function getWorkflowCommunityStarStats(
@@ -66,9 +92,12 @@ export async function listSharedWorkflowsFromD1(
   db: D1Database,
   filters: SharedWorkflowFilters,
 ): Promise<{ workflows: SharedWorkflowRow[]; hasMore: boolean }> {
-  const { limit = 50, offset = 0, starCount, search, excludeOwnerId } = filters;
+  const { limit = 50, offset = 0, starCount, search, excludeOwnerId, viewerIdentifier } = filters;
   const conditions: string[] = ['w."isShared" = 1', 'COALESCE(w."isEnterprise", 0) = 0', 'w."status" = ?'];
   const params: (string | number)[] = ['published'];
+  const viewerEmail = String(viewerIdentifier ?? '').trim().toLowerCase();
+  conditions.push(SHARE_GRANT_VISIBILITY_SQL);
+  params.push(viewerEmail);
 
   if (excludeOwnerId) {
     conditions.push('w."user_id" != ?');
@@ -88,7 +117,7 @@ export async function listSharedWorkflowsFromD1(
 
   const whereClause = conditions.join(' AND ');
   const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.definition, w.isShared, w.starCount, w.starLabel,
-      w.usageCount, w.totalEarningsUsd, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted, w.publicTriggerKinds,
+      w.usageCount, w.totalEarningsUsd, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted, w.publicTriggerKinds, w.shareGrants,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
       COALESCE(star_stats.rater_count, 0) AS communityStarCount
     FROM agent_workflows w
@@ -106,10 +135,19 @@ export async function listSharedWorkflowsFromD1(
   const result = await db.prepare(sql).bind(...params).all<SharedWorkflowRow>();
   const rows = result.results ?? [];
   const hasMore = rows.length > limit;
-  const workflows = rows.slice(0, limit).map(({ definition, ...rest }) => ({
-    ...rest,
-    triggers: summarizeWorkflowListTriggers(definition, rest.publicTriggerKinds),
-  }));
+  const workflows = rows.slice(0, limit).map(({ definition, shareGrants, ...rest }) => {
+    const viewerKinds = triggerKindsJsonForRunner({
+      publicTriggerKinds: rest.publicTriggerKinds,
+      shareGrants,
+      runnerIdentifier: viewerEmail,
+    });
+    const publicTriggerKinds = viewerKinds ?? rest.publicTriggerKinds;
+    return {
+      ...rest,
+      publicTriggerKinds,
+      triggers: summarizeWorkflowListTriggers(definition, publicTriggerKinds),
+    };
+  });
   return { workflows, hasMore };
 }
 

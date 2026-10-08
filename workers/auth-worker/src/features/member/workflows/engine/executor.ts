@@ -54,7 +54,8 @@ import { isStoppableExecutionStatus, persistStatusHonoringCancel } from './cance
 import { incrementSharedWorkflowUsage } from '../billing/royalty.js';
 import { consumeDailyWorkflowRun, loadUserAndSyncPlan } from '../billing/billing.js';
 import { runnerMeetsMinPlan } from '../billing/plan.js';
-import { isPublicTriggerAllowed, resolveRunTriggerKinds } from '../domain/public-trigger-kinds.js';
+import { resolveRunTriggerKinds } from '../domain/public-trigger-kinds.js';
+import { runnerMayUseTrigger } from '../domain/share-grants.js';
 import {
   executionHistoryLimitsFromEntitlement,
   pruneWorkflowExecutionHistory,
@@ -963,7 +964,12 @@ async function prepareWorkflowExecution(params: ExecuteWorkflowParams): Promise<
         entryNodeIds: params.entryNodeIds,
         triggerKind: params.triggerKind,
         isWebhook: Boolean(params.webhookItem),
-      }).find((kind) => !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, kind));
+      }).find((kind) => !runnerMayUseTrigger({
+        publicTriggerKinds: resolved.workflow.publicTriggerKinds,
+        shareGrants: resolved.workflow.shareGrants,
+        runnerIdentifier: user.identifier,
+        kind,
+      }));
       if (blockedKind) {
         return {
           ok: false,

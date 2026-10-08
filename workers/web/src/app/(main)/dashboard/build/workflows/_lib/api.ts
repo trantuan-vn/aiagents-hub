@@ -33,6 +33,8 @@ export interface AgentWorkflow {
   graceWhenExhausted?: boolean;
   /** JSON array of trigger kinds community users may start. Null allows all. */
   publicTriggerKinds?: string | null;
+  /** JSON array of share grants. Null keeps the legacy public trigger rule. */
+  shareGrants?: string | null;
   starCount?: number;
   starLabel?: string;
   communityStarAvg?: number;

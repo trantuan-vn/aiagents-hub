@@ -14,12 +14,8 @@ import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-sh
 import { useWorkflowCollab } from "../../_components/hooks/use-workflow-collab";
 import { useWorkflowUndo, useWorkflowUndoKeyboard } from "../../_components/hooks/use-workflow-undo";
 import { createWorkflow, deleteWorkflow, getWorkflow, updateWorkflow } from "../../_lib/api";
-import {
-  parsePublicTriggerKinds,
-  serializePublicTriggerKinds,
-  triggerKindsInDefinition,
-  type PublicTriggerKind,
-} from "../../_lib/public-trigger-kinds";
+import { triggerKindsInDefinition } from "../../_lib/public-trigger-kinds";
+import { grantsFromStored, serializeShareGrants, type ShareGrant } from "../../_lib/share-grants";
 import { parseWorkflowTags, serializeWorkflowTags } from "../../_lib/workflow-tags";
 
 type WorkflowSnapshot = {
@@ -30,7 +26,7 @@ type WorkflowSnapshot = {
   isShared: boolean;
   minPlanId: "free" | "starter" | "pro" | "business";
   graceWhenExhausted: boolean;
-  publicTriggerKinds: PublicTriggerKind[] | null;
+  shareGrants: ShareGrant[];
   starCount: number;
   starLabel: string;
   status: "draft" | "published";
@@ -55,7 +51,7 @@ function snapshotFromState(state: {
   isShared: boolean;
   minPlanId: "free" | "starter" | "pro" | "business";
   graceWhenExhausted: boolean;
-  publicTriggerKinds: PublicTriggerKind[] | null;
+  shareGrants: ShareGrant[];
   starCount: number;
   starLabel: string;
   status: "draft" | "published";
@@ -77,7 +73,7 @@ export default function EditWorkflowPage() {
   const [isShared, setIsShared] = useState(false);
   const [minPlanId, setMinPlanId] = useState<"free" | "starter" | "pro" | "business">("free");
   const [graceWhenExhausted, setGraceWhenExhausted] = useState(false);
-  const [publicTriggerKinds, setPublicTriggerKinds] = useState<PublicTriggerKind[] | null>(null);
+  const [shareGrants, setShareGrants] = useState<ShareGrant[]>([]);
   const [maxAssignableMinPlanId, setMaxAssignableMinPlanId] = useState<"free" | "starter" | "pro" | "business">("free");
   const [canGraceWhenExhausted, setCanGraceWhenExhausted] = useState(false);
   const [canShareWorkflows, setCanShareWorkflows] = useState(true);
@@ -103,12 +99,12 @@ export default function EditWorkflowPage() {
         isShared,
         minPlanId,
         graceWhenExhausted,
-        publicTriggerKinds,
+        shareGrants,
         starCount,
         starLabel,
         status,
       }),
-    [name, description, tags, definition, isShared, minPlanId, graceWhenExhausted, publicTriggerKinds, starCount, starLabel, status],
+    [name, description, tags, definition, isShared, minPlanId, graceWhenExhausted, shareGrants, starCount, starLabel, status],
   );
   const currentSnapshotRef = useRef(currentSnapshot);
   currentSnapshotRef.current = currentSnapshot;
@@ -127,7 +123,7 @@ export default function EditWorkflowPage() {
       setIsShared(snap.isShared);
       setMinPlanId(snap.minPlanId);
       setGraceWhenExhausted(snap.graceWhenExhausted);
-      setPublicTriggerKinds(snap.publicTriggerKinds);
+      setShareGrants(snap.shareGrants);
       setStarCount(snap.starCount);
       setStarLabel(snap.starLabel);
       setStatus(snap.status);
@@ -149,7 +145,7 @@ export default function EditWorkflowPage() {
         isShared: !!workflow.isShared,
         minPlanId: workflow.minPlanId === "starter" || workflow.minPlanId === "pro" || workflow.minPlanId === "business" ? workflow.minPlanId : "free",
         graceWhenExhausted: !!workflow.graceWhenExhausted,
-        publicTriggerKinds: parsePublicTriggerKinds(workflow.publicTriggerKinds),
+        shareGrants: grantsFromStored(workflow.shareGrants, workflow.publicTriggerKinds),
         starCount: workflow.starCount ?? 0,
         starLabel: workflow.starLabel ?? "",
         status: workflow.status === "published" ? "published" : "draft",
@@ -200,7 +196,7 @@ export default function EditWorkflowPage() {
         isShared: payload.isShared,
         minPlanId: payload.minPlanId,
         graceWhenExhausted: payload.graceWhenExhausted,
-        publicTriggerKinds: serializePublicTriggerKinds(payload.publicTriggerKinds),
+        shareGrants: serializeShareGrants(payload.shareGrants),
         starCount: payload.starCount,
         starLabel: payload.starLabel,
         status: payload.isShared ? "published" : payload.status,
@@ -240,7 +236,7 @@ export default function EditWorkflowPage() {
       else if (key === "isShared") setIsShared(value as boolean);
       else if (key === "minPlanId") setMinPlanId(value as "free" | "starter" | "pro" | "business");
       else if (key === "graceWhenExhausted") setGraceWhenExhausted(value as boolean);
-      else if (key === "publicTriggerKinds") setPublicTriggerKinds(value as PublicTriggerKind[] | null);
+      else if (key === "shareGrants") setShareGrants(value as ShareGrant[]);
       else if (key === "starCount") setStarCount(value as number);
       else if (key === "starLabel") setStarLabel(value as string);
       else if (key === "status") setStatus(value as "draft" | "published");
@@ -404,8 +400,8 @@ export default function EditWorkflowPage() {
           graceWhenExhausted,
           onGraceWhenExhaustedChange: (v) => recordAndSet("graceWhenExhausted", v),
           canGraceWhenExhausted,
-          publicTriggerKinds,
-          onPublicTriggerKindsChange: (v) => recordAndSet("publicTriggerKinds", v),
+          shareGrants,
+          onShareGrantsChange: (v) => recordAndSet("shareGrants", v),
           triggerKindsInWorkflow,
           starCount,
           onStarCountChange: (n) => recordAndSet("starCount", n),

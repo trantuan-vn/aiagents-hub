@@ -57,6 +57,11 @@ export const AgentWorkflowSchema = z.object({
   graceWhenExhausted: z.boolean().default(false),
   /** JSON array of trigger kinds community users may start, e.g. `["chat","form"]`. Null allows all. */
   publicTriggerKinds: z.string().max(200).nullish(),
+  /**
+   * JSON array of share grants. Each row gives a trigger set to everyone (`all`)
+   * or to specific login emails (`users`). Null keeps the legacy publicTriggerKinds rule.
+   */
+  shareGrants: z.string().max(60_000).nullish(),
   /** Owner labels workflow type (1–5 stars). */
   starCount: z.number().int().min(0).max(5).default(0),
   starLabel: z.string().max(100).optional(),

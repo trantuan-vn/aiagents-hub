@@ -12,11 +12,16 @@ import {
   WorkflowCredentialTypeSchema,
 } from '../domain/domain';
 import {
-  isPublicTriggerAllowed,
   normalizePublicTriggerKinds,
   resolveRunTriggerKinds,
   type PublicTriggerKind,
 } from '../domain/public-trigger-kinds.js';
+import {
+  applyShareGrantsOnWrite,
+  runnerMayUseTrigger,
+  shareGrantVisibleTo,
+  triggerKindsJsonForRunner,
+} from '../domain/share-grants.js';
 import { cancelWorkflowExecution, continueFromCheckpointWorkflowExecution, executeWorkflowGraph, resumeWorkflowExecution } from '../engine/executor.js';
 import { executionPersistFlags } from '../engine/persist-state.js';
 import { loadUserAndSyncPlan } from '../billing/billing.js';
@@ -253,7 +258,12 @@ export function createWorkflowRoutes(bindingName: string) {
       const blocked = resolveRunTriggerKinds({
         definition: resolved.definition,
         entryNodeIds: entryNodeId ? [entryNodeId] : undefined,
-      }).find((kind) => !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, kind));
+      }).find((kind) => !runnerMayUseTrigger({
+        publicTriggerKinds: resolved.workflow.publicTriggerKinds,
+        shareGrants: resolved.workflow.shareGrants,
+        runnerIdentifier: user.identifier,
+        kind,
+      }));
       if (blocked) {
         return {
           status: 'failed' as const,
@@ -334,7 +344,12 @@ export function createWorkflowRoutes(bindingName: string) {
       workflowId,
       ownerIdParam,
     );
-    if (!resolved.isOwnedByUser && !isPublicTriggerAllowed(resolved.workflow.publicTriggerKinds, 'chat')) {
+    if (!resolved.isOwnedByUser && !runnerMayUseTrigger({
+      publicTriggerKinds: resolved.workflow.publicTriggerKinds,
+      shareGrants: resolved.workflow.shareGrants,
+      runnerIdentifier: user.identifier,
+      kind: 'chat',
+    })) {
       return c.json(triggerNotPublicBody('chat'), 403);
     }
     return createWorkflowChatStreamResponse(
@@ -389,6 +404,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (body.publicTriggerKinds !== undefined) {
         body.publicTriggerKinds = normalizePublicTriggerKinds(body.publicTriggerKinds);
       }
+      applyShareGrantsOnWrite(body);
       const userDO = getUserDO(c, user.identifier);
       const created = await executeUtils.executeDynamicAction(
         userDO,
@@ -417,6 +433,7 @@ export function createWorkflowRoutes(bindingName: string) {
         limit,
         offset,
         excludeOwnerId: getUserId(c, user.identifier),
+        viewerIdentifier: user.identifier,
         search: search || undefined,
         starCount: starCount ? parseInt(starCount, 10) : undefined,
       });
@@ -946,6 +963,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (body.publicTriggerKinds !== undefined) {
         body.publicTriggerKinds = normalizePublicTriggerKinds(body.publicTriggerKinds);
       }
+      applyShareGrantsOnWrite(body);
       const rows = await executeUtils.executeDynamicAction(userDO, 'select', {
         where: { field: 'id', operator: '=', value: id },
       }, 'agent_workflows');
@@ -1188,10 +1206,18 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds
+      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, totalEarningsUsd, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds, shareGrants
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);
+      if (!shareGrantVisibleTo(result.shareGrants, user.identifier)) return c.json({ error: 'Not found' }, 404);
+      const viewerKinds = triggerKindsJsonForRunner({
+        publicTriggerKinds: result.publicTriggerKinds,
+        shareGrants: result.shareGrants,
+        runnerIdentifier: user.identifier,
+      });
+      if (viewerKinds != null) result.publicTriggerKinds = viewerKinds;
+      delete result.shareGrants;
       await assertPublicSharedOnOwnerDo(c.env, ownerId, workflowId);
       const userDO = getUserDO(c, user.identifier);
       const { quota } = await loadUserAndSyncPlan(userDO, c.env);

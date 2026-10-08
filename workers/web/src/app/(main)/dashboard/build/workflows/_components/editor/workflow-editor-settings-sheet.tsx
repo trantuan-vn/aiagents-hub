@@ -1,15 +1,10 @@
 "use client";
 
 import {
-  Check,
-  ClipboardList,
   FileText,
   Globe,
-  MessageSquare,
-  MousePointerClick,
   Settings2,
   Star,
-  Webhook,
   Zap,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -29,18 +24,13 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
-import { PUBLIC_TRIGGER_KINDS, type PublicTriggerKind } from "../../_lib/public-trigger-kinds";
+import type { PublicTriggerKind } from "../../_lib/public-trigger-kinds";
+import type { ShareGrant } from "../../_lib/share-grants";
 import { WorkflowEnterpriseSection } from "./workflow-enterprise-section";
+import { WorkflowShareGrantsEditor } from "./workflow-share-grants-editor";
 
 const PLAN_IDS = ["free", "starter", "pro", "business"] as const;
 type PlanId = (typeof PLAN_IDS)[number];
-
-const TRIGGER_ICONS: Record<PublicTriggerKind, typeof Webhook> = {
-  manual: MousePointerClick,
-  chat: MessageSquare,
-  form: ClipboardList,
-  webhook: Webhook,
-};
 
 export interface WorkflowEditorSettingsSheetProps {
   open: boolean;
@@ -58,8 +48,8 @@ export interface WorkflowEditorSettingsSheetProps {
   graceWhenExhausted: boolean;
   onGraceWhenExhaustedChange: (v: boolean) => void;
   canGraceWhenExhausted?: boolean;
-  publicTriggerKinds: PublicTriggerKind[] | null;
-  onPublicTriggerKindsChange: (v: PublicTriggerKind[]) => void;
+  shareGrants: ShareGrant[];
+  onShareGrantsChange: (v: ShareGrant[]) => void;
   triggerKindsInWorkflow?: Set<PublicTriggerKind>;
   starCount: number;
   onStarCountChange: (n: number) => void;
@@ -85,8 +75,8 @@ export function WorkflowEditorSettingsSheet({
   graceWhenExhausted,
   onGraceWhenExhaustedChange,
   canGraceWhenExhausted = false,
-  publicTriggerKinds,
-  onPublicTriggerKindsChange,
+  shareGrants,
+  onShareGrantsChange,
   triggerKindsInWorkflow,
   starCount,
   onStarCountChange,
@@ -100,14 +90,6 @@ export function WorkflowEditorSettingsSheet({
   const maxPlanIndex = PLAN_IDS.indexOf(maxAssignableMinPlanId);
   const plans = PLAN_IDS.filter((_, index) => index <= maxPlanIndex);
   const stars = Math.min(5, Math.max(0, starCount));
-  const allowedTriggerKinds = publicTriggerKinds ?? [...PUBLIC_TRIGGER_KINDS];
-  const toggleTriggerKind = (kind: PublicTriggerKind) => {
-    onPublicTriggerKindsChange(
-      allowedTriggerKinds.includes(kind)
-        ? allowedTriggerKinds.filter((k) => k !== kind)
-        : PUBLIC_TRIGGER_KINDS.filter((k) => k === kind || allowedTriggerKinds.includes(k)),
-    );
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -189,68 +171,11 @@ export function WorkflowEditorSettingsSheet({
               </div>
               <p className="text-muted-foreground text-xs leading-relaxed">{t("min_plan_hint")}</p>
             </div>
-            <div className="space-y-2">
-              <Label id="wf-public-triggers-label">{t("public_triggers")}</Label>
-              <div
-                role="group"
-                aria-labelledby="wf-public-triggers-label"
-                className="grid grid-cols-1 gap-2 sm:grid-cols-2"
-              >
-                {PUBLIC_TRIGGER_KINDS.map((kind) => {
-                  const Icon = TRIGGER_ICONS[kind];
-                  const checked = allowedTriggerKinds.includes(kind);
-                  const inWorkflow = triggerKindsInWorkflow?.has(kind) ?? true;
-                  return (
-                    <button
-                      key={kind}
-                      type="button"
-                      role="checkbox"
-                      aria-checked={checked}
-                      className={cn(
-                        "flex items-start gap-3 rounded-lg border p-3 text-left transition-colors",
-                        checked ? "border-primary bg-primary/10" : "bg-background hover:bg-accent",
-                        !inWorkflow && "opacity-60",
-                      )}
-                      onClick={() => toggleTriggerKind(kind)}
-                    >
-                      <span
-                        className={cn(
-                          "flex size-8 shrink-0 items-center justify-center rounded-md",
-                          checked ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        <Icon className="size-4" />
-                      </span>
-                      <span className="min-w-0 flex-1 space-y-0.5">
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-medium">{t(`public_trigger_${kind}`)}</span>
-                          <span
-                            aria-hidden
-                            className={cn(
-                              "flex size-4 shrink-0 items-center justify-center rounded-[4px] border",
-                              checked ? "border-primary bg-primary text-primary-foreground" : "border-input",
-                            )}
-                          >
-                            {checked ? <Check className="size-3" /> : null}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground block text-xs leading-relaxed">
-                          {inWorkflow ? t(`public_trigger_${kind}_desc`) : t("public_trigger_not_in_workflow")}
-                        </span>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-              <p
-                className={cn(
-                  "text-xs leading-relaxed",
-                  allowedTriggerKinds.length === 0 ? "text-destructive" : "text-muted-foreground",
-                )}
-              >
-                {allowedTriggerKinds.length === 0 ? t("public_triggers_none") : t("public_triggers_hint")}
-              </p>
-            </div>
+            <WorkflowShareGrantsEditor
+              grants={shareGrants}
+              onChange={onShareGrantsChange}
+              triggerKindsInWorkflow={triggerKindsInWorkflow}
+            />
           </SettingsSection>
 
           <div className="grid gap-5 sm:grid-cols-2">
