@@ -1,128 +1,95 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
+import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 
+import { ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 
-import { Badge } from "@/components/ui/badge";
+import { getSharedWorkflowPromoSite, type WorkflowPromoSite } from "../../_lib/api";
+import { base64ToBytes, type PromoFolderFile } from "../../_lib/promo-folder";
+import { WorkflowPromoFrame } from "../../_components/panels/workflow-panels/workflow-promo-frame";
 
-import { StarDisplay } from "../../_components/list/star-display";
-import { WorkflowEditor } from "../../_components/editor/workflow-editor";
-import { WorkflowEditorShell } from "../../_components/editor/workflow-editor-shell";
-import { getSharedWorkflow, type AgentWorkflow } from "../../_lib/api";
-import { parsePublicTriggerKinds, type PublicTriggerKind } from "../../_lib/public-trigger-kinds";
-interface ViewWorkflowState {
-  name: string;
-  description: string;
-  definition: string;
-  starLabel: string;
-  communityStarAvg: number;
-  communityStarCount: number;
-  usageCount: number;
-  publicTriggerKinds: PublicTriggerKind[] | null;
+import "../../_components/canvas/workflow-canvas-theme.css";
+
+function filesFromSite(site: WorkflowPromoSite): PromoFolderFile[] {
+  return site.files.map((file) => ({
+    path: file.path,
+    bytes: base64ToBytes(file.contentBase64),
+    contentType: file.contentType,
+  }));
 }
-
-function buildViewStateFromWorkflow(workflow: AgentWorkflow): ViewWorkflowState {
-  const def = workflow.definition || '{"nodes":[],"edges":[]}';
-  return {
-    publicTriggerKinds: parsePublicTriggerKinds(workflow.publicTriggerKinds),
-    name: workflow.name,
-    description: workflow.description ?? "",
-    definition: def,
-    starLabel: workflow.starLabel ?? "",
-    communityStarAvg: workflow.communityStarAvg ?? 0,
-    communityStarCount: workflow.communityStarCount ?? 0,
-    usageCount: workflow.usageCount ?? 0,
-  };
-}
-
-const EMPTY_VIEW_STATE: ViewWorkflowState = {
-  name: "",
-  description: "",
-  definition: '{"nodes":[],"edges":[]}',
-  starLabel: "",
-  communityStarAvg: 0,
-  communityStarCount: 0,
-  usageCount: 0,
-  publicTriggerKinds: null,
-};
 
 export default function ViewSharedWorkflowPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = Number(params.id);
   const ownerId = searchParams.get("owner") ?? "";
-  const t = useTranslations("WorkflowsPage");
-  const tv = useTranslations("WorkflowViewPage");
+  const t = useTranslations("WorkflowViewPage");
 
-  const [view, setView] = useState<ViewWorkflowState>(EMPTY_VIEW_STATE);
+  const [name, setName] = useState("");
+  const [files, setFiles] = useState<PromoFolderFile[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    if (!id || isNaN(id) || !ownerId) return;
-    setLoading(true);
-    try {
-      const { workflow } = await getSharedWorkflow(ownerId, id);
-      setView(buildViewStateFromWorkflow(workflow));
-    } catch {
-      toast.error(t("load_error"));
-    } finally {
-      setLoading(false);
-    }
-  }, [id, ownerId, t]);
+  const [missing, setMissing] = useState(false);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!id || Number.isNaN(id) || !ownerId) return;
+    let cancelled = false;
+    setLoading(true);
+    setMissing(false);
+    getSharedWorkflowPromoSite(ownerId, id)
+      .then((res) => {
+        if (cancelled) return;
+        setName(res.workflow.name);
+        setFiles(res.site ? filesFromSite(res.site) : []);
+      })
+      .catch(() => {
+        if (!cancelled) setMissing(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id, ownerId]);
 
-  if (!id || isNaN(id) || !ownerId) {
-    return <p className="text-muted-foreground p-6 text-sm">{tv("invalid")}</p>;
+  if (!id || Number.isNaN(id) || !ownerId) {
+    return <p className="text-muted-foreground p-6 text-sm">{t("invalid")}</p>;
   }
-
-  if (loading) {
-    return <p className="text-muted-foreground p-6 text-sm">...</p>;
-  }
-
-  const headerMeta = (
-    <>
-      <div className="flex items-center gap-1.5">
-        <StarDisplay count={view.communityStarAvg} size="sm" />
-        <span className="text-muted-foreground text-xs">{tv("rater_count", { count: view.communityStarCount })}</span>
-      </div>
-      {view.starLabel ? (
-        <Badge variant="secondary" className="text-[10px]">
-          {view.starLabel}
-        </Badge>
-      ) : null}
-      <span className="text-muted-foreground text-xs">
-        {t("usage_count", { count: view.usageCount })}
-      </span>
-    </>
-  );
 
   return (
-    <>
-      <WorkflowEditorShell
-        readOnly
-        workflowId={id}
-        workflowName={view.name}
-        headerMeta={headerMeta}
-        backHref="/dashboard/build/workflows"
-        backLabel={tv("back")}
-        onExecute={() => {}}
-        definitionJson={view.definition}
-      >
-        <WorkflowEditor
-          workflowId={id}
-          ownerId={ownerId}
-          definitionJson={view.definition}
-          publicTriggerKinds={view.publicTriggerKinds}
-          readOnly
-        />
-      </WorkflowEditorShell>
-    </>
+    <div className="workflow-editor-shell -mx-4 -mt-4 -mb-4 flex flex-col md:-mx-6 md:-mt-6 md:-mb-6">
+      <header className="border-border bg-background flex h-12 shrink-0 items-center gap-3 border-b px-3">
+        <Link
+          href="/dashboard/build/workflows?view=shared"
+          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm"
+        >
+          <ArrowLeft className="size-4" />
+          {t("back")}
+        </Link>
+        <div className="bg-border h-4 w-px" />
+        <h1 className="min-w-0 truncate text-sm font-medium">{name || t("intro_label")}</h1>
+        <span className="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-[10px] font-medium">
+          {t("intro_label")}
+        </span>
+      </header>
+      <div className="flex min-h-0 flex-1 flex-col p-4">
+        {loading ? (
+          <p className="text-muted-foreground text-sm">{t("intro_loading")}</p>
+        ) : missing ? (
+          <p className="text-muted-foreground text-sm">{t("intro_error")}</p>
+        ) : (
+          <WorkflowPromoFrame
+            files={files}
+            address={name || t("intro_label")}
+            emptyLabel={t("intro_empty")}
+            title={name || t("intro_label")}
+          />
+        )}
+      </div>
+    </div>
   );
 }

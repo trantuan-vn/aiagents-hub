@@ -86,6 +86,38 @@ export function updateWorkflow(id: number, data: Partial<AgentWorkflow>) {
   });
 }
 
+export interface WorkflowPromoFile {
+  path: string;
+  contentType: string;
+  contentBase64: string;
+}
+
+export interface WorkflowPromoSite {
+  updatedAt: string;
+  files: WorkflowPromoFile[];
+}
+
+export function getWorkflowPromoSite(id: number) {
+  return apiFetch<{ site: WorkflowPromoSite | null }>(`/dashboard/build/workflows/${id}/promo-site`);
+}
+
+export function publishWorkflowPromoSite(id: number, files: Array<{ path: string; contentBase64: string }>) {
+  return apiFetch<{ site: { updatedAt: string; fileCount: number } }>(`/dashboard/build/workflows/${id}/promo-site`, {
+    method: "PUT",
+    body: JSON.stringify({ files }),
+  });
+}
+
+export function deleteWorkflowPromoSite(id: number) {
+  return apiFetch<{ success: boolean }>(`/dashboard/build/workflows/${id}/promo-site`, { method: "DELETE" });
+}
+
+export function getSharedWorkflowPromoSite(ownerId: string, workflowId: number) {
+  return apiFetch<{ site: WorkflowPromoSite | null; workflow: { name: string; description: string } }>(
+    `/dashboard/build/workflows/shared/${encodeURIComponent(ownerId)}/${workflowId}/promo-site`,
+  );
+}
+
 export function deleteWorkflow(id: number) {
   return apiFetch<{ success: boolean }>(`/dashboard/build/workflows/${id}`, { method: "DELETE" });
 }

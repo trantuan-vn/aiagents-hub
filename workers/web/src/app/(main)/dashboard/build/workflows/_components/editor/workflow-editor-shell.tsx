@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import "../canvas/workflow-canvas-theme.css";
 
 import { WorkflowEditorHeader, type WorkflowEditorTab } from "./workflow-editor-header";
-import { WorkflowEvaluationsPanel } from "../panels/workflow-panels/workflow-evaluations-panel";
+import { WorkflowPromoSitePanel } from "../panels/workflow-panels/workflow-promo-site-panel";
 import { WorkflowEditorChatPanel } from "./workflow-editor-chat-panel";
 import { workflowEditorChatStore } from "./workflow-editor-chat-store";
 import { WorkflowEditorLogsPanel } from "./workflow-editor-logs-panel";
@@ -18,10 +18,6 @@ import { WorkflowEditorShellWorkspace } from "./workflow-editor-shell-workspace"
 import { WorkflowExecutionsPanel } from "../panels/workflow-panels/workflow-executions-panel";
 import { WorkflowHistorySheet } from "../panels/workflow-panels/workflow-history-sheet";
 import { WorkflowResizeHandle, workflowResizePanelClassName } from "../layout/workflow-resize-handle";
-import {
-  workflowAddNodeDrawerActions,
-  type WorkflowAddNodeDrawerOpenOptions,
-} from "../add-node/workflow-add-node-drawer-store";
 
 export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const {
@@ -70,7 +66,6 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
   const localDescRef = useRef<HTMLTextAreaElement>(null) as RefObject<HTMLTextAreaElement>;
   const resolvedNameRef = nameInputRef ?? localNameRef;
   const resolvedDescRef = descriptionInputRef ?? localDescRef;
-  const pendingDrawerRef = useRef<WorkflowAddNodeDrawerOpenOptions | null>(null);
 
   const { editSettings, onAddNode, onAddStickyNote, status: resolvedStatus } = resolveWorkflowEditorShellProps(
     props,
@@ -91,51 +86,9 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
     window.setTimeout(() => resolvedDescRef.current?.focus(), 150);
   };
 
-  const openAddNodeDrawer = (options: WorkflowAddNodeDrawerOpenOptions) => {
-    if (activeTab === "editor") {
-      workflowAddNodeDrawerActions.open(options);
-      return;
-    }
-    pendingDrawerRef.current = options;
-    setActiveTab("editor");
-  };
-
   useEffect(() => {
     if (chatOpen) setLogsOpen(true);
   }, [chatOpen]);
-
-  useEffect(() => {
-    if (activeTab !== "editor" || !pendingDrawerRef.current) return;
-    const options = pendingDrawerRef.current;
-    pendingDrawerRef.current = null;
-    requestAnimationFrame(() => {
-      workflowAddNodeDrawerActions.open(options);
-    });
-  }, [activeTab]);
-
-  const openAddEvaluationTrigger = () => {
-    openAddNodeDrawer({
-      variant: "full",
-      initialView: "triggers",
-      onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
-    });
-  };
-  const openAddSetOutputsNode = () => {
-    openAddNodeDrawer({
-      variant: "full",
-      initialView: "evaluation",
-      highlightEvaluationAction: "set_outputs",
-      onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
-    });
-  };
-  const openAddSetMetricsNode = () => {
-    openAddNodeDrawer({
-      variant: "full",
-      initialView: "evaluation",
-      highlightEvaluationAction: "set_metrics",
-      onPick: ({ type, label, extra }) => onAddNode(type, label, extra),
-    });
-  };
 
   const handleImportFile = (file: File) => {
     const reader = new FileReader();
@@ -200,11 +153,7 @@ export function WorkflowEditorShell(props: WorkflowEditorShellProps) {
         </div>
       ) : activeTab === "evaluations" ? (
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <WorkflowEvaluationsPanel
-            onAddEvaluationTrigger={openAddEvaluationTrigger}
-            onAddSetOutputsNode={openAddSetOutputsNode}
-            onAddSetMetricsNode={openAddSetMetricsNode}
-          />
+          <WorkflowPromoSitePanel workflowId={workflowId} />
         </div>
       ) : (
         <>

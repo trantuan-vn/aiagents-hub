@@ -89,6 +89,8 @@ import {
 } from '../../../enterprise/workflow-flag';
 import { ownerSetEnterpriseProposal } from '../../../enterprise/workflow-proposal';
 import { assignEnterpriseTriggerKeys } from '../../../enterprise/trigger-keys';
+import { deletePromoSite } from '../promo/promo-site';
+import { registerWorkflowPromoRoutes } from '../promo/promo-routes';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
@@ -944,6 +946,8 @@ export function createWorkflowRoutes(bindingName: string) {
     }, 'Failed to delete trigger'),
   );
 
+  registerWorkflowPromoRoutes(app, { createRouteHandler, getUserDO, getUserId });
+
   app.get(
     '/:id',
     createRouteHandler(async (c: any, user: any) => {
@@ -1205,6 +1209,7 @@ export function createWorkflowRoutes(bindingName: string) {
         { id },
         'agent_workflows',
       );
+      await deletePromoSite(c.env.R2_VERSION_BUCKET, getUserId(c, user.identifier), id);
       return c.json({ success: true });
     }, 'Failed to delete workflow'),
   );
@@ -1239,7 +1244,7 @@ export function createWorkflowRoutes(bindingName: string) {
       if (isNaN(workflowId)) throw new Error('Invalid workflow id');
       const db = c.env.D1DB;
       if (!db) throw new Error('D1 database binding not configured');
-      const sql = `SELECT id, globalId, user_id, name, description, tags, definition, starCount, starLabel, usageCount, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds, shareGrants
+      const sql = `SELECT id, globalId, user_id, name, description, tags, starCount, starLabel, usageCount, status, created_at, minPlanId, graceWhenExhausted, publicTriggerKinds, shareGrants
         FROM agent_workflows WHERE user_id = ? AND id = ? AND isShared = 1 AND COALESCE(isEnterprise, 0) = 0 LIMIT 1`;
       const result = await db.prepare(sql).bind(ownerId, workflowId).first<Record<string, unknown>>();
       if (!result) return c.json({ error: 'Not found' }, 404);

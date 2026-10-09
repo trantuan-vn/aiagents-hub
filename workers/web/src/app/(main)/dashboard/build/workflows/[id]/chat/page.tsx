@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 import { WorkflowChat } from "../../_components/chat/workflow-chat";
-import { getSharedWorkflow, getWorkflow } from "../../_lib/api";
+import { getSharedWorkflowPromoSite, getWorkflow } from "../../_lib/api";
 
 export default function WorkflowChatPage() {
   const params = useParams();
@@ -26,7 +26,7 @@ export default function WorkflowChatPage() {
     const load = async () => {
       try {
         if (ownerId) {
-          const { workflow } = await getSharedWorkflow(ownerId, id);
+          const { workflow } = await getSharedWorkflowPromoSite(ownerId, id);
           setName(workflow.name);
         } else {
           const { workflow } = await getWorkflow(id);

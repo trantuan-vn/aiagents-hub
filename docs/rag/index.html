@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KRX.DR – Workflow sinh SQL cho nhiều loại Database</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F5F7F9; --paper:#FFFFFF; --ink:#16222D; --muted:#566574; --line:#DCE3E9;
+  --accent:#0B6E8F; --accent-soft:#E2F1F6; --warn:#9A5B00; --warn-soft:#FFF3DC;
+  --ok:#17794A; --ok-soft:#E3F4EA; --code-bg:#14202B; --code-ink:#E6EDF3; --code-dim:#7F93A5;
+  --sans:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F171E; --paper:#16212A; --ink:#E6EDF3; --muted:#9AAAB8; --line:#26343F;
+    --accent:#4FB6D6; --accent-soft:#16303B; --warn:#F0B35A; --warn-soft:#2E2412;
+    --ok:#5BC993; --ok-soft:#13291E; --code-bg:#0B1218;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.7 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+header.hero{padding:56px 0 24px;text-align:left}
+h1{font-size:clamp(30px,4.4vw,46px);line-height:1.15;margin:0 0 16px;font-weight:700;letter-spacing:-.015em}
+.lead{font-size:18px;color:var(--muted);max-width:72ch;margin:0 0 24px}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:4px 12px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-bottom:12px;letter-spacing:.02em}
+.cta{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px;border:1px solid transparent;transition:transform .12s ease}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{background:var(--paper);color:var(--ink);border-color:var(--line)}
+section{padding:36px 0}
+h2{font-size:26px;line-height:1.3;margin:0 0 16px;letter-spacing:-.005em}
+h3{font-size:18px;margin:24px 0 8px}
+p{margin:0 0 14px;max-width:76ch}
+ul,ol{padding-left:22px;margin:0 0 16px;max-width:76ch}
+li{margin-bottom:6px}
+code{font:500 .88em var(--mono);background:var(--accent-soft);color:var(--accent);padding:2px 6px;border-radius:4px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:24px}
+.shots{display:grid;grid-template-columns:1fr;gap:24px}
+.shot{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.shot img{display:block;width:100%;height:auto}
+.shot .cap{padding:14px 18px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+.shot .cap b{color:var(--ink)}
+.flow{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0;padding:0;list-style:none;counter-reset:f}
+.flow li{counter-increment:f;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px}
+.flow li::before{content:counter(f)". ";color:var(--accent);font-weight:600}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:16px}
+.db{display:block;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px;text-decoration:none;color:inherit;transition:transform .12s ease,border-color .12s ease}
+.db:hover{transform:translateY(-2px);border-color:var(--accent)}
+.db .logo{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:15px;color:#fff;margin-bottom:12px}
+.db h3{margin:0 0 6px;font-size:17px}
+.db p{margin:0;font-size:13.5px;color:var(--muted);line-height:1.55}
+.db .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;margin-top:10px;background:var(--accent-soft);color:var(--accent)}
+.db.rel .logo{background:#0B6E8F}
+.db.nosql .logo{background:#17794A}
+.db.cloud .logo{background:#9A5B00}
+.callout{border-left:4px solid var(--accent);background:var(--accent-soft);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0;max-width:80ch}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.callout.ok{border-color:var(--ok);background:var(--ok-soft)}
+.callout b{display:block;margin-bottom:2px}
+.callout p:last-child{margin:0}
+footer{margin-top:48px;padding:24px 0 48px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+@media (max-width:720px){
+  header.hero{padding:40px 0 16px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="badge">KRX.DR · Workflow sinh SQL đa hệ CSDL</div>
+  <h1>Sinh câu SQL trả số liệu từ một chức năng trên ứng dụng — cho mọi loại database</h1>
+  <p class="lead">Workflow này cho phép bấm đúng một chức năng trên ứng dụng, bắt lại toàn bộ câu lệnh mà database vừa thực thi, chọn ra câu trả số liệu, lấy giá trị tham số, kiểm chứng với màn hình, rồi lưu thành một cặp “Yêu cầu số liệu – SQL” có định danh. Hỗ trợ Oracle, PostgreSQL, MySQL, SQL Server, IBM Db2 và MongoDB.</p>
+  <div class="cta">
+    <a class="btn primary" href="#workflow">Xem workflow</a>
+    <a class="btn ghost" href="#databases">Chọn database</a>
+  </div>
+  <ol class="flow">
+    <li>Chuẩn bị database mẫu</li>
+    <li>Làm sạch bộ nhớ SQL</li>
+    <li>Bấm một chức năng</li>
+    <li>Bắt SQL phát sinh</li>
+    <li>Chọn SQL trả số liệu</li>
+    <li>Lấy tham số &amp; kiểm chứng</li>
+    <li>Lưu thành cặp</li>
+  </ol>
+</header>
+
+<section id="workflow">
+  <h2>Workflow trực quan</h2>
+  <p>Workflow được xây dựng trên nền tảng AI Agents Hub, mỗi node đảm nhận một bước: nhận yêu cầu, sinh SQL, kiểm tra SQL, lấy bind, lưu cặp. Toàn bộ luồng chạy tự động, người dùng chỉ cần chọn chức năng và xác nhận kết quả.</p>
+
+  <div class="shots">
+    <div class="shot">
+      <img src="workflow-overview.png" alt="Sơ đồ workflow sinh SQL trên AI Agents Hub">
+      <div class="cap"><b>Ảnh 1 — Sơ đồ workflow.</b> Luồng node từ Chat Message Received → Researching Agent → Check SQL → Get Bind → Save SQL Pair. Mỗi node có nhiệm vụ riêng và có thể chạy lại độc lập.</div>
+    </div>
+    <div class="shot">
+      <img src="workflow-shared.png" alt="Danh sách workflow chia sẻ trong cộng đồng">
+      <div class="cap"><b>Ảnh 2 — Workflow được chia sẻ.</b> Workflow <code>KRX.DR.v1.1</code> đã được publish ở chế độ Community Sharing, sẵn sàng cho người khác xem, chạy và đánh giá.</div>
+    </div>
+  </div>
+
+  <div class="callout ok">
+    <b>Điểm mạnh của workflow</b>
+    <p>Tách rời từng bước, có thể kiểm tra và chạy lại một phần. Kết quả được lưu thành cặp có định danh, dùng lại được cho nhiều môi trường database khác nhau.</p>
+  </div>
+</section>
+
+<section id="databases">
+  <h2>Chọn database để xem hướng dẫn chi tiết</h2>
+  <p>Mỗi tài liệu dưới đây mô tả đầy đủ 11 bước lọc cặp “Yêu cầu số liệu – SQL”, kèm câu lệnh cụ thể cho từng hệ quản trị. Bấm vào một database để mở hướng dẫn tương ứng.</p>
+
+  <h3>Relational (SQL)</h3>
+  <div class="grid">
+    <a class="db rel" href="huong-dan-loc-sql-oracle.html">
+      <div class="logo">O</div>
+      <h3>Oracle</h3>
+      <p>Dùng <code>V$SQL</code>, <code>V$SQL_BIND_CAPTURE</code>, trace file để bắt SQL và bind.</p>
+      <span class="tag">Relational</span>
+    </a>
+    <a class="db rel" href="huong-dan-loc-sql-postgresql.html">
+      <div class="logo">P</div>
+      <h3>PostgreSQL</h3>
+      <p>Dùng <code>pg_stat_statements</code>, <code>pg_stat_activity</code>, log bind để lấy tham số.</p>
+      <span class="tag">Relational</span>
+    </a>
+    <a class="db rel" href="huong-dan-loc-sql-mysql.html">
+      <div class="logo">M</div>
+      <h3>MySQL</h3>
+      <p>Dùng Performance Schema và general log để bắt SQL cùng prepared statement.</p>
+      <span class="tag">Relational</span>
+    </a>
+    <a class="db rel" href="huong-dan-loc-sql-sqlserver.html">
+      <div class="logo">S</div>
+      <h3>SQL Server</h3>
+      <p>Dùng DMV (<code>sys.dm_exec_query_stats</code>) và Extended Events để bắt bind.</p>
+      <span class="tag">Relational</span>
+    </a>
+    <a class="db rel" href="huong-dan-loc-sql-Db2.html">
+      <div class="logo">D</div>
+      <h3>IBM Db2</h3>
+      <p>Dùng monitor function <code>MON_GET_PKG_CACHE_STMT</code> và Event Monitor.</p>
+      <span class="tag">Relational</span>
+    </a>
+  </div>
+
+  <h3>NoSQL</h3>
+  <div class="grid">
+    <a class="db nosql" href="huong-dan-loc-sql-MongoDB.html">
+      <div class="logo">Mg</div>
+      <h3>MongoDB</h3>
+      <p>Dùng Database Profiler (<code>system.profile</code>) và <code>$currentOp</code> để bắt query.</p>
+      <span class="tag">Document</span>
+    </a>
+  </div>
+
+  <h3>Tài liệu dùng chung</h3>
+  <div class="grid">
+    <a class="db rel" href="chuan-bi-database-mau.html">
+      <div class="logo">DB</div>
+      <h3>Chuẩn bị Database mẫu</h3>
+      <p>Quy tắc phủ đủ giá trị cho mọi cột và viết comment chuyên ngành đầy đủ cho từng cột.</p>
+      <span class="tag">Bắt buộc</span>
+    </a>
+  </div>
+
+  <div class="callout warn">
+    <b>Thứ tự thực hiện khuyến nghị</b>
+    <p>1) Chuẩn bị database mẫu đúng chuẩn. 2) Chọn hướng dẫn theo database đang dùng. 3) Chạy đủ 11 bước. 4) Lưu cặp vào hệ thống quản lý yêu cầu số liệu.</p>
+  </div>
+</section>
+
+<section id="cach-dung">
+  <h2>Cách dùng bộ tài liệu</h2>
+  <ul>
+    <li><strong>Bước 1 — Chuẩn bị:</strong> mở <a href="chuan-bi-database-mau.html">Chuẩn bị Database mẫu</a> để đảm bảo dữ liệu đủ giá trị và mọi cột đều có comment.</li>
+    <li><strong>Bước 2 — Chọn database:</strong> mở đúng tài liệu theo hệ quản trị đang dùng (Oracle, PostgreSQL, MySQL, SQL Server, IBM Db2 hoặc MongoDB).</li>
+    <li><strong>Bước 3 — Thực hiện 11 bước:</strong> làm theo thứ tự, đánh dấu vào ô “Đã hoàn thành” để theo dõi tiến độ.</li>
+    <li><strong>Bước 4 — Lưu cặp:</strong> dùng bảng “Lưu thành cặp thông tin” ở bước 11 để ghi lại mã yêu cầu, SQL, tham số và kết quả đối chiếu.</li>
+  </ul>
+  <div class="callout">
+    <b>Mẹo</b>
+    <p>Mỗi tài liệu đều có nút “Sao chép” cho từng câu lệnh. Bấm để copy nhanh, không cần chọn thủ công.</p>
+  </div>
+</section>
+
+<footer>
+  <p>Bộ tài liệu nội bộ KRX.DR — Workflow sinh SQL đa hệ CSDL. Ảnh workflow được đính kèm trực tiếp trong thư mục dự án. Thay tên database, user và bảng bằng thông tin thực tế của môi trường trước khi chạy.</p>
+</footer>
+
+</div>
+
+<script>
+// Đánh dấu mục đang xem nếu có anchor
+(function(){
+  var h = location.hash.slice(1);
+  if(!h) return;
+  var el = document.getElementById(h);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
+})();
+</script>
+</body>
+</html>

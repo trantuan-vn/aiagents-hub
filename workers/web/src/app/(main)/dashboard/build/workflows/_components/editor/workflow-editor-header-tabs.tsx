@@ -26,7 +26,7 @@ export function WorkflowEditorHeaderTabs({
   ];
 
   return (
-    <div className="bg-muted hidden items-center rounded-lg p-0.5 sm:flex">
+    <div className="bg-muted flex shrink-0 items-center rounded-lg p-0.5">
       {tabs.map((tab) => (
         <button
           key={tab.id}

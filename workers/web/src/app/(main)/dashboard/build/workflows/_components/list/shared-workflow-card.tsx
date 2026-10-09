@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { MessageSquare } from "lucide-react";
+import { Megaphone, MessageSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { useDashboardUser } from "@/app/(main)/dashboard/_context/dashboard-user-context";
@@ -86,7 +86,10 @@ export function SharedWorkflowCard({
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" asChild>
-            <Link href={viewHref}>{t("view")}</Link>
+            <Link href={viewHref}>
+              <Megaphone />
+              {t("view")}
+            </Link>
           </Button>
           <WorkflowCardActions wf={wf} ownerId={wf.user_id} />
           <Button
