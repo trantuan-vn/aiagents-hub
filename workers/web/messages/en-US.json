@@ -2814,7 +2814,11 @@
     "cron_active": "Cron active",
     "cron_next_run": "Next run: {time}",
     "cron_more": "+{count}",
-    "tab_enterprise": "Organization"
+    "tab_enterprise": "Organization",
+    "libraries_label": "Workflow libraries",
+    "view_mine_hint": "Drafts and published workflows you own.",
+    "view_shared_hint": "Graphs other people published for you to run and rate.",
+    "view_enterprise_hint": "Workflows shared inside your organization."
   },
   "WorkflowViewPage": {
     "back": "Back to community",

@@ -2814,7 +2814,11 @@
     "cron_active": "Cron đang chạy",
     "cron_next_run": "Lần chạy tiếp: {time}",
     "cron_more": "+{count}",
-    "tab_enterprise": "Tổ chức"
+    "tab_enterprise": "Tổ chức",
+    "libraries_label": "Thư viện workflow",
+    "view_mine_hint": "Bản nháp và workflow đã xuất bản của bạn.",
+    "view_shared_hint": "Workflow người khác chia sẻ để bạn chạy và đánh giá.",
+    "view_enterprise_hint": "Workflow dùng chung trong tổ chức của bạn."
   },
   "WorkflowViewPage": {
     "back": "Quay lại cộng đồng",
