@@ -48,6 +48,7 @@ import {
   isChannelTriggerType,
   listTriggers,
   countAccountCronJobs,
+  isWebhookIngressNode,
   summarizeEnabledCrons,
   syncCronTriggersForWorkflow,
   syncWebhookTriggersForWorkflow,
@@ -143,7 +144,23 @@ const ExecuteBodySchema = z.object({
   variables: z.record(z.unknown()).optional(),
   autoApproveHumanReview: z.boolean().optional(),
   entryNodeId: z.string().min(1).max(200).optional(),
+  /** JSON body for a signed-in try-run. Seeds `$json.body` the same way a webhook POST does. */
+  webhookBody: z.unknown().optional(),
+  webhookUrl: z.string().max(2000).optional(),
 });
+
+const WEBHOOK_TRY_BODY_MAX = 100_000;
+
+function safeWebhookTryUrl(value: string | undefined): string {
+  if (!value) return '';
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'https:' || url.protocol === 'http:') return url.href;
+  } catch {
+    return '';
+  }
+  return '';
+}
 
 const ResumeBodySchema = z.object({
   decision: z.enum(['approve', 'reject']).default('approve'),
@@ -341,15 +358,50 @@ export function createWorkflowRoutes(bindingName: string) {
       });
     }
 
+    let webhookItem: { webhookUrl: string; method: string; headers: Record<string, string>; body: unknown; executionMode: 'production' } | undefined;
+    if (body.webhookBody !== undefined) {
+      const failed = (error: string) => ({
+        status: 'failed' as const,
+        executionKey: crypto.randomUUID(),
+        workflowId,
+        workflowOwnerId: resolved.ownerId,
+        output: { error },
+        steps: [],
+        totalCostVnd: 0,
+      });
+      const entry = body.entryNodeId
+        ? resolved.definition.nodes.find((node) => node.id === body.entryNodeId)
+        : undefined;
+      if (!entry || !(isWebhookIngressNode(entry) || String(entry.type) === 'webhook')) {
+        return failed('Webhook entry node is required');
+      }
+      let encoded = '';
+      try {
+        encoded = JSON.stringify(body.webhookBody ?? {});
+      } catch {
+        return failed('Webhook body is not JSON');
+      }
+      if (encoded.length > WEBHOOK_TRY_BODY_MAX) return failed('Webhook body is too large');
+      webhookItem = {
+        webhookUrl: safeWebhookTryUrl(body.webhookUrl),
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: body.webhookBody ?? {},
+        executionMode: 'production',
+      };
+    }
+
     return executeWorkflowGraph({
       c,
       bindingName,
       user,
       resolved,
-      input: body.input,
+      input: webhookItem ? (body.input ?? JSON.stringify(body.webhookBody ?? {})) : body.input,
       variables: body.variables,
       autoApproveHumanReview: body.autoApproveHumanReview ?? false,
       entryNodeIds: body.entryNodeId ? [body.entryNodeId] : undefined,
+      webhookItem,
+      triggerKind: webhookItem ? 'webhook' : undefined,
       requestMeta: {
         userAgent: c.req.header('user-agent'),
         ipAddress: c.req.header('cf-connecting-ip') ?? undefined,

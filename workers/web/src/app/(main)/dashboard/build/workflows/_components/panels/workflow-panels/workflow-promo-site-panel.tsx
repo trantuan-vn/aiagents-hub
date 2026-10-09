@@ -273,6 +273,9 @@ export function WorkflowPromoSitePanel({ workflowId }: { workflowId: number }) {
           address={t("promo_preview_label")}
           emptyLabel={t("promo_empty_preview")}
           title={t("promo_title")}
+          backLabel={t("promo_history_back")}
+          forwardLabel={t("promo_history_forward")}
+          refreshLabel={t("promo_history_refresh")}
         />
       </div>
     </div>

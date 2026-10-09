@@ -1,20 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import Link from "next/link";
 
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
+import { executeWorkflow, type WorkflowExecutionResult } from "../../_lib/api";
 import { buildWebhookIntegrateExamples, type WebhookIntegrateLang } from "../../_lib/webhook-integrate-examples";
 import type { WorkflowListWebhookAction } from "../../_lib/workflow-list-triggers";
+
+const TRY_BODY = `{
+  "question": "Your question here"
+}`;
 
 const LANGS: {
   id: WebhookIntegrateLang;
@@ -102,13 +110,29 @@ function CopyIconButton({
 
 interface WorkflowWebhookIntegrateDialogProps {
   webhook: WorkflowListWebhookAction | null;
+  workflowId?: number;
+  ownerId?: string;
   clientId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+function responseJson(result: WorkflowExecutionResult): string {
+  return JSON.stringify(
+    {
+      status: result.status,
+      executionKey: result.executionKey,
+      output: result.output ?? null,
+    },
+    null,
+    2,
+  );
+}
+
 export function WorkflowWebhookIntegrateDialog({
   webhook,
+  workflowId,
+  ownerId,
   clientId,
   open,
   onOpenChange,
@@ -116,6 +140,10 @@ export function WorkflowWebhookIntegrateDialog({
   const t = useTranslations("WorkflowsPage");
   const [tab, setTab] = useState<WebhookIntegrateLang>("curl");
   const [copiedCode, setCopiedCode] = useState(false);
+  const [tryBody, setTryBody] = useState(TRY_BODY);
+  const [trying, setTrying] = useState(false);
+  const [tryError, setTryError] = useState<string | null>(null);
+  const [tryResult, setTryResult] = useState<WorkflowExecutionResult | null>(null);
   const trimmedClientId = clientId?.trim() ?? "";
   const resolvedClientId = trimmedClientId === "" ? "YOUR_CLIENT_ID" : trimmedClientId;
 
@@ -134,6 +162,47 @@ export function WorkflowWebhookIntegrateDialog({
     setCopiedCode(false);
   }, [tab, webhook?.url]);
 
+  useEffect(() => {
+    if (!open) return;
+    setTryBody(TRY_BODY);
+    setTrying(false);
+    setTryError(null);
+    setTryResult(null);
+  }, [open, webhook?.nodeId]);
+
+  const onTry = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!webhook || !workflowId || trying) return;
+    const raw = tryBody.trim();
+    let parsed: unknown = {};
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw) as unknown;
+      } catch {
+        setTryError(t("webhook_integrate_try_invalid"));
+        setTryResult(null);
+        return;
+      }
+    }
+    setTrying(true);
+    setTryError(null);
+    setTryResult(null);
+    try {
+      const result = await executeWorkflow(workflowId, {
+        ownerId,
+        entryNodeId: webhook.nodeId,
+        input: raw || "{}",
+        webhookBody: parsed,
+        webhookUrl: webhook.url,
+      });
+      setTryResult(result);
+    } catch (error) {
+      setTryError(error instanceof Error ? error.message : t("webhook_integrate_try_failed"));
+    } finally {
+      setTrying(false);
+    }
+  };
+
   const copyCode = async () => {
     if (!examples) return;
     try {
@@ -148,7 +217,7 @@ export function WorkflowWebhookIntegrateDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[min(90vh,40rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent className="flex max-h-[min(92vh,52rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogHeader className="space-y-1.5 border-b px-6 py-5 pr-12 text-left">
           <DialogTitle>{t("webhook_integrate_title")}</DialogTitle>
           <DialogDescription>
@@ -245,6 +314,48 @@ export function WorkflowWebhookIntegrateDialog({
                 </Tabs>
               </div>
             </section>
+
+            {workflowId ? (
+              <section className="space-y-3 border-t pt-5">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">{t("webhook_integrate_try")}</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed">{t("webhook_integrate_try_hint")}</p>
+                </div>
+                <form onSubmit={(event) => void onTry(event)} className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="webhook-try-body">{t("webhook_integrate_try_body")}</Label>
+                    <Textarea
+                      id="webhook-try-body"
+                      value={tryBody}
+                      onChange={(event) => setTryBody(event.target.value)}
+                      rows={6}
+                      spellCheck={false}
+                      className="field-sizing-fixed max-w-full min-w-0 font-mono text-xs wrap-anywhere"
+                      placeholder="{}"
+                    />
+                  </div>
+                  <Button type="submit" disabled={trying}>
+                    {trying ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+                    {trying ? t("webhook_integrate_try_running") : t("webhook_integrate_try_run")}
+                  </Button>
+                </form>
+                {tryError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription className="wrap-anywhere break-all">{tryError}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {tryResult ? (
+                  <div className="space-y-2">
+                    <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                      {t("webhook_integrate_try_result")}
+                    </p>
+                    <pre className="bg-muted max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs break-all whitespace-pre-wrap">
+                      {responseJson(tryResult)}
+                    </pre>
+                  </div>
+                ) : null}
+              </section>
+            ) : null}
           </div>
         ) : null}
       </DialogContent>

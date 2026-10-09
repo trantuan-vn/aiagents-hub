@@ -130,6 +130,8 @@ export function WorkflowCardActions({ wf, ownerId }: WorkflowCardActionsProps) {
       {actions.chat ? <WorkflowOpenChatButton publicChat={actions.chat.public} url={actions.chat.url} /> : null}
       <WorkflowWebhookIntegrateDialog
         webhook={webhook ?? null}
+        workflowId={wf.id}
+        ownerId={ownerId}
         clientId={callerId}
         open={webhookOpen}
         onOpenChange={setWebhookOpen}

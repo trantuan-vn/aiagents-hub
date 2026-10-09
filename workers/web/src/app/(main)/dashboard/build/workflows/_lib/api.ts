@@ -226,6 +226,9 @@ export function executeWorkflow(
     autoApproveHumanReview?: boolean;
     ownerId?: string;
     entryNodeId?: string;
+    /** When set, the run starts at `entryNodeId` as a webhook and this value becomes `$json.body`. */
+    webhookBody?: unknown;
+    webhookUrl?: string;
   },
 ) {
   const path =
@@ -239,6 +242,8 @@ export function executeWorkflow(
       variables: options?.variables,
       autoApproveHumanReview: options?.autoApproveHumanReview,
       entryNodeId: options?.entryNodeId,
+      webhookBody: options?.webhookBody,
+      webhookUrl: options?.webhookUrl,
     }),
   });
 }

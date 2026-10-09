@@ -87,6 +87,9 @@ export default function ViewSharedWorkflowPage() {
             address={name || t("intro_label")}
             emptyLabel={t("intro_empty")}
             title={name || t("intro_label")}
+            backLabel={t("intro_history_back")}
+            forwardLabel={t("intro_history_forward")}
+            refreshLabel={t("intro_history_refresh")}
           />
         )}
       </div>
