@@ -38,6 +38,8 @@ export interface SharedWorkflowRow {
   communityStarAvg?: number;
   /** Number of users who rated this workflow. */
   communityStarCount?: number;
+  /** Total comments, including replies, on this shared workflow. */
+  commentCount?: number;
   /** Compact trigger metadata for list-page Open chat / Execute buttons. */
   triggers?: SharedWorkflowTriggerSummary;
 }
@@ -120,7 +122,8 @@ export async function listSharedWorkflowsFromD1(
   const sql = `SELECT w.id, w.globalId, w.user_id, w.name, w.description, w.tags, w.definition, w.isShared, w.starCount, w.starLabel,
       w.usageCount, w.status, w.created_at, w.minPlanId, w.graceWhenExhausted, w.publicTriggerKinds, w.shareGrants,
       COALESCE(star_stats.avg_star, 0) AS communityStarAvg,
-      COALESCE(star_stats.rater_count, 0) AS communityStarCount
+      COALESCE(star_stats.rater_count, 0) AS communityStarCount,
+      COALESCE(comment_stats.comment_count, 0) AS commentCount
     FROM agent_workflows w
     LEFT JOIN (
       SELECT "workflowOwnerId", "workflowId",
@@ -129,6 +132,11 @@ export async function listSharedWorkflowsFromD1(
       FROM workflow_user_stars
       GROUP BY "workflowOwnerId", "workflowId"
     ) star_stats ON star_stats."workflowOwnerId" = w.user_id AND star_stats."workflowId" = w.id
+    LEFT JOIN (
+      SELECT "workflowOwnerId", "workflowId", COUNT(*) AS comment_count
+      FROM workflow_comments
+      GROUP BY "workflowOwnerId", "workflowId"
+    ) comment_stats ON comment_stats."workflowOwnerId" = w.user_id AND comment_stats."workflowId" = w.id
     WHERE ${whereClause}
     ORDER BY communityStarCount DESC, w.usageCount DESC, w.created_at DESC LIMIT ? OFFSET ?`;
   params.push(limit + 1, offset);
@@ -145,6 +153,7 @@ export async function listSharedWorkflowsFromD1(
     const publicTriggerKinds = viewerKinds ?? rest.publicTriggerKinds;
     return {
       ...rest,
+      commentCount: Number(rest.commentCount ?? 0) || 0,
       publicTriggerKinds,
       triggers: summarizeWorkflowListTriggers(definition, publicTriggerKinds),
     };

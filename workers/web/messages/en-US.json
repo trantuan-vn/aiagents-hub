@@ -2697,7 +2697,7 @@
   },
   "WorkflowsPage": {
     "title": "Agent Workflows",
-    "description": "Build, share, and run visual agent workflows (n8n-style).",
+    "description": "Build, share, and run visual agent workflows.",
     "tab_mine": "My workflows",
     "tab_shared": "Community sharing",
     "create": "New workflow",
@@ -3242,7 +3242,7 @@
     "tab_versions": "Versions",
     "tab_evaluations": "Introduction",
     "promo_title": "Introduction site",
-    "promo_subtitle": "Drop a static HTML folder, the same way you deploy a site on Netlify. People in the community only see this page.",
+    "promo_subtitle": "Drop a static HTML folder. People in the community only see this page.",
     "promo_drop_title": "Drag your site folder here",
     "promo_drop_hint": "A folder with index.html, CSS, images, and JavaScript. Up to 60 files and 5 MB.",
     "promo_browse": "Browse folder",

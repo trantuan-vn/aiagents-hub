@@ -253,7 +253,13 @@ export function SharedWorkflowsTab() {
                 wf={wf}
                 draft={commentDraft.get(k) ?? ""}
                 thread={comments.get(k) ?? []}
-                commentCount={comments.has(k) ? (comments.get(k)?.length ?? 0) : null}
+                commentCount={
+                  comments.has(k)
+                    ? Math.max(comments.get(k)?.length ?? 0, wf.commentCount ?? 0)
+                    : typeof wf.commentCount === "number"
+                      ? wf.commentCount
+                      : null
+                }
                 avgStars={Math.round(wf.communityStarAvg ?? 0)}
                 raterCount={wf.communityStarCount ?? 0}
                 myStar={myStars.get(k) ?? 0}

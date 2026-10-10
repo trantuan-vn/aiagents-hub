@@ -39,6 +39,8 @@ export interface AgentWorkflow {
   starLabel?: string;
   communityStarAvg?: number;
   communityStarCount?: number;
+  /** Comments on a shared workflow, including replies. */
+  commentCount?: number;
   usageCount?: number;
   totalEarningsUsd?: number;
   /** Royalty earned by the owner, in Credits. Present only on the owner's own list. */

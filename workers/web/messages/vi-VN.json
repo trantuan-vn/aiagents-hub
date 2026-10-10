@@ -2697,7 +2697,7 @@
   },
   "WorkflowsPage": {
     "title": "Agent Workflows",
-    "description": "Tạo, chia sẻ và chạy workflow agent trực quan (kiểu n8n).",
+    "description": "Tạo, chia sẻ và chạy workflow agent trực quan.",
     "tab_mine": "Workflow của tôi",
     "tab_shared": "Chia sẻ cộng đồng",
     "create": "Tạo workflow",
@@ -3242,7 +3242,7 @@
     "tab_versions": "Phiên bản",
     "tab_evaluations": "Giới thiệu",
     "promo_title": "Trang giới thiệu",
-    "promo_subtitle": "Kéo thả thư mục HTML tĩnh, giống cách đăng site lên Netlify. Người xem trên cộng đồng chỉ thấy trang này.",
+    "promo_subtitle": "Kéo thả thư mục HTML tĩnh. Người xem trên cộng đồng chỉ thấy trang này.",
     "promo_drop_title": "Kéo thư mục trang web vào đây",
     "promo_drop_hint": "Thư mục có index.html, CSS, ảnh và JavaScript. Tối đa 60 tệp và 5 MB.",
     "promo_browse": "Chọn thư mục",
