@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import { interpolate } from '../../../execution/node-runtime.js';
 import type { NodeContext } from '../../types.js';
+import { vectorChunkId } from '../../../rag/index.js';
+import { schemaDocumentId } from './documents.js';
 import { executeSaveRag, executeSaveRagPipeline } from './execute.js';
 
 function mockAi() {
@@ -573,6 +575,206 @@ describe('executeSaveRagPipeline', () => {
     await expect(executeSaveRagPipeline(ctx)).rejects.toThrow(/column "id" enrichment failed/i);
     expect(upsert).not.toHaveBeenCalled();
     expect(runContext.__saveRagIndexedTables).toBeUndefined();
+  });
+
+  it('reports a table already in Vectorize and saves only the next table', async () => {
+    const db = d1Stub();
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const ordersId = schemaDocumentId('analytics-db', 'public', 'orders');
+    const ordersChunk = await vectorChunkId(ordersId, 0);
+    const getByIds = vi.fn().mockImplementation(async (ids: string[]) =>
+      ids.includes(ordersChunk)
+        ? [
+            {
+              id: ordersChunk,
+              metadata: {
+                documentId: ordersId,
+                docType: 'schema',
+                tableName: 'orders',
+                schemaName: 'public',
+                namespace: 'uuser-1/kb-ns',
+              },
+            },
+          ]
+        : [],
+    );
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert, getByIds },
+      D1DB: db,
+    } as unknown as Env;
+    billingMock.runTextModel.mockClear();
+    const definition = saveRagGraph();
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [
+          { tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' },
+          { tableName: 'invoices', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' },
+        ],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    const sqls = db.prepare.mock.calls.map((call) => String(call[0]));
+    expect(out.ok).toBe(true);
+    expect(out.alreadyExists).toEqual(['orders']);
+    expect(out.tables).toEqual(['orders', 'invoices']);
+    expect(out.saved).toBeGreaterThanOrEqual(1);
+    expect(out.llmCalls).toBe(2);
+    expect(sqls.some((sql) => sql.includes('orders'))).toBe(false);
+    expect(sqls.some((sql) => sql.includes('invoices'))).toBe(true);
+    expect(upsert).toHaveBeenCalledTimes(1);
+    const vectors = upsert.mock.calls[0]?.[0] as Array<{ metadata?: Record<string, string> }>;
+    expect(vectors.every((vector) => vector.metadata?.tableName === 'invoices')).toBe(true);
+    const skipped = (out.items as Array<Record<string, unknown>>).find((item) => item.tableName === 'orders');
+    expect(skipped).toMatchObject({
+      ok: true,
+      saved: 0,
+      skipped: true,
+      reason: 'already exists in Vectorize',
+      documentId: ordersId,
+    });
+  });
+
+  it('does not call the LLM or upsert when every table is already in Vectorize', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const ordersId = schemaDocumentId('analytics-db', 'public', 'orders');
+    const ordersChunk = await vectorChunkId(ordersId, 0);
+    const getByIds = vi.fn().mockResolvedValue([
+      {
+        id: ordersChunk,
+        metadata: {
+          documentId: ordersId,
+          docType: 'schema',
+          tableName: 'orders',
+          schemaName: 'public',
+          namespace: 'uuser-1/kb-ns',
+        },
+      },
+    ]);
+    const db = d1Stub();
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert, getByIds },
+      D1DB: db,
+    } as unknown as Env;
+    billingMock.runTextModel.mockClear();
+    const definition = saveRagGraph();
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' }],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out).toMatchObject({
+      ok: true,
+      saved: 0,
+      skipped: true,
+      reason: 'already exists in Vectorize',
+      alreadyExists: ['orders'],
+      tables: ['orders'],
+      llmCalls: 0,
+      enrichedColumns: 0,
+    });
+    expect(upsert).not.toHaveBeenCalled();
+    expect(billingMock.runTextModel).not.toHaveBeenCalled();
+    expect(db.prepare).not.toHaveBeenCalled();
+  });
+
+  it('still saves when the stored vector belongs to another namespace', async () => {
+    const db = d1Stub();
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const ordersId = schemaDocumentId('analytics-db', 'public', 'orders');
+    const ordersChunk = await vectorChunkId(ordersId, 0);
+    const getByIds = vi.fn().mockResolvedValue([
+      {
+        id: ordersChunk,
+        metadata: {
+          documentId: ordersId,
+          docType: 'schema',
+          tableName: 'orders',
+          namespace: 'uother/kb-ns',
+        },
+      },
+    ]);
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert, getByIds },
+      D1DB: db,
+    } as unknown as Env;
+    const definition = saveRagGraph();
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' }],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.saved).toBeGreaterThanOrEqual(1);
+    expect(out.alreadyExists).toBeUndefined();
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it('still saves when the Vectorize existence check fails', async () => {
+    const db = d1Stub();
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const getByIds = vi.fn().mockRejectedValue(new Error('vectorize down'));
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert, getByIds },
+      D1DB: db,
+    } as unknown as Env;
+    const definition = saveRagGraph();
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'orders', schemaName: 'public', connection: { type: 'd1' }, dbId: 'analytics-db' }],
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.saved).toBeGreaterThanOrEqual(1);
+    expect(upsert).toHaveBeenCalled();
   });
 });
 

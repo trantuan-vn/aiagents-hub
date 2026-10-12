@@ -93,6 +93,11 @@ export function slimIterationOutput(output: NodeOutput): Record<string, unknown>
   if (output.ok != null) slim.ok = output.ok;
   if (output.saved != null) slim.saved = output.saved;
   if (output.skipped != null) slim.skipped = output.skipped;
+  if (output.reason != null) slim.reason = String(output.reason);
+  if (Array.isArray(output.alreadyExists)) {
+    const alreadyExists = output.alreadyExists.map((name) => String(name)).filter(Boolean).slice(0, 50);
+    if (alreadyExists.length) slim.alreadyExists = alreadyExists;
+  }
   if (output.error != null) slim.error = String(output.error).slice(0, 500);
   if (output.tableName != null) slim.tableName = String(output.tableName);
   if (tables?.length) slim.tables = tables;

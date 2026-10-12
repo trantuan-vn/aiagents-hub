@@ -60,6 +60,7 @@ export const SAVE_RAG_PERSIST_SHAPE: PersistShape = {
     'tableName',
     'tables',
     'documentIds',
+    'alreadyExists',
     'collection',
     'error',
     'items',

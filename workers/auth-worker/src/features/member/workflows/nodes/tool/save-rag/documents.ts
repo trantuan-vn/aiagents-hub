@@ -8,6 +8,11 @@ export type RagDocumentItem = {
   metadata: Record<string, string>;
 };
 
+/** Same id Save RAG upserts and Get RAG hydrates: `{dbId}.{schema}.{table}.schema`. */
+export function schemaDocumentId(dbId: string, schemaName: string, tableName: string): string {
+  return `${dbId || 'db'}.${schemaName}.${tableName}.schema`;
+}
+
 function qualifiedTable(info: GetDbInfoResult): string {
   return info.schemaName ? `${info.schemaName}.${info.tableName}` : info.tableName;
 }
@@ -84,7 +89,7 @@ ${summaryEn}
 ${rows}
 `;
 
-  const documentId = `${info.dbId || 'db'}.${info.schemaName}.${info.tableName}.schema`;
+  const documentId = schemaDocumentId(info.dbId, info.schemaName, info.tableName);
   return {
     content,
     documentId,

@@ -7,7 +7,13 @@ import {
 
 import type { AiCallStamp } from '../../../ai/workers-ai.js';
 import { stampFromNode } from '../../../ai/workers-ai.js';
-import { embedTextsWithUsage, upsertVectors, vectorChunkId, type VectorizeVectorRecord } from '../../../rag/index.js';
+import {
+  embedTextsWithUsage,
+  resolveVectorizeIndex,
+  upsertVectors,
+  vectorChunkId,
+  type VectorizeVectorRecord,
+} from '../../../rag/index.js';
 import type { UserDO } from '../../../../../ws/infrastructure/UserDO.js';
 import { embeddingUsageOrEstimate, mergeAiUsage, type AiUsage } from '../../../../../admin/service/pricing.js';
 import {
@@ -21,11 +27,11 @@ import {
 } from '../shared/rag-context.js';
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
-import { resolveOracleConnectConfig } from '../shared/db/index.js';
+import { resolveOracleConnectConfig, resolveOracleSchema } from '../shared/db/index.js';
 import { pipelineItems, resolveFieldOrLiteral, resolvePipelineField } from '../shared/pipeline.js';
 import { chunkDocument } from './chunk.js';
 import { describeTable } from './describe-table.js';
-import { ragDocumentsFromEnrichment, type RagDocumentItem } from './documents.js';
+import { ragDocumentsFromEnrichment, schemaDocumentId, type RagDocumentItem } from './documents.js';
 import { introspectTablesInfo } from './table-docs.js';
 
 export type SaveRagChunkInput = {
@@ -46,6 +52,9 @@ export type SaveRagResult = {
   saved: number;
   documentId: string;
   collection: string;
+  skipped?: boolean;
+  reason?: string;
+  tableName?: string;
   raw?: { usage: AiUsage };
 };
 
@@ -68,6 +77,8 @@ export type SaveRagExecuteParams = {
 
 const INDEXED_TABLES_KEY = '__saveRagIndexedTables';
 const VECTORIZE_UPSERT_LIMIT = 1000;
+const VECTORIZE_GET_BY_IDS_LIMIT = 100;
+const ALREADY_EXISTS_REASON = 'already exists in Vectorize';
 
 async function executeSaveRagMany(params: {
   env: Env;
@@ -320,6 +331,89 @@ function markIndexedTables(runContext: NodeOutput, tableNames: string[]): void {
   runContext[INDEXED_TABLES_KEY] = [...next];
 }
 
+type TableSaveIdentity = {
+  tableName: string;
+  schemaName: string;
+  documentId: string;
+};
+
+/** Identity Save RAG will upsert, resolved before introspection so a hit skips LLM and embed. */
+function tableSaveIdentity(ctx: NodeContext, item: Record<string, unknown>): TableSaveIdentity {
+  const trigger = triggerContextForTable(ctx, item);
+  const connection = asRecord(trigger.connection);
+  const requestedSchema = String(item.schemaName ?? trigger.schemaName ?? '');
+  const user = String(connection.user ?? '');
+  const type = String(connection.type ?? '').toLowerCase();
+  const schemaName =
+    type === 'oracle' || (user && connection.connectString)
+      ? resolveOracleSchema(requestedSchema, user)
+      : requestedSchema;
+  const dbId = String(trigger.dbId ?? trigger.databaseId ?? '');
+  const tableName = String(item.tableName ?? '').trim();
+  return {
+    tableName,
+    schemaName,
+    documentId: schemaDocumentId(dbId, schemaName, tableName),
+  };
+}
+
+/**
+ * Chunk 0 of the schema document is written on every successful save.
+ * A hit for this namespace means the table is already stored — no embed, no CR.
+ */
+async function tablesAlreadyInVectorize(
+  ctx: NodeContext,
+  items: Record<string, unknown>[],
+): Promise<{ collection: string; tables: Map<string, TableSaveIdentity> }> {
+  const toolId = findRagToolNodeId(ctx.definition, ctx.node.id, 'save-rag');
+  const rag = resolveRagResources(ctx.definition, toolId, undefined, {
+    ownerId: ctx.meta.ownerId,
+    workflowId: ctx.meta.workflowId,
+  });
+  const found = new Map<string, TableSaveIdentity>();
+  const index = resolveVectorizeIndex(ctx.c.env, rag.collection);
+  if (!index?.getByIds || !items.length) return { collection: rag.collection, tables: found };
+
+  const identities = items.map((item) => tableSaveIdentity(ctx, item)).filter((row) => row.tableName);
+  const chunkIds = await Promise.all(identities.map((row) => vectorChunkId(row.documentId, 0)));
+  const rows: Array<{ id?: string; metadata?: Record<string, string> }> = [];
+  for (let i = 0; i < chunkIds.length; i += VECTORIZE_GET_BY_IDS_LIMIT) {
+    const page = chunkIds.slice(i, i + VECTORIZE_GET_BY_IDS_LIMIT);
+    try {
+      rows.push(...((await index.getByIds(page)) ?? []));
+    } catch (e) {
+      console.warn('[save-rag] vectorize existence check failed:', e);
+      break;
+    }
+  }
+
+  const byId = new Map(rows.filter((row) => row.id).map((row) => [String(row.id), row]));
+  for (let i = 0; i < identities.length; i++) {
+    const hit = byId.get(chunkIds[i]!);
+    if (!hit) continue;
+    const meta = hit.metadata ?? {};
+    if (rag.namespace && meta.namespace && meta.namespace !== rag.namespace) continue;
+    if (meta.docType && meta.docType !== 'schema') continue;
+    if (meta.documentId && meta.documentId !== identities[i]!.documentId) continue;
+    const tableName = identities[i]!.tableName;
+    if (meta.tableName && meta.tableName.toUpperCase() !== tableName.toUpperCase()) continue;
+    found.set(tableName, identities[i]!);
+  }
+  return { collection: rag.collection, tables: found };
+}
+
+function alreadyExistsResult(row: TableSaveIdentity, collection: string): SaveRagResult {
+  return {
+    ok: true,
+    saved: 0,
+    skipped: true,
+    reason: ALREADY_EXISTS_REASON,
+    tableName: row.tableName,
+    documentId: row.documentId,
+    collection,
+  };
+}
+
 function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): Record<string, unknown>[] {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const done = indexedTables(ctx.runContext);
@@ -382,6 +476,33 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     };
   }
 
+  const existing = await tablesAlreadyInVectorize(ctx, pendingTables);
+  const skippedResults = [...existing.tables.values()].map((row) =>
+    alreadyExistsResult(row, existing.collection),
+  );
+  if (skippedResults.length) {
+    markIndexedTables(
+      ctx.runContext,
+      skippedResults.map((row) => String(row.tableName ?? '')),
+    );
+  }
+  const toSave = pendingTables.filter((item) => !existing.tables.has(String(item.tableName ?? '')));
+  if (!toSave.length) {
+    return {
+      ok: true,
+      saved: 0,
+      skipped: true,
+      reason: ALREADY_EXISTS_REASON,
+      items: skippedResults,
+      documentIds: skippedResults.map((row) => row.documentId),
+      tables: skippedResults.map((row) => String(row.tableName ?? '')),
+      alreadyExists: skippedResults.map((row) => String(row.tableName ?? '')),
+      collection: existing.collection,
+      enrichedColumns: 0,
+      llmCalls: 0,
+    };
+  }
+
   const results: SaveRagResult[] = [];
   const usages: AiUsage[] = [];
   let llmCalls = 0;
@@ -391,8 +512,8 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
     env: ctx.c.env,
     definition: ctx.definition,
     agentId: ctx.node.id,
-    triggerContext: triggerContextForTable(ctx, pendingTables[0]!),
-    tables: pendingTables.map((item) => ({
+    triggerContext: triggerContextForTable(ctx, toSave[0]!),
+    tables: toSave.map((item) => ({
       tableName: String(item.tableName ?? ''),
       schemaName: String(item.schemaName ?? ''),
     })),
@@ -414,13 +535,16 @@ export async function executeSaveRagPipeline(ctx: NodeContext): Promise<NodeOutp
 
   const saved = results.reduce((sum, r) => sum + r.saved, 0);
   const usage = mergeAiUsage(...usages);
+  const reported = [...skippedResults, ...results];
+  const alreadyExists = skippedResults.map((row) => String(row.tableName ?? '')).filter(Boolean);
   return {
-    ok: results.some((r) => r.ok),
+    ok: reported.some((r) => r.ok),
     saved,
-    items: results,
-    documentIds: results.map((r) => r.documentId),
-    collection: results[0]?.collection,
-    tables: infos.map((i) => i.tableName),
+    items: reported,
+    documentIds: reported.map((r) => r.documentId),
+    collection: results[0]?.collection ?? existing.collection,
+    tables: [...alreadyExists, ...infos.map((i) => i.tableName)],
+    ...(alreadyExists.length ? { alreadyExists } : {}),
     enrichedColumns,
     llmCalls,
     ...(usage ? { raw: { usage } } : {}),
