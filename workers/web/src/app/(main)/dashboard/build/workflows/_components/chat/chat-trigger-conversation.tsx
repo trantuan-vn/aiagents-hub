@@ -2,13 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 
-import { Loader2, SendHorizontal } from "lucide-react";
+import { Check, Clock, Loader2, Minus, SendHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { parseChatAuthChallenge, type ChatAuthChallenge } from "./chat-auth";
+import {
+  applyChatRunEvent,
+  pickChatRunLog,
+  type ChatActivityItem,
+  type ChatProgressEvent,
+  type ChatRunStep,
+  type ChatRunStepStatus,
+} from "./chat-run-log";
 
 export type ChatTriggerRole = "user" | "assistant" | "error";
 
@@ -107,14 +115,66 @@ export function chatBubbleText(raw: unknown, depth = 0): string {
   return "";
 }
 
+function chatResultFromPayload(data: Record<string, unknown>): { output: string; executionKey?: string; status?: string } {
+  const raw = data.output ?? data.text ?? data.message;
+  return {
+    output: chatBubbleText(raw),
+    executionKey: typeof data.executionKey === "string" ? data.executionKey : undefined,
+    status: typeof data.status === "string" ? data.status : undefined,
+  };
+}
+
+async function readChatProgressStream(
+  body: ReadableStream<Uint8Array>,
+  onProgress?: (event: ChatProgressEvent) => void,
+): Promise<{ output: string; executionKey?: string; status?: string }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: { output: string; executionKey?: string; status?: string } | null = null;
+  const consume = (block: string) => {
+    const line = block
+      .split("\n")
+      .map((entry) => entry.trim())
+      .find((entry) => entry.startsWith("data:"));
+    if (!line) return;
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(line.slice(5).trim()) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (data.type === "error") {
+      throw new Error(String(data.error ?? "Chat workflow failed"));
+    }
+    if (data.type === "result") {
+      result = chatResultFromPayload(data);
+      return;
+    }
+    onProgress?.(data as ChatProgressEvent);
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) consume(block);
+  }
+  if (buffer.trim()) consume(buffer);
+  if (!result) throw new Error("Chat workflow failed");
+  return result;
+}
+
 export async function postChatTriggerMessage(params: {
   endpointUrl: string;
   sessionId: string;
   chatInput: string;
+  onProgress?: (event: ChatProgressEvent) => void;
 }): Promise<{ output: string; executionKey?: string; status?: string }> {
   const res = await fetch(params.endpointUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream, application/json" },
     credentials: "include",
     body: JSON.stringify({
       action: "sendMessage",
@@ -122,6 +182,10 @@ export async function postChatTriggerMessage(params: {
       chatInput: params.chatInput,
     }),
   });
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/event-stream") && res.ok && res.body) {
+    return readChatProgressStream(res.body, params.onProgress);
+  }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   const challenge = parseChatAuthChallenge(res.status, data);
   if (challenge) {
@@ -130,13 +194,116 @@ export async function postChatTriggerMessage(params: {
   if (!res.ok) {
     throw new Error(String(data.error ?? `Request failed (${res.status})`));
   }
-  const raw = data.output ?? data.text ?? data.message;
-  const output = chatBubbleText(raw);
-  return {
-    output,
-    executionKey: typeof data.executionKey === "string" ? data.executionKey : undefined,
-    status: typeof data.status === "string" ? data.status : undefined,
+  return chatResultFromPayload(data);
+}
+
+function RunStatusIcon({ status }: { status: ChatRunStepStatus }) {
+  if (status === "running") return <Loader2 className="text-muted-foreground size-3.5 animate-spin" aria-hidden />;
+  if (status === "success") return <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />;
+  if (status === "error") return <X className="size-3.5 text-red-600 dark:text-red-400" aria-hidden />;
+  if (status === "pending_human") return <Clock className="size-3.5 text-amber-600 dark:text-amber-400" aria-hidden />;
+  return <Minus className="text-muted-foreground size-3.5" aria-hidden />;
+}
+
+function workLabel(
+  item: ChatActivityItem,
+  t: ReturnType<typeof useTranslations<"WorkflowEditorPage">>,
+): string {
+  if (item.work === "tool") return t("chat_work_tool", { tool: item.tool || "tool" });
+  if (item.work === "rewrite") return t("chat_work_rewrite");
+  if (item.work === "retrieve") return t("chat_work_retrieve");
+  if (item.work === "sql") return t("chat_work_sql");
+  if (item.work === "validate") return t("chat_work_validate");
+  if (item.work === "ask") return t("chat_work_ask");
+  if (item.work === "answer") return t("chat_work_answer");
+  if (item.work === "reasoning") return t("chat_work_reasoning");
+  return item.work;
+}
+
+function ChatActivityFeed({ items, live }: { items: ChatActivityItem[]; live: boolean }) {
+  const t = useTranslations("WorkflowEditorPage");
+  const endRef = useRef<HTMLDivElement>(null);
+  const tail = items[items.length - 1]?.text ?? "";
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "nearest" });
+  }, [tail, items.length]);
+  return (
+    <ol className="mt-1.5 flex flex-col gap-1.5 border-t pt-2">
+      {items.map((item, index) => {
+        const current = live && index === items.length - 1;
+        return (
+          <li key={`${item.work}:${index}`} className="min-w-0">
+            <span className={cn("block text-[11px] font-medium", current ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+              {current ? <Loader2 className="mr-1 inline size-3 animate-spin" aria-hidden /> : null}
+              {workLabel(item, t)}
+            </span>
+            {item.text ? (
+              <pre className="text-foreground/80 mt-0.5 max-h-36 overflow-y-auto font-sans text-[11px] leading-relaxed whitespace-pre-wrap">
+                {item.text}
+                {current ? <span className="text-amber-600 dark:text-amber-400">▍</span> : null}
+              </pre>
+            ) : null}
+          </li>
+        );
+      })}
+      <div ref={endRef} />
+    </ol>
+  );
+}
+
+function ChatRunStatus({ steps }: { steps: ChatRunStep[] }) {
+  const t = useTranslations("WorkflowEditorPage");
+  const reasoning = [...steps].reverse().find((step) => step.status === "running" && step.phase === "reasoning" && !step.activityLog?.length);
+  const statusLabel = (status: ChatRunStepStatus) => {
+    if (status === "running") return t("chat_run_status_running");
+    if (status === "success") return t("chat_run_status_success");
+    if (status === "error") return t("chat_run_status_error");
+    if (status === "pending_human") return t("chat_run_status_pending_human");
+    return t("chat_run_status_skipped");
   };
+  return (
+    <div
+      className={cn(
+        "bg-background w-full self-start rounded-[14px] border px-3 py-2",
+        steps.some((step) => step.activityLog?.length) ? "max-w-full" : "max-w-[78%]",
+      )}
+    >
+      <div className="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-[11px] font-medium">
+        <Loader2 className="size-3 animate-spin" aria-hidden />
+        {t("logs_title")}
+      </div>
+      {steps.length === 0 ? (
+        <p className="text-muted-foreground text-xs">{t("chat_run_starting")}</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {steps.map((step, index) => (
+            <li key={`${step.nodeId}:${index}`} className="flex items-start gap-2">
+              <span className="mt-0.5">
+                <RunStatusIcon status={step.status} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[12px] font-medium">{step.label}</span>
+                <span className="text-muted-foreground block truncate text-[10px]">
+                  {step.nodeType ? `${step.nodeType.replace(/_/g, " ")} · ` : ""}
+                  {statusLabel(step.status)}
+                </span>
+                {step.activityLog?.length ? (
+                  <ChatActivityFeed items={step.activityLog} live={step.status === "running"} />
+                ) : step.status === "running" && step.phase === "reasoning" ? (
+                  <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-400">{t("chat_run_reasoning")}</span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {reasoning ? (
+        <p className="text-muted-foreground mt-2 border-t pt-2 text-[11px] leading-relaxed">
+          {t("chat_run_reasoning_hint", { name: reasoning.label })}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function Bubble({ message }: { message: ChatTriggerMessage }) {
@@ -170,6 +337,7 @@ export function ChatTriggerConversation({
   header,
   className,
   emptyHint,
+  liveSteps,
 }: {
   endpointUrl: string;
   sessionId: string;
@@ -185,12 +353,16 @@ export function ChatTriggerConversation({
   header?: ReactNode;
   className?: string;
   emptyHint?: string;
+  /** Editor log rows already painted from the canvas websocket. */
+  liveSteps?: ChatRunStep[];
 }) {
   const t = useTranslations("WorkflowEditorPage");
   const [text, setText] = useState("");
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [streamSteps, setStreamSteps] = useState<ChatRunStep[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
   const busy = !!sending;
+  const runSteps = pickChatRunLog(streamSteps, liveSteps);
 
   const userHistory = useMemo(
     () => messages.filter((message) => message.role === "user").map((message) => message.content),
@@ -201,7 +373,7 @@ export function ChatTriggerConversation({
     const el = listRef.current;
     if (!el) return;
     el.scrollTop = el.scrollHeight;
-  }, [messages, busy]);
+  }, [messages, busy, runSteps]);
 
   const send = useCallback(
     async (raw: string) => {
@@ -216,10 +388,16 @@ export function ChatTriggerConversation({
       onMessagesChange(next);
       setText("");
       setHistoryIndex(-1);
+      setStreamSteps([]);
       onSendingChange?.(true);
       onSendStart?.();
       try {
-        const result = await postChatTriggerMessage({ endpointUrl, sessionId, chatInput });
+        const result = await postChatTriggerMessage({
+          endpointUrl,
+          sessionId,
+          chatInput,
+          onProgress: (event) => setStreamSteps((current) => applyChatRunEvent(current, event)),
+        });
         const reply = result.output.trim() || t("chat_empty_reply");
         onMessagesChange([
           ...next,
@@ -239,6 +417,7 @@ export function ChatTriggerConversation({
           },
         ]);
       } finally {
+        setStreamSteps([]);
         onSendingChange?.(false);
       }
     },
@@ -261,12 +440,7 @@ export function ChatTriggerConversation({
         ) : (
           messages.map((message) => <Bubble key={message.id} message={message} />)
         )}
-        {busy ? (
-          <div className="text-muted-foreground flex items-center gap-2 self-start text-xs">
-            <Loader2 className="size-3.5 animate-spin" />
-            {t("chat_thinking")}
-          </div>
-        ) : null}
+        {busy ? <ChatRunStatus steps={runSteps} /> : null}
       </div>
       <form className="bg-background flex shrink-0 items-end gap-2 border-t px-3 py-2" onSubmit={onSubmit}>
         <textarea

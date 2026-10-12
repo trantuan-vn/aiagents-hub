@@ -29,6 +29,10 @@ import {
   syncChatTriggersForWorkflow,
 } from '../triggers/triggers.js';
 import {
+  subscribeExecutionProgress,
+  toPublicChatProgress,
+} from '../execution/execution-progress.js';
+import {
   actorForPublicTrigger,
   progressDoIdForActor,
 } from '../execution/workflow-runner.js';
@@ -126,6 +130,68 @@ function corsHeaders(originHeader: string | undefined, allowedOrigins: string): 
     'Access-Control-Allow-Credentials': credentials,
     Vary: 'Origin',
   };
+}
+
+function wantsProgressStream(c: { req: { header: (name: string) => string | undefined } }): boolean {
+  return (c.req.header('accept') ?? '').toLowerCase().includes('text/event-stream');
+}
+
+function chatFailureMessage(result: { output?: unknown }): string {
+  return result.output && typeof result.output === 'object' && 'error' in result.output
+    ? String((result.output as { error?: unknown }).error ?? 'failed')
+    : 'Chat workflow failed';
+}
+
+function openChatProgressStream(
+  headers: Record<string, string>,
+  run: () => Promise<{ status: string; executionKey: string; output?: unknown; steps?: Array<{ output?: unknown }> }>,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (payload: unknown) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`));
+      };
+      controller.enqueue(encoder.encode(`:${' '.repeat(2048)}\n\n`));
+      try {
+        await subscribeExecutionProgress(
+          (event) => {
+            if (event.type === 'finished') return;
+            send(toPublicChatProgress(event));
+          },
+          async () => {
+            const result = await run();
+            if (result.status === 'failed') {
+              send({ type: 'error', error: chatFailureMessage(result), executionKey: result.executionKey });
+              return;
+            }
+            send({
+              type: 'result',
+              output: extractChatReply(result),
+              executionKey: result.executionKey,
+              status: result.status,
+            });
+          },
+        );
+      } catch (e) {
+        send({ type: 'error', error: e instanceof Error ? e.message : 'Chat workflow failed' });
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          /* client disconnected */
+        }
+      }
+    },
+  });
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      ...headers,
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache, no-transform',
+    },
+  });
 }
 
 function wantsJson(c: { req: { query: (name: string) => string | undefined; header: (name: string) => string | undefined } }): boolean {
@@ -363,45 +429,50 @@ async function handleChatRequest(
   }
 
   const chatUrl = actionUrl.split('?')[0] ?? actionUrl;
-  const result = await runChatTrigger({
-    env: c.env,
-    bindingName,
-    ownerId: ctx.ownerId,
-    resolved: gated.resolved,
-    node: ctx.node,
-    sessionId: parsed.sessionId,
-    chatInput: parsed.chatInput,
-    action: parsed.action,
-    chatUrl,
-    executionMode: mode,
-    autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
-    actor: gated.actor,
-  });
-
-  await broadcastChatResult(
-    c.env,
-    bindingName,
-    progressDoIdForActor(gated.actor, binding, ctx.ownerId),
-    {
-      workflowId,
-      nodeId: ctx.node.id,
-      chatPath: ctx.chatPath,
-      executionKey: result.executionKey,
-      status: result.status,
+  const run = async () => {
+    const result = await runChatTrigger({
+      env: c.env,
+      bindingName,
+      ownerId: ctx.ownerId,
+      resolved: gated.resolved,
+      node: ctx.node,
       sessionId: parsed.sessionId,
       chatInput: parsed.chatInput,
       action: parsed.action,
       chatUrl,
       executionMode: mode,
-    },
-  );
+      autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
+      actor: gated.actor,
+    });
+
+    await broadcastChatResult(
+      c.env,
+      bindingName,
+      progressDoIdForActor(gated.actor, binding, ctx.ownerId),
+      {
+        workflowId,
+        nodeId: ctx.node.id,
+        chatPath: ctx.chatPath,
+        executionKey: result.executionKey,
+        status: result.status,
+        sessionId: parsed.sessionId,
+        chatInput: parsed.chatInput,
+        action: parsed.action,
+        chatUrl,
+        executionMode: mode,
+      },
+    );
+    return result;
+  };
+
+  if (wantsProgressStream(c)) {
+    return openChatProgressStream(headers, run);
+  }
+
+  const result = await run();
 
   if (result.status === 'failed') {
-    const error =
-      result.output && typeof result.output === 'object' && 'error' in result.output
-        ? String((result.output as { error?: unknown }).error ?? 'failed')
-        : 'Chat workflow failed';
-    return c.json({ error, executionKey: result.executionKey }, 500, headers);
+    return c.json({ error: chatFailureMessage(result), executionKey: result.executionKey }, 500, headers);
   }
 
   return c.json(

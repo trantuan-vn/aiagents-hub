@@ -11,7 +11,7 @@ import {
   updateExecution,
   type ExecutionRow,
 } from '../execution/execution-store.js';
-import { broadcastWorkflowExecutionProgress } from '../execution/execution-progress.js';
+import { broadcastWorkflowExecutionProgress, progressNodeLabel } from '../execution/execution-progress.js';
 import { nodePluginRegistry } from '../nodes/index.js';
 import type { NodeContext as PluginNodeContext } from '../nodes/types.js';
 import { buildWebhookItemOutput } from '../nodes/webhook/output.js';
@@ -466,18 +466,20 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
   const durableSlices = !!args.durableSlices;
   const sliceStartedAt = Date.now();
 
+  const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
+
   const emitProgress = async (
     event: Omit<Parameters<typeof broadcastWorkflowExecutionProgress>[1], 'workflowId' | 'executionKey'>,
   ) => {
+    const label = event.label || progressNodeLabel(event.nodeId ? nodeById.get(event.nodeId) : undefined);
     await broadcastWorkflowExecutionProgress(userDO, {
       workflowId: meta.workflowId,
       executionKey,
       ...event,
+      ...(label ? { label } : {}),
       entryNodeId: event.entryNodeId || engine.entryNodeId,
     });
   };
-
-  const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
 
   const emitNodeDone = async (
     nodeId: string,

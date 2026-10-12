@@ -24,6 +24,8 @@ import {
   WORKERS_AI_GATEWAY,
   type AiCallStamp,
 } from '../ai/workers-ai.js';
+import { isReadableByteStream, readWorkersAiEventStream } from '../ai/workers-ai-stream.js';
+import { hasAgentActivity, pushAgentActivityText } from '../execution/execution-progress.js';
 
 const DEFAULT_TEXT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
 
@@ -381,6 +383,10 @@ export async function billEmbeddingUsage(
   });
 }
 
+function promptTextOf(messages: Array<{ role: string; content: string }>): string {
+  return messages.map((message) => message.content).join('\n');
+}
+
 export async function runTextModel(
   env: Env,
   modelId: string,
@@ -391,8 +397,9 @@ export async function runTextModel(
 ): Promise<unknown> {
   const id = (modelId || DEFAULT_TEXT_MODEL) as keyof AiModels;
   const textGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'text' }) : WORKERS_AI_GATEWAY;
+  const promptText = promptTextOf(messages);
 
-  const run = () =>
+  const runBuffered = () =>
     withAiCapacityRetry(() =>
       env.AI.run(
         id,
@@ -400,6 +407,33 @@ export async function runTextModel(
         { gateway: textGateway },
       ),
     );
+
+  const runStreaming = () =>
+    withAiCapacityRetry(async () => {
+      const raw = await env.AI.run(
+        id,
+        { messages, max_tokens: maxTokens, ...extra, stream: true },
+        { gateway: textGateway },
+      );
+      if (!isReadableByteStream(raw)) {
+        const text = extractTextFromAiResponse(raw);
+        if (text) pushAgentActivityText(text);
+        return raw;
+      }
+      return readWorkersAiEventStream(raw, pushAgentActivityText, promptText);
+    });
+
+  const run = async () => {
+    if (!hasAgentActivity()) return runBuffered();
+    try {
+      return await runStreaming();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/5016|agree|Prior to using this model/i.test(msg)) throw e;
+      console.warn('[runTextModel] stream failed; using a buffered response', msg);
+      return runBuffered();
+    }
+  };
 
   try {
     return await run();

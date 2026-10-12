@@ -50,7 +50,7 @@ function stepsSignature(steps: ExecutionStepLog[]): string {
   return steps
     .map(
       (step) =>
-        `${step.nodeId}:${step.nodeType}:${step.status}:${step.durationMs ?? ""}:${step.input !== undefined ? 1 : 0}:${step.output !== undefined ? 1 : 0}`,
+        `${step.nodeId}:${step.nodeType}:${step.status}:${step.phase ?? ""}:${step.label ?? ""}:${step.activityLog?.map((item) => `${item.work}:${item.text.length}`).join(",") ?? ""}:${step.durationMs ?? ""}:${step.input !== undefined ? 1 : 0}:${step.output !== undefined ? 1 : 0}`,
     )
     .join("|");
 }
@@ -189,11 +189,14 @@ export const workflowEditorLogsStore = {
   applyProgress: (
     workflowId: number,
     event: {
-      type: "started" | "node_start" | "node_done" | "finished";
+      type: "started" | "node_start" | "node_done" | "node_phase" | "finished";
       executionKey: string;
       nodeId?: string;
       nodeType?: string;
+      label?: string;
       status?: string;
+      phase?: "reasoning";
+      activityLog?: Array<{ work: string; tool?: string; text: string }>;
       input?: unknown;
       output?: unknown;
     },
@@ -207,16 +210,48 @@ export const workflowEditorLogsStore = {
     if (event.type === "node_start" && event.nodeId) {
       const last = steps[steps.length - 1];
       if (last?.status === "running" && last.nodeId === event.nodeId) {
-        if (event.nodeType && last.nodeType !== event.nodeType) {
+        if ((event.nodeType && last.nodeType !== event.nodeType) || (event.label && last.label !== event.label)) {
           steps = steps.map((step, index) =>
-            index === steps.length - 1 ? { ...step, nodeType: event.nodeType! } : step,
+            index === steps.length - 1
+              ? {
+                  ...step,
+                  ...(event.nodeType ? { nodeType: event.nodeType } : {}),
+                  ...(event.label ? { label: event.label } : {}),
+                }
+              : step,
           );
         }
       } else {
         steps = [
           ...steps,
-          { nodeId: event.nodeId, nodeType: event.nodeType ?? "", status: "running" },
+          {
+            nodeId: event.nodeId,
+            nodeType: event.nodeType ?? "",
+            status: "running",
+            ...(event.label ? { label: event.label } : {}),
+          },
         ];
+      }
+    } else if (event.type === "node_phase" && event.nodeId && event.phase === "reasoning") {
+      let index = -1;
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (steps[i]?.nodeId === event.nodeId && steps[i]?.status === "running") {
+          index = i;
+          break;
+        }
+      }
+      const patch: ExecutionStepLog = {
+        nodeId: event.nodeId,
+        nodeType: event.nodeType || steps[index]?.nodeType || "",
+        status: "running",
+        phase: "reasoning",
+        ...(event.label ? { label: event.label } : {}),
+        ...(event.activityLog?.length ? { activityLog: event.activityLog } : {}),
+      };
+      if (index >= 0) {
+        steps = steps.map((step, i) => (i === index ? { ...step, ...patch } : step));
+      } else {
+        steps = [...steps, patch];
       }
     } else if (event.type === "node_done" && event.nodeId) {
       const status = doneStatus(event.status);
@@ -231,6 +266,8 @@ export const workflowEditorLogsStore = {
         nodeId: event.nodeId,
         nodeType: event.nodeType || steps[index]?.nodeType || "",
         status,
+        phase: undefined,
+        ...(event.label ? { label: event.label } : {}),
         ...(event.input !== undefined ? { input: event.input } : {}),
         ...(event.output !== undefined ? { output: event.output } : {}),
       };

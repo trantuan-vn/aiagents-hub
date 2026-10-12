@@ -10,13 +10,16 @@ import type { ExecutionStepLog } from "../../_lib/api";
 export type NodeRunStatus = "running" | "success" | "error" | "skipped" | "pending_human";
 
 export type WorkflowExecutionProgressEvent = {
-  type: "started" | "node_start" | "node_done" | "finished";
+  type: "started" | "node_start" | "node_done" | "node_phase" | "finished";
   workflowId: number;
   executionKey: string;
   entryNodeId?: string;
   nodeId?: string;
   nodeType?: string;
+  label?: string;
   status?: string;
+  phase?: "reasoning";
+  activityLog?: Array<{ work: string; tool?: string; text: string }>;
   /** Clipped node input for the editor log. */
   input?: unknown;
   /** Clipped node output for live canvas pin. */
@@ -71,7 +74,11 @@ function isProgressEvent(value: unknown): value is WorkflowExecutionProgressEven
   if (!value || typeof value !== "object") return false;
   const event = value as WorkflowExecutionProgressEvent;
   return (
-    (event.type === "started" || event.type === "node_start" || event.type === "node_done" || event.type === "finished") &&
+    (event.type === "started" ||
+      event.type === "node_start" ||
+      event.type === "node_done" ||
+      event.type === "node_phase" ||
+      event.type === "finished") &&
     typeof event.workflowId === "number" &&
     typeof event.executionKey === "string"
   );

@@ -1,7 +1,9 @@
-import { generateText, stepCountIs } from 'ai';
+import { stepCountIs, streamText } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
 import { gatewayForExecution, stampFromNode, withAiCapacityRetry } from '../../ai/workers-ai.js';
+import { noteAgentWork, reportAgentReasoning, withAgentActivity } from '../../execution/execution-progress.js';
+import { followAgentStream } from '../../ai/workers-ai-stream.js';
 
 import {
   asBillingAiResponse,
@@ -165,6 +167,10 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
   const historyMessages = simpleMemory.history.map((m) => ({ role: m.role, content: m.content }));
 
+  return withAgentActivity(ctx, async () => {
+  await reportAgentReasoning(ctx);
+  noteAgentWork('answer');
+
   if (useToolLoop && ctx.c.env.AI) {
     let billedSteps = 0;
     const result = await withAiCapacityRetry(async () => {
@@ -172,7 +178,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         binding: ctx.c.env.AI,
         gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }),
       });
-      return generateText({
+      const streamed = streamText({
         model: workersAI(modelId as never),
         system: systemParts.join('\n\n'),
         messages: [...historyMessages, { role: 'user', content: userText }],
@@ -183,13 +189,21 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         presencePenalty: modelParams.presence_penalty as number | undefined,
         tools,
         stopWhen: stepCountIs(5),
-        onStepFinish: async (step) => {
-          billedSteps += 1;
-          const usage = (step as { usage?: unknown }).usage;
-          await billOnce(usage, String((step as { text?: unknown }).text ?? ''));
-        },
       });
+      await followAgentStream(streamed.fullStream);
+      const [text, steps, totalUsage, usage] = await Promise.all([
+        streamed.text,
+        streamed.steps,
+        streamed.totalUsage,
+        streamed.usage,
+      ]);
+      return { text, steps, totalUsage, usage };
     });
+    for (const step of result.steps ?? []) {
+      if ((step as { usage?: unknown }).usage == null) continue;
+      billedSteps += 1;
+      await billOnce((step as { usage?: unknown }).usage, String((step as { text?: unknown }).text ?? ''));
+    }
 
     const text = result.text;
     await billGenerateTextCalls(billOnce, result, billedSteps);
@@ -250,4 +264,5 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     raw: aiResponse,
     endpoint,
   };
+  });
 }

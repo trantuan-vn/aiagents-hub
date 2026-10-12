@@ -1,10 +1,18 @@
 import { REASONING_AGENT_DEFAULTS } from '@aiagents-hub/workflow-nodes';
-import { generateText, stepCountIs, tool, type ToolSet } from 'ai';
+import { generateText, stepCountIs, streamText, tool, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 import { z } from 'zod';
 
 import { createLogger } from '../../../../../shared/logger.js';
 import { gatewayForExecution, stampFromNode, withAiCapacityRetry } from '../../ai/workers-ai.js';
+import {
+  hasAgentActivity,
+  noteAgentWork,
+  reportAgentReasoning,
+  withAgentActivity,
+  type AgentWork,
+} from '../../execution/execution-progress.js';
+import { followAgentStream } from '../../ai/workers-ai-stream.js';
 import {
   asBillingAiResponse,
   billAgentUsage,
@@ -269,7 +277,15 @@ function createDefaultLlm(args: {
   const { ctx, modelId, maxTokens, params, onBill } = args;
   const temperature = params.temperature as number | undefined;
   const forcedReasoning = usesForcedReasoning(modelId);
+  const workForPurpose = (purpose: string): AgentWork => {
+    if (purpose === 'rewrite') return 'rewrite';
+    if (purpose === 'sql') return 'sql';
+    if (purpose === 'ask') return 'ask';
+    if (purpose === 'act') return 'answer';
+    return 'reasoning';
+  };
   return async (call) => {
+    noteAgentWork(workForPurpose(call.purpose));
     const limit = call.maxTokens ?? maxTokens;
     const complete = async (outputLimit: number, userText = call.user) => {
       if (call.purpose === 'act' && call.tools && Object.keys(call.tools).length && ctx.c.env.AI) {
@@ -278,11 +294,12 @@ function createDefaultLlm(args: {
           gateway: gatewayForExecution(stampFromNode(ctx, 'agent')),
         });
         let billedSteps = 0;
-        const result = await withAiCapacityRetry(async () =>
-          generateText({
-            model: workersAI(modelId as never),
+        const result = await withAiCapacityRetry(async () => {
+          const model = workersAI(modelId as never);
+          const request = {
+            model,
             system: call.system,
-            messages: [{ role: 'user', content: userText }],
+            messages: [{ role: 'user' as const, content: userText }],
             maxOutputTokens: outputLimit,
             temperature: call.temperature ?? temperature,
             topP: params.top_p as number | undefined,
@@ -290,12 +307,27 @@ function createDefaultLlm(args: {
             presencePenalty: params.presence_penalty as number | undefined,
             tools: call.tools,
             stopWhen: stepCountIs(call.stopSteps ?? DEFAULT_ACT_STEPS),
-            onStepFinish: async (step) => {
-              billedSteps += 1;
-              await onBill((step as { usage?: unknown }).usage, asText((step as { text?: unknown }).text));
-            },
-          }),
-        );
+          };
+          if (!hasAgentActivity()) {
+            return generateText({
+              ...request,
+              onStepFinish: async (step) => {
+                billedSteps += 1;
+                await onBill((step as { usage?: unknown }).usage, asText((step as { text?: unknown }).text));
+              },
+            });
+          }
+          const streamed = streamText(request);
+          await followAgentStream(streamed.fullStream);
+          const [text, steps, totalUsage, usage, finishReason] = await Promise.all([
+            streamed.text,
+            streamed.steps,
+            streamed.totalUsage,
+            streamed.usage,
+            streamed.finishReason,
+          ]);
+          return { text, steps, totalUsage, usage, finishReason };
+        });
         await billGenerateTextCalls(onBill, result, billedSteps);
 
         const observations: ToolObservation[] = [];
@@ -486,6 +518,7 @@ async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutpu
   }
 
   // 2. Schema linking: host retrieves; the model never calls get_rag.
+  noteAgentWork('retrieve');
   const prefetched = await prefetchLinkedGetRag(
     { ...ctx, nodeInput: s.nodeInput },
     ctx.node.id,
@@ -541,6 +574,7 @@ async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutpu
     }
 
     lastSql = parsed.sql;
+    noteAgentWork('validate');
     const check = await checkSql(parsed.sql);
     trace.push('sql.validate', { attempt, ok: check.ok, error: check.ok ? '' : check.error });
     if (check.ok) {
@@ -565,6 +599,7 @@ async function runSqlPipeline(s: Shared, deps: ReasoningDeps): Promise<NodeOutpu
     lastError = check.error;
 
     if (attempt < attempts && needsSchemaRefresh(check.error)) {
+      noteAgentWork('retrieve');
       const query = oracleRetrieveQuery(check.error);
       const refreshed = await retrieve(query);
       if (refreshed?.ragText && !isUngroundedRagText(refreshed.ragText)) {
@@ -625,6 +660,7 @@ async function runToolChat(s: Shared, linked: ReturnType<typeof resolveAgentReso
   const memoryNamespace = String(linked.memoryNamespace ?? '').trim() || undefined;
   const hasGetRag = agentHasRagToolKind(ctx.definition, ctx.node.id, 'get-rag');
 
+  noteAgentWork('retrieve');
   const prefetched = await prefetchLinkedGetRag({ ...ctx, nodeInput: s.nodeInput }, ctx.node.id, s.question);
   const semantic =
     memoryCollection && !hasGetRag
@@ -834,6 +870,9 @@ export async function executeReasoningAgent(ctx: NodeContext, deps: ReasoningDep
   if (!question && options.clarificationMode === 'ask') {
     return emit(clarification('What would you like me to do?', 'The request is empty.'), []);
   }
-  if (hasSqlValidator(linked.tools)) return runSqlPipeline(shared, deps);
-  return runToolChat(shared, linked, service);
+  return withAgentActivity(ctx, async () => {
+    await reportAgentReasoning(ctx);
+    if (hasSqlValidator(linked.tools)) return runSqlPipeline(shared, deps);
+    return runToolChat(shared, linked, service);
+  });
 }

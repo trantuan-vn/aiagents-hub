@@ -85,6 +85,16 @@ function StepList({
                   {nodeKindLabel(node, step.nodeType)}
                   {extra ? ` · ${extra}` : ""}
                 </span>
+                {step.status === "running" && step.phase === "reasoning" && !step.activityLog?.length ? (
+                  <span className="mt-0.5 block truncate text-[10px] text-amber-700 dark:text-amber-400">
+                    {t("chat_run_reasoning")}
+                  </span>
+                ) : null}
+                {step.activityLog?.length ? (
+                  <span className="mt-0.5 block truncate text-[10px] text-foreground/80">
+                    {step.activityLog[step.activityLog.length - 1]?.text || t("chat_run_reasoning")}
+                  </span>
+                ) : null}
               </span>
             </button>
           </li>

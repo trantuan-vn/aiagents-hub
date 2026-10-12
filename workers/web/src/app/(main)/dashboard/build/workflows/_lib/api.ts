@@ -168,6 +168,12 @@ export interface ExecutionStepLog {
   royaltyUsd?: number;
   durationMs?: number;
   attempts?: number;
+  /** Live display name from a progress event. Persisted rows may omit it. */
+  label?: string;
+  /** Set while an agent node is inside a model call. */
+  phase?: "reasoning";
+  /** Live model transcript for the chat log. */
+  activityLog?: Array<{ work: string; tool?: string; text: string }>;
 }
 
 export type WorkflowExecutionStatus =

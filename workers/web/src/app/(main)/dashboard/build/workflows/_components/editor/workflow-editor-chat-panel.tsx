@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { MessageCircle } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { ChatTriggerConversation } from "../chat/chat-trigger-conversation";
+import { executionStepsToChatRun } from "../chat/chat-run-log";
 import { getWorkflowExecution } from "../../_lib/api";
 
 import { workflowEditorChatStore } from "./workflow-editor-chat-store";
@@ -27,6 +28,16 @@ export function WorkflowEditorChatPanel({ workflowId, className }: WorkflowEdito
     workflowEditorChatStore.getState,
   );
 
+  const logs = useSyncExternalStore(
+    workflowEditorLogsStore.subscribe,
+    workflowEditorLogsStore.getState,
+    workflowEditorLogsStore.getState,
+  );
+  const liveSteps = useMemo(() => {
+    if (!chat.sending || logs.workflowId !== workflowId) return undefined;
+    return executionStepsToChatRun(logs.steps);
+  }, [chat.sending, logs.steps, logs.workflowId, workflowId]);
+
   if (!chat.open || chat.workflowId !== workflowId || !chat.endpointUrl) return null;
 
   const sessionShort = chat.sessionId ? chat.sessionId.slice(0, 8) : "";
@@ -41,6 +52,7 @@ export function WorkflowEditorChatPanel({ workflowId, className }: WorkflowEdito
         messages={chat.messages}
         onMessagesChange={workflowEditorChatStore.setMessages}
         sending={chat.sending}
+        liveSteps={liveSteps}
         onSendingChange={workflowEditorChatStore.setSending}
         onSendStart={() => {
           if (chat.nodeId) workflowEditorLogsStore.startRun(workflowId, chat.nodeId);
