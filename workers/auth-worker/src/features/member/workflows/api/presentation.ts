@@ -92,6 +92,7 @@ import { ownerSetEnterpriseProposal } from '../../../enterprise/workflow-proposa
 import { assignEnterpriseTriggerKeys } from '../../../enterprise/trigger-keys';
 import { deletePromoSite } from '../promo/promo-site';
 import { registerWorkflowPromoRoutes } from '../promo/promo-routes';
+import { registerShareInviteRoutes } from '../share-invite/routes.js';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
@@ -999,6 +1000,7 @@ export function createWorkflowRoutes(bindingName: string) {
   );
 
   registerWorkflowPromoRoutes(app, { createRouteHandler, getUserDO, getUserId });
+  registerShareInviteRoutes(app, { createRouteHandler, getUserDO, getUserId });
 
   app.get(
     '/:id',

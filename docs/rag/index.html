@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KRX.DR – Workflow sinh SQL cho nhiều loại Database</title>
+<title>Workflow sinh SQL cho nhiều loại Database</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -42,11 +42,6 @@ ul,ol{padding-left:22px;margin:0 0 16px;max-width:76ch}
 li{margin-bottom:6px}
 code{font:500 .88em var(--mono);background:var(--accent-soft);color:var(--accent);padding:2px 6px;border-radius:4px}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:24px}
-.shots{display:grid;grid-template-columns:1fr;gap:24px}
-.shot{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.shot img{display:block;width:100%;height:auto}
-.shot .cap{padding:14px 18px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
-.shot .cap b{color:var(--ink)}
 .flow{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0;padding:0;list-style:none;counter-reset:f}
 .flow li{counter-increment:f;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-size:14px}
 .flow li::before{content:counter(f)". ";color:var(--accent);font-weight:600}
@@ -75,44 +70,27 @@ footer{margin-top:48px;padding:24px 0 48px;border-top:1px solid var(--line);colo
 <div class="wrap">
 
 <header class="hero">
-  <div class="badge">KRX.DR · Workflow sinh SQL đa hệ CSDL</div>
-  <h1>Sinh câu SQL trả số liệu từ một chức năng trên ứng dụng — cho mọi loại database</h1>
-  <p class="lead">Workflow này cho phép bấm đúng một chức năng trên ứng dụng, bắt lại toàn bộ câu lệnh mà database vừa thực thi, chọn ra câu trả số liệu, lấy giá trị tham số, kiểm chứng với màn hình, rồi lưu thành một cặp “Yêu cầu số liệu – SQL” có định danh. Hỗ trợ Oracle, PostgreSQL, MySQL, SQL Server, IBM Db2 và MongoDB.</p>
+  <div class="badge">Workflow sinh SQL đa hệ CSDL</div>
+  <h1>Sinh SQL tự động bằng AI cho mọi hệ cơ sở dữ liệu — từ tri thức chuyên ngành đến câu trả số liệu</h1>
+  <p class="lead">Workflow chuyển tri thức chuyên ngành của từng cơ sở dữ liệu vào mô hình AI dưới dạng các cặp “Câu hỏi – SQL” tương ứng. Nhờ đó, AI học được ngữ cảnh nghiệp vụ đặc thù của chính hệ thống đó, sẵn sàng nhận câu hỏi mới và sinh câu SQL phù hợp để trả số liệu. Khi phát hiện thiếu thông tin để sinh SQL, hệ thống chủ động thông báo cho người dùng và đề xuất bổ sung tri thức, giúp mô hình ngày càng chính xác. Quy trình được chuẩn hóa cho Oracle, PostgreSQL, MySQL, SQL Server, IBM Db2 và MongoDB.</p>
   <div class="cta">
-    <a class="btn primary" href="#workflow">Xem workflow</a>
-    <a class="btn ghost" href="#databases">Chọn database</a>
+    <a class="btn primary" href="#databases">Chọn database</a>
+    <a class="btn ghost" href="#cach-dung">Cách dùng</a>
   </div>
   <ol class="flow">
     <li>Chuẩn bị database mẫu</li>
+    <li>Xác định chức năng cần lấy số liệu</li>
     <li>Làm sạch bộ nhớ SQL</li>
-    <li>Bấm một chức năng</li>
-    <li>Bắt SQL phát sinh</li>
-    <li>Chọn SQL trả số liệu</li>
-    <li>Lấy tham số &amp; kiểm chứng</li>
-    <li>Lưu thành cặp</li>
+    <li>Bấm đúng một chức năng</li>
+    <li>Bắt toàn bộ SQL phát sinh</li>
+    <li>Lọc câu SQL trả số liệu</li>
+    <li>Lấy giá trị tham số (bind)</li>
+    <li>Chạy lại SQL với tham số</li>
+    <li>Đối chiếu kết quả với màn hình</li>
+    <li>Gán định danh cho cặp</li>
+    <li>Lưu cặp “Yêu cầu số liệu – SQL”</li>
   </ol>
 </header>
-
-<section id="workflow">
-  <h2>Workflow trực quan</h2>
-  <p>Workflow được xây dựng trên nền tảng AI Agents Hub, mỗi node đảm nhận một bước: nhận yêu cầu, sinh SQL, kiểm tra SQL, lấy bind, lưu cặp. Toàn bộ luồng chạy tự động, người dùng chỉ cần chọn chức năng và xác nhận kết quả.</p>
-
-  <div class="shots">
-    <div class="shot">
-      <img src="workflow-overview.png" alt="Sơ đồ workflow sinh SQL trên AI Agents Hub">
-      <div class="cap"><b>Ảnh 1 — Sơ đồ workflow.</b> Luồng node từ Chat Message Received → Researching Agent → Check SQL → Get Bind → Save SQL Pair. Mỗi node có nhiệm vụ riêng và có thể chạy lại độc lập.</div>
-    </div>
-    <div class="shot">
-      <img src="workflow-shared.png" alt="Danh sách workflow chia sẻ trong cộng đồng">
-      <div class="cap"><b>Ảnh 2 — Workflow được chia sẻ.</b> Workflow <code>KRX.DR.v1.1</code> đã được publish ở chế độ Community Sharing, sẵn sàng cho người khác xem, chạy và đánh giá.</div>
-    </div>
-  </div>
-
-  <div class="callout ok">
-    <b>Điểm mạnh của workflow</b>
-    <p>Tách rời từng bước, có thể kiểm tra và chạy lại một phần. Kết quả được lưu thành cặp có định danh, dùng lại được cho nhiều môi trường database khác nhau.</p>
-  </div>
-</section>
 
 <section id="databases">
   <h2>Chọn database để xem hướng dẫn chi tiết</h2>
@@ -193,7 +171,7 @@ footer{margin-top:48px;padding:24px 0 48px;border-top:1px solid var(--line);colo
 </section>
 
 <footer>
-  <p>Bộ tài liệu nội bộ KRX.DR — Workflow sinh SQL đa hệ CSDL. Ảnh workflow được đính kèm trực tiếp trong thư mục dự án. Thay tên database, user và bảng bằng thông tin thực tế của môi trường trước khi chạy.</p>
+  <p>Bộ tài liệu nội bộ — Workflow sinh SQL đa hệ CSDL. Thay tên database, user và bảng bằng thông tin thực tế của môi trường trước khi chạy.</p>
 </footer>
 
 </div>

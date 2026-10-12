@@ -88,6 +88,39 @@ export function updateWorkflow(id: number, data: Partial<AgentWorkflow>) {
   });
 }
 
+export class WorkflowApiError extends Error {
+  code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "WorkflowApiError";
+    this.code = code;
+  }
+}
+
+export interface ShareInviteResult {
+  sent: number;
+  firstTime: number;
+  existing: number;
+  skipped: Array<{ email: string; reason: string }>;
+}
+
+export async function sendWorkflowShareInvites(
+  id: number,
+  emails: string[],
+  language: "vi" | "en",
+): Promise<ShareInviteResult> {
+  const res = await fetch(`${API_BASE_URL}/dashboard/build/workflows/${id}/share-invites`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ emails, language }),
+  });
+  const body = (await res.json().catch(() => ({}))) as ShareInviteResult & { error?: string; code?: string };
+  if (!res.ok) throw new WorkflowApiError(body.error ?? res.statusText, body.code);
+  return body;
+}
+
 export interface WorkflowPromoFile {
   path: string;
   contentType: string;

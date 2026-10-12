@@ -2,18 +2,79 @@
 
 import { useState } from "react";
 
-import { Check, ClipboardList, MessageSquare, MousePointerClick, Plus, Trash2, Webhook, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Check, ClipboardList, Loader2, Mail, MessageSquare, MousePointerClick, Plus, Trash2, Webhook, X } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+import { sendWorkflowShareInvites, WorkflowApiError } from "../../_lib/api";
 import { PUBLIC_TRIGGER_KINDS, type PublicTriggerKind } from "../../_lib/public-trigger-kinds";
 import { emptyUserGrant, isShareEmail, type ShareAudience, type ShareGrant } from "../../_lib/share-grants";
 
 const MAX_GRANTS = 20;
 const MAX_EMAILS = 30;
+
+const INVITE_ERROR_KEYS = {
+  SHARE_INVITE_UNSAVED: "share_invite_error_unsaved",
+  SHARE_INVITE_NOT_LIVE: "share_invite_error_not_live",
+  SHARE_INVITE_NO_TRIGGERS: "share_invite_error_no_triggers",
+  SHARE_INVITE_RATE: "share_invite_error_rate",
+  SHARE_INVITE_FAILED: "share_invite_error_failed",
+  SHARE_INVITE_EMPTY: "share_invite_error_generic",
+} as const;
+
+function ShareInviteButton({
+  emails,
+  workflowId,
+  canSend,
+}: {
+  emails: string[];
+  workflowId?: number;
+  canSend: boolean;
+}) {
+  const t = useTranslations("WorkflowsPage");
+  const locale = useLocale();
+  const [sending, setSending] = useState(false);
+  const saved = typeof workflowId === "number" && workflowId > 0;
+  const language = locale.toLowerCase().startsWith("en") ? "en" : "vi";
+
+  const send = async () => {
+    if (workflowId == null || workflowId <= 0 || !canSend || sending) return;
+    setSending(true);
+    try {
+      const result = await sendWorkflowShareInvites(workflowId, emails, language);
+      if (result.sent === 0) {
+        toast.message(t("share_invite_skipped", { count: result.skipped.length || emails.length }));
+        return;
+      }
+      const parts = [t("share_invite_done", { sent: result.sent })];
+      if (result.firstTime > 0) parts.push(t("share_invite_first_time", { count: result.firstTime }));
+      if (result.skipped.length > 0) parts.push(t("share_invite_skipped", { count: result.skipped.length }));
+      toast.success(parts.join(" "));
+    } catch (err) {
+      const code = err instanceof WorkflowApiError ? err.code : undefined;
+      const key = code && code in INVITE_ERROR_KEYS ? INVITE_ERROR_KEYS[code as keyof typeof INVITE_ERROR_KEYS] : undefined;
+      toast.error(key ? t(key) : t("share_invite_error_generic"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Button type="button" variant="outline" className="w-full" disabled={!saved || !canSend || sending} onClick={() => void send()}>
+        {sending ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+        {sending ? t("share_invite_sending") : t("share_invite_send")}
+      </Button>
+      <p className="text-muted-foreground text-xs leading-relaxed">
+        {!saved ? t("share_invite_need_save") : canSend ? t("share_invite_hint") : t("share_grants_triggers_none")}
+      </p>
+    </div>
+  );
+}
 
 const TRIGGER_ICONS: Record<PublicTriggerKind, typeof Webhook> = {
   manual: MousePointerClick,
@@ -26,10 +87,12 @@ export function WorkflowShareGrantsEditor({
   grants,
   onChange,
   triggerKindsInWorkflow,
+  workflowId,
 }: {
   grants: ShareGrant[];
   onChange: (grants: ShareGrant[]) => void;
   triggerKindsInWorkflow?: Set<PublicTriggerKind>;
+  workflowId?: number;
 }) {
   const t = useTranslations("WorkflowsPage");
   const update = (id: string, next: ShareGrant) => onChange(grants.map((grant) => (grant.id === id ? next : grant)));
@@ -48,6 +111,7 @@ export function WorkflowShareGrantsEditor({
             <ShareGrantCard
               key={grant.id}
               grant={grant}
+              workflowId={workflowId}
               triggerKindsInWorkflow={triggerKindsInWorkflow}
               onChange={(next) => update(grant.id, next)}
               onRemove={() => onChange(grants.filter((row) => row.id !== grant.id))}
@@ -79,11 +143,13 @@ function ShareGrantCard({
   onChange,
   onRemove,
   triggerKindsInWorkflow,
+  workflowId,
 }: {
   grant: ShareGrant;
   onChange: (grant: ShareGrant) => void;
   onRemove: () => void;
   triggerKindsInWorkflow?: Set<PublicTriggerKind>;
+  workflowId?: number;
 }) {
   const t = useTranslations("WorkflowsPage");
   const [draft, setDraft] = useState("");
@@ -185,6 +251,9 @@ function ShareGrantCard({
               ))}
             </div>
           )}
+          {grant.emails.length > 0 ? (
+            <ShareInviteButton emails={grant.emails} workflowId={workflowId} canSend={grant.triggerKinds.length > 0} />
+          ) : null}
         </div>
       ) : (
         <p className="text-muted-foreground text-xs leading-relaxed">{t("share_grants_audience_all_desc")}</p>

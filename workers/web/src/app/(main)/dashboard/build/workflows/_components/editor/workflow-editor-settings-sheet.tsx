@@ -175,6 +175,7 @@ export function WorkflowEditorSettingsSheet({
               grants={shareGrants}
               onChange={onShareGrantsChange}
               triggerKindsInWorkflow={triggerKindsInWorkflow}
+              workflowId={workflowId}
             />
           </SettingsSection>
 

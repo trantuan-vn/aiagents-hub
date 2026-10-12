@@ -13,7 +13,7 @@ export function platformSenderFromEnv(env: Env): { email: string; name: string }
 
 export async function sendViaPlatformEmail(
   env: Env,
-  opts: { to: string; subject: string; text: string },
+  opts: { to: string; subject: string; text: string; html?: string; replyTo?: string },
 ): Promise<{ messageId?: string }> {
   const apiKey = await env.BREVO_API_KEY.get();
   if (!apiKey) throw new Error('Email sending is not configured');
@@ -30,6 +30,8 @@ export async function sendViaPlatformEmail(
       to: [{ email: opts.to }],
       subject: opts.subject,
       textContent: opts.text,
+      ...(opts.html ? { htmlContent: opts.html } : {}),
+      ...(opts.replyTo ? { replyTo: { email: opts.replyTo } } : {}),
     }),
   });
   if (!response.ok) {
