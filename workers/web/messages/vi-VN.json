@@ -3706,6 +3706,7 @@
     "field_max_rows": "Số dòng mẫu tối đa",
     "field_check_sql_max_rows_desc": "Không dùng ở chế độ validate-only (EXPLAIN PLAN). Giữ để tương thích.",
     "field_check_sql_schema_desc": "Schema/owner Oracle — đặt CURRENT_SCHEMA trước khi validate (hỗ trợ expression).",
+    "field_save_rag_schema_desc": "Schema/owner Oracle dùng khi đọc cột của bảng (hỗ trợ expression).",
     "field_service_embed_desc": "Service embedding dùng để vector hóa văn bản. Dùng cùng service cho Save RAG và Get RAG.",
     "field_user_prompt": "User prompt",
     "field_user_prompt_desc": "Hướng dẫn thêm vào user message của agent khi tool này được kết nối",

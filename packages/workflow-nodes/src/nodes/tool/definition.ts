@@ -33,7 +33,51 @@ const RAG_COMMON_FIELDS = [
   },
 ];
 
+const ORACLE_CONNECTION_FIELDS = [
+  {
+    id: "userField",
+    type: "text" as const,
+    labelKey: "field_user_field",
+    descriptionKey: "field_user_field_desc",
+    defaultValue: GET_DB_INFO_USER_FIELD,
+    placeholderKey: "field_user_field_placeholder",
+    supportsExpression: true,
+    order: 3.1,
+  },
+  {
+    id: "passwordField",
+    type: "text" as const,
+    labelKey: "field_password_field",
+    descriptionKey: "field_password_field_desc",
+    defaultValue: GET_DB_INFO_PASSWORD_FIELD,
+    placeholderKey: "field_password_field_placeholder",
+    supportsExpression: true,
+    order: 3.2,
+  },
+  {
+    id: "connectStringField",
+    type: "text" as const,
+    labelKey: "field_connect_string_field",
+    descriptionKey: "field_connect_string_field_desc",
+    defaultValue: GET_DB_INFO_CONNECT_STRING_FIELD,
+    placeholderKey: "field_connect_string_field_placeholder",
+    supportsExpression: true,
+    order: 3.3,
+  },
+  {
+    id: "schemaNameField",
+    type: "text" as const,
+    labelKey: "field_schema_name_field",
+    descriptionKey: "field_save_rag_schema_desc",
+    defaultValue: GET_DB_INFO_SCHEMA_FIELD,
+    placeholderKey: "field_schema_name_field_placeholder",
+    supportsExpression: true,
+    order: 3.4,
+  },
+];
+
 const SAVE_RAG_FIELDS = [
+  ...ORACLE_CONNECTION_FIELDS,
   {
     id: "tableNameField",
     type: "text" as const,
@@ -42,7 +86,7 @@ const SAVE_RAG_FIELDS = [
     defaultValue: "{{ $json.tableName }}",
     placeholderKey: "field_table_name_field_placeholder",
     supportsExpression: true,
-    order: 3.1,
+    order: 3.5,
   },
   {
     id: "describeSystemPrompt",
@@ -50,7 +94,7 @@ const SAVE_RAG_FIELDS = [
     labelKey: "field_describe_system_prompt",
     descriptionKey: "field_describe_system_prompt_desc",
     defaultValue: "",
-    order: 3.2,
+    order: 3.6,
   },
   { id: "chunkSize", type: "number" as const, labelKey: "field_chunk_size", defaultValue: 800, order: 7 },
   { id: "chunkOverlap", type: "number" as const, labelKey: "field_chunk_overlap", defaultValue: 120, order: 8 },
@@ -163,46 +207,9 @@ const GET_RAG_FIELDS = [
 ];
 
 const CHECK_SQL_FIELDS = [
-  {
-    id: "userField",
-    type: "text" as const,
-    labelKey: "field_user_field",
-    descriptionKey: "field_user_field_desc",
-    defaultValue: GET_DB_INFO_USER_FIELD,
-    placeholderKey: "field_user_field_placeholder",
-    supportsExpression: true,
-    order: 3.1,
-  },
-  {
-    id: "passwordField",
-    type: "text" as const,
-    labelKey: "field_password_field",
-    descriptionKey: "field_password_field_desc",
-    defaultValue: GET_DB_INFO_PASSWORD_FIELD,
-    placeholderKey: "field_password_field_placeholder",
-    supportsExpression: true,
-    order: 3.2,
-  },
-  {
-    id: "connectStringField",
-    type: "text" as const,
-    labelKey: "field_connect_string_field",
-    descriptionKey: "field_connect_string_field_desc",
-    defaultValue: GET_DB_INFO_CONNECT_STRING_FIELD,
-    placeholderKey: "field_connect_string_field_placeholder",
-    supportsExpression: true,
-    order: 3.3,
-  },
-  {
-    id: "schemaNameField",
-    type: "text" as const,
-    labelKey: "field_schema_name_field",
-    descriptionKey: "field_check_sql_schema_desc",
-    defaultValue: GET_DB_INFO_SCHEMA_FIELD,
-    placeholderKey: "field_schema_name_field_placeholder",
-    supportsExpression: true,
-    order: 3.4,
-  },
+  ...ORACLE_CONNECTION_FIELDS.map((field) =>
+    field.id === "schemaNameField" ? { ...field, descriptionKey: "field_check_sql_schema_desc" } : field,
+  ),
   {
     id: "maxRows",
     type: "number" as const,
@@ -393,6 +400,10 @@ export const SAVE_RAG_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   defaultData: {
     toolKind: "save-rag",
     toolName: "save_rag",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
+    schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     tableNameField: "{{ $json.tableName }}",
   },
   sections: [
@@ -546,6 +557,10 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     toolName: "save_rag",
     toolDescription:
       "Write one shortened schema document per table into Vectorize. Summaries and column descriptions are one Vietnamese sentence and one English sentence. Does not store SQL examples.",
+    userField: GET_DB_INFO_USER_FIELD,
+    passwordField: GET_DB_INFO_PASSWORD_FIELD,
+    connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
+    schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     tableNameField: "{{ $json.tableName }}",
     describeSystemPrompt: "",
     chunkSize: 800,

@@ -55,6 +55,24 @@ const enrichmentJson = JSON.stringify({
   ],
 });
 
+const oracleMock = vi.hoisted(() => ({
+  introspectOracleTableDirect: vi.fn(
+    async (_config: unknown, _schema: string, tableName: string) => ({
+      columns: [
+        { name: 'id', type: 'NUMBER', nullable: false },
+        { name: 'total', type: 'NUMBER', nullable: false },
+      ],
+      primaryKey: ['id'],
+      foreignKeys: [],
+      ddl: `CREATE TABLE "${tableName}" ("id" NUMBER, "total" NUMBER)`,
+      sampleRows: [{ id: 1, total: 10 }],
+      rowCountEstimate: 1,
+    }),
+  ),
+}));
+
+vi.mock('@aiagents-hub/oracle-db', () => oracleMock);
+
 const billingMock = vi.hoisted(() => ({
   resolveServiceByEndpoint: vi.fn(),
   findApprovedServiceByEndpoint: vi.fn().mockResolvedValue(null),
@@ -138,6 +156,7 @@ describe('executeSaveRagPipeline', () => {
     billingMock.extractTextFromAiResponse.mockReturnValue(enrichmentJson);
     billingMock.billEmbeddingUsage.mockResolvedValue(0);
     billingMock.billAgentUsage.mockResolvedValue(0);
+    oracleMock.introspectOracleTableDirect.mockClear();
     billingMock.getModelForService.mockImplementation((service: Record<string, unknown>) => {
       const id = String(service.model ?? service.embedModel ?? service.catalogId ?? '');
       if (id.includes('bge') || id.includes('embed')) return '@cf/baai/bge-m3';
@@ -249,6 +268,119 @@ describe('executeSaveRagPipeline', () => {
     const out = await executeSaveRagPipeline(ctx);
     expect(out.ok).toBe(true);
     expect(out.saved).toBeGreaterThanOrEqual(1);
+  });
+
+  it('connects to Oracle from Save RAG credential fields when the loop item has no connection', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 2 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+    } as unknown as Env;
+
+    const definition = saveRagGraph({
+      userField: '{{ $json.u }}',
+      passwordField: '{{ $json.p }}',
+      connectStringField: '{{ $json.c }}',
+      schemaNameField: '{{ $json.s }}',
+    });
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'ORDERS' }],
+        u: 'ADMIN',
+        p: 'secret',
+        c: 'dbname_high',
+        s: 'SALES',
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.ok).toBe(true);
+    expect(oracleMock.introspectOracleTableDirect).toHaveBeenCalledWith(
+      { user: 'ADMIN', password: 'secret', connectString: 'dbname_high' },
+      'SALES',
+      'ORDERS',
+      3,
+    );
+    expect(upsert).toHaveBeenCalled();
+  });
+
+  it('still uses an Oracle connection object already on INPUT', async () => {
+    const upsert = vi.fn().mockResolvedValue({ count: 1 });
+    const env = {
+      AI: mockAi(),
+      VECTORIZE: { query: vi.fn(), upsert },
+    } as unknown as Env;
+    const definition = saveRagGraph({
+      userField: '',
+      passwordField: '',
+      connectStringField: '',
+      schemaNameField: '',
+    });
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: {
+        items: [{ tableName: 'ORDERS', schemaName: 'SALES' }],
+        connection: {
+          type: 'oracle',
+          user: 'ADMIN',
+          password: 'secret',
+          connectString: 'dbname_high',
+        },
+      },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    const out = await executeSaveRagPipeline(ctx);
+    expect(out.ok).toBe(true);
+    expect(oracleMock.introspectOracleTableDirect).toHaveBeenCalledWith(
+      expect.objectContaining({ user: 'ADMIN', password: 'secret', connectString: 'dbname_high' }),
+      'SALES',
+      'ORDERS',
+      3,
+    );
+  });
+
+  it('reports no database connection when Save RAG has no Oracle fields and no connection', async () => {
+    const definition = saveRagGraph({
+      userField: '',
+      passwordField: '',
+      connectStringField: '',
+      schemaNameField: '',
+    });
+    const ctx = {
+      node: definition.nodes[0],
+      nodeInput: { items: [{ tableName: 'ORDERS' }] },
+      definition,
+      outputs: {},
+      runContext: {},
+      executionKey: '11111111-1111-4111-8111-111111111111',
+      c: { env: {} },
+      meta: { ownerId: 'user-1', workflowId: 42 },
+      user: { identifier: 'user@example.com' },
+      bindingName: 'USER_DO',
+      userDO: {},
+    } as unknown as NodeContext;
+
+    await expect(executeSaveRagPipeline(ctx)).rejects.toThrow(/no database connection/);
+    expect(oracleMock.introspectOracleTableDirect).not.toHaveBeenCalled();
   });
 
   it('indexes only the current loop table from INPUT', async () => {

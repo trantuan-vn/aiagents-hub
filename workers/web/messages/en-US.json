@@ -3706,6 +3706,7 @@
     "field_max_rows": "Max sample rows",
     "field_check_sql_max_rows_desc": "Unused in validate-only mode (EXPLAIN PLAN). Kept for compatibility.",
     "field_check_sql_schema_desc": "Oracle schema/owner applied as CURRENT_SCHEMA before validate (expression OK).",
+    "field_save_rag_schema_desc": "Oracle schema/owner used when reading table columns (expression OK).",
     "field_service_embed_desc": "Embedding service used to vectorize text. Use the same service on Save RAG and Get RAG.",
     "field_user_prompt": "User prompt",
     "field_user_prompt_desc": "Instructions appended to the agent user message when this tool is connected",

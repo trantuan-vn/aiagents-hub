@@ -80,7 +80,7 @@ async function introspectOneTable(params: {
   if (oracleConfig || isOracleConnectionType(connType)) {
     if (!oracleConfig) {
       throw new Error(
-        'save_rag: Oracle user, password, and connectString are required from the previous node',
+        'save_rag: set userField / passwordField / connectStringField on Save RAG',
       );
     }
     introspection = await introspectOracleTable(
@@ -139,7 +139,7 @@ async function introspectOneTable(params: {
     };
   } else {
     throw new Error(
-      `save_rag: no database connection for table "${tableName}" (need Oracle user/password/connectString or connection.type=d1)`,
+      `save_rag: no database connection for table "${tableName}" (set userField / passwordField / connectStringField on Save RAG, or connection.type=d1)`,
     );
   }
 
@@ -206,7 +206,7 @@ export async function introspectTablesInfo(params: {
   if (oracleConfig || isOracleConnectionType(connType)) {
     if (!oracleConfig) {
       throw new Error(
-        'save_rag: Oracle user, password, and connectString are required from the previous node',
+        'save_rag: set userField / passwordField / connectStringField on Save RAG',
       );
     }
     const schemaName = resolveOracleSchema(tables[0]!.schemaName, oracleConfig.user);
@@ -247,7 +247,7 @@ export async function introspectTablesInfo(params: {
 
   if (connType !== 'd1' && explicitType !== 'd1') {
     throw new Error(
-      `save_rag: no database connection for ${tables.length} table(s) (need Oracle user/password/connectString from Form / Get DB Info)`,
+      `save_rag: no database connection for ${tables.length} table(s) (set userField / passwordField / connectStringField on Save RAG)`,
     );
   }
 

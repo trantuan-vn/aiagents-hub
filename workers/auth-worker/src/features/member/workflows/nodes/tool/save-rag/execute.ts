@@ -1,3 +1,10 @@
+import {
+  GET_DB_INFO_CONNECT_STRING_FIELD,
+  GET_DB_INFO_PASSWORD_FIELD,
+  GET_DB_INFO_SCHEMA_FIELD,
+  GET_DB_INFO_USER_FIELD,
+} from '@aiagents-hub/workflow-nodes';
+
 import type { AiCallStamp } from '../../../ai/workers-ai.js';
 import { stampFromNode } from '../../../ai/workers-ai.js';
 import { embedTextsWithUsage, upsertVectors, vectorChunkId, type VectorizeVectorRecord } from '../../../rag/index.js';
@@ -15,7 +22,7 @@ import {
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import type { NodeContext, NodeOutput } from '../../types.js';
 import { resolveOracleConnectConfig } from '../shared/db/index.js';
-import { pipelineItems, resolvePipelineField } from '../shared/pipeline.js';
+import { pipelineItems, resolveFieldOrLiteral, resolvePipelineField } from '../shared/pipeline.js';
 import { chunkDocument } from './chunk.js';
 import { describeTable } from './describe-table.js';
 import { ragDocumentsFromEnrichment, type RagDocumentItem } from './documents.js';
@@ -239,21 +246,56 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.map((v) => String(v)).filter(Boolean) : [];
 }
 
+/** Map Save RAG's own user / password / connect string / schema fields. Same expressions as Check SQL. */
+function mappedOracleFields(
+  data: Record<string, unknown>,
+  scope: Record<string, unknown>,
+): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+  const user = resolveFieldOrLiteral(data.userField || GET_DB_INFO_USER_FIELD, scope);
+  const password = resolveFieldOrLiteral(data.passwordField || GET_DB_INFO_PASSWORD_FIELD, scope);
+  const connectString = resolveFieldOrLiteral(
+    data.connectStringField || GET_DB_INFO_CONNECT_STRING_FIELD,
+    scope,
+  );
+  const schemaName = resolveFieldOrLiteral(data.schemaNameField || GET_DB_INFO_SCHEMA_FIELD, scope);
+  if (user) {
+    mapped.user = user;
+    mapped.u = user;
+  }
+  if (password) {
+    mapped.password = password;
+    mapped.p = password;
+  }
+  if (connectString) {
+    mapped.connectString = connectString;
+    mapped.c = connectString;
+  }
+  if (schemaName) {
+    mapped.schemaName = schemaName;
+    mapped.s = schemaName;
+  }
+  return mapped;
+}
+
 function triggerContextForTable(ctx: NodeContext, item: Record<string, unknown>): Record<string, unknown> {
+  const data = (ctx.node.data ?? {}) as Record<string, unknown>;
   const merged: Record<string, unknown> = {
     ...asRecord(ctx.nodeInput),
     ...item,
   };
-  const tableName = String(item.tableName ?? merged.tableName ?? '').trim();
-  const schemaName = String(item.schemaName ?? merged.schemaName ?? '');
+  const mapped = mappedOracleFields(data, merged);
+  const withCreds = { ...merged, ...mapped };
+  const tableName = String(item.tableName ?? withCreds.tableName ?? '').trim();
+  const schemaName = String(mapped.schemaName ?? item.schemaName ?? withCreds.schemaName ?? '');
   const connection = {
     ...asRecord(merged.connection),
     ...asRecord(item.connection),
   };
-  const oracle = resolveOracleConnectConfig({ ...merged, connection });
+  const oracle =
+    resolveOracleConnectConfig(mapped) ?? resolveOracleConnectConfig({ ...withCreds, connection });
   return {
-    ...merged,
-    ...item,
+    ...withCreds,
     tableName,
     schemaName,
     connection: oracle
@@ -283,9 +325,18 @@ function pendingTableItems(ctx: NodeContext, items: Record<string, unknown>[]): 
   const done = indexedTables(ctx.runContext);
   return items
     .map((item) => {
+      const scope = { ...(ctx.nodeInput as Record<string, unknown>), ...item };
       const tableName = resolvePipelineField(data.tableNameField, item, ctx.nodeInput, ['tableName']);
       if (!tableName.trim()) return null;
-      return { ...item, tableName, schemaName: String(item.schemaName ?? ctx.nodeInput.schemaName ?? '') };
+      const schemaFromField = resolveFieldOrLiteral(
+        data.schemaNameField || GET_DB_INFO_SCHEMA_FIELD,
+        scope,
+      );
+      return {
+        ...item,
+        tableName,
+        schemaName: schemaFromField || String(item.schemaName ?? ctx.nodeInput.schemaName ?? ''),
+      };
     })
     .filter((item): item is Record<string, unknown> => item != null)
     .filter((item) => !done.has(String(item.tableName ?? '')));
