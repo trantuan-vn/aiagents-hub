@@ -150,6 +150,58 @@ describe('Code in JavaScript node', () => {
     expect(structuredClone(out.tables)).toEqual(['GGUSDR_APP.A_SUB_ACCOUNTS']);
   });
 
+  it('splits tables the same way from a form pin and from a live trigger payload', async () => {
+    const sql = 'SELECT a.CODE FROM GGUSDR_APP.A_SUB_ACCOUNTS a';
+    const fields = { c: 'mo ta', s: sql };
+    const pin = {
+      triggerKind: 'form',
+      submittedAt: 1,
+      formUrl: '',
+      executionMode: 'test',
+      fields,
+      c: fields.c,
+      s: fields.s,
+    };
+    const live = {
+      input: JSON.stringify(fields),
+      variables: {},
+      workflowName: 'wf',
+      ...pin,
+      triggeredAt: 2,
+      text: JSON.stringify(fields),
+      data: undefined,
+      formTitle: '',
+    };
+    const jsCode = `
+      const sql = $input.item.json.s || '';
+      const names = sql.includes('A_SUB_ACCOUNTS') ? ['GGUSDR_APP.A_SUB_ACCOUNTS', 'GGUSDR_APP.A_SUB_ACC_SSA'] : [];
+      return names.map((table) => ({
+        json: {
+          table,
+          s: $input.item.json.s ?? null,
+          text: $input.item.json.text ?? null,
+          input: $input.item.json.input ?? null,
+        },
+      }));
+    `;
+    const run = (nodeInput: Record<string, unknown>) =>
+      executeDataTransformation(
+        ctx(
+          { transformKind: 'code', mode: 'runOnceForEachItem', language: 'javascript', jsCode },
+          nodeInput,
+        ),
+      );
+    const fromPin = await run(pin);
+    const fromLive = await run(live);
+    expect(fromPin.itemCount).toBe(2);
+    expect(fromPin.data).toEqual([
+      { table: 'GGUSDR_APP.A_SUB_ACCOUNTS', s: sql, text: null, input: null },
+      { table: 'GGUSDR_APP.A_SUB_ACC_SSA', s: sql, text: null, input: null },
+    ]);
+    expect(fromLive.data).toEqual(fromPin.data);
+    expect(fromLive.items).toEqual(fromPin.items);
+  });
+
   it('reads parent fields in each-item mode without replacing the row', async () => {
     const out = await executeDataTransformation(
       ctx(

@@ -26,6 +26,35 @@ export function toCodeItem(item: unknown): CodeItem {
   return { json: { value: item ?? null } };
 }
 
+/**
+ * Live form runs used to spread engine runContext onto the trigger output
+ * (`input` / `text` = raw JSON, `variables`, `workflowName`, `data`).
+ * Execute step replays the form pin, which is only the answers. Drop the
+ * engine copies so both runs expose the same `$input.item.json`.
+ */
+function dropEngineFormCopies(json: Record<string, unknown>, fields: Record<string, unknown>) {
+  if (!Object.prototype.hasOwnProperty.call(fields, 'workflowName') && typeof json.workflowName === 'string') {
+    delete json.workflowName;
+  }
+  if (!Object.prototype.hasOwnProperty.call(fields, 'variables') && isRecord(json.variables)) {
+    delete json.variables;
+  }
+  if (!Object.prototype.hasOwnProperty.call(fields, 'input') && typeof json.input === 'string') {
+    delete json.input;
+  }
+  if (!Object.prototype.hasOwnProperty.call(fields, 'data') && json.data == null) {
+    delete json.data;
+  }
+  if (typeof json.text === 'string' && (fields.text == null || fields.text === '')) {
+    try {
+      const parsed = JSON.parse(json.text) as unknown;
+      if (isRecord(parsed)) delete json.text;
+    } catch {
+      // A real text answer that is not JSON stays on the item.
+    }
+  }
+}
+
 /** Upstream object shown in the INPUT panel, without the engine parent map. */
 export function codeInputPayload(nodeInput: Record<string, unknown> | undefined): Record<string, unknown> {
   const json: Record<string, unknown> = {};
@@ -37,6 +66,7 @@ export function codeInputPayload(nodeInput: Record<string, unknown> | undefined)
   // A root key that is missing or null still has the answer at `fields.<key>`.
   const fields = json.fields;
   if (isRecord(fields)) {
+    dropEngineFormCopies(json, fields);
     for (const [key, value] of Object.entries(fields)) {
       if (json[key] == null || json[key] === '') json[key] = value;
     }

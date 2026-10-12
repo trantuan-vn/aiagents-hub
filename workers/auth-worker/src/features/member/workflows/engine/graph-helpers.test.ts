@@ -85,6 +85,22 @@ describe('loop connection passthrough', () => {
     expect(result.activeHandles.has('loop')).toBe(true);
   });
 
+  it('flattens code-node items so the next node sees the row, not { json }', () => {
+    const result = executeLoopOverItems(
+      { batchSize: 1, itemsField: '{{ $json.items }}' },
+      {
+        items: [{ json: { table: 'GGUSDR_APP.A_SUB_ACCOUNTS' } }, { json: { table: 'GGUSDR_APP.A_SUB_ACC_SSA' } }],
+        itemCount: 2,
+        data: [{ table: 'GGUSDR_APP.A_SUB_ACCOUNTS' }, { table: 'GGUSDR_APP.A_SUB_ACC_SSA' }],
+      },
+      undefined,
+      false,
+    );
+    expect(result.output.table).toBe('GGUSDR_APP.A_SUB_ACCOUNTS');
+    expect(result.output.json).toBeUndefined();
+    expect(result.output.items).toEqual([{ table: 'GGUSDR_APP.A_SUB_ACCOUNTS' }]);
+  });
+
   it('does not iterate until itemsField is mapped', () => {
     const result = executeLoopOverItems(
       { batchSize: 1, flowKind: 'loop_over_items' },

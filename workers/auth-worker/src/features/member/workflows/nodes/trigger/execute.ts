@@ -75,14 +75,17 @@ export async function executeTrigger(ctx: NodeContext): Promise<NodeOutput> {
           return {};
         }
       })();
+    // Same object the editor pins and Execute step replays. Do not spread
+    // runContext: that adds `input` / `text` as the raw JSON string and `data`
+    // from the trigger's own node input, so the next node sees a different type.
     return {
-      ...base,
-      ...fields,
-      fields,
-      formTitle: data.formTitle ?? '',
+      triggerKind: 'form',
       submittedAt: runContext.submittedAt ?? Date.now(),
       formUrl: runContext.formUrl ?? '',
       executionMode: runContext.executionMode ?? 'test',
+      fields,
+      ...fields,
+      formTitle: data.formTitle ?? '',
     };
   }
 

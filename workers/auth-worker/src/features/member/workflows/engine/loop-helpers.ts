@@ -1,5 +1,6 @@
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { interpolate } from '../execution/node-runtime.js';
+import { unwrapDataItem } from '../nodes/tool/shared/pipeline.js';
 import { getOutgoingDataFlowEdges } from './graph-helpers.js';
 
 export interface LoopState {
@@ -41,11 +42,11 @@ export function extractLoopItems(input: NodeOutput, itemsField?: unknown): unkno
   const resolved = expr.includes('{{')
     ? interpolate(expr, { ...input, $json: input })
     : input[expr];
-  return Array.isArray(resolved) ? resolved : [];
+  return Array.isArray(resolved) ? resolved.map(unwrapDataItem) : [];
 }
 
 function flattenCurrentItem(batch: unknown[]): Record<string, unknown> {
-  const first = batch[0];
+  const first = unwrapDataItem(batch[0]);
   if (first && typeof first === 'object' && !Array.isArray(first)) {
     return first as Record<string, unknown>;
   }

@@ -64,11 +64,25 @@ function firstString(item: Record<string, unknown>, keys: readonly string[]): st
   return '';
 }
 
+/** Code nodes emit n8n items `{ json: row }`. Downstream nodes read `row`. */
+export function unwrapDataItem(item: unknown): unknown {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+  const rec = item as Record<string, unknown>;
+  const json = rec.json;
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return item;
+  const keys = Object.keys(rec);
+  if (keys.every((key) => key === 'json' || key === 'pairedItem' || key === 'binary')) return json;
+  return item;
+}
+
 /** Current loop batch or a single upstream object. */
 export function pipelineItems(nodeInput: NodeOutput): PipelineItem[] {
   if (Array.isArray(nodeInput.items)) {
     return nodeInput.items
-      .map((item) => (item && typeof item === 'object' && !Array.isArray(item) ? (item as PipelineItem) : { value: item }))
+      .map((item) => {
+        const row = unwrapDataItem(item);
+        return row && typeof row === 'object' && !Array.isArray(row) ? (row as PipelineItem) : { value: row };
+      })
       .filter(Boolean);
   }
   const { parents, ...rest } = nodeInput;
