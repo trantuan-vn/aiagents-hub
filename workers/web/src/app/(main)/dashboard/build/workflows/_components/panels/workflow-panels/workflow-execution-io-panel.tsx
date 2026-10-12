@@ -1,7 +1,7 @@
 "use client";
 
 import type { Node } from "@xyflow/react";
-import { Check, CircleAlert, Clock, Minus, X } from "lucide-react";
+import { Check, CircleAlert, Clock, Loader2, Minus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
@@ -23,6 +23,9 @@ import { WorkflowIoPanelPopout } from "./workflow-io-panel-popout";
 import { WorkflowIoPanelToolbar } from "./workflow-io-panel-toolbar";
 
 function StepStatusIcon({ status }: { status: ExecutionStepLog["status"] }) {
+  if (status === "running") {
+    return <Loader2 className="text-muted-foreground size-3.5 animate-spin" aria-hidden />;
+  }
   if (status === "success") {
     return <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />;
   }

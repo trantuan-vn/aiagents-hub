@@ -16,8 +16,9 @@ import { parseDefinitionJson } from "../panels/workflow-panels/workflow-executio
 
 import { workflowEditorLogsStore } from "./workflow-editor-logs-store";
 
-const LIVE_POLL_MS = 2000;
-const LIVE_FETCH_DELAY_MS = 350;
+const LIVE_POLL_MS = 1000;
+/** Give the execution row a moment to exist before the first read. */
+const LIVE_FETCH_DELAY_MS = 200;
 /** Ignore a previous execution that started well before this editor run. */
 const LIVE_START_SKEW_MS = 15_000;
 
@@ -109,22 +110,20 @@ export function WorkflowEditorLogsPanel({
     if (!running || !belongsToWorkflow || !workflowId) return;
     let cancelled = false;
     const pull = () => {
-      void pullLiveSteps(workflowId).catch(() => {
-        /* keep the steps already on screen */
-      });
+      if (!cancelled) {
+        void pullLiveSteps(workflowId).catch(() => {
+          /* keep the steps already on screen */
+        });
+      }
     };
-    const kick = window.setTimeout(() => {
-      if (!cancelled) pull();
-    }, LIVE_FETCH_DELAY_MS);
-    const id = window.setInterval(() => {
-      if (!cancelled) pull();
-    }, LIVE_POLL_MS);
+    const kick = window.setTimeout(pull, LIVE_FETCH_DELAY_MS);
+    const id = window.setInterval(pull, LIVE_POLL_MS);
     return () => {
       cancelled = true;
       window.clearTimeout(kick);
       window.clearInterval(id);
     };
-  }, [belongsToWorkflow, logs.refreshGeneration, running, workflowId]);
+  }, [belongsToWorkflow, running, workflowId]);
 
   useEffect(() => {
     if (!workflowId) return;

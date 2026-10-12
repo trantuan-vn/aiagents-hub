@@ -19,7 +19,10 @@ export interface WorkflowExecutionProgressEvent {
   /** Trigger / entry node that started this run. */
   entryNodeId?: string;
   nodeId?: string;
+  nodeType?: string;
   status?: WorkflowExecutionProgressStatus;
+  /** Clipped node input so the editor log can render before the run is persisted. */
+  input?: unknown;
   /** Clipped node output for live canvas pin (node_done only). */
   output?: unknown;
 }

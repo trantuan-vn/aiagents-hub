@@ -15,7 +15,10 @@ export type WorkflowExecutionProgressEvent = {
   executionKey: string;
   entryNodeId?: string;
   nodeId?: string;
+  nodeType?: string;
   status?: string;
+  /** Clipped node input for the editor log. */
+  input?: unknown;
   /** Clipped node output for live canvas pin. */
   output?: unknown;
 };

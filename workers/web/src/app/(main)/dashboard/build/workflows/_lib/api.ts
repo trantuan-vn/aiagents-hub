@@ -127,7 +127,7 @@ export function deleteWorkflow(id: number) {
 export interface ExecutionStepLog {
   nodeId: string;
   nodeType: string;
-  status: "success" | "error" | "skipped" | "pending_human";
+  status: "running" | "success" | "error" | "skipped" | "pending_human";
   input?: unknown;
   output?: unknown;
   error?: string;

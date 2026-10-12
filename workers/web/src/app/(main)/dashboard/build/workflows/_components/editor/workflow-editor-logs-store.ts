@@ -12,8 +12,6 @@ export type WorkflowEditorLogsState = {
   running: boolean;
   /** Execution created for the current editor run. Empty until the first progress event. */
   executionKey: string | null;
-  /** Bumped when a live run should refetch checkpointed steps. */
-  refreshGeneration: number;
   /** Client time of startRun, used to ignore an older execution still in history. */
   runStartedAt: number;
   steps: ExecutionStepLog[];
@@ -37,7 +35,6 @@ const INITIAL: WorkflowEditorLogsState = {
   workflowId: null,
   running: false,
   executionKey: null,
-  refreshGeneration: 0,
   runStartedAt: 0,
   steps: [],
   selectedNodeId: null,
@@ -47,13 +44,68 @@ const INITIAL: WorkflowEditorLogsState = {
 };
 
 let state: WorkflowEditorLogsState = INITIAL;
-let lastLiveTouch = 0;
 const listeners = new Set<() => void>();
 
 function stepsSignature(steps: ExecutionStepLog[]): string {
   return steps
-    .map((step) => `${step.nodeId}:${step.status}:${step.durationMs ?? ""}:${step.input !== undefined ? 1 : 0}`)
+    .map(
+      (step) =>
+        `${step.nodeId}:${step.nodeType}:${step.status}:${step.durationMs ?? ""}:${step.input !== undefined ? 1 : 0}:${step.output !== undefined ? 1 : 0}`,
+    )
     .join("|");
+}
+
+function sameNodeAt(a: ExecutionStepLog | undefined, b: ExecutionStepLog | undefined): boolean {
+  return !!a && !!b && a.nodeId === b.nodeId;
+}
+
+/** Keep live input/output (clipped on the progress event) when a persisted preview is thinner. */
+function overlayStep(local: ExecutionStepLog, persisted: ExecutionStepLog): ExecutionStepLog {
+  return {
+    ...local,
+    ...persisted,
+    nodeType: persisted.nodeType || local.nodeType,
+    input: local.input !== undefined ? local.input : persisted.input,
+    output: local.output !== undefined ? local.output : persisted.output,
+  };
+}
+
+/**
+ * Persisted snapshots land at slice boundaries, so they can lag the nodes
+ * already painted from progress events. Upgrade completed rows in place and
+ * keep a trailing row that is still running.
+ */
+function mergeLiveSteps(local: ExecutionStepLog[], persisted: ExecutionStepLog[]): ExecutionStepLog[] {
+  if (!persisted.length) return local;
+  const running = local.filter((step) => step.status === "running");
+  const done = local.filter((step) => step.status !== "running");
+  const base: ExecutionStepLog[] = [];
+  let cursor = 0;
+  for (const step of persisted) {
+    if (sameNodeAt(done[cursor], step)) {
+      base.push(overlayStep(done[cursor]!, step));
+      cursor += 1;
+    } else {
+      base.push(step);
+    }
+  }
+  while (cursor < done.length) {
+    base.push(done[cursor]!);
+    cursor += 1;
+  }
+  const extras = running.filter((step) => {
+    const baseCount = base.filter((row) => row.nodeId === step.nodeId).length;
+    const doneCount = done.filter((row) => row.nodeId === step.nodeId).length;
+    return baseCount <= doneCount;
+  });
+  return extras.length ? [...base, ...extras] : base;
+}
+
+function doneStatus(status: string | undefined): ExecutionStepLog["status"] {
+  if (status === "error" || status === "failed") return "error";
+  if (status === "skipped" || status === "cancelled") return "skipped";
+  if (status === "pending_human") return "pending_human";
+  return "success";
 }
 
 function emit() {
@@ -106,12 +158,10 @@ export const workflowEditorLogsStore = {
   },
 
   startRun: (workflowId: number, nodeId: string) => {
-    lastLiveTouch = 0;
     state = {
       workflowId,
       running: true,
       executionKey: null,
-      refreshGeneration: state.refreshGeneration,
       runStartedAt: Date.now(),
       steps: [],
       selectedNodeId: nodeId,
@@ -122,38 +172,108 @@ export const workflowEditorLogsStore = {
     emit();
   },
 
-  /** Ask the logs panel to refetch steps for the execution that is still running. */
+  /** Remember the execution key so the panel can reconcile persisted steps. Does not reset polling. */
   touchLive: (workflowId: number, executionKey: string) => {
     if (!executionKey) return;
     if (!state.running) return;
     if (state.workflowId != null && state.workflowId !== workflowId) return;
-    const now = Date.now();
-    const sameKey = state.executionKey === executionKey;
-    if (sameKey && now - lastLiveTouch < 400) return;
-    lastLiveTouch = now;
+    if (state.executionKey === executionKey) return;
+    state = { ...state, workflowId, executionKey };
+    emit();
+  },
+
+  /**
+   * Paint a step as soon as the engine reports it. Persisted snapshots only
+   * exist at slice boundaries, so waiting for them hides the log until the run ends.
+   */
+  applyProgress: (
+    workflowId: number,
+    event: {
+      type: "started" | "node_start" | "node_done" | "finished";
+      executionKey: string;
+      nodeId?: string;
+      nodeType?: string;
+      status?: string;
+      input?: unknown;
+      output?: unknown;
+    },
+  ) => {
+    if (!state.running) return;
+    if (state.workflowId != null && state.workflowId !== workflowId) return;
+    if (!event.executionKey || event.type === "finished") return;
+    if (state.executionKey && state.executionKey !== event.executionKey) return;
+
+    let steps = state.steps;
+    if (event.type === "node_start" && event.nodeId) {
+      const last = steps[steps.length - 1];
+      if (last?.status === "running" && last.nodeId === event.nodeId) {
+        if (event.nodeType && last.nodeType !== event.nodeType) {
+          steps = steps.map((step, index) =>
+            index === steps.length - 1 ? { ...step, nodeType: event.nodeType! } : step,
+          );
+        }
+      } else {
+        steps = [
+          ...steps,
+          { nodeId: event.nodeId, nodeType: event.nodeType ?? "", status: "running" },
+        ];
+      }
+    } else if (event.type === "node_done" && event.nodeId) {
+      const status = doneStatus(event.status);
+      let index = -1;
+      for (let i = steps.length - 1; i >= 0; i--) {
+        if (steps[i]?.nodeId === event.nodeId && steps[i]?.status === "running") {
+          index = i;
+          break;
+        }
+      }
+      const patch: ExecutionStepLog = {
+        nodeId: event.nodeId,
+        nodeType: event.nodeType || steps[index]?.nodeType || "",
+        status,
+        ...(event.input !== undefined ? { input: event.input } : {}),
+        ...(event.output !== undefined ? { output: event.output } : {}),
+      };
+      if (index >= 0) {
+        steps = steps.map((step, i) => (i === index ? { ...step, ...patch } : step));
+      } else {
+        steps = [...steps, patch];
+      }
+    }
+
+    if (state.executionKey === event.executionKey && stepsSignature(state.steps) === stepsSignature(steps)) return;
+    const followingTail = state.selectedStepIndex < 0 || state.selectedStepIndex >= state.steps.length - 1;
+    const selected =
+      steps.length === 0
+        ? { nodeId: state.selectedNodeId, index: state.selectedStepIndex }
+        : followingTail
+          ? { nodeId: steps[steps.length - 1]!.nodeId, index: steps.length - 1 }
+          : pickSelected(steps, state.selectedNodeId, state.selectedStepIndex);
     state = {
       ...state,
       workflowId,
-      executionKey,
-      refreshGeneration: state.refreshGeneration + 1,
+      executionKey: event.executionKey,
+      steps,
+      selectedNodeId: selected.nodeId,
+      selectedStepIndex: selected.index,
     };
     emit();
   },
 
-  /** Replace steps while the run is still in progress. Ignores a stale snapshot that dropped steps. */
+  /** Fold a persisted snapshot into the live timeline without dropping the node that is still running. */
   syncLive: (workflowId: number, steps: ExecutionStepLog[]) => {
     if (!state.running) return;
     if (state.workflowId != null && state.workflowId !== workflowId) return;
-    if (!steps.length || steps.length < state.steps.length) return;
-    if (stepsSignature(state.steps) === stepsSignature(steps)) return;
+    const merged = mergeLiveSteps(state.steps, steps);
+    if (!merged.length || stepsSignature(state.steps) === stepsSignature(merged)) return;
     const followingTail = state.selectedStepIndex < 0 || state.selectedStepIndex >= state.steps.length - 1;
     const selected = followingTail
-      ? { nodeId: steps[steps.length - 1]!.nodeId, index: steps.length - 1 }
-      : pickSelected(steps, state.selectedNodeId, state.selectedStepIndex);
+      ? { nodeId: merged[merged.length - 1]!.nodeId, index: merged.length - 1 }
+      : pickSelected(merged, state.selectedNodeId, state.selectedStepIndex);
     state = {
       ...state,
       workflowId,
-      steps,
+      steps: merged,
       selectedNodeId: selected.nodeId,
       selectedStepIndex: selected.index,
     };
@@ -168,7 +288,6 @@ export const workflowEditorLogsStore = {
       workflowId,
       running: false,
       executionKey: state.executionKey,
-      refreshGeneration: state.refreshGeneration,
       runStartedAt: state.runStartedAt,
       steps: nextSteps,
       selectedNodeId: selected.nodeId,
@@ -227,7 +346,6 @@ export const workflowEditorLogsStore = {
       workflowId,
       running: false,
       executionKey: state.workflowId === workflowId ? state.executionKey : null,
-      refreshGeneration: state.refreshGeneration,
       runStartedAt: state.runStartedAt,
       steps,
       selectedNodeId: selected.nodeId,

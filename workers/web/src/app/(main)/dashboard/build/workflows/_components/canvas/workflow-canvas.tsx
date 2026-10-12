@@ -240,7 +240,7 @@ function CanvasInnerWithDrawerUi({
   const [configNodeId, setConfigNodeId] = useState<string | null>(null);
   const onLiveProgress = useCallback(
     (event: WorkflowExecutionProgressEvent) => {
-      if (workflowId) workflowEditorLogsStore.touchLive(workflowId, event.executionKey);
+      if (workflowId) workflowEditorLogsStore.applyProgress(workflowId, event);
     },
     [workflowId],
   );

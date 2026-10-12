@@ -477,15 +477,21 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     });
   };
 
+  const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
+
   const emitNodeDone = async (
     nodeId: string,
     status: NonNullable<Parameters<typeof broadcastWorkflowExecutionProgress>[1]['status']>,
     output?: unknown,
+    input?: unknown,
   ) => {
+    const nodeType = nodeById.get(nodeId)?.type;
     await emitProgress({
       type: 'node_done',
       nodeId,
+      ...(nodeType ? { nodeType } : {}),
       status,
+      ...(input !== undefined ? { input: progressOutput(input) } : {}),
       ...(output !== undefined ? { output: progressOutput(output) } : {}),
     });
   };
@@ -498,7 +504,6 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     isOwnedByUser: meta.isOwnedByUser,
   } as ResolvedWorkflow);
 
-  const nodeById = new Map(definition.nodes.map((n) => [n.id, n]));
   const ctx: NodeContext = {
     c,
     bindingName,
@@ -609,7 +614,12 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       continue;
     }
 
-    await emitProgress({ type: 'node_start', nodeId, status: 'running' });
+    await emitProgress({
+      type: 'node_start',
+      nodeId,
+      ...(node.type ? { nodeType: node.type } : {}),
+      status: 'running',
+    });
 
     // --- human review: flow control + pause/resume ---
     if (node.type === 'human_review') {
@@ -647,7 +657,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
             engine.steps.push({ ...log, durationMs: Date.now() - started });
             engine.outputs[nodeId] = log.output as NodeOutput;
             engine.finalOutput = log.output;
-            await emitNodeDone(nodeId, 'error', log.output);
+            await emitNodeDone(nodeId, 'error', log.output, nodeInput);
             await emitProgress({ type: 'finished', nodeId, status: 'failed' });
             return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
           }
@@ -662,7 +672,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
-        await emitNodeDone(nodeId, 'pending_human', log.output);
+        await emitNodeDone(nodeId, 'pending_human', log.output, nodeInput);
         await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
         // Keep other human_review waits; drop leftover siblings so Approve
         // only continues nodes wired after this one.
@@ -676,7 +686,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
         engine.steps.push({ ...log, durationMs: Date.now() - started });
         engine.outputs[nodeId] = log.output as NodeOutput;
         engine.finalOutput = log.output;
-        await emitNodeDone(nodeId, 'skipped', log.output);
+        await emitNodeDone(nodeId, 'skipped', log.output, nodeInput);
         await emitProgress({ type: 'finished', nodeId, status: 'cancelled' });
         return { status: 'cancelled', output: log.output };
       }
@@ -693,7 +703,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.outputs[nodeId] = out;
       engine.finalOutput = out;
       engine.visited.push(nodeId);
-      await emitNodeDone(nodeId, 'success', out);
+      await emitNodeDone(nodeId, 'success', out, nodeInput);
       scheduleDownstream(definition, node, out, {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
@@ -742,11 +752,11 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       if (shouldPauseChatForClarification(engine.runContext, engine.outputs[nodeId])) {
         engine.runContext.awaitingChat = true;
         engine.runContext.pendingChatNodeId = nodeId;
-        await emitNodeDone(nodeId, 'success', engine.outputs[nodeId]);
+        await emitNodeDone(nodeId, 'success', engine.outputs[nodeId], nodeInput);
         await emitProgress({ type: 'finished', nodeId, status: 'pending_human' });
         return { status: 'pending_human', output: engine.finalOutput, pendingNodeId: nodeId };
       }
-      await emitNodeDone(nodeId, 'success', engine.outputs[nodeId]);
+      await emitNodeDone(nodeId, 'success', engine.outputs[nodeId], nodeInput);
       scheduleDownstream(definition, node, engine.outputs[nodeId], {
         input: persisted.input ?? '',
         variables: engine.runContext.variables ?? {},
@@ -761,7 +771,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
       engine.steps.push({ ...log, durationMs: Date.now() - started });
       engine.outputs[nodeId] = log.output as NodeOutput;
       engine.finalOutput = log.output;
-      await emitNodeDone(nodeId, 'error', log.output);
+      await emitNodeDone(nodeId, 'error', log.output, nodeInput);
       await emitProgress({ type: 'finished', nodeId, status: 'failed' });
       return { status: 'failed', output: { error: log.error, lastNode: nodeId } };
     }
