@@ -30,4 +30,4 @@ export type TransformKind = (typeof TRANSFORM_KINDS)[number];
 export const TRANSFORM_KIND_FIELD = "transformKind" as const;
 
 /** Kinds with dedicated override modules (not factory-generated). */
-export const TRANSFORM_OVERRIDE_KINDS = new Set<TransformKind>(["filter"]);
+export const TRANSFORM_OVERRIDE_KINDS = new Set<TransformKind>(["filter", "code"]);

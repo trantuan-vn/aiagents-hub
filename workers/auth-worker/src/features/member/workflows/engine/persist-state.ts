@@ -83,6 +83,57 @@ function clipString(value: string, budget: number): string {
   return `${value.slice(0, Math.max(0, end))}…`;
 }
 
+const SMALL_VALUE_BYTES = 256;
+
+/** Keep short fields whole and only shorten long ones, so a late key is not dropped. */
+function clipObject(src: Record<string, unknown>, budget: number): Record<string, unknown> {
+  const keys = Object.keys(src).sort();
+  const overhead =
+    2 + keys.reduce((sum, key, index) => sum + (index > 0 ? 1 : 0) + jsonSize(key) + 1, 0);
+  const small = new Set<string>();
+  let smallBytes = 0;
+  for (const key of keys) {
+    const size = jsonSize(src[key]);
+    if (Number.isFinite(size) && size <= SMALL_VALUE_BYTES) {
+      small.add(key);
+      smallBytes += size;
+    }
+  }
+
+  const out: Record<string, unknown> = {};
+  if (overhead + smallBytes <= budget) {
+    const largeKeys = keys.filter((key) => !small.has(key));
+    const rest = budget - overhead - smallBytes;
+    const share = largeKeys.length ? Math.max(8, Math.floor(rest / largeKeys.length)) : 0;
+    for (const key of keys) {
+      out[key] = small.has(key) ? src[key] : clipValue(src[key], share);
+    }
+    let guard = largeKeys.length * 4;
+    while (guard > 0 && jsonSize(out) > budget) {
+      guard -= 1;
+      const key = largeKeys.find((candidate) => out[candidate] != null && jsonSize(out[candidate]) > 8);
+      if (!key) break;
+      const before = jsonSize(out[key]);
+      const next = clipValue(src[key], Math.max(8, Math.floor(before / 2)));
+      out[key] = jsonSize(next) < before ? next : null;
+    }
+    return out;
+  }
+
+  let used = 2;
+  for (const key of keys) {
+    const comma = used > 2 ? 1 : 0;
+    const room = budget - used - comma - jsonSize(key) - 1;
+    if (room < 4) break;
+    const clipped = clipValue(src[key], room);
+    const add = comma + jsonSize(key) + 1 + jsonSize(clipped);
+    if (used + add > budget) break;
+    out[key] = clipped;
+    used += add;
+  }
+  return out;
+}
+
 /**
  * Keep a usable prefix of a value so Logs still show real fields, not a stub.
  * Object keys are sorted so truncation is deterministic across runs.
@@ -116,30 +167,7 @@ export function clipValue(value: unknown, budget: number): unknown {
   }
 
   if (typeof value === 'object') {
-    const out: Record<string, unknown> = {};
-    let used = 2;
-    const keys = Object.keys(value as Record<string, unknown>).sort();
-    for (const key of keys) {
-      const nested = (value as Record<string, unknown>)[key];
-      const keySize = jsonSize(key);
-      const remaining = budget - used - keySize - 3;
-      if (remaining < 8) break;
-      const clipped = clipValue(nested, remaining);
-      const piece = jsonSize(clipped);
-      const add = (used > 2 ? 1 : 0) + keySize + 1 + piece;
-      if (!Number.isFinite(piece) || used + add > budget) {
-        const tighter = clipValue(nested, Math.min(400, Math.max(32, remaining)));
-        const tightSize = jsonSize(tighter);
-        const tightAdd = (used > 2 ? 1 : 0) + keySize + 1 + tightSize;
-        if (Number.isFinite(tightSize) && used + tightAdd <= budget) {
-          out[key] = tighter;
-        }
-        break;
-      }
-      out[key] = clipped;
-      used += add;
-    }
-    return out;
+    return clipObject(value as Record<string, unknown>, budget);
   }
 
   return value;

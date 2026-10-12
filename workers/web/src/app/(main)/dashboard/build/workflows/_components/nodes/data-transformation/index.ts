@@ -1,12 +1,14 @@
 import {
   TRANSFORM_KINDS,
   TRANSFORM_OVERRIDE_KINDS,
+  defaultCodeNodeData,
   defaultFilterNodeData,
   type TransformKind,
 } from "@aiagents-hub/workflow-nodes";
 
 import type { WorkflowNodeUIPlugin } from "../types";
 import { TransformNode } from "./canvas";
+import { CodeNodeConfigPanel } from "./code-config-panel";
 
 export { TransformNode } from "./canvas";
 
@@ -54,3 +56,20 @@ export const TRANSFORM_KIND_UI_PLUGINS: WorkflowNodeUIPlugin[] = TRANSFORM_KINDS
 
 /** Override slot for Filter — n8n conditions UI. */
 export const transformFilterUIPlugin: WorkflowNodeUIPlugin = createTransformKindUIPlugin("filter");
+
+/** Override — Code in JavaScript. */
+export const transformCodeUIPlugin: WorkflowNodeUIPlugin = {
+  id: "data_transformation:code",
+  runtimeType: "data_transformation",
+  kind: "code",
+  Canvas: TransformNode,
+  ConfigPanel: CodeNodeConfigPanel,
+  defaults: () => defaultCodeNodeData(),
+  catalog: {
+    category: "transform",
+    labelKey: "transform_kind_code",
+    descriptionKey: "transform_kind_code_desc",
+    icon: "Braces",
+    keywords: ["code", "javascript", "transform"],
+  },
+};

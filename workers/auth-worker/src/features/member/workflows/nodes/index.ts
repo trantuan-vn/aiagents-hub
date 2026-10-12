@@ -8,6 +8,7 @@ import {
   dataTransformationPlugin,
   TRANSFORM_KIND_PLUGINS,
   transformFilterPlugin,
+  transformCodePlugin,
 } from './data-transformation/index.js';
 import { flowPlugin, FLOW_KIND_PLUGINS, flowLoopOverItemsPlugin, flowFilterPlugin } from './flow/index.js';
 import { coreHttpRequestPlugin, httpRequestPlugin } from './http-request/index.js';
@@ -77,6 +78,7 @@ const BUILTIN_PLUGINS: WorkflowNodePlugin[] = [
   ...CORE_KIND_PLUGINS,
   ...TRANSFORM_KIND_PLUGINS,
   transformFilterPlugin,
+  transformCodePlugin,
   ...HUMAN_REVIEW_CHANNEL_PLUGINS,
   ...AGENT_KIND_PLUGINS,
   agentReasoningPlugin,

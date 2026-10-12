@@ -19,6 +19,18 @@ export {
   type TransformKind,
 } from "./kinds";
 export { TRANSFORM_FILTER_DEFINITION } from "./filter";
+export {
+  TRANSFORM_CODE_DEFINITION,
+  CODE_JS_ALL_ITEMS_SOURCE,
+  CODE_JS_EACH_ITEM_SOURCE,
+  CODE_JS_LANGUAGE,
+  CODE_JS_MODE_ALL,
+  CODE_JS_MODE_EACH,
+  codeJsSourceForMode,
+  defaultCodeNodeData,
+  isCodeJsStarter,
+  type CodeJsMode,
+} from "./code";
 
 /** Base family definition — fallback when no transformKind is set. */
 export const DATA_TRANSFORMATION_DEFINITION: WorkflowNodeDefinition = createBuiltin({

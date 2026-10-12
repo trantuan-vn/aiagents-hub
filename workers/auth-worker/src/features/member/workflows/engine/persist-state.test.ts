@@ -280,7 +280,19 @@ describe('clipValue', () => {
     const a = clipValue(value, 200);
     const b = clipValue(value, 200);
     expect(a).toEqual(b);
-    expect(Object.keys(a as object)).toEqual(Object.keys(a as object).slice().sort());
+    expect(Object.keys(a as object)).toEqual(['alpha', 'mid', 'zed']);
+  });
+
+  it('keeps a late field when earlier strings are long', () => {
+    const value = {
+      c: 'x'.repeat(5000),
+      fields: { s: 'SELECT 1 FROM GGUSDR_APP.A_SUB_ACCOUNTS' },
+      input: 'z'.repeat(5000),
+      s: 'y'.repeat(5000),
+      tables: ['a', 'b'],
+    };
+    const clipped = clipValue(value, 4_096) as Record<string, unknown>;
+    expect(clipped.tables).toEqual(['a', 'b']);
   });
 });
 

@@ -8,6 +8,7 @@ import {
   dataTransformationUIPlugin,
   TRANSFORM_KIND_UI_PLUGINS,
   transformFilterUIPlugin,
+  transformCodeUIPlugin,
 } from "./data-transformation";
 import { flowUIPlugin, FLOW_KIND_UI_PLUGINS, flowLoopOverItemsUIPlugin, flowFilterUIPlugin } from "./flow";
 import { formTriggerUIPlugin } from "./form";
@@ -74,6 +75,7 @@ export const BUILTIN_UI_PLUGINS: WorkflowNodeUIPlugin[] = [
   ...CORE_KIND_UI_PLUGINS,
   ...TRANSFORM_KIND_UI_PLUGINS,
   transformFilterUIPlugin,
+  transformCodeUIPlugin,
   ...HUMAN_REVIEW_CHANNEL_UI_PLUGINS,
   ...AGENT_KIND_UI_PLUGINS,
   agentReasoningUIPlugin,

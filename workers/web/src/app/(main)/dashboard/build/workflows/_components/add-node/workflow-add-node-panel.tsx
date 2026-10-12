@@ -575,7 +575,7 @@ export function WorkflowAddNodePanel({
     guardCatalogPick(`transform:${item.id}`, () => {
       onPick({
         type: "data_transformation",
-        label: t(item.nameKey),
+        label: item.id === "code" ? t("code_in_javascript") : t(item.nameKey),
         extra: { transformKind: item.id },
       });
     });

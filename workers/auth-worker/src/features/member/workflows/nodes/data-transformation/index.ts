@@ -36,3 +36,11 @@ export const transformFilterPlugin: WorkflowNodePlugin = {
   kind: 'filter',
   execute: executeDataTransformation,
 };
+
+/** Dedicated JavaScript Code plugin. */
+export const transformCodePlugin: WorkflowNodePlugin = {
+  id: 'data_transformation:code',
+  runtimeType: 'data_transformation',
+  kind: 'code',
+  execute: executeDataTransformation,
+};

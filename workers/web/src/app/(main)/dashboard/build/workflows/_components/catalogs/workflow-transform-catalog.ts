@@ -67,7 +67,6 @@ export const WORKFLOW_TRANSFORM_POPULAR: WorkflowTransformCatalogItem[] = [
     nameKey: "transform_kind_code",
     descKey: "transform_kind_code_desc",
     icon: Braces,
-    hasSubmenu: true,
   },
   {
     id: "date_time",

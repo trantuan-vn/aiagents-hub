@@ -1,9 +1,25 @@
 import { applyStructuredFilter, evaluateFilterFromNodeData } from '@aiagents-hub/workflow-nodes';
 
 import type { NodeContext, NodeOutput } from '../types.js';
+import { runCodeTransform } from './code-runtime.js';
 
 export async function executeDataTransformation(ctx: NodeContext): Promise<NodeOutput> {
   const data = (ctx.node.data ?? {}) as Record<string, unknown>;
+  if (String(data.transformKind ?? '') === 'code') {
+    try {
+      return await runCodeTransform({
+        env: ctx.c.env as { LOADER?: WorkerLoader },
+        data,
+        nodeInput: ctx.nodeInput ?? {},
+      });
+    } catch (error) {
+      if (data.continueOnFail === true) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { error: message, items: [], data: null, json: {}, itemCount: 0, text: '' };
+      }
+      throw error;
+    }
+  }
   if (String(data.transformKind ?? '') === 'filter') {
     const scope: Record<string, unknown> = {
       ...ctx.nodeInput,

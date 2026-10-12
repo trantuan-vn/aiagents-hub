@@ -22,10 +22,7 @@ export const CODE_N8N_DESCRIPTION = mainFlowNode({
       name: "language",
       type: "options",
       default: "javascript",
-      options: [
-        { name: "JavaScript", value: "javascript" },
-        { name: "Python (display only)", value: "python" },
-      ],
+      options: [{ name: "JavaScript", value: "javascript" }],
     },
     {
       displayName: "Code / template",

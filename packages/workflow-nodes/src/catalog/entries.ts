@@ -13,7 +13,7 @@ import { TRIGGER_KINDS } from "../nodes/trigger/kinds";
 const BACKEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule", "chat"]);
 const BACKEND_FLOW_KINDS = new Set(["if", "merge", "filter", "loop_over_items"]);
 const BACKEND_CORE_KINDS = new Set(["http_request", "code"]);
-const BACKEND_TRANSFORM_KINDS = new Set<string>(["filter"]);
+const BACKEND_TRANSFORM_KINDS = new Set<string>(["filter", "code"]);
 const BACKEND_TOOL_KINDS = new Set([
   "save-rag",
   "save-sql-pair",
@@ -29,7 +29,7 @@ const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
 const FRONTEND_TRIGGER_KINDS = new Set(["manual", "webhook", "form", "schedule", "chat"]);
 const FRONTEND_FLOW_KINDS = new Set(["if", "merge", "filter", "switch", "loop_over_items"]);
 const FRONTEND_CORE_KINDS = new Set(["http_request", "code"]);
-const FRONTEND_TRANSFORM_KINDS = new Set<string>(["filter"]);
+const FRONTEND_TRANSFORM_KINDS = new Set<string>(["filter", "code"]);
 const FRONTEND_TOOL_KINDS = new Set(TOOL_KINDS);
 const FRONTEND_MEMORY_KINDS = new Set(MEMORY_KINDS);
 const FRONTEND_AGENT_KINDS = new Set(AGENT_KINDS);
