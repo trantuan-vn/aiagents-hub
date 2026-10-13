@@ -82,6 +82,39 @@ describe('share grants', () => {
     })).toBeNull();
   });
 
+  it('lists a view-only everyone grant so people can read the intro and comments', () => {
+    const shareGrants = JSON.stringify([
+      { id: 'all', audience: 'all', emails: [], triggerKinds: [] },
+    ]);
+    expect(shareGrantVisibleTo(shareGrants, 'stranger@x.com')).toBe(true);
+    expect(shareGrantVisibleTo(shareGrants, null)).toBe(true);
+    expect(runnerMayUseTrigger({
+      publicTriggerKinds: '["chat"]',
+      shareGrants,
+      runnerIdentifier: 'stranger@x.com',
+      kind: 'chat',
+    })).toBe(false);
+    expect(triggerKindsJsonForRunner({
+      publicTriggerKinds: '["chat"]',
+      shareGrants,
+      runnerIdentifier: 'stranger@x.com',
+    })).toBe('[]');
+  });
+
+  it('lists a view-only user grant only for the listed emails', () => {
+    const shareGrants = JSON.stringify([
+      { id: 'vip', audience: 'users', emails: ['vip@example.com'], triggerKinds: [] },
+    ]);
+    expect(shareGrantVisibleTo(shareGrants, 'vip@example.com')).toBe(true);
+    expect(shareGrantVisibleTo(shareGrants, 'other@example.com')).toBe(false);
+    expect(runnerMayUseTrigger({
+      publicTriggerKinds: '["chat"]',
+      shareGrants,
+      runnerIdentifier: 'vip@example.com',
+      kind: 'chat',
+    })).toBe(false);
+  });
+
   it('derives the public trigger set from All rows when saving', () => {
     const body: { shareGrants?: string | null; publicTriggerKinds?: string | null } = {
       shareGrants: JSON.stringify(list),

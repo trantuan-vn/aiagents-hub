@@ -117,13 +117,15 @@ export function runnerMayUseTrigger(params: {
   });
 }
 
-/** Community catalog and shared detail. Legacy rows (no list) stay public. */
+/**
+ * Community catalog and shared detail. A matching audience can open the intro and comments
+ * even when the row grants no triggers. Legacy rows (no list) stay public.
+ */
 export function shareGrantVisibleTo(shareGrants: unknown, runnerIdentifier: string | null | undefined): boolean {
   const grants = parseShareGrants(shareGrants);
   if (!grants) return true;
   const email = normalizeRunnerEmail(runnerIdentifier);
   return grants.some((grant) => {
-    if (grant.triggerKinds.length === 0) return false;
     if (grant.audience === 'all') return true;
     return email != null && grant.emails.includes(email);
   });

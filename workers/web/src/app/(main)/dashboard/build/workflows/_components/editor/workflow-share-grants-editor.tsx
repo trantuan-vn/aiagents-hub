@@ -307,7 +307,7 @@ function ShareGrantCard({
         })}
       </div>
       {grant.triggerKinds.length === 0 ? (
-        <p className="text-destructive text-xs leading-relaxed">{t("share_grants_triggers_none")}</p>
+        <p className="text-muted-foreground text-xs leading-relaxed">{t("share_grants_triggers_none")}</p>
       ) : null}
     </div>
   );

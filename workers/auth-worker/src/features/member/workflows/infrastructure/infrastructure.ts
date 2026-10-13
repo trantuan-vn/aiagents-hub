@@ -51,7 +51,8 @@ export interface WorkflowCommunityStarStats {
 
 /**
  * Legacy rows (NULL share list) stay in the catalog. A saved list is visible when an
- * "all" row grants a trigger, or a "users" row lists this viewer's login email.
+ * "all" row exists, or a "users" row lists this viewer's login email.
+ * Empty trigger kinds still list the workflow: that audience can read the intro and comments.
  */
 const SHARE_GRANT_VISIBILITY_SQL = `(
   w."shareGrants" IS NULL
@@ -59,7 +60,6 @@ const SHARE_GRANT_VISIBILITY_SQL = `(
   OR EXISTS (
     SELECT 1 FROM json_each(CASE WHEN json_valid(w."shareGrants") THEN w."shareGrants" ELSE '[]' END) AS grant
     WHERE json_extract(grant.value, '$.audience') = 'all'
-      AND IFNULL(json_array_length(json_extract(grant.value, '$.triggerKinds')), 0) > 0
   )
   OR EXISTS (
     SELECT 1
@@ -67,7 +67,6 @@ const SHARE_GRANT_VISIBILITY_SQL = `(
          json_each(json_extract(grant.value, '$.emails')) AS email
     WHERE json_extract(grant.value, '$.audience') = 'users'
       AND lower(email.value) = ?
-      AND IFNULL(json_array_length(json_extract(grant.value, '$.triggerKinds')), 0) > 0
   )
 )`;
 
