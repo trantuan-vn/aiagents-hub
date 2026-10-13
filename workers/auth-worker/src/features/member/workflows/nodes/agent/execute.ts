@@ -24,6 +24,7 @@ import {
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { attachSimpleMemory } from '../memory-node/simple.js';
+import { appendMemberActionsNote } from '../../../../assistant/confirmation.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
 import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
@@ -39,6 +40,7 @@ import {
   resolveAgentUserText,
   resolveEmbedModel,
   resolveMaxTokens,
+  usesForcedReasoning,
 } from './shared.js';
 
 export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
@@ -136,6 +138,9 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         workflowId: textStamp.workflowId,
         nodeId: textStamp.nodeId,
       },
+      c: ctx.c,
+      bindingName: ctx.bindingName,
+      user: ctx.user,
     },
     ctx.definition,
     ctx.node.id,
@@ -148,7 +153,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   const useToolLoop = toolNames.length > 0;
 
   const systemParts = [
-    systemPrompt,
+    appendMemberActionsNote(systemPrompt, linked.tools),
     saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     toolNames.length
@@ -163,7 +168,14 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   ].filter(Boolean);
 
   const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId, nodeInput);
-  const modelParams = aiParamsFromServiceOptions(linked.serviceOptions);
+  const forcedReasoning = usesForcedReasoning(modelId);
+  // GLM-5.3 defaults reasoning_effort to max. Keep effort low for speed, but do not
+  // shrink the answer budget: a 2048 cap was cutting HTML off mid-table.
+  const outputLimit = forcedReasoning ? Math.max(maxTokens, 8192) : maxTokens;
+  const modelParams = {
+    ...aiParamsFromServiceOptions(linked.serviceOptions),
+    ...(forcedReasoning ? { reasoning_effort: 'low', max_completion_tokens: outputLimit } : {}),
+  };
   const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
   const historyMessages = simpleMemory.history.map((m) => ({ role: m.role, content: m.content }));
 
@@ -182,22 +194,26 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
         model: workersAI(modelId as never),
         system: systemParts.join('\n\n'),
         messages: [...historyMessages, { role: 'user', content: userText }],
-        maxOutputTokens: maxTokens,
+        maxOutputTokens: outputLimit,
         temperature: modelParams.temperature as number | undefined,
         topP: modelParams.top_p as number | undefined,
         frequencyPenalty: modelParams.frequency_penalty as number | undefined,
         presencePenalty: modelParams.presence_penalty as number | undefined,
+        ...(forcedReasoning
+          ? { providerOptions: { 'workers-ai': { reasoning_effort: 'low' as const } } }
+          : {}),
         tools,
         stopWhen: stepCountIs(5),
       });
       await followAgentStream(streamed.fullStream);
-      const [text, steps, totalUsage, usage] = await Promise.all([
+      const [text, steps, totalUsage, usage, finishReason] = await Promise.all([
         streamed.text,
         streamed.steps,
         streamed.totalUsage,
         streamed.usage,
+        streamed.finishReason,
       ]);
-      return { text, steps, totalUsage, usage };
+      return { text, steps, totalUsage, usage, finishReason };
     });
     for (const step of result.steps ?? []) {
       if ((step as { usage?: unknown }).usage == null) continue;
@@ -205,7 +221,43 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       await billOnce((step as { usage?: unknown }).usage, String((step as { text?: unknown }).text ?? ''));
     }
 
-    const text = result.text;
+    let text = result.text;
+    if (result.finishReason === 'length' && text.trim()) {
+      try {
+      const continued = await withAiCapacityRetry(async () => {
+        const workersAI = createWorkersAI({
+          binding: ctx.c.env.AI,
+          gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }),
+        });
+        const streamed = streamText({
+          model: workersAI(modelId as never),
+          system: systemParts.join('\n\n'),
+          messages: [
+            ...historyMessages,
+            { role: 'user', content: userText },
+            { role: 'assistant', content: text },
+            {
+              role: 'user',
+              content:
+                'The answer was cut off. Continue from the exact cutoff, without repeating text already written, until the answer and every HTML tag are finished.',
+            },
+          ],
+          maxOutputTokens: outputLimit,
+          temperature: modelParams.temperature as number | undefined,
+          ...(forcedReasoning
+            ? { providerOptions: { 'workers-ai': { reasoning_effort: 'low' as const } } }
+            : {}),
+        });
+        await followAgentStream(streamed.fullStream);
+        const [more, usage] = await Promise.all([streamed.text, streamed.usage]);
+        return { text: more, usage };
+      });
+      if (continued.text.trim()) text = `${text}${continued.text}`;
+      await billOnce(continued.usage, continued.text);
+      } catch (e) {
+        console.warn('[agent] continue after length cutoff failed', e instanceof Error ? e.message : String(e));
+      }
+    }
     await billGenerateTextCalls(billOnce, result, billedSteps);
     const usage = result.totalUsage ?? result.usage;
     await simpleMemory.persist(text);
@@ -226,7 +278,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     { role: 'user', content: userText },
   ];
 
-  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, maxTokens, modelParams, textStamp);
+  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, outputLimit, modelParams, textStamp);
   let text = extractTextFromAiResponse(aiResponse);
   await billOnce(aiResponse, text);
   let sql = extractSql(text);

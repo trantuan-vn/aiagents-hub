@@ -1,4 +1,6 @@
 import { REASONING_AGENT_DEFAULTS } from '@aiagents-hub/workflow-nodes';
+
+import { appendMemberActionsNote } from '../../../../assistant/confirmation.js';
 import { generateText, stepCountIs, streamText, tool, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 import { z } from 'zod';
@@ -685,6 +687,9 @@ async function runToolChat(s: Shared, linked: ReturnType<typeof resolveAgentReso
         workflowId: String(ctx.meta.workflowId ?? ''),
         nodeId: ctx.node.id,
       },
+      c: ctx.c,
+      bindingName: ctx.bindingName,
+      user: ctx.user,
     },
     ctx.definition,
     ctx.node.id,
@@ -827,7 +832,10 @@ export async function executeReasoningAgent(ctx: NodeContext, deps: ReasoningDep
     ? await loadSessionMemory(ctx.userDO, memoryKey(ctx.meta.workflowId, sessionId, ctx.node.id))
     : { memoryKey: '', summary: '', episodes: [] };
   const simpleMemory = await attachSimpleMemory(ctx, linked, userText);
-  const userSystem = interpolateTemplate(String(data.systemPrompt ?? ''), systemPromptScope(nodeInput, String(ctx.input ?? '')));
+  const userSystem = appendMemberActionsNote(
+    interpolateTemplate(String(data.systemPrompt ?? ''), systemPromptScope(nodeInput, String(ctx.input ?? ''))),
+    linked.tools,
+  );
 
   const emit = async (result: ReasoningResult, snippets: string[]): Promise<NodeOutput> => {
     let shown = result;

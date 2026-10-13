@@ -21,6 +21,7 @@ const BACKEND_TOOL_KINDS = new Set([
   "get-db-info",
   "check-sql",
   "code",
+  "member_actions",
 ]);
 const BACKEND_MEMORY_KINDS = new Set(["simple", "vectorize"]);
 const BACKEND_AGENT_KINDS = new Set(["tools_agent", "reasoning_agent"]);
@@ -152,7 +153,9 @@ function toolEntries(): WorkflowCatalogEntrySeed[] {
                 ? "tool_kind_get_db_info"
                 : kind === "check-sql"
                   ? "tool_kind_check_sql"
-                  : `tool_kind_${kind}`,
+                  : kind === "member_actions"
+                    ? "tool_member_actions"
+                    : `tool_kind_${kind}`,
       descKey:
         kind === "save-rag"
           ? "tool_kind_save_rag_desc"
@@ -164,7 +167,9 @@ function toolEntries(): WorkflowCatalogEntrySeed[] {
                 ? "tool_kind_get_db_info_desc"
                 : kind === "check-sql"
                   ? "tool_kind_check_sql_desc"
-                  : `tool_kind_${kind}_desc`,
+                  : kind === "member_actions"
+                    ? "tool_member_actions_desc"
+                    : `tool_kind_${kind}_desc`,
       hasBackend: BACKEND_TOOL_KINDS.has(kind) || !TOOL_OVERRIDE_KINDS.has(kind),
       hasFrontend: FRONTEND_TOOL_KINDS.has(kind),
       sortOrder: 100 + index,

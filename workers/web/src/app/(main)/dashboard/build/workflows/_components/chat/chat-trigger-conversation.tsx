@@ -251,7 +251,7 @@ function ChatActivityFeed({ items, live }: { items: ChatActivityItem[]; live: bo
   );
 }
 
-function ChatRunStatus({ steps }: { steps: ChatRunStep[] }) {
+export function ChatRunStatus({ steps }: { steps: ChatRunStep[] }) {
   const t = useTranslations("WorkflowEditorPage");
   const reasoning = [...steps].reverse().find((step) => step.status === "running" && step.phase === "reasoning" && !step.activityLog?.length);
   const statusLabel = (status: ChatRunStepStatus) => {

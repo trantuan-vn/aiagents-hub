@@ -20,6 +20,7 @@ import {
 } from '../billing/billing.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { findPrimaryAgentNode, workflowAttribution } from '../execution/workflow-context.js';
+import { appendMemberActionsNote } from '../../../assistant/confirmation.js';
 import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 import { executeReasoningAgent } from '../nodes/agent/execute-reasoning.js';
 import { isReasoningAgentKind } from '../nodes/agent/shared.js';
@@ -184,6 +185,10 @@ export async function createWorkflowChatStreamResponse(
         },
         workflowAttribution: attr,
       },
+      c,
+      bindingName,
+      user,
+      triggerContext: { chatInput: latestUser, query: latestUser },
     },
     resolved.definition,
     agentNode.id,
@@ -201,7 +206,7 @@ export async function createWorkflowChatStreamResponse(
       : [];
 
   const systemPrompt = [
-    `You are the conversational agent for the "${wfName}" workflow.`,
+    appendMemberActionsNote(`You are the conversational agent for the "${wfName}" workflow.`, linked.tools),
     wfDesc ? `Workflow description: ${wfDesc}` : '',
     String(data.systemPrompt ?? data.prompt ?? ''),
     'Answer in the same language the user uses unless they ask otherwise.',

@@ -24,6 +24,10 @@ export type AgentToolBindContext = {
   toolDescription: string;
   /** Present on an execution. Absent for workflow authoring chat. */
   aiCall?: { executionKey: string; workflowId: string; nodeId: string };
+  /** Hono context, binding, and runner. Required by dashboard member actions. */
+  c?: any;
+  bindingName?: string;
+  user?: { identifier: string };
 };
 
 export type ToolModule = {
@@ -33,4 +37,6 @@ export type ToolModule = {
   executePipeline?: (ctx: NodeContext) => Promise<NodeOutput>;
   /** AI SDK tool. Omit when the tool is pipeline-only. */
   createAgentTool?: (bind: AgentToolBindContext) => { name: string; tool: Tool } | null;
+  /** Several tools from one linked node (dashboard member actions). */
+  createAgentTools?: (bind: AgentToolBindContext) => Array<{ name: string; tool: Tool }>;
 };

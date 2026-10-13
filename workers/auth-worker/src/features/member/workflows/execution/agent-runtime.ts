@@ -36,6 +36,9 @@ interface AgentToolContext {
   billing?: RagBilling;
   /** Set only for a workflow execution. Authoring chat leaves this unset. */
   aiCall?: { executionKey: string; workflowId: string; nodeId: string };
+  c?: any;
+  bindingName?: string;
+  user?: { identifier: string };
 }
 
 /** Fold any linked retrieve/validate tool into Code Mode (not only get-rag/check-sql). */
@@ -226,7 +229,7 @@ export function buildLinkedAgentTools(
     const kind = String(t.kind ?? '');
     if (kind === 'code') continue;
     const mod = getToolModule(kind);
-    if (!mod?.createAgentTool) continue;
+    if (!mod?.createAgentTool && !mod?.createAgentTools) continue;
 
     const config = (t.config ?? {}) as Record<string, unknown>;
     const toolName = sanitizeToolName(
@@ -237,7 +240,7 @@ export function buildLinkedAgentTools(
       config.toolDescription ?? config.description ?? `Tool: ${kind}`,
     );
 
-    const created = mod.createAgentTool({
+    const bind = {
       env: ctx.env,
       userDO: ctx.userDO,
       definition,
@@ -252,7 +255,17 @@ export function buildLinkedAgentTools(
       toolName,
       toolDescription,
       aiCall: ctx.aiCall,
-    });
+      c: ctx.c,
+      bindingName: ctx.bindingName,
+      user: ctx.user,
+    };
+    if (mod.createAgentTools) {
+      for (const created of mod.createAgentTools(bind)) {
+        tools[created.name] = created.tool;
+      }
+      continue;
+    }
+    const created = mod.createAgentTool?.(bind);
     if (created) tools[created.name] = created.tool;
   }
 

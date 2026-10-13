@@ -1,5 +1,7 @@
-import { tool, ToolLoopAgent, type ToolSet } from 'ai';
+import { ToolLoopAgent, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
+
+import { CONFIRM_REQUIRED_TOKEN, withUserConfirmation } from './confirmation';
 
 import { getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
@@ -38,10 +40,6 @@ type AssistantToolConfig = {
   factory: ToolFactory;
   requiresConfirmation: boolean;
 };
-
-const CONFIRM_APPROVE_TOKEN = '__assistant_confirm_ok__';
-const CONFIRM_REQUIRED_TOKEN = '__assistant_confirm_required__';
-const CONFIRM_SEPARATOR = '::';
 
 const AI_GATEWAY_ID = 'unitoken';
 
@@ -204,64 +202,6 @@ function buildToolset(c: any, bindingName: string, user: any, latestUserMessageT
       : baseTool;
     return acc;
   }, {} as ToolSet);
-}
-
-function stableSerialize(value: unknown): string {
-  if (value === null || typeof value !== 'object') return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map((item) => stableSerialize(item)).join(',')}]`;
-
-  const entries = Object.entries(value as Record<string, unknown>)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, item]) => `${JSON.stringify(key)}:${stableSerialize(item)}`);
-  return `{${entries.join(',')}}`;
-}
-
-function buildConfirmationKey(toolName: string, input: Record<string, unknown>): string {
-  return `${toolName}:${stableSerialize(input)}`;
-}
-
-function extractApprovedConfirmationKey(message: string): string | null {
-  const normalized = message
-    .normalize('NFKC')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .trim();
-
-  if (normalized === CONFIRM_APPROVE_TOKEN) return '';
-  const prefix = `${CONFIRM_APPROVE_TOKEN}${CONFIRM_SEPARATOR}`;
-  if (!normalized.startsWith(prefix)) return null;
-  return normalized.slice(prefix.length).trim();
-}
-
-function hasExplicitUserConfirmation(message: string, expectedKey: string): boolean {
-  const approvedKey = extractApprovedConfirmationKey(message);
-  if (approvedKey === null) return false;
-  if (!approvedKey) return true; // backward compatibility for older clients sending token only.
-  return approvedKey === expectedKey;
-}
-
-function withUserConfirmation(baseTool: any, latestUserMessageText: string, toolName: string) {
-  return tool({
-    description: `${baseTool.description}\n\nBefore executing this tool, you must present a short action summary and wait for explicit user confirmation.`,
-    inputSchema: baseTool.inputSchema,
-    execute: async function* executeWithConfirmation(input: Record<string, unknown>) {
-      const parsedInput = baseTool.inputSchema.safeParse(input);
-      if (!parsedInput.success) {
-        // Let the model continue collecting missing/invalid fields from the user before asking for confirmation.
-        throw new Error(`Invalid tool input: ${parsedInput.error.message}`);
-      }
-
-      const confirmationKey = buildConfirmationKey(toolName, parsedInput.data);
-      if (!hasExplicitUserConfirmation(latestUserMessageText, confirmationKey)) {
-        yield {
-          state: 'confirmation-required' as const,
-          confirmationKey,
-        };
-        return;
-      }
-
-      yield* baseTool.execute(parsedInput.data);
-    },
-  });
 }
 
 export async function createAssistantAgent(

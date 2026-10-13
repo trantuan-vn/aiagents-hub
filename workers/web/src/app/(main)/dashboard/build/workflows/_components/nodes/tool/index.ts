@@ -22,6 +22,8 @@ function toolLabelKey(kind: ToolKind): string {
       return "tool_get_db_info";
     case "check-sql":
       return "tool_check_sql";
+    case "member_actions":
+      return "tool_member_actions";
     case "agent":
       return "tool_pick_agent";
     case "workflow":
@@ -101,3 +103,4 @@ export const toolSaveSqlPairUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlu
 export const toolGetRagUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-rag");
 export const toolGetDbInfoUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("get-db-info");
 export const toolCheckSqlUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("check-sql");
+export const toolMemberActionsUIPlugin: WorkflowNodeUIPlugin = createToolKindUIPlugin("member_actions");

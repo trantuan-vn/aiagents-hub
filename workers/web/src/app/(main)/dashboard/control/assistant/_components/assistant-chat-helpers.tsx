@@ -10,6 +10,8 @@ import {
   CreateOrderToolView,
   CreatePaymentUrlToolView,
 } from "./assistant-tool-views";
+import { formatAssistantReply } from "./assistant-html";
+import { AssistantReply } from "./assistant-reply";
 import type { AssistantUIMessage } from "./assistant-types";
 
 export const URL_REGEX = /(https?:\/\/[^\s<>"'`]+)/gi;
@@ -189,16 +191,20 @@ function toDisplayText(text: string, t: AssistantTranslations): string {
 export function AssistantMessagePartView({
   index,
   part,
+  role,
   t,
 }: {
   index: number;
   part: AssistantMessagePart;
+  role: AssistantUIMessage["role"];
   t: AssistantTranslations;
 }) {
   if (part.type === "text") {
-    return (
-      <p className="text-sm break-words whitespace-pre-wrap">{renderTextWithLinks(toDisplayText(part.text, t))}</p>
-    );
+    const display = toDisplayText(part.text, t);
+    if (role === "assistant") {
+      return <AssistantReply html={formatAssistantReply(display)} />;
+    }
+    return <p className="text-sm break-words whitespace-pre-wrap">{renderTextWithLinks(display)}</p>;
   }
   if (part.type === "step-start") {
     return index > 0 ? <hr className="border-muted my-2" /> : null;
@@ -227,15 +233,28 @@ export function AssistantMessagesList({
   if (messages.length === 0) {
     return <p className="text-muted-foreground text-sm">{emptyLabel}</p>;
   }
-  return messages.map((message) => (
-    <div key={message.id} className="space-y-2">
-      <div className="text-muted-foreground text-xs font-medium uppercase">{message.role}</div>
-      <div className="space-y-2 pl-0">
-        {message.parts.map((part, index) => (
-          // eslint-disable-next-line react/no-array-index-key -- SDK parts are ordered; not all part kinds expose stable ids
-          <AssistantMessagePartView key={`${message.id}-${index}`} index={index} part={part} t={t} />
-        ))}
+  return messages.map((message) => {
+    const isUser = message.role === "user";
+    return (
+      <div key={message.id} className={isUser ? "flex justify-end" : "flex justify-start"}>
+        <div
+          className={
+            isUser
+              ? "bg-primary text-primary-foreground max-w-[85%] rounded-2xl px-3 py-2"
+              : "bg-muted/40 max-w-[85%] rounded-2xl border px-3 py-2"
+          }
+        >
+          <div className={`mb-1 text-[10px] font-medium uppercase ${isUser ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+            {isUser ? t("role_user") : t("role_assistant")}
+          </div>
+          <div className="space-y-2">
+            {message.parts.map((part, index) => (
+              // eslint-disable-next-line react/no-array-index-key -- SDK parts are ordered; not all part kinds expose stable ids
+              <AssistantMessagePartView key={`${message.id}-${index}`} index={index} part={part} role={message.role} t={t} />
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
-  ));
+    );
+  });
 }

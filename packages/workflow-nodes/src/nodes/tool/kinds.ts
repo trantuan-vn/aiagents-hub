@@ -9,6 +9,7 @@ export const TOOL_KINDS = [
   "get-rag",
   "get-db-info",
   "check-sql",
+  "member_actions",
   "mcp",
 ] as const;
 
@@ -25,4 +26,5 @@ export const TOOL_OVERRIDE_KINDS = new Set<ToolKind>([
   "get-db-info",
   "check-sql",
   "code",
+  "member_actions",
 ]);

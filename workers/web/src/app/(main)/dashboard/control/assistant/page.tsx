@@ -1,12 +1,11 @@
-"use client";
-
 import { Bot } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 
 import { AssistantChat } from "./_components/assistant-chat";
+import { dashboardAssistantChatUrl } from "./assistant-config";
 
-export default function AssistantPage() {
-  const t = useTranslations("AssistantPage");
+export default async function AssistantPage() {
+  const t = await getTranslations("AssistantPage");
 
   return (
     <div className="@container/main flex flex-col gap-4 md:gap-6">
@@ -19,7 +18,7 @@ export default function AssistantPage() {
           <p className="text-muted-foreground mt-1 text-sm">{t("description")}</p>
         </div>
       </div>
-      <AssistantChat />
+      <AssistantChat chatUrl={dashboardAssistantChatUrl()} />
     </div>
   );
 }

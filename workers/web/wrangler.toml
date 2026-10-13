@@ -11,6 +11,10 @@ NEXT_PUBLIC_DEBUG = "true"
 # Must match auth-worker TURNSTILE_SITE_KEY (Cloudflare Turnstile widget hostnames: aiagents-hub.vn + www)
 NEXT_PUBLIC_TURNSTILE_SITE_KEY = "0x4AAAAAADXOWPMRtW0XIcLk"
 NEXT_PUBLIC_SMS_2FA_ENABLED = false
+# Dashboard assistant at /dashboard/control/assistant. Baked in at `opennextjs-cloudflare build`.
+NEXT_PUBLIC_DASHBOARD_ASSISTANT_WORKFLOW_ID = "33"
+NEXT_PUBLIC_DASHBOARD_ASSISTANT_OWNER_ID = "e1a09eae9956f0489180c63f332235d0f6d9e8861b883d3c2f21802988c4ecff"
+NEXT_PUBLIC_DASHBOARD_ASSISTANT_CHAT_PATH = "trigger-1791901863127"
 
 [limits]
 cpu_ms = 300000

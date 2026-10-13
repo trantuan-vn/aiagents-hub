@@ -301,6 +301,8 @@ function toolNameKey(kind: ToolKind): string {
       return "tool_get_db_info";
     case "check-sql":
       return "tool_check_sql";
+    case "member_actions":
+      return "tool_member_actions";
     case "agent":
       return "tool_pick_agent";
     case "workflow":
@@ -328,6 +330,8 @@ function toolDescKey(kind: ToolKind): string {
       return "tool_get_db_info_desc";
     case "check-sql":
       return "tool_check_sql_desc";
+    case "member_actions":
+      return "tool_member_actions_desc";
     case "agent":
       return "tool_pick_agent_desc";
     case "workflow":
@@ -547,6 +551,27 @@ export const CODE_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
   ],
 });
 
+export const MEMBER_ACTIONS_TOOL_DEFINITION: WorkflowNodeDefinition = createBuiltin({
+  id: "tool_node:member_actions",
+  runtimeType: "tool_node",
+  kind: "member_actions",
+  nameKey: "tool_member_actions",
+  descriptionKey: "tool_member_actions_desc",
+  category: "resource",
+  icon: "Wrench",
+  defaultData: {
+    toolKind: "member_actions",
+    label: "Dashboard actions",
+  },
+  sections: [
+    defaultInputSection(),
+    defaultParametersSection([
+      { id: "label", type: "text", labelKey: "field_label", required: true, order: 0 },
+    ]),
+    defaultOutputSection(false),
+  ],
+});
+
 export const TOOL_KIND_DEFINITIONS: WorkflowNodeDefinition[] = TOOL_KINDS.filter(
   (kind) => !TOOL_OVERRIDE_KINDS.has(kind),
 ).map(createToolKindDefinition);
@@ -612,6 +637,10 @@ export const TOOL_KIND_DEFAULTS: Record<string, Record<string, unknown>> = {
     connectStringField: GET_DB_INFO_CONNECT_STRING_FIELD,
     schemaNameField: GET_DB_INFO_SCHEMA_FIELD,
     maxRows: 5,
+  },
+  member_actions: {
+    toolKind: "member_actions",
+    label: "Dashboard actions",
   },
   code: {
     toolKind: "code",

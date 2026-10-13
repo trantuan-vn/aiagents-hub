@@ -6,6 +6,7 @@ import {
   Globe,
   Link2,
   LogIn,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { ComponentType } from "react";
@@ -174,7 +175,13 @@ export const WORKFLOW_AGENT_VECTOR_STORES: WorkflowAgentVectorStoreItem[] = [
 ];
 
 /** Hub-built tool_node kinds — extend this list when adding new runtime tools. */
-export type WorkflowAgentBuiltinToolId = "save-rag" | "save-sql-pair" | "get-rag" | "get-db-info" | "check-sql";
+export type WorkflowAgentBuiltinToolId =
+  | "save-rag"
+  | "save-sql-pair"
+  | "get-rag"
+  | "get-db-info"
+  | "check-sql"
+  | "member_actions";
 
 export type WorkflowAgentBuiltinTool = {
   id: WorkflowAgentBuiltinToolId;
@@ -183,13 +190,15 @@ export type WorkflowAgentBuiltinTool = {
     | "tool_save_sql_pair"
     | "tool_get_rag"
     | "tool_get_db_info"
-    | "tool_check_sql";
+    | "tool_check_sql"
+    | "tool_member_actions";
   descKey:
     | "tool_save_rag_desc"
     | "tool_save_sql_pair_desc"
     | "tool_get_rag_desc"
     | "tool_get_db_info_desc"
-    | "tool_check_sql_desc";
+    | "tool_check_sql_desc"
+    | "tool_member_actions_desc";
   icon: ComponentType<{ className?: string }>;
 };
 
@@ -223,6 +232,12 @@ export const WORKFLOW_AGENT_BUILTIN_TOOLS: WorkflowAgentBuiltinTool[] = [
     nameKey: "tool_check_sql",
     descKey: "tool_check_sql_desc",
     icon: OracleIcon,
+  },
+  {
+    id: "member_actions",
+    nameKey: "tool_member_actions",
+    descKey: "tool_member_actions_desc",
+    icon: Wrench,
   },
 ];
 

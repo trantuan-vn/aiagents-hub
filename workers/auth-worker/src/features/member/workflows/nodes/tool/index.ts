@@ -126,3 +126,11 @@ export const toolCheckSqlPlugin: WorkflowNodePlugin = {
   kind: 'check-sql',
   skipExecution: true,
 };
+
+/** Agent-only dashboard tools. Credit is charged on the Agent node, not here. */
+export const toolMemberActionsPlugin: WorkflowNodePlugin = {
+  id: 'tool_node:member_actions',
+  runtimeType: 'tool_node',
+  kind: 'member_actions',
+  skipExecution: true,
+};

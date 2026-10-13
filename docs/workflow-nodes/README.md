@@ -39,6 +39,7 @@ Thư mục chứa **spec từng node** — dùng làm hướng dẫn khi phát t
 | schema.md | [`schema.md`](./schema.md) | — | Artifact — table schema |
 | sqlexample.md | [`sqlexample.md`](./sqlexample.md) | — | Artifact — SQL examples. Thay bằng cặp `sqlpair` trong [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) |
 | **Sinh SQL gọn token** | [`sql-generation-improvement-spec.md`](./sql-generation-improvement-spec.md) | `save-rag/` + `save-sql-pair/` + `get-rag/` + reasoning | **Draft** — schema only, node cặp câu hỏi–SQL, Get RAG hai phần |
+| **Dashboard assistant** | [`dashboard-assistant-workflow-spec.md`](./dashboard-assistant-workflow-spec.md) | `nodes/tool/member-actions/` + chat trigger + agent | **In progress** — node `member_actions` đã chạy; workflow publish là việc vận hành |
 
 Add-node drawer **vẫn** đọc `workers/web/.../catalogs/*.ts`. UI `NODE_CATALOG` chưa thay catalogs.
 
