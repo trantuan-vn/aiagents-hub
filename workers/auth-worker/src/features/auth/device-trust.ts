@@ -2,27 +2,38 @@ import { Context } from 'hono';
 import { Session } from './domain';
 import {
   isNovelLoginCountry,
-  newSessionDeviceFingerprint,
-  uaFingerprintsMatch,
+  normalizeLoginCountry,
+  normalizeUaFingerprint,
 } from './session-fingerprint';
 import { createAccountAuthenticatorApplication, createAccountSmsApplication } from '../account/application';
 import { createSmsRepository } from '../account/infrastructure';
-import { getIdFromName } from '../../shared/utils';
+import { getClientDeviceIdFromRequest, getIdFromName } from '../../shared/utils';
 import { UserDO } from '../ws/infrastructure/UserDO';
 import { validationUtils, hashPhone, otpUtils, markPreAuthSessionTrusted } from './utils';
 import { createOTPService } from './infrastructure';
 import { storePendingSmsLogin } from './pending-sms-login';
 import { decryptField } from '../../shared/field-encryption';
+import { AUTH_CONSTANTS, CLIENT_DEVICE_ID_RE } from './constant';
 
+/** Bản ghi cũ, chỉ còn để xóa khi logout bảo mật. */
 export const KNOWN_DEVICE_KV_PREFIX = 'KnownDevice:';
+export const RECOGNIZED_DEVICE_KV_PREFIX = 'RecognizedDevice:';
 export const PENDING_LOGIN_DEVICE_PREFIX = 'PendingLoginDevice:';
 export const PASSKEY_DEVICE_KV_PREFIX = 'PasskeyDevice:';
 
-/** Lưu thiết bị đã tin — vẫn nhận ra sau logout hết phiên */
+/** TTL KV, gia hạn mỗi lần đăng nhập thành công từ thiết bị đó. */
 export const KNOWN_DEVICE_TTL_SEC = 365 * 24 * 60 * 60;
 export const PENDING_LOGIN_DEVICE_TTL_SEC = 15 * 60;
 
-const DEVICE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DEVICE_ID_RE = CLIENT_DEVICE_ID_RE;
+
+export type RecognizedDeviceRecord = {
+  uaFp: string;
+  country: string | null;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  stepUpTrustedUntil: string;
+};
 
 export function normalizeDeviceId(raw?: string | null): string | null {
   const id = (raw ?? '').trim().toLowerCase();
@@ -77,52 +88,248 @@ export async function consumePendingLoginDevice(
   return d;
 }
 
+function recognizedDeviceKey(identifier: string, deviceId: string): string {
+  const id = validationUtils.normalizeIdentifier(identifier);
+  return `${RECOGNIZED_DEVICE_KV_PREFIX}${id}:${deviceId}`;
+}
+
+function parseRecognizedDevice(raw: string | null): RecognizedDeviceRecord | null {
+  if (!raw || raw === '1') return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<RecognizedDeviceRecord>;
+    if (!parsed || typeof parsed.lastSeenAt !== 'string' || typeof parsed.stepUpTrustedUntil !== 'string') {
+      return null;
+    }
+    return {
+      uaFp: typeof parsed.uaFp === 'string' ? parsed.uaFp : '',
+      country: typeof parsed.country === 'string' ? parsed.country : null,
+      firstSeenAt: typeof parsed.firstSeenAt === 'string' ? parsed.firstSeenAt : parsed.lastSeenAt,
+      lastSeenAt: parsed.lastSeenAt,
+      stepUpTrustedUntil: parsed.stepUpTrustedUntil,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function seenWithin(iso: string, nowMs: number, windowSec: number): boolean {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return false;
+  return nowMs - t <= windowSec * 1000;
+}
+
+async function listKvKeys(kv: KVNamespace, prefix: string): Promise<string[]> {
+  const keys: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await kv.list({ prefix, cursor });
+    for (const key of page.keys) keys.push(key.name);
+    cursor = page.list_complete || !page.cursor ? undefined : page.cursor;
+  } while (cursor);
+  return keys;
+}
+
+export async function readRecognizedDevice(
+  kv: KVNamespace,
+  identifier: string,
+  deviceId: string,
+): Promise<RecognizedDeviceRecord | null> {
+  const d = normalizeDeviceId(deviceId);
+  if (!d) return null;
+  return parseRecognizedDevice(await kv.get(recognizedDeviceKey(identifier, d)));
+}
+
+export async function listRecognizedDevices(
+  kv: KVNamespace,
+  identifier: string,
+): Promise<Array<{ deviceId: string; record: RecognizedDeviceRecord }>> {
+  const id = validationUtils.normalizeIdentifier(identifier);
+  const prefix = `${RECOGNIZED_DEVICE_KV_PREFIX}${id}:`;
+  const keys = await listKvKeys(kv, prefix);
+  const rows: Array<{ deviceId: string; record: RecognizedDeviceRecord }> = [];
+  for (const key of keys) {
+    const deviceId = normalizeDeviceId(key.slice(prefix.length));
+    if (!deviceId) continue;
+    const record = parseRecognizedDevice(await kv.get(key));
+    if (record) rows.push({ deviceId, record });
+  }
+  return rows;
+}
+
+/** Bản ghi còn trong KV, kể cả khi `lastSeenAt` đã quá 30 ngày. */
+export async function hasRecognizedDeviceRecord(
+  kv: KVNamespace,
+  identifier: string,
+  deviceId: string,
+): Promise<boolean> {
+  return (await readRecognizedDevice(kv, identifier, deviceId)) !== null;
+}
+
+/** `lastSeenAt` còn trong 30 ngày. Không dùng phiên active làm trí nhớ thiết bị. */
 export async function isKnownDeviceId(
   kv: KVNamespace,
   identifier: string,
   deviceId: string,
-  activeSessions: Session[],
 ): Promise<boolean> {
-  const sessionMatch = activeSessions.find((s) => s.isActive && s.deviceId === deviceId);
-  if (sessionMatch) return true;
-  const key = `${KNOWN_DEVICE_KV_PREFIX}${identifier}:${deviceId}`;
-  return (await kv.get(key)) !== null;
+  const record = await readRecognizedDevice(kv, identifier, deviceId);
+  if (!record) return false;
+  return seenWithin(record.lastSeenAt, Date.now(), AUTH_CONSTANTS.RECOGNIZED_DEVICE_IDLE_SEC);
 }
 
-/** Login không gửi device_id trong khi account đã có phiên gắn device_id */
-export function isLoginMissingDeviceIdWithRegisteredDevices(
-  deviceId: string | null,
-  activeSessions: Session[],
-): boolean {
-  if (deviceId) return false;
-  return activeSessions.some((s) => s.isActive && !!s.deviceId);
+/**
+ * Bỏ qua step-up chỉ khi đúng device id còn `stepUpTrustedUntil` và quốc gia không lạ.
+ * Không có cookie thì không bỏ qua.
+ */
+export async function isLoginStepUpSatisfied(
+  kv: KVNamespace,
+  identifier: string,
+  deviceId: string | null | undefined,
+  country: string | undefined,
+  nowMs = Date.now(),
+): Promise<boolean> {
+  const d = normalizeDeviceId(deviceId);
+  if (!d || !(await isStepUpRemembered(kv, identifier, d, nowMs))) return false;
+  const records = await listRecognizedDevices(kv, identifier);
+  const novel = isNovelLoginCountry(
+    country,
+    [],
+    records.map((row) => row.record.country),
+  );
+  return !novel;
+}
+
+export async function isStepUpRemembered(
+  kv: KVNamespace,
+  identifier: string,
+  deviceId: string,
+  nowMs = Date.now(),
+): Promise<boolean> {
+  const record = await readRecognizedDevice(kv, identifier, deviceId);
+  if (!record) return false;
+  const until = Date.parse(record.stepUpTrustedUntil);
+  return Number.isFinite(until) && until > nowMs;
 }
 
 export async function markKnownDevice(
   kv: KVNamespace,
   identifier: string,
   deviceId: string | null | undefined,
+  meta?: { userAgent?: string; country?: string; nowMs?: number },
 ): Promise<void> {
   const d = normalizeDeviceId(deviceId);
   if (!d) return;
-  await kv.put(`${KNOWN_DEVICE_KV_PREFIX}${identifier}:${d}`, '1', {
+  const nowMs = meta?.nowMs ?? Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const existing = await readRecognizedDevice(kv, identifier, d);
+  const uaFp = meta?.userAgent ? normalizeUaFingerprint(meta.userAgent) : (existing?.uaFp ?? '');
+  const country = normalizeLoginCountry(meta?.country) ?? existing?.country ?? null;
+  const record: RecognizedDeviceRecord = {
+    uaFp,
+    country,
+    firstSeenAt: existing?.firstSeenAt ?? nowIso,
+    lastSeenAt: nowIso,
+    stepUpTrustedUntil: new Date(nowMs + AUTH_CONSTANTS.STEP_UP_REMEMBER_SEC * 1000).toISOString(),
+  };
+  await kv.put(recognizedDeviceKey(identifier, d), JSON.stringify(record), {
     expirationTtl: KNOWN_DEVICE_TTL_SEC,
   });
 }
 
-/** Sau revoke/logout: bỏ tin thiết bị nếu không còn phiên active nào dùng device_id đó. */
-export async function forgetKnownDeviceIfUnused(
+function countryCompatible(recordCountry: string | null, currentCountry?: string): boolean {
+  const current = normalizeLoginCountry(currentCountry);
+  if (!current) return true;
+  const stored = normalizeLoginCountry(recordCountry ?? undefined);
+  if (!stored) return true;
+  return stored === current;
+}
+
+function matchingPartialRecords(
+  records: Array<{ deviceId: string; record: RecognizedDeviceRecord }>,
+  userAgent: string,
+  country: string | undefined,
+  nowMs: number,
+): Array<{ deviceId: string; record: RecognizedDeviceRecord }> {
+  const uaFp = normalizeUaFingerprint(userAgent);
+  return records.filter((row) => {
+    if (!row.record.uaFp || row.record.uaFp !== uaFp) return false;
+    if (!seenWithin(row.record.lastSeenAt, nowMs, AUTH_CONSTANTS.RECOGNIZED_DEVICE_IDLE_SEC)) return false;
+    return countryCompatible(row.record.country, country);
+  });
+}
+
+/** Gia hạn bản ghi khớp UA khi request không có device id. */
+async function renewPartialMatches(
+  kv: KVNamespace,
+  identifier: string,
+  userAgent: string,
+  country: string | undefined,
+  nowMs: number,
+): Promise<void> {
+  const matches = matchingPartialRecords(
+    await listRecognizedDevices(kv, identifier),
+    userAgent,
+    country,
+    nowMs,
+  );
+  for (const row of matches) {
+    await markKnownDevice(kv, identifier, row.deviceId, { userAgent, country, nowMs });
+  }
+}
+
+/**
+ * Ghi hoặc gia hạn RecognizedDevice sau đăng nhập thành công.
+ * Không có device id thì gia hạn bản ghi partial-match, không tạo id mới.
+ */
+export async function rememberLoginDevice(
   kv: KVNamespace,
   identifier: string,
   deviceId: string | null | undefined,
-  activeSessions: Session[],
+  userAgent: string,
+  country?: string,
+  nowMs = Date.now(),
+): Promise<void> {
+  if (normalizeDeviceId(deviceId)) {
+    await markKnownDevice(kv, identifier, deviceId, { userAgent, country, nowMs });
+    return;
+  }
+  await renewPartialMatches(kv, identifier, userAgent, country, nowMs);
+}
+
+export async function forgetRecognizedDevice(
+  kv: KVNamespace,
+  identifier: string,
+  deviceId: string | null | undefined,
 ): Promise<void> {
   const d = normalizeDeviceId(deviceId);
   if (!d) return;
-  const stillUsed = activeSessions.some((s) => s.isActive && s.deviceId === d);
-  if (!stillUsed) {
-    await kv.delete(`${KNOWN_DEVICE_KV_PREFIX}${identifier}:${d}`);
+  const id = validationUtils.normalizeIdentifier(identifier);
+  await kv.delete(recognizedDeviceKey(identifier, d));
+  await kv.delete(`${KNOWN_DEVICE_KV_PREFIX}${id}:${d}`);
+}
+
+/** Xóa mọi trí nhớ thiết bị của user (logout bảo mật, đổi mật khẩu). */
+export async function forgetAllRecognizedDevices(kv: KVNamespace, identifier: string): Promise<void> {
+  const id = validationUtils.normalizeIdentifier(identifier);
+  for (const prefix of [RECOGNIZED_DEVICE_KV_PREFIX, KNOWN_DEVICE_KV_PREFIX]) {
+    const keys = await listKvKeys(kv, `${prefix}${id}:`);
+    for (const key of keys) await kv.delete(key);
   }
+}
+
+/**
+ * Header đã ghi nhận thắng. Cookie API đã ghi nhận thắng header mới.
+ * Không có id trên request thì dùng fallback (pending login).
+ */
+export async function resolveAccountDeviceId(
+  kv: KVNamespace,
+  identifier: string,
+  request: Request,
+  fallback?: string | null,
+): Promise<string | null> {
+  const selected = await getClientDeviceIdFromRequest(request, async (id) =>
+    hasRecognizedDeviceRecord(kv, identifier, id),
+  );
+  return normalizeDeviceId(selected) ?? normalizeDeviceId(fallback);
 }
 
 function passkeyDeviceKvKey(identifier: string, credentialId: string): string {
@@ -163,22 +370,6 @@ export async function bindPasskeyDeviceId(
   await kv.put(passkeyDeviceKvKey(identifier, credentialId), d, {
     expirationTtl: KNOWN_DEVICE_TTL_SEC,
   });
-}
-
-/**
- * Chỉ tin device_id client nếu đã ghi nhận server-side (KV hoặc phiên active).
- * UUID tự khai báo không làm giảm step-up.
- */
-export async function resolveTrustedLoginDeviceId(
-  kv: KVNamespace | undefined,
-  identifier: string,
-  rawDeviceId: string | null | undefined,
-  activeSessions: Session[],
-): Promise<string | null> {
-  const d = normalizeDeviceId(rawDeviceId);
-  if (!d || !kv) return null;
-  const known = await isKnownDeviceId(kv, identifier, d, activeSessions);
-  return known ? d : null;
 }
 
 async function resolveSmsPhoneFor2FA(
@@ -260,107 +451,61 @@ export async function decideNewSessionEmail(
   identifier: string,
   sessionExisted: boolean,
   deviceId: string | null,
-  ipAddress: string,
+  _ipAddress: string,
   userAgent: string,
   country: string | undefined,
   activeSessions: Session[],
+  nowMs = Date.now(),
 ): Promise<NewSessionEmailDecision> {
-  const novelCountry = isNovelLoginCountry(country, activeSessions);
-  const uaFp = newSessionDeviceFingerprint(ipAddress, userAgent);
+  if (sessionExisted) return { send: false };
 
-  if (sessionExisted) {
-    return { send: false };
-  }
-
-  if (deviceId) {
-    const known = await isKnownDeviceId(kv, identifier, deviceId, activeSessions);
-    if (known) {
-      return { send: false };
-    }
-    const cooldownKey = `NewSessionEmailCooldown:${identifier}:dev:${deviceId}`;
-    const onCooldown = !!(await kv.get(cooldownKey));
-    if (!novelCountry) {
-      return { send: !onCooldown, cooldownKey };
-    }
-    return { send: true, cooldownKey };
-  }
-
-  if (isLoginMissingDeviceIdWithRegisteredDevices(null, activeSessions)) {
-    if (!novelCountry) {
-      const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-      const onCooldown = !!(await kv.get(cooldownKey));
-      return { send: !onCooldown, cooldownKey };
-    }
-    const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-    return { send: true, cooldownKey };
-  }
-
-  const hasSimilarUaActive = activeSessions.some(
-    (s) => s.isActive && s.userAgent && uaFingerprintsMatch(s.userAgent, userAgent),
+  const id = validationUtils.normalizeIdentifier(identifier);
+  const normalizedDeviceId = normalizeDeviceId(deviceId);
+  const uaFp = normalizeUaFingerprint(userAgent);
+  const burstKey = `NewSessionEmailBurst:${id}:${normalizedDeviceId ?? uaFp}`;
+  const records = await listRecognizedDevices(kv, identifier);
+  const novelCountry = isNovelLoginCountry(
+    country,
+    activeSessions,
+    records.map((row) => row.record.country),
   );
-  if (hasSimilarUaActive && !novelCountry) {
+
+  if (normalizedDeviceId) {
+    const row = records.find((item) => item.deviceId === normalizedDeviceId);
+    const recent =
+      !!row && seenWithin(row.record.lastSeenAt, nowMs, AUTH_CONSTANTS.RECOGNIZED_DEVICE_IDLE_SEC);
+    if (recent && !novelCountry) return { send: false };
+  } else if (
+    matchingPartialRecords(records, userAgent, country, nowMs).length > 0 &&
+    !novelCountry
+  ) {
     return { send: false };
   }
 
-  if (!novelCountry) {
-    const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-    const onCooldown = !!(await kv.get(cooldownKey));
-    return { send: !onCooldown, cooldownKey };
-  }
+  if (novelCountry) return { send: true, cooldownKey: burstKey };
 
-  const cooldownKey = `NewSessionEmailCooldown:${identifier}:ua:${uaFp}`;
-  return { send: true, cooldownKey };
+  const onBurst = !!(await kv.get(burstKey));
+  return { send: !onBurst, cooldownKey: burstKey };
 }
 
 /**
- * Step-up 2FA khi thiết bị chưa tin (kể cả không còn phiên active khác).
- * Step-up thiết bị lạ (OTP, OAuth, wallet). Passkey login không gọi hàm này.
+ * Step-up khi không có `stepUpTrustedUntil` còn hạn cho đúng device id.
+ * Không có cookie (partial match) vẫn step-up. Passkey login không gọi hàm này.
  */
 export async function evaluateNovelDeviceStepUp(
   c: Context,
   bindingName: string,
-  repository: { sessions: { listAll: (n: number) => Promise<Session[]> } },
+  _repository: { sessions: { listAll: (n: number) => Promise<Session[]> } },
   identifier: string,
   sessionId: string,
   deviceIdForPending: string | null | undefined,
 ): Promise<{ requiresTotp: true } | { requiresSms: true } | null> {
   if (!c.env.NONCE_KV) return null;
 
-  const activeSessions = await repository.sessions.listAll(50);
-  const trusted = await resolveTrustedLoginDeviceId(
-    c.env.NONCE_KV,
-    identifier,
-    deviceIdForPending,
-    activeSessions,
-  );
-  const d = normalizeDeviceId(deviceIdForPending);
-  const missingDeviceWithRegistered = isLoginMissingDeviceIdWithRegisteredDevices(trusted, activeSessions);
-
-  if (trusted) return null;
-  if (!d && !missingDeviceWithRegistered) return null;
-
-  const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
-  const smsApp = createAccountSmsApplication(c, bindingName);
-  const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
-  const smsStatus = await smsApp.getSmsStatusUseCase(identifier);
-
-  if (!totpStatus.enabled && !smsStatus.enabled) return null;
-
-  const pendingPayload = serializePendingAuth(identifier, d);
-
-  if (totpStatus.enabled) {
-    await c.env.NONCE_KV.put(`PendingTotp:${sessionId}`, pendingPayload, { expirationTtl: 300 });
-    await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
-    return { requiresTotp: true };
+  const country = (c.req.raw as Request & { cf?: { country?: string } }).cf?.country;
+  if (await isLoginStepUpSatisfied(c.env.NONCE_KV, identifier, deviceIdForPending, country)) {
+    return null;
   }
 
-  const phone = await resolveSmsPhoneFor2FA(c, bindingName, identifier);
-  if (!phone) return null;
-
-  const smsOtp = otpUtils.generateOTP(6);
-  const normalizedId = validationUtils.normalizeIdentifier(identifier);
-  await storePendingSmsLogin(c.env, sessionId, normalizedId, smsOtp, d);
-  await markPreAuthSessionTrusted(c.env.NONCE_KV, sessionId);
-  await createOTPService(c.env).sendSmsOTP(phone.startsWith('+') ? phone : `+${phone}`, smsOtp, 300);
-  return { requiresSms: true };
+  return applyEnabledSecondFactorStepUp(c, bindingName, identifier, sessionId, deviceIdForPending);
 }

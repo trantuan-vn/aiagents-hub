@@ -79,21 +79,81 @@ export function normalizeLoginCountry(country?: string): string | null {
 }
 
 /**
- * Quốc gia login hiện tại chưa từng thấy trên phiên active → rủi ro geo (VPN/du lịch/tấn công).
- * Dùng để vẫn gửi email dù cùng browser|os (bù giả UA).
+ * Quốc gia login chưa từng thấy trên các thiết bị đã ghi nhận (còn trong KV).
+ * Khi chưa có bản ghi nào, phiên active là tín hiệu bổ sung.
+ * `XX` / `T1` / rỗng không tính là quốc gia mới.
  */
 export function isNovelLoginCountry(
   currentCountry: string | undefined,
   activeSessions: Array<{ country?: string }>,
+  recognizedCountries?: Array<string | null | undefined>,
 ): boolean {
   const current = normalizeLoginCountry(currentCountry);
   if (!current) return false;
 
+  const fromDevices = (recognizedCountries ?? [])
+    .map((c) => normalizeLoginCountry(c ?? undefined))
+    .filter((c): c is string => !!c);
+
   const known = new Set<string>();
-  for (const s of activeSessions) {
-    const c = normalizeLoginCountry(s.country);
-    if (c) known.add(c);
+  if (fromDevices.length > 0) {
+    for (const c of fromDevices) known.add(c);
+  } else {
+    for (const s of activeSessions) {
+      const c = normalizeLoginCountry(s.country);
+      if (c) known.add(c);
+    }
   }
   if (known.size === 0) return false;
   return !known.has(current);
+}
+
+const BROWSER_LABELS: Record<string, string> = {
+  safari: 'Safari',
+  edge: 'Edge',
+  chrome: 'Chrome',
+  firefox: 'Firefox',
+  opera: 'Opera',
+  other: 'Browser',
+};
+
+const OS_LABELS: Record<string, string> = {
+  macos: 'macOS',
+  windows: 'Windows',
+  ios: 'iOS',
+  android: 'Android',
+  linux: 'Linux',
+  other: 'Unknown',
+};
+
+/** Nhãn mail từ fingerprint `browser|os`, không đưa nguyên User-Agent. */
+export function formatDeviceLabel(userAgent: string, language: 'vi' | 'en' = 'vi'): string {
+  const fp = normalizeUaFingerprint(userAgent);
+  if (!fp.includes('|')) {
+    return language === 'en' ? 'Unknown device' : 'Thiết bị không xác định';
+  }
+  const [browser, os] = fp.split('|');
+  const b = BROWSER_LABELS[browser] ?? 'Browser';
+  const o = OS_LABELS[os] ?? 'Unknown';
+  return language === 'en' ? `${b} on ${o}` : `${b} trên ${o}`;
+}
+
+/** Giờ đăng nhập cố định múi Asia/Ho_Chi_Minh, ví dụ `16:47 8/10/2026 GMT+7`. */
+export function formatLoginTimeGmt7(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh',
+    hour: '2-digit',
+    minute: '2-digit',
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const pick = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const hour = pick('hour');
+  const minute = pick('minute');
+  const day = String(Number(pick('day')));
+  const month = String(Number(pick('month')));
+  const year = pick('year');
+  return `${hour}:${minute} ${day}/${month}/${year} GMT+7`;
 }

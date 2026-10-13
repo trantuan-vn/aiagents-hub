@@ -61,6 +61,17 @@ export const AUTH_CONSTANTS = {
   BACKUP_CODE_RECOVER_MAX_PER_IDENTIFIER_HOUR: 10,
   /** Wallet SIWE / DID challenge nonce */
   NONCE_EXPIRY: 5 * 60, // 5 minutes
-  /** Tối thiểu giữa 2 email "đăng nhập từ thiết bị mới" cho cùng browser/OS (không theo IP — tránh spam khi mạng đổi) */
+  /**
+   * Khóa chống gửi dồn `NewSessionEmailBurst` khi hai request song song ghi nhận cùng thiết bị
+   * trước khi KV kịp ghi. Không phải trí nhớ thiết bị.
+   */
   NEW_SESSION_EMAIL_COOLDOWN_SEC: 12 * 60 * 60, // 12 hours
+  /** `lastSeenAt` cũ hơn mốc này thì lần đăng nhập sau được coi là thiết bị mới. */
+  RECOGNIZED_DEVICE_IDLE_SEC: 30 * 24 * 60 * 60,
+  /** Hết hạn thì step-up lại, dù mail vẫn im nếu `lastSeenAt` còn trong 30 ngày. */
+  STEP_UP_REMEMBER_SEC: 30 * 24 * 60 * 60,
 } as const;
+
+/** UUID thiết bị client (v4 và các biến thể RFC). */
+export const CLIENT_DEVICE_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

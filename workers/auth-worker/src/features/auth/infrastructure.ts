@@ -20,6 +20,7 @@ import {
   ISessionRepository
 } from './domain';
 import { AUTH_CONSTANTS, ERROR_MESSAGES } from './constant';
+import { formatDeviceLabel, formatLoginTimeGmt7, normalizeLoginCountry } from './session-fingerprint';
 import {
   checkOtpVerifyBlocked,
   clearOtpVerifyAttempts,
@@ -224,26 +225,31 @@ export function createOTPService(env: Env): IOTPService {
     }
   };
 
-  // Template Brevo: session mới - VI: 5, EN: 6. Params: IP_ADDRESS, USER_AGENT, LOGIN_TIME
-  const sendNewSessionEmail = async (
-    email: string,
-    ipAddress: string,
-    userAgent: string,
-    language?: 'vi' | 'en'
-  ): Promise<void> => {
+  // Template Brevo 3 (VI) và 4 (EN). Params: deviceLabel, location, ipAddress, loginTime, sessionsUrl.
+  const sendNewSessionEmail = async (input: {
+    email: string;
+    ipAddress: string;
+    userAgent: string;
+    country?: string;
+    sessionsUrl: string;
+    language?: 'vi' | 'en';
+  }): Promise<void> => {
     const brevoApiKey = await env.BREVO_API_KEY.get();
-    if (!brevoApiKey) return; // Không block login nếu thiếu config
+    if (!brevoApiKey) {
+      throw new Error('BREVO_API_KEY is not defined in environment variables');
+    }
 
+    const language = input.language === 'en' ? 'en' : 'vi';
     const templateId = language === 'en' ? 4 : 3;
-    const loginTime = new Date().toLocaleString(language === 'en' ? 'en-US' : 'vi-VN');
-
     const emailData = {
       templateId,
-      to: [{ email }],
+      to: [{ email: input.email }],
       params: {
-        ipAddress: ipAddress || '-',
-        userAgent: userAgent || '-',
-        loginTime: loginTime,
+        deviceLabel: formatDeviceLabel(input.userAgent, language),
+        location: normalizeLoginCountry(input.country) ?? '-',
+        ipAddress: input.ipAddress || '-',
+        loginTime: formatLoginTimeGmt7(new Date()),
+        sessionsUrl: input.sessionsUrl || '-',
       },
     };
 
@@ -257,7 +263,8 @@ export function createOTPService(env: Env): IOTPService {
     });
 
     if (!response.ok) {
-      console.warn('[Auth] Failed to send new session notification:', await response.text());
+      const detail = await response.text();
+      throw new Error(`Failed to send new session notification: ${detail}`);
     }
   };
 
@@ -410,13 +417,15 @@ export function createOTPService(env: Env): IOTPService {
       await sendSMS(phone, otp, expirySeconds);
     },
 
-    async sendNewSessionNotification(
-      email: string,
-      ipAddress: string,
-      userAgent: string,
-      language?: 'vi' | 'en'
-    ): Promise<void> {
-      await sendNewSessionEmail(email, ipAddress, userAgent, language);
+    async sendNewSessionNotification(input: {
+      email: string;
+      ipAddress: string;
+      userAgent: string;
+      country?: string;
+      sessionsUrl: string;
+      language?: 'vi' | 'en';
+    }): Promise<void> {
+      await sendNewSessionEmail(input);
     },
   };
 }

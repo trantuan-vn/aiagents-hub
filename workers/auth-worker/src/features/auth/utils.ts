@@ -209,6 +209,17 @@ export const otpUtils = {
 
 // V. Cookie Utilities
 export const cookieUtils = {
+  /** Cookie host-only trên API. HttpOnly để script trang không đọc. Không set Domain. */
+  setClientDeviceIdCookie(c: Context, deviceId: string) {
+    setCookie(c, 'client_device_id', deviceId, {
+      path: '/',
+      maxAge: 31536000,
+      secure: true,
+      sameSite: 'Lax',
+      httpOnly: true,
+    });
+  },
+
   setCookieWithOption(c: Context, name: string, value: string, maxAge: number) {
     const cookieOptions = {
       sameSite: 'lax' as const, 

@@ -151,6 +151,28 @@ export default function SessionsPage() {
     void fetchSessions();
   }, [fetchSessions]);
 
+  const forgetDevice = async (deviceId: string) => {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/dashboard/auth/sessions/devices/${encodeURIComponent(deviceId)}/forget`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+      if (!res.ok) throw new Error(await res.text());
+      toast({ title: t("device_forgotten"), description: t("device_forgotten_description") });
+      void fetchSessions();
+    } catch (e) {
+      toast({
+        title: t("forget_device_error"),
+        description: e instanceof Error ? e.message : "",
+        variant: "destructive",
+      });
+    }
+  };
+
   const revokeSession = async (sessionId: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/dashboard/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, {
@@ -271,16 +293,28 @@ export default function SessionsPage() {
                           {s.hashSessionId && <SessionIdCopy value={s.hashSessionId} />}
                         </div>
                       </div>
-                      {!s.isCurrent && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
-                          onClick={() => revokeSession(s.hashSessionId)}
-                        >
-                          {t("revoke")}
-                        </Button>
-                      )}
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        {s.deviceId && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => forgetDevice(s.deviceId!)}
+                          >
+                            {t("forget_device")}
+                          </Button>
+                        )}
+                        {!s.isCurrent && s.isActive && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => revokeSession(s.hashSessionId)}
+                          >
+                            {t("revoke")}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </li>
                 );

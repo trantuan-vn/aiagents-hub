@@ -50,6 +50,7 @@ export interface IAccountPasskeyApplication {
     body: { response: RegistrationResponseJSON; challengeKey: string },
     origin: string,
     deviceId?: string | null,
+    deviceMeta?: { userAgent?: string; country?: string },
   ): Promise<void>;
   listCredentialsUseCase(identifier: string): Promise<PasskeyCredentialListItem[]>;
   removeCredentialUseCase(identifier: string, credentialId: string): Promise<void>;
@@ -112,6 +113,7 @@ export function createAccountPasskeyApplication(
       body: { response: RegistrationResponseJSON; challengeKey: string },
       origin: string,
       deviceId?: string | null,
+      deviceMeta?: { userAgent?: string; country?: string },
     ): Promise<void> {
       const storedChallenge = await c.env.NONCE_KV.get(body.challengeKey);
       if (!storedChallenge) throw new Error('Challenge expired or invalid');
@@ -146,7 +148,7 @@ export function createAccountPasskeyApplication(
 
       if (deviceId) {
         await bindPasskeyDeviceId(c.env.NONCE_KV, identifier, credentialIdB64, deviceId);
-        await markKnownDevice(c.env.NONCE_KV, identifier, deviceId);
+        await markKnownDevice(c.env.NONCE_KV, identifier, deviceId, deviceMeta);
       }
     },
 

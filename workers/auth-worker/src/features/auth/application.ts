@@ -13,10 +13,11 @@ import {
   clearBackupCodeRecoverAttempts,
   recordBackupCodeRecoverFailure,
 } from '../../shared/backup-code-rate-limit';
-import { 
+import {
   validationUtils, 
   walletUtils, 
   oauthUtils,
+  cookieUtils,
 } from './utils';
 import { createOAuthService, createRepository, createOTPService, createWalletService } from './infrastructure';
 import {
@@ -45,15 +46,15 @@ import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry'
 import { createWebsocketApplicationService } from '../ws/application';
 import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../member/referral/utils';
 import {
-  applyEnabledSecondFactorStepUp,
   bindPasskeyDeviceId,
   decideNewSessionEmail,
   evaluateNovelDeviceStepUp,
-  forgetKnownDeviceIfUnused,
-  KNOWN_DEVICE_KV_PREFIX,
-  markKnownDevice,
+  forgetAllRecognizedDevices,
+  forgetRecognizedDevice,
   normalizeDeviceId,
   parsePendingAuth,
+  rememberLoginDevice,
+  resolveAccountDeviceId,
   resolvePasskeyLoginDeviceId,
 } from './device-trust';
 import {
@@ -108,7 +109,8 @@ interface IApplicationService {
   logoutUseCase(identifier: string, sessionId: string): Promise<void>;
   /** Revoke session by sessionId only (dùng khi middleware catch lỗi, chưa có identifier). Lấy identifier từ KV nếu còn. */
   revokeSessionBySessionIdUseCase(sessionId: string): Promise<void>;
-  logoutAllUseCase(identifier: string): Promise<void>;
+  logoutAllUseCase(identifier: string, reason?: 'user' | 'security'): Promise<void>;
+  forgetDeviceUseCase(identifier: string, deviceId: string): Promise<void>;
   listSessionsUseCase(identifier: string, currentSessionId?: string): Promise<{ sessions: Array<{ id: number; hashSessionId: string; type: string; ipAddress?: string; userAgent?: string; deviceId?: string; country?: string; expiresAt: string; isActive: boolean; isCurrent?: boolean }> }>;
   revokeSessionUseCase(identifier: string, sessionId: string): Promise<void>;
   verifySessionUseCase(
@@ -155,7 +157,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const expiry = await getAuthExpiryFromConfig(c.env);
     const sessionId = getSessionIdHash(ipAddress, userAgent, `${encryptSecret}|${user.identifier}`);
     const sessionExisted = await repository.sessions.existsByHashSessionId(sessionId);
-    const normalizedDeviceId = normalizeDeviceId(deviceId);
+    const normalizedDeviceId = await resolveAccountDeviceId(
+      c.env.NONCE_KV,
+      user.identifier,
+      c.req.raw,
+      deviceId,
+    );
     const activeSessionsBeforeCreate = await repository.sessions.listAll(50);
 
     const sessionData: Session = {
@@ -194,23 +201,49 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     const userEmail =
       user.email || (validationUtils.isValidEmail(user.identifier) ? user.identifier : null);
 
+    let rememberDevice = !emailDecision.send;
     if (emailDecision.send && userEmail) {
       try {
-        await createOTPService(c.env).sendNewSessionNotification(userEmail, ipAddress, userAgent);
+        const acceptLanguage = (c.req.header('accept-language') ?? '').toLowerCase();
+        const language = acceptLanguage.startsWith('en') ? 'en' : 'vi';
+        const frontend = (c.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+        await createOTPService(c.env).sendNewSessionNotification({
+          email: userEmail,
+          ipAddress,
+          userAgent,
+          country,
+          sessionsUrl: `${frontend}/dashboard/control/account/sessions`,
+          language,
+        });
         if (emailDecision.cooldownKey) {
           await c.env.NONCE_KV.put(emailDecision.cooldownKey, '1', {
             expirationTtl: AUTH_CONSTANTS.NEW_SESSION_EMAIL_COOLDOWN_SEC,
           });
         }
+        rememberDevice = true;
       } catch (e) {
+        rememberDevice = false;
         log.warn('session.new_device_email_failed', {
           identifier: user.identifier,
           error: e instanceof Error ? e.message : String(e),
         });
       }
+    } else if (emailDecision.send) {
+      rememberDevice = false;
     }
 
-    await markKnownDevice(c.env.NONCE_KV, user.identifier, normalizedDeviceId);
+    if (rememberDevice) {
+      await rememberLoginDevice(
+        c.env.NONCE_KV,
+        user.identifier,
+        normalizedDeviceId,
+        userAgent,
+        country,
+      );
+    }
+    if (normalizedDeviceId) {
+      cookieUtils.setClientDeviceIdCookie(c, normalizedDeviceId);
+    }
 
     log.info('session.created', {
       identifier: user.identifier,
@@ -329,22 +362,17 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(identifier);
       const { user, isNewUser } = await getOrCreateUser(repository, identifier, {}, ref);
       const normalizedId = validationUtils.normalizeIdentifier(identifier);
-      const dForPending = normalizeDeviceId(deviceId);
+      const dForPending = await resolveAccountDeviceId(c.env.NONCE_KV, normalizedId, c.req.raw, deviceId);
 
-      const account2fa = await applyEnabledSecondFactorStepUp(
-        c, bindingName, identifier, sessionId, dForPending,
-      );
-      if (account2fa) {
+      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dForPending);
+      if (stepUp) {
         log.info('auth.oauth_step_up', {
-          method: 'requiresTotp' in account2fa ? 'totp' : 'sms',
+          method: 'requiresTotp' in stepUp ? 'totp' : 'sms',
           identifier: normalizedId,
           isNewUser,
         });
-        return account2fa;
+        return stepUp;
       }
-
-      const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dForPending);
-      if (stepUp) return stepUp;
 
       const result = await createUserSession(repository, user, 'oauth', ipAddress, userAgent, country, dForPending);
       // Notification gửi khi WS connect (đúng flow: login → token → client connect WS → gửi notification)
@@ -406,12 +434,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
 
       const repository = getRepository(normalizedId);
       const { user, isNewUser } = await getOrCreateUser(repository, normalizedId, {}, ref);
-      const dForPending = normalizeDeviceId(deviceId);
-
-      const account2fa = await applyEnabledSecondFactorStepUp(
-        c, bindingName, normalizedId, sessionId, dForPending,
-      );
-      if (account2fa) return account2fa;
+      const dForPending = await resolveAccountDeviceId(c.env.NONCE_KV, normalizedId, c.req.raw, deviceId);
 
       const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedId, sessionId, dForPending);
       if (stepUp) return stepUp;
@@ -436,7 +459,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         throw new Error(ERROR_MESSAGES.AUTH.TOTP_SESSION_EXPIRED);
       }
       const { identifier } = pending;
-      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? pending.deviceId ?? null;
+      const resolvedDeviceId = await resolveAccountDeviceId(
+        c.env.NONCE_KV,
+        identifier,
+        c.req.raw,
+        normalizeDeviceId(deviceId) ?? pending.deviceId,
+      );
 
       const authenticatorApp = createAccountAuthenticatorApplication(c, bindingName);
       const totpStatus = await authenticatorApp.getAuthenticatorStatusUseCase(identifier);
@@ -492,7 +520,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         }
         throw new Error(ERROR_MESSAGES.AUTH.INVALID_OTP);
       }
-      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? normalizeDeviceId(parsed.deviceId) ?? null;
+      const resolvedDeviceId = await resolveAccountDeviceId(
+        c.env.NONCE_KV,
+        parsed.identifier,
+        c.req.raw,
+        normalizeDeviceId(deviceId) ?? normalizeDeviceId(parsed.deviceId),
+      );
 
       await c.env.NONCE_KV.delete(pendingSmsLoginKvKey(sessionId));
       await clearOtpVerifyAttempts(c.env, sessionId);
@@ -520,7 +553,12 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         pending = { identifier: parsed.identifier, deviceId: normalizeDeviceId(parsed.deviceId) ?? undefined };
       }
       const { identifier } = pending;
-      const resolvedDeviceId = normalizeDeviceId(deviceId) ?? pending.deviceId ?? null;
+      const resolvedDeviceId = await resolveAccountDeviceId(
+        c.env.NONCE_KV,
+        identifier,
+        c.req.raw,
+        normalizeDeviceId(deviceId) ?? pending.deviceId,
+      );
 
       const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
       const backupRepo = createBackupCodeRepository(userDO);
@@ -588,7 +626,8 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
 
       await clearBackupCodeRecoverAttempts(c.env, nIdentifier);
-      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, normalizeDeviceId(deviceId));
+      const resolvedDeviceId = await resolveAccountDeviceId(c.env.NONCE_KV, nIdentifier, c.req.raw, deviceId);
+      return await createUserSession(repository, user, 'otp', ipAddress, userAgent, country, resolvedDeviceId);
     },
 
     // III. WALLET
@@ -606,12 +645,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       const repository = getRepository(address);
       const { user, isNewUser } = await getOrCreateUser(repository, address, { address }, ref);
       const normalizedAddr = validationUtils.normalizeIdentifier(address);
-      const dForPending = normalizeDeviceId(deviceId);
-
-      const account2fa = await applyEnabledSecondFactorStepUp(
-        c, bindingName, address, sessionId, dForPending,
-      );
-      if (account2fa) return account2fa;
+      const dForPending = await resolveAccountDeviceId(c.env.NONCE_KV, normalizedAddr, c.req.raw, deviceId);
 
       const stepUp = await evaluateNovelDeviceStepUp(c, bindingName, repository, normalizedAddr, sessionId, dForPending);
       if (stepUp) return stepUp;
@@ -638,13 +672,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       if (!user) throw new Error(ERROR_MESSAGES.AUTH.USER_NOT_FOUND);
       const normalizedId = validationUtils.normalizeIdentifier(identifier);
 
-      let dForPending = normalizeDeviceId(deviceId);
+      let dForPending = await resolveAccountDeviceId(c.env.NONCE_KV, normalizedId, c.req.raw, deviceId);
       if (passkeyCredentialId && c.env.NONCE_KV) {
         dForPending = await resolvePasskeyLoginDeviceId(
           c.env.NONCE_KV,
           normalizedId,
           passkeyCredentialId,
-          deviceId,
+          dForPending,
         );
       }
 
@@ -668,11 +702,9 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     async logoutUseCase(identifier: string, sessionId: string): Promise<void> {
       await clearCaptchaSatisfied(c.env, 'session', sessionId);
       const repository = getRepository(identifier);
-      const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });
       await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
-      const activeSessions = await repository.sessions.listAll(50);
-      await forgetKnownDeviceIfUnused(c.env.NONCE_KV, identifier, session?.deviceId, activeSessions);
+      // Giữ RecognizedDevice. Đăng xuất không xóa trí nhớ thiết bị.
       // Đóng WebSocket để trigger webSocketClose → unregisterUser trên BroadcastServiceDO
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
@@ -686,20 +718,14 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       }
     },
 
-    async logoutAllUseCase(identifier: string): Promise<void> {
+    async logoutAllUseCase(identifier: string, reason: 'user' | 'security' = 'user'): Promise<void> {
       const repository = getRepository(identifier);
-      const beforeDeactivate = await repository.sessions.listAll(500);
       const hashSessionIds = await repository.sessions.deactivateAllUserSessions(identifier);
       for (const sid of hashSessionIds) {
         await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sid}`);
       }
-      const deviceIds = new Set<string>();
-      for (const s of beforeDeactivate) {
-        const d = normalizeDeviceId(s.deviceId);
-        if (d) deviceIds.add(d);
-      }
-      for (const d of deviceIds) {
-        await c.env.NONCE_KV.delete(`${KNOWN_DEVICE_KV_PREFIX}${identifier}:${d}`);
+      if (reason === 'security') {
+        await forgetAllRecognizedDevices(c.env.NONCE_KV, identifier);
       }
       // Đóng tất cả WebSocket để trigger unregisterUser
       try {
@@ -732,13 +758,35 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       return { sessions };
     },
 
+    async forgetDeviceUseCase(identifier: string, deviceId: string): Promise<void> {
+      const d = normalizeDeviceId(deviceId);
+      if (!d) throw new Error('Invalid device');
+      const repository = getRepository(identifier);
+      const sessions = await repository.sessions.listAll(200);
+      const targets = sessions.filter((s) => !!s.isActive && normalizeDeviceId(s.deviceId) === d);
+      for (const session of targets) {
+        await repository.sessions.update(session.hashSessionId, { isActive: false });
+        await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${session.hashSessionId}`);
+      }
+      await forgetRecognizedDevice(c.env.NONCE_KV, identifier, d);
+      try {
+        const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
+        for (const session of targets) {
+          await userDO.fetch('https://user.internal/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'closeConnectionsForSession', sessionId: session.hashSessionId }),
+          });
+        }
+      } catch (e) {
+        console.warn('[forgetDeviceUseCase] closeConnectionsForSession failed:', e);
+      }
+    },
+
     async revokeSessionUseCase(identifier: string, sessionId: string): Promise<void> {
       const repository = getRepository(identifier);
-      const session = await repository.sessions.findById(sessionId);
       await repository.sessions.update(sessionId, { isActive: false });
       await c.env.NONCE_KV.delete(`${SESSION_LOOKUP_PREFIX}${sessionId}`);
-      const activeSessions = await repository.sessions.listAll(50);
-      await forgetKnownDeviceIfUnused(c.env.NONCE_KV, identifier, session?.deviceId, activeSessions);
       try {
         const userDO = getIdFromName(c, identifier, bindingName) as DurableObjectStub<UserDO>;
         await userDO.fetch('https://user.internal/', {
@@ -784,7 +832,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         if (!uaFingerprintsMatch(sessionUa, clientUserAgent)) uaMismatch = true;
       }
       if (ipMismatch && uaMismatch) {
-        await this.logoutAllUseCase(identifier);
+        await this.logoutAllUseCase(identifier, 'security');
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
 
@@ -809,7 +857,7 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
           currentUaFp: current.uaFp,
           deltaMs: current.ts - previous.ts,
         });
-        await this.logoutAllUseCase(identifier);
+        await this.logoutAllUseCase(identifier, 'security');
         throw new Error(ERROR_MESSAGES.AUTH.SESSION_NOT_FOUND);
       }
       if (decision.shouldWrite) {

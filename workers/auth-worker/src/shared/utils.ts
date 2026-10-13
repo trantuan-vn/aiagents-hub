@@ -122,11 +122,42 @@ function readCookieValue(cookieHeader: string | null, name: string): string | un
   return undefined;
 }
 
-/** Device UUID từ header (fetch) hoặc cookie (OAuth redirect). */
-export function getClientDeviceIdFromRequest(request: Request): string | undefined {
-  const fromHeader = request.headers.get('X-Client-Device-Id')?.trim();
-  if (fromHeader) return fromHeader;
-  return readCookieValue(request.headers.get('Cookie'), 'client_device_id');
+const CLIENT_DEVICE_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function validClientDeviceId(raw?: string | null): string | undefined {
+  const id = (raw ?? '').trim().toLowerCase();
+  if (!id || id.length > 64 || !CLIENT_DEVICE_ID_RE.test(id)) return undefined;
+  return id;
+}
+
+/**
+ * Chọn device id cho account:
+ * 1. Header hợp lệ và đã ghi nhận → header.
+ * 2. Ngược lại cookie API-host hợp lệ và đã ghi nhận → cookie (header mới sau khi mất localStorage bị bỏ).
+ * 3. Còn lại: header hợp lệ, rồi cookie, rồi không có id.
+ * Không truyền `isRecorded` thì chỉ áp bước 3 (chưa biết account).
+ */
+export async function getClientDeviceIdFromRequest(
+  request: Request,
+  isRecorded?: (deviceId: string) => Promise<boolean>,
+): Promise<string | undefined> {
+  let headerRaw = request.headers.get('X-Client-Device-Id');
+  let cookieRaw = readCookieValue(request.headers.get('Cookie'), 'client_device_id');
+  if (cookieRaw) {
+    try {
+      cookieRaw = decodeURIComponent(cookieRaw);
+    } catch {
+      /* keep raw */
+    }
+  }
+  const header = validClientDeviceId(headerRaw);
+  const cookie = validClientDeviceId(cookieRaw);
+  if (isRecorded) {
+    if (header && (await isRecorded(header))) return header;
+    if (cookie && (await isRecorded(cookie))) return cookie;
+  }
+  return header ?? cookie;
 }
 
 /** Deterministic sessionId hash (pre-auth: secret includes server secret + per-browser nonce). */

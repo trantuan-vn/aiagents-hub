@@ -31,6 +31,7 @@ import { assertAllowedFrontendOrigin } from '../../shared/frontend-origin';
 import { AUTH_CONSTANTS, ERROR_MESSAGES, PASSKEY_STATUS_MIN_RESPONSE_MS } from './constant';
 import {
   consumePendingLoginDevice,
+  hasRecognizedDeviceRecord,
   normalizeDeviceId,
   storePendingLoginDevice,
 } from './device-trust';
@@ -92,7 +93,7 @@ export function createAuthRoutes(bindingName: string) {
     request: Request,
     sessionId: string,
   ): Promise<string | undefined> => {
-    const fromRequest = normalizeDeviceId(getClientDeviceIdFromRequest(request));
+    const fromRequest = normalizeDeviceId(await getClientDeviceIdFromRequest(request));
     if (fromRequest) return fromRequest;
     if (c.env.NONCE_KV) {
       return (await consumePendingLoginDevice(c.env.NONCE_KV, sessionId)) ?? undefined;
@@ -951,7 +952,7 @@ export function createAuthRoutes(bindingName: string) {
       
       const user = requireAuth(c);
       const applicationService = createApplicationService(c, bindingName);
-      await applicationService.logoutAllUseCase(user.identifier);
+      await applicationService.logoutAllUseCase(user.identifier, 'user');
       
       cookieUtils.clearAuthCookies(c);
       return c.json({ ok: true });
@@ -1059,6 +1060,20 @@ export function createAuthRoutes(bindingName: string) {
       return c.json(result.sessions);
     } catch (e) {
       const { errorResponse, status } = await handleError(c, e, 'Failed to list sessions');
+      return c.json(errorResponse, status);
+    }
+  });
+
+  app.post('/sessions/devices/:deviceId/forget', async (c) => {
+    try {
+      const user = requireAuth(c);
+      const deviceId = c.req.param('deviceId');
+      if (!deviceId) throw new Error('Device ID required');
+      const applicationService = createApplicationService(c, bindingName);
+      await applicationService.forgetDeviceUseCase(user.identifier, deviceId);
+      return c.json({ ok: true });
+    } catch (e) {
+      const { errorResponse, status } = await handleError(c, e, 'Failed to forget device');
       return c.json(errorResponse, status);
     }
   });
@@ -1226,12 +1241,18 @@ export function createAuthRoutes(bindingName: string) {
       const body = await c.req.json() as { response: unknown; challengeKey?: string };
       if (!body?.response || !body?.challengeKey) throw new Error('response and challengeKey required');
       const appService = getPasskeyApp(c);
-      const deviceId = normalizeDeviceId(getClientDeviceIdFromRequest(c.req.raw));
+      const deviceId = normalizeDeviceId(
+        await getClientDeviceIdFromRequest(c.req.raw, async (id) =>
+          hasRecognizedDeviceRecord(c.env.NONCE_KV, user.identifier, id),
+        ),
+      );
+      const country = (c.req.raw as Request & { cf?: { country?: string } }).cf?.country;
       await appService.verifyRegistrationUseCase(
         user.identifier,
         { response: body.response as any, challengeKey: body.challengeKey },
         origin,
         deviceId,
+        { userAgent: c.req.header('user-agent') ?? undefined, country },
       );
       return c.json({ ok: true });
     } catch (e) {
