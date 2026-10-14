@@ -33,7 +33,7 @@ export async function executeActionInApp(ctx: NodeContext): Promise<NodeOutput> 
       jsonResponse: data.jsonResponse ?? preset?.node.jsonResponse,
       timeoutMs: data.timeoutMs,
     };
-    const result = await runHttpRequest(httpData, scope, credential);
+    const result = await runHttpRequest(httpData, scope, credential, ctx.c.env as unknown as Record<string, unknown>);
     if (!result.ok && data.failOnError !== false) {
       throw new Error(`${integrationId || actionId} failed with status ${result.status}`);
     }

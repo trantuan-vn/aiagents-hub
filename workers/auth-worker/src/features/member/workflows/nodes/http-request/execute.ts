@@ -25,7 +25,7 @@ export async function executeHttpRequest(ctx: NodeContext): Promise<NodeOutput> 
   const credential = credentialKey
     ? await resolveCredential(ctx.userDO, ctx.c.env, credentialKey)
     : null;
-  const result = await runHttpRequest(data, scope, credential);
+  const result = await runHttpRequest(data, scope, credential, ctx.c.env as unknown as Record<string, unknown>);
   if (!result.ok && data.failOnError !== false) {
     throw new Error(`HTTP request failed with status ${result.status}`);
   }

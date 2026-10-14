@@ -1,5 +1,6 @@
 import { interpolate, interpolateDeep } from '@aiagents-hub/workflow-nodes';
 
+import { publicPlansCatalog } from '../billing/catalog.js';
 import type { ResolvedCredential } from '../storage/credentials.js';
 
 /**
@@ -72,6 +73,18 @@ const DEFAULT_TIMEOUT_MS = 15_000;
 /** Hosts we serve — DO→custom-domain fetch often 522s; short-circuit local sinks. */
 const LOCAL_API_HOSTS = new Set(['api.aiagents-hub.vn']);
 
+function isLocalApiHost(hostname: string, env?: Record<string, unknown>): boolean {
+  const host = hostname.toLowerCase();
+  if (LOCAL_API_HOSTS.has(host)) return true;
+  const base = env?.BASE_URL;
+  if (typeof base !== 'string' || !base.trim()) return false;
+  try {
+    return new URL(base).hostname.toLowerCase() === host;
+  } catch {
+    return false;
+  }
+}
+
 function normalizeHeaderSpec(raw: unknown, scope: NodeScope): Record<string, string> {
   let spec: unknown = raw ?? {};
   if (typeof spec === 'string') {
@@ -112,10 +125,11 @@ function tryLocalEcho(
   method: string,
   headers: Record<string, string>,
   body: BodyInit | undefined,
+  env?: Record<string, unknown>,
 ): HttpRequestResult | null {
   const path = url.pathname.replace(/\/+$/, '') || '/';
   if (path !== '/hooks/echo') return null;
-  if (!LOCAL_API_HOSTS.has(url.hostname.toLowerCase())) return null;
+  if (!isLocalApiHost(url.hostname, env)) return null;
 
   const parsedBody = parseRequestBody(body);
   const safeHeaders: Record<string, string> = {};
@@ -135,6 +149,27 @@ function tryLocalEcho(
         ? String((parsedBody as Record<string, unknown>).sql ?? '')
         : undefined,
   };
+  return {
+    status: 200,
+    ok: true,
+    headers: { 'content-type': 'application/json' },
+    body: payload,
+    data: payload,
+  };
+}
+
+/** In-process GET /public/plans — same 522 avoidance as /hooks/echo. */
+function tryLocalPublicPlans(
+  url: URL,
+  method: string,
+  env?: Record<string, unknown>,
+): HttpRequestResult | null {
+  if (method !== 'GET' && method !== 'HEAD') return null;
+  const path = url.pathname.replace(/\/+$/, '') || '/';
+  if (path !== '/public/plans') return null;
+  if (!isLocalApiHost(url.hostname, env)) return null;
+
+  const payload = publicPlansCatalog(env as { PAYPAL_BILLING_ENABLED?: string } | undefined);
   return {
     status: 200,
     ok: true,
@@ -196,6 +231,7 @@ export async function runHttpRequest(
   data: Record<string, unknown>,
   scope: NodeScope,
   credential: ResolvedCredential | null,
+  env?: Record<string, unknown>,
 ): Promise<HttpRequestResult> {
   const method = String(data.method ?? 'GET').toUpperCase();
   const rawUrl = String(interpolate(String(data.url ?? ''), scope));
@@ -217,8 +253,10 @@ export async function runHttpRequest(
     }
   }
 
-  const localEcho = tryLocalEcho(url, method, headers, body);
+  const localEcho = tryLocalEcho(url, method, headers, body, env);
   if (localEcho) return localEcho;
+  const localPlans = tryLocalPublicPlans(url, method, env);
+  if (localPlans) return localPlans;
 
   const timeoutMs = Math.min(MAX_TIMEOUT_MS, Number(data.timeoutMs ?? DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS);
   const controller = new AbortController();

@@ -121,7 +121,7 @@ export function buildAgentToolset(
           : null;
         const scope = { args: args ?? {} };
         try {
-          const result = await runHttpRequest(data, scope, credential);
+          const result = await runHttpRequest(data, scope, credential, ctx.env as unknown as Record<string, unknown>);
           return { ok: result.ok, status: result.status, data: truncate(result.data) };
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : String(e) };
