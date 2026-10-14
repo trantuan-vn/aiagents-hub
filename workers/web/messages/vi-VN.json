@@ -913,6 +913,8 @@
     "features": {
       "included_credits": "{count} Credit tặng / tháng",
       "runs_per_day": "{count} lượt chạy workflow / ngày",
+      "execution_history": "{count} bản ghi lịch sử, giữ {days} ngày",
+      "unlocks_on_starter": "Chia sẻ, webhook, cron và mua Credit mở từ Starter",
       "no_buy_credits": "Không mua thêm Credit",
       "no_sharing": "Không chia sẻ công khai",
       "no_webhooks": "Không webhook production",
@@ -926,7 +928,7 @@
       "higher_quotas": "Quota hạ tầng cao hơn",
       "committed_credits": "Credit cam kết + mua thêm",
       "custom_quotas": "Quota tùy chỉnh và hạ tầng riêng",
-      "model_family_visibility": "Hiện model family (vẫn trừ Credit)",
+      "model_family_visibility": "Thấy họ model đang chạy",
       "credits_expire": "Credit tặng hết hạn cuối kỳ",
       "sharing": "Chia sẻ workflow và nhận royalty",
       "sso_audit": "SSO, audit và điều khoản tùy chỉnh",

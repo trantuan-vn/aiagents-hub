@@ -512,8 +512,6 @@ Màn hình cancel: mục 9.2.
 ```ts
 {
   billingEnabled: boolean,
-  gateway: 'paypal',
-  creditPriceUsd: number,
   intervals: [1, 3, 6, 12],
   discounts: { 1: 0, 3: 0.1, 6: 0.15, 12: 0.2 },
   plans: Array<{
@@ -521,12 +519,14 @@ Màn hình cancel: mục 9.2.
     listPriceUsdPerMonth: number,
     prices: Record<'1' | '3' | '6' | '12', { chargeUsd: number, usdPerMonth: number } | null>,
     includedCredits: number,
-    includedCogsUsdCap: number,
     workflowRunsPerDay: number,
+    executionHistoryMax: number,
+    executionHistoryDays: number,
     maxCronJobs: number,
     canBuyCredits: boolean,
     canShareWorkflows: boolean,
     canUseWebhooks: boolean,
+    canUseCron: boolean,
     canGraceWhenExhausted: boolean,
     showModelFamily: boolean,
     popular: boolean  // pro
@@ -534,7 +534,7 @@ Màn hình cancel: mục 9.2.
 }
 ```
 
-Free: `prices` toàn `null`.
+Không đưa ra catalog công khai: `creditPriceUsd` (neo sổ sách; member lấy lúc nạp), `includedCogsUsdCap` (trần lỗ nội bộ), `gateway` (cổng chọn ở checkout). Free: `prices` toàn `null`. Thẻ Free kể credit, lượt chạy và lịch sử, rồi một dòng mở khóa từ Starter — không liệt kê từng quyền bị khóa.
 
 ### 4.6 Vault cho auto top-up Credit (phase sau Checkout)
 

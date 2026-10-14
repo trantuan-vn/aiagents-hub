@@ -913,6 +913,8 @@
     "features": {
       "included_credits": "{count} included Credits / month",
       "runs_per_day": "{count} workflow runs / day",
+      "execution_history": "{count} execution records, kept {days} days",
+      "unlocks_on_starter": "Sharing, webhooks, cron, and Credit packs start on Starter",
       "no_buy_credits": "Cannot buy extra Credits",
       "no_sharing": "No public sharing",
       "no_webhooks": "No production webhooks",
@@ -926,7 +928,7 @@
       "higher_quotas": "Higher infrastructure quotas",
       "committed_credits": "Committed Credit volume + on-demand",
       "custom_quotas": "Custom quotas and dedicated infra",
-      "model_family_visibility": "Model family visible (still billed in Credits)",
+      "model_family_visibility": "See which model family ran",
       "credits_expire": "Included Credits expire at period end",
       "sharing": "Share workflows and earn royalties",
       "sso_audit": "SSO, audit, and custom terms",

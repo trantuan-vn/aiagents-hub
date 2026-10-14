@@ -428,6 +428,9 @@ describe('plan entitlements', () => {
     expect(catalog.plans[0]?.canUseCron).toBe(false);
     expect(catalog.plans[1]?.canUseCron).toBe(true);
     expect(resolvePlanId({ planId: 'pro' })).toBe('free');
+    expect(catalog).not.toHaveProperty('gateway');
+    expect(catalog).not.toHaveProperty('creditPriceUsd');
+    expect(catalog.plans.every((p) => !('includedCogsUsdCap' in p))).toBe(true);
   });
 
   it('matches the published packages card numbers', () => {
@@ -438,6 +441,8 @@ describe('plan entitlements', () => {
         price: p.listPriceUsdPerMonth,
         credits: p.includedCredits,
         runs: p.workflowRunsPerDay,
+        history: p.executionHistoryMax,
+        historyDays: p.executionHistoryDays,
         cron: p.maxCronJobs,
         buy: p.canBuyCredits,
         share: p.canShareWorkflows,
@@ -447,10 +452,10 @@ describe('plan entitlements', () => {
         modelFamily: p.showModelFamily,
       })),
     ).toEqual([
-      { planId: 'free', price: 0, credits: 150, runs: 15, cron: 0, buy: false, share: false, webhook: false, grace: false, popular: false, modelFamily: false },
-      { planId: 'starter', price: 4.9, credits: 500, runs: 50, cron: 3, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: false },
-      { planId: 'pro', price: 19.9, credits: 2000, runs: 200, cron: 15, buy: true, share: true, webhook: true, grace: true, popular: true, modelFamily: false },
-      { planId: 'business', price: 99.9, credits: 10000, runs: 1000, cron: 100, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: true },
+      { planId: 'free', price: 0, credits: 150, runs: 15, history: 20, historyDays: 7, cron: 0, buy: false, share: false, webhook: false, grace: false, popular: false, modelFamily: false },
+      { planId: 'starter', price: 4.9, credits: 500, runs: 50, history: 50, historyDays: 14, cron: 3, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: false },
+      { planId: 'pro', price: 19.9, credits: 2000, runs: 200, history: 200, historyDays: 30, cron: 15, buy: true, share: true, webhook: true, grace: true, popular: true, modelFamily: false },
+      { planId: 'business', price: 99.9, credits: 10000, runs: 1000, history: 500, historyDays: 90, cron: 100, buy: true, share: true, webhook: true, grace: true, popular: false, modelFamily: true },
     ]);
   });
 });

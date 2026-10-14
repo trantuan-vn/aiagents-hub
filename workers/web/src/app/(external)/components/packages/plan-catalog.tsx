@@ -18,11 +18,14 @@ export type PublicPlan = {
   prices: Record<string, { chargeUsd: number; usdPerMonth: number } | null>;
   includedCredits: number;
   workflowRunsPerDay: number;
+  executionHistoryMax: number;
+  executionHistoryDays: number;
   maxCronJobs: number;
   canBuyCredits: boolean;
   canShareWorkflows: boolean;
   canUseWebhooks: boolean;
   canGraceWhenExhausted: boolean;
+  showModelFamily: boolean;
   popular: boolean;
 };
 
@@ -44,11 +47,14 @@ const FALLBACK: PublicCatalog = {
       prices: { "1": null, "3": null, "6": null, "12": null },
       includedCredits: 150,
       workflowRunsPerDay: 15,
+      executionHistoryMax: 20,
+      executionHistoryDays: 7,
       maxCronJobs: 0,
       canBuyCredits: false,
       canShareWorkflows: false,
       canUseWebhooks: false,
       canGraceWhenExhausted: false,
+      showModelFamily: false,
       popular: false,
     },
     {
@@ -62,11 +68,14 @@ const FALLBACK: PublicCatalog = {
       },
       includedCredits: 500,
       workflowRunsPerDay: 50,
+      executionHistoryMax: 50,
+      executionHistoryDays: 14,
       maxCronJobs: 3,
       canBuyCredits: true,
       canShareWorkflows: true,
       canUseWebhooks: true,
       canGraceWhenExhausted: true,
+      showModelFamily: false,
       popular: false,
     },
     {
@@ -80,11 +89,14 @@ const FALLBACK: PublicCatalog = {
       },
       includedCredits: 2000,
       workflowRunsPerDay: 200,
+      executionHistoryMax: 200,
+      executionHistoryDays: 30,
       maxCronJobs: 15,
       canBuyCredits: true,
       canShareWorkflows: true,
       canUseWebhooks: true,
       canGraceWhenExhausted: true,
+      showModelFamily: false,
       popular: true,
     },
     {
@@ -98,11 +110,14 @@ const FALLBACK: PublicCatalog = {
       },
       includedCredits: 10000,
       workflowRunsPerDay: 1000,
+      executionHistoryMax: 500,
+      executionHistoryDays: 90,
       maxCronJobs: 100,
       canBuyCredits: true,
       canShareWorkflows: true,
       canUseWebhooks: true,
       canGraceWhenExhausted: true,
+      showModelFamily: true,
       popular: false,
     },
   ],
@@ -228,11 +243,24 @@ export function PlanCatalog({ compact = false }: { compact?: boolean }) {
           const features = [
             t("features.included_credits", { count: plan.includedCredits.toLocaleString() }),
             t("features.runs_per_day", { count: String(plan.workflowRunsPerDay) }),
-            plan.canBuyCredits ? t("features.buy_credits") : t("features.no_buy_credits"),
-            plan.canShareWorkflows ? t("features.sharing") : t("features.no_sharing"),
-            plan.canUseWebhooks ? t("features.webhooks") : t("features.no_webhooks"),
-            plan.maxCronJobs > 0 ? t("features.cron_count", { count: String(plan.maxCronJobs) }) : t("features.no_cron"),
-            plan.canGraceWhenExhausted ? t("features.grace") : t("features.no_grace"),
+            ...(plan.executionHistoryMax > 0 && plan.executionHistoryDays > 0
+              ? [
+                  t("features.execution_history", {
+                    count: plan.executionHistoryMax.toLocaleString(),
+                    days: String(plan.executionHistoryDays),
+                  }),
+                ]
+              : []),
+            ...(plan.planId === "free"
+              ? [t("features.unlocks_on_starter")]
+              : [
+                  ...(plan.canBuyCredits ? [t("features.buy_credits")] : []),
+                  ...(plan.canShareWorkflows ? [t("features.sharing")] : []),
+                  ...(plan.canUseWebhooks ? [t("features.webhooks")] : []),
+                  ...(plan.maxCronJobs > 0 ? [t("features.cron_count", { count: String(plan.maxCronJobs) })] : []),
+                  ...(plan.canGraceWhenExhausted ? [t("features.grace")] : []),
+                  ...(plan.showModelFamily ? [t("features.model_family_visibility")] : []),
+                ]),
           ];
           const cta = (() => {
             if (plan.planId === "free") return loggedIn ? t("go_dashboard") : t("start_free");

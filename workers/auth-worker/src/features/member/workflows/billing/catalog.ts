@@ -95,8 +95,6 @@ export function publicPlansCatalog(env?: Record<string, unknown> & { PAYPAL_BILL
   const billingEnabled = isPaypalBillingEnabled(env);
   return {
     billingEnabled,
-    gateway: 'paypal' as const,
-    creditPriceUsd: 0.0077,
     intervals: [...PLAN_INTERVALS],
     discounts: { ...INTERVAL_DISCOUNT },
     plans: PLAN_IDS.map((planId) => {
@@ -118,7 +116,6 @@ export function publicPlansCatalog(env?: Record<string, unknown> & { PAYPAL_BILL
         listPriceUsdPerMonth: e.listPriceUsdPerMonth,
         prices,
         includedCredits: e.includedCredits,
-        includedCogsUsdCap: e.includedCogsUsdCap,
         workflowRunsPerDay: e.workflowRunsPerDay,
         executionHistoryMax: e.executionHistoryMax,
         executionHistoryDays: e.executionHistoryDays,
