@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 
-import { handleErrorWithoutIp } from '../../../../shared/utils';
+import { trackPublicChatPost } from '../../../../shared/public-chat-rate-limit';
+import { getClientIp, handleErrorWithoutIp } from '../../../../shared/utils';
+import { buildChatCorsHeaders } from './chat-cors.js';
 import {
   buildHubLoginRedirectUrl,
   handleBasicAuthLoginPost,
@@ -106,30 +108,6 @@ function unauthenticatedChatResponse(
     return c.html(renderFormBasicLoginHtml({ title: chatTitle, actionUrl }));
   }
   return c.json({ error: 'Authentication required' }, 401, headers);
-}
-
-function corsHeaders(originHeader: string | undefined, allowedOrigins: string): Record<string, string> {
-  const allowed = allowedOrigins.trim() || '*';
-  const requestOrigin = originHeader?.trim();
-  let allow = '*';
-  let credentials = 'false';
-  if (allowed === '*') {
-    if (requestOrigin) {
-      allow = requestOrigin;
-      credentials = 'true';
-    }
-  } else {
-    const list = allowed.split(',').map((s) => s.trim()).filter(Boolean);
-    allow = requestOrigin && list.includes(requestOrigin) ? requestOrigin : list[0] || '*';
-    credentials = allow === '*' ? 'false' : 'true';
-  }
-  return {
-    'Access-Control-Allow-Origin': allow,
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, Accept',
-    'Access-Control-Allow-Credentials': credentials,
-    Vary: 'Origin',
-  };
 }
 
 function wantsProgressStream(c: { req: { header: (name: string) => string | undefined } }): boolean {
@@ -278,7 +256,7 @@ async function handleChatRequest(
 
   const data = !('error' in ctx) ? ((ctx.node.data ?? {}) as ChatTriggerNodeData) : undefined;
   const options = (data?.chatOptions ?? {}) as Record<string, unknown>;
-  const headers = corsHeaders(c.req.header('origin'), String(options.allowedOrigins ?? '*'));
+  const headers = buildChatCorsHeaders(c.req.header('origin'), String(options.allowedOrigins ?? '*'));
 
   if (c.req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers });
@@ -422,8 +400,21 @@ async function handleChatRequest(
     return c.redirect(pageUrl, 302);
   }
 
+  if (c.req.method === 'POST' && mode === 'production' && chatAuth === 'none') {
+    const limited = await trackPublicChatPost(c.env, getClientIp(c));
+    if (limited) {
+      return c.json({ error: 'Too many chat messages', retryAfter: limited.retryAfter }, 429, headers);
+    }
+  }
+
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const parsed = parseChatMessageRequest(body);
+  if (parsed.invalidSession) {
+    return c.json({ error: 'Invalid sessionId' }, 400, headers);
+  }
+  if (parsed.tooLong) {
+    return c.json({ error: 'chatInput is too long' }, 400, headers);
+  }
   if (!parsed.chatInput) {
     return c.json({ error: 'Missing chatInput' }, 400, headers);
   }

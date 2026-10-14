@@ -1361,6 +1361,7 @@
     "rate_limited": "Try again in a few minutes, or email support@aiagents-hub.vn.",
     "fallback_email_note": "Email support@aiagents-hub.vn if you still need a person.",
     "type_message": "Type your message...",
+    "secret_notice": "Don't send a password, one-time code, or card number.",
     "cta": {
       "signup": "Open an account",
       "packages": "Compare plans",
@@ -1425,7 +1426,7 @@
       "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Hello — I can help with workflows, Credits, and plans. What are you trying to ship?",
+      "welcome": "Hello — I can help with workflows, Credits, and plans. Don't send a password, one-time code, or card number. What are you trying to ship?",
       "recommend": "Start in Dashboard > Workflows: add a trigger (chat, webhook, or cron), an agent node, and optional RAG or tools. Run once and watch the Credit estimate. Need a specific job (support, RAG Q&A, HTTP automation)?",
       "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each UTC month. Starter, Pro, and Business can buy more (wallet cap applies). Buying Credits does not upgrade your plan.",
       "upgrade": "Change plans at /packages. PayPal Subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet. Cancel at Dashboard > Billing > Cancel plan — you keep the plan until the period you already paid for ends. Want an organization plan? Use Contact.",

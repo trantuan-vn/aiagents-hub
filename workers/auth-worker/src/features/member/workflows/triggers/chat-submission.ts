@@ -233,22 +233,7 @@ export function renderHostedChatHtml(params: {
 </html>`;
 }
 
-export function parseChatMessageRequest(body: Record<string, unknown>): {
-  sessionId: string;
-  chatInput: string;
-  action: string;
-} {
-  const nested =
-    body.body && typeof body.body === 'object' && !Array.isArray(body.body)
-      ? (body.body as Record<string, unknown>)
-      : {};
-  const chatInput = String(
-    body.chatInput ?? body.message ?? body.query ?? body.text ?? nested.chatInput ?? nested.message ?? '',
-  ).trim();
-  const sessionId = String(body.sessionId ?? nested.sessionId ?? crypto.randomUUID());
-  const action = String(body.action ?? 'sendMessage');
-  return { sessionId, chatInput, action };
-}
+export { CHAT_INPUT_MAX, parseChatMessageRequest, redactChatSecrets } from './chat-message.js';
 
 export { extractChatReply } from './chat-reply.js';
 

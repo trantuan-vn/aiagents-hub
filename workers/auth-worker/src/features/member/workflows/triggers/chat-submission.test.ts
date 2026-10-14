@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { extractChatReply, shouldPauseChatForClarification } from './chat-reply.js';
+import { parseChatMessageRequest, redactChatSecrets } from './chat-message.js';
 
 describe('extractChatReply', () => {
   it('uses the last node text instead of echoing the chat trigger payload', () => {
@@ -139,5 +140,27 @@ describe('extractChatReply', () => {
     expect(shouldPauseChatForClarification({ triggerKind: 'chat' }, { status: 'needs_clarification' })).toBe(true);
     expect(shouldPauseChatForClarification({ triggerKind: 'chat' }, { status: 'ok', sql: 'SELECT 1;' })).toBe(false);
     expect(shouldPauseChatForClarification({ triggerKind: 'manual' }, { status: 'needs_clarification' })).toBe(false);
+  });
+});
+
+describe('parseChatMessageRequest', () => {
+  it('redacts a card number and a labeled one-time code', () => {
+    expect(redactChatSecrets('card 4242424242424242')).toBe('card [redacted]');
+    expect(redactChatSecrets('otp is 123456')).toBe('otp is [redacted]');
+    expect(redactChatSecrets('password: hunter2')).toBe('password [redacted]');
+    expect(redactChatSecrets('how do I reset my password?')).toBe('how do I reset my password?');
+  });
+
+  it('rejects an oversized message and a session id with separators', () => {
+    const long = parseChatMessageRequest({ chatInput: 'a'.repeat(1001), sessionId: '11111111-1111-1111-1111-111111111111' });
+    expect(long.tooLong).toBe(true);
+    expect(long.chatInput).toBe('');
+
+    const session = parseChatMessageRequest({ chatInput: 'hello', sessionId: 'not a session' });
+    expect(session.invalidSession).toBe(true);
+
+    const ok = parseChatMessageRequest({ chatInput: 'hello', sessionId: '11111111-1111-1111-1111-111111111111' });
+    expect(ok.invalidSession).toBe(false);
+    expect(ok.chatInput).toBe('hello');
   });
 });

@@ -232,9 +232,9 @@ Lỗi mạng, 403, ví hết Credit: hiện lại câu mẫu của đúng chủ 
 
 ## 6. Trần request
 
-`POST /chat/...` đã đi qua `createIpRateLimitMiddleware` gắn trên mọi route của auth-worker. IP không có cookie session dashboard được **600 request trong 60 giây**, tính chung mọi path, rồi bị chặn 5 phút. Đó là trần chống flood, không phải quota của cuộc chat Support.
+`POST /chat/...` đã đi qua `createIpRateLimitMiddleware` gắn trên mọi route của auth-worker. IP không có cookie session dashboard được **600 request trong 60 giây**, tính chung mọi path, rồi bị chặn 5 phút. Đó là trần chống flood.
 
-Khách trên `/support` gửi vài tin mỗi phút, không chạm ngưỡng này. Không thêm limiter riêng cho path `site-support`, và không đổi số 600.
+Chat production với `chatAuth: none` còn có trần riêng: **20 POST trong 10 phút mỗi IP**, rồi chặn 10 phút. Trần này không đổi số 600.
 
 Ví nền tảng vẫn bị trừ mỗi lượt Agent chạy. Giữ mức tiêu trong phạm vi đã có:
 
@@ -243,9 +243,9 @@ Ví nền tảng vẫn bị trừ mỗi lượt Agent chạy. Giữ mức tiêu 
 - Ví chủ về 0 thì route trả lỗi và trang dùng câu mẫu. Không nuốt lỗi charge để chạy model miễn phí.
 - Gỡ ba biến môi trường ở mục 5 là tắt trợ lý.
 
-Ô nhập trên trang giới hạn 1 000 ký tự. `chatInput` rỗng vẫn 400 như route chat hiện tại. Không thêm trần độ dài ở server.
+Ô nhập trên trang giới hạn 1 000 ký tự. Server từ chối `chatInput` dài hơn 1 000 ký tự và `sessionId` không khớp `[A-Za-z0-9_-]{8,64}`. Số thẻ (Luhn) và mật khẩu/OTP ghi kèm giá trị được thay bằng `[redacted]` trước khi vào model và memory.
 
-Nếu log execution sau này toàn là script, lúc đó mới xét trần theo path — khoảng 20 lượt / 10 phút / IP, đủ một cuộc hỏi sản phẩm. Không nằm trong lần làm này.
+CORS của route chat không phản chiếu Origin lạ. `allowedOrigins` để trống hoặc `*` chỉ cho phép host `aiagents-hub.vn` (kể cả `www` và `beta`). Danh sách tường minh vẫn mở đúng origin đã khai.
 
 ---
 

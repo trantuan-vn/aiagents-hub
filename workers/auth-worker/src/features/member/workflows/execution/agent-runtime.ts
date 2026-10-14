@@ -14,7 +14,7 @@ import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
 import { getToolModule } from '../nodes/tool/shared/registry.js';
 import { createCodeModeOuterTool } from '../nodes/tool/code/create.js';
 import { runHttpRequest } from './node-runtime.js';
-import { isHttpAgentToolNode } from './http-agent-tool.js';
+import { agentHttpToolUrlIsSafe, isHttpAgentToolNode } from './http-agent-tool.js';
 
 /**
  * Builds the AI SDK toolset + RAG context for a workflow's conversational agent.
@@ -112,6 +112,9 @@ export function buildAgentToolset(
           ),
       }),
       execute: async ({ args }: { args?: Record<string, unknown> }) => {
+        if (!agentHttpToolUrlIsSafe(String(data.url ?? ''))) {
+          return { ok: false, error: 'HTTP tool URL host must be a constant' };
+        }
         const credentialKey = String(data.credentialId ?? data.credentialKey ?? '');
         const credential = credentialKey
           ? await resolveCredential(ctx.userDO, ctx.env, credentialKey)

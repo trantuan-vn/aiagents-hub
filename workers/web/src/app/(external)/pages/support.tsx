@@ -271,6 +271,7 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
+                  <p className="text-muted-foreground mt-2 text-xs">{t("secret_notice")}</p>
                 </div>
               </Card>
             </div>

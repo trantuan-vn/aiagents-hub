@@ -32,6 +32,19 @@ const BLOCKED_HOST_PATTERNS = [
   /^\[?fd[0-9a-f]{2}:/i,
 ];
 
+const MAX_HTTP_REDIRECTS = 3;
+
+/** Follow a redirect only when the next hop passes the same host blocklist. */
+export function resolveHttpRedirect(currentUrl: string, location: string): URL {
+  let next: URL;
+  try {
+    next = new URL(location, currentUrl);
+  } catch {
+    throw new Error(`Invalid redirect URL: ${location}`);
+  }
+  return assertUrlAllowed(next.toString());
+}
+
 function assertUrlAllowed(rawUrl: string): URL {
   let url: URL;
   try {
@@ -212,7 +225,28 @@ export async function runHttpRequest(
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetch(url.toString(), { method, headers, body, signal: controller.signal });
+    let currentUrl = url;
+    let currentMethod = method;
+    let currentBody = body;
+    let res: Response | null = null;
+    for (let hop = 0; hop <= MAX_HTTP_REDIRECTS; hop += 1) {
+      res = await fetch(currentUrl.toString(), {
+        method: currentMethod,
+        headers,
+        body: currentMethod === 'GET' || currentMethod === 'HEAD' ? undefined : currentBody,
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+      const redirected = res.status === 301 || res.status === 302 || res.status === 303 || res.status === 307 || res.status === 308;
+      const location = res.headers.get('location');
+      if (!redirected || !location || hop === MAX_HTTP_REDIRECTS) break;
+      currentUrl = resolveHttpRedirect(currentUrl.toString(), location);
+      if (res.status === 301 || res.status === 302 || res.status === 303) {
+        currentMethod = 'GET';
+        currentBody = undefined;
+      }
+    }
+    if (!res) throw new Error('HTTP request failed');
     const resHeaders: Record<string, string> = {};
     res.headers.forEach((value, key) => {
       resHeaders[key] = value;
