@@ -19,6 +19,9 @@ allowBuilds:
 # instead of the local packages/workflow-nodes workspace package.
 linkWorkspacePackages: true
 
+minimumReleaseAgeExclude:
+  - mermaid@12.2.0
+
 # @opennextjs/cloudflare@1.20.x pulls a non-existent AWS SDK patch range.
 overrides:
   "@aws-sdk/signature-v4-multi-region": "3.996.42"

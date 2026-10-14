@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { isScannerProbePath } from "@/lib/scanner-paths";
-
+import { siteSupportChatUrl } from "../pages/support-chat";
 import App from "../app";
 
 import "@/app/globals.css";
@@ -37,5 +37,10 @@ export default async function CatchAll({
     notFound();
   }
   const query = await searchParams;
-  return <App ssrLocation={`${path}${queryStringFromSearchParams(query)}`} />;
+  return (
+    <App
+      ssrLocation={`${path}${queryStringFromSearchParams(query)}`}
+      supportChatUrl={siteSupportChatUrl()}
+    />
+  );
 }

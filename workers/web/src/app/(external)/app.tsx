@@ -63,7 +63,7 @@ function ThemeSync() {
   return null;
 }
 
-function ExternalRoutes() {
+function ExternalRoutes({ supportChatUrl }: { supportChatUrl: string | null }) {
   return (
     <Routes>
       <Route path="/" element={<Index />} />
@@ -74,7 +74,7 @@ function ExternalRoutes() {
       <Route path="/careers" element={<Careers />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/community" element={<Community />} />
-      <Route path="/support" element={<Support />} />
+      <Route path="/support" element={<Support chatUrl={supportChatUrl} />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/cookies" element={<Cookies />} />
@@ -94,7 +94,13 @@ function ExternalRoutes() {
   );
 }
 
-const App = ({ ssrLocation = "/" }: { ssrLocation?: string }) => {
+const App = ({
+  ssrLocation = "/",
+  supportChatUrl = null,
+}: {
+  ssrLocation?: string;
+  supportChatUrl?: string | null;
+}) => {
   const [clientReady, setClientReady] = useState(false);
 
   useEffect(() => {
@@ -109,11 +115,11 @@ const App = ({ ssrLocation = "/" }: { ssrLocation?: string }) => {
         <Sonner />
         {clientReady ? (
           <BrowserRouter>
-            <ExternalRoutes />
+            <ExternalRoutes supportChatUrl={supportChatUrl} />
           </BrowserRouter>
         ) : (
           <MemoryRouter initialEntries={[ssrLocation]}>
-            <ExternalRoutes />
+            <ExternalRoutes supportChatUrl={supportChatUrl} />
           </MemoryRouter>
         )}
       </TooltipProvider>

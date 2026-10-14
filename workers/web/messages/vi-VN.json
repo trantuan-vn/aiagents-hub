@@ -1355,7 +1355,20 @@
     "subtitle": "Hỏi về Credit, workflow hoặc gói — hoặc xem FAQ.",
     "ai_assistant": "Trợ lý hỗ trợ",
     "online": "Trực tuyến",
+    "short_answers": "Câu trả lời ngắn",
+    "signed_in_banner": "Bạn đã có tài khoản. Việc trong workspace dùng trợ lý dashboard.",
+    "signed_in_link": "Mở trợ lý dashboard",
+    "rate_limited": "Thử lại sau ít phút, hoặc email support@aiagents-hub.vn.",
+    "fallback_email_note": "Cần người hỗ trợ thì email support@aiagents-hub.vn.",
     "type_message": "Nhập tin nhắn của bạn...",
+    "cta": {
+      "signup": "Mở tài khoản",
+      "packages": "Xem các gói",
+      "quickstart": "Đọc quickstart",
+      "plans": "Gói và Credit",
+      "credits": "Cách Credit hoạt động",
+      "contact": "Liên hệ"
+    },
     "quick_actions": {
       "build_agent": "Làm sao xây agent đầu tiên?",
       "credits_left": "Credit hoạt động thế nào?",

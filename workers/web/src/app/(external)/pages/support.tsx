@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { MessageCircle, Send, Bot, User, Book, HelpCircle, Mail, Clock, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -10,15 +10,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 
 import Layout from "../components/layout/main-layout";
+import {
+  cannedSupportKey,
+  parseSupportReply,
+  postSiteSupportChat,
+  SUPPORT_CHAT_INPUT_MAX,
+  SUPPORT_SESSION_STORAGE_KEY,
+  supportCtaHref,
+  SupportChatError,
+  type SupportCta,
+} from "./support-chat";
 
 interface Message {
   id: number;
   role: "user" | "assistant";
   content: string;
+  cta?: SupportCta;
 }
 
-const Support = () => {
+function readSessionId(): string {
+  const existing = sessionStorage.getItem(SUPPORT_SESSION_STORAGE_KEY);
+  if (existing) return existing;
+  const created = crypto.randomUUID();
+  sessionStorage.setItem(SUPPORT_SESSION_STORAGE_KEY, created);
+  return created;
+}
+
+const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
   const t = useTranslations("SupportPage");
+  const liveWorkflow = Boolean(chatUrl);
+  const [signedIn, setSignedIn] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -28,6 +49,8 @@ const Support = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const sendingRef = useRef(false);
+  const nextId = useRef(2);
 
   const quickActions = [
     t("quick_actions.build_agent"),
@@ -59,84 +82,80 @@ const Support = () => {
     },
   ];
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  useEffect(() => {
+    const apiUrl = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
+    void fetch(`${apiUrl}/profile/me`, { method: "GET", credentials: "include" })
+      .then((response) => setSignedIn(response.ok))
+      .catch(() => setSignedIn(false));
+  }, []);
 
-    const userMessage: Message = {
-      id: messages.length + 1,
-      role: "user",
-      content: inputValue,
+  const takeId = () => {
+    const id = nextId.current;
+    nextId.current += 1;
+    return id;
+  };
+
+  const cannedReply = (query: string, withEmail: boolean): Message => {
+    const key = cannedSupportKey(query);
+    const body = key === "default" ? t("ai_responses.default", { query }) : t(`ai_responses.${key}`);
+    return {
+      id: takeId(),
+      role: "assistant",
+      content: withEmail ? `${body}\n\n${t("fallback_email_note")}` : body,
     };
-    setMessages([...messages, userMessage]);
+  };
+
+  const send = (raw: string) => {
+    const chatInput = raw.trim().slice(0, SUPPORT_CHAT_INPUT_MAX);
+    if (!chatInput || sendingRef.current) return;
+    sendingRef.current = true;
     setInputValue("");
     setIsTyping(true);
+    const userId = takeId();
+    setMessages((prev) => [...prev, { id: userId, role: "user", content: chatInput }]);
 
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: messages.length + 2,
-        role: "assistant",
-        content: getAIResponse(inputValue),
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+    const finish = (assistant: Message) => {
+      setMessages((prev) => [...prev, assistant]);
       setIsTyping(false);
-    }, 1500);
-  };
+      sendingRef.current = false;
+    };
 
-  const getAIResponse = (query: string): string => {
-    const lowerQuery = query.toLowerCase();
-
-    if (
-      lowerQuery.includes("agent") ||
-      lowerQuery.includes("workflow") ||
-      lowerQuery.includes("recommend") ||
-      lowerQuery.includes("đề xuất") ||
-      lowerQuery.includes("xây")
-    ) {
-      return t("ai_responses.recommend");
-    }
-    if (
-      lowerQuery.includes("credit") ||
-      lowerQuery.includes("quota") ||
-      lowerQuery.includes("calls") ||
-      lowerQuery.includes("ví") ||
-      lowerQuery.includes("credit")
-    ) {
-      return t("ai_responses.credits");
-    }
-    if (
-      lowerQuery.includes("rate limit") ||
-      lowerQuery.includes("giới hạn") ||
-      lowerQuery.includes("how credit") ||
-      lowerQuery.includes("credit work")
-    ) {
-      return t("ai_responses.how_credits");
-    }
-    if (
-      lowerQuery.includes("upgrade") ||
-      lowerQuery.includes("plan") ||
-      lowerQuery.includes("gói") ||
-      lowerQuery.includes("nâng cấp") ||
-      lowerQuery.includes("cancel") ||
-      lowerQuery.includes("hủy")
-    ) {
-      return t("ai_responses.upgrade");
-    }
-    return t("ai_responses.default", { query });
-  };
-
-  const handleQuickAction = (action: string) => {
-    if (action === t("quick_actions.upgrade")) {
-      window.location.href = "/packages";
+    if (!chatUrl) {
+      finish(cannedReply(chatInput, false));
       return;
     }
-    setInputValue(action);
+
+    void postSiteSupportChat({
+      endpointUrl: chatUrl,
+      sessionId: readSessionId(),
+      chatInput,
+    })
+      .then((output) => {
+        const parsed = parseSupportReply(output);
+        if (!parsed.text && !parsed.cta) {
+          finish(cannedReply(chatInput, true));
+          return;
+        }
+        finish({
+          id: takeId(),
+          role: "assistant",
+          content: parsed.text,
+          cta: parsed.cta ?? undefined,
+        });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof SupportChatError && error.status === 429) {
+          finish({ id: takeId(), role: "assistant", content: t("rate_limited") });
+          return;
+        }
+        finish(cannedReply(chatInput, true));
+      });
   };
 
   return (
     <Layout>
       <div className="pt-24 pb-16">
         <div className="container mx-auto px-4">
-          {/* Header */}
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <div className="bg-primary/10 border-primary/20 mb-4 inline-flex items-center gap-2 rounded-full border px-3 py-1">
               <MessageCircle className="text-primary h-4 w-4" />
@@ -149,8 +168,15 @@ const Support = () => {
           </div>
 
           <div className="grid gap-8 lg:grid-cols-3">
-            {/* Chat Section */}
             <div className="lg:col-span-2">
+              {signedIn ? (
+                <p className="text-muted-foreground mb-3 text-sm">
+                  {t("signed_in_banner")}{" "}
+                  <a href="/dashboard/control/assistant" className="text-primary font-medium underline-offset-4 hover:underline">
+                    {t("signed_in_link")}
+                  </a>
+                </p>
+              ) : null}
               <Card className="flex h-[600px] flex-col">
                 <CardHeader className="border-b">
                   <div className="flex items-center gap-3">
@@ -160,8 +186,10 @@ const Support = () => {
                     <div>
                       <CardTitle className="text-lg">{t("ai_assistant")}</CardTitle>
                       <div className="flex items-center gap-2">
-                        <div className="bg-accent h-2 w-2 animate-pulse rounded-full" />
-                        <span className="text-muted-foreground text-xs">{t("online")}</span>
+                        {liveWorkflow ? <div className="bg-accent h-2 w-2 animate-pulse rounded-full" /> : null}
+                        <span className="text-muted-foreground text-xs">
+                          {liveWorkflow ? t("online") : t("short_answers")}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -180,14 +208,23 @@ const Support = () => {
                           <Bot className="text-primary-foreground h-4 w-4" />
                         )}
                       </div>
-                      <div
-                        className={`max-w-[80%] rounded-2xl p-3 ${
-                          message.role === "user"
-                            ? "bg-primary text-primary-foreground rounded-br-md"
-                            : "bg-muted rounded-bl-md"
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <div className={`flex max-w-[80%] flex-col gap-2 ${message.role === "user" ? "items-end" : "items-start"}`}>
+                        {message.content ? (
+                          <div
+                            className={`rounded-2xl p-3 ${
+                              message.role === "user"
+                                ? "bg-primary text-primary-foreground rounded-br-md"
+                                : "bg-muted rounded-bl-md"
+                            }`}
+                          >
+                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                          </div>
+                        ) : null}
+                        {message.cta ? (
+                          <Button asChild size="sm" variant="secondary">
+                            <a href={supportCtaHref(message.cta)}>{t(`cta.${message.cta}`)}</a>
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -207,27 +244,30 @@ const Support = () => {
                   )}
                 </CardContent>
                 <div className="border-t p-4">
-                  {/* Quick Actions */}
                   <div className="mb-3 flex flex-wrap gap-2">
                     {quickActions.map((action) => (
                       <button
                         key={action}
-                        onClick={() => handleQuickAction(action)}
-                        className="bg-muted hover:bg-muted/80 rounded-full px-3 py-1.5 text-xs transition-colors"
+                        type="button"
+                        disabled={isTyping}
+                        onClick={() => send(action)}
+                        className="bg-muted hover:bg-muted/80 rounded-full px-3 py-1.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50"
                       >
                         {action}
                       </button>
                     ))}
                   </div>
-                  {/* Input */}
                   <div className="flex gap-2">
                     <Input
                       placeholder={t("type_message")}
                       value={inputValue}
+                      maxLength={SUPPORT_CHAT_INPUT_MAX}
                       onChange={(e) => setInputValue(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") send(inputValue);
+                      }}
                     />
-                    <Button onClick={handleSend} disabled={!inputValue.trim()}>
+                    <Button onClick={() => send(inputValue)} disabled={isTyping || !inputValue.trim()}>
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
@@ -235,9 +275,7 @@ const Support = () => {
               </Card>
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-6">
-              {/* FAQ */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -255,7 +293,6 @@ const Support = () => {
                 </CardContent>
               </Card>
 
-              {/* Contact Options */}
               <Card>
                 <CardHeader>
                   <CardTitle>{t("need_help.title")}</CardTitle>
@@ -282,7 +319,6 @@ const Support = () => {
                 </CardContent>
               </Card>
 
-              {/* Resources */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

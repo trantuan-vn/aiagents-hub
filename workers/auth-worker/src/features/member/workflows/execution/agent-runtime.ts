@@ -14,6 +14,7 @@ import type { RagBilling } from '../nodes/tool/shared/rag-context.js';
 import { getToolModule } from '../nodes/tool/shared/registry.js';
 import { createCodeModeOuterTool } from '../nodes/tool/code/create.js';
 import { runHttpRequest } from './node-runtime.js';
+import { isHttpAgentToolNode } from './http-agent-tool.js';
 
 /**
  * Builds the AI SDK toolset + RAG context for a workflow's conversational agent.
@@ -76,14 +77,15 @@ function truncate(value: unknown, max = 4000): unknown {
   return value;
 }
 
+/** Canvas HTTP tools are `tool_node` + `toolKind: http-request`. Legacy graphs use `http_request` + `asTool`. */
+export { isHttpAgentToolNode } from './http-agent-tool.js';
+
 export function buildAgentToolset(
   ctx: AgentToolContext,
   definition: WorkflowDefinition,
 ): ToolSet {
   const tools: ToolSet = {};
-  const httpNodes = definition.nodes.filter(
-    (n) => n.type === 'http_request' && (n.data as Record<string, unknown>)?.asTool === true,
-  );
+  const httpNodes = definition.nodes.filter((n) => isHttpAgentToolNode(n));
 
   httpNodes.forEach((node, index) => {
     const data = (node.data ?? {}) as Record<string, unknown>;
