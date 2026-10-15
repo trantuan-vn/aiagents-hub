@@ -25,6 +25,9 @@ declare namespace Cloudflare {
 		PRIMARY_ADMIN_IDENTIFIER: "tuanta2021@gmail.com";
 		INTERNAL_PROXY_SECRET: "";
 		TURNSTILE_SITE_KEY: "";
+		SITE_SUPPORT_WORKFLOW_ID: "34";
+		SITE_SUPPORT_OWNER_ID: "e1a09eae9956f0489180c63f332235d0f6d9e8861b883d3c2f21802988c4ecff";
+		SITE_SUPPORT_CHAT_PATH: "trigger-1791965135447";
 		BROADCAST_SERVICE_DO: DurableObjectNamespace /* BroadcastServiceDO from auth-worker */;
 		USER_SHARD_DO: DurableObjectNamespace /* UserShardDO from auth-worker */;
 		USER_DO: DurableObjectNamespace /* UserDO from auth-worker */;

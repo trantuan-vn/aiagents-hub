@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 
+import { assertSupportChatChallenge } from '../../../../shared/human-challenge';
 import { trackPublicChatPost } from '../../../../shared/public-chat-rate-limit';
+import { CaptchaRequiredError, InvalidCaptchaError } from '../../../../shared/turnstile';
 import { getClientIp, handleErrorWithoutIp } from '../../../../shared/utils';
 import { buildChatCorsHeaders } from './chat-cors.js';
 import {
@@ -25,6 +27,7 @@ import {
   runChatTrigger,
   type ChatTriggerNodeData,
 } from '../triggers/chat-submission.js';
+import { isSiteSupportChat } from '../triggers/site-support.js';
 import {
   findChatTriggerByWorkflowId,
   resolveOwnedWorkflow,
@@ -400,7 +403,18 @@ async function handleChatRequest(
     return c.redirect(pageUrl, 302);
   }
 
-  if (c.req.method === 'POST' && mode === 'production' && chatAuth === 'none') {
+  let requestedChatPath = chatPathRaw;
+  try {
+    requestedChatPath = decodeURIComponent(chatPathRaw);
+  } catch {
+    requestedChatPath = chatPathRaw;
+  }
+  const siteSupport =
+    mode === 'production' &&
+    (isSiteSupportChat(c.env, workflowId, ctx.ownerId, ctx.chatPath) ||
+      isSiteSupportChat(c.env, workflowId, ctx.ownerId, requestedChatPath));
+
+  if (c.req.method === 'POST' && mode === 'production' && chatAuth === 'none' && !siteSupport) {
     const limited = await trackPublicChatPost(c.env, getClientIp(c));
     if (limited) {
       return c.json({ error: 'Too many chat messages', retryAfter: limited.retryAfter }, 429, headers);
@@ -417,6 +431,31 @@ async function handleChatRequest(
   }
   if (!parsed.chatInput) {
     return c.json({ error: 'Missing chatInput' }, 400, headers);
+  }
+
+  if (siteSupport) {
+    try {
+      await assertSupportChatChallenge(c.env, {
+        sessionId: parsed.sessionId,
+        ip: getClientIp(c) || '',
+        turnstileToken: typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined,
+      });
+    } catch (e) {
+      if (e instanceof CaptchaRequiredError || e instanceof InvalidCaptchaError) {
+        return c.json(
+          { error: e.message, requiresCaptcha: true, siteKey: e.siteKey },
+          400,
+          headers,
+        );
+      }
+      throw e;
+    }
+    if (chatAuth === 'none') {
+      const limited = await trackPublicChatPost(c.env, getClientIp(c));
+      if (limited) {
+        return c.json({ error: 'Too many chat messages', retryAfter: limited.retryAfter }, 429, headers);
+      }
+    }
   }
 
   const chatUrl = actionUrl.split('?')[0] ?? actionUrl;

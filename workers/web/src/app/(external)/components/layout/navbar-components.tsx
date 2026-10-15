@@ -202,8 +202,9 @@ export function MobileMenu({
             </Button>
           ) : (
             <Button
-              variant="outline"
-              className="w-full"
+              variant="gradient"
+              size="lg"
+              className="w-full font-semibold"
               onClick={() => {
                 setIsMobileMenuOpen(false);
                 window.location.href = "/auth/v3/login";

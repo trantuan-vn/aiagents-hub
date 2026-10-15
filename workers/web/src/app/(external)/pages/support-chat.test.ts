@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   cannedSupportKey,
   parseSupportReply,
+  postSiteSupportChat,
   siteSupportChatUrl,
+  SupportChatError,
   supportCtaHref,
 } from "./support-chat.ts";
 
@@ -53,6 +55,43 @@ test("siteSupportChatUrl is absent until a workflow id is set", () => {
   else process.env.NEXT_PUBLIC_SITE_SUPPORT_OWNER_ID = previousOwner;
   if (previousPath === undefined) delete process.env.NEXT_PUBLIC_SITE_SUPPORT_CHAT_PATH;
   else process.env.NEXT_PUBLIC_SITE_SUPPORT_CHAT_PATH = previousPath;
+});
+
+test("postSiteSupportChat sends the turnstile token and surfaces a captcha challenge", async () => {
+  const original = globalThis.fetch;
+  let sent = "";
+  globalThis.fetch = async (_input, init) => {
+    sent = String(init?.body ?? "");
+    return new Response(
+      JSON.stringify({
+        error: "Captcha verification required",
+        requiresCaptcha: true,
+        siteKey: "0x4AAAAAADXOWPMRtW0XIcLk",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  };
+  try {
+    await assert.rejects(
+      () =>
+        postSiteSupportChat({
+          endpointUrl: "https://api.example/chat/34/trigger-support",
+          sessionId: "session-12345678",
+          chatInput: "hello",
+          turnstileToken: "fresh-token",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof SupportChatError);
+        assert.equal(error.requiresCaptcha, true);
+        assert.equal(error.status, 400);
+        assert.equal(error.siteKey, "0x4AAAAAADXOWPMRtW0XIcLk");
+        return true;
+      },
+    );
+    assert.equal(JSON.parse(sent).turnstileToken, "fresh-token");
+  } finally {
+    globalThis.fetch = original;
+  }
 });
 
 test("canned fallback still recognizes plan and credit questions", () => {

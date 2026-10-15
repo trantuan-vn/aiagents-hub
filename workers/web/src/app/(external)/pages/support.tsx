@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { HumanChallengeTurnstile, useHumanChallenge } from "@/hooks/use-human-challenge";
 
 import Layout from "../components/layout/main-layout";
 import {
@@ -36,10 +37,14 @@ function readSessionId(): string {
   return created;
 }
 
+const AUTH_API_URL = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
+const ENV_TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+
 const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
   const t = useTranslations("SupportPage");
   const liveWorkflow = Boolean(chatUrl);
   const [signedIn, setSignedIn] = useState(false);
+  const [supportSessionId, setSupportSessionId] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 1,
@@ -82,9 +87,19 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
     },
   ];
 
+  const captcha = useHumanChallenge({
+    authApiUrl: AUTH_API_URL,
+    scope: "support",
+    sessionId: supportSessionId || undefined,
+    envFallbackSiteKey: ENV_TURNSTILE_SITE_KEY,
+    revealWhenUnsatisfied: liveWorkflow,
+    hideWhenSolved: true,
+  });
+  const blockForCaptcha = liveWorkflow && captcha.needsTokenBeforeSubmit;
+
   useEffect(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_AUTH_API_URL ?? "https://api.aiagents-hub.vn/dashboard/auth";
-    void fetch(`${apiUrl}/profile/me`, { method: "GET", credentials: "include" })
+    setSupportSessionId(readSessionId());
+    void fetch(`${AUTH_API_URL}/profile/me`, { method: "GET", credentials: "include" })
       .then((response) => setSignedIn(response.ok))
       .catch(() => setSignedIn(false));
   }, []);
@@ -107,7 +122,7 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
 
   const send = (raw: string) => {
     const chatInput = raw.trim().slice(0, SUPPORT_CHAT_INPUT_MAX);
-    if (!chatInput || sendingRef.current) return;
+    if (!chatInput || sendingRef.current || blockForCaptcha) return;
     sendingRef.current = true;
     setInputValue("");
     setIsTyping(true);
@@ -129,8 +144,10 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
       endpointUrl: chatUrl,
       sessionId: readSessionId(),
       chatInput,
+      turnstileToken: captcha.turnstileTokenForBody(),
     })
-      .then((output) => {
+      .then(async (output) => {
+        await captcha.onRequestSuccess().catch(() => undefined);
         const parsed = parseSupportReply(output);
         if (!parsed.text && !parsed.cta) {
           finish(cannedReply(chatInput, true));
@@ -144,6 +161,18 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
         });
       })
       .catch((error: unknown) => {
+        if (error instanceof SupportChatError && error.requiresCaptcha) {
+          captcha.applyCaptchaError({
+            requiresCaptcha: true,
+            siteKey: error.siteKey,
+            error: error.message,
+          });
+          setMessages((prev) => prev.filter((message) => message.id !== userId));
+          setInputValue(chatInput);
+          setIsTyping(false);
+          sendingRef.current = false;
+          return;
+        }
         if (error instanceof SupportChatError && error.status === 429) {
           finish({ id: takeId(), role: "assistant", content: t("rate_limited") });
           return;
@@ -249,7 +278,7 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                       <button
                         key={action}
                         type="button"
-                        disabled={isTyping}
+                        disabled={isTyping || blockForCaptcha}
                         onClick={() => send(action)}
                         className="bg-muted hover:bg-muted/80 rounded-full px-3 py-1.5 text-xs transition-colors disabled:pointer-events-none disabled:opacity-50"
                       >
@@ -257,6 +286,12 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                       </button>
                     ))}
                   </div>
+                  {liveWorkflow && captcha.showTurnstileField ? (
+                    <div className="mb-3">
+                      <HumanChallengeTurnstile challenge={captcha} keyPrefix="support-" action="support" />
+                      <p className="text-muted-foreground mt-1 text-center text-xs">{t("captcha_hint")}</p>
+                    </div>
+                  ) : null}
                   <div className="flex gap-2">
                     <Input
                       placeholder={t("type_message")}
@@ -267,7 +302,7 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                         if (e.key === "Enter") send(inputValue);
                       }}
                     />
-                    <Button onClick={() => send(inputValue)} disabled={isTyping || !inputValue.trim()}>
+                    <Button onClick={() => send(inputValue)} disabled={isTyping || !inputValue.trim() || blockForCaptcha}>
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>

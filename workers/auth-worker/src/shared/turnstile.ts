@@ -4,8 +4,42 @@ type TurnstileEnv = Pick<Env, 'TURNSTILE_SECRET_KEY' | 'TURNSTILE_SITE_KEY'>;
 
 type SiteverifyResponse = {
   success: boolean;
+  action?: string;
+  hostname?: string;
   'error-codes'?: string[];
 };
+
+export type TurnstileVerifyExpectation = {
+  action: string;
+  hostnames: ReadonlySet<string>;
+};
+
+const LOCAL_TURNSTILE_HOSTS = new Set(['localhost', '127.0.0.1']);
+
+/** Frontend hosts accepted for a support-chat token. Production never includes localhost. */
+export function frontendTurnstileHostnames(
+  frontendUrl: string | undefined,
+  environment: string | undefined,
+): Set<string> {
+  const hosts = new Set<string>();
+  const raw = (frontendUrl ?? '').trim();
+  if (raw) {
+    try {
+      const host = new URL(raw).hostname.trim().toLowerCase();
+      if (host && !LOCAL_TURNSTILE_HOSTS.has(host)) {
+        hosts.add(host);
+        hosts.add(host.startsWith('www.') ? host.slice(4) : `www.${host}`);
+      }
+    } catch {
+      /* fail closed when the frontend URL is not a URL */
+    }
+  }
+  if (environment !== 'production') {
+    hosts.add('localhost');
+    hosts.add('127.0.0.1');
+  }
+  return hosts;
+}
 
 /** Cloudflare Turnstile site keys start with 0x4 (production) or 1x0 (test). */
 const TURNSTILE_SITE_KEY_RE = /^0x4[A-Za-z0-9_-]{20,}$|^1x0[A-Za-z0-9_-]{20,}$/;
@@ -36,12 +70,14 @@ export async function verifyTurnstileToken(
   env: TurnstileEnv,
   token: string,
   remoteIp?: string,
+  expected?: TurnstileVerifyExpectation,
 ): Promise<boolean> {
   const secret = await getTurnstileSecret(env);
   if (!secret) return true;
 
   const trimmed = token?.trim();
-  if (!trimmed) return false;
+  if (!trimmed || trimmed.length > 2048) return false;
+  if (expected && expected.hostnames.size === 0) return false;
 
   const body: Record<string, string> = {
     secret,
@@ -51,11 +87,17 @@ export async function verifyTurnstileToken(
     body.remoteip = remoteIp.trim();
   }
 
-  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return false;
+  }
 
   if (!response.ok) return false;
 
@@ -66,7 +108,10 @@ export async function verifyTurnstileToken(
     return false;
   }
 
-  return data.success === true;
+  if (data.success !== true) return false;
+  if (!expected) return true;
+  const hostname = (data.hostname ?? '').trim().toLowerCase();
+  return data.action === expected.action && expected.hostnames.has(hostname);
 }
 
 export class CaptchaRequiredError extends Error {

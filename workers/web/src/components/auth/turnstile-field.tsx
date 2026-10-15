@@ -55,12 +55,13 @@ export function isValidTurnstileSiteKey(siteKey: string | null | undefined): boo
 
 type TurnstileFieldProps = {
   siteKey: string;
+  action?: string;
   onToken: (token: string) => void;
   onExpire?: () => void;
   onError?: () => void;
 };
 
-export function TurnstileField({ siteKey, onToken, onExpire, onError }: TurnstileFieldProps) {
+export function TurnstileField({ siteKey, action, onToken, onExpire, onError }: TurnstileFieldProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string | null>(null);
   const onTokenRef = useRef(onToken);
@@ -95,6 +96,7 @@ export function TurnstileField({ siteKey, onToken, onExpire, onError }: Turnstil
 
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: siteKey,
+        ...(action ? { action } : {}),
         callback: (token: string) => onTokenRef.current(token),
         "expired-callback": () => onExpireRef.current?.(),
         "error-callback": () => onErrorRef.current?.(),
@@ -122,7 +124,7 @@ export function TurnstileField({ siteKey, onToken, onExpire, onError }: Turnstil
         }
       }
     };
-  }, [siteKey]);
+  }, [action, siteKey]);
 
   return <div ref={containerRef} className="flex min-h-[65px] justify-center" aria-label="Captcha" />;
 }
@@ -133,14 +135,19 @@ export type CaptchaConfig = {
   satisfied?: boolean;
   satisfiedPreauth?: boolean;
   satisfiedSession?: boolean;
+  unreachable?: boolean;
 };
 
 export async function fetchCaptchaConfig(
   authApiUrl: string,
-  options?: { scope?: "preauth" | "session" },
+  options?: { scope?: "preauth" | "session" | "support"; sessionId?: string },
 ): Promise<CaptchaConfig> {
   try {
-    const qs = options?.scope ? `?scope=${options.scope}` : "";
+    const params = new URLSearchParams();
+    if (options?.scope) params.set("scope", options.scope);
+    if (options?.sessionId) params.set("sessionId", options.sessionId);
+    const query = params.toString();
+    const qs = query ? `?${query}` : "";
     const res = await fetch(`${authApiUrl}/captcha/config${qs}`, { credentials: "include" });
     if (!res.ok) return { enabled: false, siteKey: null };
     const data: {
@@ -160,6 +167,6 @@ export async function fetchCaptchaConfig(
       satisfiedSession: Boolean(data.satisfiedSession),
     };
   } catch {
-    return { enabled: false, siteKey: null };
+    return { enabled: false, siteKey: null, unreachable: true };
   }
 }

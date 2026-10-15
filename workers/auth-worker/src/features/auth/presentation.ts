@@ -365,7 +365,7 @@ export function createAuthRoutes(bindingName: string) {
     return c.redirect(`${c.env.FRONTEND_URL}/dashboard`);
   }, "OAuth callback failed"));
 
-  app.get('/captcha/config', createRouteHandler(async (c: any) => {
+  app.get('/captcha/config', createRouteHandler(async (c: any, _sessionId: string, ipAddress: string) => {
     const enabled = await isTurnstileEnabled(c.env);
     const preAuthSessionId = getCookie(c, 'preAuthSessionId') ?? '';
     const authSessionId = getCookie(c, 'sessionId') ?? '';
@@ -378,8 +378,19 @@ export function createAuthRoutes(bindingName: string) {
         ? await isCaptchaSatisfied(c.env, 'session', authSessionId)
         : false;
     const scope = c.req.query('scope');
+    const supportSessionId = String(c.req.query('sessionId') ?? '').trim();
+    const satisfiedSupport =
+      enabled && scope === 'support' && /^[A-Za-z0-9_-]{8,64}$/.test(supportSessionId)
+        ? await isCaptchaSatisfied(c.env, 'support', supportSessionId, ipAddress)
+        : false;
     const satisfied =
-      scope === 'session' ? satisfiedSession : scope === 'preauth' ? satisfiedPreauth : satisfiedPreauth;
+      scope === 'session'
+        ? satisfiedSession
+        : scope === 'support'
+          ? satisfiedSupport
+          : scope === 'preauth'
+            ? satisfiedPreauth
+            : satisfiedPreauth;
     return c.json({
       enabled,
       siteKey: enabled ? getTurnstileSiteKey(c.env) : null,

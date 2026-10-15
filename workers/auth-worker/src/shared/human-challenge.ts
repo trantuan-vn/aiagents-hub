@@ -2,17 +2,22 @@ import { AUTH_CONSTANTS } from '../features/auth/constant';
 import { getIdentifierOtpVerifyFailCount } from './otp-abuse-monitor';
 import {
   CaptchaRequiredError,
+  frontendTurnstileHostnames,
   getTurnstileSiteKey,
   InvalidCaptchaError,
   isTurnstileEnabled,
   verifyTurnstileToken,
 } from './turnstile';
 
-export type HumanChallengeScope = 'preauth' | 'session';
+export type HumanChallengeScope = 'preauth' | 'session' | 'support';
+
+/** Widget action for the public support composer. Siteverify must echo it. */
+export const SUPPORT_TURNSTILE_ACTION = 'support';
 
 const CAPTCHA_OK_KEY = {
   preauth: 'CaptchaOk:preauth:',
   session: 'CaptchaOk:session:',
+  support: 'CaptchaOk:support:',
 } as const;
 
 type CaptchaSatisfiedRecord = { ip?: string };
@@ -205,4 +210,45 @@ export async function assertHumanChallenge(
   }
 
   await markCaptchaSatisfied(env, scope, sessionId, ip);
+}
+
+/**
+ * Public support chat: one successful Turnstile solve per session id + IP, then skip until TTL.
+ * Login and step-up keep their own scopes. This always challenges when Turnstile is configured.
+ */
+export async function assertSupportChatChallenge(
+  env: Env,
+  options: {
+    sessionId: string;
+    ip: string;
+    turnstileToken?: string;
+  },
+): Promise<void> {
+  const enabled = await isTurnstileEnabled(env);
+  if (!enabled) return;
+
+  const sessionId = options.sessionId.trim();
+  const ip = options.ip.trim();
+  if (
+    sessionId &&
+    (await isCaptchaSatisfied(env, 'support', sessionId, ip))
+  ) {
+    return;
+  }
+
+  const siteKey = getTurnstileSiteKey(env);
+  const token = options.turnstileToken?.trim() ?? '';
+  if (!sessionId || !token) {
+    throw new CaptchaRequiredError(siteKey);
+  }
+
+  const ok = await verifyTurnstileToken(env, token, ip, {
+    action: SUPPORT_TURNSTILE_ACTION,
+    hostnames: frontendTurnstileHostnames(env.FRONTEND_URL, env.ENVIRONMENT),
+  });
+  if (!ok) {
+    throw new InvalidCaptchaError(siteKey);
+  }
+
+  await markCaptchaSatisfied(env, 'support', sessionId, ip);
 }

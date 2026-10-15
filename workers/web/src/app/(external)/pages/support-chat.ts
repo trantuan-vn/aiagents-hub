@@ -101,11 +101,19 @@ export function cannedSupportKey(query: string): CannedSupportKey {
 
 export class SupportChatError extends Error {
   readonly status: number;
+  readonly requiresCaptcha: boolean;
+  readonly siteKey: string | null;
 
-  constructor(message: string, status: number) {
+  constructor(
+    message: string,
+    status: number,
+    extra?: { requiresCaptcha?: boolean; siteKey?: string | null },
+  ) {
     super(message);
     this.name = "SupportChatError";
     this.status = status;
+    this.requiresCaptcha = Boolean(extra?.requiresCaptcha);
+    this.siteKey = extra?.siteKey ?? null;
   }
 }
 
@@ -113,6 +121,7 @@ export async function postSiteSupportChat(params: {
   endpointUrl: string;
   sessionId: string;
   chatInput: string;
+  turnstileToken?: string;
   signal?: AbortSignal;
 }): Promise<string> {
   const response = await fetch(params.endpointUrl, {
@@ -123,13 +132,22 @@ export async function postSiteSupportChat(params: {
       action: "sendMessage",
       sessionId: params.sessionId,
       chatInput: params.chatInput,
+      ...(params.turnstileToken ? { turnstileToken: params.turnstileToken } : {}),
     }),
     signal: params.signal,
   });
-  const body = (await response.json().catch(() => ({}))) as { output?: unknown; error?: unknown };
+  const body = (await response.json().catch(() => ({}))) as {
+    output?: unknown;
+    error?: unknown;
+    requiresCaptcha?: unknown;
+    siteKey?: unknown;
+  };
   if (!response.ok) {
     const message = typeof body.error === "string" ? body.error : "Chat workflow failed";
-    throw new SupportChatError(message, response.status);
+    throw new SupportChatError(message, response.status, {
+      requiresCaptcha: body.requiresCaptcha === true,
+      siteKey: typeof body.siteKey === "string" ? body.siteKey : null,
+    });
   }
   return typeof body.output === "string" ? body.output : "";
 }
