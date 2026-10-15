@@ -31,6 +31,7 @@ import {
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { attachSimpleMemory } from '../memory-node/simple.js';
 import { appendMemberActionsNote } from '../../../../assistant/confirmation.js';
+import { siteSupportAnswerNote } from '../../triggers/site-support.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
 import { prefetchLinkedGetRag } from '../tool/get-rag/execute.js';
 import { filesFromWebhookBody, extractTextFromPdfFiles } from '../tool/save-rag/pdf-extract.js';
@@ -161,6 +162,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
 
   const systemParts = [
     appendMemberActionsNote(systemPrompt, linked.tools),
+    siteSupportAnswerNote(ctx.c.env, ctx.meta.workflowId, ctx.meta.ownerId, ctx.definition),
     saveRagSystemPrompt,
     ctx.meta.workflowDescription ? `Workflow: ${ctx.meta.workflowDescription}` : '',
     toolNames.length

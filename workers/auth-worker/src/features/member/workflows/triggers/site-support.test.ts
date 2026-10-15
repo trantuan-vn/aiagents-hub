@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSiteSupportChat, siteSupportReplySeconds } from './site-support';
+import { isSiteSupportChat, siteSupportAnswerNote, siteSupportReplySeconds } from './site-support';
 
 const env = {
   SITE_SUPPORT_WORKFLOW_ID: '34',
@@ -19,6 +19,24 @@ describe('isSiteSupportChat', () => {
 
   it('stays off when the support target is not configured', () => {
     expect(isSiteSupportChat({}, 34, 'abc', 'trigger-support')).toBe(false);
+  });
+});
+
+describe('siteSupportAnswerNote', () => {
+  const definition = {
+    nodes: [{ type: 'trigger', data: { triggerKind: 'chat', chatPath: 'trigger-support' } }],
+  };
+
+  it('asks the public support agent for an HTML fragment', () => {
+    const note = siteSupportAnswerNote(env, 34, 'abc', definition);
+    expect(note).toContain('HTML fragment');
+    expect(note).toContain('__support_cta__');
+    expect(note.indexOf('<')).toBeGreaterThan(-1);
+  });
+
+  it('stays empty for every other chat', () => {
+    expect(siteSupportAnswerNote(env, 35, 'abc', definition)).toBe('');
+    expect(siteSupportAnswerNote({}, 34, 'abc', definition)).toBe('');
   });
 });
 

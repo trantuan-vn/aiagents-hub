@@ -110,7 +110,7 @@ function inline(text: string): string {
   value = value.replace(/`([^`]+)`/g, "<code>$1</code>");
   value = value.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   value = value.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
-  value = value.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2">$1</a>');
+  value = value.replace(/\[([^\]]+)\]\(((?:https?:\/\/|mailto:|\/(?!\/))[^)\s]+)\)/g, '<a href="$2">$1</a>');
   value = value.replace(/(^|[\s(])(https?:\/\/[^\s<]+)(?=$|[\s).,])/g, '$1<a href="$2">$2</a>');
   return value;
 }
@@ -226,6 +226,7 @@ export function assistantMarkup(text: string): string {
 function safeHref(value: string | null): string | null {
   const href = value?.trim() ?? "";
   if (/^https?:\/\//i.test(href) || href.startsWith("mailto:")) return href;
+  if (href.startsWith("/") && !href.startsWith("//") && !href.includes("\\") && !/[\s<>"']/.test(href)) return href;
   return null;
 }
 

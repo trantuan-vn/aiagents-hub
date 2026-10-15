@@ -1360,10 +1360,10 @@
     "short_answers": "Câu trả lời ngắn",
     "signed_in_banner": "Bạn đã có tài khoản. Việc trong workspace dùng trợ lý dashboard.",
     "signed_in_link": "Mở trợ lý dashboard",
-    "rate_limited": "Thử lại sau ít phút, hoặc email support@aiagents-hub.vn.",
-    "rate_limited_daily": "Khách được hỏi tối đa 30 câu mỗi ngày. Thử lại vào ngày mai, hoặc email support@aiagents-hub.vn.",
+    "rate_limited": "Thử lại sau ít phút, hoặc email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
+    "rate_limited_daily": "Khách được hỏi tối đa 30 câu mỗi ngày. Thử lại vào ngày mai, hoặc email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
     "account_gate": "Bạn đã hỏi khá nhiều với tư cách khách. Mở tài khoản miễn phí để tiếp tục trải nghiệm workflow, Credit và các gói.",
-    "fallback_email_note": "Cần người hỗ trợ thì email support@aiagents-hub.vn.",
+    "fallback_email_note": "Cần người hỗ trợ thì email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
     "type_message": "Nhập tin nhắn của bạn...",
     "secret_notice": "Đừng gửi mật khẩu, mã OTP hoặc số thẻ.",
     "reply_eta": "Câu trả lời sẽ có trong {seconds} giây nữa.",
@@ -1432,14 +1432,14 @@
       "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Xin chào — tôi giúp về workflow, Credit và gói. Đừng gửi mật khẩu, mã OTP hoặc số thẻ. Bạn đang muốn đưa gì vào việc?",
-      "recommend": "Bắt đầu ở Dashboard > Workflows: thêm trigger (chat, webhook hoặc cron), node agent, và RAG/tool nếu cần. Chạy một lần và xem ước lượng Credit. Bạn đang làm việc cụ thể nào (hỗ trợ, RAG Q&A, tự động HTTP)?",
-      "credits": "Credit là đồng hồ duy nhất cho mức dùng AI/agent. Credit tặng theo gói và hết hạn mỗi tháng UTC. Starter, Pro và Business mua thêm được (có trần ví). Nạp Credit không nâng gói.",
-      "upgrade": "Đổi gói tại /packages. PayPal Subscriptions tự gia hạn bằng Visa, Mastercard hoặc ví PayPal. Hủy tại Dashboard > Thanh toán > Hủy gói — bạn giữ gói đến hết kỳ đã trả. Muốn gói tổ chức? Dùng Liên hệ.",
-      "how_credits": "Mỗi lần chạy trừ Credit theo lớp model (tiny / mid / frontier) và token đã dùng. Có ước lượng trước; ví trừ sau. Chạy workflow người khác có thể thêm royalty bằng Credit.",
-      "calls": "Credit đo mức dùng AI. Xem Dashboard > Thanh toán để biết số dư và Credit tặng.",
-      "rate_limit": "Gói có quota hạ tầng (chống lạm dụng). Mức dùng AI là Credit, không phải SKU request/giây. Nếu lần chạy bị chặn, kiểm tra quota và số dư Credit.",
-      "default": "Tôi hiểu bạn đang hỏi về {query}. Cho biết đây là xây workflow, Credit hay gói để tôi chỉ đúng chỗ."
+      "welcome": "Xin chào — tôi giúp về **workflow**, **Credit** và **gói**.\n\nĐừng gửi mật khẩu, mã OTP hoặc số thẻ. Bạn đang muốn đưa gì vào việc?",
+      "recommend": "Bắt đầu ở **Dashboard > Workflows**:\n\n- Thêm trigger (chat, webhook hoặc cron)\n- Thêm node agent, và RAG hoặc tool nếu cần\n- Chạy một lần và xem ước lượng Credit\n\nBạn đang làm việc cụ thể nào — hỗ trợ, RAG Q&A, hay tự động HTTP?",
+      "credits": "**Credit** là đồng hồ duy nhất cho mức dùng AI và agent.\n\n- Credit tặng theo gói và hết hạn mỗi tháng UTC\n- Starter, Pro và Business mua thêm được (có trần ví)\n- Nạp Credit không nâng gói",
+      "upgrade": "Đổi gói tại [các gói](/packages). PayPal tự gia hạn bằng Visa, Mastercard hoặc ví PayPal.\n\nHủy tại **Dashboard > Thanh toán > Hủy gói**. Bạn giữ gói đến hết kỳ đã trả.\n\nMuốn gói tổ chức? Dùng Liên hệ.",
+      "how_credits": "Mỗi lần chạy trừ Credit theo lớp model (**tiny**, **mid** hoặc **frontier**) và token đã dùng.\n\n- Có ước lượng trước khi chạy\n- Ví bị trừ sau khi chạy xong\n- Chạy workflow của người khác có thể thêm royalty bằng Credit",
+      "calls": "Credit đo mức dùng AI. Xem **Dashboard > Thanh toán** để biết số dư và Credit tặng.",
+      "rate_limit": "Gói có quota hạ tầng để chống lạm dụng. Mức dùng AI là Credit, không phải sản phẩm theo số request mỗi giây.\n\nNếu lần chạy bị chặn, kiểm tra quota và số dư Credit.",
+      "default": "Tôi hiểu bạn đang hỏi về {query}.\n\nCho biết đây là xây workflow, Credit hay gói để tôi chỉ đúng chỗ."
     }
   },
   "TermsPage": {

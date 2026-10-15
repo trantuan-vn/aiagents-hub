@@ -1360,10 +1360,10 @@
     "short_answers": "Short answers",
     "signed_in_banner": "You already have an account. For work inside your workspace, use the dashboard assistant.",
     "signed_in_link": "Open dashboard assistant",
-    "rate_limited": "Try again in a few minutes, or email support@aiagents-hub.vn.",
-    "rate_limited_daily": "Guest questions are limited to 30 a day. Try again tomorrow, or email support@aiagents-hub.vn.",
+    "rate_limited": "Try again in a few minutes, or email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
+    "rate_limited_daily": "Guest questions are limited to 30 a day. Try again tomorrow, or email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
     "account_gate": "You have asked quite a few questions as a guest. Open a free account to keep exploring workflows, Credits, and plans.",
-    "fallback_email_note": "Email support@aiagents-hub.vn if you still need a person.",
+    "fallback_email_note": "Email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn) if you still need a person.",
     "type_message": "Type your message...",
     "secret_notice": "Don't send a password, one-time code, or card number.",
     "reply_eta": "A reply will be ready in {seconds} seconds.",
@@ -1432,14 +1432,14 @@
       "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Hello — I can help with workflows, Credits, and plans. Don't send a password, one-time code, or card number. What are you trying to ship?",
-      "recommend": "Start in Dashboard > Workflows: add a trigger (chat, webhook, or cron), an agent node, and optional RAG or tools. Run once and watch the Credit estimate. Need a specific job (support, RAG Q&A, HTTP automation)?",
-      "credits": "Credits are the only meter for AI/agent usage. Included Credits come with your plan and expire each UTC month. Starter, Pro, and Business can buy more (wallet cap applies). Buying Credits does not upgrade your plan.",
-      "upgrade": "Change plans at /packages. PayPal Subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet. Cancel at Dashboard > Billing > Cancel plan — you keep the plan until the period you already paid for ends. Want an organization plan? Use Contact.",
-      "how_credits": "A run costs Credits based on model class (tiny / mid / frontier) and tokens used. You get an estimate first; the wallet is charged after. Sharing someone else's workflow may add a royalty in Credits.",
-      "calls": "Credits meter AI usage. Check Dashboard > Billing for your balance and included pool.",
-      "rate_limit": "Plans include infrastructure quotas (to prevent abuse). AI usage is Credits, not request/second product SKUs. If a run is blocked, check quota and Credit balance.",
-      "default": "I understand you're asking about {query}. Share whether this is about building a workflow, Credits, or your plan and I can point you more precisely."
+      "welcome": "Hello — I can help with **workflows**, **Credits**, and **plans**.\n\nDon't send a password, one-time code, or card number. What are you trying to ship?",
+      "recommend": "Start in **Dashboard > Workflows**:\n\n- Add a trigger (chat, webhook, or cron)\n- Add an agent node, plus RAG or tools if you need them\n- Run once and read the Credit estimate\n\nNeed a specific job — support, RAG Q&A, or HTTP automation?",
+      "credits": "**Credits** are the only meter for AI and agent usage.\n\n- Included Credits come with your plan and expire each UTC month\n- Starter, Pro, and Business can buy more (a wallet cap applies)\n- Buying Credits does not upgrade your plan",
+      "upgrade": "Change plans on [packages](/packages). PayPal subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet.\n\nCancel at **Dashboard > Billing > Cancel plan**. You keep the plan until the period you already paid for ends.\n\nWant an organization plan? Use Contact.",
+      "how_credits": "A run costs Credits based on the model class (**tiny**, **mid**, or **frontier**) and the tokens used.\n\n- You see an estimate first\n- The wallet is charged after the run\n- Sharing someone else's workflow may add a royalty in Credits",
+      "calls": "Credits meter AI usage. Check **Dashboard > Billing** for your balance and included pool.",
+      "rate_limit": "Plans include infrastructure quotas to prevent abuse. AI usage is Credits, not a request-per-second product.\n\nIf a run is blocked, check the quota and your Credit balance.",
+      "default": "I understand you're asking about {query}.\n\nSay whether this is about building a workflow, Credits, or your plan, and I can point you more precisely."
     }
   },
   "TermsPage": {

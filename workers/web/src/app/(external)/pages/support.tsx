@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Send, Bot, User, Book, HelpCircle, Mail, Clock, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { formatAssistantReply } from "@/app/(main)/dashboard/control/assistant/_components/assistant-html";
+import { AssistantReply } from "@/app/(main)/dashboard/control/assistant/_components/assistant-reply";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -260,17 +262,21 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                           <Bot className="text-primary-foreground h-4 w-4" />
                         )}
                       </div>
-                      <div className={`flex max-w-[80%] flex-col gap-2 ${message.role === "user" ? "items-end" : "items-start"}`}>
+                      <div
+                        className={`flex flex-col gap-2 ${
+                          message.role === "user" ? "max-w-[80%] items-end" : "max-w-[85%] items-start"
+                        }`}
+                      >
                         {message.content ? (
-                          <div
-                            className={`rounded-2xl p-3 ${
-                              message.role === "user"
-                                ? "bg-primary text-primary-foreground rounded-br-md"
-                                : "bg-muted rounded-bl-md"
-                            }`}
-                          >
-                            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                          </div>
+                          message.role === "assistant" ? (
+                            <div className="bg-muted/40 w-full rounded-2xl rounded-bl-md border px-3 py-2">
+                              <AssistantReply html={formatAssistantReply(message.content)} />
+                            </div>
+                          ) : (
+                            <div className="bg-primary text-primary-foreground rounded-2xl rounded-br-md p-3">
+                              <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+                            </div>
+                          )
                         ) : null}
                         {message.cta ? (
                           <Button asChild size="sm" variant="secondary">
