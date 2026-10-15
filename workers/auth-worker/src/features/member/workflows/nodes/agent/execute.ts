@@ -1,7 +1,13 @@
 import { stepCountIs, streamText } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
 
-import { gatewayForExecution, stampFromNode, withAiCapacityRetry } from '../../ai/workers-ai.js';
+import {
+  gatewayForExecution,
+  isReasoningCutoff,
+  reasoningBudgetError,
+  stampFromNode,
+  withAiCapacityRetry,
+} from '../../ai/workers-ai.js';
 import { noteAgentWork, reportAgentReasoning, withAgentActivity } from '../../execution/execution-progress.js';
 import { followAgentStream } from '../../ai/workers-ai-stream.js';
 
@@ -39,6 +45,7 @@ import {
   isReasoningAgentKind,
   resolveAgentUserText,
   resolveEmbedModel,
+  resolveMaxReasoningMs,
   resolveMaxTokens,
   usesForcedReasoning,
 } from './shared.js';
@@ -168,6 +175,8 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
   ].filter(Boolean);
 
   const maxTokens = resolveMaxTokens(data, linked.serviceOptions, modelId, nodeInput);
+  const reasoningMs = resolveMaxReasoningMs(data, nodeInput);
+  const stepTimeout = reasoningMs ? { timeout: { stepMs: reasoningMs }, maxRetries: 0 } : {};
   const forcedReasoning = usesForcedReasoning(modelId);
   // GLM-5.3 defaults reasoning_effort to max. Keep effort low for speed, but do not
   // shrink the answer budget: a 2048 cap was cutting HTML off mid-table.
@@ -188,7 +197,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     const result = await withAiCapacityRetry(async () => {
       const workersAI = createWorkersAI({
         binding: ctx.c.env.AI,
-        gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }),
+        gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }, reasoningMs),
       });
       const streamed = streamText({
         model: workersAI(modelId as never),
@@ -204,16 +213,32 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
           : {}),
         tools,
         stopWhen: stepCountIs(5),
+        ...stepTimeout,
       });
-      await followAgentStream(streamed.fullStream);
-      const [text, steps, totalUsage, usage, finishReason] = await Promise.all([
-        streamed.text,
-        streamed.steps,
-        streamed.totalUsage,
-        streamed.usage,
-        streamed.finishReason,
-      ]);
-      return { text, steps, totalUsage, usage, finishReason };
+      const partial = { text: '' };
+      try {
+        await followAgentStream(streamed.fullStream, partial);
+        const [text, steps, totalUsage, usage, finishReason] = await Promise.all([
+          streamed.text,
+          streamed.steps,
+          streamed.totalUsage,
+          streamed.usage,
+          streamed.finishReason,
+        ]);
+        return { text: text || partial.text, steps, totalUsage, usage, finishReason, timedOut: false };
+      } catch (e) {
+        if (!isReasoningCutoff(e)) throw e;
+        const text = partial.text.trim();
+        if (!text) throw reasoningMs ? reasoningBudgetError(reasoningMs) : e;
+        return {
+          text,
+          steps: [],
+          totalUsage: undefined,
+          usage: undefined,
+          finishReason: 'stop',
+          timedOut: true,
+        };
+      }
     });
     for (const step of result.steps ?? []) {
       if ((step as { usage?: unknown }).usage == null) continue;
@@ -222,12 +247,12 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     }
 
     let text = result.text;
-    if (result.finishReason === 'length' && text.trim()) {
+    if (!result.timedOut && result.finishReason === 'length' && text.trim()) {
       try {
       const continued = await withAiCapacityRetry(async () => {
         const workersAI = createWorkersAI({
           binding: ctx.c.env.AI,
-          gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }),
+          gateway: gatewayForExecution({ ...textStamp, kind: 'agent' }, reasoningMs),
         });
         const streamed = streamText({
           model: workersAI(modelId as never),
@@ -247,6 +272,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
           ...(forcedReasoning
             ? { providerOptions: { 'workers-ai': { reasoning_effort: 'low' as const } } }
             : {}),
+          ...stepTimeout,
         });
         await followAgentStream(streamed.fullStream);
         const [more, usage] = await Promise.all([streamed.text, streamed.usage]);
@@ -278,7 +304,15 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     { role: 'user', content: userText },
   ];
 
-  let aiResponse = await runTextModel(ctx.c.env, modelId, messages, outputLimit, modelParams, textStamp);
+  let aiResponse = await runTextModel(
+    ctx.c.env,
+    modelId,
+    messages,
+    outputLimit,
+    modelParams,
+    textStamp,
+    reasoningMs,
+  );
   let text = extractTextFromAiResponse(aiResponse);
   await billOnce(aiResponse, text);
   let sql = extractSql(text);
@@ -299,6 +333,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       retryTokens,
       modelParams,
       textStamp,
+      reasoningMs,
     );
     const retryText = extractTextFromAiResponse(aiResponse);
     await billOnce(aiResponse, retryText);

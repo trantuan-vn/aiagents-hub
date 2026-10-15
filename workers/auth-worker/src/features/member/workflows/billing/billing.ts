@@ -20,6 +20,8 @@ import {
 } from './plan.js';
 import {
   gatewayForExecution,
+  isReasoningCutoff,
+  runWithinReasoningBudget,
   withAiCapacityRetry,
   WORKERS_AI_GATEWAY,
   type AiCallStamp,
@@ -394,26 +396,29 @@ export async function runTextModel(
   maxTokens = 1024,
   extra?: Record<string, unknown>,
   stamp?: AiCallStamp,
+  reasoningMs?: number,
 ): Promise<unknown> {
   const id = (modelId || DEFAULT_TEXT_MODEL) as keyof AiModels;
-  const textGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'text' }) : WORKERS_AI_GATEWAY;
+  const textGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'text' }, reasoningMs) : WORKERS_AI_GATEWAY;
   const promptText = promptTextOf(messages);
+  const runOptions = (signal?: AbortSignal) =>
+    signal ? { gateway: textGateway, signal } : { gateway: textGateway };
 
-  const runBuffered = () =>
+  const runBuffered = (signal?: AbortSignal) =>
     withAiCapacityRetry(() =>
       env.AI.run(
         id,
         { messages, max_tokens: maxTokens, ...extra },
-        { gateway: textGateway },
+        runOptions(signal),
       ),
     );
 
-  const runStreaming = () =>
+  const runStreaming = (signal?: AbortSignal) =>
     withAiCapacityRetry(async () => {
       const raw = await env.AI.run(
         id,
         { messages, max_tokens: maxTokens, ...extra, stream: true },
-        { gateway: textGateway },
+        runOptions(signal),
       );
       if (!isReadableByteStream(raw)) {
         const text = extractTextFromAiResponse(raw);
@@ -423,26 +428,25 @@ export async function runTextModel(
       return readWorkersAiEventStream(raw, pushAgentActivityText, promptText);
     });
 
-  const run = async () => {
-    if (!hasAgentActivity()) return runBuffered();
-    try {
-      return await runStreaming();
-    } catch (e) {
+  const run = (signal?: AbortSignal) => {
+    if (!hasAgentActivity()) return runBuffered(signal);
+    return runStreaming(signal).catch((e: unknown) => {
       const msg = e instanceof Error ? e.message : String(e);
-      if (/5016|agree|Prior to using this model/i.test(msg)) throw e;
+      if (/5016|agree|Prior to using this model/i.test(msg) || isReasoningCutoff(e)) throw e;
       console.warn('[runTextModel] stream failed; using a buffered response', msg);
-      return runBuffered();
-    }
+      return runBuffered(signal);
+    });
   };
 
   try {
-    return await run();
+    return await runWithinReasoningBudget(reasoningMs, run);
   } catch (e) {
+    if (isReasoningCutoff(e)) throw e;
     const msg = e instanceof Error ? e.message : String(e);
     if (/5016|agree|Prior to using this model/i.test(msg)) {
       const agreeGateway = stamp ? gatewayForExecution({ ...stamp, kind: 'agree' }) : undefined;
       await env.AI.run(id, { prompt: 'agree' }, agreeGateway ? { gateway: agreeGateway } : undefined);
-      return await run();
+      return await runWithinReasoningBudget(reasoningMs, run);
     }
     throw e;
   }

@@ -37,14 +37,14 @@ vi.mock('../../billing/billing.js', () => billingMock);
 
 import { executeAgent } from './execute.js';
 
-function ctx(agentKind: string): NodeContext {
+function ctx(agentKind: string, data: Record<string, unknown> = {}): NodeContext {
   const definition: WorkflowDefinition = {
     nodes: [
       {
         id: 'agent_1',
         type: 'agent',
         position: { x: 0, y: 0 },
-        data: { agentKind, prompt: 'hi', serviceEndpoint: '/svc' },
+        data: { agentKind, prompt: 'hi', serviceEndpoint: '/svc', ...data },
       },
       {
         id: 'svc_1',
@@ -84,6 +84,24 @@ describe('executeAgent dispatcher', () => {
     expect(billingMock.runTextModel).toHaveBeenCalled();
     expect(billingMock.billAgentUsage).toHaveBeenCalledTimes(1);
     expect(out.text).toBe('SELECT 1;');
+  });
+
+  it('forwards a tools_agent reasoning budget in seconds as milliseconds', async () => {
+    await executeAgent(ctx('tools_agent', { maxReasoningSeconds: 12 }));
+    expect(billingMock.runTextModel).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      12_000,
+    );
+  });
+
+  it('leaves reasoning uncapped when the field is empty', async () => {
+    await executeAgent(ctx('tools_agent', { maxReasoningSeconds: '' }));
+    expect(billingMock.runTextModel.mock.calls[0]?.[6]).toBeUndefined();
   });
 
   it('routes reasoning_agent to the governed controller', async () => {

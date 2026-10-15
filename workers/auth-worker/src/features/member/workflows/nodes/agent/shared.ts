@@ -37,6 +37,24 @@ export function usesForcedReasoning(modelId: string): boolean {
   return modelId.toLowerCase().includes('glm-5.3');
 }
 
+const MIN_REASONING_SECONDS = 3;
+const MAX_REASONING_SECONDS = 120;
+
+/**
+ * Wall-clock budget for one tools_agent model step, in milliseconds.
+ * Workers AI exposes reasoning effort (low/high/max), not a seconds cap.
+ * Empty, zero, or non-numeric values mean no extra cap.
+ */
+export function resolveMaxReasoningMs(
+  agentData: Record<string, unknown>,
+  input: Record<string, unknown> = {},
+): number | undefined {
+  const seconds = resolveConfiguredNumber(agentData.maxReasoningSeconds, input);
+  if (seconds == null || !(seconds > 0)) return undefined;
+  const clamped = Math.min(MAX_REASONING_SECONDS, Math.max(MIN_REASONING_SECONDS, Math.floor(seconds)));
+  return clamped * 1000;
+}
+
 export function resolveMaxTokens(
   agentData: Record<string, unknown>,
   serviceOptions?: Record<string, unknown>,

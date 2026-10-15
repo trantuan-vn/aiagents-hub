@@ -3987,6 +3987,8 @@
     "agent_opt_safety_level": "Safety level",
     "agent_opt_safety_standard": "Standard",
     "agent_opt_safety_strict": "Strict",
+    "agent_opt_max_reasoning_seconds": "Max reasoning seconds",
+    "agent_opt_max_reasoning_seconds_desc": "Each model step stops after this many seconds. Empty keeps the model's own wait. Values are clamped to 3–120.",
     "agent_kind_tools_agent": "Tools Agent",
     "agent_kind_tools_agent_desc": "LLM step with optional tool calling",
     "agent_kind_reasoning_agent": "Reasoning Agent",

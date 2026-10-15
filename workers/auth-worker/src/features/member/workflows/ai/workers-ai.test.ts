@@ -4,6 +4,8 @@ import {
   gatewayForExecution,
   isAiAccountLimitedError,
   isAiCapacityError,
+  isReasoningCutoff,
+  reasoningBudgetError,
   stampFromNode,
   withAiCapacityRetry,
 } from './workers-ai.js';
@@ -35,10 +37,28 @@ describe('gatewayForExecution', () => {
     expect(gateway.metadata).not.toHaveProperty('owner');
   });
 
+  it('caps one inference and skips gateway retries when a reasoning budget is set', () => {
+    const gateway = gatewayForExecution(
+      { executionKey: key, workflowId: '42', nodeId: 'node-1', kind: 'agent' },
+      12_000,
+    );
+    expect(gateway.requestTimeoutMs).toBe(12_000);
+    expect(gateway.retries).toEqual({ maxAttempts: 1, retryDelayMs: 0, backoff: 'constant' });
+    expect(Object.keys(gateway.metadata).sort()).toEqual(['executionKey', 'kind', 'nodeId', 'workflowId']);
+  });
+
   it('fails closed when the execution key is missing', () => {
     expect(() =>
       gatewayForExecution(stampFromNode({ node: { id: 'n' }, meta: { workflowId: 1 } }, 'text')),
     ).toThrow(/ai_call_missing_execution_key/);
+  });
+});
+
+describe('reasoning budget', () => {
+  it('recognizes a budget error and a provider timeout', () => {
+    expect(isReasoningCutoff(reasoningBudgetError(8000))).toBe(true);
+    expect(isReasoningCutoff(new DOMException('step timeout of 8000ms exceeded', 'TimeoutError'))).toBe(true);
+    expect(isReasoningCutoff(new Error('3040: Capacity temporarily exceeded'))).toBe(false);
   });
 });
 

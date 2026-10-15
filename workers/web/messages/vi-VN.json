@@ -3987,6 +3987,8 @@
     "agent_opt_safety_level": "Mức an toàn",
     "agent_opt_safety_standard": "Tiêu chuẩn",
     "agent_opt_safety_strict": "Nghiêm ngặt",
+    "agent_opt_max_reasoning_seconds": "Số giây tối đa suy luận",
+    "agent_opt_max_reasoning_seconds_desc": "Mỗi bước gọi model dừng sau số giây này. Để trống thì giữ thời gian chờ của model. Giá trị được đưa về khoảng 3–120.",
     "agent_kind_tools_agent": "Tools Agent",
     "agent_kind_tools_agent_desc": "Bước LLM với tool calling tùy chọn",
     "agent_kind_reasoning_agent": "Reasoning Agent",

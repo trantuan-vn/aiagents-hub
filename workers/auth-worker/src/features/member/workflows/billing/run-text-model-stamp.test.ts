@@ -42,4 +42,29 @@ describe('runTextModel gateway stamp', () => {
     expect(agree.gateway.eventId).toBe(stamp.executionKey);
     expect(agree.gateway.metadata.kind).toBe('agree');
   });
+
+  it('stops the call when the reasoning budget elapses', async () => {
+    vi.useFakeTimers();
+    try {
+      const run = vi.fn().mockImplementation(() => new Promise(() => undefined));
+      const env = { AI: { run } } as unknown as Env;
+      const pending = runTextModel(
+        env,
+        '@cf/test',
+        [{ role: 'user', content: 'hi' }],
+        32,
+        undefined,
+        stamp,
+        4_000,
+      );
+      const assertion = expect(pending).rejects.toThrow('Agent reasoning exceeded 4s');
+      await vi.advanceTimersByTimeAsync(4_000);
+      await assertion;
+      const options = run.mock.calls[0]?.[2] as { gateway: { requestTimeoutMs?: number; retries?: { maxAttempts?: number } } };
+      expect(options.gateway.requestTimeoutMs).toBe(4_000);
+      expect(options.gateway.retries?.maxAttempts).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

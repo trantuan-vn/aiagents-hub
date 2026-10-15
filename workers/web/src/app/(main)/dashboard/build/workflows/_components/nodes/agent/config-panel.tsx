@@ -371,6 +371,30 @@ export function AgentNodeConfigPanel({
                   </p>
                 ) : null}
 
+                {agentKind === "tools_agent" ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">{t("agent_opt_max_reasoning_seconds")}</Label>
+                    <ExpressionDropField
+                      value={
+                        nodeData.maxReasoningSeconds == null ? "" : String(nodeData.maxReasoningSeconds)
+                      }
+                      numeric
+                      inputClassName="h-9 text-xs"
+                      placeholder="15"
+                      onChange={(v) => {
+                        const trimmed = v.trim();
+                        patch({
+                          maxReasoningSeconds:
+                            trimmed === "" ? "" : trimmed.includes("{{") ? trimmed : Number(trimmed),
+                        });
+                      }}
+                    />
+                    <p className="text-muted-foreground text-[11px]">
+                      {t("agent_opt_max_reasoning_seconds_desc")}
+                    </p>
+                  </div>
+                ) : null}
+
                 <div className="space-y-3">
                   <Label className="text-xs">{t("field_options")}</Label>
                   {AGENT_EXTRA_OPTIONS.filter(

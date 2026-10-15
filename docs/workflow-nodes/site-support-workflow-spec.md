@@ -104,6 +104,8 @@ Resource bắt buộc. Endpoint **approved**, đã có `creditCoeffInput` và `c
 
 `maxTokens` của Agent: 700. Câu trả lời dài không giúp mở tài khoản.
 
+`maxReasoningSeconds` trên Tools Agent giới hạn mỗi lần gọi model (giây). Để trống thì không cắt. Trang `/support` chậm khi model suy luận lâu: đặt 8–15, lưu, rồi publish lại. Giá trị ngoài 3–120 được kẹp về khoảng đó. Hết giờ mà chưa có câu trả lời thì lượt đó thất bại và trang rơi về câu mẫu.
+
 ### 4.3 Simple Memory
 
 `memoryKind: simple`, `sessionKey: "{{ $json.sessionId }}"`, `contextWindowLength: 8`.

@@ -103,14 +103,18 @@ type AgentStreamPart = {
   toolName?: string;
 };
 
-/** Forward AI SDK fullStream parts into the chat activity log. */
-export async function followAgentStream(stream: AsyncIterable<AgentStreamPart>): Promise<void> {
+/** Forward AI SDK fullStream parts into the chat activity log. Answer text lands in `into` when provided. */
+export async function followAgentStream(
+  stream: AsyncIterable<AgentStreamPart>,
+  into?: { text: string },
+): Promise<void> {
   for await (const part of stream) {
     if (part.type === 'reasoning-delta' && part.text) {
       pushAgentActivityText(part.text);
       continue;
     }
     if (part.type === 'text-delta' && part.text) {
+      if (into) into.text += part.text;
       pushAgentActivityText(part.text);
       continue;
     }

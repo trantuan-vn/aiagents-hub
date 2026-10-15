@@ -28,14 +28,20 @@ const GATEWAY_RETRIES = WORKERS_AI_GATEWAY.retries;
  * Stamp one execution's Workers AI calls so gateway logs filter by `event_id`.
  * Metadata is exactly four keys. Do not add owner, email, or prompt text.
  */
-export function gatewayForExecution(stamp: AiCallStamp) {
+export function gatewayForExecution(stamp: AiCallStamp, requestTimeoutMs?: number) {
   const executionKey = String(stamp.executionKey ?? '').trim();
   if (!executionKey) {
     throw new Error('ai_call_missing_execution_key');
   }
+  const timeoutMs =
+    requestTimeoutMs != null && Number.isFinite(requestTimeoutMs) && requestTimeoutMs > 0
+      ? Math.floor(requestTimeoutMs)
+      : undefined;
   return {
     id: AI_GATEWAY_ID,
-    retries: GATEWAY_RETRIES,
+    retries: timeoutMs
+      ? { maxAttempts: 1 as const, retryDelayMs: 0, backoff: 'constant' as const }
+      : GATEWAY_RETRIES,
     eventId: executionKey,
     metadata: {
       executionKey,
@@ -43,7 +49,54 @@ export function gatewayForExecution(stamp: AiCallStamp) {
       nodeId: stamp.nodeId == null ? '' : String(stamp.nodeId),
       kind: stamp.kind,
     },
+    ...(timeoutMs ? { requestTimeoutMs: timeoutMs } : {}),
   };
+}
+
+/** Visitor-facing failure when a tools_agent step passes its reasoning budget. */
+export function reasoningBudgetError(ms: number): Error {
+  const err = new Error(`Agent reasoning exceeded ${Math.round(ms / 1000)}s`);
+  err.name = 'ReasoningBudgetError';
+  return err;
+}
+
+export function isReasoningCutoff(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : '';
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return (
+    name === 'ReasoningBudgetError' ||
+    name === 'TimeoutError' ||
+    name === 'AbortError' ||
+    /timed out|timeout|aborted|reasoning exceeded/i.test(message)
+  );
+}
+
+/**
+ * Stop waiting after `ms`. The in-flight call is aborted; a late rejection is ignored
+ * so the workflow can return while the binding finishes closing the request.
+ */
+export async function runWithinReasoningBudget<T>(
+  ms: number | undefined,
+  run: (signal?: AbortSignal) => Promise<T>,
+): Promise<T> {
+  if (ms == null || !(ms > 0)) return run();
+  const controller = new AbortController();
+  const pending = run(controller.signal);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      pending,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(reasoningBudgetError(ms));
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+    pending.catch(() => undefined);
+  }
 }
 
 /** Production node path. Missing executionKey fails closed before `AI.run`. */
