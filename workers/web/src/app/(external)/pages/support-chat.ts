@@ -9,6 +9,19 @@ export type SupportCta = (typeof SUPPORT_CTA_ACTIONS)[number];
 
 const CTA_LINE = /^__support_cta__ (signup|packages|quickstart|plans|credits|contact)$/;
 
+export function siteSupportTimingUrl(): string {
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || "https://api.aiagents-hub.vn";
+  return `${apiBaseUrl.replace(/\/$/, "")}/public/site-support`;
+}
+
+/** Seconds from GET /public/site-support. Missing or invalid means hide the hint. */
+export function replyWithinSecondsFromBody(body: unknown): number | null {
+  if (!body || typeof body !== "object") return null;
+  const seconds = Number((body as { replyWithinSeconds?: unknown }).replyWithinSeconds);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return Math.round(seconds);
+}
+
 export function siteSupportChatUrl(): string | null {
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || "https://api.aiagents-hub.vn";
   const workflowId = process.env.NEXT_PUBLIC_SITE_SUPPORT_WORKFLOW_ID?.trim();
@@ -103,19 +116,26 @@ export class SupportChatError extends Error {
   readonly status: number;
   readonly requiresCaptcha: boolean;
   readonly siteKey: string | null;
+  readonly code: string | null;
 
   constructor(
     message: string,
     status: number,
-    extra?: { requiresCaptcha?: boolean; siteKey?: string | null },
+    extra?: { requiresCaptcha?: boolean; siteKey?: string | null; code?: string | null },
   ) {
     super(message);
     this.name = "SupportChatError";
     this.status = status;
     this.requiresCaptcha = Boolean(extra?.requiresCaptcha);
     this.siteKey = extra?.siteKey ?? null;
+    this.code = extra?.code ?? null;
   }
 }
+
+export type SiteSupportChatResult = {
+  output: string;
+  accountGate: boolean;
+};
 
 export async function postSiteSupportChat(params: {
   endpointUrl: string;
@@ -123,7 +143,7 @@ export async function postSiteSupportChat(params: {
   chatInput: string;
   turnstileToken?: string;
   signal?: AbortSignal;
-}): Promise<string> {
+}): Promise<SiteSupportChatResult> {
   const response = await fetch(params.endpointUrl, {
     method: "POST",
     credentials: "omit",
@@ -141,13 +161,19 @@ export async function postSiteSupportChat(params: {
     error?: unknown;
     requiresCaptcha?: unknown;
     siteKey?: unknown;
+    code?: unknown;
+    accountGate?: unknown;
   };
   if (!response.ok) {
     const message = typeof body.error === "string" ? body.error : "Chat workflow failed";
     throw new SupportChatError(message, response.status, {
       requiresCaptcha: body.requiresCaptcha === true,
       siteKey: typeof body.siteKey === "string" ? body.siteKey : null,
+      code: typeof body.code === "string" ? body.code : null,
     });
   }
-  return typeof body.output === "string" ? body.output : "";
+  return {
+    output: typeof body.output === "string" ? body.output : "",
+    accountGate: body.accountGate === true,
+  };
 }

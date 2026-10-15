@@ -27,6 +27,7 @@ import { createWorkflowHookRoutes } from './features/member/workflows/api/hooks-
 import { createFormHookRoutes } from './features/member/workflows/api/form-hooks-presentation';
 import { createChatHookRoutes } from './features/member/workflows/api/chat-hooks-presentation';
 import { consumeWorkflowCronRun } from './features/member/workflows/triggers/triggers';
+import { createPublicSiteSupportRoutes } from './features/member/workflows/triggers/site-support-public';
 import { scanContributionAndPropose } from './features/admin/billing/scan';
 import { processPendingCancels } from './features/member/paypal/subscriptions';
 import { rollupMarketingStats } from './features/admin/system-config/marketing-stats';
@@ -103,6 +104,7 @@ function createRoutes(bindingName: string) {
   });
 
   routes.route('/public', createPublicPlanRoutes());
+  routes.route('/public', createPublicSiteSupportRoutes(bindingName));
 
   // I. DASHBOARD
   // Auth middleware

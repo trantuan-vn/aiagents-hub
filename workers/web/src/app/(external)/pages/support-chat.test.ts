@@ -5,6 +5,7 @@ import {
   cannedSupportKey,
   parseSupportReply,
   postSiteSupportChat,
+  replyWithinSecondsFromBody,
   siteSupportChatUrl,
   SupportChatError,
   supportCtaHref,
@@ -32,6 +33,12 @@ test("support CTA paths stay on first-party pages", () => {
   assert.equal(supportCtaHref("plans"), "/docs/plans");
   assert.equal(supportCtaHref("credits"), "/docs/credits");
   assert.equal(supportCtaHref("contact"), "/contact");
+});
+
+test("replyWithinSecondsFromBody keeps a positive whole number", () => {
+  assert.equal(replyWithinSecondsFromBody({ replyWithinSeconds: 30 }), 30);
+  assert.equal(replyWithinSecondsFromBody({ replyWithinSeconds: null }), null);
+  assert.equal(replyWithinSecondsFromBody({}), null);
 });
 
 test("siteSupportChatUrl is absent until a workflow id is set", () => {
@@ -89,6 +96,57 @@ test("postSiteSupportChat sends the turnstile token and surfaces a captcha chall
       },
     );
     assert.equal(JSON.parse(sent).turnstileToken, "fresh-token");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("postSiteSupportChat reads the account gate without treating it as an error", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        output: "Open a free account.\n__support_cta__ signup",
+        accountGate: true,
+        status: "ok",
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    );
+  try {
+    const result = await postSiteSupportChat({
+      endpointUrl: "https://api.example/chat/34/trigger-support",
+      sessionId: "session-12345678",
+      chatInput: "hello",
+    });
+    assert.equal(result.accountGate, true);
+    assert.equal(parseSupportReply(result.output).cta, "signup");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("postSiteSupportChat keeps the daily limit code on 429", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ error: "Too many chat messages", retryAfter: 3600, code: "site_support_daily" }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    });
+  try {
+    await assert.rejects(
+      () =>
+        postSiteSupportChat({
+          endpointUrl: "https://api.example/chat/34/trigger-support",
+          sessionId: "session-12345678",
+          chatInput: "hello",
+        }),
+      (error: unknown) => {
+        assert.ok(error instanceof SupportChatError);
+        assert.equal(error.status, 429);
+        assert.equal(error.code, "site_support_daily");
+        return true;
+      },
+    );
   } finally {
     globalThis.fetch = original;
   }

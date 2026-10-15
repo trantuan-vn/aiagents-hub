@@ -1361,9 +1361,12 @@
     "signed_in_banner": "You already have an account. For work inside your workspace, use the dashboard assistant.",
     "signed_in_link": "Open dashboard assistant",
     "rate_limited": "Try again in a few minutes, or email support@aiagents-hub.vn.",
+    "rate_limited_daily": "Guest questions are limited to 30 a day. Try again tomorrow, or email support@aiagents-hub.vn.",
+    "account_gate": "You have asked quite a few questions as a guest. Open a free account to keep exploring workflows, Credits, and plans.",
     "fallback_email_note": "Email support@aiagents-hub.vn if you still need a person.",
     "type_message": "Type your message...",
     "secret_notice": "Don't send a password, one-time code, or card number.",
+    "reply_eta": "A reply will be ready in {seconds} seconds.",
     "captcha_hint": "Complete the security check to send a message.",
     "cta": {
       "signup": "Open an account",

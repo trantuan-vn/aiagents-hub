@@ -2,6 +2,10 @@ import { Hono } from 'hono';
 
 import { assertSupportChatChallenge } from '../../../../shared/human-challenge';
 import { trackPublicChatPost } from '../../../../shared/public-chat-rate-limit';
+import {
+  SITE_SUPPORT_ACCOUNT_GATE_OUTPUT,
+  trackSiteSupportPost,
+} from '../../../../shared/site-support-rate-limit';
 import { CaptchaRequiredError, InvalidCaptchaError } from '../../../../shared/turnstile';
 import { getClientIp, handleErrorWithoutIp } from '../../../../shared/utils';
 import { buildChatCorsHeaders } from './chat-cors.js';
@@ -451,9 +455,16 @@ async function handleChatRequest(
       throw e;
     }
     if (chatAuth === 'none') {
-      const limited = await trackPublicChatPost(c.env, getClientIp(c));
-      if (limited) {
-        return c.json({ error: 'Too many chat messages', retryAfter: limited.retryAfter }, 429, headers);
+      const limited = await trackSiteSupportPost(c.env, getClientIp(c));
+      if (limited?.kind === 'account_gate') {
+        return c.json({ output: SITE_SUPPORT_ACCOUNT_GATE_OUTPUT, accountGate: true, status: 'ok' }, 200, headers);
+      }
+      if (limited?.kind === 'blocked') {
+        return c.json(
+          { error: 'Too many chat messages', retryAfter: limited.retryAfter, code: limited.code },
+          429,
+          headers,
+        );
       }
     }
   }

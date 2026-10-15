@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isSiteSupportChat } from './site-support';
+import { isSiteSupportChat, siteSupportReplySeconds } from './site-support';
 
 const env = {
   SITE_SUPPORT_WORKFLOW_ID: '34',
@@ -19,5 +19,23 @@ describe('isSiteSupportChat', () => {
 
   it('stays off when the support target is not configured', () => {
     expect(isSiteSupportChat({}, 34, 'abc', 'trigger-support')).toBe(false);
+  });
+});
+
+describe('siteSupportReplySeconds', () => {
+  it('uses the published tools agent cap', () => {
+    expect(
+      siteSupportReplySeconds({
+        nodes: [{ type: 'agent', data: { agentKind: 'tools_agent', maxReasoningSeconds: 30 } }],
+      }),
+    ).toBe(30);
+  });
+
+  it('hides the hint when the agent has no cap', () => {
+    expect(
+      siteSupportReplySeconds({
+        nodes: [{ type: 'agent', data: { agentKind: 'tools_agent' } }],
+      }),
+    ).toBeNull();
   });
 });

@@ -15,8 +15,10 @@ import {
   cannedSupportKey,
   parseSupportReply,
   postSiteSupportChat,
+  replyWithinSecondsFromBody,
   SUPPORT_CHAT_INPUT_MAX,
   SUPPORT_SESSION_STORAGE_KEY,
+  siteSupportTimingUrl,
   supportCtaHref,
   SupportChatError,
   type SupportCta,
@@ -54,6 +56,7 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [replySeconds, setReplySeconds] = useState<number | null>(null);
   const sendingRef = useRef(false);
   const nextId = useRef(2);
 
@@ -104,6 +107,21 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
       .catch(() => setSignedIn(false));
   }, []);
 
+  useEffect(() => {
+    if (!liveWorkflow) return;
+    const controller = new AbortController();
+    void fetch(siteSupportTimingUrl(), { signal: controller.signal, cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!controller.signal.aborted) setReplySeconds(replyWithinSecondsFromBody(body));
+      })
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        setReplySeconds(null);
+      });
+    return () => controller.abort();
+  }, [liveWorkflow]);
+
   const takeId = () => {
     const id = nextId.current;
     nextId.current += 1;
@@ -146,9 +164,13 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
       chatInput,
       turnstileToken: captcha.turnstileTokenForBody(),
     })
-      .then(async (output) => {
+      .then(async (result) => {
         await captcha.onRequestSuccess().catch(() => undefined);
-        const parsed = parseSupportReply(output);
+        if (result.accountGate) {
+          finish({ id: takeId(), role: "assistant", content: t("account_gate"), cta: "signup" });
+          return;
+        }
+        const parsed = parseSupportReply(result.output);
         if (!parsed.text && !parsed.cta) {
           finish(cannedReply(chatInput, true));
           return;
@@ -174,7 +196,8 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
           return;
         }
         if (error instanceof SupportChatError && error.status === 429) {
-          finish({ id: takeId(), role: "assistant", content: t("rate_limited") });
+          const key = error.code === "site_support_daily" ? "rate_limited_daily" : "rate_limited";
+          finish({ id: takeId(), role: "assistant", content: t(key) });
           return;
         }
         finish(cannedReply(chatInput, true));
@@ -307,6 +330,9 @@ const Support = ({ chatUrl = null }: { chatUrl?: string | null }) => {
                     </Button>
                   </div>
                   <p className="text-muted-foreground mt-2 text-xs">{t("secret_notice")}</p>
+                  {replySeconds ? (
+                    <p className="text-muted-foreground mt-1 text-xs">{t("reply_eta", { seconds: replySeconds })}</p>
+                  ) : null}
                 </div>
               </Card>
             </div>
