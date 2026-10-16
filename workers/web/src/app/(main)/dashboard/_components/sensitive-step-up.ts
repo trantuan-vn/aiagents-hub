@@ -1,5 +1,6 @@
 export const STEP_UP_SESSION_KEY = "dashboard_sensitive_step_up_allow_once";
-export const STEP_UP_ONCE_TTL_MS = 2 * 60 * 1000;
+/** Matches the server sensitive-action unlock window so a slow return after verify still lands. */
+export const STEP_UP_ONCE_TTL_MS = 30 * 60 * 1000;
 
 const ACCOUNT_SECURITY_PREFIXES = [
   "/dashboard/control/token",

@@ -5,7 +5,10 @@ import { createPasskeyAuthApplication } from '../account/passkey';
 const STRONG_AUTH_SETUP_UNLOCK_PREFIX = 'StrongAuthSetupUnlock:';
 export const STRONG_AUTH_SETUP_UNLOCK_TTL_SEC = 15 * 60; // 15 minutes
 const SENSITIVE_ACTION_UNLOCK_PREFIX = 'SensitiveActionUnlock:';
-export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 5 * 60; // 5 minutes
+/** Idle window after step-up. Active sensitive calls refresh it, so work is not cut off at a fixed cutoff. */
+export const SENSITIVE_ACTION_UNLOCK_TTL_SEC = 30 * 60;
+/** Rewrite KV at most this often while the user keeps calling sensitive APIs. */
+const SENSITIVE_ACTION_UNLOCK_REFRESH_SEC = 5 * 60;
 export type StepUpMethod =
   | 'passkey'
   | 'authenticator'
@@ -46,13 +49,35 @@ function sensitiveActionUnlockKey(identifier: string, method: StepUpMethod): str
   return `${SENSITIVE_ACTION_UNLOCK_PREFIX}${identifier}:${method}`;
 }
 
+function sensitiveActionUnlockPayload(now: number): string {
+  return JSON.stringify({ refreshedAt: now });
+}
+
+function sensitiveActionRefreshedAt(raw: string): number {
+  try {
+    const parsed = JSON.parse(raw) as { refreshedAt?: number };
+    return typeof parsed.refreshedAt === 'number' ? parsed.refreshedAt : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export async function isSensitiveActionUnlocked(
   kv: KVNamespace,
   identifier: string,
   method: StepUpMethod,
 ): Promise<boolean> {
   const key = sensitiveActionUnlockKey(identifier, method);
-  return (await kv.get(key)) !== null;
+  const raw = await kv.get(key);
+  if (raw === null) return false;
+
+  const now = Date.now();
+  if (now - sensitiveActionRefreshedAt(raw) >= SENSITIVE_ACTION_UNLOCK_REFRESH_SEC * 1000) {
+    await kv.put(key, sensitiveActionUnlockPayload(now), {
+      expirationTtl: SENSITIVE_ACTION_UNLOCK_TTL_SEC,
+    });
+  }
+  return true;
 }
 
 export async function markSensitiveActionUnlocked(
@@ -61,7 +86,9 @@ export async function markSensitiveActionUnlocked(
   method: StepUpMethod,
 ): Promise<void> {
   const key = sensitiveActionUnlockKey(identifier, method);
-  await kv.put(key, '1', { expirationTtl: SENSITIVE_ACTION_UNLOCK_TTL_SEC });
+  await kv.put(key, sensitiveActionUnlockPayload(Date.now()), {
+    expirationTtl: SENSITIVE_ACTION_UNLOCK_TTL_SEC,
+  });
 }
 
 /** Account có số dư hoặc đã nạp tier — cần TOTP, SMS 2FA hoặc passkey trước khi dùng dashboard. */
