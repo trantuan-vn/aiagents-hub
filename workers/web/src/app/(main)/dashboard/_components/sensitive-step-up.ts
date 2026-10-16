@@ -10,6 +10,7 @@ const ACCOUNT_SECURITY_PREFIXES = [
   "/dashboard/control/account/payout-beneficiary",
   "/dashboard/notify",
   "/dashboard/control/notifications",
+  "/dashboard/control/assistant",
 ] as const;
 
 const ADMIN_MANAGEMENT_PREFIXES = [

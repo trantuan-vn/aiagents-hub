@@ -20,6 +20,7 @@ import {
 } from '../billing/billing.js';
 import type { ResolvedWorkflow } from '../execution/workflow-context.js';
 import { findPrimaryAgentNode, workflowAttribution } from '../execution/workflow-context.js';
+import { assistantAdminScopeNote } from '../../../assistant/admin-access.js';
 import { appendMemberActionsNote } from '../../../assistant/confirmation.js';
 import { WORKERS_AI_GATEWAY } from '../ai/workers-ai.js';
 import { executeReasoningAgent } from '../nodes/agent/execute-reasoning.js';
@@ -188,6 +189,7 @@ export async function createWorkflowChatStreamResponse(
       c,
       bindingName,
       user,
+      sessionIdentifier: user.identifier,
       triggerContext: { chatInput: latestUser, query: latestUser },
     },
     resolved.definition,
@@ -214,6 +216,7 @@ export async function createWorkflowChatStreamResponse(
     toolNames.length
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
+    assistantAdminScopeNote(toolNames),
     memoryCollection
       ? 'Use the retrieve_memory tool to ground answers in stored knowledge when relevant.'
       : '',

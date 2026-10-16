@@ -33,6 +33,10 @@ import {
 } from '../triggers/chat-submission.js';
 import { isSiteSupportChat } from '../triggers/site-support.js';
 import {
+  dashboardAssistantStepUpDenied,
+  isDashboardAssistantChat,
+} from './dashboard-assistant-step-up.js';
+import {
   findChatTriggerByWorkflowId,
   resolveOwnedWorkflow,
   syncChatTriggersForWorkflow,
@@ -372,6 +376,14 @@ async function handleChatRequest(
     });
   }
 
+  if (
+    c.req.method === 'POST' &&
+    isDashboardAssistantChat(c.env, workflowId, ctx.ownerId, ctx.chatPath)
+  ) {
+    const denied = await dashboardAssistantStepUpDenied(c, bindingName, sessionIdentifier ?? '');
+    if (denied) return c.json(denied.body, denied.status, headers);
+  }
+
   if (!gated.resolved.isOwnedByUser && !runnerMayUseTrigger({
     publicTriggerKinds: gated.resolved.workflow.publicTriggerKinds,
     shareGrants: gated.resolved.workflow.shareGrants,
@@ -484,6 +496,7 @@ async function handleChatRequest(
       executionMode: mode,
       autoApproveHumanReview: ctx.trigger?.autoApproveHumanReview === 1,
       actor: gated.actor,
+      callerIdentifier: sessionIdentifier,
     });
 
     await broadcastChatResult(

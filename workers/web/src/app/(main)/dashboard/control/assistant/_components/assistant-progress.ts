@@ -6,6 +6,13 @@ export type AssistantRunResult = {
   status?: string;
 };
 
+export class AssistantStepUpRequiredError extends Error {
+  constructor() {
+    super("Step-up required");
+    this.name = "AssistantStepUpRequiredError";
+  }
+}
+
 function parseEventBlock(block: string): Record<string, unknown> | null {
   const line = block
     .split("\n")
@@ -39,7 +46,8 @@ export async function postAssistantChat(params: {
   });
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.ok && !contentType.includes("text/event-stream")) {
-    const body = (await response.json().catch(() => ({}))) as { error?: unknown };
+    const body = (await response.json().catch(() => ({}))) as { error?: unknown; stepUpRequired?: boolean };
+    if (body.stepUpRequired) throw new AssistantStepUpRequiredError();
     throw new Error(typeof body.error === "string" ? body.error : "Chat workflow failed");
   }
   if (!response.body || !contentType.includes("text/event-stream")) {

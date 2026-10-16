@@ -40,6 +40,8 @@ interface AgentToolContext {
   c?: any;
   bindingName?: string;
   user?: { identifier: string };
+  /** Verified hub session email. Admin tools are registered only from this value. */
+  sessionIdentifier?: string | null;
 }
 
 /** Fold any linked retrieve/validate tool into Code Mode (not only get-rag/check-sql). */
@@ -263,6 +265,7 @@ export function buildLinkedAgentTools(
       c: ctx.c,
       bindingName: ctx.bindingName,
       user: ctx.user,
+      sessionIdentifier: ctx.sessionIdentifier,
     };
     if (mod.createAgentTools) {
       for (const created of mod.createAgentTools(bind)) {

@@ -18,6 +18,8 @@ import { queryPaymentTransactionTool } from '../../../../../assistant/tools/quer
 import { refundPaymentTool } from '../../../../../assistant/tools/refund-payment-tool';
 import { revokeAllApiKeysTool } from '../../../../../assistant/tools/revoke-all-api-keys-tool';
 import { revokeApiKeyTool } from '../../../../../assistant/tools/revoke-api-key-tool';
+import { createAdminAssistantTools } from '../../../../../assistant/tools/admin-tools';
+import { isVerifiedAdminSession, normalizeAssistantSessionIdentifier } from '../../../../../assistant/admin-access';
 import { withUserConfirmation } from '../../../../../assistant/confirmation';
 import type { AgentToolBindContext, ToolModule } from '../shared/tool-module';
 
@@ -72,6 +74,20 @@ export const memberActionsToolModule: ToolModule = {
       name,
       tool: withUserConfirmation(factory(bind.c, bind.bindingName as string, user), latest, name),
     }));
-    return [...reads, ...writes];
+    const sessionIdentifier = normalizeAssistantSessionIdentifier(bind.sessionIdentifier);
+    const admin =
+      sessionIdentifier && isVerifiedAdminSession(bind.env, sessionIdentifier)
+        ? createAdminAssistantTools({
+            env: bind.env,
+            c: bind.c,
+            bindingName: bind.bindingName,
+            adminIdentifier: sessionIdentifier,
+          })
+        : { reads: [], writes: [] };
+    const adminWrites = admin.writes.map((item) => ({
+      name: item.name,
+      tool: withUserConfirmation(item.tool, latest, item.name),
+    }));
+    return [...reads, ...writes, ...admin.reads, ...adminWrites];
   },
 };

@@ -30,6 +30,8 @@ import { queryPaymentTransactionTool } from './tools/query-payment-transaction-t
 import { refundPaymentTool } from './tools/refund-payment-tool';
 import { revokeAllApiKeysTool } from './tools/revoke-all-api-keys-tool';
 import { revokeApiKeyTool } from './tools/revoke-api-key-tool';
+import { createAdminAssistantTools } from './tools/admin-tools';
+import { assistantAdminScopeNote, isVerifiedAdminSession, normalizeAssistantSessionIdentifier } from './admin-access';
 
 type ToolFactory = (c: any, bindingName: string, user: any) => any;
 type UserRole = 'member' | 'admin';
@@ -220,6 +222,19 @@ export async function createAssistantAgent(
   });
 
   const tools = buildToolset(c, bindingName, user, latestUserMessageText);
+  const sessionIdentifier = normalizeAssistantSessionIdentifier(user?.identifier);
+  if (sessionIdentifier && isVerifiedAdminSession(c.env, sessionIdentifier)) {
+    const admin = createAdminAssistantTools({
+      env: c.env,
+      c,
+      bindingName,
+      adminIdentifier: sessionIdentifier,
+    });
+    for (const item of admin.reads) tools[item.name] = item.tool;
+    for (const item of admin.writes) {
+      tools[item.name] = withUserConfirmation(item.tool, latestUserMessageText, item.name);
+    }
+  }
   const enabledTools = Object.keys(tools);
   const modelId = ASSISTANT_CHAT_SERVICE.model;
 
@@ -251,6 +266,7 @@ export async function createAssistantAgent(
       enabledTools.length
         ? `Enabled tools for this user: ${enabledTools.join(', ')}.`
         : 'No tools are enabled for this user. Reply with guidance instead of attempting tool calls.',
+      assistantAdminScopeNote(enabledTools),
       'For any tool call, if required parameters are missing, first use available lookup/list tools to fetch options for the user to choose from.',
       'If lookup tools are unavailable or still insufficient, ask the user to provide the missing fields explicitly, then confirm the final payload before executing the action.',
       'Only ask for confirmation before mutation actions (create/update/delete/cancel/refund/revoke).',

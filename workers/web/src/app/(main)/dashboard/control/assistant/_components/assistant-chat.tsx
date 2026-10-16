@@ -18,7 +18,7 @@ import {
   getPendingConfirmationKey,
   shouldShowConfirmationActions,
 } from "./assistant-chat-helpers";
-import { postAssistantChat } from "./assistant-progress";
+import { AssistantStepUpRequiredError, postAssistantChat } from "./assistant-progress";
 import type { AssistantUIMessage } from "./assistant-types";
 
 type AssistantTranslations = ReturnType<typeof useTranslations<"AssistantPage">>;
@@ -101,6 +101,12 @@ export function AssistantChat({ chatUrl }: { chatUrl: string | null }) {
       setRunSteps([]);
       setStatus("ready");
     } catch (cause) {
+      if (cause instanceof AssistantStepUpRequiredError) {
+        window.location.assign(
+          `/dashboard/step-up?returnTo=${encodeURIComponent("/dashboard/control/assistant")}`,
+        );
+        return;
+      }
       if (cause instanceof DOMException && cause.name === "AbortError") {
         setStatus("ready");
         return;

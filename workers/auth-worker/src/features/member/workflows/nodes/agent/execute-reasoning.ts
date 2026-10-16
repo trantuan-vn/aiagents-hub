@@ -1,5 +1,6 @@
 import { REASONING_AGENT_DEFAULTS } from '@aiagents-hub/workflow-nodes';
 
+import { assistantAdminScopeNote } from '../../../../assistant/admin-access.js';
 import { appendMemberActionsNote } from '../../../../assistant/confirmation.js';
 import { generateText, stepCountIs, streamText, tool, type ToolSet } from 'ai';
 import { createWorkersAI } from 'workers-ai-provider';
@@ -690,6 +691,7 @@ async function runToolChat(s: Shared, linked: ReturnType<typeof resolveAgentReso
       c: ctx.c,
       bindingName: ctx.bindingName,
       user: ctx.user,
+      sessionIdentifier: ctx.sessionIdentifier,
     },
     ctx.definition,
     ctx.node.id,
@@ -727,6 +729,7 @@ async function runToolChat(s: Shared, linked: ReturnType<typeof resolveAgentReso
           toolNames.includes(ASK_USER_TOOL) ? ` Call ${ASK_USER_TOOL} only when required details are missing and no tool can fill them.` : ''
         }`
       : 'If you lack required details, say so. Do not guess.',
+    assistantAdminScopeNote(toolNames),
     citationsRequired ? 'Every factual claim must include [n] citations that match the retrieved context.' : '',
     s.sessionSummary ? `Session memory:\n${s.sessionSummary}` : '',
     s.historyText ? `Previous conversation:\n${s.historyText}` : '',

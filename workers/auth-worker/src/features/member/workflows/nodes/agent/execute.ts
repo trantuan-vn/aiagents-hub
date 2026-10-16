@@ -30,6 +30,7 @@ import {
 } from '../../execution/agent-runtime.js';
 import { resolveAgentResources } from '../../engine/graph-helpers.js';
 import { attachSimpleMemory } from '../memory-node/simple.js';
+import { assistantAdminScopeNote } from '../../../../assistant/admin-access.js';
 import { appendMemberActionsNote } from '../../../../assistant/confirmation.js';
 import { siteSupportAnswerNote } from '../../triggers/site-support.js';
 import { ragBillingFromNodeContext, toolNodeConfig } from '../tool/shared/rag-context.js';
@@ -149,6 +150,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
       c: ctx.c,
       bindingName: ctx.bindingName,
       user: ctx.user,
+      sessionIdentifier: ctx.sessionIdentifier,
     },
     ctx.definition,
     ctx.node.id,
@@ -168,6 +170,7 @@ export async function executeAgent(ctx: NodeContext): Promise<NodeOutput> {
     toolNames.length
       ? `You can call these tools when helpful: ${toolNames.join(', ')}. Call a tool instead of guessing when it can fetch the answer.`
       : '',
+    assistantAdminScopeNote(toolNames),
     hasSaveRagTool && !saveRagSystemPrompt
       ? 'Use save_rag to persist extracted document text into the knowledge base.'
       : '',

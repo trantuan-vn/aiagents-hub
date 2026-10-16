@@ -39,6 +39,8 @@ export interface NodeContext {
   c: any;
   bindingName: string;
   user: { identifier: string };
+  /** Verified hub session email for this request. Absent when the caller is not signed in. */
+  sessionIdentifier?: string | null;
   userDO: DurableObjectStub<UserDO>;
   meta: WorkflowMeta;
   attr?: WorkflowAttribution;

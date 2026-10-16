@@ -28,6 +28,8 @@ export type AgentToolBindContext = {
   c?: any;
   bindingName?: string;
   user?: { identifier: string };
+  /** Verified hub session email for this request. Never copied from workflow data. */
+  sessionIdentifier?: string | null;
 };
 
 export type ToolModule = {

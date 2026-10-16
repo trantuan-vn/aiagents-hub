@@ -120,6 +120,8 @@ export interface ExecuteWorkflowParams {
   webhookItem?: import('../nodes/webhook/output.js').BuildWebhookItemParams;
   /** Merge into initial runContext (form trigger fan-out per-table payload). */
   runContextOverride?: Record<string, unknown>;
+  /** Verified hub session email. Null means this request has no signed-in caller. */
+  sessionIdentifier?: string | null;
   triggerKind?: string;
   /**
    * Yield after Save RAG / wall budget so DO alarm can continue.
@@ -262,6 +264,7 @@ interface NodeContext {
   c: any;
   bindingName: string;
   user: { identifier: string };
+  sessionIdentifier?: string | null;
   userDO: DurableObjectStub<UserDO>;
   meta: EngineMeta;
   attr: ReturnType<typeof workflowAttribution>;
@@ -305,6 +308,7 @@ async function executeNodeLogic(
     c: ctx.c,
     bindingName: ctx.bindingName,
     user: ctx.user,
+    sessionIdentifier: ctx.sessionIdentifier,
     userDO: ctx.userDO,
     meta: ctx.meta,
     attr: ctx.attr,
@@ -324,6 +328,7 @@ interface RunEngineArgs {
   c: any;
   bindingName: string;
   user: { identifier: string };
+  sessionIdentifier?: string | null;
   userDO: DurableObjectStub<UserDO>;
   persisted: PersistedState;
   executionKey: string;
@@ -510,6 +515,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
     c,
     bindingName,
     user,
+    sessionIdentifier: args.sessionIdentifier,
     userDO,
     meta,
     attr,
@@ -644,6 +650,7 @@ async function runEngine(args: RunEngineArgs): Promise<RunEngineResult> {
               c,
               bindingName,
               user,
+              sessionIdentifier: args.sessionIdentifier,
               userDO,
               meta,
               attr,
@@ -1209,6 +1216,7 @@ export async function executeWorkflowGraph(
       c,
       bindingName,
       user,
+      sessionIdentifier: params.sessionIdentifier,
       userDO,
       persisted,
       executionKey,
@@ -1466,6 +1474,7 @@ export async function continueChatExecution(params: {
   c: any;
   bindingName: string;
   user: { identifier: string };
+  sessionIdentifier?: string | null;
   runnerDoIdString?: string;
   executionKey: string;
   sessionId: string;
@@ -1524,6 +1533,7 @@ export async function continueChatExecution(params: {
     c: params.c,
     bindingName: params.bindingName,
     user: params.user,
+    sessionIdentifier: params.sessionIdentifier,
     userDO,
     persisted,
     executionKey: params.executionKey,
@@ -1563,6 +1573,7 @@ export async function executeOrContinueChat(
         c: params.c,
         bindingName: params.bindingName,
         user: params.user,
+        sessionIdentifier: params.sessionIdentifier,
         runnerDoIdString: params.runnerDoIdString,
         executionKey: pending.executionKey,
         sessionId,

@@ -250,6 +250,8 @@ export async function runChatTrigger(params: {
   executionMode: 'test' | 'production';
   autoApproveHumanReview?: boolean;
   actor?: WorkflowRunActor;
+  /** Verified hub session email. Workflow data cannot set this. */
+  callerIdentifier?: string | null;
 }): Promise<Awaited<ReturnType<typeof executeWorkflowGraph>>> {
   const output = buildChatTriggerOutput({
     sessionId: params.sessionId,
@@ -267,6 +269,7 @@ export async function runChatTrigger(params: {
     c: { env: params.env } as any,
     bindingName: params.bindingName,
     user: { identifier: actor.identifier },
+    sessionIdentifier: params.callerIdentifier ?? null,
     resolved,
     input: params.chatInput,
     autoApproveHumanReview: params.autoApproveHumanReview ?? true,

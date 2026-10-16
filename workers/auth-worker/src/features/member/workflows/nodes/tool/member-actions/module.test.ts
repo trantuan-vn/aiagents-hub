@@ -18,6 +18,7 @@ vi.mock('../../../../../ws/infrastructure/UserDO', () => ({
 import type { WorkflowDefinition } from '../../../domain/domain.js';
 import { buildLinkedAgentTools } from '../../../execution/agent-runtime.js';
 import { CONFIRM_APPROVE_TOKEN } from '../../../../../assistant/confirmation.js';
+import { isVerifiedAdminSession } from '../../../../../assistant/admin-access.js';
 
 const definition: WorkflowDefinition = {
   nodes: [
@@ -110,5 +111,50 @@ describe('member_actions tools', () => {
     const ran = await collect(confirmed.createApiKey as never, { name: 'ci' });
     expect(ran.some((chunk) => (chunk as { state?: string }).state === 'confirmation-required')).toBe(false);
     expect(ran.at(-1)).toMatchObject({ state: 'ready', ok: false });
+  });
+
+  it('keeps admin tools off the billing actor and on the verified admin session', async () => {
+    expect(isVerifiedAdminSession({ ADMIN_IDENTIFIERS: 'admin@example.com' } as Env, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')).toBe(false);
+
+    const asBillingAdmin = buildLinkedAgentTools(
+      {
+        env: { ADMIN_IDENTIFIERS: 'admin@example.com' } as Env,
+        userDO: {} as DurableObjectStub<any>,
+        c: {},
+        bindingName: 'USER_DO',
+        user: { identifier: 'admin@example.com' },
+        sessionIdentifier: 'member@example.com',
+        triggerContext: { chatInput: 'what can you do' },
+      },
+      definition,
+      'agent',
+    );
+    expect(asBillingAdmin.adminGetDashboardStats).toBeUndefined();
+    expect(asBillingAdmin.adminGrantPlan).toBeUndefined();
+
+    const asAdminSession = buildLinkedAgentTools(
+      {
+        env: { ADMIN_IDENTIFIERS: 'admin@example.com' } as Env,
+        userDO: {} as DurableObjectStub<any>,
+        c: {},
+        bindingName: 'USER_DO',
+        user: { identifier: 'member@example.com' },
+        sessionIdentifier: 'admin@example.com',
+        triggerContext: { chatInput: 'grant pro' },
+      },
+      definition,
+      'agent',
+    );
+    expect(asAdminSession.getOverview).toBeDefined();
+    expect(asAdminSession.adminGetDashboardStats).toBeDefined();
+    expect(asAdminSession.adminListEnterprises).toBeDefined();
+    expect(asAdminSession.adminGrantPlan).toBeDefined();
+
+    const blocked = await collect(asAdminSession.adminGrantPlan as never, {
+      email: 'user@example.com',
+      planId: 'pro',
+      reason: 'support',
+    });
+    expect(blocked[0]).toMatchObject({ state: 'confirmation-required' });
   });
 });
