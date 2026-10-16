@@ -3,6 +3,7 @@ import { UserDO } from '../../../ws/infrastructure/UserDO.js';
 import type { WorkflowDefinition } from '../domain/domain.js';
 import { WorkflowDefinitionSchema } from '../domain/domain.js';
 import { frozenEnterpriseRoyaltyPercent, isEnterpriseWorkflow } from '../../../enterprise/workflow-flag.js';
+import { isDashboardAssistantWorkflow } from '../api/dashboard-assistant-step-up.js';
 
 export interface ResolvedWorkflow {
   workflow: Record<string, unknown>;
@@ -48,6 +49,9 @@ export async function resolveWorkflow(
       .bind(ownerIdParam, workflowId)
       .first<Record<string, unknown>>();
     if (!row) throw new Error('Shared workflow not found');
+    if (isDashboardAssistantWorkflow(c.env, workflowId, ownerIdParam)) {
+      throw new Error('Shared workflow not found');
+    }
     if (row.status !== 'published') throw new Error('Workflow is not published');
 
     const ownerDO = binding.get(binding.idFromString(ownerIdParam)) as DurableObjectStub<UserDO>;

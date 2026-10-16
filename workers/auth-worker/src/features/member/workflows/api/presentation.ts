@@ -93,6 +93,7 @@ import { assignEnterpriseTriggerKeys } from '../../../enterprise/trigger-keys';
 import { deletePromoSite } from '../promo/promo-site';
 import { registerWorkflowPromoRoutes } from '../promo/promo-routes';
 import { registerShareInviteRoutes } from '../share-invite/routes.js';
+import { isDashboardAssistantWorkflow } from './dashboard-assistant-step-up';
 
 const CreateWorkflowSchema = MemberWorkflowWriteSchema;
 const UpdateWorkflowSchema = MemberWorkflowWriteSchema.partial();
@@ -257,6 +258,17 @@ function parseExecutionRow(row: any) {
 
 export function createWorkflowRoutes(bindingName: string) {
   const app = new Hono<{ Bindings: Env }>();
+
+  const hideDashboardAssistant = async (c: any, next: () => Promise<void>) => {
+    const workflowId = parseInt(c.req.param('workflowId'), 10);
+    const ownerId = String(c.req.param('ownerId') ?? '');
+    if (isDashboardAssistantWorkflow(c.env, workflowId, ownerId)) {
+      return c.json({ error: 'Not found' }, 404);
+    }
+    await next();
+  };
+  app.use('/shared/:ownerId/:workflowId', hideDashboardAssistant);
+  app.use('/shared/:ownerId/:workflowId/*', hideDashboardAssistant);
 
   const createRouteHandler = (handler: Function, errorMessage: string) => {
     return async (c: any) => {
@@ -518,12 +530,18 @@ export function createWorkflowRoutes(bindingName: string) {
       const offset = Math.max(0, parseInt(c.req.query('offset') || '0', 10));
       const starCount = c.req.query('starCount');
       const search = c.req.query('search');
+      const assistantId = Number(String(c.env.DASHBOARD_ASSISTANT_WORKFLOW_ID ?? '').trim());
+      const assistantOwner = String(c.env.DASHBOARD_ASSISTANT_OWNER_ID ?? '').trim();
       const { workflows, hasMore } = await listSharedWorkflowsFromD1(db, {
         limit,
         offset,
         viewerIdentifier: user.identifier,
         search: search || undefined,
         starCount: starCount ? parseInt(starCount, 10) : undefined,
+        excludeWorkflow:
+          assistantOwner && Number.isInteger(assistantId) && assistantId > 0
+            ? { ownerId: assistantOwner, id: assistantId }
+            : undefined,
       });
       return c.json({ workflows, hasMore });
     }, 'Failed to list shared workflows'),

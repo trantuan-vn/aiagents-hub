@@ -3,6 +3,7 @@ import { executeUtils } from '../../shared/utils';
 import { EnterpriseError } from './domain';
 import { d1, insertEvent } from './store';
 import { assignEnterpriseTriggerKeys } from './trigger-keys';
+import { isDashboardAssistantWorkflow } from '../member/workflows/api/dashboard-assistant-step-up';
 
 export type FlagRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -77,6 +78,9 @@ export async function deleteWorkflowGrants(db: D1Database, ownerId: string, work
  * The D1 projection may still show the row until the queue flushes.
  */
 export async function assertPublicSharedOnOwnerDo(env: Env, ownerId: string, workflowId: number): Promise<Record<string, unknown>> {
+  if (isDashboardAssistantWorkflow(env, workflowId, ownerId)) {
+    throw new Error('Shared workflow not found');
+  }
   const wf = await loadOwnerWorkflow(env, ownerId, workflowId);
   const shared = wf?.isShared === true || wf?.isShared === 1;
   if (!wf || !shared || isEnterpriseWorkflow(wf)) {

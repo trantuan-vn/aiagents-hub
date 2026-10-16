@@ -13,6 +13,8 @@ export interface SharedWorkflowFilters {
   excludeOwnerId?: string;
   /** Login email of the viewer. User-only grants are listed only for that account. */
   viewerIdentifier?: string;
+  /** Platform workflow kept off the community catalog (dashboard assistant). */
+  excludeWorkflow?: { ownerId: string; id: number };
 }
 
 export interface SharedWorkflowRow {
@@ -94,7 +96,7 @@ export async function listSharedWorkflowsFromD1(
   db: D1Database,
   filters: SharedWorkflowFilters,
 ): Promise<{ workflows: SharedWorkflowRow[]; hasMore: boolean }> {
-  const { limit = 50, offset = 0, starCount, search, excludeOwnerId, viewerIdentifier } = filters;
+  const { limit = 50, offset = 0, starCount, search, excludeOwnerId, viewerIdentifier, excludeWorkflow } = filters;
   const conditions: string[] = ['w."isShared" = 1', 'COALESCE(w."isEnterprise", 0) = 0', 'w."status" = ?'];
   const params: (string | number)[] = ['published'];
   const viewerEmail = String(viewerIdentifier ?? '').trim().toLowerCase();
@@ -104,6 +106,10 @@ export async function listSharedWorkflowsFromD1(
   if (excludeOwnerId) {
     conditions.push('w."user_id" != ?');
     params.push(excludeOwnerId);
+  }
+  if (excludeWorkflow && excludeWorkflow.ownerId && Number.isInteger(excludeWorkflow.id) && excludeWorkflow.id > 0) {
+    conditions.push('NOT (w."user_id" = ? AND w.id = ?)');
+    params.push(excludeWorkflow.ownerId, excludeWorkflow.id);
   }
   if (starCount != null && starCount >= 1 && starCount <= 5) {
     conditions.push(

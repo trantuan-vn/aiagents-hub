@@ -33,6 +33,7 @@ import {
 } from '../triggers/chat-submission.js';
 import { isSiteSupportChat } from '../triggers/site-support.js';
 import {
+  dashboardAssistantEmbeddedChat,
   dashboardAssistantStepUpDenied,
   isDashboardAssistantChat,
 } from './dashboard-assistant-step-up.js';
@@ -396,7 +397,11 @@ async function handleChatRequest(
     return c.json({ error: 'Chat is not available to community users', code: 'TRIGGER_NOT_PUBLIC', triggerKind: 'chat' }, 403, headers);
   }
 
-  const hosted = String(data?.chatMode ?? 'hostedChat') !== 'webhook';
+  const hosted = !dashboardAssistantEmbeddedChat(
+    mode,
+    isDashboardAssistantChat(c.env, workflowId, ctx.ownerId, ctx.chatPath),
+    data?.chatMode,
+  );
 
   if (c.req.method === 'GET') {
     if (!hosted) {

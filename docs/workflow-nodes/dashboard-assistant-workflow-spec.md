@@ -31,6 +31,7 @@ Chat production chỉ trừ ví người gọi khi workflow **vừa share vừa 
 | Share | bật, grant audience `all`, `triggerKinds` có `chat` |
 | Chat public | `chatPublic: true` (production từ chối `false` trước cả bước đăng nhập) |
 | Chat auth | `hub_users` |
+| Chat mode | `webhook` (Embedded Chat). Màn dashboard tự nhúng và POST tới URL chat. Không dùng Hosted Chat, vì mode đó mở trang `/chat/...` công khai |
 | Chat path | `dashboard-assistant` |
 
 `chatPublic: true` chỉ mở URL. `hub_users` vẫn chặn khách chưa đăng nhập.
@@ -74,7 +75,7 @@ Không dùng các node sau cho trợ lý này:
     "triggerKind": "chat",
     "chatPath": "dashboard-assistant",
     "chatPublic": true,
-    "chatMode": "hostedChat",
+    "chatMode": "webhook",
     "chatAuth": "hub_users",
     "initialMessages": "Xin chào. Mình hỗ trợ các việc trên dashboard của bạn."
   }

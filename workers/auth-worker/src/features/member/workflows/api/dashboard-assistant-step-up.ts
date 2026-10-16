@@ -13,6 +13,31 @@ type DashboardAssistantEnv = {
   DASHBOARD_ASSISTANT_CHAT_PATH?: string;
 };
 
+/** Platform assistant workflow. Hidden from the community catalog when both ids are set. */
+export function isDashboardAssistantWorkflow(
+  env: DashboardAssistantEnv,
+  workflowId: number | string,
+  ownerId: string,
+): boolean {
+  const expectedId = String(env.DASHBOARD_ASSISTANT_WORKFLOW_ID ?? '').trim();
+  const expectedOwner = String(env.DASHBOARD_ASSISTANT_OWNER_ID ?? '').trim();
+  if (!expectedId || !expectedOwner) return false;
+  return String(workflowId) === expectedId && ownerId === expectedOwner;
+}
+
+/**
+ * Production dashboard assistant is embedded in `/dashboard/control/assistant`.
+ * It posts to the chat webhook and does not publish a hosted chat page.
+ */
+export function dashboardAssistantEmbeddedChat(
+  mode: 'test' | 'production',
+  assistantChat: boolean,
+  chatMode: string | undefined,
+): boolean {
+  if (mode === 'production' && assistantChat) return true;
+  return String(chatMode ?? 'hostedChat') === 'webhook';
+}
+
 /** The published dashboard assistant, identified like the support chat. */
 export function isDashboardAssistantChat(
   env: DashboardAssistantEnv,
