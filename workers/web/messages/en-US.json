@@ -1365,7 +1365,7 @@
     "account_gate": "You have asked quite a few questions as a guest. Open a free account to keep exploring workflows, Credits, and plans.",
     "fallback_email_note": "Email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn) if you still need a person.",
     "type_message": "Type your message...",
-    "secret_notice": "Don't send a password, one-time code, or card number.",
+    "secret_notice": "A reply may take a few minutes.",
     "reply_eta": "A reply will be ready in {seconds} seconds.",
     "captcha_hint": "Complete the security check to send a message.",
     "cta": {
@@ -1432,7 +1432,7 @@
       "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Hello — I can help with **workflows**, **Credits**, and **plans**.\n\nDon't send a password, one-time code, or card number. What are you trying to ship?",
+      "welcome": "Hello. I can help with questions about **workflows**, **Credits**, and **plans**. What would you like help with?",
       "recommend": "Start in **Dashboard > Workflows**:\n\n- Add a trigger (chat, webhook, or cron)\n- Add an agent node, plus RAG or tools if you need them\n- Run once and read the Credit estimate\n\nNeed a specific job — support, RAG Q&A, or HTTP automation?",
       "credits": "**Credits** are the only meter for AI and agent usage.\n\n- Included Credits come with your plan and expire each UTC month\n- Starter, Pro, and Business can buy more (a wallet cap applies)\n- Buying Credits does not upgrade your plan",
       "upgrade": "Change plans on [packages](/packages). PayPal subscriptions auto-renew on Visa, Mastercard, or a PayPal wallet.\n\nCancel at **Dashboard > Billing > Cancel plan**. You keep the plan until the period you already paid for ends.\n\nWant an organization plan? Use Contact.",

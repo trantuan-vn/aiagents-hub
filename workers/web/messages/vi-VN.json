@@ -1365,7 +1365,7 @@
     "account_gate": "Bạn đã hỏi khá nhiều với tư cách khách. Mở tài khoản miễn phí để tiếp tục trải nghiệm workflow, Credit và các gói.",
     "fallback_email_note": "Cần người hỗ trợ thì email [support@aiagents-hub.vn](mailto:support@aiagents-hub.vn).",
     "type_message": "Nhập tin nhắn của bạn...",
-    "secret_notice": "Đừng gửi mật khẩu, mã OTP hoặc số thẻ.",
+    "secret_notice": "Câu trả lời có thể mất vài phút.",
     "reply_eta": "Câu trả lời sẽ có trong {seconds} giây nữa.",
     "captcha_hint": "Hoàn tất kiểm tra bảo mật để gửi tin nhắn.",
     "cta": {
@@ -1432,7 +1432,7 @@
       "developer_blog": "Blog"
     },
     "ai_responses": {
-      "welcome": "Xin chào — tôi giúp về **workflow**, **Credit** và **gói**.\n\nĐừng gửi mật khẩu, mã OTP hoặc số thẻ. Bạn đang muốn đưa gì vào việc?",
+      "welcome": "Xin chào. Tôi hỗ trợ các câu hỏi về **workflow**, **Credit** và **gói**. Bạn cần hỗ trợ nội dung nào?",
       "recommend": "Bắt đầu ở **Dashboard > Workflows**:\n\n- Thêm trigger (chat, webhook hoặc cron)\n- Thêm node agent, và RAG hoặc tool nếu cần\n- Chạy một lần và xem ước lượng Credit\n\nBạn đang làm việc cụ thể nào — hỗ trợ, RAG Q&A, hay tự động HTTP?",
       "credits": "**Credit** là đồng hồ duy nhất cho mức dùng AI và agent.\n\n- Credit tặng theo gói và hết hạn mỗi tháng UTC\n- Starter, Pro và Business mua thêm được (có trần ví)\n- Nạp Credit không nâng gói",
       "upgrade": "Đổi gói tại [các gói](/packages). PayPal tự gia hạn bằng Visa, Mastercard hoặc ví PayPal.\n\nHủy tại **Dashboard > Thanh toán > Hủy gói**. Bạn giữ gói đến hết kỳ đã trả.\n\nMuốn gói tổ chức? Dùng Liên hệ.",
