@@ -11,7 +11,7 @@ const GetReferralCommissionsInputSchema = z.object({
 
 export function getReferralCommissionsTool(c: any, bindingName: string, user: any) {
   return tool({
-    description: 'Lay danh sach hoa hong referral theo bo loc thoi gian va phan trang.',
+    description: 'Lich su hoa hong tien cu (da ngung). Referral moi tra 150 CR khi mo tai khoan, khong tra tien.',
     inputSchema: GetReferralCommissionsInputSchema,
     async *execute(input: z.infer<typeof GetReferralCommissionsInputSchema>) {
       yield { state: 'loading' as const };

@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import Link from "next/link";
-
-import { Copy, ExternalLink, Gift } from "lucide-react";
+import { Copy, Gift } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
@@ -72,13 +70,9 @@ export function ReferralCard() {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="default" size="sm" asChild>
-                <Link href="/dashboard/monitor/commissions">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  {t("manage_commission")}
-                </Link>
-              </Button>
+            <div className="bg-primary/5 rounded-lg p-3">
+              <p className="text-muted-foreground text-xs">{t("reward_hint")}</p>
+              <p className="text-primary text-2xl font-bold">{t("reward")}</p>
             </div>
           </>
         )}

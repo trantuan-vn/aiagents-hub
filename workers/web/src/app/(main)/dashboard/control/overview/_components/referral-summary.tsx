@@ -4,12 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import { Copy, Gift, TrendingUp } from "lucide-react";
+import { Copy, Gift } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { formatUsd } from "@/lib/utils";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "https://api.aiagents-hub.vn";
 
@@ -22,43 +21,25 @@ interface ReferralData {
   referralCode?: string;
 }
 
-interface CommissionStats {
-  totalAmount?: number;
-  byDay?: { date: string; total: number }[];
-}
-
 export function ReferralSummary({ t }: ReferralSummaryProps) {
   const { toast } = useToast();
   const [referral, setReferral] = useState<ReferralData | null>(null);
-  const [stats, setStats] = useState<CommissionStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const [linkRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/dashboard/referral/link`, {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        }),
-        fetch(`${API_BASE_URL}/dashboard/referral/commissions/stats?period=30`, {
-          method: "GET",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        }),
-      ]);
+      const linkRes = await fetch(`${API_BASE_URL}/dashboard/referral/link`, {
+        method: "GET",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
 
       if (linkRes.ok) {
         const linkData: ReferralData = await linkRes.json();
         setReferral(linkData);
       }
-      if (statsRes.ok) {
-        const statsData: CommissionStats = await statsRes.json();
-        setStats(statsData);
-      }
     } catch {
       setReferral(null);
-      setStats(null);
     } finally {
       setIsLoading(false);
     }
@@ -89,7 +70,6 @@ export function ReferralSummary({ t }: ReferralSummaryProps) {
     );
   }
 
-  const totalCommission = stats?.totalAmount ?? 0;
   const hasReferral = Boolean(referral?.referralLink);
 
   return (
@@ -104,24 +84,14 @@ export function ReferralSummary({ t }: ReferralSummaryProps) {
       <CardContent className="space-y-4">
         {hasReferral ? (
           <>
-            {totalCommission > 0 && (
-              <div className="bg-primary/5 rounded-lg p-3">
-                <p className="text-muted-foreground text-xs">{t("referral.earned")}</p>
-                <p className="text-primary text-2xl font-bold">{formatUsd(totalCommission)}</p>
-              </div>
-            )}
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleCopy} className="flex-1 gap-1.5">
-                <Copy className="h-4 w-4" />
-                {t("referral.copy_link")}
-              </Button>
-              <Button size="sm" asChild>
-                <Link href="/dashboard/monitor/commissions" className="gap-1.5">
-                  <TrendingUp className="h-4 w-4" />
-                  {t("referral.manage")}
-                </Link>
-              </Button>
+            <div className="bg-primary/5 rounded-lg p-3">
+              <p className="text-muted-foreground text-xs">{t("referral.reward_hint")}</p>
+              <p className="text-primary text-2xl font-bold">{t("referral.reward")}</p>
             </div>
+            <Button variant="outline" size="sm" onClick={handleCopy} className="w-full gap-1.5">
+              <Copy className="h-4 w-4" />
+              {t("referral.copy_link")}
+            </Button>
           </>
         ) : (
           <Button variant="outline" size="sm" asChild className="w-full">

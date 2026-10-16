@@ -9,7 +9,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'https://aiagents-hub.vn';
 
 export function getReferralLinkTool(c: any, bindingName: string, user: any) {
   return tool({
-    description: 'Lay referral link va referral code cua user dang dang nhap.',
+    description: 'Lay referral link va referral code. Nguoi gioi thieu nhan 150 CR khi user duoc moi mo tai khoan moi thanh cong. Khong nhan tien.',
     inputSchema: z.object({}),
     async *execute() {
       yield { state: 'loading' as const };
@@ -42,7 +42,12 @@ export function getReferralLinkTool(c: any, bindingName: string, user: any) {
         yield {
           state: 'ready' as const,
           ok: true,
-          body: { referralLink, referralCode },
+          body: {
+            referralLink,
+            referralCode,
+            rewardCredits: 150,
+            reward: '150 CR when the referred user opens a new account. No cash.',
+          },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to get referral link';

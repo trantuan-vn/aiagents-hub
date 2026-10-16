@@ -189,6 +189,15 @@ export const UserSchema = BaseUserSchema.extend({
   referrerId: z.string().optional(),
   /** Unique referral code for this user's referral link (e.g. ABC12XYZ) */
   referralCode: z.string().min(6).max(32).optional(),
+  /** True until the referrer has been granted signup credits for this new account. */
+  referralRewardPending: z.preprocess((val) => {
+    if (val == null || val === '') return undefined;
+    if (val === 1 || val === '1' || val === 'true' || val === true) return true;
+    if (val === 0 || val === '0' || val === 'false' || val === false) return false;
+    return val;
+  }, z.boolean().optional()),
+  /** JSON array of referred identifiers already paid the signup credit reward. */
+  referralRewardKeys: z.string().max(100_000).optional(),
   /** Subscription plan. Paid plans require paypal or admin source. */
   planId: z.preprocess((v) => {
     if (v == null || v === '') return undefined;

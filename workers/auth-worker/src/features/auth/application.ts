@@ -45,6 +45,7 @@ import { createVersionApplicationService } from '../admin/version/application';
 import { getAuthExpiryFromConfig } from '../admin/system-config/get-auth-expiry';
 import { createWebsocketApplicationService } from '../ws/application';
 import { generateReferralCode, resolveReferrerByCode, storeReferralCode } from '../member/referral/utils';
+import { grantReferralSignupCredits, isReferralRewardPending } from '../member/referral/signup-reward';
 import {
   bindPasskeyDeviceId,
   decideNewSessionEmail,
@@ -255,6 +256,26 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     return { sessionId };
   };
 
+  const settleReferralReward = async (repository: any, user: any): Promise<any> => {
+    if (!isReferralRewardPending(user)) return user;
+    const referredIdentifier = validationUtils.normalizeIdentifier(String(user.identifier ?? ''));
+    const referrerId = String(user.referrerId ?? '');
+    if (!referrerId || referrerId === referredIdentifier) {
+      return repository.users.save({ ...user, referralRewardPending: false });
+    }
+    try {
+      const granted = await grantReferralSignupCredits(c, bindingName, referrerId, referredIdentifier);
+      if (!granted) return user;
+      return await repository.users.save({ ...user, referralRewardPending: false });
+    } catch (error) {
+      log.error('user.referral_reward_failed', {
+        identifier: referredIdentifier,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return user;
+    }
+  };
+
   const getOrCreateUser = async (repository: any, identifier: string, additionalData: any = {}, refCode?: string): Promise<{ user: any; isNewUser: boolean }> => {
     const encryptSecret= await c.env.ENCRYPTION_SECRET.get();
     if (!encryptSecret) {
@@ -271,6 +292,10 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         await storeReferralCode(c.env.NONCE_KV, code, existingUser.identifier);
         existingUser.referralCode = code;
       }
+      if (isReferralRewardPending(existingUser)) {
+        const settled = await settleReferralReward(repository, existingUser);
+        return { user: settled, isNewUser: false };
+      }
       return { user: existingUser, isNewUser: false };
     }
 
@@ -284,13 +309,15 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     }
 
     const referralCode = generateReferralCode();
+    const normalizedIdentifier = validationUtils.normalizeIdentifier(identifier);
+    const safeReferrer = referrerId && referrerId !== normalizedIdentifier ? referrerId : undefined;
 
     const baseUser = {
-      identifier: validationUtils.normalizeIdentifier(identifier),
+      identifier: normalizedIdentifier,
       role: isAdminIdentifier(c.env, identifier) ? 'admin' : 'member',
       referralCode,
-      ...(referrerId && { referrerId }),
-      ...additionalData
+      ...additionalData,
+      ...(safeReferrer && { referrerId: safeReferrer, referralRewardPending: true }),
     };
 
     // Generate wallet for new users (except wallet connections)
@@ -309,16 +336,24 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
     } else if (validationUtils.isValidPhone(identifier)) {
       Object.assign(baseUser, { phone: identifier });
     }
-    const user = await repository.users.save(baseUser);
+    let user = await repository.users.save(baseUser);
 
     // Index referral code in KV for lookup
     if (c.env.NONCE_KV) {
       await storeReferralCode(c.env.NONCE_KV, referralCode, user.identifier);
     }
 
+    if (safeReferrer) {
+      user = await settleReferralReward(repository, {
+        ...user,
+        referrerId: safeReferrer,
+        referralRewardPending: true,
+      });
+    }
+
     log.info('user.created', {
       identifier: user.identifier,
-      hasReferrer: !!referrerId,
+      hasReferrer: !!safeReferrer,
       role: baseUser.role,
     });
 

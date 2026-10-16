@@ -6,7 +6,6 @@ import { getUsdVndRateFromEnv } from '../../admin/system-config/get-usd-vnd-rate
 import { createVoucherInfrastructureService } from '../../admin/voucher/infrastructure';
 import { syncUserMembershipTierOnAccess } from '../../admin/membership-tier/infrastructure';
 import type { MembershipTier } from '../../admin/membership-tier/domain';
-import { processCommissionOnOrder } from '../referral/commission-service';
 import { assertCanBuyCredits, quotaFromUser } from '../workflows/billing/plan';
 import { parsePlanOrderIntent } from '../billing/plan-order';
 import { settleOpenPlanOrdersIfPaypalActive } from '../billing/settle-subscribe-orders';
@@ -108,17 +107,6 @@ export function createOrderInfrastructureService(
           'orders',
         );
 
-        try {
-          await processCommissionOnOrder(context, bindingName, user, {
-            id: orderRecord.id,
-            orderCode,
-            finalAmount,
-            currency: 'USD',
-          });
-        } catch (e) {
-          console.warn('[Order] Commission processing failed:', e);
-        }
-
         return {
           id: orderRecord.id,
           order: mapOrderForMemberApi(orderRecord as Record<string, unknown>),
@@ -154,17 +142,6 @@ export function createOrderInfrastructureService(
         },
         'orders',
       );
-
-      try {
-        await processCommissionOnOrder(context, bindingName, user, {
-          id: orderRecord.id,
-          orderCode,
-          finalAmount,
-          currency: 'USD',
-        });
-      } catch (e) {
-        console.warn('[Order] Commission processing failed:', e);
-      }
 
       return {
         id: orderRecord.id,

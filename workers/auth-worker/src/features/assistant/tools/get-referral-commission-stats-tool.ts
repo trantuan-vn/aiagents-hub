@@ -9,7 +9,7 @@ const GetReferralCommissionStatsInputSchema = z.object({
 
 export function getReferralCommissionStatsTool(c: any, bindingName: string, user: any) {
   return tool({
-    description: 'Lay thong ke hoa hong referral theo ngay trong khoang 7-90 ngay.',
+    description: 'Thong ke hoa hong tien cu (da ngung). Referral moi tra 150 CR khi mo tai khoan, khong tra tien.',
     inputSchema: GetReferralCommissionStatsInputSchema,
     async *execute(input: z.infer<typeof GetReferralCommissionStatsInputSchema>) {
       yield { state: 'loading' as const };
