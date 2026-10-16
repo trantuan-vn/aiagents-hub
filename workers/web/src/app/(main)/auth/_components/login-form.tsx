@@ -733,21 +733,22 @@ export function LoginForm() {
           body: JSON.stringify(body),
           credentials: "include",
         });
+        const resBody = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          retryAfter?: number;
+          requiresCaptcha?: boolean;
+          siteKey?: string | null;
+          reused?: boolean;
+        };
         if (!res.ok) {
-          const errBody = (await res.json().catch(() => ({}))) as {
-            error?: string;
-            retryAfter?: number;
-            requiresCaptcha?: boolean;
-            siteKey?: string | null;
-          };
-          captcha.applyCaptchaError(errBody);
-          throw new Error(formatAuthApiErrorMessage(errBody, t("otp_send_error"), t, res.status));
+          captcha.applyCaptchaError(resBody);
+          throw new Error(formatAuthApiErrorMessage(resBody, t("otp_send_error"), t, res.status));
         }
         await captcha.onRequestSuccess();
         if (isMounted.current) {
           setIdentifier(data.email.trim());
           setShowOtpPopup(true);
-          toast.success(t("otp_sent_success"));
+          toast.success(resBody.reused ? t("otp_still_valid") : t("otp_sent_success"));
         }
       } catch (error) {
         if (isMounted.current) {

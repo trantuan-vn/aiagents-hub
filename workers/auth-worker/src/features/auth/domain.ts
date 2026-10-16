@@ -284,6 +284,9 @@ export interface ISessionRepository {
 // VIII. Service Interfaces
 export interface IOTPService {
   generateOTP(sessionId: string, identifier: string): Promise<string>;
+  /** True when this session already has an unexpired login OTP for the identifier. */
+  hasActiveLoginOtp(sessionId: string, identifier: string): Promise<boolean>;
+  clearLoginOtp(sessionId: string): Promise<void>;
   verifyOTP(otp: string, sessionId: string, identifier: string): Promise<boolean>;
   sendEmailOTP(email: string, otp: string, language?: 'vi' | 'en'): Promise<void>;
   sendSmsOTP(phone: string, otp: string, expirySeconds?: number): Promise<void>;

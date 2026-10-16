@@ -63,6 +63,7 @@ export function StrongAuthReverify() {
         requiresCaptcha?: boolean;
         siteKey?: string | null;
         error?: string;
+        reused?: boolean;
       };
 
       if (!res.ok) {
@@ -79,7 +80,11 @@ export function StrongAuthReverify() {
       }
 
       await captcha.onRequestSuccess();
-      toast({ title: "Verification code sent" });
+      toast({
+        title: data.reused
+          ? "The previous code is still valid. Use the code already in your email."
+          : "Verification code sent. It is valid for 3 minutes.",
+      });
       setOtpSent(true);
       setCode("");
     } catch (e) {

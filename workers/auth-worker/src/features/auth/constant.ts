@@ -35,8 +35,8 @@ export const AUTH_CONSTANTS = {
   ACCESS_TOKEN_EXPIRY: 15 * 60, // 15 minutes
   REFRESH_TOKEN_EXPIRY: 4 * 60 * 60, // 4 hours
   SESSION_EXPIRY: 4 * 60 * 60, // 4 hours
-  /** OTP email/SMS — short-lived */
-  OTP_EXPIRY: 60,
+  /** OTP email/SMS login code lifetime. Resend reuses this code until it expires. */
+  OTP_EXPIRY: 3 * 60,
   OTP_VERIFY_MAX_ATTEMPTS: 5,
   /** SMS OTP for /step-up when method is sms */
   STEP_UP_SMS_OTP_TTL_SEC: 300,

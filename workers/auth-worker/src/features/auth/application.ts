@@ -91,7 +91,7 @@ interface IApplicationService {
     language?: 'vi' | 'en',
     turnstileToken?: string,
     captchaScope?: HumanChallengeScope,
-  ): Promise<void>;
+  ): Promise<{ reused: boolean }>;
   verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }>;
   verifyTotpLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
   verifySmsLoginUseCase(sessionId: string, code: string, ipAddress: string, userAgent: string, country?: string, deviceId?: string): Promise<{ sessionId: string }>;
@@ -426,7 +426,13 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
       language?: 'vi' | 'en',
       turnstileToken?: string,
       captchaScope: HumanChallengeScope = 'preauth',
-    ): Promise<void> {
+    ): Promise<{ reused: boolean }> {
+      const nIdentifier = validationUtils.normalizeIdentifier(identifier);
+      const otpService = createOTPService(c.env);
+      if (await otpService.hasActiveLoginOtp(sessionId, nIdentifier)) {
+        return { reused: true };
+      }
+
       const hourlyCount = await getOtpRequestCountThisHour(c.env, identifier);
       await assertHumanChallenge(c.env, {
         scope: captchaScope,
@@ -443,19 +449,23 @@ export function createApplicationService(c: Context, bindingName: string): IAppl
         throw new OtpRateLimitError(allowed.retryAfter);
       }
 
-      const nIdentifier = validationUtils.normalizeIdentifier(identifier);
-      const otpService = createOTPService(c.env);
       const otp = await otpService.generateOTP(sessionId, nIdentifier);
 
-      if (validationUtils.isValidEmail(nIdentifier)) {
-        await otpService.sendEmailOTP(nIdentifier, otp, language);
-      } else if (validationUtils.isValidPhone(nIdentifier)) {
-        await otpService.sendSmsOTP(nIdentifier, otp);
-      } else {
-        throw new Error('Invalid identifier');
+      try {
+        if (validationUtils.isValidEmail(nIdentifier)) {
+          await otpService.sendEmailOTP(nIdentifier, otp, language);
+        } else if (validationUtils.isValidPhone(nIdentifier)) {
+          await otpService.sendSmsOTP(nIdentifier, otp);
+        } else {
+          throw new Error('Invalid identifier');
+        }
+      } catch (error) {
+        await otpService.clearLoginOtp(sessionId);
+        throw error;
       }
 
       await recordOtpRequest(c.env, ipAddress, identifier);
+      return { reused: false };
     },
 
     async verifyOtpUseCase(identifier: string, sessionId: string, otp: string, ipAddress: string, userAgent: string, country?: string, ref?: string, deviceId?: string): Promise<{ sessionId: string } | { requiresTotp: true } | { requiresSms: true }> {

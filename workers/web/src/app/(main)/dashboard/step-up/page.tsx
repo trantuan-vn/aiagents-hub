@@ -143,6 +143,7 @@ export default function StepUpPage() {
           requiresCaptcha?: boolean;
           siteKey?: string | null;
           error?: string;
+          reused?: boolean;
         };
         if (!res.ok || !data.requiredMethod) {
           captcha.applyCaptchaError(data);
@@ -161,7 +162,7 @@ export default function StepUpPage() {
         setFacebookAuthUrl(data.authUrl ?? null);
         setCode("");
         if (data.requiredMethod === "otp_email") {
-          toast({ title: t("email_otp_sent") });
+          toast({ title: data.reused ? t("email_otp_still_valid") : t("email_otp_sent") });
           await captcha.onRequestSuccess();
         } else if (data.requiredMethod === "sms") {
           toast({ title: t("sms_otp_sent") });

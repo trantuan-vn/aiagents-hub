@@ -424,7 +424,7 @@ export function createAuthRoutes(bindingName: string) {
     }
 
     const applicationService = createApplicationService(c, bindingName);
-    await applicationService.getRequestOtpUseCase(
+    const { reused } = await applicationService.getRequestOtpUseCase(
       identifier,
       sessionId,
       ipAddress,
@@ -433,7 +433,7 @@ export function createAuthRoutes(bindingName: string) {
       'preauth',
     );
 
-    return c.json({ ok: true });
+    return c.json({ ok: true, reused });
   }, "OTP request failed", true));
 
   app.post('/otp/verify', createRouteHandler(async (c: any, sessionId: string, ipAddress: string, userAgent: string, country?: string) => {
@@ -570,7 +570,7 @@ export function createAuthRoutes(bindingName: string) {
             throw new Error('OTP verification is unavailable for this account');
           }
           const appService = createApplicationService(c, bindingName);
-          await appService.getRequestOtpUseCase(
+          const { reused } = await appService.getRequestOtpUseCase(
             otpIdentifier,
             sessionId,
             getClientIp(c),
@@ -578,6 +578,7 @@ export function createAuthRoutes(bindingName: string) {
             typeof body.turnstileToken === 'string' ? body.turnstileToken : undefined,
             'session',
           );
+          return c.json({ availableMethods, requiredMethod: requestedMethod, ok: true, reused });
         }
 
         if (requestedMethod === 'wallet_reauth') {

@@ -198,9 +198,14 @@ export function createOTPService(env: Env): IOTPService {
       throw new Error("BREVO_API_KEY is not defined in environment variables");
     }
 
-    // Tiếng Việt: templateId=1, Tiếng Anh: templateId=2
+    // Tiếng Việt: templateId=1, Tiếng Anh: templateId=2.
+    // Template phải hiện {{ params.expiry }} (ví dụ "3 phút"), không hardcode thời hạn.
     const templateId = language === 'en' ? 2 : 1;
     const actionText = language === 'en' ? 'API login' : 'đăng nhập API';
+    const expiryMinutes = Math.max(1, Math.round(AUTH_CONSTANTS.OTP_EXPIRY / 60));
+    const expiryText = language === 'en'
+      ? `${expiryMinutes} minute${expiryMinutes === 1 ? '' : 's'}`
+      : `${expiryMinutes} phút`;
 
     const emailData = {
       templateId,
@@ -208,6 +213,7 @@ export function createOTPService(env: Env): IOTPService {
       params: {
         OTP: otp,
         action: actionText,
+        expiry: expiryText,
       },
     };
 
@@ -372,6 +378,23 @@ export function createOTPService(env: Env): IOTPService {
         { expirationTtl: AUTH_CONSTANTS.OTP_EXPIRY },
       );
       return otp;
+    },
+
+    async clearLoginOtp(sessionId: string): Promise<void> {
+      await env.NONCE_KV.delete(otpNonceKey(sessionId));
+    },
+
+    async hasActiveLoginOtp(sessionId: string, identifier: string): Promise<boolean> {
+      const normalizedId = validationUtils.normalizeIdentifier(identifier);
+      const raw = await env.NONCE_KV.get(otpNonceKey(sessionId));
+      if (!raw) return false;
+      try {
+        const data = JSON.parse(raw) as PendingLoginOtpRecord;
+        if (data.identifier !== normalizedId) return false;
+        return Boolean(data.otpHash || data.nonce);
+      } catch {
+        return false;
+      }
     },
 
     async verifyOTP(otp: string, sessionId: string, identifier: string): Promise<boolean> {
